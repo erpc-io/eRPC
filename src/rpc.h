@@ -1,5 +1,5 @@
-#ifndef ERPC_RPC_H_H
-#define ERPC_RPC_H_H
+#ifndef ERPC_RPC_H
+#define ERPC_RPC_H
 
 #include "transport.h"
 
@@ -18,4 +18,4 @@ public:
 
 } // End ERpc
 
-#endif //ERPC_RPC_H_H
+#endif //ERPC_RPC_H
