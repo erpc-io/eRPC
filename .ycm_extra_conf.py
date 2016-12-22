@@ -15,7 +15,11 @@ flags = [
     '-std=c++11',
     '-x', 'c++',
     '-isystem', '/usr/local/include',
-    '-I', 'src'
+    '-isystem', '/usr/include',
+    '-I', '/usr/local/include',
+    '-I', '/usr/include',
+    '-I', '/home/akalia/eRPC/src',
+    '-I', '/home/anuj/eRPC/src'
 ]
 
 # Set this to the absolute path to the folder (NOT the file!) containing the

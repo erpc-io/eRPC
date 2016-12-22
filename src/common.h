@@ -3,5 +3,7 @@
 
 // Header file that is included everywhere
 #include <stdio.h>
+#include <stdint.h>
+#include <string>
 
 #endif
