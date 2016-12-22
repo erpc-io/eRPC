@@ -16,7 +16,10 @@ public:
 
   ~InfinibandTransport();
 
-  void resolve_session(Session &session) { return; }
+  void resolve_session(Session &session) {
+    _unused(session);
+    return;
+  }
 
   void send_message(Session *session) {
     int rem_qpn = session->rem_qpn;

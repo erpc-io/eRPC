@@ -12,7 +12,6 @@ public:
 
   void foo() {
     ERpc::Transport transport;
-    transport.send_message();
   }
 };
 

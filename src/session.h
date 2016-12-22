@@ -2,17 +2,17 @@
 #define ERPC_SESSION_H
 
 #include "common.h"
+#include "transport.h"
 
 namespace ERpc {
 
 // A one-to-one session class for all transports
 class Session {
 public:
-  /**
-   * @brief Construct a session object for a remote port
-   */
-  Session(std::string remote_port_name) : remote_port_name(remote_port_name) {
-    is_cc = false;
+  Session(const char* transport_type,
+      const char* hostname, int rem_port_index) {
+
+
   }
 
   ~Session() {}
@@ -27,11 +27,13 @@ public:
    */
   void disable_congestion_control() { is_cc = false; }
 
-  // Name of the remote port that this session is connected to
-  std::string remote_port_name;
+  // The information required to resolve the remote port
+  std::string transport_type;
+  std::string hostname;
+  int rem_port_index; // 0-based index in the device list of the remote port
 
-  // Is congestion control enabled for this session?
-  bool is_cc;
+
+  bool is_cc; // Is congestion control enabled for this session?
 
   // InfiniBand UD. XXX: Can we reuse these fields?
   struct ibv_ah *rem_ah;

@@ -19,7 +19,8 @@ flags = [
     '-I', '/usr/local/include',
     '-I', '/usr/include',
     '-I', '/home/akalia/eRPC/src',
-    '-I', '/home/anuj/eRPC/src'
+    '-I', '/home/anuj/eRPC/src',
+    '-I.'
 ]
 
 # Set this to the absolute path to the folder (NOT the file!) containing the
