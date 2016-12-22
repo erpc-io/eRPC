@@ -18,4 +18,4 @@ public:
 
 } // End ERpc
 
-#endif //ERPC_RPC_H
+#endif // ERPC_RPC_H

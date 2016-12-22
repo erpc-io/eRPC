@@ -18,6 +18,11 @@ public:
   Transport();
   ~Transport();
 
+  /**
+   * @brief Fill in the transport-related fields of \p session based on
+   * its remote_port_name.
+   */
+  virtual void resolve_session(Session &session);
   virtual void send_message(Session *session);
   virtual void poll_completions();
 
@@ -26,4 +31,4 @@ public:
 
 } // End ERpc
 
-#endif //ERPC_TRANSPORT_H
+#endif // ERPC_TRANSPORT_H
