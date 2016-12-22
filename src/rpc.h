@@ -10,9 +10,7 @@ public:
   Rpc();
   ~Rpc();
 
-  void foo() {
-    ERpc::Transport transport;
-  }
+  void foo() { ERpc::Transport transport; }
 };
 
 } // End ERpc

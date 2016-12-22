@@ -3,28 +3,9 @@
 
 #include "common.h"
 #include "session.h"
-#include <strings.h>
+#include "transport_types.h"
 
 namespace ERpc {
-
-enum TransportType {
-  InfiniBand,
-  RoCE,
-  OmniPath,
-  Invalid
-};
-
-TransportType get_type(const char* transport_type) {
-  if (strcasecmp(transport_type, "InfiniBand")) {
-    return TransportType::InfiniBand;
-  } else if (strcasecmp(transport_type, "RoCE")) {
-    return TransportType::RoCE;
-  } else if (strcasecmp(transport_type, "OmniPath")) {
-    return TransportType::OmniPath;
-  } else {
-    return TransportType::Invalid;
-  }
-}
 
 // Generic transport class
 class Transport {
@@ -33,11 +14,12 @@ public:
   ~Transport();
 
   /**
-   * @brief Fill in the transport-related fields of \p session based on
-   * its remote_port_name.
+   * @brief Resolve the transport-specific fields of \p session by talking
+   * to the remote host.
    */
   virtual void resolve_session(Session &session);
-  virtual void send_message(Session *session);
+
+  virtual void send_message(Session &session);
   virtual void poll_completions();
 
   TransportType type;

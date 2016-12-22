@@ -21,7 +21,7 @@ public:
     return;
   }
 
-  void send_message(Session *session) {
+  void send_message(Session &session) {
     int rem_qpn = session->rem_qpn;
     struct ibv_ah *rem_ah = session->rem_ah;
 
