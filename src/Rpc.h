@@ -1,7 +1,7 @@
 #ifndef ERPC_RPC_H
 #define ERPC_RPC_H
 
-#include "transport.h"
+#include "Transport.h"
 
 namespace ERpc {
 
@@ -10,7 +10,9 @@ public:
   Rpc();
   ~Rpc();
 
-  void foo() { ERpc::Transport transport; }
+  void Foo() {
+    Transport transport;
+  }
 };
 
 } // End ERpc

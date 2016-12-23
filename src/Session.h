@@ -3,24 +3,24 @@
 
 #include <string>
 
-#include "common.h"
-#include "transport_types.h"
+#include "Common.h"
+#include "TransportTypes.h"
 
 namespace ERpc {
 
 // A one-to-one session class for all transports
 class Session {
 public:
-  Session(const char *transport_type_cstr, const char *hostname_cstr,
+  Session(const char *transportTypeCStr, const char *hostnameCStr,
           int rem_port_index)
       : rem_port_index(rem_port_index) {
 
-    transport_type = get_transport_type(transport_type_cstr);
+    transport_type = getTransportType(transportTypeCStr);
     if (transport_type == TransportType::Invalid) {
-      fprintf(stderr, "ERpc: Invalid transport type %s\n", transport_type_cstr);
+      fprintf(stderr, "ERpc: Invalid transport type %s\n", transportTypeCStr);
     }
 
-    hostname = std::string(hostname_cstr);
+    hostname = std::string(hostnameCStr);
   }
 
   ~Session() {}
