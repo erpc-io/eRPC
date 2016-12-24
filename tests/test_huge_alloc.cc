@@ -34,7 +34,7 @@ TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
 }
 
 /**
- * @brief Try to allocate most hugepages as variable-length 2MB-aligned chunks.
+ * @brief Try to allocate all memory as variable-length 2MB-aligned chunks.
  * When allocation finally fails, print out the memory efficiency.
  */
 TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
@@ -48,14 +48,16 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
     void *buf = allocator->alloc_huge(num_hugepages * ERpc::kHugepageSize);
 
     if (buf == NULL) {
-      test_printf("Fraction of system memory consumed by allocator before "
+      EXPECT_EQ(allocator->get_allocated_memory(), app_memory);
+
+      test_printf("Fraction of system memory reserved by allocator at "
                   "failure = %.2f\n",
-                  (double)allocator->get_total_memory() /
+                  (double)allocator->get_reserved_memory() /
                       (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
 
-      test_printf("Fraction of memory used by allocator actually given to "
-                  "application = %.2f\n",
-                  ((double)app_memory / allocator->get_total_memory()));
+      test_printf("Fraction of memory reserved allocated to user = %.2f\n",
+                  ((double)allocator->get_allocated_memory() /
+                   allocator->get_reserved_memory()));
       break;
     } else {
       app_memory += (num_hugepages * ERpc::kHugepageSize);
@@ -66,8 +68,9 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
 }
 
 /**
- * @brief Try to allocate most hugepages as variable-length 2MB-aligned chunks.
- * When allocation finally fails, print out the memory efficiency.
+ * @brief Try to allocate all memory as a mixture of variable-length 2MB-aligned
+ * chunks and 4K pages.When allocation finally fails, print out the memory
+ * efficiency.
  */
 TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
   ERpc::HugeAllocator *allocator;
@@ -91,14 +94,15 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
     }
 
     if (buf == NULL) {
-      test_printf("Fraction of system memory consumed by allocator before "
+      EXPECT_EQ(app_memory, allocator->get_allocated_memory());
+      test_printf("Fraction of system memory reserved by allocator at "
                   "failure = %.2f\n",
-                  (double)allocator->get_total_memory() /
+                  (double)allocator->get_reserved_memory() /
                       (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
 
-      test_printf("Fraction of memory used by allocator actually given to "
-                  "application = %.2f\n",
-                  ((double)app_memory / allocator->get_total_memory()));
+      test_printf("Fraction of memory reserved allocated to user = %.2f\n",
+                  ((double)allocator->get_allocated_memory() /
+                   allocator->get_reserved_memory()));
       break;
     } else {
       app_memory += new_app_memory;

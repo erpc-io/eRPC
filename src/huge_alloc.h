@@ -26,14 +26,14 @@ class HugeAllocator {
 private:
   static const size_t kMaxAllocSize = (256 * 1024 * 1024 * 1024ull);
 
-  /* Information about an SHM region required to deallocate it */
+  /* Information about an SHM region. */
   struct shm_region_t {
     int key;        /* The key used to create the SHM region */
     void *base_buf; /* The start address of the allocated SHM buffer */
     size_t size;    /* The size in bytes of the allocated buffer */
 
     void *cur_buf;         /* Pointer to the currently free hugepage */
-    size_t free_hugepages; /* The number of hugepages left */
+    size_t free_hugepages; /* The number of hugepages left in this region */
 
     shm_region_t(int key, void *buf, size_t size)
         : key(key), base_buf(buf), size(size), cur_buf(buf) {
@@ -50,12 +50,15 @@ private:
 
   size_t tot_free_hugepages; /* Number of free hugepages over all SHM regions */
   size_t prev_allocation_size; /* The size of the previous SHM allocation */
-  size_t tot_memory_allocated;
+
+  size_t tot_memory_reserved;  /* Total hugepage memory reserved by allocator */
+  size_t tot_memory_allocated; /* Total memory allocated to users */
 
 public:
   HugeAllocator(size_t initial_size, size_t numa_node)
       : numa_node(numa_node), tot_free_hugepages(0),
-        prev_allocation_size(initial_size), tot_memory_allocated(0) {
+        prev_allocation_size(initial_size), tot_memory_reserved(0),
+        tot_memory_allocated(0) {
     assert(initial_size > 0 && initial_size <= kMaxAllocSize);
     assert(numa_node <= kMaxNumaNodes);
 
@@ -80,6 +83,8 @@ public:
     if (page_freelist.size() != 0) {
       void *free_page = page_freelist.back();
       page_freelist.pop_back();
+
+      tot_memory_allocated += kPageSize;
       return free_page;
     } else {
       /* There is no free 4K page. */
@@ -93,6 +98,7 @@ public:
       }
 
       /*
+       * If we are here, there is at least one SHM region with a free hugepage.
        * Pick the smallest SHM region with a free hugepage and carve it into
        * 4K pages. Note that multiple SHM regions can have free hugepages.
        */
@@ -109,6 +115,8 @@ public:
           assert(page_freelist.size() > 0);
           void *free_page = page_freelist.back();
           page_freelist.pop_back();
+
+          tot_memory_allocated += kPageSize;
           return free_page;
         }
       }
@@ -121,6 +129,8 @@ public:
   forceinline void free_page(void *page) {
     assert((uintptr_t)page % KB(4) == 0);
     page_freelist.push_back(page);
+
+    tot_memory_allocated -= kPageSize;
   }
 
   inline void *alloc_huge(size_t size) {
@@ -133,6 +143,8 @@ public:
       if (shm_region.free_hugepages >= reqd_hugepages) {
         void *hugebuf_addr = shm_region.cur_buf; /* Copy before popping */
         pop_hugepages(shm_region, reqd_hugepages);
+
+        tot_memory_allocated += size;
         return hugebuf_addr;
       }
     }
@@ -156,10 +168,12 @@ public:
 
     pop_hugepages(shm_region, reqd_hugepages);
 
+    tot_memory_allocated += size;
     return hugebuf_addr;
   }
 
-  size_t get_total_memory() { return tot_memory_allocated; }
+  size_t get_reserved_memory() { return tot_memory_reserved; }
+  size_t get_allocated_memory() { return tot_memory_allocated; }
 
 private:
   /**
@@ -253,7 +267,7 @@ private:
 
     shm_list.push_back(shm_region_t(shm_key, shm_buf, size));
     tot_free_hugepages += (size / kHugepageSize);
-    tot_memory_allocated += size;
+    tot_memory_reserved += size;
 
     return true;
   }
