@@ -1,25 +1,48 @@
 cmake_minimum_required(VERSION 3.5)
 project(eRPC)
 
-SET(CMAKE_CXX_COMPILER g++-5)
-SET(CMAKE_C_LINK_EXECUTABLE g++-5)
+set(CMAKE_CXX_COMPILER g++-5)
+set(CMAKE_C_LINK_EXECUTABLE g++-5)
 
-INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src)
-SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
-SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
-SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
+add_definitions(-std=c++11)
 
-OPTION(DEBUG "Enable debugging" OFF)
-IF(DEBUG)
+add_definitions(-Wall -Wextra)
+add_definitions(-Wsign-conversion)
+add_definitions(-Wconversion)
+add_definitions(-Winline)
+
+add_definitions(-march=native)
+add_definitions(-pthread)
+
+add_definitions(-g)
+
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs)
+
+include_directories(${CMAKE_SOURCE_DIR}/src)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
+
+option(DEBUG "Enable debugging" OFF)
+if(DEBUG)
   MESSAGE(WARNING "Debugging is ENABLED (to disable, run `cmake .. -DDEBUG=OFF`). Performance will be low.")
-  ADD_DEFINITIONS(-Og)
-ELSE(DEBUG)
+  add_definitions(-Og)
+else(DEBUG)
   MESSAGE(STATUS "Debugging is disabled (to enable, run `cmake .. -DDEBUG=ON`)")
-  ADD_DEFINITIONS(-DNDEBUG)
-  ADD_DEFINITIONS(-O3)
-ENDIF(DEBUG)
+  add_definitions(-DNDEBUG)
+  add_definitions(-O3)
+endif(DEBUG)
 
-set(SOURCE_FILES
-  example.cc)
+set(SOURCES
+  src/common.h
+  src/huge_alloc.h
+  src/rpc.h
+  src/session.h
+  src/transport.h
+  src/transport_impl/infiniband_transport.h
+  src/transport_types.h)
 
-add_executable(eRPC ${SOURCE_FILES})
+add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCE_FILES})
+target_link_libraries(test_huge_alloc ${LIBRARIES})
+
+

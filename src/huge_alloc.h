@@ -11,7 +11,7 @@
 #include <sys/shm.h>
 #include <vector>
 
-#include "Common.h"
+#include "common.h"
 
 namespace ERpc {
 class HugeAllocator {
@@ -56,13 +56,13 @@ public:
     prev_allocation_size = initial_size;
 
     /* Begin by allocating the specified amount of memory in hugepages */
-    ReserveHugePages(initial_size, numa_node);
+    reserve_huge_pages(initial_size, numa_node);
   }
 
   ~HugeAllocator() {
     /* Delete the created SHM regions */
     for (shm_region_t &shm_region : shm_list) {
-      DeleteSHM(shm_region.key, shm_region.base_buf);
+      delete_shm(shm_region.key, shm_region.base_buf);
     }
   }
 
@@ -77,7 +77,7 @@ public:
     } else {
       /* There is no free 4K page. */
       if (tot_free_hugepages == 0) {
-        ReserveHugePages(prev_allocation_size * 2, numa_node);
+        reserve_huge_pages(prev_allocation_size * 2, numa_node);
         prev_allocation_size *= 2;
       }
 
@@ -125,7 +125,7 @@ public:
     while (prev_allocation_size < size) {
       prev_allocation_size *= 2;
     }
-    ReserveHugePages(prev_allocation_size, numa_node);
+    reserve_huge_pages(prev_allocation_size, numa_node);
 
     /*
      * Use the last SHM region in the list to allocate. Other regions don't
@@ -138,13 +138,13 @@ public:
   }
 
 private:
-  void ReserveHugePages(size_t size, int numa_node) {
+  void reserve_huge_pages(size_t size, size_t numa_node) {
     size = RoundUp<kHugepageSize>(size);
     int shm_key, shm_id;
 
     while (true) {
       /* Choose a random SHM key */
-      shm_key = std::hash<uint64_t>()(RdTsc());
+      shm_key = static_cast<int>(std::hash<uint64_t>()(RdTsc()));
 
       /* Try to get an SHM region */
       shm_id = shmget(shm_key, size, IPC_CREAT | IPC_EXCL | 0666 | SHM_HUGETLB);
@@ -195,8 +195,8 @@ private:
     }
 
     /* Bind the buffer to the NUMA node */
-    const unsigned long nodemask = (1 << numa_node);
-    int ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
+    const unsigned long nodemask = (1ul << (unsigned long)numa_node);
+    long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
     if (ret != 0) {
       fprintf(stderr, "eRPC HugeAllocator: SHM malloc error. mbind() failed "
                       "for key %d\n",
@@ -211,7 +211,7 @@ private:
     tot_free_hugepages += (size / kHugepageSize);
   }
 
-  void DeleteSHM(int shm_key, void *shm_buf) {
+  void delete_shm(int shm_key, void *shm_buf) {
     int shmid = shmget(shm_key, 0, 0);
     if (shmid == -1) {
       switch (errno) {

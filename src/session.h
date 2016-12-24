@@ -3,8 +3,8 @@
 
 #include <string>
 
-#include "Common.h"
-#include "TransportTypes.h"
+#include "common.h"
+#include "transport_types.h"
 
 namespace ERpc {
 

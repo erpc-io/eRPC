@@ -1,9 +1,9 @@
 #ifndef ERPC_TRANSPORT_H
 #define ERPC_TRANSPORT_H
 
-#include "Common.h"
-#include "Session.h"
-#include "TransportTypes.h"
+#include "common.h"
+#include "session.h"
+#include "transport_types.h"
 
 namespace ERpc {
 

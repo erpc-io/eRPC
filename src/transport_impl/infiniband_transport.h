@@ -1,9 +1,9 @@
 #ifndef ERPC_INFINIBAND_H_H
 #define ERPC_INFINIBAND_H_H
 
-#include "Common.h"
-#include "Session.h"
-#include "Transport.h"
+#include "common.h"
+#include "session.h"
+#include "transport.h"
 
 #include <infiniband/verbs.h>
 #include <stdio.h>
