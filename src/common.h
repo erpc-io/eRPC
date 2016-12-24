@@ -14,29 +14,33 @@
 #define forceinline inline __attribute__((always_inline))
 #define _unused(x) ((void)(x)) /* Make production builds happy */
 
+#define KB(x) ((size_t)(x) << 10)
+#define KB_(x) (KB(x) - 1)
+#define MB(x) ((size_t)(x) << 20)
+#define MB_(x) (MB(x) - 1)
+
 namespace ERpc {
-  static const size_t kMaxNumaNodes = 16; /* Maximum number of NUMA nodes */
-  static const size_t kPageSize = 4096; /* Page size in bytes */
-  static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
+static const size_t kMaxNumaNodes = 16; /* Maximum number of NUMA nodes */
+static const size_t kPageSize = 4096;   /* Page size in bytes */
+static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
 
-  static uint64_t RdTsc() {
-    uint64_t rax;
-    uint64_t rdx;
-    asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
-    return (rdx << 32) | rax;
-  }
+static uint64_t RdTsc() {
+  uint64_t rax;
+  uint64_t rdx;
+  asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
+  return (rdx << 32) | rax;
+}
 
-  template <typename T>
-  static constexpr bool IsPowerOfTwo(T x) {
-    return x && ((x & T(x - 1)) == 0);
-  }
+template <typename T> static constexpr bool IsPowerOfTwo(T x) {
+  return x && ((x & T(x - 1)) == 0);
+}
 
-  template <uint64_t PowerOfTwoNumber, typename T>
-  static constexpr T RoundUp(T x) {
-    static_assert(IsPowerOfTwo(PowerOfTwoNumber),
-                  "PowerOfTwoNumber must be a power of 2");
-    return ((x) + T(PowerOfTwoNumber - 1)) & (~T(PowerOfTwoNumber - 1));
-  }
+template <uint64_t PowerOfTwoNumber, typename T>
+static constexpr T RoundUp(T x) {
+  static_assert(IsPowerOfTwo(PowerOfTwoNumber),
+                "PowerOfTwoNumber must be a power of 2");
+  return ((x) + T(PowerOfTwoNumber - 1)) & (~T(PowerOfTwoNumber - 1));
+}
 }
 
 #endif

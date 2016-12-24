@@ -8,15 +8,17 @@ add_definitions(-std=c++11)
 
 add_definitions(-Wall -Wextra)
 add_definitions(-Wsign-conversion)
-add_definitions(-Wconversion)
 add_definitions(-Winline)
 
 add_definitions(-march=native)
-add_definitions(-pthread)
 
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs)
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread)
+
+# Locate GTest
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
 
 include_directories(${CMAKE_SOURCE_DIR}/src)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
@@ -43,6 +45,4 @@ set(SOURCES
   src/transport_types.h)
 
 add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCE_FILES})
-target_link_libraries(test_huge_alloc ${LIBRARIES})
-
-
+target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
