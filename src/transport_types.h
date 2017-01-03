@@ -2,10 +2,19 @@
 #define ERPC_TRANSPORT_TYPE_H
 
 #include <strings.h>
+#include "common.h"
 
 namespace ERpc {
 
 enum TransportType { InfiniBand, RoCE, OmniPath, Invalid };
+
+/**
+ * @brief Generic class to store routing info for any transport.
+ */
+static const size_t kMaxRoutingInfoSize = 128;
+class RoutingInfo {
+  uint8_t buf[kMaxRoutingInfoSize];
+};
 
 /**
  * @brief Returns an enum representation of the transport type string

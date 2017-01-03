@@ -23,7 +23,7 @@ class Transport {
   virtual void send_message(Session &session, Buffer *buffer);
   virtual void poll_completions();
 
-  TransportType type;
+  TransportType transport_type;
 };
 
 }  // End ERpc

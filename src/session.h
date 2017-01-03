@@ -8,6 +8,19 @@
 
 namespace ERpc {
 
+class SessionEstablishmentReq {
+  TransportType transport_type;
+  int client_sn;            /* Session number at client */
+  size_t client_start_seq;  /* Starting sequence number chosen by client */
+  RoutingInfo client_route; /* Transport-specific routing info of client */
+};
+
+class SessionEstablishmentResp {
+  int server_sn;            /* Session number at server */
+  size_t server_start_seq;  /* Starting sequence number chosen by server */
+  RoutingInfo server_route; /* Transport-specific routing info of server */
+};
+
 // A one-to-one session class for all transports
 class Session {
  public:
