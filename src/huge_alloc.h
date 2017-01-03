@@ -23,7 +23,7 @@ namespace ERpc {
  * regions when it is deleted.
  */
 class HugeAllocator {
-private:
+ private:
   static const size_t kMaxAllocSize = (256 * 1024 * 1024 * 1024ull);
 
   /* Information about an SHM region. */
@@ -54,10 +54,12 @@ private:
   size_t tot_memory_reserved;  /* Total hugepage memory reserved by allocator */
   size_t tot_memory_allocated; /* Total memory allocated to users */
 
-public:
+ public:
   HugeAllocator(size_t initial_size, size_t numa_node)
-      : numa_node(numa_node), tot_free_hugepages(0),
-        prev_allocation_size(initial_size), tot_memory_reserved(0),
+      : numa_node(numa_node),
+        tot_free_hugepages(0),
+        prev_allocation_size(initial_size),
+        tot_memory_reserved(0),
         tot_memory_allocated(0) {
     assert(initial_size > 0 && initial_size <= kMaxAllocSize);
     assert(numa_node <= kMaxNumaNodes);
@@ -89,12 +91,11 @@ public:
     } else {
       /* There is no free 4K page. */
       if (tot_free_hugepages == 0) {
-        bool success = reserve_hugepages(prev_allocation_size * 2, numa_node);
+        prev_allocation_size *= 2;
+        bool success = reserve_hugepages(prev_allocation_size, numa_node);
         if (!success) {
           return NULL; /* We're out of hugepages */
         }
-
-        prev_allocation_size *= 2;
       }
 
       /*
@@ -149,10 +150,15 @@ public:
       }
     }
 
-    /* If here, no existing SHM region has sufficient hugepages */
+    /*
+     * If here, no existing SHM region has sufficient hugepages. Increase the
+     * allocation size, and ensure that we can allocate at least \p size.
+     */
+    prev_allocation_size *= 2;
     while (prev_allocation_size < size) {
       prev_allocation_size *= 2;
     }
+
     bool success = reserve_hugepages(prev_allocation_size, numa_node);
     if (!success) {
       /* We're out of hugepages */
@@ -172,10 +178,23 @@ public:
     return hugebuf_addr;
   }
 
-  size_t get_reserved_memory() { return tot_memory_reserved; }
-  size_t get_allocated_memory() { return tot_memory_allocated; }
+  /**
+   * @brief Return the total amount of memory reserved as hugepages.
+   */
+  size_t get_reserved_memory() {
+    assert(tot_memory_reserved % kHugepageSize == 0);
+    return tot_memory_reserved;
+  }
 
-private:
+  /**
+   * @brief Return the total amount of memory allocated to the user.
+   */
+  size_t get_allocated_memory() {
+    assert(tot_memory_allocated % kPageSize == 0);
+    return tot_memory_allocated;
+  }
+
+ private:
   /**
    * @brief Remove \p num_hugepages from the beginning of this SHM region.
    */
@@ -210,33 +229,38 @@ private:
       if (shm_id == -1) {
         /* shm_key did not work. Try again. */
         switch (errno) {
-        case EEXIST:
-          fprintf(stderr, "eRPC HugeAllocator: SHM malloc error: "
-                          "Key %d exists. Trying again with different key.\n",
-                  shm_key);
-          break;
-        case EACCES:
-          fprintf(stderr, "eRPC HugeAllocator: SHM malloc error: "
-                          "Insufficient permissions.\n");
-          exit(-1);
-          break;
-        case EINVAL:
-          fprintf(stderr, "eRPC HugeAllocator: SHM malloc error: SHMMAX/SHMIN "
-                          "mismatch. SHM key = %d, size = %lu (%lu MB).\n",
-                  shm_key, size, size / MB(1));
-          exit(-1);
-          break;
-        case ENOMEM:
-          fprintf(stderr, "eRPC HugeAllocator: SHM malloc error: Insufficient "
-                          "memory. SHM key = %d, size = %lu (%lu MB).\n",
-                  shm_key, size, size / MB(1));
-          return false;
-          break;
-        default:
-          printf("eRPC HugeAllocator: SHM malloc error: Wild SHM error: %s.\n",
-                 strerror(errno));
-          exit(-1);
-          break;
+          case EEXIST:
+            fprintf(stderr,
+                    "eRPC HugeAllocator: SHM malloc error: "
+                    "Key %d exists. Trying again with different key.\n",
+                    shm_key);
+            break;
+          case EACCES:
+            fprintf(stderr,
+                    "eRPC HugeAllocator: SHM malloc error: "
+                    "Insufficient permissions.\n");
+            exit(-1);
+            break;
+          case EINVAL:
+            fprintf(stderr,
+                    "eRPC HugeAllocator: SHM malloc error: SHMMAX/SHMIN "
+                    "mismatch. SHM key = %d, size = %lu (%lu MB).\n",
+                    shm_key, size, size / MB(1));
+            exit(-1);
+            break;
+          case ENOMEM:
+            fprintf(stderr,
+                    "eRPC HugeAllocator: SHM malloc error: Insufficient "
+                    "memory. SHM key = %d, size = %lu (%lu MB).\n",
+                    shm_key, size, size / MB(1));
+            return false;
+            break;
+          default:
+            printf(
+                "eRPC HugeAllocator: SHM malloc error: Wild SHM error: %s.\n",
+                strerror(errno));
+            exit(-1);
+            break;
         }
       } else {
         /* shm_key worked. Break out of the while loop */
@@ -246,8 +270,9 @@ private:
 
     void *shm_buf = shmat(shm_id, NULL, 0);
     if (shm_buf == NULL) {
-      fprintf(stderr, "eRPC HugeAllocator: SHM malloc error: shmat() failed "
-                      "for key %d\n",
+      fprintf(stderr,
+              "eRPC HugeAllocator: SHM malloc error: shmat() failed "
+              "for key %d\n",
               shm_key);
       exit(-1);
     }
@@ -256,8 +281,9 @@ private:
     const unsigned long nodemask = (1ul << (unsigned long)numa_node);
     long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
     if (ret != 0) {
-      fprintf(stderr, "eRPC HugeAllocator: SHM malloc error. mbind() failed "
-                      "for key %d\n",
+      fprintf(stderr,
+              "eRPC HugeAllocator: SHM malloc error. mbind() failed "
+              "for key %d\n",
               shm_key);
       exit(-1);
     }
@@ -276,21 +302,24 @@ private:
     int shmid = shmget(shm_key, 0, 0);
     if (shmid == -1) {
       switch (errno) {
-      case EACCES:
-        fprintf(stderr, "eRPC HugeAllocator: SHM free error: "
-                        "Insufficient permissions. SHM key = %d.\n",
-                shm_key);
-        break;
-      case ENOENT:
-        fprintf(stderr, "eRPC HugeAllocator: SHM free error: No such SHM key."
-                        "SHM key = %d.\n",
-                shm_key);
-        break;
-      default:
-        fprintf(stderr, "eRPC HugeAllocator: SHM free error: A wild SHM error: "
-                        "%s\n",
-                strerror(errno));
-        break;
+        case EACCES:
+          fprintf(stderr,
+                  "eRPC HugeAllocator: SHM free error: "
+                  "Insufficient permissions. SHM key = %d.\n",
+                  shm_key);
+          break;
+        case ENOENT:
+          fprintf(stderr,
+                  "eRPC HugeAllocator: SHM free error: No such SHM key."
+                  "SHM key = %d.\n",
+                  shm_key);
+          break;
+        default:
+          fprintf(stderr,
+                  "eRPC HugeAllocator: SHM free error: A wild SHM error: "
+                  "%s\n",
+                  strerror(errno));
+          break;
       }
 
       exit(-1);
@@ -304,8 +333,9 @@ private:
 
     ret = shmdt(shm_buf);
     if (ret != 0) {
-      fprintf(stderr, "HugeAllocator: Error freeing SHM buf %p. "
-                      "(SHM key = %d)\n",
+      fprintf(stderr,
+              "HugeAllocator: Error freeing SHM buf %p. "
+              "(SHM key = %d)\n",
               shm_buf, shm_key);
       exit(-1);
     }
@@ -313,4 +343,4 @@ private:
 };
 }
 
-#endif // ERPC_HUGE_ALLOC_H
+#endif  // ERPC_HUGE_ALLOC_H

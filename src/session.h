@@ -10,17 +10,15 @@ namespace ERpc {
 
 // A one-to-one session class for all transports
 class Session {
-public:
-  Session(const char *transportTypeCStr, const char *hostnameCStr,
-          int rem_port_index)
+ public:
+  Session(const char *transport_name, const char *_hostname, int rem_port_index)
       : rem_port_index(rem_port_index) {
-
-    transport_type = getTransportType(transportTypeCStr);
+    transport_type = get_transport_type(transport_name);
     if (transport_type == TransportType::Invalid) {
-      fprintf(stderr, "ERpc: Invalid transport type %s\n", transportTypeCStr);
+      fprintf(stderr, "ERpc: Invalid transport type %s\n", transport_name);
     }
 
-    hostname = std::string(hostnameCStr);
+    hostname = std::string(_hostname);
   }
 
   ~Session() {}
@@ -38,15 +36,15 @@ public:
   // The information required to resolve the remote port
   TransportType transport_type;
   std::string hostname;
-  int rem_port_index; // 0-based index in the device list of the remote port
+  int rem_port_index;  // 0-based index in the device list of the remote port
 
-  bool is_cc; // Is congestion control enabled for this session?
+  bool is_cc;  // Is congestion control enabled for this session?
 
   // InfiniBand UD. XXX: Can we reuse these fields?
   struct ibv_ah *rem_ah;
   int rem_qpn;
 };
 
-} // End ERpc
+}  // End ERpc
 
-#endif // ERPC_SESSION_H
+#endif  // ERPC_SESSION_H

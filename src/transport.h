@@ -1,15 +1,16 @@
 #ifndef ERPC_TRANSPORT_H
 #define ERPC_TRANSPORT_H
 
+#include "buffer.h"
 #include "common.h"
 #include "session.h"
 #include "transport_types.h"
 
 namespace ERpc {
 
-// Generic transport class
+// Generic unreliable transport class
 class Transport {
-public:
+ public:
   Transport();
   ~Transport();
 
@@ -17,14 +18,14 @@ public:
    * @brief Resolve the transport-specific fields of \p session by talking
    * to the remote host.
    */
-  virtual void resolveSession(Session &session);
+  virtual void resolve_session(Session &session);
 
-  virtual void sendMessage(Session &session);
-  virtual void pollCompletions();
+  virtual void send_message(Session &session, Buffer *buffer);
+  virtual void poll_completions();
 
   TransportType type;
 };
 
-} // End ERpc
+}  // End ERpc
 
-#endif // ERPC_TRANSPORT_H
+#endif  // ERPC_TRANSPORT_H
