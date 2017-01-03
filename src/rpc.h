@@ -3,21 +3,20 @@
 
 #include <mutex>
 #include <queue>
-#include "buffer.h"
+#include "util/buffer.h"
 #include "common.h"
-#include "nexus.h"
 #include "session.h"
 #include "transport.h"
 using namespace std;
 
 namespace ERpc {
 
+class Nexus; // Forward declaration
+
 // Per-thread RPC object
 class Rpc {
  public:
-  Rpc(Nexus &nexus, Transport &transport)
-      : nexus(nexus), transport(transport){};
-
+  Rpc(Nexus &nexus, Transport &transport);
   ~Rpc();
 
   void send_request(const Session &session, const Buffer &buffer);

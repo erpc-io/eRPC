@@ -1,4 +1,4 @@
-#include "huge_alloc.h"
+#include "util/huge_alloc.h"
 #include "test_printf.h"
 #include <gtest/gtest.h>
 

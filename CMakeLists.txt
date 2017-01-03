@@ -10,8 +10,9 @@ add_definitions(-Wall -Wextra)
 add_definitions(-Wsign-conversion)
 add_definitions(-Winline)
 
-add_definitions(-march=native)
+add_definitions(-Wno-unused-function)
 
+add_definitions(-march=native)
 add_definitions(-g)
 
 set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread)
@@ -37,12 +38,22 @@ endif(DEBUG)
 
 set(SOURCES
   src/common.h
-  src/huge_alloc.h
+  src/util/huge_alloc.h
+  src/util/buffer.h
+  src/util/buffer.cc
   src/rpc.h
+  src/rpc.cc
   src/session.h
+  src/session.cc
+  src/nexus.h
+  src/nexus.cc
   src/transport.h
   src/transport_impl/infiniband_transport.h
   src/transport_types.h)
 
-add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCE_FILES})
+#add_executable(test_build tests/test_build.cc ${SOURCES})
+#target_link_libraries(test_build ${LIBRARIES})
+
+add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
 target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
+

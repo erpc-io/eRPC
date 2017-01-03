@@ -19,7 +19,7 @@ class RoutingInfo {
 /**
  * @brief Returns an enum representation of the transport type string
  */
-TransportType get_transport_type(const char *transport_name) {
+static TransportType get_transport_type(const char *transport_name) {
   if (strcasecmp(transport_name, "InfiniBand")) {
     return TransportType::InfiniBand;
   } else if (strcasecmp(transport_name, "RoCE")) {

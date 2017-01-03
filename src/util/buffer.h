@@ -8,12 +8,8 @@ namespace ERpc {
 // Variable-sized buffer
 class Buffer {
  public:
-  Buffer(size_t size) : size(size) { buf = (void *)malloc(size); }
-
-  ~Buffer() {
-    assert(buf != NULL);
-    free(buf);
-  }
+  Buffer(size_t size);
+  ~Buffer();
 
   size_t size;
   void *buf;

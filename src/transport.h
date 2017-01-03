@@ -1,7 +1,7 @@
 #ifndef ERPC_TRANSPORT_H
 #define ERPC_TRANSPORT_H
 
-#include "buffer.h"
+#include "util/buffer.h"
 #include "common.h"
 #include "session.h"
 #include "transport_types.h"

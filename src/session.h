@@ -24,27 +24,18 @@ class SessionEstablishmentResp {
 // A one-to-one session class for all transports
 class Session {
  public:
-  Session(const char *transport_name, const char *_hostname, int rem_port_index)
-      : rem_port_index(rem_port_index) {
-    transport_type = get_transport_type(transport_name);
-    if (transport_type == TransportType::Invalid) {
-      fprintf(stderr, "ERpc: Invalid transport type %s\n", transport_name);
-    }
-
-    hostname = std::string(_hostname);
-  }
-
-  ~Session() {}
+  Session(const char *transport_name, const char *_hostname, int rem_port_index);
+  ~Session();
 
   /**
    * @brief Enables congestion control for this session
    */
-  void enable_congestion_control() { is_cc = true; }
+  void enable_congestion_control();
 
   /**
    * @brief Disables congestion control for this session
    */
-  void disable_congestion_control() { is_cc = false; }
+  void disable_congestion_control();
 
   // The information required to resolve the remote port
   TransportType transport_type;
