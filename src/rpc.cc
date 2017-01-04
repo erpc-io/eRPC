@@ -3,21 +3,28 @@
 
 namespace ERpc {
 
-Rpc::Rpc(Nexus &nexus, Transport &transport)
-    : nexus(nexus), transport(transport){};
+template <class Transport>
+Rpc<Transport>::Rpc(Nexus &nexus) : nexus(nexus) {
+  nexus.register_hook((SessionManagementHook *)&sm_hook);
+}
 
-Rpc::~Rpc() {}
+template <class Transport>
+Rpc<Transport>::~Rpc() {}
 
-void Rpc::send_request(const Session &session, const Buffer &buffer) {
+template <class Transport>
+void Rpc<Transport>::send_request(const Session &session,
+                                  const Buffer &buffer) {
   _unused(session);
   _unused(buffer);
 }
 
-void Rpc::send_response(const Session &session, const Buffer &buffer) {
+template <class Transport>
+void Rpc<Transport>::send_response(const Session &session,
+                                   const Buffer &buffer) {
   _unused(session);
   _unused(buffer);
 };
 
-void Rpc::run_event_loop() {};
-
+template <class Transport>
+void Rpc<Transport>::run_event_loop(){};
 }

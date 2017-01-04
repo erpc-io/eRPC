@@ -1,10 +1,10 @@
 #ifndef ERPC_TRANSPORT_H
 #define ERPC_TRANSPORT_H
 
-#include "util/buffer.h"
 #include "common.h"
 #include "session.h"
 #include "transport_types.h"
+#include "util/buffer.h"
 
 namespace ERpc {
 
@@ -20,7 +20,7 @@ class Transport {
    */
   virtual void resolve_session(Session &session);
 
-  virtual void send_message(Session &session, Buffer *buffer);
+  virtual void send_message(Session &session, const Buffer &buffer);
   virtual void poll_completions();
 
   TransportType transport_type;

@@ -31,7 +31,8 @@ static uint64_t RdTsc() {
   return (rdx << 32) | rax;
 }
 
-template <typename T> static constexpr bool IsPowerOfTwo(T x) {
+template <typename T>
+static constexpr bool IsPowerOfTwo(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
 

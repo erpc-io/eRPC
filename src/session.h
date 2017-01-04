@@ -1,6 +1,8 @@
 #ifndef ERPC_SESSION_H
 #define ERPC_SESSION_H
 
+#include <mutex>
+#include <queue>
 #include <string>
 
 #include "common.h"
@@ -21,10 +23,25 @@ class SessionEstablishmentResp {
   RoutingInfo server_route; /* Transport-specific routing info of server */
 };
 
-// A one-to-one session class for all transports
+/**
+ * @brief
+ */
+class SessionManagementHook {
+  std::mutex session_mgmt_mutex;
+  size_t session_mgmt_req_counter;
+  std::queue<SessionEstablishmentReq> session_req_queue;
+  std::queue<SessionEstablishmentResp> session_resp_queue;
+
+  SessionManagementHook() : session_mgmt_req_counter(0) {}
+};
+
+/**
+ * @brief A one-to-one session class for all transports
+ */
 class Session {
  public:
-  Session(const char *transport_name, const char *_hostname, int rem_port_index);
+  Session(const char *transport_name, const char *_hostname,
+          int rem_port_index);
   ~Session();
 
   /**
