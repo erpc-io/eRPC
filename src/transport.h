@@ -11,17 +11,27 @@ namespace ERpc {
 // Generic unreliable transport class
 class Transport {
  public:
-  Transport();
-  ~Transport();
-
   /**
    * @brief Resolve the transport-specific fields of \p session by talking
    * to the remote host.
    */
-  virtual void resolve_session(Session &session);
+  void resolve_session(Session &session);
 
-  virtual void send_message(Session &session, const Buffer &buffer);
-  virtual void poll_completions();
+  void send_message(Session &session, const Buffer &buffer);
+  void poll_completions();
+
+  TransportType transport_type;
+};
+
+class InfiniBandTransport : public Transport {
+ public:
+  InfiniBandTransport();
+  ~InfiniBandTransport();
+
+  void resolve_session(Session &session);
+
+  void send_message(Session &session, const Buffer &buffer);
+  void poll_completions();
 
   TransportType transport_type;
 };

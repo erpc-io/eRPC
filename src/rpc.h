@@ -10,7 +10,7 @@
 namespace ERpc {
 
 // Per-thread RPC object
-template <class Transport>
+template <class Transport_>
 class Rpc {
  public:
   Rpc(Nexus &nexus);
@@ -23,9 +23,12 @@ class Rpc {
 
  private:
   Nexus &nexus;
-  Transport &transport; /* The unreliable transport */
+  Transport_ *transport; /* The unreliable transport */
   const volatile SessionManagementHook sm_hook;
 };
+
+/* Instantiate required Rpc classes so they get compiled for the linker */
+template class Rpc<InfiniBandTransport>;
 
 }  // End ERpc
 

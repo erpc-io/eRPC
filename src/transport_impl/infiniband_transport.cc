@@ -1,33 +1,28 @@
-#ifndef ERPC_INFINIBAND_H_H
-#define ERPC_INFINIBAND_H_H
-
-#include "transport.h"
 #include <infiniband/verbs.h>
+#include "transport.h"
 
 namespace ERpc {
-class InfinibandTransport : public Transport {
-public:
-  InfinibandTransport() { transport_type = TransportType::InfiniBand; }
 
-  ~InfinibandTransport();
-
-  void resolve_session(Session &session) {
-    _unused(session);
-    return;
-  }
-
-  void send_message(Session &session, const Buffer &buffer) {
-    int rem_qpn = session.rem_qpn;
-    struct ibv_ah *rem_ah = session.rem_ah;
-
-    _unused(rem_qpn);
-    _unused(rem_ah);
-    _unused(session);
-    _unused(buffer);
-  }
-
-  void poll_completions() {}
-};
+InfiniBandTransport::InfiniBandTransport() {
+  transport_type = TransportType::InfiniBand;
 }
 
-#endif // ERPC_INFINIBAND_H_H
+InfiniBandTransport::~InfiniBandTransport() {}
+
+void InfiniBandTransport::resolve_session(Session &session) {
+  _unused(session);
+  return;
+}
+
+void InfiniBandTransport::send_message(Session &session, const Buffer &buffer) {
+  int rem_qpn = session.rem_qpn;
+  struct ibv_ah *rem_ah = session.rem_ah;
+
+  _unused(rem_qpn);
+  _unused(rem_ah);
+  _unused(session);
+  _unused(buffer);
+}
+
+void InfiniBandTransport::poll_completions() {}
+};

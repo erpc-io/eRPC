@@ -11,6 +11,7 @@
 namespace ERpc {
 
 class SessionEstablishmentReq {
+ public:
   TransportType transport_type;
   int client_sn;            /* Session number at client */
   size_t client_start_seq;  /* Starting sequence number chosen by client */
@@ -18,15 +19,14 @@ class SessionEstablishmentReq {
 };
 
 class SessionEstablishmentResp {
+ public:
   int server_sn;            /* Session number at server */
   size_t server_start_seq;  /* Starting sequence number chosen by server */
   RoutingInfo server_route; /* Transport-specific routing info of server */
 };
 
-/**
- * @brief
- */
 class SessionManagementHook {
+ public:
   std::mutex session_mgmt_mutex;
   size_t session_mgmt_req_counter;
   std::queue<SessionEstablishmentReq> session_req_queue;
