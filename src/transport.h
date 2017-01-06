@@ -15,7 +15,7 @@ class Transport {
    * @brief Resolve the transport-specific fields of \p session by talking
    * to the remote host.
    */
-  void resolve_session(Session &session);
+  void send_resolve_session_msg(Session &session) const;
 
   void send_message(Session &session, const Buffer &buffer);
   void poll_completions();
@@ -28,7 +28,7 @@ class InfiniBandTransport : public Transport {
   InfiniBandTransport();
   ~InfiniBandTransport();
 
-  void resolve_session(Session &session);
+  void send_resolve_session_msg(Session &session) const;
 
   void send_message(Session &session, const Buffer &buffer);
   void poll_completions();

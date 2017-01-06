@@ -18,7 +18,7 @@ class Nexus {
    *
    * @param port The UDP port to listen on for session management
    */
-  Nexus(uint16_t udp_port);
+  Nexus(uint16_t global_udp_port);
   ~Nexus();
 
   void register_hook(SessionManagementHook *hook);
@@ -30,7 +30,11 @@ class Nexus {
   /* Hooks into Session Management objects registered by RPC objects */
   std::vector<volatile SessionManagementHook *> reg_hooks;
 
-  uint16_t udp_port; /* The UDP port to listen on for session management */
+  /*
+   * The UDP port used by all Nexus-es in the cluster to listen on for
+   * session management
+   */
+  const uint16_t global_udp_port;
   int nexus_sock_fd; /* The file descriptor of the UDP socket */
 };
 

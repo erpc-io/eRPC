@@ -14,8 +14,9 @@
 
 namespace ERpc {
 
-Nexus::Nexus(uint16_t udp_port) : udp_port(udp_port) {
-  erpc_dprintf("eRPC: Nexus created with UDP port %u\n", udp_port);
+Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
+  erpc_dprintf("eRPC: Nexus created with global UDP port %u\n",
+               global_udp_port);
   nexus_object = this;
   install_sigio_handler();
 }
@@ -68,7 +69,7 @@ void Nexus::install_sigio_handler() {
   memset(&server, 0, sizeof(server));
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons(udp_port);
+  server.sin_port = htons(global_udp_port);
 
   if (bind(nexus_sock_fd, (struct sockaddr *)&server,
            sizeof(struct sockaddr_in)) < 0) {

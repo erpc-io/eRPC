@@ -44,8 +44,8 @@ class SessionManagementHook {
  */
 class Session {
  public:
-  Session(const char *transport_name, const char *_hostname,
-          int rem_port_index);
+  Session(const char *_rem_hostname, TransportType transport_type,
+          uint16_t rem_dev_port_index);
   ~Session();
 
   /**
@@ -58,10 +58,11 @@ class Session {
    */
   void disable_congestion_control();
 
-  // The information required to resolve the remote port
+  std::string rem_hostname;
+  uint16_t rem_udp_port;
   TransportType transport_type;
-  std::string hostname;
-  int rem_port_index;  // 0-based index in the device list of the remote port
+  int rem_dev_port_index;  // 0-based index in the device list of the remote
+                           // port
 
   bool is_cc;  // Is congestion control enabled for this session?
 

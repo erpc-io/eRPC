@@ -24,6 +24,8 @@ class Rpc {
   Rpc(Nexus &nexus);
   ~Rpc();
 
+  void resolve_session(Session &session);
+
   void send_request(const Session &session, const Buffer &buffer);
   void send_response(const Session &session, const Buffer &buffer);
 

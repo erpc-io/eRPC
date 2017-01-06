@@ -2,15 +2,14 @@
 
 namespace ERpc {
 
-Session::Session(const char *transport_name, const char *_hostname,
-                 int rem_port_index)
-    : rem_port_index(rem_port_index) {
-  transport_type = get_transport_type(transport_name);
+Session::Session(const char *_rem_hostname, TransportType transport_type,
+                 uint16_t rem_dev_port_index)
+    : transport_type(transport_type), rem_dev_port_index(rem_dev_port_index) {
   if (transport_type == TransportType::Invalid) {
-    fprintf(stderr, "ERpc: Invalid transport type %s\n", transport_name);
+    fprintf(stderr, "ERpc: Invalid transport type\n");
   }
 
-  hostname = std::string(_hostname);
+  rem_hostname = std::string(_rem_hostname);
 }
 
 Session::~Session(){};
@@ -18,4 +17,5 @@ Session::~Session(){};
 void Session::enable_congestion_control() { is_cc = true; }
 
 void Session::disable_congestion_control() { is_cc = true; }
-}
+
+}  // End ERpc

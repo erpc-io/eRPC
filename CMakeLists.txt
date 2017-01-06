@@ -47,9 +47,11 @@ set(SOURCES
   src/transport.h
   src/transport_impl/infiniband_transport.cc
   src/transport_types.h
-  src/util/huge_alloc.h
+  src/util/buffer.cc
   src/util/buffer.h
-  src/util/buffer.cc)
+  src/util/huge_alloc.h
+  src/util/udp_client.cc
+  src/util/udp_client.h)
 
 add_executable(test_build tests/test_build.cc ${SOURCES})
 target_link_libraries(test_build ${GTEST_LIBRARIES} ${LIBRARIES})
