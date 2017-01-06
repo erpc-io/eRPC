@@ -5,6 +5,7 @@ namespace ERpc {
 template <class Transport_>
 Rpc<Transport_>::Rpc(Nexus &nexus) : nexus(nexus) {
   Transport_ *transport = new Transport_();
+  _unused(transport);
   nexus.register_hook((SessionManagementHook *)&sm_hook);
 }
 

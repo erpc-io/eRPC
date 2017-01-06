@@ -6,7 +6,7 @@ set(CMAKE_C_LINK_EXECUTABLE g++-5)
 
 add_definitions(-std=c++11)
 
-add_definitions(-Wall -Wextra)
+add_definitions(-Wall -Wextra -Werror)
 add_definitions(-Wsign-conversion)
 add_definitions(-Winline)
 
@@ -40,8 +40,8 @@ set(SOURCES
   src/common.h
   src/nexus.cc
   src/nexus.h
-  src/rpc.cc
   src/rpc.h
+  src/rpc_impl/rpc.cc
   src/session.cc
   src/session.h
   src/transport.h
@@ -52,7 +52,7 @@ set(SOURCES
   src/util/buffer.cc)
 
 add_executable(test_build tests/test_build.cc ${SOURCES})
-target_link_libraries(test_build ${LIBRARIES})
+target_link_libraries(test_build ${GTEST_LIBRARIES} ${LIBRARIES})
 
 add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
 target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})

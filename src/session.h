@@ -25,6 +25,10 @@ class SessionEstablishmentResp {
   RoutingInfo server_route; /* Transport-specific routing info of server */
 };
 
+/**
+ * @brief An object shared between the per-thread Rpc and the per-process Nexus.
+ * All accesses must be done with @session_mgmt_mutex locked.
+ */
 class SessionManagementHook {
  public:
   std::mutex session_mgmt_mutex;

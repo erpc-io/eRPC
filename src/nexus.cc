@@ -5,7 +5,8 @@
 
 namespace ERpc {
 
-Nexus::Nexus() {}
+Nexus::Nexus(int udp_port) : udp_port(udp_port) {}
+
 Nexus::~Nexus() {}
 
 void Nexus::register_hook(SessionManagementHook *hook) {

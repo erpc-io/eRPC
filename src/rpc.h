@@ -9,6 +9,14 @@
 
 namespace ERpc {
 
+#define rpc_dprintf(fmt, ...)            \
+  do {                                   \
+    if (RPC_DPRINTF) {                   \
+      fprintf(stderr, fmt, __VA_ARGS__); \
+      fflush(stderr);                    \
+    }                                    \
+  } while (0)
+
 // Per-thread RPC object
 template <class Transport_>
 class Rpc {
@@ -24,6 +32,11 @@ class Rpc {
  private:
   Nexus &nexus;
   Transport_ *transport; /* The unreliable transport */
+
+  /*
+   * The Nexus modifies this object when there is session-management related
+   * work to be done.
+   */
   const volatile SessionManagementHook sm_hook;
 };
 

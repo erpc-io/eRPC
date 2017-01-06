@@ -9,6 +9,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+namespace ERpc {
+
+// Control debug-mode printing for classes without special needs
+#define DPRINTF 1
+#define dprintf(fmt, ...)                \
+  do {                                   \
+    if (DPRINTF) {                       \
+      fprintf(stderr, fmt, __VA_ARGS__); \
+      fflush(stderr);                    \
+    }                                    \
+  } while (0)
+
+// Control debug-mode printing for classes with special needs
+#define RPC_DPRINTF 1
+
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 #define forceinline inline __attribute__((always_inline))
@@ -19,7 +34,6 @@
 #define MB(x) ((size_t)(x) << 20)
 #define MB_(x) (MB(x) - 1)
 
-namespace ERpc {
 static const size_t kMaxNumaNodes = 16; /* Maximum number of NUMA nodes */
 static const size_t kPageSize = 4096;   /* Page size in bytes */
 static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
