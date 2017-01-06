@@ -11,17 +11,17 @@
 
 namespace ERpc {
 
-// Control debug-mode printing for classes without special needs
-#define DPRINTF 1
-#define dprintf(fmt, ...)                \
+// Debug printing for ERPC classes without special needs.
+#define ERPC_DPRINTF 1
+#define erpc_dprintf(fmt, ...)           \
   do {                                   \
-    if (DPRINTF) {                       \
+    if (ERPC_DPRINTF) {                  \
       fprintf(stderr, fmt, __VA_ARGS__); \
       fflush(stderr);                    \
     }                                    \
   } while (0)
 
-// Control debug-mode printing for classes with special needs
+// Debug-mode printing for classes with special needs
 #define RPC_DPRINTF 1
 
 #define likely(x) __builtin_expect(!!(x), 1)
