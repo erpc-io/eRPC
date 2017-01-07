@@ -27,9 +27,11 @@ class Rpc {
 
   ~Rpc();
 
-  Session* create_session(int local_fdev_port_index, const char*_rem_hostname,
-                          int rem_app_tid, int rem_fdev_port_index,
-                          session_mgmt_handler_t sm_handler);
+  Session *create_session(int local_fdev_port_index, const char *_rem_hostname,
+                          int rem_app_tid, int rem_fdev_port_index);
+
+  SessionStatus connect_session(Session *session,
+                                session_mgmt_handler_t sm_handler);
 
   void send_request(const Session *session, const Buffer *buffer);
   void send_response(const Session *session, const Buffer *buffer);

@@ -39,6 +39,24 @@ template <class Transport_>
 Rpc<Transport_>::~Rpc() {}
 
 template <class Transport_>
+Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
+                                         const char *_rem_hostname,
+                                         int rem_app_tid,
+                                         int rem_fdev_port_index) {
+  _unused(local_fdev_port_index);
+  _unused(_rem_hostname);
+  _unused(rem_app_tid);
+  _unused(rem_fdev_port_index);
+}
+
+template <class Transport_>
+SessionStatus Rpc<Transport_>::connect_session(
+    Session *session, session_mgmt_handler_t sm_handler) {
+  _unused(session);
+  _unused(sm_handler);
+}
+
+template <class Transport_>
 void Rpc<Transport_>::send_request(const Session *session,
                                    const Buffer *buffer) {
   _unused(session);

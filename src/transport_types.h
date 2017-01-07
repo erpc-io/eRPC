@@ -6,7 +6,7 @@
 
 namespace ERpc {
 
-enum TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
+enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
 
 /**
  * @brief Generic class to store routing info for any transport.
