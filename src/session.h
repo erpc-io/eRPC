@@ -10,6 +10,8 @@
 
 namespace ERpc {
 
+enum SessionEventType { Connected, Disconnected };
+
 class SessionEstablishmentReq {
  public:
   TransportType transport_type;
@@ -31,7 +33,7 @@ class SessionEstablishmentResp {
  */
 class SessionManagementHook {
  public:
-  erpc_tid_t thread_id; /* Thread ID of the RPC obj that created this hook */
+  int app_tid; /* App-level thread ID of the RPC obj that created this hook */
   std::mutex session_mgmt_mutex;
   size_t session_mgmt_req_counter;
   std::queue<SessionEstablishmentReq> session_req_queue;
@@ -69,6 +71,8 @@ class Session {
   struct ibv_ah *rem_ah;
   int rem_qpn;
 };
+
+typedef void (*session_mgmt_handler_t)(Session *, SessionEventType, void *);
 
 }  // End ERpc
 

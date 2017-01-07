@@ -3,9 +3,12 @@
 namespace ERpc {
 
 template <class Transport_>
-Rpc<Transport_>::Rpc(Nexus *nexus, erpc_tid_t thread_id,
+Rpc<Transport_>::Rpc(Nexus *nexus, void *context,
+                     session_mgmt_handler_t session_mgmt_handler, int app_tid,
                      std::vector<int> fdev_port_vec)
-    : nexus(nexus) {
+    : nexus(nexus),
+      context(context),
+      session_mgmt_handler(session_mgmt_handler) {
   Transport_ *transport = new Transport_();
   _unused(transport);
 
@@ -28,7 +31,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, erpc_tid_t thread_id,
   }
 
   /* Register a hook with the Nexus */
-  sm_hook.thread_id = thread_id;
+  sm_hook.app_tid = app_tid;
   nexus->register_hook((SessionManagementHook *)&sm_hook);
 }
 

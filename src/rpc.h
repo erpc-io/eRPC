@@ -22,7 +22,9 @@ namespace ERpc {
 template <class Transport_>
 class Rpc {
  public:
-  Rpc(Nexus *nexus, erpc_tid_t thread_id, std::vector<int> fdev_port_vec);
+  Rpc(Nexus *nexus, void *context, session_mgmt_handler_t session_mgmt_handler,
+      int app_tid, std::vector<int> fdev_port_vec);
+
   ~Rpc();
 
   void resolve_session(Session *session);
@@ -34,9 +36,11 @@ class Rpc {
 
  private:
   Nexus *nexus;
+  void *context; /* The application context */
+  session_mgmt_handler_t session_mgmt_handler;
   int num_fdev_ports;
   int fdev_port_arr[kMaxFabDevPorts];
-  erpc_tid_t thread_id;
+  int app_tid;
   Transport_ *transport; /* The unreliable transport */
 
   /* Shared with Nexus for session management */

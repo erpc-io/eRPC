@@ -36,11 +36,11 @@ void Nexus::register_hook(SessionManagementHook *hook) {
 
   /* There should be no existing hook with the same thread ID */
   for (auto reg_hook : reg_hooks) {
-    if (reg_hook->thread_id == hook->thread_id) {
+    if (reg_hook->app_tid == hook->app_tid) {
       fprintf(stderr,
               "eRPC Nexus: FATAL attempt to register hook with "
               "existing thread ID %d\n",
-              hook->thread_id);
+              hook->app_tid);
       exit(-1);
     }
   }
