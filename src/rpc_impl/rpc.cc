@@ -32,7 +32,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context,
 
   /* Register a hook with the Nexus */
   sm_hook.app_tid = app_tid;
-  nexus->register_hook((SessionManagementHook *)&sm_hook);
+  nexus->register_hook((SessionMgmtHook *)&sm_hook);
 }
 
 template <class Transport_>

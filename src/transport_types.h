@@ -12,7 +12,7 @@ enum TransportType { InfiniBand, RoCE, OmniPath, Invalid };
  * @brief Generic class to store routing info for any transport.
  */
 static const size_t kMaxRoutingInfoSize = 128;
-class RoutingInfo {
+struct RoutingInfo {
   uint8_t buf[kMaxRoutingInfoSize];
 };
 

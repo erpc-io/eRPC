@@ -23,7 +23,7 @@ Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
 
 Nexus::~Nexus() {}
 
-void Nexus::register_hook(SessionManagementHook *hook) {
+void Nexus::register_hook(SessionMgmtHook *hook) {
   assert(hook != NULL);
 
   nexus_lock.lock();
@@ -50,7 +50,7 @@ void Nexus::register_hook(SessionManagementHook *hook) {
   nexus_lock.unlock();
 }
 
-void Nexus::unregister_hook(SessionManagementHook *hook) {
+void Nexus::unregister_hook(SessionMgmtHook *hook) {
   assert(hook != NULL);
 
   nexus_lock.lock();

@@ -2,7 +2,7 @@
 #include "rpc.h"
 
 void session_mgmt_handler(ERpc::Session *session,
-                          ERpc::SessionEventType session_event_type,
+                          ERpc::SessionMgmtEventType session_event_type,
                           void *context) {
   _unused(session);
   _unused(session_event_type);

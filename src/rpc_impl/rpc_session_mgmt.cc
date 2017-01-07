@@ -3,21 +3,21 @@
 namespace ERpc {
 
 /**
- * @brief Process all session management events in the queue. This function
- * is called with the session management hook locked. The caller will unlock
- * the hook when this function returns.
+ * @brief Process all session management events in the queue.
  */
 template <class Transport_>
 void Rpc<Transport_>::do_session_management() {
   assert(sm_hook.session_mgmt_ev_counter > 0);
+  sm_hook.session_mgmt_mutex.lock();
 
-  if (sm_hook.session_req_queue.size() > 0) {
-    /* Handle a session management request */
+  /* Handle all session management requests */
+  for (SessionMgmtPkt *sm_pkt : sm_hook.session_mgmt_pkt_list) {
+    free(sm_pkt);
   }
 
-  if (sm_hook.session_resp_queue.size() > 0) {
-    /* Handle a session management response */
-  }
+  sm_hook.session_mgmt_pkt_list.clear();
+  sm_hook.session_mgmt_ev_counter = 0;
+  sm_hook.session_mgmt_mutex.unlock();
 };
 
 }  // End ERpc

@@ -21,8 +21,8 @@ class Nexus {
   Nexus(uint16_t global_udp_port);
   ~Nexus();
 
-  void register_hook(SessionManagementHook *hook);
-  void unregister_hook(SessionManagementHook *hook);
+  void register_hook(SessionMgmtHook *hook);
+  void unregister_hook(SessionMgmtHook *hook);
 
   void install_sigio_handler();
   void session_mgnt_handler();
@@ -33,8 +33,8 @@ class Nexus {
    */
   std::mutex nexus_lock;
 
-  /* Hooks into Session Management objects registered by RPC objects */
-  std::vector<volatile SessionManagementHook *> reg_hooks;
+  /* Hooks into session management objects registered by RPC objects */
+  std::vector<volatile SessionMgmtHook *> reg_hooks;
 
   /*
    * The UDP port used by all Nexus-es in the cluster to listen on for

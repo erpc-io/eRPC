@@ -10,36 +10,49 @@
 
 namespace ERpc {
 
-enum SessionEventType { Connected, Disconnected };
-
-class SessionEstablishmentReq {
- public:
-  TransportType transport_type;
-  int client_sn;            /* Session number at client */
-  size_t client_start_seq;  /* Starting sequence number chosen by client */
-  RoutingInfo client_route; /* Transport-specific routing info of client */
+enum SessionMgmtEventType { Connected, Disconnected };
+enum SessionMgmtPktType {
+  ConnectReq,
+  ConnectResp,
+  DisconnectReq,
+  DisconnectResp
 };
 
-class SessionEstablishmentResp {
- public:
-  int server_sn;            /* Session number at server */
-  size_t server_start_seq;  /* Starting sequence number chosen by server */
-  RoutingInfo server_route; /* Transport-specific routing info of server */
+/**
+ * @brief General-purpose session management packet sent by both Rpc clients
+ * and servers. This is pretty large (~500 bytes), so use sparingly.
+ */
+class SessionMgmtPkt {
+  /*
+   * Pointer to the session management hook of the client Rpc object that
+   * initiated this session management exchange.
+   */
+  void *client_hook;
+  int target_app_tid;
+  SessionMgmtPktType pkt_type;
+
+  /* Each session management packet contains two copies of this struct. */
+  struct {
+    TransportType transport_type; /* Should match at client and server */
+    char hostname[kMaxHostnameLen];
+    int session_num;
+    size_t start_seq;
+    RoutingInfo routing_info;
+  } client, server;
 };
 
 /**
  * @brief An object created by the per-thread Rpc, and shared with the
  * per-process Nexus. All accesses must be done with @session_mgmt_mutex locked.
  */
-class SessionManagementHook {
+class SessionMgmtHook {
  public:
   int app_tid; /* App-level thread ID of the RPC obj that created this hook */
   std::mutex session_mgmt_mutex;
   volatile size_t session_mgmt_ev_counter; /* Number of session mgmt events */
-  std::queue<SessionEstablishmentReq> session_req_queue;
-  std::queue<SessionEstablishmentResp> session_resp_queue;
+  std::vector<SessionMgmtPkt *> session_mgmt_pkt_list;
 
-  SessionManagementHook() : session_mgmt_ev_counter(0) {}
+  SessionMgmtHook() : session_mgmt_ev_counter(0) {}
 };
 
 /**
@@ -72,7 +85,7 @@ class Session {
   int rem_qpn;
 };
 
-typedef void (*session_mgmt_handler_t)(Session *, SessionEventType, void *);
+typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType, void *);
 
 }  // End ERpc
 

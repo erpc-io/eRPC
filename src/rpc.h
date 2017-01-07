@@ -44,7 +44,7 @@ class Rpc {
   Transport_ *transport; /* The unreliable transport */
 
   /* Shared with Nexus for session management */
-  SessionManagementHook sm_hook;
+  SessionMgmtHook sm_hook;
 
   // Private methods
   void do_session_management();
