@@ -39,11 +39,6 @@ template <class Transport_>
 Rpc<Transport_>::~Rpc() {}
 
 template <class Transport_>
-void Rpc<Transport_>::resolve_session(Session *session) {
-  transport->send_resolve_session_msg(session);
-}
-
-template <class Transport_>
 void Rpc<Transport_>::send_request(const Session *session,
                                    const Buffer *buffer) {
   _unused(session);

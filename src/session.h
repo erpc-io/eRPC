@@ -24,18 +24,17 @@ enum SessionMgmtPktType {
  * and servers. This is pretty large (~500 bytes), so use sparingly.
  */
 class SessionMgmtPkt {
-  /*
-   * Pointer to the session management hook of the client Rpc object that
-   * initiated this session management exchange.
-   */
-  void *client_hook;
-  int target_app_tid;
   SessionMgmtPktType pkt_type;
 
-  /* Each session management packet contains two copies of this struct. */
+  /*
+   * Each session management packet contains two copies of this struct, filled
+   * in by the client and server Rpc.
+   */
   struct {
     TransportType transport_type; /* Should match at client and server */
     char hostname[kMaxHostnameLen];
+    int app_tid; /* App-level TID of the Rpc object */
+    int fdev_port_index;
     int session_num;
     size_t start_seq;
     RoutingInfo routing_info;
@@ -61,8 +60,7 @@ class SessionMgmtHook {
  */
 class Session {
  public:
-  Session(const char *_rem_hostname, int rem_fdev_port_index,
-          uint16_t nexus_udp_port);
+  Session(int session_num, const char *_rem_hostname, int rem_fdev_port_index);
   ~Session();
 
   /**
@@ -75,9 +73,14 @@ class Session {
    */
   void disable_congestion_control();
 
+  // Local information
+  int local_fdev_port_index;
+  int session_num; /* The Rpc object assigns a unique session number */
+
+  /* Information about the remote session */
   std::string rem_hostname;
+  int rem_app_tid;
   int rem_fdev_port_index; /* 0-based port index in the remote device list */
-  uint16_t nexus_udp_port; /* The UDP port used by all Nexus-es */
 
   bool is_cc; /* Is congestion control enabled for this session? */
 

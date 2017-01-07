@@ -11,9 +11,7 @@ InfiniBandTransport::InfiniBandTransport() {
 InfiniBandTransport::~InfiniBandTransport() {}
 
 void InfiniBandTransport::send_resolve_session_msg(Session *session) const {
-  UDPClient *udp_client =
-      new UDPClient(session->rem_hostname.c_str(), session->nexus_udp_port);
-  _unused(udp_client);
+  _unused(session);
   return;
 }
 
