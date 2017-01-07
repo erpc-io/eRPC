@@ -57,7 +57,4 @@ void Rpc<Transport_>::send_response(const Session *session,
   _unused(buffer);
 };
 
-template <class Transport_>
-void Rpc<Transport_>::run_event_loop(){};
-
 }  // End ERpc

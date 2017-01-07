@@ -35,11 +35,11 @@ class SessionManagementHook {
  public:
   int app_tid; /* App-level thread ID of the RPC obj that created this hook */
   std::mutex session_mgmt_mutex;
-  size_t session_mgmt_req_counter;
+  volatile size_t session_mgmt_ev_counter; /* Number of session mgmt events */
   std::queue<SessionEstablishmentReq> session_req_queue;
   std::queue<SessionEstablishmentResp> session_resp_queue;
 
-  SessionManagementHook() : session_mgmt_req_counter(0) {}
+  SessionManagementHook() : session_mgmt_ev_counter(0) {}
 };
 
 /**

@@ -42,6 +42,8 @@ set(SOURCES
   src/nexus.h
   src/rpc.h
   src/rpc_impl/rpc.cc
+  src/rpc_impl/rpc_ev_loop.cc
+  src/rpc_impl/rpc_session_mgmt.cc
   src/session.cc
   src/session.h
   src/transport.h
