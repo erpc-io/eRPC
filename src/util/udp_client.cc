@@ -24,7 +24,7 @@ UDPClient::UDPClient(const char *addr, int port) : port(port), f_addr(addr) {
   hints.ai_protocol = IPPROTO_UDP;
 
   int r = getaddrinfo(addr, decimal_port, &hints, &f_addrinfo);
-  if (r != 0 || f_addrinfo == NULL) {
+  if (r != 0 || f_addrinfo == nullptr) {
     printf("UDPClient: Invalid address or port\n");
     exit(-1);
   }

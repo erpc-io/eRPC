@@ -94,7 +94,7 @@ class HugeAllocator {
         prev_allocation_size *= 2;
         bool success = reserve_hugepages(prev_allocation_size, numa_node);
         if (!success) {
-          return NULL; /* We're out of hugepages */
+          return nullptr; /* We're out of hugepages */
         }
       }
 
@@ -124,7 +124,7 @@ class HugeAllocator {
     }
 
     exit(-1); /* We should never get here */
-    return NULL;
+    return nullptr;
   }
 
   forceinline void free_page(void *page) {
@@ -162,7 +162,7 @@ class HugeAllocator {
     bool success = reserve_hugepages(prev_allocation_size, numa_node);
     if (!success) {
       /* We're out of hugepages */
-      return NULL;
+      return nullptr;
     }
 
     /*
@@ -268,8 +268,8 @@ class HugeAllocator {
       }
     }
 
-    void *shm_buf = shmat(shm_id, NULL, 0);
-    if (shm_buf == NULL) {
+    void *shm_buf = shmat(shm_id, nullptr, 0);
+    if (shm_buf == nullptr) {
       fprintf(stderr,
               "eRPC HugeAllocator: SHM malloc error: shmat() failed "
               "for key %d\n",
@@ -325,7 +325,7 @@ class HugeAllocator {
       exit(-1);
     }
 
-    int ret = shmctl(shmid, IPC_RMID, NULL); /* Please don't fail */
+    int ret = shmctl(shmid, IPC_RMID, nullptr); /* Please don't fail */
     if (ret != 0) {
       fprintf(stderr, "eRPC HugeAllocator: Error freeing SHM ID %d\n", shmid);
       exit(-1);

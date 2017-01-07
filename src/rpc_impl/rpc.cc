@@ -47,6 +47,8 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   _unused(_rem_hostname);
   _unused(rem_app_tid);
   _unused(rem_fdev_port_index);
+
+  return nullptr;
 }
 
 template <class Transport_>
@@ -54,6 +56,8 @@ SessionStatus Rpc<Transport_>::connect_session(
     Session *session, session_mgmt_handler_t sm_handler) {
   _unused(session);
   _unused(sm_handler);
+
+  return SessionStatus::kInit; /*XXX */
 }
 
 template <class Transport_>

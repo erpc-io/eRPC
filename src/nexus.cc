@@ -24,7 +24,7 @@ Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
 Nexus::~Nexus() {}
 
 void Nexus::register_hook(SessionMgmtHook *hook) {
-  assert(hook != NULL);
+  assert(hook != nullptr);
 
   nexus_lock.lock();
 
@@ -51,7 +51,7 @@ void Nexus::register_hook(SessionMgmtHook *hook) {
 }
 
 void Nexus::unregister_hook(SessionMgmtHook *hook) {
-  assert(hook != NULL);
+  assert(hook != nullptr);
 
   nexus_lock.lock();
 
@@ -123,7 +123,7 @@ void Nexus::install_sigio_handler() {
   struct sigaction act;
   memset((void *)&act, 0, sizeof(act));
   act.sa_handler = &sigio_handler;
-  if (sigaction(SIGIO, &act, NULL) < 0) { /* Old signal handler is NULL */
+  if (sigaction(SIGIO, &act, nullptr) < 0) { /* Old signal handler is NULL */
     perror("sigaction");
     exit(-1);
   }

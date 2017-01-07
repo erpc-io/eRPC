@@ -47,7 +47,7 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
     size_t num_hugepages = 1ul + (unsigned)(std::rand() % 15);
     void *buf = allocator->alloc_huge(num_hugepages * ERpc::kHugepageSize);
 
-    if (buf == NULL) {
+    if (buf == nullptr) {
       EXPECT_EQ(allocator->get_allocated_memory(), app_memory);
 
       test_printf("Fraction of system memory reserved by allocator at "
@@ -79,7 +79,7 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
   size_t app_memory = 0;
 
   while (true) {
-    void *buf = NULL;
+    void *buf = nullptr;
 
     bool alloc_hugepages = (std::rand() % 100) == 0;
     size_t new_app_memory;
@@ -93,7 +93,7 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
       new_app_memory = ERpc::kPageSize;
     }
 
-    if (buf == NULL) {
+    if (buf == nullptr) {
       EXPECT_EQ(app_memory, allocator->get_allocated_memory());
       test_printf("Fraction of system memory reserved by allocator at "
                   "failure = %.2f\n",
