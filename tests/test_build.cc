@@ -3,7 +3,9 @@
 
 TEST(test_build, test_build) {
   ERpc::Nexus nexus(31851);
-  ERpc::Rpc<ERpc::InfiniBandTransport> rpc(nexus);
+  std::vector<int> port_vec = {1};
+
+  ERpc::Rpc<ERpc::InfiniBandTransport> rpc(&nexus, 0, port_vec);
 
   int a = 1, b = 2;
   assert(a == b);

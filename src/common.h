@@ -34,10 +34,16 @@ namespace ERpc {
 #define MB(x) ((size_t)(x) << 20)
 #define MB_(x) (MB(x) - 1)
 
+// General typedefs
+typedef uint32_t erpc_tid_t; /* User-specified thread identifier */
+
+// General constants
 static const size_t kMaxNumaNodes = 16; /* Maximum number of NUMA nodes */
 static const size_t kPageSize = 4096;   /* Page size in bytes */
 static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
+static const size_t kMaxFabDevPorts = 4; /* Max fabric device ports */
 
+// Simple methods
 static uint64_t RdTsc() {
   uint64_t rax;
   uint64_t rdx;

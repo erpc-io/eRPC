@@ -26,16 +26,34 @@ Nexus::~Nexus() {}
 void Nexus::register_hook(SessionManagementHook *hook) {
   assert(hook != NULL);
 
-  /* The hook must not exist */
+  nexus_lock.lock();
+
+  /* This hook must not exist */
   if (std::find(reg_hooks.begin(), reg_hooks.end(), hook) != reg_hooks.end()) {
     fprintf(stderr, "eRPC Nexus: FATAL attempt to re-register hook %p\n", hook);
     exit(-1);
   }
+
+  /* There should be no existing hook with the same thread ID */
+  for (auto reg_hook : reg_hooks) {
+    if (reg_hook->thread_id == hook->thread_id) {
+      fprintf(stderr,
+              "eRPC Nexus: FATAL attempt to register hook with "
+              "existing thread ID %d\n",
+              hook->thread_id);
+      exit(-1);
+    }
+  }
+
   reg_hooks.push_back(hook);
+
+  nexus_lock.unlock();
 }
 
 void Nexus::unregister_hook(SessionManagementHook *hook) {
   assert(hook != NULL);
+
+  nexus_lock.lock();
 
   /* The hook must exist in the vector of registered hooks */
   if (std::find(reg_hooks.begin(), reg_hooks.end(), hook) == reg_hooks.end()) {
@@ -47,6 +65,8 @@ void Nexus::unregister_hook(SessionManagementHook *hook) {
 
   reg_hooks.erase(std::remove(reg_hooks.begin(), reg_hooks.end(), hook),
                   reg_hooks.end());
+
+  nexus_lock.unlock();
 }
 
 void Nexus::install_sigio_handler() {

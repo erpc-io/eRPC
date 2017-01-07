@@ -26,11 +26,12 @@ class SessionEstablishmentResp {
 };
 
 /**
- * @brief An object shared between the per-thread Rpc and the per-process Nexus.
- * All accesses must be done with @session_mgmt_mutex locked.
+ * @brief An object created by the per-thread Rpc, and shared with the
+ * per-process Nexus. All accesses must be done with @session_mgmt_mutex locked.
  */
 class SessionManagementHook {
  public:
+  erpc_tid_t thread_id; /* Thread ID of the RPC obj that created this hook */
   std::mutex session_mgmt_mutex;
   size_t session_mgmt_req_counter;
   std::queue<SessionEstablishmentReq> session_req_queue;
@@ -44,8 +45,8 @@ class SessionManagementHook {
  */
 class Session {
  public:
-  Session(const char *_rem_hostname, TransportType transport_type,
-          uint16_t rem_dev_port_index);
+  Session(const char *_rem_hostname, int rem_fdev_port_index,
+          uint16_t nexus_udp_port);
   ~Session();
 
   /**
@@ -59,14 +60,12 @@ class Session {
   void disable_congestion_control();
 
   std::string rem_hostname;
-  uint16_t rem_udp_port;
-  TransportType transport_type;
-  int rem_dev_port_index;  // 0-based index in the device list of the remote
-                           // port
+  int rem_fdev_port_index; /* 0-based port index in the remote device list */
+  uint16_t nexus_udp_port; /* The UDP port used by all Nexus-es */
 
-  bool is_cc;  // Is congestion control enabled for this session?
+  bool is_cc; /* Is congestion control enabled for this session? */
 
-  // InfiniBand UD. XXX: Can we reuse these fields?
+  /* InfiniBand UD. XXX: Can we reuse these fields? */
   struct ibv_ah *rem_ah;
   int rem_qpn;
 };

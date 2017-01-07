@@ -10,16 +10,16 @@ InfiniBandTransport::InfiniBandTransport() {
 
 InfiniBandTransport::~InfiniBandTransport() {}
 
-void InfiniBandTransport::send_resolve_session_msg(Session &session) const {
+void InfiniBandTransport::send_resolve_session_msg(Session *session) const {
   UDPClient *udp_client =
-      new UDPClient(session.rem_hostname.c_str(), session.rem_udp_port);
+      new UDPClient(session->rem_hostname.c_str(), session->nexus_udp_port);
   _unused(udp_client);
   return;
 }
 
-void InfiniBandTransport::send_message(Session &session, const Buffer &buffer) {
-  int rem_qpn = session.rem_qpn;
-  struct ibv_ah *rem_ah = session.rem_ah;
+void InfiniBandTransport::send_message(Session *session, const Buffer *buffer) {
+  int rem_qpn = session->rem_qpn;
+  struct ibv_ah *rem_ah = session->rem_ah;
 
   _unused(rem_qpn);
   _unused(rem_ah);

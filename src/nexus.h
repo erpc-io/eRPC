@@ -3,8 +3,8 @@
 
 #include <mutex>
 #include <queue>
-
 #include <vector>
+
 #include "common.h"
 #include "session.h"
 using namespace std;
@@ -26,6 +26,12 @@ class Nexus {
 
   void install_sigio_handler();
   void session_mgnt_handler();
+
+  /*
+   * The Nexus is shared among all Rpc threads. This lock must be held while
+   * calling Nexus functions from Rpc threads.
+   */
+  std::mutex nexus_lock;
 
   /* Hooks into Session Management objects registered by RPC objects */
   std::vector<volatile SessionManagementHook *> reg_hooks;

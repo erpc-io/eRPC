@@ -1,6 +1,7 @@
 #ifndef ERPC_RPC_H
 #define ERPC_RPC_H
 
+#include <vector>
 #include "common.h"
 #include "nexus.h"
 #include "session.h"
@@ -21,25 +22,25 @@ namespace ERpc {
 template <class Transport_>
 class Rpc {
  public:
-  Rpc(Nexus &nexus);
+  Rpc(Nexus *nexus, erpc_tid_t thread_id, std::vector<int> fdev_port_vec);
   ~Rpc();
 
-  void resolve_session(Session &session);
+  void resolve_session(Session *session);
 
-  void send_request(const Session &session, const Buffer &buffer);
-  void send_response(const Session &session, const Buffer &buffer);
+  void send_request(const Session *session, const Buffer *buffer);
+  void send_response(const Session *session, const Buffer *buffer);
 
   void run_event_loop();
 
  private:
-  Nexus &nexus;
+  Nexus *nexus;
+  int num_fdev_ports;
+  int fdev_port_arr[kMaxFabDevPorts];
+  erpc_tid_t thread_id;
   Transport_ *transport; /* The unreliable transport */
 
-  /*
-   * The Nexus modifies this object when there is session-management related
-   * work to be done.
-   */
-  const volatile SessionManagementHook sm_hook;
+  /* Shared with Nexus for session management */
+  volatile SessionManagementHook sm_hook;
 };
 
 /* Instantiate required Rpc classes so they get compiled for the linker */

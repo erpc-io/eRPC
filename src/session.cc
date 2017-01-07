@@ -2,15 +2,11 @@
 
 namespace ERpc {
 
-Session::Session(const char *_rem_hostname, TransportType transport_type,
-                 uint16_t rem_dev_port_index)
-    : transport_type(transport_type), rem_dev_port_index(rem_dev_port_index) {
-  if (transport_type == TransportType::Invalid) {
-    fprintf(stderr, "ERpc: Invalid transport type\n");
-  }
-
-  rem_hostname = std::string(_rem_hostname);
-}
+Session::Session(const char *_rem_hostname, int rem_fdev_port_index,
+                 uint16_t nexus_udp_port)
+    : rem_hostname(_rem_hostname),
+      rem_fdev_port_index(rem_fdev_port_index),
+      nexus_udp_port(nexus_udp_port) {}
 
 Session::~Session(){};
 
