@@ -10,12 +10,13 @@
 
 namespace ERpc {
 
-enum SessionMgmtEventType { Connected, Disconnected };
+enum SessionMgmtEventType { kConnected, kDisconnected };
+
 enum SessionMgmtPktType {
-  ConnectReq,
-  ConnectResp,
-  DisconnectReq,
-  DisconnectResp
+  kConnectReq,
+  kConnectResp,
+  kDisconnectReq,
+  kDisconnectResp
 };
 
 /**

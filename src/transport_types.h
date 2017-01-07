@@ -6,7 +6,7 @@
 
 namespace ERpc {
 
-enum TransportType { InfiniBand, RoCE, OmniPath, Invalid };
+enum TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
 
 /**
  * @brief Generic class to store routing info for any transport.
@@ -21,13 +21,13 @@ struct RoutingInfo {
  */
 static TransportType get_transport_type(const char *transport_name) {
   if (strcasecmp(transport_name, "InfiniBand")) {
-    return TransportType::InfiniBand;
+    return TransportType::kInfiniBand;
   } else if (strcasecmp(transport_name, "RoCE")) {
-    return TransportType::RoCE;
+    return TransportType::kRoCE;
   } else if (strcasecmp(transport_name, "OmniPath")) {
-    return TransportType::OmniPath;
+    return TransportType::kOmniPath;
   } else {
-    return TransportType::Invalid;
+    return TransportType::kInvalidTransport;
   }
 }
 

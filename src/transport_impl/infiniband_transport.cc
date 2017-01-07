@@ -5,7 +5,7 @@
 namespace ERpc {
 
 InfiniBandTransport::InfiniBandTransport() {
-  transport_type = TransportType::InfiniBand;
+  transport_type = TransportType::kInfiniBand;
 }
 
 InfiniBandTransport::~InfiniBandTransport() {}
