@@ -10,8 +10,8 @@ InfiniBandTransport::InfiniBandTransport() {
 
 InfiniBandTransport::~InfiniBandTransport() {}
 
-void InfiniBandTransport::send_resolve_session_msg(Session *session) const {
-  _unused(session);
+void InfiniBandTransport::fill_routing_info(RoutingInfo *routing_info) const {
+  memset((void *)routing_info, 0, kMaxRoutingInfoSize);
   return;
 }
 

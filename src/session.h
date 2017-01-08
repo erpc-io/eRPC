@@ -30,7 +30,7 @@ enum class SessionStatus {
 };
 
 /**
- * @brief Basic info about a session filled in while creating or connecting it.
+ * @brief Basic info about a session filled in during initialization.
  */
 class SessionMetadata {
  public:
@@ -44,11 +44,13 @@ class SessionMetadata {
 
   /* Fill invalid metadata to aid debugging */
   SessionMetadata() {
-    memset((void *)this, 0, sizeof(*this));
     transport_type = TransportType::kInvalidTransport;
+    memset((void *)hostname, 0, sizeof(hostname));
     app_tid = -1;
     fdev_port_index = -1;
     session_num = -1;
+    start_seq = 0;
+    memset((void *)&routing_info, 0, sizeof(routing_info));
   }
 };
 

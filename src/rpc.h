@@ -23,6 +23,8 @@ namespace ERpc {
 // Per-thread RPC object
 template <class Transport_>
 class Rpc {
+  const uint64_t kStartSeqMask = ((1ull << 48) - 1ull);
+
  public:
   Rpc(Nexus *nexus, void *context, int app_tid,
       session_mgmt_handler_t session_mgmt_handler,
@@ -57,6 +59,7 @@ class Rpc {
   SlowRand slow_rand;
 
   // Private methods
+  uint64_t generate_start_seq();
   void do_session_management();
 };
 

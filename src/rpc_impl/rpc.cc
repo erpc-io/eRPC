@@ -42,6 +42,12 @@ template <class Transport_>
 Rpc<Transport_>::~Rpc() {}
 
 template <class Transport_>
+uint64_t Rpc<Transport_>::generate_start_seq() {
+  uint64_t rand = slow_rand.next_u64();
+  return (rand & kStartSeqMask);
+}
+
+template <class Transport_>
 Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
                                          const char *rem_hostname,
                                          int rem_app_tid,
@@ -86,7 +92,7 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
     exit(-1);
   }
 
-  /* Fill in Session object */
+  /* Create a session object and fill in local metadata */
   Session *session = new Session(); /* XXX: Use pool? */
   SessionMetadata &client_metadata = session->local;
 
@@ -95,7 +101,8 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   client_metadata.app_tid = app_tid;
   client_metadata.fdev_port_index = local_fdev_port_index;
   client_metadata.session_num = next_session_num++;
-  /* XXX: Assign start seq num and fill in routing info */
+  client_metadata.start_seq = generate_start_seq();
+  transport->fill_routing_info(&client_metadata.routing_info);
 
   return session;
 }
