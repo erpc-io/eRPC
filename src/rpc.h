@@ -1,6 +1,7 @@
 #ifndef ERPC_RPC_H
 #define ERPC_RPC_H
 
+#include <random>
 #include <vector>
 #include "common.h"
 #include "nexus.h"
@@ -22,8 +23,9 @@ namespace ERpc {
 template <class Transport_>
 class Rpc {
  public:
-  Rpc(Nexus *nexus, void *context, session_mgmt_handler_t session_mgmt_handler,
-      int app_tid, std::vector<int> fdev_port_vec);
+  Rpc(Nexus *nexus, void *context, int app_tid,
+      session_mgmt_handler_t session_mgmt_handler,
+      std::vector<int> fdev_port_vec);
 
   ~Rpc();
 
@@ -39,12 +41,16 @@ class Rpc {
   void run_event_loop();
 
  private:
+  // Constructor args
   Nexus *nexus;
   void *context; /* The application context */
+  int app_tid;
   session_mgmt_handler_t session_mgmt_handler;
   int num_fdev_ports;
   int fdev_port_arr[kMaxFabDevPorts];
-  int app_tid;
+
+  // Derived
+  int next_session_num;
   Transport_ *transport; /* The unreliable transport */
 
   /* Shared with Nexus for session management */

@@ -33,6 +33,7 @@ enum class SessionStatus {
  * @brief Basic info about a session filled in while creating or connecting it.
  */
 class SessionMetadata {
+ public:
   TransportType transport_type; /* Should match at client and server */
   char hostname[kMaxHostnameLen];
   int app_tid; /* App-level TID of the Rpc object */
@@ -84,7 +85,7 @@ class SessionMgmtHook {
  */
 class Session {
  public:
-  Session(int session_num, const char *_rem_hostname, int rem_fdev_port_index);
+  Session();
   ~Session();
 
   /**
@@ -100,10 +101,6 @@ class Session {
   SessionMetadata local, remote;
 
   bool is_cc; /* Is congestion control enabled for this session? */
-
-  /* InfiniBand UD. XXX: Can we reuse these fields? */
-  struct ibv_ah *rem_ah;
-  int rem_qpn;
 };
 
 typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType, void *);

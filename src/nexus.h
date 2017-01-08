@@ -27,6 +27,8 @@ class Nexus {
   void install_sigio_handler();
   void session_mgnt_handler();
 
+  char hostname[kMaxHostnameLen]; /* The local host's network hostname */
+
   /*
    * The Nexus is shared among all Rpc threads. This lock must be held while
    * calling Nexus functions from Rpc threads.

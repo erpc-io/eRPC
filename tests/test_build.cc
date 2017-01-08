@@ -11,10 +11,12 @@ void session_mgmt_handler(ERpc::Session *session,
 
 TEST(test_build, test_build) {
   ERpc::Nexus nexus(31851);
+  void *context = nullptr;
+  int app_tid = 0;
   std::vector<int> port_vec = {1};
 
-  ERpc::Rpc<ERpc::InfiniBandTransport> rpc(&nexus, nullptr, &session_mgmt_handler,
-                                           0, port_vec);
+  ERpc::Rpc<ERpc::InfiniBandTransport> rpc(&nexus, context, app_tid,
+                                           &session_mgmt_handler, port_vec);
 
   int a = 1, b = 2;
   assert(a == b);

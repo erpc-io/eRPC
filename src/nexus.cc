@@ -15,8 +15,15 @@
 namespace ERpc {
 
 Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
-  erpc_dprintf("eRPC: Nexus created with global UDP port %u\n",
-               global_udp_port);
+  int ret = gethostname(hostname, kMaxHostnameLen);
+  if (ret == -1) {
+    fprintf(stderr, "eRPC Nexus: FATAL. gethostname failed. Error = %s\n",
+            strerror(errno));
+    exit(-1);
+  }
+
+  erpc_dprintf("eRPC: Nexus created with global UDP port %u, hostname %s\n",
+               global_udp_port, hostname);
   nexus_object = this;
   install_sigio_handler();
 }
