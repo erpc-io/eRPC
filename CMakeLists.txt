@@ -63,3 +63,5 @@ target_link_libraries(test_build ${GTEST_LIBRARIES} ${LIBRARIES})
 add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
 target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
 
+add_executable(test_rand tests/test_rand.cc ${SOURCES})
+target_link_libraries(test_rand ${GTEST_LIBRARIES} ${LIBRARIES})
