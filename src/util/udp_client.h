@@ -23,6 +23,6 @@ class UDPClient {
   struct addrinfo *f_addrinfo;
 };
 
-} // End ERpc
+}  // End ERpc
 
-#endif
+#endif  // ERPC_UDP_CLIENT_H

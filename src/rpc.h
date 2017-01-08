@@ -8,6 +8,7 @@
 #include "session.h"
 #include "transport.h"
 #include "util/buffer.h"
+#include "util/rand.h"
 
 namespace ERpc {
 
@@ -49,12 +50,11 @@ class Rpc {
   int num_fdev_ports;
   int fdev_port_arr[kMaxFabDevPorts];
 
-  // Derived
+  // Others
   int next_session_num;
-  Transport_ *transport; /* The unreliable transport */
-
-  /* Shared with Nexus for session management */
-  SessionMgmtHook sm_hook;
+  Transport_ *transport;   /* The unreliable transport */
+  SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
+  SlowRand slow_rand;
 
   // Private methods
   void do_session_management();
