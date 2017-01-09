@@ -1,4 +1,5 @@
 #include "rpc.h"
+#include "util/udp_client.h"
 
 namespace ERpc {
 
@@ -39,7 +40,12 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
 }
 
 template <class Transport_>
-Rpc<Transport_>::~Rpc() {}
+Rpc<Transport_>::~Rpc() {
+  for (Session *session : session_vec) {
+    /* Free this session */
+    _unused(session);
+  }
+}
 
 template <class Transport_>
 uint64_t Rpc<Transport_>::generate_start_seq() {
@@ -51,7 +57,8 @@ template <class Transport_>
 Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
                                          const char *rem_hostname,
                                          int rem_app_tid,
-                                         int rem_fdev_port_index) {
+                                         int rem_fdev_port_index,
+                                         session_mgmt_handler_t sm_handler) {
   /*
    * This function is not on the critical path and is exposed to the user,
    * so the args checking is always enabled.
@@ -92,8 +99,10 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
     exit(-1);
   }
 
-  /* Create a session object and fill in local metadata */
   Session *session = new Session(); /* XXX: Use pool? */
+  session->sm_handler = sm_handler;
+
+  /* Fill in local metadata */
   SessionMetadata &client_metadata = session->local;
 
   client_metadata.transport_type = transport->transport_type;
@@ -104,16 +113,29 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   client_metadata.start_seq = generate_start_seq();
   transport->fill_routing_info(&client_metadata.routing_info);
 
+  /*
+   * Fill in remote metadata. Commented fields will be filled when the
+   * session is connected.
+   */
+  SessionMetadata &server_metadata = session->remote;
+  strcpy((char *)server_metadata.hostname, rem_hostname);
+  server_metadata.app_tid = rem_app_tid;
+  server_metadata.fdev_port_index = rem_fdev_port_index;
+  // server_metadata.session_num = ??
+  // server_metadata.start_seq = ??
+  // server_metadata.routing_info = ??
+
   return session;
 }
 
 template <class Transport_>
-SessionStatus Rpc<Transport_>::connect_session(
-    Session *session, session_mgmt_handler_t sm_handler) {
-  _unused(session);
-  _unused(sm_handler);
+void Rpc<Transport_>::connect_session(Session *session) {
+  assert(session != NULL);
 
-  return SessionStatus::kInit;
+  UDPClient *udp_client =
+      new UDPClient(session->remote.hostname, nexus->global_udp_port);
+
+  delete udp_client;
 }
 
 template <class Transport_>

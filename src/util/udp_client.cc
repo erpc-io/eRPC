@@ -12,9 +12,10 @@
 
 namespace ERpc {
 
-UDPClient::UDPClient(const char *addr, int port) : port(port), f_addr(addr) {
+UDPClient::UDPClient(const char *remote_addr, uint16_t remote_port)
+    : remote_port(remote_port), remote_addr(remote_addr) {
   char decimal_port[16];
-  snprintf(decimal_port, sizeof(decimal_port), "%d", port);
+  snprintf(decimal_port, sizeof(decimal_port), "%d", remote_port);
   decimal_port[sizeof(decimal_port) / sizeof(decimal_port[0]) - 1] = '\0';
 
   struct addrinfo hints;
@@ -23,28 +24,28 @@ UDPClient::UDPClient(const char *addr, int port) : port(port), f_addr(addr) {
   hints.ai_socktype = SOCK_DGRAM;
   hints.ai_protocol = IPPROTO_UDP;
 
-  int r = getaddrinfo(addr, decimal_port, &hints, &f_addrinfo);
-  if (r != 0 || f_addrinfo == nullptr) {
-    printf("UDPClient: Invalid address or port\n");
+  int r = getaddrinfo(remote_addr, decimal_port, &hints, &remote_addrinfo);
+  if (r != 0 || remote_addrinfo == nullptr) {
+    printf("UDPClient: Invalid remote address or remote port\n");
     exit(-1);
   }
 
-  sock_fd = socket(f_addrinfo->ai_family, SOCK_DGRAM, IPPROTO_UDP);
+  sock_fd = socket(remote_addrinfo->ai_family, SOCK_DGRAM, IPPROTO_UDP);
   if (sock_fd == -1) {
-    freeaddrinfo(f_addrinfo);
+    freeaddrinfo(remote_addrinfo);
     printf("UDPClient: Could not create socket\n");
     exit(-1);
   }
 }
 
 UDPClient::~UDPClient() {
-  freeaddrinfo(f_addrinfo);
+  freeaddrinfo(remote_addrinfo);
   close(sock_fd);
 }
 
 ssize_t UDPClient::send(const char *msg, size_t size) {
-  return sendto(sock_fd, msg, size, 0, f_addrinfo->ai_addr,
-                f_addrinfo->ai_addrlen);
+  return sendto(sock_fd, msg, size, 0, remote_addrinfo->ai_addr,
+                remote_addrinfo->ai_addrlen);
 }
 
 }  // End ERpc

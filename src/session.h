@@ -55,6 +55,32 @@ class SessionMetadata {
 };
 
 /**
+ * @brief A one-to-one session class for all transports
+ */
+class Session {
+ public:
+  Session();
+  ~Session();
+
+  /**
+   * @brief Enables congestion control for this session
+   */
+  void enable_congestion_control();
+
+  /**
+   * @brief Disables congestion control for this session
+   */
+  void disable_congestion_control();
+
+  SessionMetadata local, remote;
+
+  void (*sm_handler)(Session *, SessionMgmtEventType, void *);
+  bool is_cc; /* Is congestion control enabled for this session? */
+};
+
+typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType, void *);
+
+/**
  * @brief General-purpose session management packet sent by both Rpc clients
  * and servers. This is pretty large (~500 bytes), so use sparingly.
  */
@@ -81,31 +107,6 @@ class SessionMgmtHook {
 
   SessionMgmtHook() : session_mgmt_ev_counter(0) {}
 };
-
-/**
- * @brief A one-to-one session class for all transports
- */
-class Session {
- public:
-  Session();
-  ~Session();
-
-  /**
-   * @brief Enables congestion control for this session
-   */
-  void enable_congestion_control();
-
-  /**
-   * @brief Disables congestion control for this session
-   */
-  void disable_congestion_control();
-
-  SessionMetadata local, remote;
-
-  bool is_cc; /* Is congestion control enabled for this session? */
-};
-
-typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType, void *);
 
 }  // End ERpc
 

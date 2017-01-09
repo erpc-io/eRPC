@@ -11,16 +11,16 @@ namespace ERpc {
  */
 class UDPClient {
  public:
-  UDPClient(const char *addr, int port);
+  UDPClient(const char *remote_addr, uint16_t remote_port);
   ~UDPClient();
 
   ssize_t send(const char *msg, size_t size);
 
  private:
   int sock_fd;
-  int port;
-  std::string f_addr;
-  struct addrinfo *f_addrinfo;
+  int remote_port;
+  std::string remote_addr;
+  struct addrinfo *remote_addrinfo;
 };
 
 }  // End ERpc
