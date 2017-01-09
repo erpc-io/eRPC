@@ -23,7 +23,7 @@ Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
     exit(-1);
   }
 
-  erpc_dprintf("eRPC: Nexus created with global UDP port %u, hostname %s\n",
+  erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s\n",
                global_udp_port, hostname);
   nexus_object = this;
   install_sigio_handler();

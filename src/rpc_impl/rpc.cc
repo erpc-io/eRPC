@@ -15,9 +15,6 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
       session_mgmt_handler(session_mgmt_handler),
       num_fdev_ports((int)fdev_port_vec.size()),
       next_session_num(0) {
-  Transport_ *transport = new Transport_();
-  _unused(transport);
-
   if (fdev_port_vec.size() == 0) {
     fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with 0 fabric ports.\n");
     exit(-1);
@@ -35,6 +32,9 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
     fdev_port_arr[i] = fdev_port;
     i++;
   }
+
+  /* Initialize the transport */
+  transport = new Transport_();
 
   /* Register a hook with the Nexus */
   sm_hook.app_tid = app_tid;
@@ -162,8 +162,8 @@ void Rpc<Transport_>::connect_session(Session *session) {
   memcpy((void *)&connect_req.server, (void *)&session->server,
          sizeof(connect_req.server));
 
-  int ret = udp_client->send((char *)&connect_req, sizeof(connect_req));
-  assert(ret == 0);
+  ssize_t ret = udp_client->send((char *)&connect_req, sizeof(connect_req));
+  assert(ret == sizeof(connect_req));
   _unused(ret);
 
   delete udp_client;

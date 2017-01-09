@@ -17,7 +17,8 @@ class Nexus {
   /**
    * @brief Construct the one-per-process Nexus object
    *
-   * @param port The UDP port to listen on for session management
+   * @param port The UDP port used by all Nexus-es in the cluster to listen
+   * for session management packets.
    */
   Nexus(uint16_t global_udp_port);
   ~Nexus();
