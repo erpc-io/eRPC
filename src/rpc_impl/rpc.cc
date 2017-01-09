@@ -71,8 +71,7 @@ template <class Transport_>
 Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
                                          const char *rem_hostname,
                                          int rem_app_tid,
-                                         int rem_fdev_port_index,
-                                         session_mgmt_handler_t sm_handler) {
+                                         int rem_fdev_port_index) {
   /*
    * This function is not on the critical path and is exposed to the user,
    * so the args checking is always enabled (i.e., no asserts).
@@ -114,7 +113,6 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   }
 
   Session *session = new Session(); /* XXX: Use pool? */
-  session->sm_handler = sm_handler;
 
   /* Fill in local metadata */
   SessionMetadata &client_metadata = session->client;

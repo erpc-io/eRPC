@@ -15,6 +15,21 @@ namespace ERpc {
  */
 enum class SessionMgmtEventType { kConnected, kDisconnected };
 
+static std::string session_mgmt_event_type_str(
+    SessionMgmtEventType event_type) {
+  switch (event_type) {
+    case SessionMgmtEventType::kConnected:
+      return std::string("Connected");
+      break;
+    case SessionMgmtEventType::kDisconnected:
+      return std::string("Disconnected");
+      break;
+    default:
+      return std::string("Invalid");
+      break;
+  }
+}
+
 /**
  * @brief Types of packets used for session management.
  */
@@ -97,7 +112,6 @@ class Session {
 
   SessionMetadata client, server;
 
-  void (*sm_handler)(Session *, SessionMgmtEventType, void *);
   bool is_cc; /* Is congestion control enabled for this session? */
 };
 

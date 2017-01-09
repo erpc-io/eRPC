@@ -1,27 +1,30 @@
 #include <gtest/gtest.h>
 #include "rpc.h"
 
-void session_mgmt_handler(ERpc::Session *session,
-                          ERpc::SessionMgmtEventType session_event_type,
-                          void *context) {
-  _unused(session);
-  _unused(session_event_type);
-  _unused(context);
+using namespace ERpc;
+
+void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
+               void *context) {
+  printf("Received event of type %s on session %p, context = %p\n",
+         session_mgmt_event_type_str(sm_event_type).c_str(), session, context);
+
 }
 
 TEST(test_build, test_build) {
-  ERpc::Nexus nexus(31851);
+  Nexus nexus(31851);
   void *context = nullptr;
-  int app_tid = 0;
-  std::vector<int> port_vec = {1};
+  int app_tid = 3;
+  std::vector<int> port_vec = {0};
 
-  ERpc::Rpc<ERpc::InfiniBandTransport> rpc(&nexus, context, app_tid,
-                                           &session_mgmt_handler, port_vec);
+  Rpc<InfiniBandTransport> rpc(&nexus, context, app_tid, &test_sm_hander,
+                               port_vec);
 
-  int a = 1, b = 2;
-  assert(a == b);
-  ((void)(a));
-  ((void)(b));
+  Session *session = rpc.create_session(port_vec[0], /* Local port */
+                                        "localhost", /* Remote hostname */
+                                        app_tid, /* Remote app TID */
+                                        port_vec[0]); /* Remote port */
+
+  _unused(session);
 }
 
 int main(int argc, char **argv) {
