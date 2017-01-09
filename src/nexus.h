@@ -1,6 +1,7 @@
 #ifndef ERPC_NEXUS_H
 #define ERPC_NEXUS_H
 
+#include <signal.h>
 #include <mutex>
 #include <queue>
 #include <vector>
@@ -36,7 +37,7 @@ class Nexus {
   std::mutex nexus_lock;
 
   /* Hooks into session management objects registered by RPC objects */
-  std::vector<volatile SessionMgmtHook *> reg_hooks;
+  std::vector<SessionMgmtHook *> reg_hooks;
 
   /*
    * The UDP port used by all Nexus-es in the cluster to listen on for
@@ -46,10 +47,16 @@ class Nexus {
   int nexus_sock_fd; /* The file descriptor of the UDP socket */
 };
 
-static Nexus *nexus_object;
+static Nexus *nexus_object; /* The one per-process Nexus object */
+
+/**
+ * @brief The static signal handler, which executes the actual signal handler
+ * with the one Nexus object.
+ */
 static void sigio_handler(int sig_num) {
   erpc_dprintf("eRPC Nexus: SIGIO handler called with nexus_object = %p\n",
                (void *)nexus_object);
+  assert(sig_num == SIGIO);
   _unused(sig_num);
   nexus_object->session_mgnt_handler();
 }

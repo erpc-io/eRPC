@@ -49,6 +49,7 @@ set(SOURCES
   src/transport.h
   src/transport_impl/infiniband_transport.cc
   src/transport_types.h
+  src/util/barrier.h
   src/util/buffer.cc
   src/util/buffer.h
   src/util/huge_alloc.h

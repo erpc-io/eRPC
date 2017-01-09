@@ -11,6 +11,7 @@
 #include "common.h"
 #include "nexus.h"
 #include "rpc.h"
+#include "util/barrier.h"
 
 namespace ERpc {
 
@@ -42,7 +43,7 @@ void Nexus::register_hook(SessionMgmtHook *hook) {
   }
 
   /* There should be no existing hook with the same thread ID */
-  for (auto reg_hook : reg_hooks) {
+  for (SessionMgmtHook *reg_hook : reg_hooks) {
     if (reg_hook->app_tid == hook->app_tid) {
       fprintf(stderr,
               "eRPC Nexus: FATAL attempt to register hook with "
@@ -137,8 +138,70 @@ void Nexus::install_sigio_handler() {
 }
 
 void Nexus::session_mgnt_handler() {
-  printf("eRPC Nexus: Number of registered RPC hooks = %zu\n",
-         reg_hooks.size());
+  erpc_dprintf("eRPC Nexus: Running session mgmt handler. RPC hooks = %zu\n",
+               reg_hooks.size());
+
+  nexus_lock.lock();
+
+  uint32_t addr_len = sizeof(struct sockaddr_in); /* value-result */
+  struct sockaddr_in their_addr; /* Sender's address information goes here */
+
+  SessionMgmtPkt *sm_pkt = new SessionMgmtPkt(); /* Need new: assed to Rpc */
+  int flags = 0;
+
+  /* Receive a packet from the socket. We're guaranteed to get exactly one. */
+  ssize_t recv_bytes =
+      recvfrom(nexus_sock_fd, (void *)sm_pkt, sizeof(*sm_pkt), flags,
+               (struct sockaddr *)&their_addr, &addr_len);
+  if (recv_bytes != sizeof(*sm_pkt)) {
+    fprintf(stderr,
+            "eRPC Nexus: FATAL. Received unexpected data size (%zd) from "
+            "socket. Expected = %zu.\n",
+            recv_bytes, sizeof(*sm_pkt));
+    exit(-1);
+  }
+
+  if (!is_valid_session_mgmt_pkt(sm_pkt)) {
+    fprintf(stderr,
+            "eRPC Nexus: FATAL. Received session management packet of "
+            "unexpected type %d.\n",
+            static_cast<int>(sm_pkt->pkt_type));
+    exit(-1);
+  }
+
+  int target_app_tid; /* TID of the Rpc that should handle this packet */
+  if (is_session_mgmt_pkt_req(sm_pkt)) {
+    target_app_tid = sm_pkt->server.app_tid;
+  } else {
+    target_app_tid = sm_pkt->client.app_tid;
+  }
+
+  /* Find the registered Rpc that has this TID */
+  SessionMgmtHook *target_hook = nullptr;
+  for (SessionMgmtHook *hook : reg_hooks) {
+    if (hook->app_tid == target_app_tid) {
+      target_hook = hook;
+    }
+  }
+
+  if (target_hook == nullptr) {
+    fprintf(stderr,
+            "eRPC Nexus. FATAL. Received session management packet for "
+            "unregistered app TID %d\n.",
+            target_app_tid);
+    exit(-1);
+  }
+
+  /* Add the packet to the target Rpc's session management packet list */
+  target_hook->session_mgmt_mutex.lock();
+  target_hook->session_mgmt_pkt_list.push_back(sm_pkt);
+
+  /* Update event counter after push_back to avoid false positive in Rpc */
+  ERpc::memory_barrier();
+  target_hook->session_mgmt_ev_counter++;
+
+  target_hook->session_mgmt_mutex.unlock();
+  nexus_lock.unlock();
 }
 
 }  // End ERpc

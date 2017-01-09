@@ -15,12 +15,35 @@ namespace ERpc {
  */
 enum class SessionMgmtEventType { kConnected, kDisconnected };
 
-enum class SessionMgmtPktType {
+/**
+ * @brief Types of packets used for session management.
+ */
+enum class SessionMgmtPktType : int {
   kConnectReq,
   kConnectResp,
   kDisconnectReq,
   kDisconnectResp
 };
+
+static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
+  switch (sm_pkt_type) {
+    case SessionMgmtPktType::kConnectReq:
+      return std::string("Connect request");
+      break;
+    case SessionMgmtPktType::kConnectResp:
+      return std::string("Connect response");
+      break;
+    case SessionMgmtPktType::kDisconnectReq:
+      return std::string("Disconnect request");
+      break;
+    case SessionMgmtPktType::kDisconnectResp:
+      return std::string("Disconnect response");
+      break;
+    default:
+      return std::string("Invalid");
+      break;
+  };
+}
 
 enum class SessionStatus {
   kInit,
@@ -94,8 +117,32 @@ class SessionMgmtPkt {
    */
   SessionMetadata client, server;
 
+  SessionMgmtPkt() {}
   SessionMgmtPkt(SessionMgmtPktType pkt_type) : pkt_type(pkt_type) {}
 };
+static_assert(sizeof(SessionMgmtPkt) < 1400,
+              "Session management packet too large for UDP");
+
+/**
+ * @brief Check if a session management packet is valid. XXX: Use a pkt tag.
+ */
+static bool is_valid_session_mgmt_pkt(SessionMgmtPkt *sm_pkt) {
+  int sm_pkt_type = static_cast<int>(sm_pkt->pkt_type);
+  int min_pkt_type = static_cast<int>(SessionMgmtPktType::kConnectReq);
+  int max_pkt_type = static_cast<int>(SessionMgmtPktType::kDisconnectResp);
+
+  return (sm_pkt_type >= min_pkt_type && sm_pkt_type <= max_pkt_type);
+}
+
+/**
+ * @brief Check if this session management packet is a request. Use the
+ * complement of this to check if a packet is a response.
+ */
+static bool is_session_mgmt_pkt_req(SessionMgmtPkt *sm_pkt) {
+  auto &pkt_type = sm_pkt->pkt_type;
+  return (pkt_type == SessionMgmtPktType::kConnectReq ||
+          pkt_type == SessionMgmtPktType::kConnectResp);
+}
 
 /**
  * @brief An object created by the per-thread Rpc, and shared with the
