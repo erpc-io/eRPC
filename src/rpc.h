@@ -26,13 +26,13 @@ class Rpc {
   const uint64_t kStartSeqMask = ((1ull << 48) - 1ull);
 
  public:
+  // rpc.cc
   Rpc(Nexus *nexus, void *context, int app_tid,
       session_mgmt_handler_t session_mgmt_handler,
       std::vector<int> fdev_port_vec);
 
   ~Rpc();
 
-  // rpc_session_mgmt.cc
   Session *create_session(int local_fdev_port_index, const char *_rem_hostname,
                           int rem_app_tid, int rem_fdev_port_index,
                           session_mgmt_handler_t sm_handler);
@@ -45,6 +45,9 @@ class Rpc {
 
   // rpc_ev_loop.cc
   void run_event_loop();
+
+  // rpc_session_mgmt.cc
+  void handle_session_management();
 
  private:
   // Constructor args
