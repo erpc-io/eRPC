@@ -32,15 +32,18 @@ class Rpc {
 
   ~Rpc();
 
+  // rpc_session_mgmt.cc
   Session *create_session(int local_fdev_port_index, const char *_rem_hostname,
                           int rem_app_tid, int rem_fdev_port_index,
                           session_mgmt_handler_t sm_handler);
 
   void connect_session(Session *session);
 
+  // rpc_datapath.cc
   void send_request(const Session *session, const Buffer *buffer);
   void send_response(const Session *session, const Buffer *buffer);
 
+  // rpc_ev_loop.cc
   void run_event_loop();
 
  private:
@@ -60,8 +63,10 @@ class Rpc {
   SlowRand slow_rand;
 
   // Private methods
+  
+  // rpc.cc
   uint64_t generate_start_seq();
-  void do_session_management();
+  bool is_session_managed(Session *session);
 };
 
 /* Instantiate required Rpc classes so they get compiled for the linker */

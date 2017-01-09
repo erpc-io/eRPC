@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "rpc.h"
 #include "util/udp_client.h"
 
@@ -54,6 +56,18 @@ uint64_t Rpc<Transport_>::generate_start_seq() {
 }
 
 template <class Transport_>
+bool Rpc<Transport_>::is_session_managed(Session *session) {
+  assert(session != NULL);
+
+  if (std::find(session_vec.begin(), session_vec.end(), session) ==
+      session_vec.end()) {
+    return false;
+  }
+
+  return true;
+}
+
+template <class Transport_>
 Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
                                          const char *rem_hostname,
                                          int rem_app_tid,
@@ -61,7 +75,7 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
                                          session_mgmt_handler_t sm_handler) {
   /*
    * This function is not on the critical path and is exposed to the user,
-   * so the args checking is always enabled.
+   * so the args checking is always enabled (i.e., no asserts).
    */
   if (local_fdev_port_index < 0 ||
       local_fdev_port_index >= (int)kMaxFabDevPorts) {
@@ -109,7 +123,7 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   strcpy((char *)client_metadata.hostname, nexus->hostname);
   client_metadata.app_tid = app_tid;
   client_metadata.fdev_port_index = local_fdev_port_index;
-  client_metadata.session_num = next_session_num++;
+  client_metadata.session_num = next_session_num++; /* Assign unique sess num */
   client_metadata.start_seq = generate_start_seq();
   transport->fill_routing_info(&client_metadata.routing_info);
 
@@ -124,13 +138,21 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   // server_metadata.session_num = ??
   // server_metadata.start_seq = ??
   // server_metadata.routing_info = ??
-
+  
+  session_vec.push_back(session);
   return session;
 }
 
 template <class Transport_>
 void Rpc<Transport_>::connect_session(Session *session) {
   assert(session != NULL);
+
+  if (!is_session_managed(session)) {
+    fprintf(stderr,
+            "eRPC connect_session: FATAL. Session %p is not managed Rpc.\n",
+            session);
+    exit(-1);
+  }
 
   UDPClient *udp_client =
       new UDPClient(session->remote.hostname, nexus->global_udp_port);
