@@ -117,7 +117,7 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   session->sm_handler = sm_handler;
 
   /* Fill in local metadata */
-  SessionMetadata &client_metadata = session->local;
+  SessionMetadata &client_metadata = session->client;
 
   client_metadata.transport_type = transport->transport_type;
   strcpy((char *)client_metadata.hostname, nexus->hostname);
@@ -131,14 +131,14 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
    * Fill in remote metadata. Commented fields will be filled when the
    * session is connected.
    */
-  SessionMetadata &server_metadata = session->remote;
+  SessionMetadata &server_metadata = session->server;
   strcpy((char *)server_metadata.hostname, rem_hostname);
   server_metadata.app_tid = rem_app_tid;
   server_metadata.fdev_port_index = rem_fdev_port_index;
   // server_metadata.session_num = ??
   // server_metadata.start_seq = ??
   // server_metadata.routing_info = ??
-  
+
   session_vec.push_back(session);
   return session;
 }
@@ -154,8 +154,19 @@ void Rpc<Transport_>::connect_session(Session *session) {
     exit(-1);
   }
 
+  /* Send a connect request */
   UDPClient *udp_client =
-      new UDPClient(session->remote.hostname, nexus->global_udp_port);
+      new UDPClient(session->server.hostname, nexus->global_udp_port);
+
+  SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
+  memcpy((void *)&connect_req.client, (void *)&session->client,
+         sizeof(connect_req.client));
+  memcpy((void *)&connect_req.server, (void *)&session->server,
+         sizeof(connect_req.server));
+
+  int ret = udp_client->send((char *)&connect_req, sizeof(connect_req));
+  assert(ret == 0);
+  _unused(ret);
 
   delete udp_client;
 }

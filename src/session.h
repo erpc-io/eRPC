@@ -72,7 +72,7 @@ class Session {
    */
   void disable_congestion_control();
 
-  SessionMetadata local, remote;
+  SessionMetadata client, server;
 
   void (*sm_handler)(Session *, SessionMgmtEventType, void *);
   bool is_cc; /* Is congestion control enabled for this session? */
@@ -85,6 +85,7 @@ typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType, void *);
  * and servers. This is pretty large (~500 bytes), so use sparingly.
  */
 class SessionMgmtPkt {
+ public:
   SessionMgmtPktType pkt_type;
 
   /*
@@ -92,6 +93,8 @@ class SessionMgmtPkt {
    * filled in by the client and server Rpc.
    */
   SessionMetadata client, server;
+
+  SessionMgmtPkt(SessionMgmtPktType pkt_type) : pkt_type(pkt_type) {}
 };
 
 /**
