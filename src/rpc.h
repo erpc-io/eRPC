@@ -61,7 +61,7 @@ class Rpc {
   /**
    * @brief Run the event loop for \p timeout_ms milliseconds
    */
-  inline void run_event_loop(size_t timeout_ms) {
+  inline void run_event_loop_timeout(size_t timeout_ms) {
     double freq_ghz = nexus->get_freq_ghz();
     uint64_t start_tsc = rdtsc();
 
