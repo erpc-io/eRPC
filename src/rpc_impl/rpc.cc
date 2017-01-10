@@ -33,6 +33,12 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
     i++;
   }
 
+  /*
+   * Copy the gigahertz frequency computed in the Nexus. This prevents false
+   * sharing in case the Nexus cacheline containing frequency is modified.
+   */
+  freq_ghz = nexus->get_freq_ghz();
+
   /* Initialize the transport */
   transport = new Transport_();
 

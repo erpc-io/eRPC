@@ -43,7 +43,37 @@ class Rpc {
   void send_response(const Session *session, const Buffer *buffer);
 
   // rpc_ev_loop.cc
-  void run_event_loop();
+
+  /**
+   * @brief Run one iteration of the event loop
+   */
+  void run_event_loop_one();
+
+  /**
+   * @brief Run the event loop forever
+   */
+  inline void run_event_loop() {
+    while (true) {
+      run_event_loop_one();
+    }
+  }
+
+  /**
+   * @brief Run the event loop for \p timeout_ms milliseconds
+   */
+  inline void run_event_loop(size_t timeout_ms) {
+    double freq_ghz = nexus->get_freq_ghz();
+    uint64_t start_tsc = rdtsc();
+
+    while (true) {
+      run_event_loop_one();
+
+      double elapsed_ms = to_sec(rdtsc() - start_tsc, freq_ghz) * 1000;
+      if (elapsed_ms > timeout_ms) {
+        return;
+      }
+    }
+  }
 
   // rpc_session_mgmt.cc
   void handle_session_management();
@@ -63,9 +93,10 @@ class Rpc {
   std::vector<Session *> session_vec;
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
+  double freq_ghz; /* Copied from Nexus to avoid false sharing */
 
   // Private methods
-  
+
   // rpc.cc
   uint64_t generate_start_seq();
   bool is_session_managed(Session *session);

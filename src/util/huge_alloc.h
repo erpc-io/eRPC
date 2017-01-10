@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "common.h"
+#include "util/rand.h"
 
 namespace ERpc {
 /**
@@ -42,9 +43,10 @@ class HugeAllocator {
     }
   };
 
-  /* SHM regions used by this allocator, in order of increasing size. */
-  size_t numa_node;
+  SlowRand slow_rand; /* RNG to generate SHM keys */
+  size_t numa_node;   /* NUMA node on which all memory is allocated */
 
+  /* SHM regions used by this allocator, in order of increasing size. */
   std::vector<shm_region_t> shm_list;
   std::vector<void *> page_freelist; /* Currently free 4k pages */
 
@@ -137,7 +139,7 @@ class HugeAllocator {
   inline void *alloc_huge(size_t size) {
     assert(size >= ERpc::kHugepageSize && size <= kMaxAllocSize);
 
-    size = RoundUp<kHugepageSize>(size);
+    size = round_up<kHugepageSize>(size);
     size_t reqd_hugepages = size / kHugepageSize;
 
     for (shm_region_t &shm_region : shm_list) {
@@ -216,12 +218,12 @@ class HugeAllocator {
    * other reason, an error message is printed and exit(-1) is called.
    */
   bool reserve_hugepages(size_t size, size_t numa_node) {
-    size = RoundUp<kHugepageSize>(size);
+    size = round_up<kHugepageSize>(size);
     int shm_key, shm_id;
 
     while (true) {
       /* Choose a random SHM key */
-      shm_key = static_cast<int>(std::hash<uint64_t>()(RdTsc()));
+      shm_key = static_cast<int>(slow_rand.next_u64());
 
       /* Try to get an SHM region */
       shm_id = shmget(shm_key, size, IPC_CREAT | IPC_EXCL | 0666 | SHM_HUGETLB);

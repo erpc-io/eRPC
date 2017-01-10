@@ -29,6 +29,8 @@ class Nexus {
   void install_sigio_handler();
   void session_mgnt_handler();
 
+  inline double get_freq_ghz() { return freq_ghz; }
+
   char hostname[kMaxHostnameLen]; /* The local host's network hostname */
 
   /*
@@ -46,6 +48,13 @@ class Nexus {
    */
   const uint16_t global_udp_port;
   int nexus_sock_fd; /* The file descriptor of the UDP socket */
+
+ private:
+  /**
+   * @brief Compute the frequency of rdtsc and set @freq_ghz
+   */
+  void compute_freq_ghz();
+  double freq_ghz;
 };
 
 static Nexus *nexus_object; /* The one per-process Nexus object */

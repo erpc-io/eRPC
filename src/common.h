@@ -45,24 +45,39 @@ static const size_t kMaxFabDevPorts = 4; /* Max fabric device ports */
 static const size_t kMaxHostnameLen = 128;
 
 // Simple methods
-static uint64_t RdTsc() {
+static uint64_t rdtsc() {
   uint64_t rax;
   uint64_t rdx;
   asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
   return (rdx << 32) | rax;
 }
 
+/**
+ * @brief Convert cycles measured by rdtsc with frequence \p freq_ghz to seconds
+ */
+static double to_sec(uint64_t cycles, double freq_ghz) {
+  return (cycles / (freq_ghz * 1000000000));
+}
+
+/**
+ * @brief Convert cycles measured by rdtsc with frequence \p freq_ghz to msec
+ */
+static double to_nsec(uint64_t cycles, double freq_ghz) {
+  return (cycles / freq_ghz);
+}
+
 template <typename T>
-static constexpr bool IsPowerOfTwo(T x) {
+static constexpr bool is_power_of_two(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
 
-template <uint64_t PowerOfTwoNumber, typename T>
-static constexpr T RoundUp(T x) {
-  static_assert(IsPowerOfTwo(PowerOfTwoNumber),
+template <uint64_t power_of_two_number, typename T>
+static constexpr T round_up(T x) {
+  static_assert(is_power_of_two(power_of_two_number),
                 "PowerOfTwoNumber must be a power of 2");
-  return ((x) + T(PowerOfTwoNumber - 1)) & (~T(PowerOfTwoNumber - 1));
+  return ((x) + T(power_of_two_number - 1)) & (~T(power_of_two_number - 1));
 }
-}
+
+}  // End ERpc
 
 #endif

@@ -26,6 +26,8 @@ Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s\n",
                global_udp_port, hostname);
   nexus_object = this;
+
+  compute_freq_ghz();
   install_sigio_handler();
 }
 
@@ -202,6 +204,38 @@ void Nexus::session_mgnt_handler() {
 
   target_hook->session_mgmt_mutex.unlock();
   nexus_lock.unlock();
+}
+
+void Nexus::compute_freq_ghz() {
+  struct timespec start, end;
+  clock_gettime(CLOCK_REALTIME, &start);
+  uint64_t rdtsc_start = rdtsc();
+
+  /*
+   * Do not change this loop! The hardcoded value below depends on this loop
+   * and prevents it from being optimized out.
+   */
+  uint64_t sum = 5;
+  for (uint64_t i = 0; i < 1000000; i++) {
+    sum += i + (sum + i) * (i % sum);
+  }
+
+  if (sum != 13580802877818827968ull) {
+    fprintf(stderr, "eRPC: FATAL. Failed in rdtsc frequency measurement.");
+    exit(-1);
+  }
+
+  clock_gettime(CLOCK_REALTIME, &end);
+  uint64_t clock_ns = (uint64_t)(end.tv_sec - start.tv_sec) * 1000000000 +
+                      (uint64_t)(end.tv_nsec - start.tv_nsec);
+  uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
+
+  freq_ghz = rdtsc_cycles / clock_ns;
+
+  if (freq_ghz < 1.0 || freq_ghz > 4.0) {
+    fprintf(stderr, "eRPC Nexus: FATAL. Abnormal CPU frequency %.4f GHz\n",
+            freq_ghz);
+  }
 }
 
 }  // End ERpc
