@@ -140,9 +140,6 @@ void Nexus::install_sigio_handler() {
 }
 
 void Nexus::session_mgnt_handler() {
-  erpc_dprintf("eRPC Nexus: Running session mgmt handler. RPC hooks = %zu\n",
-               reg_hooks.size());
-
   nexus_lock.lock();
 
   uint32_t addr_len = sizeof(struct sockaddr_in); /* value-result */
@@ -172,10 +169,19 @@ void Nexus::session_mgnt_handler() {
   }
 
   int target_app_tid; /* TID of the Rpc that should handle this packet */
+  int source_app_tid; /* Debug-only */
+  _unused(source_app_tid);
+  const char *source_hostname; /* Debug-only */
+  _unused(source_hostname);
+
   if (is_session_mgmt_pkt_req(sm_pkt)) {
     target_app_tid = sm_pkt->server.app_tid;
+    source_app_tid = sm_pkt->client.app_tid;
+    source_hostname = sm_pkt->client.hostname;
   } else {
     target_app_tid = sm_pkt->client.app_tid;
+    source_app_tid = sm_pkt->server.app_tid;
+    source_hostname = sm_pkt->server.hostname;
   }
 
   /* Find the registered Rpc that has this TID */
@@ -201,6 +207,12 @@ void Nexus::session_mgnt_handler() {
   /* Update event counter after push_back to avoid false positive in Rpc */
   ERpc::memory_barrier();
   target_hook->session_mgmt_ev_counter++;
+
+  erpc_dprintf(
+      "eRPC Nexus: Received session mgmt packet of type %s for Rpc %d, "
+      "from Rpc [%s, %d]\n",
+      session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str(), target_app_tid,
+      source_hostname, source_app_tid);
 
   target_hook->session_mgmt_mutex.unlock();
   nexus_lock.unlock();

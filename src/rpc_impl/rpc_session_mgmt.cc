@@ -12,7 +12,7 @@ void Rpc<Transport_>::handle_session_management() {
 
   /* Handle all session management requests */
   for (SessionMgmtPkt *sm_pkt : sm_hook.session_mgmt_pkt_list) {
-    erpc_dprintf("eRPC Rpc: RPC %d received session mgmt pkt of type %s\n",
+    erpc_dprintf("eRPC Rpc: Rpc %d received session mgmt pkt of type %s\n",
                  app_tid, session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str());
     free(sm_pkt);
   }

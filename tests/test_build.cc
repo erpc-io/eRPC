@@ -32,10 +32,10 @@ void client_thread_func(Nexus *nexus) {
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, port_vec);
 
-  Session *session = rpc.create_session(port_vec[0], /* Local port */
-                                        "localhost", /* Remote hostname */
+  Session *session = rpc.create_session(port_vec[0],    /* Local port */
+                                        "localhost",    /* Remote hostname */
                                         SERVER_APP_TID, /* Remote app TID */
-                                        port_vec[0]); /* Remote port */
+                                        port_vec[0]);   /* Remote port */
 
   /* Send the connect request only after the server is ready */
   while (server_ready == 0) {
@@ -48,7 +48,6 @@ void client_thread_func(Nexus *nexus) {
   _unused(session);
 }
 
-
 void server_thread_func(Nexus *nexus) {
   test_context_t *server_context = new test_context_t("client_thread");
 
@@ -56,10 +55,8 @@ void server_thread_func(Nexus *nexus) {
                                &test_sm_hander, port_vec);
 
   server_ready = 1;
-  sleep(5);
+  rpc.run_event_loop_timeout(5000);
 }
-
-
 
 TEST(test_build, test_build) {
   Nexus nexus(NEXUS_UDP_PORT);

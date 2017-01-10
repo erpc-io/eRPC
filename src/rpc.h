@@ -62,13 +62,12 @@ class Rpc {
    * @brief Run the event loop for \p timeout_ms milliseconds
    */
   inline void run_event_loop_timeout(size_t timeout_ms) {
-    double freq_ghz = nexus->get_freq_ghz();
     uint64_t start_tsc = rdtsc();
 
     while (true) {
       run_event_loop_one();
 
-      double elapsed_ms = to_sec(rdtsc() - start_tsc, freq_ghz) * 1000;
+      double elapsed_ms = to_sec(rdtsc() - start_tsc, nexus->freq_ghz) * 1000;
       if (elapsed_ms > timeout_ms) {
         return;
       }
@@ -93,7 +92,6 @@ class Rpc {
   std::vector<Session *> session_vec;
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
-  double freq_ghz; /* Copied from Nexus to avoid false sharing */
 
   // Private methods
 

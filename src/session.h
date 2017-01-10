@@ -19,13 +19,13 @@ static std::string session_mgmt_event_type_str(
     SessionMgmtEventType event_type) {
   switch (event_type) {
     case SessionMgmtEventType::kConnected:
-      return std::string("Connected");
+      return std::string("[Connected]");
       break;
     case SessionMgmtEventType::kDisconnected:
-      return std::string("Disconnected");
+      return std::string("[Disconnected]");
       break;
     default:
-      return std::string("Invalid");
+      return std::string("[Invalid]");
       break;
   }
 }
@@ -43,19 +43,19 @@ enum class SessionMgmtPktType : int {
 static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
-      return std::string("Connect request");
+      return std::string("[Connect request]");
       break;
     case SessionMgmtPktType::kConnectResp:
-      return std::string("Connect response");
+      return std::string("[Connect response]");
       break;
     case SessionMgmtPktType::kDisconnectReq:
-      return std::string("Disconnect request");
+      return std::string("[Disconnect request]");
       break;
     case SessionMgmtPktType::kDisconnectResp:
-      return std::string("Disconnect response");
+      return std::string("[Disconnect response]");
       break;
     default:
-      return std::string("Invalid");
+      return std::string("[Invalid]");
       break;
   };
 }

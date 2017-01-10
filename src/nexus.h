@@ -29,19 +29,11 @@ class Nexus {
   void install_sigio_handler();
   void session_mgnt_handler();
 
-  inline double get_freq_ghz() { return freq_ghz; }
-
+  // The Nexus object is shared among all Rpc objects, so we need to avoid
+  // false sharing. Read-only members go first; other members come after
+  // a cache line padding.
   char hostname[kMaxHostnameLen]; /* The local host's network hostname */
-
-  /*
-   * The Nexus is shared among all Rpc threads. This lock must be held while
-   * calling Nexus functions from Rpc threads.
-   */
-  std::mutex nexus_lock;
-
-  /* Hooks into session management objects registered by RPC objects */
-  std::vector<SessionMgmtHook *> reg_hooks;
-
+  double freq_ghz;
   /*
    * The UDP port used by all Nexus-es in the cluster to listen on for
    * session management
@@ -49,12 +41,17 @@ class Nexus {
   const uint16_t global_udp_port;
   int nexus_sock_fd; /* The file descriptor of the UDP socket */
 
+  uint8_t pad[64];
+  std::mutex nexus_lock; /* Held by Rpc threads to access Nexus */
+
+  /* Hooks into session management objects registered by RPC objects */
+  std::vector<SessionMgmtHook *> reg_hooks;
+
  private:
   /**
    * @brief Compute the frequency of rdtsc and set @freq_ghz
    */
   void compute_freq_ghz();
-  double freq_ghz;
 };
 
 static Nexus *nexus_object; /* The one per-process Nexus object */
@@ -64,8 +61,6 @@ static Nexus *nexus_object; /* The one per-process Nexus object */
  * with the one Nexus object.
  */
 static void sigio_handler(int sig_num) {
-  erpc_dprintf("eRPC Nexus: SIGIO handler called with nexus_object = %p\n",
-               (void *)nexus_object);
   assert(sig_num == SIGIO);
   _unused(sig_num);
   nexus_object->session_mgnt_handler();
