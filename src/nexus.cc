@@ -160,7 +160,7 @@ void Nexus::session_mgnt_handler() {
     exit(-1);
   }
 
-  if (!is_valid_session_mgmt_pkt(sm_pkt)) {
+  if (!is_valid_session_mgmt_pkt_type(sm_pkt->pkt_type)) {
     fprintf(stderr,
             "eRPC Nexus: FATAL. Received session management packet of "
             "unexpected type %d.\n",
@@ -174,7 +174,7 @@ void Nexus::session_mgnt_handler() {
   const char *source_hostname; /* Debug-only */
   _unused(source_hostname);
 
-  if (is_session_mgmt_pkt_req(sm_pkt)) {
+  if (is_session_mgmt_pkt_type_req(sm_pkt->pkt_type)) {
     target_app_tid = sm_pkt->server.app_tid;
     source_app_tid = sm_pkt->client.app_tid;
     source_hostname = sm_pkt->client.hostname;

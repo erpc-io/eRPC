@@ -76,6 +76,10 @@ class Rpc {
 
   // rpc_session_mgmt.cc
   void handle_session_management();
+  void handle_session_connect_req(SessionMgmtPkt *pkt);
+  void handle_session_connect_resp(SessionMgmtPkt *pkt);
+  void handle_session_disconnect_req(SessionMgmtPkt *pkt);
+  void handle_session_disconnect_resp(SessionMgmtPkt *pkt);
 
  private:
   // Constructor args
