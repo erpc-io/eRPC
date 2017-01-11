@@ -1,4 +1,5 @@
 #include "rpc.h"
+#include <algorithm>
 
 namespace ERpc {
 
@@ -43,8 +44,36 @@ template <class Transport_>
 void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *pkt) {
   assert(pkt != NULL);
   assert(pkt->pkt_type == SessionMgmtPktType::kConnectReq);
+
+  /* Ensure that the server fields were filled correctly */
   assert(pkt->server.app_tid == app_tid);
   assert(strcmp(pkt->server.hostname, nexus->hostname));
+
+  /* Send back an error if we don't manage the requested fabric port */
+  if (!is_fdev_port_managed(pkt->server.fdev_port_index)) {
+    /* XXX: Send back an error response */
+  }
+
+  /* Check if we already have a session with this client */
+  for (Session *existing_session : session_vec) {
+    if (strcmp(existing_session->client.hostname, pkt->client.hostname) &&
+        existing_session->client.app_tid == pkt->client.app_tid) {
+      assert(existing_session->client.session_num == pkt->client.session_num);
+
+      /* XXX: We need to send back an "exists" response */
+      erpc_dprintf(
+          "eRPC Rpc: Rpc %s received duplicate session connect "
+          "request from %s\n",
+          get_name().c_str(), existing_session->get_client_name().c_str());
+      return;
+    }
+  }
+
+  /* Create a new session. XXX: Use pool? */
+  Session *session = new Session();
+  session->client = pkt->client;
+  session->server = pkt->server;
+  _unused(session);
 }
 
 template <class Transport_>

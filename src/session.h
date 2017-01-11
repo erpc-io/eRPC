@@ -141,6 +141,8 @@ class Session {
   Session();
   ~Session();
 
+  std::string get_client_name();
+
   /**
    * @brief Enables congestion control for this session
    */

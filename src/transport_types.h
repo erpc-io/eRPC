@@ -2,6 +2,7 @@
 #define ERPC_TRANSPORT_TYPE_H
 
 #include <strings.h>
+#include <string>
 #include "common.h"
 
 namespace ERpc {
@@ -16,21 +17,18 @@ struct RoutingInfo {
   uint8_t buf[kMaxRoutingInfoSize];
 };
 
-/**
- * @brief Returns an enum representation of the transport type string
- */
-static TransportType get_transport_type(const char *transport_name) {
-  if (strcasecmp(transport_name, "InfiniBand")) {
-    return TransportType::kInfiniBand;
-  } else if (strcasecmp(transport_name, "RoCE")) {
-    return TransportType::kRoCE;
-  } else if (strcasecmp(transport_name, "OmniPath")) {
-    return TransportType::kOmniPath;
-  } else {
-    return TransportType::kInvalidTransport;
+static std::string get_transport_name(TransportType transport_type) {
+  switch (transport_type) {
+    case TransportType::kInfiniBand:
+      return std::string("InfiniBand");
+    case TransportType::kRoCE:
+      return std::string("RoCE");
+    case TransportType::kOmniPath:
+      return std::string("OmniPath");
+    case TransportType::kInvalidTransport:
+      return std::string("Invalid transport");
   }
 }
-
 }  // End ERpc
 
 #endif  // ERPC_TRANSPORT_TYPE_H

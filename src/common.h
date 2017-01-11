@@ -21,6 +21,14 @@ namespace ERpc {
     }                                    \
   } while (0)
 
+#define erpc_dprintf_noargs(fmt) \
+  do {                           \
+    if (ERPC_DPRINTF) {          \
+      fprintf(stderr, fmt);      \
+      fflush(stderr);            \
+    }                            \
+  } while (0)
+
 // Debug-mode printing for classes with special needs
 #define RPC_DPRINTF 1
 

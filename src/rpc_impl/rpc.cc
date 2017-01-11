@@ -78,38 +78,37 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
    */
   if (local_fdev_port_index < 0 ||
       local_fdev_port_index >= (int)kMaxFabDevPorts) {
-    fprintf(stderr, "eRPC create_session: FATAL. Invalid local port index.\n");
-    exit(-1);
+    erpc_dprintf(
+        "eRPC RPC: create_session failed. Invalid local fabric port %d\n",
+        local_fdev_port_index);
+    return nullptr;
   }
 
   if (rem_hostname == nullptr || strlen(rem_hostname) > kMaxHostnameLen) {
-    fprintf(stderr, "eRPC create_session: FATAL. Invalid remote hostname.\n");
-    exit(-1);
+    erpc_dprintf_noargs(
+        "eRPC RPC: create_session failed. Invalid remote hostname.\n");
+    return nullptr;
   }
 
   if (rem_app_tid < 0) {
-    fprintf(stderr, "eRPC create_session: FATAL. Invalid remote app TID.\n");
-    exit(-1);
+    erpc_dprintf("eRPC RPC: create_session failed. Invalid remote TID %d.\n",
+                 rem_app_tid);
+    return nullptr;
   }
 
   if (rem_fdev_port_index < 0 || rem_fdev_port_index >= (int)kMaxFabDevPorts) {
-    fprintf(stderr, "eRPC create_session: FATAL. Invalid remote port index.\n");
-    exit(-1);
+    erpc_dprintf(
+        "eRPC RPC: create_session failed. Invalid remote fabric port %d\n",
+        rem_fdev_port_index);
+    return nullptr;
   }
 
   /* Ensure that the requested local port is managed by Rpc */
-  bool is_local_port_managed = false;
-  for (int i = 0; i < num_fdev_ports; i++) {
-    if (fdev_port_arr[i] == local_fdev_port_index) {
-      is_local_port_managed = true;
-    }
-  }
-
-  if (!is_local_port_managed) {
-    fprintf(stderr,
-            "eRPC create_session: FATAL. Local port index %d is unmanaged\n",
-            local_fdev_port_index);
-    exit(-1);
+  if (!is_fdev_port_managed(local_fdev_port_index)) {
+    erpc_dprintf(
+        "eRPC RPC: create_session failed. Local fabric port %d is unmanaged.\n",
+        local_fdev_port_index);
+    return nullptr;
   }
 
   Session *session = new Session(); /* XXX: Use pool? */
@@ -167,6 +166,27 @@ void Rpc<Transport_>::connect_session(Session *session) {
   _unused(ret);
 
   delete udp_client;
+}
+
+template <class Transport_>
+std::string Rpc<Transport_>::get_name() {
+  std::string ret;
+  ret += std::string("[");
+  ret += std::string(nexus->hostname);
+  ret += std::string(", ");
+  ret += std::to_string(app_tid);
+  ret += std::string("]");
+  return ret;
+}
+
+template <class Transport_>
+bool Rpc<Transport_>::is_fdev_port_managed(int fab_port_index) {
+  for (int i = 0; i < num_fdev_ports; i++) {
+    if (fdev_port_arr[i] == fab_port_index) {
+      return true;
+    }
+  }
+  return false;
 }
 
 template <class Transport_>

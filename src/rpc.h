@@ -33,10 +33,22 @@ class Rpc {
 
   ~Rpc();
 
+  /**
+   * @brief Create a Session. The session needs to be connected separarely.
+   *
+   * @return A pointer to the created session if creation succeeds. NULL if
+   * creation fails.
+   */
   Session *create_session(int local_fdev_port_index, const char *_rem_hostname,
                           int rem_app_tid, int rem_fdev_port_index);
 
   void connect_session(Session *session);
+  std::string get_name();
+
+  /**
+   * @brief Check if fabric port \p fab_port_index is managed by this Rpc
+   */
+  bool is_fdev_port_managed(int fab_port_index);
 
   // rpc_datapath.cc
   void send_request(const Session *session, const Buffer *buffer);

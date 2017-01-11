@@ -193,6 +193,8 @@ void Nexus::session_mgnt_handler() {
   }
 
   if (target_hook == nullptr) {
+    /* XXX: This should not be fatal. We should send back a "try again"
+     * response. */
     fprintf(stderr,
             "eRPC Nexus. FATAL. Received session management packet for "
             "unregistered app TID %d\n.",
