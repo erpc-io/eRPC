@@ -151,21 +151,13 @@ void Rpc<Transport_>::connect_session(Session *session) {
     exit(-1);
   }
 
-  /* Send a connect request */
-  UDPClient *udp_client =
-      new UDPClient(session->server.hostname, nexus->global_udp_port);
-
   SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
   memcpy((void *)&connect_req.client, (void *)&session->client,
          sizeof(connect_req.client));
   memcpy((void *)&connect_req.server, (void *)&session->server,
          sizeof(connect_req.server));
 
-  ssize_t ret = udp_client->send((char *)&connect_req, sizeof(connect_req));
-  assert(ret == sizeof(connect_req));
-  _unused(ret);
-
-  delete udp_client;
+  connect_req.send_to(session->server.hostname, nexus->global_udp_port);
 }
 
 template <class Transport_>

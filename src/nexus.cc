@@ -145,7 +145,7 @@ void Nexus::session_mgnt_handler() {
   uint32_t addr_len = sizeof(struct sockaddr_in); /* value-result */
   struct sockaddr_in their_addr; /* Sender's address information goes here */
 
-  SessionMgmtPkt *sm_pkt = new SessionMgmtPkt(); /* Need new: assed to Rpc */
+  SessionMgmtPkt *sm_pkt = new SessionMgmtPkt(); /* Need new: passed to Rpc */
   int flags = 0;
 
   /* Receive a packet from the socket. We're guaranteed to get exactly one. */
@@ -169,12 +169,13 @@ void Nexus::session_mgnt_handler() {
   }
 
   int target_app_tid; /* TID of the Rpc that should handle this packet */
+  const char *source_hostname;
   int source_app_tid; /* Debug-only */
   _unused(source_app_tid);
-  const char *source_hostname; /* Debug-only */
-  _unused(source_hostname);
 
-  if (is_session_mgmt_pkt_type_req(sm_pkt->pkt_type)) {
+  bool is_sm_req = is_session_mgmt_pkt_type_req(sm_pkt->pkt_type);
+
+  if (is_sm_req) {
     target_app_tid = sm_pkt->server.app_tid;
     source_app_tid = sm_pkt->client.app_tid;
     source_hostname = sm_pkt->client.hostname;
@@ -193,13 +194,29 @@ void Nexus::session_mgnt_handler() {
   }
 
   if (target_hook == nullptr) {
-    /* XXX: This should not be fatal. We should send back a "try again"
-     * response. */
-    fprintf(stderr,
-            "eRPC Nexus. FATAL. Received session management packet for "
-            "unregistered app TID %d\n.",
-            target_app_tid);
-    exit(-1);
+    /* We don't have an Rpc for @target_app_tid  */
+
+    if (is_sm_req) {
+      /* If it's a request, we must send a response */
+      erpc_dprintf(
+          "eRPC Nexus: Received session management request for invalid Rpc %d "
+          "from Rpc [%s, %d]. Sending response.\n",
+          target_app_tid, source_hostname, source_app_tid);
+
+      sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
+      sm_pkt->resp_type = SessionMgmtResponseType::kInvalidRemoteAppTid;
+
+      sm_pkt->send_to(source_hostname, global_udp_port);
+    } else {
+      /* If it's a response, we can ignore it */
+      erpc_dprintf(
+          "eRPC Nexus: Received session management response for invalid Rpc %d "
+          "from Rpc [%s, %d]. Ignoring.\n",
+          target_app_tid, source_hostname, source_app_tid);
+    }
+
+    delete sm_pkt;
+    return;
   }
 
   /* Add the packet to the target Rpc's session management packet list */
