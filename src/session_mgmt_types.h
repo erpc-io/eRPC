@@ -58,6 +58,7 @@ static bool is_session_mgmt_pkt_type_req(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kDisconnectResp:
       return false;
   }
+  return false;
 }
 
 /**
@@ -75,9 +76,11 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
       return SessionMgmtPktType::kDisconnectResp;
     case SessionMgmtPktType::kConnectResp:
     case SessionMgmtPktType::kDisconnectResp:
-      exit(-1);
-      return static_cast<SessionMgmtPktType>(-1);
+      break;
   }
+
+  exit(-1);
+  return static_cast<SessionMgmtPktType>(-1);
 }
 
 /**
