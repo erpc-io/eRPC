@@ -42,7 +42,7 @@ class Rpc {
   Session *create_session(int local_fdev_port_index, const char *_rem_hostname,
                           int rem_app_tid, int rem_fdev_port_index);
 
-  void connect_session(Session *session);
+  bool connect_session(Session *session);
   std::string get_name();
 
   /**
@@ -103,8 +103,14 @@ class Rpc {
   int fdev_port_arr[kMaxFabDevPorts];
 
   // Others
-  int next_session_num;
   Transport_ *transport; /* The unreliable transport */
+
+  /*
+   * The append-only list of session pointers, indexed by session num.
+   * Disconnected sessions are denoted by null pointers. This grows as sessions
+   * are repeatedly connected and disconnected, but paying 8 bytes per session
+   * seems OK.
+   */
   std::vector<Session *> session_vec;
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;

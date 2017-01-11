@@ -98,7 +98,12 @@ static_assert(sizeof(SessionMgmtPkt) < 1400,
  */
 class Session {
  public:
-  Session();
+  enum class Role : bool {
+    kServer,
+    kClient
+  };
+
+  inline Session(Role role) : role(role) {};
   ~Session();
 
   std::string get_client_name();
@@ -115,6 +120,7 @@ class Session {
 
   SessionMetadata client, server;
 
+  Role role;
   bool is_cc; /* Is congestion control enabled for this session? */
 };
 

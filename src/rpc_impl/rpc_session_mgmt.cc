@@ -49,8 +49,14 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->server.app_tid == app_tid);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname));
 
-  /* Send back an error if we don't manage the requested fabric port */
+  /* Check if the requested fabric port is managed by us */
   if (!is_fdev_port_managed(sm_pkt->server.fdev_port_index)) {
+    erpc_dprintf(
+        "eRPC Rpc: Rpc %s received session connect request from [%s, %d] with "
+        "invalid server fabric port %d\n",
+        get_name().c_str(), sm_pkt->client.hostname, sm_pkt->client.app_tid,
+        sm_pkt->server.fdev_port_index);
+
     sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
     sm_pkt->resp_type = SessionMgmtResponseType::kInvalidRemotePort;
 
@@ -60,7 +66,11 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     return;
   }
 
-  /* Check if we already have a session with this client */
+  /*
+   * Check if we already have a session as a server Rpc with the client Rpc
+   * (C) that sent this packet. It's OK if we have a session where we are a
+   * client Rpc, and C is the server Rpc.
+   */
   for (Session *existing_session : session_vec) {
     if (strcmp(existing_session->client.hostname, sm_pkt->client.hostname) &&
         existing_session->client.app_tid == sm_pkt->client.app_tid) {
@@ -82,8 +92,25 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     }
   }
 
-  /* Create a new session. XXX: Use pool? */
-  Session *session = new Session();
+  /* Check if we are allowed to create another session */
+  if (session_vec.size() == kMaxSessionsPerThread) {
+    erpc_dprintf(
+        "eRPC Rpc: Rpc %s received session connect request from [%s, %d], "
+        "but we are at session limit (%zu)\n",
+        get_name().c_str(), sm_pkt->client.hostname, sm_pkt->client.app_tid,
+        kMaxSessionsPerThread);
+
+    sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
+    sm_pkt->resp_type = SessionMgmtResponseType::kTooManySessions;
+
+    sm_pkt->send_to(sm_pkt->client.hostname, nexus->global_udp_port);
+
+    delete sm_pkt;
+    return;
+  }
+
+  /* If we are here, it is OK to create a new session */
+  Session *session = new Session(Session::Role::kServer);
   session->client = sm_pkt->client;
   session->server = sm_pkt->server;
   _unused(session);

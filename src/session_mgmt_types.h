@@ -92,6 +92,7 @@ enum class SessionMgmtResponseType : int {
   kSessionExists,
   kInvalidRemoteAppTid,
   kInvalidRemotePort,
+  kTooManySessions
 };
 
 }  // End ERpc

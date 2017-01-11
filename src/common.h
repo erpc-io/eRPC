@@ -52,6 +52,13 @@ static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
 static const size_t kMaxFabDevPorts = 4; /* Max fabric device ports */
 static const size_t kMaxHostnameLen = 128;
 
+/*
+ * Maximum number of sessions (both as client and server) that can be created
+ * by a thread through its lifetime. This is small only for testing; several
+ * million sessions should be fine.
+ */
+static const size_t kMaxSessionsPerThread = 1024;
+
 // Simple methods
 static uint64_t rdtsc() {
   uint64_t rax;

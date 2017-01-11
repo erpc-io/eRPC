@@ -111,7 +111,16 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
     return nullptr;
   }
 
-  Session *session = new Session(); /* XXX: Use pool? */
+  /* Ensure bounded session_vec size */
+  if (session_vec.size() >= kMaxSessionsPerThread) {
+    erpc_dprintf(
+        "eRPC RPC: create_session failed. Session limit (%zu) reached.\n",
+        kMaxSessionsPerThread);
+    return nullptr;
+  }
+
+  /* Create a new session and add it to the session list */
+  Session *session = new Session(Session::Role::kClient); /* XXX: Use pool? */
 
   /* Fill in local metadata */
   SessionMetadata &client_metadata = session->client;
@@ -120,7 +129,7 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   strcpy((char *)client_metadata.hostname, nexus->hostname);
   client_metadata.app_tid = app_tid;
   client_metadata.fdev_port_index = local_fdev_port_index;
-  client_metadata.session_num = next_session_num++; /* Assign unique sess num */
+  client_metadata.session_num = (uint32_t)session_vec.size();
   client_metadata.start_seq = generate_start_seq();
   transport->fill_routing_info(&client_metadata.routing_info);
 
@@ -141,14 +150,19 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
 }
 
 template <class Transport_>
-void Rpc<Transport_>::connect_session(Session *session) {
+bool Rpc<Transport_>::connect_session(Session *session) {
   assert(session != NULL);
 
   if (!is_session_managed(session)) {
-    fprintf(stderr,
-            "eRPC connect_session: FATAL. Session %p is not managed Rpc.\n",
-            session);
-    exit(-1);
+    erpc_dprintf_noargs("eRPC Rpc: connect_session failed because session does "
+                        "not belong to Rpc.\n");
+    return false;
+  }
+
+  if (session->role != Session::Role::kClient) {
+    erpc_dprintf_noargs("eRPC Rpc: connect_session failed because session role "
+                        "is not client.\n");
+    return false;
   }
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
@@ -158,6 +172,7 @@ void Rpc<Transport_>::connect_session(Session *session) {
          sizeof(connect_req.server));
 
   connect_req.send_to(session->server.hostname, nexus->global_udp_port);
+  return true;
 }
 
 template <class Transport_>
