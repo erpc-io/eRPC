@@ -43,8 +43,10 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
 template <class Transport_>
 Rpc<Transport_>::~Rpc() {
   for (Session *session : session_vec) {
-    /* Free this session */
-    _unused(session);
+    if (session != nullptr) {
+      /* Free this session */
+      _unused(session);
+    }
   }
 }
 
@@ -66,54 +68,67 @@ bool Rpc<Transport_>::is_session_managed(Session *session) {
   return true;
 }
 
+/**
+ * @brief Create a new client session with this Rpc.
+ *
+ * This function is not on the critical path and is exposed to the user,
+ * so the args checking is always enabled (i.e., no asserts).
+ */
 template <class Transport_>
 Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
                                          const char *rem_hostname,
                                          int rem_app_tid,
                                          int rem_fdev_port_index) {
-  /*
-   * This function is not on the critical path and is exposed to the user,
-   * so the args checking is always enabled (i.e., no asserts).
-   */
+  /* Check local fabric port */
   if (local_fdev_port_index < 0 ||
       local_fdev_port_index >= (int)kMaxFabDevPorts) {
     erpc_dprintf(
-        "eRPC RPC: create_session failed. Invalid local fabric port %d\n",
+        "eRPC Rpc: create_session failed. Invalid local fabric port %d\n",
         local_fdev_port_index);
-    return nullptr;
-  }
-
-  if (rem_hostname == nullptr || strlen(rem_hostname) > kMaxHostnameLen) {
-    erpc_dprintf_noargs(
-        "eRPC RPC: create_session failed. Invalid remote hostname.\n");
-    return nullptr;
-  }
-
-  if (rem_app_tid < 0) {
-    erpc_dprintf("eRPC RPC: create_session failed. Invalid remote TID %d.\n",
-                 rem_app_tid);
-    return nullptr;
-  }
-
-  if (rem_fdev_port_index < 0 || rem_fdev_port_index >= (int)kMaxFabDevPorts) {
-    erpc_dprintf(
-        "eRPC RPC: create_session failed. Invalid remote fabric port %d\n",
-        rem_fdev_port_index);
     return nullptr;
   }
 
   /* Ensure that the requested local port is managed by Rpc */
   if (!is_fdev_port_managed(local_fdev_port_index)) {
     erpc_dprintf(
-        "eRPC RPC: create_session failed. Local fabric port %d is unmanaged.\n",
+        "eRPC Rpc: create_session failed. Local fabric port %d is unmanaged.\n",
         local_fdev_port_index);
+    return nullptr;
+  }
+
+  /* Check remote fabric port */
+  if (rem_fdev_port_index < 0 || rem_fdev_port_index >= (int)kMaxFabDevPorts) {
+    erpc_dprintf(
+        "eRPC Rpc: create_session failed. Invalid remote fabric port %d\n",
+        rem_fdev_port_index);
+    return nullptr;
+  }
+
+  /* Check remote hostname */
+  if (rem_hostname == nullptr || strlen(rem_hostname) > kMaxHostnameLen) {
+    erpc_dprintf_noargs(
+        "eRPC Rpc: create_session failed. Invalid remote hostname.\n");
+    return nullptr;
+  }
+
+  /* Check remote app TID */
+  if (rem_app_tid < 0) {
+    erpc_dprintf("eRPC Rpc: create_session failed. Invalid remote TID. %d.\n",
+                 rem_app_tid);
+    return nullptr;
+  }
+
+  /* Creating a session to the same thread is the client is not allowed */
+  if (strcmp(rem_hostname, nexus->hostname) && rem_app_tid == app_tid) {
+    erpc_dprintf_noargs(
+        "eRPC Rpc: create_session failed. Remote Rpc is same as local.\n");
     return nullptr;
   }
 
   /* Ensure bounded session_vec size */
   if (session_vec.size() >= kMaxSessionsPerThread) {
     erpc_dprintf(
-        "eRPC RPC: create_session failed. Session limit (%zu) reached.\n",
+        "eRPC Rpc: create_session failed. Session limit (%zu) reached.\n",
         kMaxSessionsPerThread);
     return nullptr;
   }
@@ -153,14 +168,14 @@ bool Rpc<Transport_>::connect_session(Session *session) {
   assert(session != NULL);
 
   if (!is_session_managed(session)) {
-    erpc_dprintf_noargs("eRPC Rpc: connect_session failed because session does "
-                        "not belong to Rpc.\n");
+    erpc_dprintf_noargs(
+        "eRPC Rpc: connect_session failed. Session does not belong to Rpc.\n");
     return false;
   }
 
   if (session->role != Session::Role::kClient) {
-    erpc_dprintf_noargs("eRPC Rpc: connect_session failed because session role "
-                        "is not client.\n");
+    erpc_dprintf_noargs(
+        "eRPC Rpc: connect_session failed. Session role is not Client.\n");
     return false;
   }
 

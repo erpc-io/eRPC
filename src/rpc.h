@@ -42,6 +42,12 @@ class Rpc {
   Session *create_session(int local_fdev_port_index, const char *_rem_hostname,
                           int rem_app_tid, int rem_fdev_port_index);
 
+  /**
+   * @brief Initiate the connection establishment process for \p session.
+   *
+   * @return True if the connection establishment process was started
+   * successfully, false otherwise.
+   */
   bool connect_session(Session *session);
   std::string get_name();
 
@@ -108,8 +114,7 @@ class Rpc {
   /*
    * The append-only list of session pointers, indexed by session num.
    * Disconnected sessions are denoted by null pointers. This grows as sessions
-   * are repeatedly connected and disconnected, but paying 8 bytes per session
-   * seems OK.
+   * are repeatedly connected and disconnected, but 8 bytes per session is OK.
    */
   std::vector<Session *> session_vec;
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
