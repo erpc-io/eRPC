@@ -13,8 +13,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
       context(context),
       app_tid(app_tid),
       session_mgmt_handler(session_mgmt_handler),
-      num_fdev_ports((int)fdev_port_vec.size()),
-      next_session_num(0) {
+      num_fdev_ports((int)fdev_port_vec.size()) {
   if (fdev_port_vec.size() == 0) {
     fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with 0 fabric ports.\n");
     exit(-1);

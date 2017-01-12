@@ -44,7 +44,7 @@ class SessionMetadata {
   char hostname[kMaxHostnameLen];
   int app_tid; /* App-level TID of the Rpc object */
   int fdev_port_index;
-  int session_num;
+  uint32_t session_num;
   size_t start_seq;
   RoutingInfo routing_info;
 
@@ -54,7 +54,7 @@ class SessionMetadata {
     memset((void *)hostname, 0, sizeof(hostname));
     app_tid = -1;
     fdev_port_index = -1;
-    session_num = -1;
+    session_num = UINT32_MAX;
     start_seq = 0;
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
@@ -103,7 +103,7 @@ class Session {
     kClient
   };
 
-  inline Session(Role role) : role(role) {};
+  Session(Role role);
   ~Session();
 
   std::string get_client_name();

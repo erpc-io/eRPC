@@ -1,7 +1,6 @@
 #ifndef ERPC_RAND_H
 #define ERPC_RAND_H
 
-#include <limits.h>
 #include <random>
 
 namespace ERpc {
