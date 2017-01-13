@@ -2,8 +2,8 @@
 
 namespace ERpc {
 
-Session::Session(Role role, SessionStatus status)
-    : role(role), status(status), is_cc(false) {}
+Session::Session(Role role, SessionState state)
+    : role(role), state(state), is_cc(false) {}
 
 Session::~Session(){};
 

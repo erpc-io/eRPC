@@ -4,7 +4,8 @@
 namespace ERpc {
 
 /**
- * @brief Process all session management events in the queue.
+ * @brief Process all session management events in the queue and free them.
+ * The handlers for individual request/response types should not free packets.
  */
 template <class Transport_>
 void Rpc<Transport_>::handle_session_management() {
@@ -19,10 +20,10 @@ void Rpc<Transport_>::handle_session_management() {
     /* The sender of a packet cannot be this Rpc */
     if (is_session_mgmt_pkt_type_req(sm_pkt->pkt_type)) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) &&
-             sm_pkt->client.app_tid == app_tid));
+               sm_pkt->client.app_tid == app_tid));
     } else {
       assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname) &&
-             sm_pkt->server.app_tid == app_tid));
+               sm_pkt->server.app_tid == app_tid));
     }
 
     switch (sm_pkt->pkt_type) {
@@ -42,6 +43,8 @@ void Rpc<Transport_>::handle_session_management() {
         assert(false);
         break;
     }
+
+    /* Free memory that was allocated by the Nexus */
     free(sm_pkt);
   }
 
@@ -51,14 +54,14 @@ void Rpc<Transport_>::handle_session_management() {
 };
 
 /**
- * @brief Handle a session connect request. Caller will free \p sm_pkt.
+ * @brief Handle a session connect request
  */
 template <class Transport_>
 void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
 
-  /* Ensure that the server fields were filled correctly */
+  /* Ensure that server fields known by the client were filled correctly */
   assert(sm_pkt->server.app_tid == app_tid);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname));
 
@@ -106,7 +109,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
         strcmp(existing_session->client.hostname, sm_pkt->client.hostname) &&
         (existing_session->client.app_tid == sm_pkt->client.app_tid)) {
       assert(existing_session->role == Session::Role::kServer);
-      assert(existing_session->status == SessionStatus::kConnected);
+      assert(existing_session->state == SessionState::kConnected);
 
       /* There's a valid session, so client's metadata cannot have changed. */
       assert(memcmp((void *)&existing_session->client, (void *)&sm_pkt->client,
@@ -140,7 +143,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* If we are here, it's OK to create a new session */
   Session *session =
-      new Session(Session::Role::kServer, SessionStatus::kConnected);
+      new Session(Session::Role::kServer, SessionState::kConnected);
 
   /* Set the server metadata fields in the packet */
   sm_pkt->server.session_num = (uint32_t)session_vec.size();
@@ -156,9 +159,64 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   return;
 }
 
+/**
+ * @brief Handle a session connect response.
+ */
 template <class Transport_>
 void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
-  _unused(sm_pkt);
+  assert(sm_pkt != NULL);
+  assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
+
+  /* Try to locate the requester session for this response */
+  uint32_t session_num = sm_pkt->client.session_num;
+  assert(session_num < session_vec.size());
+
+  Session *session = session_vec[session_num];
+
+  /*
+   * Check if the client session was already disconnected. If so, the callback
+   * is not invoked.
+   */
+  if (session == nullptr) {
+    erpc_dprintf(
+        "eRPC Rpc: Rpc %s received session connect response from [%s, %d] for "
+        "session %u that is already disconnected.\n",
+        get_name().c_str(), sm_pkt->server.hostname, sm_pkt->server.app_tid,
+        session_num);
+    return;
+  }
+
+  /*
+   * Ensure that the metadata that the client filled in the connect request
+   * still match
+   */
+  assert(sm_pkt->server.app_tid == session->server.app_tid);
+  assert(strcmp(sm_pkt->server.hostname, session->server.hostname));
+  assert(memcmp((void *)&sm_pkt->client, (void *)&session->client,
+                sizeof(sm_pkt->client)) == 0);
+
+  /*
+   * If we are here, we still have the requester session as Client.
+   * Check if the session state has somehow advanced beyond kConnectInProgress.
+   * If so, the callback is not invoked.
+   */
+  assert(session->state >= SessionState::kConnectInProgress);
+
+  if (session->state > SessionState::kConnectInProgress) {
+    erpc_dprintf(
+        "eRPC Rpc: Rpc %s received session connect response from [%s, %d] "
+        "session %u that is not in state %s.\n",
+        get_name().c_str(), sm_pkt->server.hostname, sm_pkt->server.app_tid,
+        session_num,
+        session_state_str(SessionState::kConnectInProgress).c_str());
+    return;
+  }
+
+  /* Save server metadata, mark session connected, and invoke app callback */
+  session->server = sm_pkt->server;
+  session->state = SessionState::kConnected;
+
+  session_mgmt_handler(session, SessionMgmtEventType::kConnected, context);
 }
 
 template <class Transport_>

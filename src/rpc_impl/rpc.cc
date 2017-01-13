@@ -134,7 +134,7 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
   }
 
   /* Create a new session and add it to the session list. XXX: Use pool? */
-  Session *session = new Session(Session::Role::kClient, SessionStatus::kInit);
+  Session *session = new Session(Session::Role::kClient, SessionState::kInit);
 
   /* Fill in local metadata */
   SessionMetadata &client_metadata = session->client;
@@ -179,13 +179,13 @@ bool Rpc<Transport_>::connect_session(Session *session) {
     return false;
   }
 
-  if (session->status != SessionStatus::kInit) {
+  if (session->state != SessionState::kInit) {
     erpc_dprintf_noargs(
         "eRPC Rpc: connect_session failed. Session status is not Init.\n");
     return false;
   }
 
-  session->status = SessionStatus::kConnectInProgress;
+  session->state = SessionState::kConnectInProgress;
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
   memcpy((void *)&connect_req.client, (void *)&session->client,

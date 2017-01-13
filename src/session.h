@@ -13,7 +13,10 @@
 
 namespace ERpc {
 
-enum class SessionStatus {
+/**
+ * @brief Session state that can only go forward.
+ */
+enum class SessionState {
   kInit,
   kConnectInProgress,
   kConnected,
@@ -21,17 +24,17 @@ enum class SessionStatus {
   kDisconnected
 };
 
-static std::string session_status_str(SessionStatus status) {
-  switch (status) {
-    case SessionStatus::kInit:
+static std::string session_state_str(SessionState state) {
+  switch (state) {
+    case SessionState::kInit:
       return std::string("[Init]");
-    case SessionStatus::kConnectInProgress:
+    case SessionState::kConnectInProgress:
       return std::string("[Connect in progress]");
-    case SessionStatus::kConnected:
+    case SessionState::kConnected:
       return std::string("[Connected]");
-    case SessionStatus::kDisconnectInProgress:
+    case SessionState::kDisconnectInProgress:
       return std::string("[Disconnect in progress]");
-    case SessionStatus::kDisconnected:
+    case SessionState::kDisconnected:
       return std::string("[Disconnected]");
   }
   return std::string("[Invalid]");
@@ -146,7 +149,7 @@ class Session {
  public:
   enum class Role : bool { kServer, kClient };
 
-  Session(Role role, SessionStatus status);
+  Session(Role role, SessionState state);
   ~Session();
 
   std::string get_client_name();
@@ -162,7 +165,7 @@ class Session {
   void disable_congestion_control();
 
   Role role;
-  SessionStatus status;
+  SessionState state;
   SessionMetadata client, server;
 
   bool is_cc; /* Is congestion control enabled for this session? */
