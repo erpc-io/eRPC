@@ -18,11 +18,11 @@ void Rpc<Transport_>::handle_session_management() {
 
     /* The sender of a packet cannot be this Rpc */
     if (is_session_mgmt_pkt_type_req(sm_pkt->pkt_type)) {
-      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname)) &&
-             sm_pkt->client.app_tid == app_tid);
+      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) &&
+             sm_pkt->client.app_tid == app_tid));
     } else {
-      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname)) &&
-             sm_pkt->server.app_tid == app_tid);
+      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname) &&
+             sm_pkt->server.app_tid == app_tid));
     }
 
     switch (sm_pkt->pkt_type) {
