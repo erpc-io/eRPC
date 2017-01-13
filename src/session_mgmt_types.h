@@ -87,12 +87,14 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
  * @brief The types of responses to a session management packet
  */
 enum class SessionMgmtResponseType : int {
-  kConnectSuccess,
-  kDisconnectSuccess,
-  kSessionExists,
+  kConnectSuccess,    /* The connect req succeeded */
+  kDisconnectSuccess, /* The disconnect req succeeded */
+  kTooManySessions,   /* Connect req failed because server is out of sessions */
+
+  // Errors
   kInvalidRemoteAppTid,
   kInvalidRemotePort,
-  kTooManySessions
+  kInvalidTransport
 };
 
 }  // End ERpc

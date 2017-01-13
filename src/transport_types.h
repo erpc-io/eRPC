@@ -25,7 +25,7 @@ static std::string get_transport_name(TransportType transport_type) {
       return std::string("RoCE");
     case TransportType::kOmniPath:
       return std::string("OmniPath");
-    case TransportType::kInvalidTransport:
+    default:
       return std::string("Invalid transport");
   }
 }

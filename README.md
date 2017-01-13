@@ -1,9 +1,9 @@
 ## API notes
- * Creating Rpc objects
-   * Should the user specify the local port?
- * Creating Session objects
-   * Should the session be created using the Rpc object, or as a stand-alone
-     object? When should the Rpc object allocate resources for the Session?
- * Connecting Sessions
-   * Synchronous or asynchronous?
- * Disconnecting Sessions
+ * Disconnecting sessions
+   * Only a connected session can be disconnected. So the requester must
+     receive the connect response before sending the disconnect.
+
+## TODOs
+ * Add retransmissions for session management requests. Keep a vector of
+   in-progress sessions in the Rpc and check on entering the event loop.
+    * The vector should usually be empty, so common-case perf cost is low.
