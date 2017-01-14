@@ -65,29 +65,29 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->server.app_tid == app_tid);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0);
 
+  /* Create the base issue message */
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg,
+          "eRPC Rpc: Rpc %s received session connect request from %s. Issue",
+          get_name().c_str(), sm_pkt->client.name().c_str());
+
   /* Check if the requested fabric port is managed by us */
   if (!is_fdev_port_managed(sm_pkt->server.fdev_port_index)) {
-    erpc_dprintf(
-        "eRPC Rpc: Rpc %s received session connect request from [%s, %d] with "
-        "invalid server fabric port %d\n",
-        get_name().c_str(), sm_pkt->client.hostname, sm_pkt->client.app_tid,
-        sm_pkt->server.fdev_port_index);
+    erpc_dprintf("%s. Invalid server fabric port %d.\n", issue_msg,
+                 sm_pkt->server.fdev_port_index);
 
     sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtRespType::kInvalidRemotePort);
+                          SessionMgmtErrType::kInvalidRemotePort);
     return;
   }
 
   /* Check that the transport matches */
   if (sm_pkt->server.transport_type != transport->transport_type) {
-    erpc_dprintf(
-        "eRPC Rpc: Rpc %s received session connect request from [%s, %d] with "
-        "invalid transport type %s\n",
-        get_name().c_str(), sm_pkt->client.hostname, sm_pkt->client.app_tid,
-        get_transport_name(sm_pkt->server.transport_type).c_str());
+    erpc_dprintf("%s: Invalid transport type %s.\n", issue_msg,
+                 get_transport_name(sm_pkt->server.transport_type).c_str());
 
     sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtRespType::kInvalidTransport);
+                          SessionMgmtErrType::kInvalidTransport);
     return;
   }
 
@@ -115,29 +115,23 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
       assert(memcmp((void *)&old_session->client, (void *)&sm_pkt->client,
                     sizeof(old_session->client)) == 0);
 
-      erpc_dprintf(
-          "eRPC Rpc: Rpc %s received duplicate session connect "
-          "request from %s\n",
-          get_name().c_str(), old_session->get_client_name().c_str());
+      erpc_dprintf("%s: Duplicate session connect request.\n", issue_msg);
 
       /* Send a connect success response */
       sm_pkt->server = old_session->server; /* Fill in server metadata */
       sm_pkt->send_resp_mut(nexus->global_udp_port,
-                            SessionMgmtRespType::kConnectSuccess);
+                            SessionMgmtErrType::kNoError);
       return;
     }
   }
 
   /* Check if we are allowed to create another session */
   if (session_vec.size() == kMaxSessionsPerThread) {
-    erpc_dprintf(
-        "eRPC Rpc: Rpc %s received session connect request from [%s, %d], "
-        "but we are at session limit (%zu)\n",
-        get_name().c_str(), sm_pkt->client.hostname, sm_pkt->client.app_tid,
-        kMaxSessionsPerThread);
+    erpc_dprintf("%s: Reached session limit %zu.\n", issue_msg,
+                 kMaxSessionsPerThread);
 
     sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtRespType::kTooManySessions);
+                          SessionMgmtErrType::kTooManySessions);
     return;
   }
 
@@ -154,8 +148,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 
-  sm_pkt->send_resp_mut(nexus->global_udp_port,
-                        SessionMgmtRespType::kConnectSuccess);
+  sm_pkt->send_resp_mut(nexus->global_udp_port, SessionMgmtErrType::kNoError);
   return;
 }
 
@@ -166,6 +159,15 @@ template <class Transport_>
 void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
+  assert(session_mgmt_is_valid_err_type(sm_pkt->err_type));
+
+  /* Create the base issue message */
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg,
+          "eRPC Rpc: Rpc %s received session connect response from %s for "
+          "client session %u. Issue",
+          get_name().c_str(), sm_pkt->server.name().c_str(),
+          sm_pkt->client.session_num);
 
   /* Try to locate the requester session for this response */
   uint32_t session_num = sm_pkt->client.session_num;
@@ -178,11 +180,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * is not invoked.
    */
   if (session == nullptr) {
-    erpc_dprintf(
-        "eRPC Rpc: Rpc %s received session connect response from [%s, %d] for "
-        "session %u that is already disconnected.\n",
-        get_name().c_str(), sm_pkt->server.hostname, sm_pkt->server.app_tid,
-        session_num);
+    erpc_dprintf("%s: Client session is already disconnected.\n", issue_msg);
     return;
   }
 
@@ -197,25 +195,23 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
 
   /*
    * If we are here, we still have the requester session as Client.
-   * Check if the session state has somehow advanced beyond kConnectInProgress.
-   * If so, we are not interested in the response and the callback is not
-   * invoked.
+   *
+   * Check if the session state has advanced beyond kConnectInProgress. If so,
+   * we are not interested in the response and the callback is not invoked.
    */
   assert(session->state >= SessionState::kConnectInProgress);
 
   if (session->state > SessionState::kConnectInProgress) {
-    erpc_dprintf(
-        "eRPC Rpc: Rpc %s received session connect response from [%s, %d] "
-        "session %u that is not in state %s.\n",
-        get_name().c_str(), sm_pkt->server.hostname, sm_pkt->server.app_tid,
-        session_num,
-        session_state_str(SessionState::kConnectInProgress).c_str());
+    erpc_dprintf("%s: Client session is not in state %s.\n", issue_msg,
+                 session_state_str(SessionState::kConnectInProgress).c_str());
     return;
   }
 
   /* Check if the session was successfully connected */
-  if (sm_pkt->resp_type != SessionMgmtRespType::kConnectSuccess) {
-    /* XXX */
+  if (sm_pkt->err_type != SessionMgmtErrType::kNoError) {
+    erpc_dprintf("%s: Response type indicates error %s.\n", issue_msg,
+                 session_mgmt_err_type_str(sm_pkt->err_type).c_str());
+    return;
   }
 
   /* Save server metadata, mark session connected, and invoke app callback */

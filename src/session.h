@@ -69,7 +69,7 @@ static std::string session_mgmt_event_type_str(
 }
 
 /**
- * @brief Basic info about a session filled in during initialization.
+ * @brief Basic info about a session emd point filled in during initialization.
  */
 class SessionMetadata {
  public:
@@ -94,6 +94,23 @@ class SessionMetadata {
     start_seq = std::numeric_limits<size_t>::max();
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
+
+  /**
+   * @brief Return a string with a name for this session end point, containing
+   * its hostname, Rpc TID, and the session number.
+   */
+  inline std::string name() {
+    std::string ret;
+    ret += std::string("[H: "); /* Hostname */
+    ret += std::string(hostname);
+    ret += std::string(", R: "); /* Rpc */
+    ret += std::to_string(app_tid);
+    ret += std::string(", S: "); /* Session */
+    ret += std::to_string(session_num);
+    ret += std::string("]");
+
+    return ret;
+  }
 };
 
 /**
@@ -103,7 +120,7 @@ class SessionMetadata {
 class SessionMgmtPkt {
  public:
   SessionMgmtPktType pkt_type;
-  SessionMgmtRespType resp_type; /* For responses only */
+  SessionMgmtErrType err_type; /* For responses only */
 
   /*
    * Each session management packet contains two copies of session metadata,
@@ -134,10 +151,10 @@ class SessionMgmtPkt {
    * and fills in the response type.
    */
   inline void send_resp_mut(uint16_t global_udp_port,
-                            SessionMgmtRespType _resp_type) {
+                            SessionMgmtErrType _err_type) {
     assert(session_mgmt_is_pkt_type_req(pkt_type));
     pkt_type = session_mgmt_pkt_type_req_to_resp(pkt_type);
-    resp_type = _resp_type;
+    err_type = _err_type;
 
     send_to(client.hostname, global_udp_port);
   }

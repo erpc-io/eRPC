@@ -152,6 +152,7 @@ Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
    * session is connected.
    */
   SessionMetadata &server_metadata = session->server;
+  server_metadata.transport_type = transport->transport_type;
   strcpy((char *)server_metadata.hostname, rem_hostname);
   server_metadata.app_tid = rem_app_tid;
   server_metadata.fdev_port_index = rem_fdev_port_index;

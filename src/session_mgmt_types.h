@@ -26,7 +26,8 @@ static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kDisconnectResp:
       return std::string("[Disconnect response]");
   };
-  return std::string("[Invalid type]");
+  exit(-1);
+  return std::string("");
 }
 
 /**
@@ -58,6 +59,7 @@ static bool session_mgmt_is_pkt_type_req(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kDisconnectResp:
       return false;
   }
+  exit(-1);
   return false;
 }
 
@@ -86,50 +88,44 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
 /**
  * @brief The types of responses to a session management packet
  */
-enum class SessionMgmtRespType : int {
-  kConnectSuccess,    /* The connect req succeeded */
-  kDisconnectSuccess, /* The disconnect req succeeded */
-
-  // Errors
+enum class SessionMgmtErrType : int {
+  kNoError,         /* The only non-error error type */
   kTooManySessions, /* Connect req failed because server is out of sessions */
   kInvalidRemoteAppTid,
   kInvalidRemotePort,
   kInvalidTransport
 };
 
-static std::string session_mgmt_resp_type_str(SessionMgmtRespType resp_type) {
-  switch (resp_type) {
-    case SessionMgmtRespType::kConnectSuccess:
-      return std::string("[Connect success]");
-    case SessionMgmtRespType::kDisconnectSuccess:
-      return std::string("[Disconnect success]");
-    case SessionMgmtRespType::kTooManySessions:
-      return std::string("[Too many sessions]");
-    case SessionMgmtRespType::kInvalidRemoteAppTid:
-      return std::string("[Invalid remote app TID]");
-    case SessionMgmtRespType::kInvalidRemotePort:
-      return std::string("[Invalid remote port]");
-    case SessionMgmtRespType::kInvalidTransport:
-      return std::string("[Invalid transport]");
-  }
-}
-
-/**
- * @brief Return true iff \p resp_type is an error response type
- */
-static bool session_mgmt_is_resp_type_err(SessionMgmtRespType resp_type) {
-  switch (resp_type) {
-    case SessionMgmtRespType::kConnectSuccess:
-    case SessionMgmtRespType::kDisconnectSuccess:
-      return false;
-    case SessionMgmtRespType::kTooManySessions:
-    case SessionMgmtRespType::kInvalidRemoteAppTid:
-    case SessionMgmtRespType::kInvalidRemotePort:
-    case SessionMgmtRespType::kInvalidTransport:
+static bool session_mgmt_is_valid_err_type(SessionMgmtErrType err_type) {
+  switch (err_type) {
+    case SessionMgmtErrType::kNoError:
+    case SessionMgmtErrType::kTooManySessions:
+    case SessionMgmtErrType::kInvalidRemoteAppTid:
+    case SessionMgmtErrType::kInvalidRemotePort:
+    case SessionMgmtErrType::kInvalidTransport:
       return true;
   }
+  return false;
 }
 
+static std::string session_mgmt_err_type_str(SessionMgmtErrType err_type) {
+  assert(session_mgmt_is_valid_err_type(err_type));
+
+  switch (err_type) {
+    case SessionMgmtErrType::kNoError:
+      return std::string("[No error]");
+    case SessionMgmtErrType::kTooManySessions:
+      return std::string("[Too many sessions]");
+    case SessionMgmtErrType::kInvalidRemoteAppTid:
+      return std::string("[Invalid remote app TID]");
+    case SessionMgmtErrType::kInvalidRemotePort:
+      return std::string("[Invalid remote port]");
+    case SessionMgmtErrType::kInvalidTransport:
+      return std::string("[Invalid transport]");
+  }
+  exit(-1);
+  return std::string("");
+}
 }  // End ERpc
 
 #endif  // ERPC_SESSION_MGMT_PKT_TYPE_H

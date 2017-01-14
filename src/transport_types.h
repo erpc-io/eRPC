@@ -20,13 +20,13 @@ struct RoutingInfo {
 static std::string get_transport_name(TransportType transport_type) {
   switch (transport_type) {
     case TransportType::kInfiniBand:
-      return std::string("InfiniBand");
+      return std::string("[InfiniBand]");
     case TransportType::kRoCE:
-      return std::string("RoCE");
+      return std::string("[RoCE]");
     case TransportType::kOmniPath:
-      return std::string("OmniPath");
+      return std::string("[OmniPath]");
     default:
-      return std::string("Invalid transport");
+      return std::string("[Invalid transport]");
   }
 }
 }  // End ERpc

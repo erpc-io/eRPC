@@ -157,7 +157,7 @@ void Nexus::session_mgnt_handler() {
   if (recv_bytes != sizeof(*sm_pkt)) {
     fprintf(stderr,
             "eRPC Nexus: FATAL. Received unexpected data size (%zd) from "
-            "socket. Expected = %zu.\n",
+            "session management socket. Expected = %zu.\n",
             recv_bytes, sizeof(*sm_pkt));
     exit(-1);
   }
@@ -205,10 +205,8 @@ void Nexus::session_mgnt_handler() {
           "from Rpc [%s, %d]. Sending response.\n",
           target_app_tid, source_hostname, source_app_tid);
 
-      sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
-      sm_pkt->resp_type = SessionMgmtRespType::kInvalidRemoteAppTid;
-
-      sm_pkt->send_to(source_hostname, global_udp_port);
+      sm_pkt->send_resp_mut(global_udp_port,
+                            SessionMgmtErrType::kInvalidRemoteAppTid);
     } else {
       /* If it's a response, we can ignore it */
       erpc_dprintf(
