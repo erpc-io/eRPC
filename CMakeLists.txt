@@ -58,11 +58,13 @@ set(SOURCES
   src/util/udp_client.cc
   src/util/udp_client.h)
 
-add_executable(test_build tests/test_build.cc ${SOURCES})
-target_link_libraries(test_build ${GTEST_LIBRARIES} ${LIBRARIES})
+add_library(erpc ${SOURCES})
 
-add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
-target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
+add_executable(test_session_mgmt tests/test_session_mgmt.cc)
+target_link_libraries(test_session_mgmt erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 
-add_executable(test_rand tests/test_rand.cc ${SOURCES})
-target_link_libraries(test_rand ${GTEST_LIBRARIES} ${LIBRARIES})
+add_executable(test_huge_alloc tests/test_huge_alloc.cc)
+target_link_libraries(test_huge_alloc erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+
+add_executable(test_rand tests/test_rand.cc)
+target_link_libraries(test_rand erpc ${GTEST_LIBRARIES} ${LIBRARIES})
