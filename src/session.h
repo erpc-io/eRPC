@@ -191,7 +191,8 @@ class Session {
   bool is_cc; /* Is congestion control enabled for this session? */
 };
 
-typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType, void *);
+typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType,
+                                       SessionMgmtErrType, void *);
 
 /**
  * @brief An object created by the per-thread Rpc, and shared with the

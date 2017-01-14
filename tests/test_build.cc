@@ -7,6 +7,7 @@ using namespace ERpc;
 #define NEXUS_UDP_PORT 31851
 #define SERVER_APP_TID 1
 #define CLIENT_APP_TID 2
+#define EVENT_LOOP_MS 2000
 
 volatile int server_ready = 0;
 std::vector<int> port_vec = {0};
@@ -18,7 +19,8 @@ struct test_context_t {
 };
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
-                    void *_context) {
+                    SessionMgmtErrType sm_err_type, void *_context) {
+  assert(sm_err_type == SessionMgmtErrType::kNoError);
   test_context_t *context = (test_context_t *)_context;
 
   printf("Thread %s received event of type %s on session %p, context = %p\n",
@@ -43,7 +45,7 @@ void client_thread_func(Nexus *nexus) {
   }
 
   rpc.connect_session(session);
-  rpc.run_event_loop_timeout(5000);
+  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 
   _unused(session);
 }
@@ -55,7 +57,7 @@ void server_thread_func(Nexus *nexus) {
                                &test_sm_hander, port_vec);
 
   server_ready = 1;
-  rpc.run_event_loop_timeout(5000);
+  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 }
 
 TEST(test_build, test_build) {

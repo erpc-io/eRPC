@@ -65,7 +65,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->server.app_tid == app_tid);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0);
 
-  /* Create the base issue message */
+  /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "eRPC Rpc: Rpc %s received session connect request from %s. Issue",
@@ -93,8 +93,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /*
    * Check if we (= this Rpc) already have a session as the server with the
-   * client Rpc (C) that sent this packet. It's OK if we have a session where
-   * we are the client Rpc, and C is the server Rpc.
+   * client Rpc (C) that sent this packet. (This is different from if we have a
+   * session as the client Rpc, where C is the server Rpc.)
    */
   for (Session *old_session : session_vec) {
     /*
@@ -161,7 +161,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
   assert(session_mgmt_is_valid_err_type(sm_pkt->err_type));
 
-  /* Create the base issue message */
+  /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "eRPC Rpc: Rpc %s received session connect response from %s for "
@@ -185,8 +185,8 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   }
 
   /*
-   * Ensure that the metadata that the client filled in the connect request
-   * still match
+   * The session is non-null. Ensure that the metadata that the client filled
+   * in the connect request still matches.
    */
   assert(sm_pkt->server.app_tid == session->server.app_tid);
   assert(strcmp(sm_pkt->server.hostname, session->server.hostname) == 0);
@@ -207,18 +207,27 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
     return;
   }
 
-  /* Check if the session was successfully connected */
+  /*
+   * If the connect request failed, move the session to the error state and
+   * invoke the callback.
+   */
   if (sm_pkt->err_type != SessionMgmtErrType::kNoError) {
     erpc_dprintf("%s: Response type indicates error %s.\n", issue_msg,
                  session_mgmt_err_type_str(sm_pkt->err_type).c_str());
+
+    session->state = SessionState::kError;
+    session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
+                         sm_pkt->err_type, context);
+
     return;
   }
 
-  /* Save server metadata, mark session connected, and invoke app callback */
+  /* Save server metadata, mark session connected, and invoke callback */
   session->server = sm_pkt->server;
   session->state = SessionState::kConnected;
 
-  session_mgmt_handler(session, SessionMgmtEventType::kConnected, context);
+  session_mgmt_handler(session, SessionMgmtEventType::kConnected,
+                       SessionMgmtErrType::kNoError, context);
 }
 
 template <class Transport_>
