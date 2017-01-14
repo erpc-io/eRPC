@@ -15,17 +15,22 @@
 
 namespace ERpc {
 
-Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
+Nexus::Nexus(size_t global_udp_port) : global_udp_port(global_udp_port) {
+  if (global_udp_port >= std::numeric_limits<uint16_t>::max()) {
+    fprintf(stderr, "eRPC Nexus: FATAL. UDP port number too large.\n");
+    exit(-1);
+  }
+
   /* Get the local hostname */
   memset((void *)&hostname, 0, sizeof(hostname));
   int ret = gethostname(hostname, kMaxHostnameLen);
   if (ret == -1) {
-    fprintf(stderr, "eRPC Nexus: FATAL. gethostname failed. Error = %s\n",
+    fprintf(stderr, "eRPC Nexus: FATAL. gethostname failed. Error = %s.\n",
             strerror(errno));
     exit(-1);
   }
 
-  erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s\n",
+  erpc_dprintf("eRPC Nexus: Created with global UDP port %zu, hostname %s.\n",
                global_udp_port, hostname);
   nexus_object = this;
 
@@ -101,7 +106,7 @@ void Nexus::install_sigio_handler() {
   memset(&server, 0, sizeof(server));
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons(global_udp_port);
+  server.sin_port = htons((uint16_t)global_udp_port);
 
   if (bind(nexus_sock_fd, (struct sockaddr *)&server,
            sizeof(struct sockaddr_in)) < 0) {
@@ -170,9 +175,9 @@ void Nexus::session_mgnt_handler() {
     exit(-1);
   }
 
-  int target_app_tid; /* TID of the Rpc that should handle this packet */
+  size_t target_app_tid; /* TID of the Rpc that should handle this packet */
   const char *source_hostname;
-  int source_app_tid; /* Debug-only */
+  size_t source_app_tid; /* Debug-only */
   _unused(source_app_tid);
 
   bool is_sm_req = session_mgmt_is_pkt_type_req(sm_pkt->pkt_type);
@@ -201,8 +206,8 @@ void Nexus::session_mgnt_handler() {
     if (is_sm_req) {
       /* If it's a request, we must send a response */
       erpc_dprintf(
-          "eRPC Nexus: Received session management request for invalid Rpc %d "
-          "from Rpc [%s, %d]. Sending response.\n",
+          "eRPC Nexus: Received session management request for invalid Rpc %zu "
+          "from Rpc [%s, %zu]. Sending response.\n",
           target_app_tid, source_hostname, source_app_tid);
 
       sm_pkt->send_resp_mut(global_udp_port,
@@ -210,8 +215,8 @@ void Nexus::session_mgnt_handler() {
     } else {
       /* If it's a response, we can ignore it */
       erpc_dprintf(
-          "eRPC Nexus: Received session management response for invalid Rpc %d "
-          "from Rpc [%s, %d]. Ignoring.\n",
+          "eRPC Nexus: Received session management resp for invalid Rpc %zu "
+          "from Rpc [%s, %zu]. Ignoring.\n",
           target_app_tid, source_hostname, source_app_tid);
     }
 
@@ -228,8 +233,8 @@ void Nexus::session_mgnt_handler() {
   target_hook->session_mgmt_ev_counter++;
 
   erpc_dprintf(
-      "eRPC Nexus: Received session mgmt packet of type %s for Rpc %d, "
-      "from Rpc [%s, %d]\n",
+      "eRPC Nexus: Received session mgmt packet of type %s for Rpc %zu, "
+      "from Rpc [%s, %zu]\n",
       session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str(), target_app_tid,
       source_hostname, source_app_tid);
 

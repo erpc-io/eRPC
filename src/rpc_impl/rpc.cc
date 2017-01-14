@@ -6,14 +6,14 @@
 namespace ERpc {
 
 template <class Transport_>
-Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
+Rpc<Transport_>::Rpc(Nexus *nexus, void *context, size_t app_tid,
                      session_mgmt_handler_t session_mgmt_handler,
-                     std::vector<int> fdev_port_vec)
+                     std::vector<size_t> fdev_port_vec)
     : nexus(nexus),
       context(context),
       app_tid(app_tid),
       session_mgmt_handler(session_mgmt_handler),
-      num_fdev_ports((int)fdev_port_vec.size()) {
+      num_fdev_ports(fdev_port_vec.size()) {
   if (fdev_port_vec.size() == 0) {
     fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with 0 fabric ports.\n");
     exit(-1);
@@ -27,7 +27,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, int app_tid,
 
   /* Record the requested local ports in an array */
   int i = 0;
-  for (int fdev_port : fdev_port_vec) {
+  for (size_t fdev_port : fdev_port_vec) {
     fdev_port_arr[i] = fdev_port;
     i++;
   }
@@ -75,61 +75,71 @@ bool Rpc<Transport_>::is_session_managed(Session *session) {
  * so the args checking is always enabled (i.e., no asserts).
  */
 template <class Transport_>
-Session *Rpc<Transport_>::create_session(int local_fdev_port_index,
+Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
                                          const char *rem_hostname,
-                                         int rem_app_tid,
-                                         int rem_fdev_port_index) {
+                                         size_t rem_app_tid,
+                                         size_t rem_fdev_port_index) {
+  /* Create the basic issue message */
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg, "eRPC Rpc: create_session failed. Issue");
+
   /* Check local fabric port */
-  if (local_fdev_port_index < 0 ||
-      local_fdev_port_index >= (int)kMaxFabDevPorts) {
-    erpc_dprintf(
-        "eRPC Rpc: create_session failed. Invalid local fabric port %d\n",
-        local_fdev_port_index);
+  if (local_fdev_port_index >= kMaxFabDevPorts) {
+    erpc_dprintf("%s: Invalid local fabric port %zu\n", issue_msg,
+                 local_fdev_port_index);
+    return nullptr;
+  }
+
+  /* Check remote fabric port */
+  if (rem_fdev_port_index >= kMaxFabDevPorts) {
+    erpc_dprintf("%s: Invalid remote fabric port %zu\n", issue_msg,
+                 rem_fdev_port_index);
     return nullptr;
   }
 
   /* Ensure that the requested local port is managed by Rpc */
   if (!is_fdev_port_managed(local_fdev_port_index)) {
-    erpc_dprintf(
-        "eRPC Rpc: create_session failed. Local fabric port %d is unmanaged.\n",
-        local_fdev_port_index);
-    return nullptr;
-  }
-
-  /* Check remote fabric port */
-  if (rem_fdev_port_index < 0 || rem_fdev_port_index >= (int)kMaxFabDevPorts) {
-    erpc_dprintf(
-        "eRPC Rpc: create_session failed. Invalid remote fabric port %d\n",
-        rem_fdev_port_index);
+    erpc_dprintf("%s: eRPC Rpc: Local fabric port %zu unmanaged.\n", issue_msg,
+                 local_fdev_port_index);
     return nullptr;
   }
 
   /* Check remote hostname */
   if (rem_hostname == nullptr || strlen(rem_hostname) > kMaxHostnameLen) {
-    erpc_dprintf_noargs(
-        "eRPC Rpc: create_session failed. Invalid remote hostname.\n");
+    erpc_dprintf("%s: Invalid remote hostname.\n", issue_msg);
     return nullptr;
   }
 
-  /* Check remote app TID */
-  if (rem_app_tid < 0) {
-    erpc_dprintf("eRPC Rpc: create_session failed. Invalid remote TID. %d.\n",
-                 rem_app_tid);
+  /* Creating a session to one's own Rpc as the client is not allowed */
+  if (strcmp(rem_hostname, nexus->hostname) == 0 && rem_app_tid == app_tid) {
+    erpc_dprintf("%s: Remote Rpc is same as local.\n", issue_msg);
     return nullptr;
   }
 
-  /* Creating a session to the same thread is the client is not allowed */
-  if (strcmp(rem_hostname, nexus->hostname) && rem_app_tid == app_tid) {
-    erpc_dprintf_noargs(
-        "eRPC Rpc: create_session failed. Remote Rpc is same as local.\n");
-    return nullptr;
+  /* Creating two sessions as client to the same remote Rpc is not allowed */
+  for (Session *existing_session : session_vec) {
+    if (existing_session == nullptr) {
+      continue;
+    }
+
+    if (strcmp(existing_session->server.hostname, rem_hostname) == 0 &&
+        existing_session->server.app_tid == rem_app_tid) {
+      /*
+       * @existing_session->server != this Rpc, since @existing_session->server
+       * matches (@rem_hostname, @rem_app_tid), which does match this
+       * Rpc (checked earlier). So we must be the client.
+       */
+      assert(existing_session->role == Session::Role::kClient);
+      erpc_dprintf("%s: Session to %s already exists.\n", issue_msg,
+                   existing_session->server.rpc_name().c_str());
+      return nullptr;
+    }
   }
 
   /* Ensure bounded session_vec size */
   if (session_vec.size() >= kMaxSessionsPerThread) {
-    erpc_dprintf(
-        "eRPC Rpc: create_session failed. Session limit (%zu) reached.\n",
-        kMaxSessionsPerThread);
+    erpc_dprintf("%s: Session limit (%zu) reached.\n", issue_msg,
+                 kMaxSessionsPerThread);
     return nullptr;
   }
 
@@ -210,8 +220,8 @@ std::string Rpc<Transport_>::get_name() {
 }
 
 template <class Transport_>
-bool Rpc<Transport_>::is_fdev_port_managed(int fab_port_index) {
-  for (int i = 0; i < num_fdev_ports; i++) {
+bool Rpc<Transport_>::is_fdev_port_managed(size_t fab_port_index) {
+  for (size_t i = 0; i < num_fdev_ports; i++) {
     if (fdev_port_arr[i] == fab_port_index) {
       return true;
     }

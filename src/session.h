@@ -76,11 +76,11 @@ class SessionMetadata {
   // Fields that are specified by the client in the connect request
   TransportType transport_type; /* Should match at client and server */
   char hostname[kMaxHostnameLen];
-  int app_tid; /* App-level TID of the Rpc object */
-  int fdev_port_index;
+  size_t app_tid; /* App-level TID of the Rpc object */
+  size_t fdev_port_index;
 
   // Fields that are filled in by the server
-  uint32_t session_num;
+  size_t session_num;
   size_t start_seq;
   RoutingInfo routing_info;
 
@@ -88,9 +88,9 @@ class SessionMetadata {
   SessionMetadata() {
     transport_type = TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));
-    app_tid = std::numeric_limits<int>::max();
-    fdev_port_index = std::numeric_limits<int>::max();
-    session_num = std::numeric_limits<uint32_t>::max();
+    app_tid = std::numeric_limits<size_t>::max();
+    fdev_port_index = std::numeric_limits<size_t>::max();
+    session_num = std::numeric_limits<size_t>::max();
     start_seq = std::numeric_limits<size_t>::max();
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
@@ -107,6 +107,21 @@ class SessionMetadata {
     ret += std::to_string(app_tid);
     ret += std::string(", S: "); /* Session */
     ret += std::to_string(session_num);
+    ret += std::string("]");
+
+    return ret;
+  }
+
+  /**
+   * @brief Return a string with the name of the Rpc hosting this session
+   * end point.
+   */
+  inline std::string rpc_name() {
+    std::string ret;
+    ret += std::string("[H: "); /* Hostname */
+    ret += std::string(hostname);
+    ret += std::string(", R: "); /* Rpc */
+    ret += std::to_string(app_tid);
     ret += std::string("]");
 
     return ret;
@@ -135,7 +150,7 @@ class SessionMgmtPkt {
    * @brief Send this session management packet "as is" to \p dst_hostname on
    * port \p global_udp_port.
    */
-  inline void send_to(const char *dst_hostname, uint16_t global_udp_port) {
+  inline void send_to(const char *dst_hostname, size_t global_udp_port) {
     assert(dst_hostname != NULL);
 
     UDPClient udp_client(dst_hostname, global_udp_port);
@@ -150,7 +165,7 @@ class SessionMgmtPkt {
    * This function mutates the packet: it flips the packet type to response,
    * and fills in the response type.
    */
-  inline void send_resp_mut(uint16_t global_udp_port,
+  inline void send_resp_mut(size_t global_udp_port,
                             SessionMgmtErrType _err_type) {
     assert(session_mgmt_is_pkt_type_req(pkt_type));
     pkt_type = session_mgmt_pkt_type_req_to_resp(pkt_type);
@@ -200,7 +215,7 @@ typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType,
  */
 class SessionMgmtHook {
  public:
-  int app_tid; /* App-level thread ID of the RPC obj that created this hook */
+  uint32_t app_tid; /* App-level thread ID of the RPC that created this hook */
   std::mutex session_mgmt_mutex;
   volatile size_t session_mgmt_ev_counter; /* Number of session mgmt events */
   std::vector<SessionMgmtPkt *> session_mgmt_pkt_list;

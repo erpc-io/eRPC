@@ -20,7 +20,7 @@ class Nexus {
    * @param port The UDP port used by all Nexus-es in the cluster to listen
    * for session management packets.
    */
-  Nexus(uint16_t global_udp_port);
+  Nexus(size_t global_udp_port);
   ~Nexus();
 
   void register_hook(SessionMgmtHook *hook);
@@ -38,7 +38,7 @@ class Nexus {
    * The UDP port used by all Nexus-es in the cluster to listen on for
    * session management
    */
-  const uint16_t global_udp_port;
+  const size_t global_udp_port;
   int nexus_sock_fd; /* The file descriptor of the UDP socket */
 
   uint8_t pad[64];

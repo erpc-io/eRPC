@@ -60,8 +60,8 @@ set(SOURCES
 
 add_library(erpc ${SOURCES})
 
-add_executable(test_session_mgmt tests/test_session_mgmt.cc)
-target_link_libraries(test_session_mgmt erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+add_executable(test_create_session tests/test_create_session.cc)
+target_link_libraries(test_create_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 
 add_executable(test_huge_alloc tests/test_huge_alloc.cc)
 target_link_libraries(test_huge_alloc erpc ${GTEST_LIBRARIES} ${LIBRARIES})

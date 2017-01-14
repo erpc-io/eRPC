@@ -27,9 +27,9 @@ class Rpc {
 
  public:
   // rpc.cc
-  Rpc(Nexus *nexus, void *context, int app_tid,
+  Rpc(Nexus *nexus, void *context, size_t app_tid,
       session_mgmt_handler_t session_mgmt_handler,
-      std::vector<int> fdev_port_vec);
+      std::vector<size_t> fdev_port_vec);
 
   ~Rpc();
 
@@ -39,8 +39,9 @@ class Rpc {
    * @return A pointer to the created session if creation succeeds. NULL if
    * creation fails.
    */
-  Session *create_session(int local_fdev_port_index, const char *_rem_hostname,
-                          int rem_app_tid, int rem_fdev_port_index);
+  Session *create_session(size_t local_fdev_port_index,
+                          const char *_rem_hostname, size_t rem_app_tid,
+                          size_t rem_fdev_port_index);
 
   /**
    * @brief Initiate the connection establishment process for \p session.
@@ -54,7 +55,7 @@ class Rpc {
   /**
    * @brief Check if fabric port \p fab_port_index is managed by this Rpc
    */
-  bool is_fdev_port_managed(int fab_port_index);
+  bool is_fdev_port_managed(size_t fab_port_index);
 
   // rpc_datapath.cc
   void send_request(const Session *session, const Buffer *buffer);
@@ -103,10 +104,10 @@ class Rpc {
   // Constructor args
   Nexus *nexus;
   void *context; /* The application context */
-  int app_tid;
+  size_t app_tid;
   session_mgmt_handler_t session_mgmt_handler;
-  int num_fdev_ports;
-  int fdev_port_arr[kMaxFabDevPorts];
+  size_t num_fdev_ports;
+  size_t fdev_port_arr[kMaxFabDevPorts];
 
   // Others
   Transport_ *transport; /* The unreliable transport */

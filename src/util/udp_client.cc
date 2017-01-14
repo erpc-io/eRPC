@@ -12,10 +12,10 @@
 
 namespace ERpc {
 
-UDPClient::UDPClient(const char *remote_addr, uint16_t remote_port)
+UDPClient::UDPClient(const char *remote_addr, size_t remote_port)
     : remote_port(remote_port), remote_addr(remote_addr) {
   char decimal_port[16];
-  snprintf(decimal_port, sizeof(decimal_port), "%d", remote_port);
+  snprintf(decimal_port, sizeof(decimal_port), "%zu", remote_port);
   decimal_port[sizeof(decimal_port) / sizeof(decimal_port[0]) - 1] = '\0';
 
   struct addrinfo hints;

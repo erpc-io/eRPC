@@ -14,7 +14,7 @@ void Rpc<Transport_>::handle_session_management() {
 
   /* Handle all session management requests */
   for (SessionMgmtPkt *sm_pkt : sm_hook.session_mgmt_pkt_list) {
-    erpc_dprintf("eRPC Rpc: Rpc %d received session mgmt pkt of type %s\n",
+    erpc_dprintf("eRPC Rpc: Rpc %zu received session mgmt pkt of type %s\n",
                  app_tid, session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str());
 
     /* The sender of a packet cannot be this Rpc */
@@ -73,7 +73,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Check if the requested fabric port is managed by us */
   if (!is_fdev_port_managed(sm_pkt->server.fdev_port_index)) {
-    erpc_dprintf("%s. Invalid server fabric port %d.\n", issue_msg,
+    erpc_dprintf("%s. Invalid server fabric port %zu.\n", issue_msg,
                  sm_pkt->server.fdev_port_index);
 
     sm_pkt->send_resp_mut(nexus->global_udp_port,
@@ -165,7 +165,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "eRPC Rpc: Rpc %s received session connect response from %s for "
-          "client session %u. Issue",
+          "client session %zu. Issue",
           get_name().c_str(), sm_pkt->server.name().c_str(),
           sm_pkt->client.session_num);
 
