@@ -162,7 +162,7 @@ void Nexus::session_mgnt_handler() {
     exit(-1);
   }
 
-  if (!is_valid_session_mgmt_pkt_type(sm_pkt->pkt_type)) {
+  if (!session_mgmt_is_valid_pkt_type(sm_pkt->pkt_type)) {
     fprintf(stderr,
             "eRPC Nexus: FATAL. Received session management packet of "
             "unexpected type %d.\n",
@@ -175,7 +175,7 @@ void Nexus::session_mgnt_handler() {
   int source_app_tid; /* Debug-only */
   _unused(source_app_tid);
 
-  bool is_sm_req = is_session_mgmt_pkt_type_req(sm_pkt->pkt_type);
+  bool is_sm_req = session_mgmt_is_pkt_type_req(sm_pkt->pkt_type);
 
   if (is_sm_req) {
     target_app_tid = sm_pkt->server.app_tid;
@@ -206,7 +206,7 @@ void Nexus::session_mgnt_handler() {
           target_app_tid, source_hostname, source_app_tid);
 
       sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
-      sm_pkt->resp_type = SessionMgmtResponseType::kInvalidRemoteAppTid;
+      sm_pkt->resp_type = SessionMgmtRespType::kInvalidRemoteAppTid;
 
       sm_pkt->send_to(source_hostname, global_udp_port);
     } else {

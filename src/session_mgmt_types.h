@@ -32,7 +32,7 @@ static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
 /**
  * @brief Check if a session management packet type is valid
  */
-static bool is_valid_session_mgmt_pkt_type(SessionMgmtPktType sm_pkt_type) {
+static bool session_mgmt_is_valid_pkt_type(SessionMgmtPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
     case SessionMgmtPktType::kConnectResp:
@@ -47,8 +47,8 @@ static bool is_valid_session_mgmt_pkt_type(SessionMgmtPktType sm_pkt_type) {
  * @brief Check if a valid session management packet type is a request type. Use
  * the complement of this to check if a packet is a response.
  */
-static bool is_session_mgmt_pkt_type_req(SessionMgmtPktType sm_pkt_type) {
-  assert(is_valid_session_mgmt_pkt_type(sm_pkt_type));
+static bool session_mgmt_is_pkt_type_req(SessionMgmtPktType sm_pkt_type) {
+  assert(session_mgmt_is_valid_pkt_type(sm_pkt_type));
 
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
@@ -67,7 +67,7 @@ static bool is_session_mgmt_pkt_type_req(SessionMgmtPktType sm_pkt_type) {
  */
 static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
     SessionMgmtPktType sm_pkt_type) {
-  assert(is_session_mgmt_pkt_type_req(sm_pkt_type));
+  assert(session_mgmt_is_pkt_type_req(sm_pkt_type));
 
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
@@ -86,16 +86,49 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
 /**
  * @brief The types of responses to a session management packet
  */
-enum class SessionMgmtResponseType : int {
+enum class SessionMgmtRespType : int {
   kConnectSuccess,    /* The connect req succeeded */
   kDisconnectSuccess, /* The disconnect req succeeded */
-  kTooManySessions,   /* Connect req failed because server is out of sessions */
 
   // Errors
+  kTooManySessions, /* Connect req failed because server is out of sessions */
   kInvalidRemoteAppTid,
   kInvalidRemotePort,
   kInvalidTransport
 };
+
+static std::string session_mgmt_resp_type_str(SessionMgmtRespType resp_type) {
+  switch (resp_type) {
+    case SessionMgmtRespType::kConnectSuccess:
+      return std::string("[Connect success]");
+    case SessionMgmtRespType::kDisconnectSuccess:
+      return std::string("[Disconnect success]");
+    case SessionMgmtRespType::kTooManySessions:
+      return std::string("[Too many sessions]");
+    case SessionMgmtRespType::kInvalidRemoteAppTid:
+      return std::string("[Invalid remote app TID]");
+    case SessionMgmtRespType::kInvalidRemotePort:
+      return std::string("[Invalid remote port]");
+    case SessionMgmtRespType::kInvalidTransport:
+      return std::string("[Invalid transport]");
+  }
+}
+
+/**
+ * @brief Return true iff \p resp_type is an error response type
+ */
+static bool session_mgmt_is_resp_type_err(SessionMgmtRespType resp_type) {
+  switch (resp_type) {
+    case SessionMgmtRespType::kConnectSuccess:
+    case SessionMgmtRespType::kDisconnectSuccess:
+      return false;
+    case SessionMgmtRespType::kTooManySessions:
+    case SessionMgmtRespType::kInvalidRemoteAppTid:
+    case SessionMgmtRespType::kInvalidRemotePort:
+    case SessionMgmtRespType::kInvalidTransport:
+      return true;
+  }
+}
 
 }  // End ERpc
 

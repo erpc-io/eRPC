@@ -18,7 +18,7 @@ void Rpc<Transport_>::handle_session_management() {
                  app_tid, session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str());
 
     /* The sender of a packet cannot be this Rpc */
-    if (is_session_mgmt_pkt_type_req(sm_pkt->pkt_type)) {
+    if (session_mgmt_is_pkt_type_req(sm_pkt->pkt_type)) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) == 0 &&
                sm_pkt->client.app_tid == app_tid));
     } else {
@@ -74,7 +74,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
         sm_pkt->server.fdev_port_index);
 
     sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtResponseType::kInvalidRemotePort);
+                          SessionMgmtRespType::kInvalidRemotePort);
     return;
   }
 
@@ -87,7 +87,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
         get_transport_name(sm_pkt->server.transport_type).c_str());
 
     sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtResponseType::kInvalidTransport);
+                          SessionMgmtRespType::kInvalidTransport);
     return;
   }
 
@@ -123,7 +123,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
       /* Send a connect success response */
       sm_pkt->server = old_session->server; /* Fill in server metadata */
       sm_pkt->send_resp_mut(nexus->global_udp_port,
-                            SessionMgmtResponseType::kConnectSuccess);
+                            SessionMgmtRespType::kConnectSuccess);
       return;
     }
   }
@@ -137,7 +137,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
         kMaxSessionsPerThread);
 
     sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtResponseType::kTooManySessions);
+                          SessionMgmtRespType::kTooManySessions);
     return;
   }
 
@@ -155,7 +155,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   session->client = sm_pkt->client;
 
   sm_pkt->send_resp_mut(nexus->global_udp_port,
-                        SessionMgmtResponseType::kConnectSuccess);
+                        SessionMgmtRespType::kConnectSuccess);
   return;
 }
 
@@ -198,7 +198,8 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   /*
    * If we are here, we still have the requester session as Client.
    * Check if the session state has somehow advanced beyond kConnectInProgress.
-   * If so, the callback is not invoked.
+   * If so, we are not interested in the response and the callback is not
+   * invoked.
    */
   assert(session->state >= SessionState::kConnectInProgress);
 
@@ -210,6 +211,11 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
         session_num,
         session_state_str(SessionState::kConnectInProgress).c_str());
     return;
+  }
+
+  /* Check if the session was successfully connected */
+  if (sm_pkt->resp_type != SessionMgmtRespType::kConnectSuccess) {
+    /* XXX */
   }
 
   /* Save server metadata, mark session connected, and invoke app callback */

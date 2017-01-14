@@ -21,7 +21,8 @@ enum class SessionState {
   kConnectInProgress,
   kConnected,
   kDisconnectInProgress,
-  kDisconnected
+  kDisconnected,
+  kError
 };
 
 static std::string session_state_str(SessionState state) {
@@ -36,8 +37,10 @@ static std::string session_state_str(SessionState state) {
       return std::string("[Disconnect in progress]");
     case SessionState::kDisconnected:
       return std::string("[Disconnected]");
+    case SessionState::kError:
+      return std::string("[Error]");
   }
-  return std::string("[Invalid]");
+  return std::string("[Invalid state]");
 }
 
 /**
@@ -62,7 +65,7 @@ static std::string session_mgmt_event_type_str(
     case SessionMgmtEventType::kDisconnectFailed:
       return std::string("[kDisconnect failed]");
   }
-  return std::string("[Invalid]");
+  return std::string("[Invalid event type]");
 }
 
 /**
@@ -100,7 +103,7 @@ class SessionMetadata {
 class SessionMgmtPkt {
  public:
   SessionMgmtPktType pkt_type;
-  SessionMgmtResponseType resp_type; /* For responses only */
+  SessionMgmtRespType resp_type; /* For responses only */
 
   /*
    * Each session management packet contains two copies of session metadata,
@@ -131,8 +134,8 @@ class SessionMgmtPkt {
    * and fills in the response type.
    */
   inline void send_resp_mut(uint16_t global_udp_port,
-                            SessionMgmtResponseType _resp_type) {
-    assert(is_session_mgmt_pkt_type_req(pkt_type));
+                            SessionMgmtRespType _resp_type) {
+    assert(session_mgmt_is_pkt_type_req(pkt_type));
     pkt_type = session_mgmt_pkt_type_req_to_resp(pkt_type);
     resp_type = _resp_type;
 
