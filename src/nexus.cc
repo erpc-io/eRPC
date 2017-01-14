@@ -16,6 +16,8 @@
 namespace ERpc {
 
 Nexus::Nexus(uint16_t global_udp_port) : global_udp_port(global_udp_port) {
+  /* Get the local hostname */
+  memset((void *)&hostname, 0, sizeof(hostname));
   int ret = gethostname(hostname, kMaxHostnameLen);
   if (ret == -1) {
     fprintf(stderr, "eRPC Nexus: FATAL. gethostname failed. Error = %s\n",

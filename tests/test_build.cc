@@ -27,15 +27,15 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 }
 
 void client_thread_func(Nexus *nexus) {
-  test_context_t *client_context = new test_context_t("client_thread");
+  test_context_t *client_context = new test_context_t("[client_thread]");
 
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, port_vec);
 
-  Session *session = rpc.create_session(port_vec[0],    /* Local port */
-                                        "localhost",    /* Remote hostname */
-                                        SERVER_APP_TID, /* Remote app TID */
-                                        port_vec[0]);   /* Remote port */
+  Session *session = rpc.create_session(port_vec[0],      /* Local port */
+                                        "akalia-cmudesk", /* Remote hostname */
+                                        SERVER_APP_TID,   /* Remote app TID */
+                                        port_vec[0]);     /* Remote port */
 
   /* Send the connect request only after the server is ready */
   while (server_ready == 0) {
@@ -49,7 +49,7 @@ void client_thread_func(Nexus *nexus) {
 }
 
 void server_thread_func(Nexus *nexus) {
-  test_context_t *server_context = new test_context_t("client_thread");
+  test_context_t *server_context = new test_context_t("[client_thread]");
 
   Rpc<InfiniBandTransport> rpc(nexus, (void *)server_context, SERVER_APP_TID,
                                &test_sm_hander, port_vec);

@@ -19,10 +19,10 @@ void Rpc<Transport_>::handle_session_management() {
 
     /* The sender of a packet cannot be this Rpc */
     if (is_session_mgmt_pkt_type_req(sm_pkt->pkt_type)) {
-      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) &&
+      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) == 0 &&
                sm_pkt->client.app_tid == app_tid));
     } else {
-      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname) &&
+      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0 &&
                sm_pkt->server.app_tid == app_tid));
     }
 
@@ -63,7 +63,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Ensure that server fields known by the client were filled correctly */
   assert(sm_pkt->server.app_tid == app_tid);
-  assert(strcmp(sm_pkt->server.hostname, nexus->hostname));
+  assert(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0);
 
   /* Check if the requested fabric port is managed by us */
   if (!is_fdev_port_managed(sm_pkt->server.fdev_port_index)) {
@@ -96,32 +96,32 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
    * client Rpc (C) that sent this packet. It's OK if we have a session where
    * we are the client Rpc, and C is the server Rpc.
    */
-  for (Session *existing_session : session_vec) {
+  for (Session *old_session : session_vec) {
     /*
      * This check ensures that we own the session as the server.
      *
-     * If the check succeeds, we cannot own @existing_session as the client:
+     * If the check succeeds, we cannot own @old_session as the client:
      * @sm_pkt was sent by a different Rpc than us, since an Rpc cannot send
      * session management packets to itself. So the client hostname and app_tid
      * in the located session cannot be ours, since they are same as @sm_pkt's.
      */
-    if ((existing_session != nullptr) &&
-        strcmp(existing_session->client.hostname, sm_pkt->client.hostname) &&
-        (existing_session->client.app_tid == sm_pkt->client.app_tid)) {
-      assert(existing_session->role == Session::Role::kServer);
-      assert(existing_session->state == SessionState::kConnected);
+    if ((old_session != nullptr) &&
+        strcmp(old_session->client.hostname, sm_pkt->client.hostname) == 0 &&
+        (old_session->client.app_tid == sm_pkt->client.app_tid)) {
+      assert(old_session->role == Session::Role::kServer);
+      assert(old_session->state == SessionState::kConnected);
 
       /* There's a valid session, so client's metadata cannot have changed. */
-      assert(memcmp((void *)&existing_session->client, (void *)&sm_pkt->client,
-                    sizeof(existing_session->client)) == 0);
+      assert(memcmp((void *)&old_session->client, (void *)&sm_pkt->client,
+                    sizeof(old_session->client)) == 0);
 
       erpc_dprintf(
           "eRPC Rpc: Rpc %s received duplicate session connect "
           "request from %s\n",
-          get_name().c_str(), existing_session->get_client_name().c_str());
+          get_name().c_str(), old_session->get_client_name().c_str());
 
       /* Send a connect success response */
-      sm_pkt->server = existing_session->server; /* Fill in server metadata */
+      sm_pkt->server = old_session->server; /* Fill in server metadata */
       sm_pkt->send_resp_mut(nexus->global_udp_port,
                             SessionMgmtResponseType::kConnectSuccess);
       return;
@@ -191,7 +191,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * still match
    */
   assert(sm_pkt->server.app_tid == session->server.app_tid);
-  assert(strcmp(sm_pkt->server.hostname, session->server.hostname));
+  assert(strcmp(sm_pkt->server.hostname, session->server.hostname) == 0);
   assert(memcmp((void *)&sm_pkt->client, (void *)&session->client,
                 sizeof(sm_pkt->client)) == 0);
 
