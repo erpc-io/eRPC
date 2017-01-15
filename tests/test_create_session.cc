@@ -22,6 +22,10 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
   _unused(_context);
 }
 
+/**
+ * @brief Test the create_session API. This does not connect or destroy the
+ * created sessions.
+ */
 TEST(create_session, create_session) {
   Nexus nexus(NEXUS_UDP_PORT);
 

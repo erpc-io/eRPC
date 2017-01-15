@@ -65,7 +65,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->server.app_tid == app_tid);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0);
 
-  /* Create the basic issue message using only the packet */
+  /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "eRPC Rpc: Rpc %s received session connect request from %s. Issue",
