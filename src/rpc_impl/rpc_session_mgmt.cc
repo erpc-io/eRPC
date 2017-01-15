@@ -73,8 +73,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     erpc_dprintf("%s. Invalid server fabric port %zu.\n", issue_msg,
                  sm_pkt->server.fdev_port_index);
 
-    sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtErrType::kInvalidRemotePort);
+    sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
+                          &nexus->udp_config);
     return;
   }
 
@@ -83,8 +83,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     erpc_dprintf("%s: Invalid transport type %s.\n", issue_msg,
                  get_transport_name(sm_pkt->server.transport_type).c_str());
 
-    sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtErrType::kInvalidTransport);
+    sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidTransport,
+                          &nexus->udp_config);
     return;
   }
 
@@ -117,8 +117,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
       /* Send a connect success response */
       sm_pkt->server = old_session->server; /* Fill in server metadata */
-      sm_pkt->send_resp_mut(nexus->global_udp_port,
-                            SessionMgmtErrType::kNoError);
+      sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
       return;
     }
   }
@@ -128,8 +127,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     erpc_dprintf("%s: Reached session limit %zu.\n", issue_msg,
                  kMaxSessionsPerThread);
 
-    sm_pkt->send_resp_mut(nexus->global_udp_port,
-                          SessionMgmtErrType::kTooManySessions);
+    sm_pkt->send_resp_mut(SessionMgmtErrType::kTooManySessions,
+                          &nexus->udp_config);
     return;
   }
 
@@ -146,7 +145,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 
-  sm_pkt->send_resp_mut(nexus->global_udp_port, SessionMgmtErrType::kNoError);
+  sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
   return;
 }
 

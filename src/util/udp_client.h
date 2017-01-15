@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string>
+#include "util/rand.h"
 
 namespace ERpc {
 
@@ -11,16 +12,22 @@ namespace ERpc {
  */
 class UDPClient {
  public:
-  UDPClient(const char *remote_addr, size_t remote_port);
+  UDPClient(const char *remote_addr, size_t remote_port, double drop_prob);
   ~UDPClient();
 
   ssize_t send(const char *msg, size_t size);
 
  private:
-  int sock_fd;
-  size_t remote_port;
+  // Constructor args
   std::string remote_addr;
+  size_t remote_port;
+  double drop_prob;
+
+  // Others
+  int sock_fd;
   struct addrinfo *remote_addrinfo;
+
+  SlowRand slow_rand; /* For adding packet drops */
 };
 
 }  // End ERpc

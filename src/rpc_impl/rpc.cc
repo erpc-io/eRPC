@@ -204,7 +204,7 @@ bool Rpc<Transport_>::connect_session(Session *session) {
   memcpy((void *)&connect_req.server, (void *)&session->server,
          sizeof(connect_req.server));
 
-  connect_req.send_to(session->server.hostname, nexus->global_udp_port);
+  connect_req.send_to(session->server.hostname, &nexus->udp_config);
   return true;
 }
 

@@ -150,10 +150,12 @@ class SessionMgmtPkt {
    * @brief Send this session management packet "as is" to \p dst_hostname on
    * port \p global_udp_port.
    */
-  inline void send_to(const char *dst_hostname, size_t global_udp_port) {
+  inline void send_to(const char *dst_hostname,
+                      const udp_config_t *udp_config) {
     assert(dst_hostname != NULL);
 
-    UDPClient udp_client(dst_hostname, global_udp_port);
+    UDPClient udp_client(dst_hostname, udp_config->global_udp_port,
+                         udp_config->drop_prob);
     ssize_t ret = udp_client.send((char *)this, sizeof(*this));
     assert(ret == sizeof(*this));
   }
@@ -165,13 +167,13 @@ class SessionMgmtPkt {
    * This function mutates the packet: it flips the packet type to response,
    * and fills in the response type.
    */
-  inline void send_resp_mut(size_t global_udp_port,
-                            SessionMgmtErrType _err_type) {
+  inline void send_resp_mut(SessionMgmtErrType _err_type,
+                            const udp_config_t *udp_config) {
     assert(session_mgmt_is_pkt_type_req(pkt_type));
     pkt_type = session_mgmt_pkt_type_req_to_resp(pkt_type);
     err_type = _err_type;
 
-    send_to(client.hostname, global_udp_port);
+    send_to(client.hostname, udp_config);
   }
 };
 static_assert(sizeof(SessionMgmtPkt) < 1400,

@@ -15,12 +15,27 @@ namespace ERpc {
 class Nexus {
  public:
   /**
-   * @brief Construct the one-per-process Nexus object
+   * @brief The Nexus creation API exposed to the user. Creates the
+   * one-per-process Nexus object. This sets @udp_drop_prob = 0.0.
    *
-   * @param port The UDP port used by all Nexus-es in the cluster to listen
-   * for session management packets.
+   * @param global_udp_port The UDP port used by all Nexus-es in the cluster to
+   * listen for session management packets.
    */
   Nexus(size_t global_udp_port);
+
+  /**
+   * @brief Nexus creation API for UDP packet loss testing. Creates the
+   * one-per-process Nexus object.
+   *
+   * @param global_udp_port The UDP port used by all Nexus-es in the cluster to
+   * listen for session management packets.
+   * 
+   * @param udp_drop_prob The probability that a session management packet
+   * will be dropped. This is useful for testing session management packet
+   * retransmission.
+   */
+  Nexus(size_t global_udp_port, double udp_drop_prob);
+
   ~Nexus();
 
   void register_hook(SessionMgmtHook *hook);
@@ -34,11 +49,7 @@ class Nexus {
   // a cache line padding.
   char hostname[kMaxHostnameLen]; /* The local host's network hostname */
   double freq_ghz;
-  /*
-   * The UDP port used by all Nexus-es in the cluster to listen on for
-   * session management
-   */
-  const size_t global_udp_port;
+  const udp_config_t udp_config;
   int nexus_sock_fd; /* The file descriptor of the UDP socket */
 
   uint8_t pad[64];

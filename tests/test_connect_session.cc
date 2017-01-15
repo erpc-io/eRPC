@@ -19,9 +19,11 @@ std::atomic<size_t> server_count;
 std::vector<size_t> port_vec = {0};
 
 struct client_context_t {
+  size_t nb_sm_events;
   SessionMgmtErrType err_map[NUM_CLIENT_SESSIONS];
 
   client_context_t() {
+    nb_sm_events = 0;
     /* Initialize the error map */
     for (int i = 0; i < NUM_CLIENT_SESSIONS; i++) {
       err_map[i] =
@@ -34,6 +36,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
                     SessionMgmtErrType sm_err_type, void *_context) {
   ASSERT_TRUE(_context != nullptr); 
   client_context_t *context = (client_context_t *)_context;
+  context->nb_sm_events++;
 
   /* Check that the error type matches the expected value */
   size_t client_session_num = session->client.session_num;
@@ -92,6 +95,9 @@ void client_thread_func(Nexus *nexus) {
   ASSERT_TRUE(connect_2);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
+
+  /* Check that we actually received the expected number of response packets */
+  ASSERT_EQ(client_context->nb_sm_events, 2);
 }
 
 /* The server thread */

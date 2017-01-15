@@ -42,8 +42,18 @@ namespace ERpc {
 #define MB(x) ((size_t)(x) << 20)
 #define MB_(x) (MB(x) - 1)
 
-// General typedefs
-typedef uint32_t erpc_tid_t; /* User-specified thread identifier */
+// General typedefs and structs
+struct udp_config_t {
+  /*
+   * The UDP port used by all Nexus-es in the cluster to listen on for
+   * session management
+   */
+  size_t global_udp_port;
+  double drop_prob; /* Used to add packet loss to UDP traffic */
+
+  udp_config_t(size_t global_udp_port, double drop_prob)
+      : global_udp_port(global_udp_port), drop_prob(drop_prob) {}
+};
 
 // General constants
 static const size_t kMaxNumaNodes = 16; /* Maximum number of NUMA nodes */

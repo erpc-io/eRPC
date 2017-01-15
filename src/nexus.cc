@@ -15,7 +15,10 @@
 
 namespace ERpc {
 
-Nexus::Nexus(size_t global_udp_port) : global_udp_port(global_udp_port) {
+Nexus::Nexus(size_t global_udp_port) : Nexus(global_udp_port, 0.0) {}
+
+Nexus::Nexus(size_t global_udp_port, double udp_drop_prob)
+    : udp_config(global_udp_port, udp_drop_prob) {
   if (global_udp_port >= std::numeric_limits<uint16_t>::max()) {
     fprintf(stderr, "eRPC Nexus: FATAL. UDP port number too large.\n");
     exit(-1);
@@ -106,7 +109,7 @@ void Nexus::install_sigio_handler() {
   memset(&server, 0, sizeof(server));
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons((uint16_t)global_udp_port);
+  server.sin_port = htons((uint16_t)udp_config.global_udp_port);
 
   if (bind(nexus_sock_fd, (struct sockaddr *)&server,
            sizeof(struct sockaddr_in)) < 0) {
@@ -210,8 +213,8 @@ void Nexus::session_mgnt_handler() {
           "from Rpc [%s, %zu]. Sending response.\n",
           target_app_tid, source_hostname, source_app_tid);
 
-      sm_pkt->send_resp_mut(global_udp_port,
-                            SessionMgmtErrType::kInvalidRemoteAppTid);
+      sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemoteAppTid,
+                            &udp_config);
     } else {
       /* If it's a response, we can ignore it */
       erpc_dprintf(
