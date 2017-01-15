@@ -14,9 +14,6 @@ void Rpc<Transport_>::handle_session_management() {
 
   /* Handle all session management requests */
   for (SessionMgmtPkt *sm_pkt : sm_hook.session_mgmt_pkt_list) {
-    erpc_dprintf("eRPC Rpc: Rpc %zu received session mgmt pkt of type %s\n",
-                 app_tid, session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str());
-
     /* The sender of a packet cannot be this Rpc */
     if (session_mgmt_is_pkt_type_req(sm_pkt->pkt_type)) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) == 0 &&
@@ -94,7 +91,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   /*
    * Check if we (= this Rpc) already have a session as the server with the
    * client Rpc (C) that sent this packet. (This is different from if we have a
-   * session as the client Rpc, where C is the server Rpc.)
+   * session as the client Rpc, where C is the server Rpc.) This happens when
+   * the connect request is retransmitted.
    */
   for (Session *old_session : session_vec) {
     /*

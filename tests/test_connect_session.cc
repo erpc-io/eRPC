@@ -18,59 +18,86 @@ static_assert(CLIENT_APP_TID > SERVER_APP_TID + NUM_CLIENT_SESSIONS, "");
 std::atomic<size_t> server_count;
 std::vector<size_t> port_vec = {0};
 
-/* Used to map client session numbers to the expected error codes */
-SessionMgmtErrType err_map[NUM_CLIENT_SESSIONS];
+struct client_context_t {
+  SessionMgmtErrType err_map[NUM_CLIENT_SESSIONS];
 
-struct test_context_t {
-  bool is_client;
-  test_context_t(bool is_client) : is_client(is_client) {}
+  client_context_t() {
+    /* Initialize the error map */
+    for (int i = 0; i < NUM_CLIENT_SESSIONS; i++) {
+      err_map[i] =
+          static_cast<SessionMgmtErrType>(std::numeric_limits<int>::max());
+    }
+  }
 };
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
                     SessionMgmtErrType sm_err_type, void *_context) {
-  assert(sm_err_type == SessionMgmtErrType::kNoError);
-  test_context_t *context = (test_context_t *)_context;
+  ASSERT_TRUE(_context != nullptr); 
+  client_context_t *context = (client_context_t *)_context;
 
-  printf("Thread %s received event of type %s on session %p, context = %p\n",
-         context->is_client ? "client" : "server",
-         session_mgmt_event_type_str(sm_event_type).c_str(), session, context);
+  /* Check that the error type matches the expected value */
+  size_t client_session_num = session->client.session_num;
+  ASSERT_EQ(sm_err_type, context->err_map[client_session_num]);
+
+  /* If the error type is really an error, the event should be connect failed */
+  if (sm_err_type != SessionMgmtErrType::kNoError) {
+    ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnectFailed);
+  } else {
+    ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnected);
+  }
 }
 
 /* The client thread */
 void client_thread_func(Nexus *nexus) {
-  /* Initialize the error map */
-  for (int i = 0; i < NUM_CLIENT_SESSIONS; i++) {
-    err_map[i] =
-        static_cast<SessionMgmtErrType>(std::numeric_limits<int>::max());
-  }
+  /* Use a different remote TID for each session up to NUM_CLIENT_SESSIONS. */
+  size_t rem_app_tid = SERVER_APP_TID;
 
   /* Create the Rpc */
-  test_context_t *client_context = new test_context_t(true);
+  client_context_t *client_context = new client_context_t();
+  auto &err_map = client_context->err_map;
+
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, port_vec);
 
   /* Test: Successful connection */
   Session *session_1 = rpc.create_session(port_vec[0], "akalia-cmudesk",
-                                          SERVER_APP_TID, port_vec[0]);
+                                          rem_app_tid++, port_vec[0]);
   ASSERT_TRUE(session_1 != nullptr);
-  ASSERT_TRUE(session_1->client.session_num == 0);
+  ASSERT_EQ(session_1->client.session_num, 0);
   err_map[session_1->client.session_num] = SessionMgmtErrType::kNoError;
+
+  /* Test: Invalid remote port */
+  Session *session_2 = rpc.create_session(port_vec[0], "akalia-cmudesk",
+                                          rem_app_tid++, port_vec[0] + 1);
+  ASSERT_TRUE(session_2 != nullptr);
+  ASSERT_EQ(session_2->client.session_num, 1);
+  err_map[session_2->client.session_num] =
+      SessionMgmtErrType::kInvalidRemotePort;
 
   /* Send the connect requests only after the server is ready */
   while (server_count != NUM_CLIENT_SESSIONS) {
     usleep(1);
   }
 
-  rpc.connect_session(session_1);
+  /* Initiate the connect request for session 1 */
+  bool connect_1 = rpc.connect_session(session_1);
+  ASSERT_TRUE(connect_1);
+
+  /* Try to initiate the connect request for session 1 again */
+  connect_1 = rpc.connect_session(session_1);
+  ASSERT_FALSE(connect_1);
+
+  /* Initiate the connect request for session 2 */
+  bool connect_2 = rpc.connect_session(session_2);
+  ASSERT_TRUE(connect_2);
+
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 }
 
 /* The server thread */
 void server_thread_func(Nexus *nexus, size_t app_tid) {
-  test_context_t *server_context = new test_context_t(false);
-
-  Rpc<InfiniBandTransport> rpc(nexus, (void *)server_context, app_tid,
-                               &test_sm_hander, port_vec);
+  Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
+                               port_vec);
 
   server_count++;
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
@@ -90,7 +117,7 @@ TEST(test_build, test_build) {
 
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(2 * i, &cpuset);
+    CPU_SET(0, &cpuset);
     int rc = pthread_setaffinity_np(server_threads[i].native_handle(),
                                     sizeof(cpu_set_t), &cpuset);
     if (rc != 0) {

@@ -226,17 +226,10 @@ void Nexus::session_mgnt_handler() {
 
   /* Add the packet to the target Rpc's session management packet list */
   target_hook->session_mgmt_mutex.lock();
-  target_hook->session_mgmt_pkt_list.push_back(sm_pkt);
 
-  /* Update event counter after push_back to avoid false positive in Rpc */
+  target_hook->session_mgmt_pkt_list.push_back(sm_pkt);
   ERpc::memory_barrier();
   target_hook->session_mgmt_ev_counter++;
-
-  erpc_dprintf(
-      "eRPC Nexus: Received session mgmt packet of type %s for Rpc %zu, "
-      "from Rpc [%s, %zu]\n",
-      session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str(), target_app_tid,
-      source_hostname, source_app_tid);
 
   target_hook->session_mgmt_mutex.unlock();
   nexus_lock.unlock();
