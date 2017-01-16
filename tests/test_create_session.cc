@@ -67,10 +67,6 @@ void client_thread_func(Nexus *nexus) {
 
   auto &err_map = client_context->err_map;
 
-  //
-  // Tests that actually generate a connect request
-  //
-
   {
     /* Test: Successful connection */
     Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
@@ -94,38 +90,6 @@ void client_thread_func(Nexus *nexus) {
 
   /* Check that we actually received the expected number of response packets */
   ASSERT_EQ(client_context->nb_sm_events, 2);
-
-  //
-  // Tests that don't generate a connect request because of invalid params
-  //
-
-  {
-    /* Test: Unmanaged local port */
-    Session *session = rpc.create_session(port_vec[0] + 1, "akalia-cmudesk",
-                                          SERVER_APP_TID, port_vec[0]);
-    ASSERT_TRUE(session == nullptr);
-  }
-
-  {
-    /* Test: Unmanaged remote port */
-    Session *session = rpc.create_session(port_vec[0] + 1, "akalia-cmudesk",
-                                          SERVER_APP_TID, kMaxFabDevPorts);
-    ASSERT_TRUE(session == nullptr);
-  }
-
-  {
-    /* Test: Try to create session to self */
-    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
-                                          CLIENT_APP_TID, port_vec[0]);
-    ASSERT_TRUE(session == nullptr);
-  }
-
-  {
-    /* Test: Try to create another session to the same remote Rpc. */
-    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
-                                          SERVER_APP_TID, port_vec[0]);
-    ASSERT_TRUE(session == nullptr);
-  }
 }
 
 /* The server thread */
