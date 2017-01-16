@@ -143,10 +143,14 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
     return nullptr;
   }
 
-  /* Create a new session and add it to the session list. XXX: Use pool? */
-  Session *session = new Session(Session::Role::kClient, SessionState::kInit);
+  /* Create a new session. XXX: Use pool? */
+  Session *session =
+      new Session(Session::Role::kClient, SessionState::kConnectInProgress);
 
-  /* Fill in local metadata */
+  /*
+   * Fill in client and server metadata. Commented server fields will be filled
+   * when the connect response is received.
+   */
   SessionMetadata &client_metadata = session->client;
 
   client_metadata.transport_type = transport->transport_type;
@@ -157,10 +161,6 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
   client_metadata.start_seq = generate_start_seq();
   transport->fill_routing_info(&client_metadata.routing_info);
 
-  /*
-   * Fill in remote metadata. Commented fields will be filled when the
-   * session is connected.
-   */
   SessionMetadata &server_metadata = session->server;
   server_metadata.transport_type = transport->transport_type;
   strcpy((char *)server_metadata.hostname, rem_hostname);
@@ -170,33 +170,27 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
   // server_metadata.start_seq = ??
   // server_metadata.routing_info = ??
 
-  session_vec.push_back(session);
+  session_vec.push_back(session); /* Add to list of all sessions */
+  add_to_in_flight(session); /* Add to list of sessions w/ in-flight sm reqs */
+  send_connect_req_one(session);
+
   return session;
 }
 
 template <class Transport_>
-bool Rpc<Transport_>::connect_session(Session *session) {
+void Rpc<Transport_>::send_connect_req_one(Session *session) {
   assert(session != NULL);
+  assert(is_session_managed(session));
+  assert(session->role == Session::Role::kClient);
 
-  if (!is_session_managed(session)) {
-    erpc_dprintf_noargs(
-        "eRPC Rpc: connect_session failed. Session does not belong to Rpc.\n");
-    return false;
-  }
-
-  if (session->role != Session::Role::kClient) {
-    erpc_dprintf_noargs(
-        "eRPC Rpc: connect_session failed. Session role is not Client.\n");
-    return false;
-  }
-
-  if (session->state != SessionState::kInit) {
-    erpc_dprintf_noargs(
-        "eRPC Rpc: connect_session failed. Session status is not Init.\n");
-    return false;
-  }
-
-  session->state = SessionState::kConnectInProgress;
+  /*
+   * We may send/resend the connect request packet in two cases:
+   * 1. After create_session() in the kConnectInProgress state.
+   * 2. If the user calls destroy session (which moves the session to
+   *    kDisconnectWaitForConnect) before the connection is established.
+   */
+  assert(session->state == SessionState::kConnectInProgress ||
+         session->state == SessionState::kDisconnectWaitForConnect);
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
   memcpy((void *)&connect_req.client, (void *)&session->client,
@@ -205,7 +199,25 @@ bool Rpc<Transport_>::connect_session(Session *session) {
          sizeof(connect_req.server));
 
   connect_req.send_to(session->server.hostname, &nexus->udp_config);
-  return true;
+}
+
+template <class Transport_>
+void Rpc<Transport_>::add_to_in_flight(Session *session) {
+  assert(session != nullptr);
+  assert(is_session_managed(session));
+
+  /* Only client-mode sessions can have requests in flight */
+  assert(session->role == Session::Role::kClient);
+
+  /* Ensure that we don't have this session in flight already */
+  for (in_flight_req_t &req : in_flight_vec) {
+    if (req.session == session) {
+      assert(false);
+    }
+  }
+
+  uint64_t tsc = rdtsc();
+  in_flight_vec.push_back(in_flight_req_t(tsc, session));
 }
 
 template <class Transport_>

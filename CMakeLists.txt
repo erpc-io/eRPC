@@ -60,9 +60,6 @@ set(SOURCES
 
 add_library(erpc ${SOURCES})
 
-add_executable(test_create_session tests/test_create_session.cc)
-target_link_libraries(test_create_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-
 add_executable(test_connect_session tests/test_connect_session.cc)
 target_link_libraries(test_connect_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 

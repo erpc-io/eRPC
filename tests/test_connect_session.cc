@@ -34,7 +34,7 @@ struct client_context_t {
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
                     SessionMgmtErrType sm_err_type, void *_context) {
-  ASSERT_TRUE(_context != nullptr); 
+  ASSERT_TRUE(_context != nullptr);
   client_context_t *context = (client_context_t *)_context;
   context->nb_sm_events++;
 
@@ -52,52 +52,80 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
 /* The client thread */
 void client_thread_func(Nexus *nexus) {
+  /* Start the tests only after all servers are ready */
+  while (server_count != NUM_CLIENT_SESSIONS) {
+    usleep(1);
+  }
+
   /* Use a different remote TID for each session up to NUM_CLIENT_SESSIONS. */
   size_t rem_app_tid = SERVER_APP_TID;
 
   /* Create the Rpc */
   client_context_t *client_context = new client_context_t();
-  auto &err_map = client_context->err_map;
-
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, port_vec);
 
-  /* Test: Successful connection */
-  Session *session_1 = rpc.create_session(port_vec[0], "akalia-cmudesk",
+  auto &err_map = client_context->err_map;
+
+  //
+  // Tests that actually generate a connect request
+  //
+
+  {
+    /* Test: Successful connection */
+    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
                                           rem_app_tid++, port_vec[0]);
-  ASSERT_TRUE(session_1 != nullptr);
-  ASSERT_EQ(session_1->client.session_num, 0);
-  err_map[session_1->client.session_num] = SessionMgmtErrType::kNoError;
-
-  /* Test: Invalid remote port */
-  Session *session_2 = rpc.create_session(port_vec[0], "akalia-cmudesk",
-                                          rem_app_tid++, port_vec[0] + 1);
-  ASSERT_TRUE(session_2 != nullptr);
-  ASSERT_EQ(session_2->client.session_num, 1);
-  err_map[session_2->client.session_num] =
-      SessionMgmtErrType::kInvalidRemotePort;
-
-  /* Send the connect requests only after the server is ready */
-  while (server_count != NUM_CLIENT_SESSIONS) {
-    usleep(1);
+    ASSERT_TRUE(session != nullptr);
+    ASSERT_EQ(session->client.session_num, 0);
+    err_map[session->client.session_num] = SessionMgmtErrType::kNoError;
   }
 
-  /* Initiate the connect request for session 1 */
-  bool connect_1 = rpc.connect_session(session_1);
-  ASSERT_TRUE(connect_1);
-
-  /* Try to initiate the connect request for session 1 again */
-  connect_1 = rpc.connect_session(session_1);
-  ASSERT_FALSE(connect_1);
-
-  /* Initiate the connect request for session 2 */
-  bool connect_2 = rpc.connect_session(session_2);
-  ASSERT_TRUE(connect_2);
+  {
+    /* Test: Unmanaged remote port */
+    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+                                          rem_app_tid++, port_vec[0] + 1);
+    ASSERT_TRUE(session != nullptr);
+    ASSERT_EQ(session->client.session_num, 1);
+    err_map[session->client.session_num] =
+        SessionMgmtErrType::kInvalidRemotePort;
+  }
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 
   /* Check that we actually received the expected number of response packets */
   ASSERT_EQ(client_context->nb_sm_events, 2);
+
+  //
+  // Tests that don't generate a connect request because of invalid params
+  //
+
+  {
+    /* Test: Unmanaged local port */
+    Session *session = rpc.create_session(port_vec[0] + 1, "akalia-cmudesk",
+                                          SERVER_APP_TID, port_vec[0]);
+    ASSERT_TRUE(session == nullptr);
+  }
+
+  {
+    /* Test: Unmanaged remote port */
+    Session *session = rpc.create_session(port_vec[0] + 1, "akalia-cmudesk",
+                                          SERVER_APP_TID, kMaxFabDevPorts);
+    ASSERT_TRUE(session == nullptr);
+  }
+
+  {
+    /* Test: Try to create session to self */
+    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+                                          CLIENT_APP_TID, port_vec[0]);
+    ASSERT_TRUE(session == nullptr);
+  }
+
+  {
+    /* Test: Try to create another session to the same remote Rpc. */
+    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+                                          SERVER_APP_TID, port_vec[0]);
+    ASSERT_TRUE(session == nullptr);
+  }
 }
 
 /* The server thread */
@@ -114,7 +142,7 @@ TEST(test_build, test_build) {
 
   /*
    * Launch the server threads. Bind all server threads to core 0 to avoid
-   * overload as the event loop will use 100% CPU.
+   * overload as the event loops will use 100% CPU.
    */
   std::thread server_threads[NUM_CLIENT_SESSIONS];
   for (size_t i = 0; i < NUM_CLIENT_SESSIONS; i++) {

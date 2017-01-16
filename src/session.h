@@ -17,20 +17,20 @@ namespace ERpc {
  * @brief Session state that can only go forward.
  */
 enum class SessionState {
-  kInit,
   kConnectInProgress,
+  kDisconnectWaitForConnect, /* If destroy called before connect response */
   kConnected,
   kDisconnectInProgress,
-  kDisconnected,
+  kDisconnected, /* Temporary state just for disconnected callback */
   kError
 };
 
 static std::string session_state_str(SessionState state) {
   switch (state) {
-    case SessionState::kInit:
-      return std::string("[Init]");
     case SessionState::kConnectInProgress:
       return std::string("[Connect in progress]");
+    case SessionState::kDisconnectWaitForConnect:
+      return std::string("[Disconnect wait for connect]");
     case SessionState::kConnected:
       return std::string("[Connected]");
     case SessionState::kDisconnectInProgress:
@@ -106,7 +106,11 @@ class SessionMetadata {
     ret += std::string(", R: "); /* Rpc */
     ret += std::to_string(app_tid);
     ret += std::string(", S: "); /* Session */
-    ret += std::to_string(session_num);
+    if (session_num == std::numeric_limits<size_t>::max()) {
+      ret += std::string("XX");
+    } else {
+      ret += std::to_string(session_num);
+    }
     ret += std::string("]");
 
     return ret;

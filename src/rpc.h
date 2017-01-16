@@ -25,6 +25,18 @@ template <class Transport_>
 class Rpc {
   const uint64_t kStartSeqMask = ((1ull << 48) - 1ull);
 
+  struct in_flight_req_t {
+    uint64_t prev_tsc; /* The tsc at which a request was last sent */
+    Session *session;
+
+    in_flight_req_t(uint64_t tsc, Session *session)
+        : prev_tsc(tsc), session(session) {}
+
+    bool operator==(const in_flight_req_t &other) {
+      return (prev_tsc == other.prev_tsc) && (session == other.session);
+    }
+  };
+
  public:
   // rpc.cc
   Rpc(Nexus *nexus, void *context, size_t app_tid,
@@ -34,22 +46,16 @@ class Rpc {
   ~Rpc();
 
   /**
-   * @brief Create a Session. The session needs to be connected separarely.
+   * @brief Create a Session and initiate session connection.
    *
-   * @return A pointer to the created session if creation succeeds. NULL if
-   * creation fails.
+   * @return A pointer to the created session if creation succeeds; a callback
+   * will be invoked later when connection establishment succeeds/fails.
+   * NULL if creation fails; a callback will not be invoked.
    */
   Session *create_session(size_t local_fdev_port_index,
                           const char *_rem_hostname, size_t rem_app_tid,
                           size_t rem_fdev_port_index);
 
-  /**
-   * @brief Initiate the connection establishment process for \p session.
-   *
-   * @return True if the connection establishment process was started
-   * successfully, false otherwise.
-   */
-  bool connect_session(Session *session);
   std::string get_name();
 
   /**
@@ -93,6 +99,7 @@ class Rpc {
     }
   }
 
+ private:
   // rpc_session_mgmt.cc
   void handle_session_management();
   void handle_session_connect_req(SessionMgmtPkt *pkt);
@@ -100,7 +107,12 @@ class Rpc {
   void handle_session_disconnect_req(SessionMgmtPkt *pkt);
   void handle_session_disconnect_resp(SessionMgmtPkt *pkt);
 
- private:
+  // rpc.cc
+  void send_connect_req_one(Session *session);
+  void add_to_in_flight(Session *session);
+  uint64_t generate_start_seq();
+  bool is_session_managed(Session *session);
+
   // Constructor args
   Nexus *nexus;
   void *context; /* The application context */
@@ -118,14 +130,15 @@ class Rpc {
    * are repeatedly connected and disconnected, but 8 bytes per session is OK.
    */
   std::vector<Session *> session_vec;
+
+  /*
+   * List of client sessions for which session management requests are in
+   * flight.
+   */
+  std::vector<in_flight_req_t> in_flight_vec;
+
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
-
-  // Private methods
-
-  // rpc.cc
-  uint64_t generate_start_seq();
-  bool is_session_managed(Session *session);
 };
 
 /* Instantiate required Rpc classes so they get compiled for the linker */
