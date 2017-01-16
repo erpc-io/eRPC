@@ -44,7 +44,8 @@ set(SOURCES
   src/rpc_impl/rpc.cc
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_ev_loop.cc
-  src/rpc_impl/rpc_session_mgmt_handlers.cc
+  src/rpc_impl/rpc_connect_handlers.cc
+  src/rpc_impl/rpc_disconnect_handlers.cc
   src/session.cc
   src/session.h
   src/transport.h

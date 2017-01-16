@@ -68,6 +68,49 @@ bool Rpc<Transport_>::is_session_managed(Session *session) {
   return true;
 }
 
+template <class Transport_>
+void Rpc<Transport_>::handle_session_management() {
+  assert(sm_hook.session_mgmt_ev_counter > 0);
+  sm_hook.session_mgmt_mutex.lock();
+
+  /* Handle all session management requests */
+  for (SessionMgmtPkt *sm_pkt : sm_hook.session_mgmt_pkt_list) {
+    /* The sender of a packet cannot be this Rpc */
+    if (session_mgmt_is_pkt_type_req(sm_pkt->pkt_type)) {
+      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) == 0 &&
+               sm_pkt->client.app_tid == app_tid));
+    } else {
+      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0 &&
+               sm_pkt->server.app_tid == app_tid));
+    }
+
+    switch (sm_pkt->pkt_type) {
+      case SessionMgmtPktType::kConnectReq:
+        handle_session_connect_req(sm_pkt);
+        break;
+      case SessionMgmtPktType::kConnectResp:
+        handle_session_connect_resp(sm_pkt);
+        break;
+      case SessionMgmtPktType::kDisconnectReq:
+        handle_session_connect_resp(sm_pkt);
+        break;
+      case SessionMgmtPktType::kDisconnectResp:
+        handle_session_connect_resp(sm_pkt);
+        break;
+      default:
+        assert(false);
+        break;
+    }
+
+    /* Free memory that was allocated by the Nexus */
+    free(sm_pkt);
+  }
+
+  sm_hook.session_mgmt_pkt_list.clear();
+  sm_hook.session_mgmt_ev_counter = 0;
+  sm_hook.session_mgmt_mutex.unlock();
+};
+
 /**
  * @brief Send or resend the connect request for a session
  */

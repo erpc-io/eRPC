@@ -115,14 +115,14 @@ class Rpc {
   }
 
  private:
-  // rpc_session_mgmt_handlers.cc
-  void handle_session_management();
-  void handle_session_connect_req(SessionMgmtPkt *pkt);
-  void handle_session_connect_resp(SessionMgmtPkt *pkt);
-  void handle_session_disconnect_req(SessionMgmtPkt *pkt);
-  void handle_session_disconnect_resp(SessionMgmtPkt *pkt);
-
   // rpc.cc
+
+  /**
+   * @brief Process all session management events in the queue and free them.
+   * The handlers for individual request/response types should not free packets.
+   */
+  void handle_session_management();
+
   void send_connect_req_one(Session *session);
   void send_disconnect_req_one(Session *session);
   void add_to_in_flight(Session *session);
@@ -131,6 +131,14 @@ class Rpc {
   void retry_in_flight();
   uint64_t generate_start_seq();
   bool is_session_managed(Session *session);
+
+  // rpc_connect_handlers.cc
+  void handle_session_connect_req(SessionMgmtPkt *pkt);
+  void handle_session_connect_resp(SessionMgmtPkt *pkt);
+
+  // rpc_disconnect_handlers.cc
+  void handle_session_disconnect_req(SessionMgmtPkt *pkt);
+  void handle_session_disconnect_resp(SessionMgmtPkt *pkt);
 
   // Constructor args
   Nexus *nexus;
