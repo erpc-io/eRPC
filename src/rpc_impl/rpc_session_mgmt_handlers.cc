@@ -145,6 +145,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 
+  session_vec.push_back(session); /* Add to list of all sessions */
+
   erpc_dprintf("%s: None. Sending response.\n", issue_msg);
   sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
   return;
