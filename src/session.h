@@ -21,11 +21,11 @@ static const size_t kSessionMgmtTimeoutMs = 50; /* Timeout for sm reqs */
  */
 enum class SessionState {
   kConnectInProgress,
-  kDisconnectWaitForConnect, /* If destroy called before connect response */
-  kConnected,
+  kDisconnectWaitForConnect, /*!< Destroy called before connect response */
+  kConnected, /*!< The only state for server-side sessions */
   kDisconnectInProgress,
-  kDisconnected, /* Temporary state just for disconnected callback */
-  kError
+  kDisconnected, /*!< Temporary state just for the disconnected callback */
+  kError /*!< Only allowed for client-side sessions */
 };
 
 static std::string session_state_str(SessionState state) {

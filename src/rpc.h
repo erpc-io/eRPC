@@ -60,6 +60,17 @@ class Rpc {
                           const char *_rem_hostname, size_t rem_app_tid,
                           size_t rem_fdev_port_index);
 
+  /**
+   * @brief Disconnect and destroy a session.
+   *
+   * @param session A session that was returned by create_session().
+   *
+   * @return True if session disconnection was initiated, i.e., a callback will
+   * be invoked later. False if disconnection has already been initiated or
+   * if the session is alread
+   */
+  bool destroy_session(Session *session);
+
   std::string get_name();
 
   /**
