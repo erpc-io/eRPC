@@ -192,18 +192,21 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   /*
    * If we are here, we still have the requester session as Client.
    *
-   * Check if the session state has advanced beyond kConnectInProgress. If so,
-   * we are not interested in the response and the callback is not invoked.
+   * Check if the session state has advanced beyond kDisconnectWaitForConnect.
+   * If so, we are not interested in the response and the callback is not
+   * invoked.
    */
-  assert(session->state >= SessionState::kConnectInProgress);
+  if (session->state > SessionState::kDisconnectWaitForConnect) {
+    erpc_dprintf("%s: Ignoring. Client is in state %s.\n", issue_msg,
+                 session_state_str(session->state).c_str());
 
-  if (session->state > SessionState::kConnectInProgress) {
-    erpc_dprintf("%s: Client session is not in state %s.\n", issue_msg,
-                 session_state_str(SessionState::kConnectInProgress).c_str());
+    assert(!is_in_flight(session));
     return;
   }
 
   /*
+   * If we are here, we are interested in the response.
+   *
    * If the connect request failed, move the session to the error state and
    * invoke the callback.
    */
@@ -212,15 +215,18 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
                  session_mgmt_err_type_str(sm_pkt->err_type).c_str());
 
     session->state = SessionState::kError;
+    remove_from_in_flight(session);
+
     session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
                          sm_pkt->err_type, context);
 
     return;
   }
 
-  /* Save server metadata, mark session connected, and invoke callback */
-  session->server = sm_pkt->server;
-  session->state = SessionState::kConnected;
+  session->server = sm_pkt->server; /* Save server metadata from packet */
+
+  session->state = SessionState::kConnected; /* Mark session connected */
+  remove_from_in_flight(session);
 
   session_mgmt_handler(session, SessionMgmtEventType::kConnected,
                        SessionMgmtErrType::kNoError, context);

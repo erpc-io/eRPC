@@ -32,8 +32,12 @@ class Rpc {
     in_flight_req_t(uint64_t tsc, Session *session)
         : prev_tsc(tsc), session(session) {}
 
+    /*
+     * The in-flight request vector contains distinct sessions, so we can
+     * ignore the timestamp for comparison.
+     */
     bool operator==(const in_flight_req_t &other) {
-      return (prev_tsc == other.prev_tsc) && (session == other.session);
+      return (session == other.session);
     }
   };
 
@@ -100,7 +104,7 @@ class Rpc {
   }
 
  private:
-  // rpc_session_mgmt.cc
+  // rpc_session_mgmt_handlers.cc
   void handle_session_management();
   void handle_session_connect_req(SessionMgmtPkt *pkt);
   void handle_session_connect_resp(SessionMgmtPkt *pkt);
@@ -109,7 +113,11 @@ class Rpc {
 
   // rpc.cc
   void send_connect_req_one(Session *session);
+  void send_disconnect_req_one(Session *session);
   void add_to_in_flight(Session *session);
+  bool is_in_flight(Session *session);
+  void remove_from_in_flight(Session *session);
+  void retry_in_flight();
   uint64_t generate_start_seq();
   bool is_session_managed(Session *session);
 
