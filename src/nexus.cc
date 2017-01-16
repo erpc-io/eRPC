@@ -41,7 +41,10 @@ Nexus::Nexus(size_t global_udp_port, double udp_drop_prob)
   install_sigio_handler();
 }
 
-Nexus::~Nexus() {}
+Nexus::~Nexus() {
+  fprintf(stderr, "eRPC Nexus: Destroying Nexus.\n");
+  close(nexus_sock_fd);
+}
 
 void Nexus::register_hook(SessionMgmtHook *hook) {
   assert(hook != nullptr);
@@ -103,7 +106,7 @@ void Nexus::install_sigio_handler() {
 
   /*
    * Bind the socket to accept packets destined to any IP interface of this
-   * machine (INADDR_ANY), and to port @udp_port.
+   * machine (INADDR_ANY), and to port @global_udp_port.
    */
   struct sockaddr_in server;
   memset(&server, 0, sizeof(server));

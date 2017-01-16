@@ -69,7 +69,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Check if the requested fabric port is managed by us */
   if (!is_fdev_port_managed(sm_pkt->server.fdev_port_index)) {
-    erpc_dprintf("%s. Invalid server fabric port %zu.\n", issue_msg,
+    erpc_dprintf("%s. Invalid server port %zu. Sending response.\n", issue_msg,
                  sm_pkt->server.fdev_port_index);
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
@@ -79,7 +79,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Check that the transport matches */
   if (sm_pkt->server.transport_type != transport->transport_type) {
-    erpc_dprintf("%s: Invalid transport type %s.\n", issue_msg,
+    erpc_dprintf("%s: Invalid transport %s. Sending response.\n", issue_msg,
                  get_transport_name(sm_pkt->server.transport_type).c_str());
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidTransport,
@@ -112,7 +112,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
       assert(memcmp((void *)&old_session->client, (void *)&sm_pkt->client,
                     sizeof(old_session->client)) == 0);
 
-      erpc_dprintf("%s: Duplicate session connect request.\n", issue_msg);
+      erpc_dprintf("%s: Duplicate session connect request. Sending response.\n",
+                   issue_msg);
 
       /* Send a connect success response */
       sm_pkt->server = old_session->server; /* Fill in server metadata */
@@ -123,8 +124,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Check if we are allowed to create another session */
   if (session_vec.size() == kMaxSessionsPerThread) {
-    erpc_dprintf("%s: Reached session limit %zu.\n", issue_msg,
-                 kMaxSessionsPerThread);
+    erpc_dprintf("%s: Reached session limit %zu. Sending response.\n",
+                 issue_msg, kMaxSessionsPerThread);
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kTooManySessions,
                           &nexus->udp_config);
@@ -144,6 +145,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 
+  erpc_dprintf("%s: None. Sending response.\n", issue_msg);
   sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
   return;
 }
@@ -211,7 +213,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * invoke the callback.
    */
   if (sm_pkt->err_type != SessionMgmtErrType::kNoError) {
-    erpc_dprintf("%s: Response type indicates error %s.\n", issue_msg,
+    erpc_dprintf("%s: Error %s.\n", issue_msg,
                  session_mgmt_err_type_str(sm_pkt->err_type).c_str());
 
     session->state = SessionState::kError;
@@ -228,6 +230,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   session->state = SessionState::kConnected; /* Mark session connected */
   remove_from_in_flight(session);
 
+  erpc_dprintf("%s: None. Session connected.\n", issue_msg);
   session_mgmt_handler(session, SessionMgmtEventType::kConnected,
                        SessionMgmtErrType::kNoError, context);
 }
