@@ -62,11 +62,35 @@ uint64_t Rpc<Transport_>::generate_start_seq() {
 }
 
 template <class Transport_>
-bool Rpc<Transport_>::is_session_managed(Session *session) {
-  assert(session != NULL);
+bool Rpc<Transport_>::is_session_ptr_client(Session *session) {
+  if (session == nullptr) {
+    return false;
+  }
 
   if (std::find(session_vec.begin(), session_vec.end(), session) ==
       session_vec.end()) {
+    return false;
+  }
+
+  if (session->role != Session::Role::kClient) {
+    return false;
+  }
+
+  return true;
+}
+
+template <class Transport_>
+bool Rpc<Transport_>::is_session_ptr_server(Session *session) {
+  if (session == nullptr) {
+    return false;
+  }
+
+  if (std::find(session_vec.begin(), session_vec.end(), session) ==
+      session_vec.end()) {
+    return false;
+  }
+
+  if (session->role != Session::Role::kServer) {
     return false;
   }
 

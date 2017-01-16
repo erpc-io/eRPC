@@ -119,8 +119,7 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
 
 template <class Transport_>
 void Rpc<Transport_>::destroy_session(Session *session) {
-  assert(session != nullptr);
-  assert(is_session_managed(session));
+  assert(is_session_ptr_client(session));
 
   /*
    * Only client-mode sessions can be destroyed using this. The server-mode
@@ -132,7 +131,7 @@ void Rpc<Transport_>::destroy_session(Session *session) {
     case SessionState::kConnectInProgress:
       assert(is_in_flight(session));
       remove_from_in_flight(session); /* We'll move to kDisconnectInProgress */
-      /* Fall through to the kConnected case */
+    /* Fall through to the kConnected case */
 
     case SessionState::kConnected:
       session->state = SessionState::kDisconnectInProgress;

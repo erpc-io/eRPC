@@ -15,9 +15,7 @@ namespace ERpc {
  */
 template <class Transport_>
 void Rpc<Transport_>::send_connect_req_one(Session *session) {
-  assert(session != nullptr);
-  assert(is_session_managed(session));
-  assert(session->role == Session::Role::kClient);
+  assert(is_session_ptr_client(session));
   assert(session->state == SessionState::kConnectInProgress);
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
@@ -31,9 +29,7 @@ void Rpc<Transport_>::send_connect_req_one(Session *session) {
  */
 template <class Transport_>
 void Rpc<Transport_>::send_disconnect_req_one(Session *session) {
-  assert(session != nullptr);
-  assert(is_session_managed(session));
-  assert(session->role == Session::Role::kClient);
+  assert(is_session_ptr_client(session));
   assert(session->state == SessionState::kDisconnectInProgress);
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kDisconnectReq);
@@ -55,8 +51,7 @@ bool Rpc<Transport_>::is_in_flight(Session *session) {
 
 template <class Transport_>
 void Rpc<Transport_>::add_to_in_flight(Session *session) {
-  assert(session != nullptr);
-  assert(is_session_managed(session));
+  assert(is_session_ptr_client(session));
 
   /* Only client-mode sessions can have requests in flight */
   assert(session->role == Session::Role::kClient);
@@ -70,8 +65,7 @@ void Rpc<Transport_>::add_to_in_flight(Session *session) {
 
 template <class Transport_>
 void Rpc<Transport_>::remove_from_in_flight(Session *session) {
-  assert(session != nullptr);
-  assert(is_session_managed(session));
+  assert(is_session_ptr_client(session));
   assert(is_in_flight(session));
 
   size_t initial_size = in_flight_vec.size();

@@ -126,7 +126,16 @@ class Rpc {
   void handle_session_management();
 
   uint64_t generate_start_seq();
-  bool is_session_managed(Session *session);
+
+  /**
+   * @brief Check if this session pointer is a valid client session.
+   */
+  bool is_session_ptr_client(Session *session);
+
+  /**
+   * @brief Check if this session pointer is a valid server session.
+   */
+  bool is_session_ptr_server(Session *session);
 
   // rpc_connect_handlers.cc
   void handle_session_connect_req(SessionMgmtPkt *pkt);
