@@ -123,12 +123,6 @@ class Rpc {
    */
   void handle_session_management();
 
-  void send_connect_req_one(Session *session);
-  void send_disconnect_req_one(Session *session);
-  void add_to_in_flight(Session *session);
-  bool is_in_flight(Session *session);
-  void remove_from_in_flight(Session *session);
-  void retry_in_flight();
   uint64_t generate_start_seq();
   bool is_session_managed(Session *session);
 
@@ -139,6 +133,14 @@ class Rpc {
   // rpc_disconnect_handlers.cc
   void handle_session_disconnect_req(SessionMgmtPkt *pkt);
   void handle_session_disconnect_resp(SessionMgmtPkt *pkt);
+
+  // rpc_sm_retry.cc
+  void send_connect_req_one(Session *session);
+  void send_disconnect_req_one(Session *session);
+  void add_to_in_flight(Session *session);
+  bool is_in_flight(Session *session);
+  void remove_from_in_flight(Session *session);
+  void retry_in_flight();
 
   // Constructor args
   Nexus *nexus;

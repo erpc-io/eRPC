@@ -81,7 +81,6 @@ void invalid_remote_port_func(Nexus *nexus) {
 
 /* The server thread used by all tests */
 void server_thread_func(Nexus *nexus, size_t app_tid) {
-  fprintf(stderr, "Server func\n");
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
                                port_vec);
 
