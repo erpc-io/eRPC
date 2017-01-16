@@ -49,6 +49,8 @@ class Rpc {
 
   ~Rpc();
 
+  // rpc_sm_api.cc
+
   /**
    * @brief Create a Session and initiate session connection.
    *
@@ -61,22 +63,12 @@ class Rpc {
                           size_t rem_fdev_port_index);
 
   /**
-   * @brief Disconnect and destroy a session.
+   * @brief Disconnect and destroy a client session. \p session should not
+   * be used by the application after this function is called.
    *
    * @param session A session that was returned by create_session().
-   *
-   * @return True if session disconnection was initiated, i.e., a callback will
-   * be invoked later. False if disconnection has already been initiated or
-   * if the session is alread
    */
-  bool destroy_session(Session *session);
-
-  std::string get_name();
-
-  /**
-   * @brief Check if fabric port \p fab_port_index is managed by this Rpc
-   */
-  bool is_fdev_port_managed(size_t fab_port_index);
+  void destroy_session(Session *session);
 
   // rpc_datapath.cc
   void send_request(const Session *session, const Buffer *buffer);
@@ -116,6 +108,16 @@ class Rpc {
 
  private:
   // rpc.cc
+
+  /**
+   * @brief Return the hostname and app TID of this Rpc.
+   */
+  std::string get_name();
+
+  /**
+   * @brief Check if fabric port \p fab_port_index is managed by this Rpc
+   */
+  bool is_fdev_port_managed(size_t fab_port_index);
 
   /**
    * @brief Process all session management events in the queue and free them.

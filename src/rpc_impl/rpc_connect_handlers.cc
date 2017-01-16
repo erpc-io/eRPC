@@ -153,11 +153,11 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   /*
    * If we are here, we still have the requester session as Client.
    *
-   * Check if the session state has advanced beyond kDisconnectWaitForConnect.
+   * Check if the session state has advanced beyond kConnectInProgress.
    * If so, we are not interested in the response and the callback is not
    * invoked.
    */
-  if (session->state > SessionState::kDisconnectWaitForConnect) {
+  if (session->state > SessionState::kConnectInProgress) {
     erpc_dprintf("%s: Ignoring. Client is in state %s.\n", issue_msg,
                  session_state_str(session->state).c_str());
 

@@ -15,25 +15,14 @@ namespace ERpc {
  */
 template <class Transport_>
 void Rpc<Transport_>::send_connect_req_one(Session *session) {
-  assert(session != NULL);
+  assert(session != nullptr);
   assert(is_session_managed(session));
   assert(session->role == Session::Role::kClient);
-
-  /*
-   * We may send/resend the connect request packet in two cases:
-   * 1. After create_session() in the kConnectInProgress state.
-   * 2. If the user calls destroy session (which moves the session to
-   *    kDisconnectWaitForConnect) before the connection is established.
-   */
-  assert(session->state == SessionState::kConnectInProgress ||
-         session->state == SessionState::kDisconnectWaitForConnect);
+  assert(session->state == SessionState::kConnectInProgress);
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
-  memcpy((void *)&connect_req.client, (void *)&session->client,
-         sizeof(connect_req.client));
-  memcpy((void *)&connect_req.server, (void *)&session->server,
-         sizeof(connect_req.server));
-
+  connect_req.client = session->client;
+  connect_req.server = session->server;
   connect_req.send_to(session->server.hostname, &nexus->udp_config);
 }
 
@@ -42,26 +31,15 @@ void Rpc<Transport_>::send_connect_req_one(Session *session) {
  */
 template <class Transport_>
 void Rpc<Transport_>::send_disconnect_req_one(Session *session) {
-  _unused(session);
-}
-
-template <class Transport_>
-void Rpc<Transport_>::add_to_in_flight(Session *session) {
   assert(session != nullptr);
   assert(is_session_managed(session));
-
-  /* Only client-mode sessions can have requests in flight */
   assert(session->role == Session::Role::kClient);
+  assert(session->state == SessionState::kDisconnectInProgress);
 
-  /* Ensure that we don't have this session in flight already */
-  for (in_flight_req_t &req : in_flight_vec) {
-    if (req.session == session) {
-      assert(false);
-    }
-  }
-
-  uint64_t tsc = rdtsc();
-  in_flight_vec.push_back(in_flight_req_t(tsc, session));
+  SessionMgmtPkt connect_req(SessionMgmtPktType::kDisconnectReq);
+  connect_req.client = session->client;
+  connect_req.server = session->server;
+  connect_req.send_to(session->server.hostname, &nexus->udp_config);
 }
 
 template <class Transport_>
@@ -73,6 +51,21 @@ bool Rpc<Transport_>::is_in_flight(Session *session) {
   }
 
   return false;
+}
+
+template <class Transport_>
+void Rpc<Transport_>::add_to_in_flight(Session *session) {
+  assert(session != nullptr);
+  assert(is_session_managed(session));
+
+  /* Only client-mode sessions can have requests in flight */
+  assert(session->role == Session::Role::kClient);
+
+  /* Ensure that we don't have this session in flight already */
+  assert(!is_in_flight(session));
+
+  uint64_t tsc = rdtsc();
+  in_flight_vec.push_back(in_flight_req_t(tsc, session));
 }
 
 template <class Transport_>
@@ -100,7 +93,6 @@ void Rpc<Transport_>::retry_in_flight() {
     assert(req.session != nullptr);
     SessionState state = req.session->state;
     assert(state == SessionState::kConnectInProgress ||
-           state == SessionState::kDisconnectWaitForConnect ||
            state == SessionState::kDisconnectInProgress);
 
     uint64_t elapsed_cycles = cur_tsc - req.prev_tsc;
@@ -111,7 +103,6 @@ void Rpc<Transport_>::retry_in_flight() {
       /* We need to retransmit */
       switch (state) {
         case SessionState::kConnectInProgress:
-        case SessionState::kDisconnectWaitForConnect:
           send_connect_req_one(req.session);
           break; /* Process other in-flight requests */
         case SessionState::kDisconnectInProgress:

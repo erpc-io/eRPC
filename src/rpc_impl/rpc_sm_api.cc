@@ -118,9 +118,41 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
 }
 
 template <class Transport_>
-bool Rpc<Transport_>::destroy_session(Session *session) {
-  _unused(session);
-  return true;
+void Rpc<Transport_>::destroy_session(Session *session) {
+  assert(session != nullptr);
+  assert(is_session_managed(session));
+
+  /*
+   * Only client-mode sessions can be destroyed using this. The server-mode
+   * sessions are not exposed to the application.
+   */
+  assert(session->role == Session::Role::kClient);
+
+  switch (session->state) {
+    case SessionState::kConnectInProgress:
+      assert(is_in_flight(session));
+      remove_from_in_flight(session); /* We'll move to kDisconnectInProgress */
+      /* Fall through to the kConnected case */
+
+    case SessionState::kConnected:
+      session->state = SessionState::kDisconnectInProgress;
+      add_to_in_flight(session);
+      send_disconnect_req_one(session);
+      return;
+
+    case SessionState::kDisconnectInProgress:
+      assert(is_in_flight(session));
+      return;
+
+    case SessionState::kDisconnected:
+    case SessionState::kError:
+      /*
+       * In these cases, the server has no state for this client session, so
+       * we don't have to do anything.
+       */
+      delete session;
+      return;
+  }
 }
 
 }  // End ERpc

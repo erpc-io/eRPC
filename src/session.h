@@ -21,7 +21,6 @@ static const size_t kSessionMgmtTimeoutMs = 50; /* Timeout for sm reqs */
  */
 enum class SessionState {
   kConnectInProgress,
-  kDisconnectWaitForConnect, /*!< Destroy called before connect response */
   kConnected, /*!< The only state for server-side sessions */
   kDisconnectInProgress,
   kDisconnected, /*!< Temporary state just for the disconnected callback */
@@ -32,8 +31,6 @@ static std::string session_state_str(SessionState state) {
   switch (state) {
     case SessionState::kConnectInProgress:
       return std::string("[Connect in progress]");
-    case SessionState::kDisconnectWaitForConnect:
-      return std::string("[Disconnect wait for connect]");
     case SessionState::kConnected:
       return std::string("[Connected]");
     case SessionState::kDisconnectInProgress:
