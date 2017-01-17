@@ -42,7 +42,7 @@ Nexus::Nexus(size_t global_udp_port, double udp_drop_prob)
 }
 
 Nexus::~Nexus() {
-  fprintf(stderr, "eRPC Nexus: Destroying Nexus.\n");
+  erpc_dprintf_noargs("eRPC Nexus: Destroying Nexus.\n");
   close(nexus_sock_fd);
 }
 
