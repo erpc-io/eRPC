@@ -19,6 +19,7 @@ std::atomic<bool> server_ready; /* Client starts after server is ready */
 std::atomic<bool> client_done;  /* Server ends after client is done */
 
 std::vector<size_t> port_vec = {0};
+char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
   size_t nb_sm_events;
@@ -53,7 +54,7 @@ void simple_disconnect(Nexus *nexus) {
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
-  Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+  Session *session = rpc.create_session(port_vec[0], local_hostname,
                                         SERVER_APP_TID, port_vec[0]);
 
   /* Try to disconnect the session before it is connected. This should fail. */
@@ -111,7 +112,7 @@ void disconnect_multi(Nexus *nexus) {
     client_context->exp_err = SessionMgmtErrType::kNoError;
 
     /* Connect the session */
-    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+    Session *session = rpc.create_session(port_vec[0], local_hostname,
                                           SERVER_APP_TID, port_vec[0]);
 
     rpc.run_event_loop_timeout(EVENT_LOOP_MS);
@@ -157,7 +158,7 @@ void disconnect_error(Nexus *nexus) {
 
   /* Try to connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
-  Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+  Session *session = rpc.create_session(port_vec[0], local_hostname,
                                         SERVER_APP_TID, port_vec[0] + 1);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
@@ -202,6 +203,7 @@ void server_thread_func(Nexus *nexus, size_t app_tid) {
 }
 
 int main(int argc, char **argv) {
+  Nexus::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

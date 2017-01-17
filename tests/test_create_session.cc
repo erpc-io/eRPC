@@ -17,6 +17,7 @@ void server_thread_func(Nexus *nexus, size_t app_tid);
 /* Shared between client and server thread */
 std::atomic<size_t> server_count;
 std::vector<size_t> port_vec = {0};
+char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
   size_t nb_sm_events;
@@ -68,7 +69,7 @@ void simple_connect(Nexus *nexus) {
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
-  Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+  Session *session = rpc.create_session(port_vec[0], local_hostname,
                                         SERVER_APP_TID, port_vec[0]);
   ASSERT_TRUE(session != nullptr);
 
@@ -101,7 +102,7 @@ void invalid_remote_port(Nexus *nexus) {
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
-  Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+  Session *session = rpc.create_session(port_vec[0], local_hostname,
                                         SERVER_APP_TID, port_vec[0] + 1);
   ASSERT_TRUE(session != nullptr);
 
@@ -120,6 +121,7 @@ TEST(InvalidRemotePort, InvalidRemotePort) {
 }
 
 int main(int argc, char **argv) {
+  Nexus::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
