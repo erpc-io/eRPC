@@ -40,7 +40,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 }
 
 //
-// Successful disconnection
+// Simple successful disconnection of one session, and other simple tests
 //
 void simple_disconnect(Nexus *nexus) {
   while (!server_ready) { /* Wait for server */
@@ -55,6 +55,10 @@ void simple_disconnect(Nexus *nexus) {
   client_context->exp_err = SessionMgmtErrType::kNoError;
   Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
                                         SERVER_APP_TID, port_vec[0]);
+
+  /* Try to disconnect the session before it is connected. This should fail. */
+  ASSERT_EQ(rpc.destroy_session(session), false);
+
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 
   ASSERT_EQ(client_context->nb_sm_events, 1); /* The connect event */
@@ -66,6 +70,15 @@ void simple_disconnect(Nexus *nexus) {
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 
   ASSERT_EQ(client_context->nb_sm_events, 2); /* The disconnect event */
+  ASSERT_EQ(rpc.num_active_sessions(), 0);
+
+  // Other simple tests
+
+  /* Try to disconnect the session again. This should fail. */
+  ASSERT_EQ(rpc.destroy_session(session), false);
+
+  /* Try to disconnect an invalid session. This should fail. */
+  ASSERT_EQ(rpc.destroy_session(nullptr), false);
 
   client_done = true;
 }
@@ -91,6 +104,8 @@ void server_thread_func(Nexus *nexus, size_t app_tid) {
   while (!client_done) { /* Wait for the client */
     rpc.run_event_loop_timeout(EVENT_LOOP_MS);
   }
+
+  ASSERT_EQ(rpc.num_active_sessions(), 0);
 }
 
 int main(int argc, char **argv) {

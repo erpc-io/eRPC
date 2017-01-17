@@ -81,6 +81,11 @@ class Rpc {
    */
   bool destroy_session(Session *session);
 
+  /**
+   * @brief Return the number of active server or client sessions.
+   */
+  size_t num_active_sessions();
+
   // rpc_datapath.cc
   void send_request(const Session *session, const Buffer *buffer);
   void send_response(const Session *session, const Buffer *buffer);

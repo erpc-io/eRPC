@@ -166,4 +166,16 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
   return false;
 }
 
+template <class Transport_>
+size_t Rpc<Transport_>::num_active_sessions() {
+  size_t ret = 0;
+  for (Session *session : session_vec) {
+    if (session != nullptr) {
+      ret++;
+    }
+  }
+
+  return ret;
+}
+
 }  // End ERpc
