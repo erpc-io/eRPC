@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <algorithm>
 
 #include "common.h"
@@ -25,10 +24,9 @@ Nexus::Nexus(size_t global_udp_port, double udp_drop_prob)
   }
 
   /* Get the local hostname */
-  memset((void *)&hostname, 0, sizeof(hostname));
-  int ret = gethostname(hostname, kMaxHostnameLen);
+  int ret = get_hostname(hostname);
   if (ret == -1) {
-    fprintf(stderr, "eRPC Nexus: FATAL. gethostname failed. Error = %s.\n",
+    fprintf(stderr, "eRPC Nexus: FATAL. get_hostname failed. Error = %s.\n",
             strerror(errno));
     exit(-1);
   }

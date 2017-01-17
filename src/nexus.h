@@ -5,6 +5,7 @@
 #include <mutex>
 #include <queue>
 #include <vector>
+#include <unistd.h>
 
 #include "common.h"
 #include "session.h"
@@ -43,6 +44,19 @@ class Nexus {
 
   void install_sigio_handler();
   void session_mgnt_handler();
+
+  /**
+   * @brief Copy the hostname of this machine to \p hostname. \p hostname must
+   * have space for kMaxHostnameLen characters.
+   * 
+   * @return 0 on success, -1 on error.
+   */
+  static int get_hostname(char *_hostname) {
+    assert(_hostname != nullptr);
+
+    int ret = gethostname(_hostname, kMaxHostnameLen);
+    return ret;
+  }
 
   // The Nexus object is shared among all Rpc objects, so we need to avoid
   // false sharing. Read-only members go first; other members come after
