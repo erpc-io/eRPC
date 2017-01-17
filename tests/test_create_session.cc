@@ -12,6 +12,8 @@ using namespace ERpc;
 #define SERVER_APP_TID 100
 #define CLIENT_APP_TID 200
 
+void server_thread_func(Nexus *nexus, size_t app_tid);
+
 /* Shared between client and server thread */
 std::atomic<size_t> server_count;
 std::vector<size_t> port_vec = {0};
@@ -79,15 +81,6 @@ void invalid_remote_port_func(Nexus *nexus) {
   ASSERT_EQ(client_context->nb_sm_events, 1);
 }
 
-/* The server thread used by all tests */
-void server_thread_func(Nexus *nexus, size_t app_tid) {
-  Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               port_vec);
-
-  server_count++;
-  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
-}
-
 TEST(SuccessfulConnect, SuccessfulConnect) {
   Nexus nexus(NEXUS_UDP_PORT, .8);
   server_count = 0;
@@ -106,6 +99,15 @@ TEST(InvalidRemotePort, InvalidRemotePort) {
   std::thread client_thread(invalid_remote_port_func, &nexus);
   server_thread.join();
   client_thread.join();
+}
+
+/* The server thread used by all tests */
+void server_thread_func(Nexus *nexus, size_t app_tid) {
+  Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
+                               port_vec);
+
+  server_count++;
+  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 }
 
 int main(int argc, char **argv) {

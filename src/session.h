@@ -13,9 +13,6 @@
 
 namespace ERpc {
 
-static const size_t kSessionMgmtRetransMs = 5;  /* Retransmission for sm reqs */
-static const size_t kSessionMgmtTimeoutMs = 50; /* Timeout for sm reqs */
-
 /**
  * @brief Session state that can only go forward.
  */

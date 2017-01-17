@@ -12,6 +12,9 @@
 
 namespace ERpc {
 
+static const size_t kSessionMgmtRetransMs = 5;  /* Retransmission for sm reqs */
+static const size_t kSessionMgmtTimeoutMs = 50; /* Timeout for sm reqs */
+
 #define rpc_dprintf(fmt, ...)            \
   do {                                   \
     if (RPC_DPRINTF) {                   \
@@ -167,6 +170,10 @@ class Rpc {
   void add_to_in_flight(Session *session);
   bool is_in_flight(Session *session);
   void remove_from_in_flight(Session *session);
+
+  /**
+   * @brief Retry in-flight requests whose retry timeout has expired.
+   */
   void retry_in_flight();
 
   // Constructor args

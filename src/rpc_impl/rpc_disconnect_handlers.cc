@@ -47,6 +47,7 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
   assert(session->server == sm_pkt->server);
   assert(session->client == sm_pkt->client);
 
+  erpc_dprintf("%s. None. Sending response.\n", issue_msg);
   sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
   bury_session(session);
 }

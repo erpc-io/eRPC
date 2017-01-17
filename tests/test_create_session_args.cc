@@ -7,7 +7,7 @@
 using namespace ERpc;
 
 #define NEXUS_UDP_PORT 31851
-#define EVENT_LOOP_MS 2000
+#define EVENT_LOOP_MS 200
 
 #define SERVER_APP_TID 100
 #define CLIENT_APP_TID 200

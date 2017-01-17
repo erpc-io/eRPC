@@ -141,10 +141,10 @@ void Rpc<Transport_>::handle_session_management() {
         handle_session_connect_resp(sm_pkt);
         break;
       case SessionMgmtPktType::kDisconnectReq:
-        handle_session_connect_resp(sm_pkt);
+        handle_session_disconnect_req(sm_pkt);
         break;
       case SessionMgmtPktType::kDisconnectResp:
-        handle_session_connect_resp(sm_pkt);
+        handle_session_disconnect_resp(sm_pkt);
         break;
       default:
         assert(false);

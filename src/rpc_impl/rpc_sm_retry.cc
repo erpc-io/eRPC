@@ -10,9 +10,6 @@
 
 namespace ERpc {
 
-/**
- * @brief Send or resend the connect request for a session
- */
 template <class Transport_>
 void Rpc<Transport_>::send_connect_req_one(Session *session) {
   assert(is_session_ptr_client(session));
@@ -24,9 +21,6 @@ void Rpc<Transport_>::send_connect_req_one(Session *session) {
   connect_req.send_to(session->server.hostname, &nexus->udp_config);
 }
 
-/**
- * @brief Send or resend the disconnect request for a session
- */
 template <class Transport_>
 void Rpc<Transport_>::send_disconnect_req_one(Session *session) {
   assert(is_session_ptr_client(session));

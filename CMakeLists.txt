@@ -70,6 +70,9 @@ add_executable(test_create_session_args tests/test_create_session_args.cc)
 target_link_libraries(test_create_session_args
                       erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 
+add_executable(test_destroy_session tests/test_destroy_session.cc)
+target_link_libraries(test_destroy_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+
 add_executable(test_huge_alloc tests/test_huge_alloc.cc)
 target_link_libraries(test_huge_alloc erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 
