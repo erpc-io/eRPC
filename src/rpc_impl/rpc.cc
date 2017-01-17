@@ -62,6 +62,26 @@ uint64_t Rpc<Transport_>::generate_start_seq() {
 }
 
 template <class Transport_>
+void Rpc<Transport_>::bury_session(Session *session) {
+  assert(session != nullptr);
+
+  size_t session_num;
+  if (session->role == Session::Role::kClient) {
+    assert(is_session_ptr_client(session));
+    assert(!is_in_flight(session));
+
+    session_num = session->client.session_num;
+  } else {
+    assert(is_session_ptr_server(session));
+
+    session_num = session->server.session_num;
+  }
+
+  session_vec.at(session_num) = nullptr;
+  delete session;
+}
+
+template <class Transport_>
 bool Rpc<Transport_>::is_session_ptr_client(Session *session) {
   if (session == nullptr) {
     return false;

@@ -24,7 +24,7 @@ enum class SessionState {
   kConnected, /*!< The only state for server-side sessions */
   kDisconnectInProgress,
   kDisconnected, /*!< Temporary state just for the disconnected callback */
-  kError /*!< Only allowed for client-side sessions */
+  kError         /*!< Only allowed for client-side sessions */
 };
 
 static std::string session_state_str(SessionState state) {
@@ -73,13 +73,10 @@ static std::string session_mgmt_event_type_str(
  */
 class SessionMetadata {
  public:
-  // Fields that are specified by the client in the connect request
-  TransportType transport_type; /* Should match at client and server */
+  TransportType transport_type;
   char hostname[kMaxHostnameLen];
-  size_t app_tid; /* App-level TID of the Rpc object */
-  size_t fdev_port_index;
-
-  // Fields that are filled in by the server
+  size_t app_tid;          ///< TID of the Rpc that created this end point
+  size_t fdev_port_index;  ///< Fabric port used by this end point
   size_t session_num;
   size_t start_seq;
   RoutingInfo routing_info;
@@ -129,6 +126,15 @@ class SessionMetadata {
     ret += std::string("]");
 
     return ret;
+  }
+
+  /**
+   * @brief Compare the location fields of two SessionMetadata objects. This
+   * does not account for non-location fields (e.g., fabric port, routing info).
+   */
+  bool operator==(const SessionMetadata &other) {
+    return strcmp(hostname, other.hostname) == 0 && app_tid == other.app_tid &&
+           session_num == other.session_num;
   }
 };
 

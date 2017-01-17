@@ -67,8 +67,16 @@ class Rpc {
    * be used by the application after this function is called.
    *
    * @param session A session that was returned by create_session().
+   *
+   * @return True if (a) the session disconnect packet was sent, and the
+   * disconnect callback will be invoked later, or if (b) there was no need for
+   * a disconnect packet since the session is in an error state. In the latter
+   * case, the callback is invoked before this function returns.
+   *
+   * False if the session cannot be disconnected right now since connection
+   * establishment is in progress , or if the \p session argument is invalid.
    */
-  void destroy_session(Session *session);
+  bool destroy_session(Session *session);
 
   // rpc_datapath.cc
   void send_request(const Session *session, const Buffer *buffer);
@@ -125,7 +133,15 @@ class Rpc {
    */
   void handle_session_management();
 
+  /**
+   * @brief Generate the start sequence number for a session.
+   */
   uint64_t generate_start_seq();
+
+  /**
+   * @brief Destroy a session object and remove it from the session list.
+   */
+  void bury_session(Session *session);
 
   /**
    * @brief Check if this session pointer is a valid client session.

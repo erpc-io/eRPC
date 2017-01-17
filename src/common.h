@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits>
 
 namespace ERpc {
 
@@ -70,6 +71,8 @@ static const size_t kMaxIssueMsgLen = /* Debug issue messages */
  * million sessions should be fine.
  */
 static const size_t kMaxSessionsPerThread = 1024;
+static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),
+              "Session number must fit in 32 bits");
 
 // Simple methods
 static uint64_t rdtsc() {

@@ -1,14 +1,15 @@
 /**
  * @file rpc_connect_handlers.cc
- * @brief Handlers for session management connect requests and responses
+ * @brief Handlers for session management connect requests and responses.
  */
 #include "rpc.h"
 #include <algorithm>
 
 namespace ERpc {
 
-/**
- * @brief Handle a session connect request
+/*
+ * We need to handle all types of errors in remote arguments that the client can
+ * make when calling create_session(), which cannot check for such errors.
  */
 template <class Transport_>
 void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
@@ -94,7 +95,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
       new Session(Session::Role::kServer, SessionState::kConnected);
 
   /* Set the server metadata fields in the packet */
-  sm_pkt->server.session_num = (uint32_t)session_vec.size();
+  sm_pkt->server.session_num = session_vec.size();
   sm_pkt->server.start_seq = generate_start_seq();
   transport->fill_routing_info(&(sm_pkt->server.routing_info));
 
@@ -133,41 +134,49 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   Session *session = session_vec[session_num];
 
   /*
-   * Check if the client session was already disconnected. If so, the callback
-   * is not invoked.
+   * Check if the client session was already disconnected. This happens when
+   * we get a (massively delayed) out-of-order duplicate connect response after
+   * a disconnect response. If so, the callback is not invoked.
    */
   if (session == nullptr) {
+    assert(!is_in_flight(session));
     erpc_dprintf("%s: Client session is already disconnected.\n", issue_msg);
     return;
   }
 
   /*
-   * The session is non-null. Ensure that the metadata that the client filled
-   * in the connect request still matches.
-   */
-  assert(sm_pkt->server.app_tid == session->server.app_tid);
-  assert(strcmp(sm_pkt->server.hostname, session->server.hostname) == 0);
-  assert(memcmp((void *)&sm_pkt->client, (void *)&session->client,
-                sizeof(sm_pkt->client)) == 0);
-
-  /*
    * If we are here, we still have the requester session as Client.
    *
-   * Check if the session state has advanced beyond kConnectInProgress.
-   * If so, we are not interested in the response and the callback is not
-   * invoked.
+   * Check if the session state has advanced beyond kConnectInProgress (due to
+   * a prior duplicate connect response). If so, we are not interested in this
+   * response and the callback is not invoked.
    */
   if (session->state > SessionState::kConnectInProgress) {
+    assert(!is_in_flight(session));
     erpc_dprintf("%s: Ignoring. Client is in state %s.\n", issue_msg,
                  session_state_str(session->state).c_str());
-
-    assert(!is_in_flight(session));
     return;
   }
 
   /*
-   * If we are here, we are interested in the response.
-   *
+   * If we are here, this is the first connect response, so the connect request
+   * should be in flight. It's not possible to also have a disconnect request in
+   * flight, since disconnect must wait for the first connect response.
+   */
+  assert(is_in_flight(session));
+  remove_from_in_flight(session);
+
+  /*
+   * If the session was not already disconnected, the session metadata
+   * (hostname, app TID, session num) from the pkt should match our local copy.
+   * We don't have the server's session number yet.
+   */
+  assert(strcmp(session->server.hostname, sm_pkt->server.hostname) == 0);
+  assert(session->server.app_tid == sm_pkt->server.app_tid);
+  assert(session->server.session_num == std::numeric_limits<size_t>::max());
+  assert(session->client == sm_pkt->client);
+
+  /*
    * If the connect request failed, move the session to the error state and
    * invoke the callback.
    */
@@ -185,9 +194,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   }
 
   session->server = sm_pkt->server; /* Save server metadata from packet */
-
   session->state = SessionState::kConnected; /* Mark session connected */
-  remove_from_in_flight(session);
 
   erpc_dprintf("%s: None. Session connected.\n", issue_msg);
   session_mgmt_handler(session, SessionMgmtEventType::kConnected,

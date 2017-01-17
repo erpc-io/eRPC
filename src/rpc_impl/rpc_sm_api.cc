@@ -97,7 +97,7 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
   strcpy((char *)client_metadata.hostname, nexus->hostname);
   client_metadata.app_tid = app_tid;
   client_metadata.fdev_port_index = local_fdev_port_index;
-  client_metadata.session_num = (uint32_t)session_vec.size();
+  client_metadata.session_num = session_vec.size();
   client_metadata.start_seq = generate_start_seq();
   transport->fill_routing_info(&client_metadata.routing_info);
 
@@ -118,40 +118,50 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
 }
 
 template <class Transport_>
-void Rpc<Transport_>::destroy_session(Session *session) {
-  assert(is_session_ptr_client(session));
+bool Rpc<Transport_>::destroy_session(Session *session) {
+  /* Create the basic issue message */
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg, "eRPC Rpc: destroy_session() failed. Issue");
 
-  /*
-   * Only client-mode sessions can be destroyed using this. The server-mode
-   * sessions are not exposed to the application.
-   */
-  assert(session->role == Session::Role::kClient);
+  if (!is_session_ptr_client(session)) {
+    erpc_dprintf("%s: Invalid session.\n", issue_msg);
+    return false;
+  }
 
   switch (session->state) {
     case SessionState::kConnectInProgress:
       assert(is_in_flight(session));
-      remove_from_in_flight(session); /* We'll move to kDisconnectInProgress */
-    /* Fall through to the kConnected case */
+      erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
+      return false;
 
     case SessionState::kConnected:
       session->state = SessionState::kDisconnectInProgress;
-      add_to_in_flight(session);
+      add_to_in_flight(session); /* Ensures that @session is not in flight */
       send_disconnect_req_one(session);
-      return;
+      return true;
 
     case SessionState::kDisconnectInProgress:
       assert(is_in_flight(session));
-      return;
+      erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
+      return false;
 
     case SessionState::kDisconnected:
+      assert(!is_in_flight(session));
+      erpc_dprintf("%s: Session already disconnected.\n", issue_msg);
+      return false;
+
     case SessionState::kError:
       /*
-       * In these cases, the server has no state for this client session, so
-       * we don't have to do anything.
+       * This means that the connect request timed out, so we don't send a
+       * disconnect request.
        */
-      delete session;
-      return;
+      session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
+                           SessionMgmtErrType::kNoError, context);
+      bury_session(session);
+      return true;
   }
+  exit(-1);
+  return false;
 }
 
 }  // End ERpc

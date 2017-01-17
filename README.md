@@ -4,6 +4,5 @@
      receive the connect response before sending the disconnect.
 
 ## TODOs
- * Add retransmissions for session management requests. Keep a vector of
-   in-progress sessions in the Rpc and check on entering the event loop.
-    * The vector should usually be empty, so common-case perf cost is low.
+ * Use kInvalidSessionNum instead of std::numeric_limits<>. Use this in
+   is_session_ptr_client and is_session_ptr_server.
