@@ -130,11 +130,13 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
 
   switch (session->state) {
     case SessionState::kConnectInProgress:
+      /* Can't disconnect right now. User needs to wait. */
       assert(is_in_flight(session));
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
       return false;
 
     case SessionState::kConnected:
+      /* This is the only case where we send the disconnect packet */
       session->state = SessionState::kDisconnectInProgress;
       add_to_in_flight(session); /* Ensures that @session is not in flight */
       send_disconnect_req_one(session);

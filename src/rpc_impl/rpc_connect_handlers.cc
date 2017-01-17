@@ -185,7 +185,6 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
                  session_mgmt_err_type_str(sm_pkt->err_type).c_str());
 
     session->state = SessionState::kError;
-    remove_from_in_flight(session);
 
     session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
                          sm_pkt->err_type, context);
