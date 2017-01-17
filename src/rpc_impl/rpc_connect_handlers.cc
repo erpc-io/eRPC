@@ -200,14 +200,4 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
                        SessionMgmtErrType::kNoError, context);
 }
 
-template <class Transport_>
-void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
-  _unused(sm_pkt);
-}
-
-template <class Transport_>
-void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
-  _unused(sm_pkt);
-}
-
 }  // End ERpc
