@@ -16,7 +16,7 @@ void server_thread_func(Nexus *nexus, size_t app_tid);
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready; /* Client starts after server is ready */
-std::atomic<bool> client_done; /* Server ends after client is done */
+std::atomic<bool> client_done;  /* Server ends after client is done */
 
 std::vector<size_t> port_vec = {0};
 
@@ -24,9 +24,7 @@ struct client_context_t {
   size_t nb_sm_events;
   SessionMgmtErrType exp_err;
 
-  client_context_t() {
-    nb_sm_events = 0;
-  }
+  client_context_t() { nb_sm_events = 0; }
 };
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
@@ -41,6 +39,9 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
   ASSERT_EQ(sm_err_type, context->exp_err);
 }
 
+//
+// Successful disconnection
+//
 void simple_disconnect(Nexus *nexus) {
   while (!server_ready) { /* Wait for server */
     usleep(1);
@@ -91,7 +92,6 @@ void server_thread_func(Nexus *nexus, size_t app_tid) {
     rpc.run_event_loop_timeout(EVENT_LOOP_MS);
   }
 }
-
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

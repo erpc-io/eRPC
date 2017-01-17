@@ -22,11 +22,10 @@ struct client_context_t {
   size_t nb_sm_events;
   SessionMgmtErrType exp_err;
 
-  client_context_t(SessionMgmtErrType exp_err) : exp_err(exp_err) {
-    nb_sm_events = 0;
-  }
+  client_context_t() { nb_sm_events = 0; }
 };
 
+/* Only invoked for clients */
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
                     SessionMgmtErrType sm_err_type, void *_context) {
   ASSERT_TRUE(_context != nullptr);
@@ -46,35 +45,31 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
   }
 }
 
-void successful_connect_func(Nexus *nexus) {
-  while (server_count != 1) { /* Wait for server */
-    usleep(1);
-  }
+/* The server thread used by all tests */
+void server_thread_func(Nexus *nexus, size_t app_tid) {
+  Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
+                               port_vec);
 
-  auto *client_context = new client_context_t(SessionMgmtErrType::kNoError);
-  Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, port_vec);
-
-  Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
-                                        SERVER_APP_TID, port_vec[0]);
-  ASSERT_TRUE(session != nullptr);
-
+  server_count++;
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
-  ASSERT_EQ(client_context->nb_sm_events, 1);
 }
 
-void invalid_remote_port_func(Nexus *nexus) {
+//
+// Successful connection establishment
+//
+void simple_connect(Nexus *nexus) {
   while (server_count != 1) { /* Wait for server */
     usleep(1);
   }
 
-  auto *client_context =
-      new client_context_t(SessionMgmtErrType::kInvalidRemotePort);
+  auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, port_vec);
 
+  /* Connect the session */
+  client_context->exp_err = SessionMgmtErrType::kNoError;
   Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
-                                        SERVER_APP_TID, port_vec[0] + 1);
+                                        SERVER_APP_TID, port_vec[0]);
   ASSERT_TRUE(session != nullptr);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
@@ -86,9 +81,32 @@ TEST(SuccessfulConnect, SuccessfulConnect) {
   server_count = 0;
 
   std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
-  std::thread client_thread(successful_connect_func, &nexus);
+  std::thread client_thread(simple_connect, &nexus);
   server_thread.join();
   client_thread.join();
+}
+
+//
+// Create (and connect) a session with an invalid remote port. The server should
+// reply with the error code
+//
+void invalid_remote_port(Nexus *nexus) {
+  while (server_count != 1) { /* Wait for server */
+    usleep(1);
+  }
+
+  auto *client_context = new client_context_t();
+  Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
+                               &test_sm_hander, port_vec);
+
+  /* Connect the session */
+  client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
+  Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+                                        SERVER_APP_TID, port_vec[0] + 1);
+  ASSERT_TRUE(session != nullptr);
+
+  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
+  ASSERT_EQ(client_context->nb_sm_events, 1);
 }
 
 TEST(InvalidRemotePort, InvalidRemotePort) {
@@ -96,18 +114,9 @@ TEST(InvalidRemotePort, InvalidRemotePort) {
   server_count = 0;
 
   std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
-  std::thread client_thread(invalid_remote_port_func, &nexus);
+  std::thread client_thread(invalid_remote_port, &nexus);
   server_thread.join();
   client_thread.join();
-}
-
-/* The server thread used by all tests */
-void server_thread_func(Nexus *nexus, size_t app_tid) {
-  Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               port_vec);
-
-  server_count++;
-  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 }
 
 int main(int argc, char **argv) {
