@@ -94,6 +94,54 @@ TEST(SimpleDisconnect, SimpleDisconnect) {
   client_thread.join();
 }
 
+//
+// Repeat: Create a session to the server and disconnect it.
+//
+void connect_multi(Nexus *nexus) {
+  while (!server_ready) { /* Wait for server */
+    usleep(1);
+  }
+
+  auto *client_context = new client_context_t();
+  Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
+                               &test_sm_hander, port_vec);
+
+  for (size_t i = 0; i < 5; i++) {
+    client_context->nb_sm_events = 0;
+    client_context->exp_err = SessionMgmtErrType::kNoError;
+
+    /* Connect the session */
+    Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+                                          SERVER_APP_TID, port_vec[0]);
+
+    rpc.run_event_loop_timeout(EVENT_LOOP_MS);
+
+    ASSERT_EQ(client_context->nb_sm_events, 1); /* The connect event */
+    ASSERT_EQ(session->state, SessionState::kConnected);
+
+    /* Disconnect the session */
+    client_context->exp_err = SessionMgmtErrType::kNoError;
+    rpc.destroy_session(session);
+    rpc.run_event_loop_timeout(EVENT_LOOP_MS);
+
+    ASSERT_EQ(client_context->nb_sm_events, 2); /* The disconnect event */
+    ASSERT_EQ(rpc.num_active_sessions(), 0);
+  }
+
+  client_done = true;
+}
+
+TEST(ConnectMulti, ConnectMulti) {
+  Nexus nexus(NEXUS_UDP_PORT, .8);
+  server_ready = false;
+  client_done = false;
+
+  std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
+  std::thread client_thread(connect_multi, &nexus);
+  server_thread.join();
+  client_thread.join();
+}
+
 /* The server thread used by all tests */
 void server_thread_func(Nexus *nexus, size_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
