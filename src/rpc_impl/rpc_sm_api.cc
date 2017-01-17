@@ -21,7 +21,8 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
                                          size_t rem_fdev_port_index) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg, "eRPC Rpc: create_session failed. Issue");
+  sprintf(issue_msg, "eRPC Rpc %s: create_session() failed. Issue",
+          get_name().c_str());
 
   /* Check local fabric port */
   if (local_fdev_port_index >= kMaxFabDevPorts) {
@@ -119,14 +120,17 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
 
 template <class Transport_>
 bool Rpc<Transport_>::destroy_session(Session *session) {
-  /* Create the basic issue message */
-  char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg, "eRPC Rpc: destroy_session() failed. Issue");
-
   if (!is_session_ptr_client(session)) {
-    erpc_dprintf("%s: Invalid session.\n", issue_msg);
+    erpc_dprintf("eRPC Rpc %s: destroy_session() failed. Invalid session.\n",
+                 get_name().c_str());
     return false;
   }
+
+  size_t session_num = session->client.session_num;
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg,
+          "eRPC Rpc %s: destroy_session() failed for session %zu. Issue",
+          get_name().c_str(), session_num);
 
   switch (session->state) {
     case SessionState::kConnectInProgress:
@@ -149,14 +153,22 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
 
     case SessionState::kDisconnected:
       assert(!is_in_flight(session));
-      erpc_dprintf("%s: Session already disconnected.\n", issue_msg);
+      erpc_dprintf_noargs(
+          "eRPC Rpc: destroy_session() failed. Issue: "
+          "Session already disconnected.\n");
       return false;
 
     case SessionState::kError:
       /*
-       * This means that the connect request timed out, so we don't send a
-       * disconnect request.
+       * This means that the either we got a connect response with an error,
+       * or that the connect request timed out. In either case, we don't need
+       * to send a disconnect request.
        */
+      assert(!is_in_flight(session));
+      erpc_dprintf(
+          "eRPC Rpc %s: destroy_session() succeeded for error session %zu.\n",
+          get_name().c_str(), session_num);
+
       session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
                            SessionMgmtErrType::kNoError, context);
       bury_session(session);

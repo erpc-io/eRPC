@@ -22,7 +22,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg, "eRPC Rpc: Rpc %s received connect request from %s. Issue",
+  sprintf(issue_msg, "eRPC Rpc %s: Received connect request from %s. Issue",
           get_name().c_str(), sm_pkt->client.name().c_str());
 
   /* Check if the requested fabric port is managed by us */
@@ -122,7 +122,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc: Rpc %s received connect response from %s for session %zu. "
+          "eRPC Rpc %s: Received connect response from %s for session %zu. "
           "Issue",
           get_name().c_str(), sm_pkt->server.name().c_str(),
           sm_pkt->client.session_num);

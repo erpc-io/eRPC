@@ -97,7 +97,7 @@ TEST(SimpleDisconnect, SimpleDisconnect) {
 //
 // Repeat: Create a session to the server and disconnect it.
 //
-void connect_multi(Nexus *nexus) {
+void disconnect_multi(Nexus *nexus) {
   while (!server_ready) { /* Wait for server */
     usleep(1);
   }
@@ -106,7 +106,7 @@ void connect_multi(Nexus *nexus) {
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, port_vec);
 
-  for (size_t i = 0; i < 5; i++) {
+  for (size_t i = 0; i < 3; i++) {
     client_context->nb_sm_events = 0;
     client_context->exp_err = SessionMgmtErrType::kNoError;
 
@@ -131,13 +131,58 @@ void connect_multi(Nexus *nexus) {
   client_done = true;
 }
 
-TEST(ConnectMulti, ConnectMulti) {
+TEST(DisconnectMulti, DisconnectMulti) {
   Nexus nexus(NEXUS_UDP_PORT, .8);
   server_ready = false;
   client_done = false;
 
   std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
-  std::thread client_thread(connect_multi, &nexus);
+  std::thread client_thread(disconnect_multi, &nexus);
+  server_thread.join();
+  client_thread.join();
+}
+
+//
+// Disconnect a session that encountered a local or a remote error. This should
+// succeed.
+//
+void disconnect_error(Nexus *nexus) {
+  while (!server_ready) { /* Wait for server */
+    usleep(1);
+  }
+
+  auto *client_context = new client_context_t();
+  Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
+                               &test_sm_hander, port_vec);
+
+  /* Try to connect the session */
+  client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
+  Session *session = rpc.create_session(port_vec[0], "akalia-cmudesk",
+                                        SERVER_APP_TID, port_vec[0] + 1);
+
+  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
+
+  ASSERT_EQ(client_context->nb_sm_events, 1); /* The connect failed event */
+  ASSERT_EQ(session->state, SessionState::kError);
+
+  /* Disconnect the session */
+  client_context->exp_err = SessionMgmtErrType::kNoError;
+  rpc.destroy_session(session);
+  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
+
+  ASSERT_EQ(client_context->nb_sm_events, 2); /* The disconnect event */
+  ASSERT_EQ(rpc.num_active_sessions(), 0);
+
+  client_done = true;
+}
+
+TEST(DisconnectError, DisconnectError) {
+  Nexus nexus(NEXUS_UDP_PORT, .8);
+  server_ready = false;
+  client_done = false;
+
+  std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
+  std::thread client_thread(disconnect_error, &nexus);
   server_thread.join();
   client_thread.join();
 }

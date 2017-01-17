@@ -22,8 +22,7 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg,
-          "eRPC Rpc: Rpc %s received disconnect request from %s. Issue",
+  sprintf(issue_msg, "eRPC Rpc %s: Received disconnect request from %s. Issue",
           get_name().c_str(), sm_pkt->client.name().c_str());
 
   size_t session_num = sm_pkt->server.session_num;
@@ -61,7 +60,7 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc: Rpc %s received disconnect response from %s for "
+          "eRPC Rpc %s: Received disconnect response from %s for "
           "session %zu. Issue",
           get_name().c_str(), sm_pkt->server.name().c_str(),
           sm_pkt->client.session_num);
