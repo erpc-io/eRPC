@@ -19,26 +19,24 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       app_tid(app_tid),
       session_mgmt_handler(session_mgmt_handler),
       num_fdev_ports(fdev_port_vec.size()) {
-
   if (nexus == nullptr) {
-    fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with bad Nexus.\n");
-    exit(-1);
+    throw std::invalid_argument("eRPC Rpc: Invalid nexus");
+    return;
   }
 
-  if (app_tid == kInvalidAppTid) {
-    fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with bad app TID.\n");
-    exit(-1);
+  if (app_tid == kInvalidAppTid || nexus->app_tid_exists(app_tid)) {
+    throw std::invalid_argument("eRPC Rpc: Invalid app_tid");
+    return;
   }
 
   if (fdev_port_vec.size() == 0) {
-    fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with 0 fabric ports.\n");
-    exit(-1);
+    throw std::invalid_argument("eRPC Rpc: Empty fdev_port_vec");
+    return;
   }
 
   if (fdev_port_vec.size() > kMaxFabDevPorts) {
-    fprintf(stderr, "eRPC Rpc: FATAL. Only %zu local ports supported.\n",
-            kMaxFabDevPorts);
-    exit(-1);
+    throw std::invalid_argument("eRPC Rpc: fdev_port_vec too large");
+    return;
   }
 
   /* Record the requested local ports in an array */

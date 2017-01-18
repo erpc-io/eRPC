@@ -39,7 +39,23 @@ class Nexus {
 
   ~Nexus();
 
+  /**
+   * @brief Check if a hook with app TID = \p app_tid exists in this Nexus.
+   * If \p app_tid is derived from a hook, this function also checks if that
+   * hook is already registered.
+   *
+   * The caller must not hold the Nexus lock before calling this.
+   */
+  bool app_tid_exists(uint8_t app_tid);
+
+  /**
+   * @brief Register a previously unregistered hook.
+   */
   void register_hook(SessionMgmtHook *hook);
+
+  /**
+   * @brief Unregister a previously registered hook.
+   */
   void unregister_hook(SessionMgmtHook *hook);
 
   void install_sigio_handler();

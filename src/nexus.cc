@@ -21,9 +21,10 @@ Nexus::Nexus(uint16_t global_udp_port, double udp_drop_prob)
   /* Get the local hostname */
   int ret = get_hostname(hostname);
   if (ret == -1) {
-    fprintf(stderr, "eRPC Nexus: FATAL. get_hostname failed. Error = %s.\n",
-            strerror(errno));
-    exit(-1);
+    erpc_dprintf("eRPC Nexus: gethostname failed. Error = %s.\n",
+                 strerror(errno));
+    throw std::runtime_error("eRPC Nexus: gethostname failed");
+    return;
   }
 
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
@@ -39,27 +40,25 @@ Nexus::~Nexus() {
   close(nexus_sock_fd);
 }
 
-void Nexus::register_hook(SessionMgmtHook *hook) {
-  assert(hook != nullptr);
-
+bool Nexus::app_tid_exists(uint8_t app_tid) {
   nexus_lock.lock();
+  bool found = false;
 
-  /* This hook must not exist */
-  if (std::find(reg_hooks.begin(), reg_hooks.end(), hook) != reg_hooks.end()) {
-    fprintf(stderr, "eRPC Nexus: FATAL attempt to re-register hook %p\n", hook);
-    exit(-1);
-  }
-
-  /* There should be no existing hook with the same thread ID */
   for (SessionMgmtHook *reg_hook : reg_hooks) {
-    if (reg_hook->app_tid == hook->app_tid) {
-      fprintf(stderr,
-              "eRPC Nexus: FATAL attempt to register hook with "
-              "existing thread ID %d\n",
-              hook->app_tid);
-      exit(-1);
+    if (reg_hook->app_tid == app_tid) {
+      found = true;
     }
   }
+
+  nexus_lock.unlock();
+  return found;
+}
+
+void Nexus::register_hook(SessionMgmtHook *hook) {
+  assert(hook != nullptr);
+  assert(!app_tid_exists(hook->app_tid));
+
+  nexus_lock.lock();
 
   reg_hooks.push_back(hook);
 
@@ -68,19 +67,14 @@ void Nexus::register_hook(SessionMgmtHook *hook) {
 
 void Nexus::unregister_hook(SessionMgmtHook *hook) {
   assert(hook != nullptr);
+  assert(app_tid_exists(hook->app_tid));
 
   nexus_lock.lock();
 
-  /* The hook must exist in the vector of registered hooks */
-  if (std::find(reg_hooks.begin(), reg_hooks.end(), hook) == reg_hooks.end()) {
-    fprintf(stderr,
-            "eRPC Nexus: FATAL attempt to unregister non-existent hook %p\n",
-            hook);
-    exit(-1);
-  }
-
+  size_t initial_size = reg_hooks.size();
   reg_hooks.erase(std::remove(reg_hooks.begin(), reg_hooks.end(), hook),
                   reg_hooks.end());
+  assert(reg_hooks.size() == initial_size - 1);
 
   nexus_lock.unlock();
 }
@@ -159,18 +153,20 @@ void Nexus::session_mgnt_handler() {
       recvfrom(nexus_sock_fd, (void *)sm_pkt, sizeof(*sm_pkt), flags,
                (struct sockaddr *)&their_addr, &addr_len);
   if (recv_bytes != sizeof(*sm_pkt)) {
-    fprintf(stderr,
-            "eRPC Nexus: FATAL. Received unexpected data size (%zd) from "
-            "session management socket. Expected = %zu.\n",
-            recv_bytes, sizeof(*sm_pkt));
+    erpc_dprintf(
+        "eRPC Nexus: FATAL. Received unexpected data size (%zd) from "
+        "session management socket. Expected = %zu.\n",
+        recv_bytes, sizeof(*sm_pkt));
+    assert(false);
     exit(-1);
   }
 
   if (!session_mgmt_is_valid_pkt_type(sm_pkt->pkt_type)) {
-    fprintf(stderr,
-            "eRPC Nexus: FATAL. Received session management packet of "
-            "unexpected type %d.\n",
-            static_cast<int>(sm_pkt->pkt_type));
+    erpc_dprintf(
+        "eRPC Nexus: FATAL. Received session management packet of "
+        "unexpected type %d.\n",
+        static_cast<int>(sm_pkt->pkt_type));
+    assert(false);
     exit(-1);
   }
 
@@ -249,7 +245,8 @@ void Nexus::compute_freq_ghz() {
   }
 
   if (sum != 13580802877818827968ull) {
-    fprintf(stderr, "eRPC: FATAL. Failed in rdtsc frequency measurement.");
+    erpc_dprintf_noargs("eRPC: FATAL. Failed in rdtsc frequency measurement.");
+    assert(false);
     exit(-1);
   }
 
@@ -261,8 +258,10 @@ void Nexus::compute_freq_ghz() {
   freq_ghz = rdtsc_cycles / clock_ns;
 
   if (freq_ghz < 1.0 || freq_ghz > 4.0) {
-    fprintf(stderr, "eRPC Nexus: FATAL. Abnormal CPU frequency %.4f GHz\n",
-            freq_ghz);
+    erpc_dprintf("eRPC Nexus: FATAL. Abnormal CPU frequency %.4f GHz\n",
+                 freq_ghz);
+    assert(false);
+    exit(-1);
   }
 }
 
