@@ -14,15 +14,10 @@
 
 namespace ERpc {
 
-Nexus::Nexus(size_t global_udp_port) : Nexus(global_udp_port, 0.0) {}
+Nexus::Nexus(uint16_t global_udp_port) : Nexus(global_udp_port, 0.0) {}
 
-Nexus::Nexus(size_t global_udp_port, double udp_drop_prob)
+Nexus::Nexus(uint16_t global_udp_port, double udp_drop_prob)
     : udp_config(global_udp_port, udp_drop_prob) {
-  if (global_udp_port >= std::numeric_limits<uint16_t>::max()) {
-    fprintf(stderr, "eRPC Nexus: FATAL. UDP port number too large.\n");
-    exit(-1);
-  }
-
   /* Get the local hostname */
   int ret = get_hostname(hostname);
   if (ret == -1) {
@@ -31,7 +26,7 @@ Nexus::Nexus(size_t global_udp_port, double udp_drop_prob)
     exit(-1);
   }
 
-  erpc_dprintf("eRPC Nexus: Created with global UDP port %zu, hostname %s.\n",
+  erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
                global_udp_port, hostname);
   nexus_object = this;
 
@@ -179,9 +174,9 @@ void Nexus::session_mgnt_handler() {
     exit(-1);
   }
 
-  size_t target_app_tid; /* TID of the Rpc that should handle this packet */
+  uint32_t target_app_tid; /* TID of the Rpc that should handle this packet */
   const char *source_hostname;
-  size_t source_app_tid; /* Debug-only */
+  uint32_t source_app_tid; /* Debug-only */
   _unused(source_app_tid);
 
   bool is_sm_req = session_mgmt_is_pkt_type_req(sm_pkt->pkt_type);
@@ -210,8 +205,8 @@ void Nexus::session_mgnt_handler() {
     if (is_sm_req) {
       /* If it's a request, we must send a response */
       erpc_dprintf(
-          "eRPC Nexus: Received session management request for invalid Rpc %zu "
-          "from Rpc [%s, %zu]. Sending response.\n",
+          "eRPC Nexus: Received session management request for invalid Rpc %u "
+          "from Rpc [%s, %u]. Sending response.\n",
           target_app_tid, source_hostname, source_app_tid);
 
       sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemoteAppTid,
@@ -219,8 +214,8 @@ void Nexus::session_mgnt_handler() {
     } else {
       /* If it's a response, we can ignore it */
       erpc_dprintf(
-          "eRPC Nexus: Received session management resp for invalid Rpc %zu "
-          "from Rpc [%s, %zu]. Ignoring.\n",
+          "eRPC Nexus: Received session management resp for invalid Rpc %u "
+          "from Rpc [%s, %u]. Ignoring.\n",
           target_app_tid, source_hostname, source_app_tid);
     }
 

@@ -49,10 +49,10 @@ struct udp_config_t {
    * The UDP port used by all Nexus-es in the cluster to listen on for
    * session management
    */
-  size_t global_udp_port;
+  uint16_t global_udp_port;
   double drop_prob; /* Used to add packet loss to UDP traffic */
 
-  udp_config_t(size_t global_udp_port, double drop_prob)
+  udp_config_t(uint16_t global_udp_port, double drop_prob)
       : global_udp_port(global_udp_port), drop_prob(drop_prob) {}
 };
 
@@ -64,15 +64,6 @@ static const size_t kMaxFabDevPorts = 4; /* Max fabric device ports */
 static const size_t kMaxHostnameLen = 128;
 static const size_t kMaxIssueMsgLen = /* Debug issue messages */
     (240 + kMaxHostnameLen * 2);      /* Three lines and two hostnames */
-
-/*
- * Maximum number of sessions (both as client and server) that can be created
- * by a thread through its lifetime. This is small only for testing; several
- * million sessions should be fine.
- */
-static const size_t kMaxSessionsPerThread = 1024;
-static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),
-              "Session number must fit in 32 bits");
 
 // Simple methods
 static uint64_t rdtsc() {

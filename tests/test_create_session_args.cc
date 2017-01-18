@@ -14,7 +14,7 @@ using namespace ERpc;
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready;
-std::vector<size_t> port_vec = {0};
+std::vector<uint8_t> port_vec = {0};
 char local_hostname[kMaxHostnameLen];
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
@@ -73,7 +73,7 @@ void client_thread_func(Nexus *nexus) {
 }
 
 /* The server thread */
-void server_thread_func(Nexus *nexus, size_t app_tid) {
+void server_thread_func(Nexus *nexus, uint32_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
                                port_vec);
 

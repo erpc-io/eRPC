@@ -27,7 +27,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Check if the requested fabric port is managed by us */
   if (!is_fdev_port_managed(sm_pkt->server.fdev_port_index)) {
-    erpc_dprintf("%s. Invalid server port %zu. Sending response.\n", issue_msg,
+    erpc_dprintf("%s. Invalid server port %u. Sending response.\n", issue_msg,
                  sm_pkt->server.fdev_port_index);
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
@@ -122,7 +122,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %s: Received connect response from %s for session %zu. "
+          "eRPC Rpc %s: Received connect response from %s for session %u. "
           "Issue",
           get_name().c_str(), sm_pkt->server.name().c_str(),
           sm_pkt->client.session_num);
@@ -173,7 +173,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    */
   assert(strcmp(session->server.hostname, sm_pkt->server.hostname) == 0);
   assert(session->server.app_tid == sm_pkt->server.app_tid);
-  assert(session->server.session_num == std::numeric_limits<size_t>::max());
+  assert(session->server.session_num == kInvalidSessionNum);
   assert(session->client == sm_pkt->client);
 
   /*

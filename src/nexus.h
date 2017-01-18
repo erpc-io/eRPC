@@ -2,10 +2,10 @@
 #define ERPC_NEXUS_H
 
 #include <signal.h>
+#include <unistd.h>
 #include <mutex>
 #include <queue>
 #include <vector>
-#include <unistd.h>
 
 #include "common.h"
 #include "session.h"
@@ -22,7 +22,7 @@ class Nexus {
    * @param global_udp_port The UDP port used by all Nexus-es in the cluster to
    * listen for session management packets.
    */
-  Nexus(size_t global_udp_port);
+  Nexus(uint16_t global_udp_port);
 
   /**
    * @brief Nexus creation API for UDP packet loss testing. Creates the
@@ -30,12 +30,12 @@ class Nexus {
    *
    * @param global_udp_port The UDP port used by all Nexus-es in the cluster to
    * listen for session management packets.
-   * 
+   *
    * @param udp_drop_prob The probability that a session management packet
    * will be dropped. This is useful for testing session management packet
    * retransmission.
    */
-  Nexus(size_t global_udp_port, double udp_drop_prob);
+  Nexus(uint16_t global_udp_port, double udp_drop_prob);
 
   ~Nexus();
 
@@ -48,7 +48,7 @@ class Nexus {
   /**
    * @brief Copy the hostname of this machine to \p hostname. \p hostname must
    * have space for kMaxHostnameLen characters.
-   * 
+   *
    * @return 0 on success, -1 on error.
    */
   static int get_hostname(char *_hostname) {

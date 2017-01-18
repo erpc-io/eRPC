@@ -13,6 +13,24 @@
 
 namespace ERpc {
 
+/*
+ * Maximum number of sessions (both as client and server) that can be created
+ * by a thread through its lifetime. This is small only for testing; several
+ * million sessions should be fine.
+ */
+static const size_t kMaxSessionsPerThread = 1024;
+static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),
+              "Session number must fit in 32 bits");
+
+/*
+ * Invalid values that need to be filled in session metadata.
+ */
+static const uint32_t kInvalidAppTid = std::numeric_limits<uint32_t>::max();
+static const uint32_t kInvalidSessionNum = std::numeric_limits<uint32_t>::max();
+static const uint64_t kInvalidStartSeq = std::numeric_limits<uint64_t>::max();
+static const uint8_t kInvalidFdevPortIndex =
+    std::numeric_limits<uint8_t>::max();
+
 /**
  * @brief Session state that can only go forward.
  */
@@ -72,20 +90,20 @@ class SessionMetadata {
  public:
   TransportType transport_type;
   char hostname[kMaxHostnameLen];
-  size_t app_tid;          ///< TID of the Rpc that created this end point
-  size_t fdev_port_index;  ///< Fabric port used by this end point
-  size_t session_num;
-  size_t start_seq;
+  uint32_t app_tid;         ///< TID of the Rpc that created this end point
+  uint8_t fdev_port_index;  ///< Fabric port used by this end point
+  uint32_t session_num;
+  uint64_t start_seq;
   RoutingInfo routing_info;
 
   /* Fill invalid metadata to aid debugging */
   SessionMetadata() {
     transport_type = TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));
-    app_tid = std::numeric_limits<size_t>::max();
-    fdev_port_index = std::numeric_limits<size_t>::max();
-    session_num = std::numeric_limits<size_t>::max();
-    start_seq = std::numeric_limits<size_t>::max();
+    app_tid = kInvalidAppTid;
+    fdev_port_index = kInvalidFdevPortIndex;
+    session_num = kInvalidSessionNum;
+    start_seq = kInvalidStartSeq;
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
 
@@ -100,7 +118,7 @@ class SessionMetadata {
     ret += std::string(", R: "); /* Rpc */
     ret += std::to_string(app_tid);
     ret += std::string(", S: "); /* Session */
-    if (session_num == std::numeric_limits<size_t>::max()) {
+    if (session_num == kInvalidSessionNum) {
       ret += std::string("XX");
     } else {
       ret += std::to_string(session_num);

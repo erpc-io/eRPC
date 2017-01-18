@@ -11,9 +11,9 @@
 namespace ERpc {
 
 template <class Transport_>
-Rpc<Transport_>::Rpc(Nexus *nexus, void *context, size_t app_tid,
+Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint32_t app_tid,
                      session_mgmt_handler_t session_mgmt_handler,
-                     std::vector<size_t> fdev_port_vec)
+                     std::vector<uint8_t> fdev_port_vec)
     : nexus(nexus),
       context(context),
       app_tid(app_tid),
@@ -32,7 +32,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, size_t app_tid,
 
   /* Record the requested local ports in an array */
   int i = 0;
-  for (size_t fdev_port : fdev_port_vec) {
+  for (uint8_t fdev_port : fdev_port_vec) {
     fdev_port_arr[i] = fdev_port;
     i++;
   }
@@ -65,7 +65,7 @@ template <class Transport_>
 void Rpc<Transport_>::bury_session(Session *session) {
   assert(session != nullptr);
 
-  size_t session_num;
+  uint32_t session_num;
   if (session->role == Session::Role::kClient) {
     assert(is_session_ptr_client(session));
     assert(!is_in_flight(session));
@@ -172,7 +172,7 @@ std::string Rpc<Transport_>::get_name() {
 }
 
 template <class Transport_>
-bool Rpc<Transport_>::is_fdev_port_managed(size_t fab_port_index) {
+bool Rpc<Transport_>::is_fdev_port_managed(uint8_t fab_port_index) {
   for (size_t i = 0; i < num_fdev_ports; i++) {
     if (fdev_port_arr[i] == fab_port_index) {
       return true;

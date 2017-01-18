@@ -15,10 +15,10 @@ namespace ERpc {
  * so the args checking is always enabled (i.e., no asserts).
  */
 template <class Transport_>
-Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
+Session *Rpc<Transport_>::create_session(uint8_t local_fdev_port_index,
                                          const char *rem_hostname,
-                                         size_t rem_app_tid,
-                                         size_t rem_fdev_port_index) {
+                                         uint32_t rem_app_tid,
+                                         uint8_t rem_fdev_port_index) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %s: create_session() failed. Issue",
@@ -26,21 +26,21 @@ Session *Rpc<Transport_>::create_session(size_t local_fdev_port_index,
 
   /* Check local fabric port */
   if (local_fdev_port_index >= kMaxFabDevPorts) {
-    erpc_dprintf("%s: Invalid local fabric port %zu\n", issue_msg,
+    erpc_dprintf("%s: Invalid local fabric port %u\n", issue_msg,
                  local_fdev_port_index);
     return nullptr;
   }
 
   /* Check remote fabric port */
   if (rem_fdev_port_index >= kMaxFabDevPorts) {
-    erpc_dprintf("%s: Invalid remote fabric port %zu\n", issue_msg,
+    erpc_dprintf("%s: Invalid remote fabric port %u\n", issue_msg,
                  rem_fdev_port_index);
     return nullptr;
   }
 
   /* Ensure that the requested local port is managed by Rpc */
   if (!is_fdev_port_managed(local_fdev_port_index)) {
-    erpc_dprintf("%s: eRPC Rpc: Local fabric port %zu unmanaged.\n", issue_msg,
+    erpc_dprintf("%s: eRPC Rpc: Local fabric port %u unmanaged.\n", issue_msg,
                  local_fdev_port_index);
     return nullptr;
   }
@@ -126,10 +126,10 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
     return false;
   }
 
-  size_t session_num = session->client.session_num;
+  uint32_t session_num = session->client.session_num;
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %s: destroy_session() failed for session %zu. Issue",
+          "eRPC Rpc %s: destroy_session() failed for session %u. Issue",
           get_name().c_str(), session_num);
 
   switch (session->state) {
@@ -166,7 +166,7 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
        */
       assert(!is_in_flight(session));
       erpc_dprintf(
-          "eRPC Rpc %s: destroy_session() succeeded for error session %zu.\n",
+          "eRPC Rpc %s: destroy_session() succeeded for error session %u.\n",
           get_name().c_str(), session_num);
 
       session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,

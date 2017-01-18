@@ -12,11 +12,9 @@ using namespace ERpc;
 #define SERVER_APP_TID 100
 #define CLIENT_APP_TID 200
 
-void server_thread_func(Nexus *nexus, size_t app_tid);
-
 /* Shared between client and server thread */
 std::atomic<size_t> server_count;
-std::vector<size_t> port_vec = {0};
+std::vector<uint8_t> port_vec = {0};
 char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
@@ -47,7 +45,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 }
 
 /* The server thread used by all tests */
-void server_thread_func(Nexus *nexus, size_t app_tid) {
+void server_thread_func(Nexus *nexus, uint32_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
                                port_vec);
 

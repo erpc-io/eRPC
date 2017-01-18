@@ -25,7 +25,7 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
   sprintf(issue_msg, "eRPC Rpc %s: Received disconnect request from %s. Issue",
           get_name().c_str(), sm_pkt->client.name().c_str());
 
-  size_t session_num = sm_pkt->server.session_num;
+  uint32_t session_num = sm_pkt->server.session_num;
   assert(session_num < session_vec.size());
 
   /* Check if the session was already disconnected */
@@ -61,7 +61,7 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "eRPC Rpc %s: Received disconnect response from %s for "
-          "session %zu. Issue",
+          "session %u. Issue",
           get_name().c_str(), sm_pkt->server.name().c_str(),
           sm_pkt->client.session_num);
 

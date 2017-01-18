@@ -12,7 +12,7 @@ namespace ERpc {
  */
 class UDPClient {
  public:
-  UDPClient(const char *remote_addr, size_t remote_port, double drop_prob);
+  UDPClient(const char *remote_addr, uint16_t remote_port, double drop_prob);
   ~UDPClient();
 
   ssize_t send(const char *msg, size_t size);
@@ -20,7 +20,7 @@ class UDPClient {
  private:
   // Constructor args
   std::string remote_addr;
-  size_t remote_port;
+  uint16_t remote_port;
   double drop_prob;
 
   // Others
