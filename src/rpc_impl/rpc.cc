@@ -11,7 +11,7 @@
 namespace ERpc {
 
 template <class Transport_>
-Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint32_t app_tid,
+Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
                      session_mgmt_handler_t session_mgmt_handler,
                      std::vector<uint8_t> fdev_port_vec)
     : nexus(nexus),
@@ -19,6 +19,17 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint32_t app_tid,
       app_tid(app_tid),
       session_mgmt_handler(session_mgmt_handler),
       num_fdev_ports(fdev_port_vec.size()) {
+
+  if (nexus == nullptr) {
+    fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with bad Nexus.\n");
+    exit(-1);
+  }
+
+  if (app_tid == kInvalidAppTid) {
+    fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with bad app TID.\n");
+    exit(-1);
+  }
+
   if (fdev_port_vec.size() == 0) {
     fprintf(stderr, "eRPC Rpc: FATAL. Rpc created with 0 fabric ports.\n");
     exit(-1);

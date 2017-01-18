@@ -17,7 +17,7 @@ namespace ERpc {
 template <class Transport_>
 Session *Rpc<Transport_>::create_session(uint8_t local_fdev_port_index,
                                          const char *rem_hostname,
-                                         uint32_t rem_app_tid,
+                                         uint8_t rem_app_tid,
                                          uint8_t rem_fdev_port_index) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];

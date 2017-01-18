@@ -174,9 +174,9 @@ void Nexus::session_mgnt_handler() {
     exit(-1);
   }
 
-  uint32_t target_app_tid; /* TID of the Rpc that should handle this packet */
+  uint8_t target_app_tid; /* TID of the Rpc that should handle this packet */
   const char *source_hostname;
-  uint32_t source_app_tid; /* Debug-only */
+  uint8_t source_app_tid; /* Debug-only */
   _unused(source_app_tid);
 
   bool is_sm_req = session_mgmt_is_pkt_type_req(sm_pkt->pkt_type);
@@ -200,7 +200,7 @@ void Nexus::session_mgnt_handler() {
   }
 
   if (target_hook == nullptr) {
-    /* We don't have an Rpc for @target_app_tid  */
+    /* We don't have an Rpc object for @target_app_tid  */
 
     if (is_sm_req) {
       /* If it's a request, we must send a response */

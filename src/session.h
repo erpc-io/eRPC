@@ -25,7 +25,7 @@ static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),
 /*
  * Invalid values that need to be filled in session metadata.
  */
-static const uint32_t kInvalidAppTid = std::numeric_limits<uint32_t>::max();
+static const uint8_t kInvalidAppTid = std::numeric_limits<uint8_t>::max();
 static const uint32_t kInvalidSessionNum = std::numeric_limits<uint32_t>::max();
 static const uint64_t kInvalidStartSeq = std::numeric_limits<uint64_t>::max();
 static const uint8_t kInvalidFdevPortIndex =
@@ -90,7 +90,7 @@ class SessionMetadata {
  public:
   TransportType transport_type;
   char hostname[kMaxHostnameLen];
-  uint32_t app_tid;         ///< TID of the Rpc that created this end point
+  uint8_t app_tid;         ///< TID of the Rpc that created this end point
   uint8_t fdev_port_index;  ///< Fabric port used by this end point
   uint32_t session_num;
   uint64_t start_seq;
@@ -242,7 +242,7 @@ typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType,
  */
 class SessionMgmtHook {
  public:
-  uint32_t app_tid; /* App-level thread ID of the RPC that created this hook */
+  uint8_t app_tid; /* App-level thread ID of the RPC that created this hook */
   std::mutex session_mgmt_mutex;
   volatile size_t session_mgmt_ev_counter; /* Number of session mgmt events */
   std::vector<SessionMgmtPkt *> session_mgmt_pkt_list;

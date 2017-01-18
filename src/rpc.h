@@ -46,7 +46,7 @@ class Rpc {
 
  public:
   // rpc.cc
-  Rpc(Nexus *nexus, void *context, uint32_t app_tid,
+  Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       session_mgmt_handler_t session_mgmt_handler,
       std::vector<uint8_t> fdev_port_vec);
 
@@ -62,7 +62,7 @@ class Rpc {
    * NULL if creation fails; a callback will not be invoked.
    */
   Session *create_session(uint8_t local_fdev_port_index,
-                          const char *_rem_hostname, uint32_t rem_app_tid,
+                          const char *_rem_hostname, uint8_t rem_app_tid,
                           uint8_t rem_fdev_port_index);
 
   /**
@@ -184,7 +184,7 @@ class Rpc {
   // Constructor args
   Nexus *nexus;
   void *context; /* The application context */
-  uint32_t app_tid;
+  uint8_t app_tid;
   session_mgmt_handler_t session_mgmt_handler;
   size_t num_fdev_ports;
   uint8_t fdev_port_arr[kMaxFabDevPorts];
