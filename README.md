@@ -3,7 +3,9 @@
     * App TIDs: `uint8_t`. We need one per thread, so 256 is enough.
     * Session number: `uint32_t`. We need one per session, and we may need
       more than 65,536.
-    * Sequence numbers: `uint64_t` - not `size_t`.
+    * Sequence numbers: `uint64_t` - not `size_t`
+  * Use exceptions in constructors of Nexus and Rpc. These are the only two
+    class types that the user is allowed to construct.
 
 ## API notes
 
@@ -20,4 +22,6 @@
       does not have the server's sessio number. (One solution is to let the
       server create the server-side end point and reply with a successful connect
       response - the client can just ignore the response because it will see
-      that session_vec[sm_pkt->client.session_num] == nullptr.)
+      that session_vec[sm_pkt->client.session_num] == nullptr. This causes a
+      memory leak at the server since the allocated server-side endpoint will
+      never get destroyed.)
