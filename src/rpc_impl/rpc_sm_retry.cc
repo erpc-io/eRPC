@@ -62,7 +62,8 @@ void Rpc<Transport_>::remove_from_in_flight(Session *session) {
   assert(is_session_ptr_client(session));
   assert(is_in_flight(session));
 
-  size_t initial_size = in_flight_vec.size();
+  size_t initial_size = in_flight_vec.size(); /* Debug-only */
+  _unused(initial_size);
 
   in_flight_req_t dummy_req(0, session); /* Dummy for std::remove */
   in_flight_vec.erase(

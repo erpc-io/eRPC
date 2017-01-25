@@ -8,7 +8,7 @@ Session management
 
 ## Listening for session management packets
  * Each Nexus installs a `SIGIO` handler and listens for UDP packets on
-   port `global_udp_port`.
+   port `mgmt_udp_port`.
  * When the handler is invoked by the OS, the Nexus enqueues the packet in the
    session management queue of the Rpc specified by the packet's destination
    TID.

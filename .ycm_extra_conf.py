@@ -22,6 +22,7 @@ flags = [
     '-I', '/usr/local/include',
     '-I', '/usr/include',
     '-I', '/home/akalia/eRPC/src',
+    '-I', '/users/akalia/eRPC/src',
     '-I', '/home/anuj/eRPC/src',
     '-I.'
 ]

@@ -19,23 +19,23 @@ class Nexus {
    * @brief The Nexus creation API exposed to the user. Creates the
    * one-per-process Nexus object. This sets @udp_drop_prob = 0.0.
    *
-   * @param global_udp_port The UDP port used by all Nexus-es in the cluster to
+   * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
    * listen for session management packets.
    */
-  Nexus(uint16_t global_udp_port);
+  Nexus(uint16_t mgmt_udp_port);
 
   /**
    * @brief Nexus creation API for UDP packet loss testing. Creates the
    * one-per-process Nexus object.
    *
-   * @param global_udp_port The UDP port used by all Nexus-es in the cluster to
+   * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
    * listen for session management packets.
    *
    * @param udp_drop_prob The probability that a session management packet
    * will be dropped. This is useful for testing session management packet
    * retransmission.
    */
-  Nexus(uint16_t global_udp_port, double udp_drop_prob);
+  Nexus(uint16_t mgmt_udp_port, double udp_drop_prob);
 
   ~Nexus();
 

@@ -14,10 +14,10 @@
 
 namespace ERpc {
 
-Nexus::Nexus(uint16_t global_udp_port) : Nexus(global_udp_port, 0.0) {}
+Nexus::Nexus(uint16_t mgmt_udp_port) : Nexus(mgmt_udp_port, 0.0) {}
 
-Nexus::Nexus(uint16_t global_udp_port, double udp_drop_prob)
-    : udp_config(global_udp_port, udp_drop_prob) {
+Nexus::Nexus(uint16_t mgmt_udp_port, double udp_drop_prob)
+    : udp_config(mgmt_udp_port, udp_drop_prob) {
   /* Get the local hostname */
   int ret = get_hostname(hostname);
   if (ret == -1) {
@@ -28,7 +28,7 @@ Nexus::Nexus(uint16_t global_udp_port, double udp_drop_prob)
   }
 
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
-               global_udp_port, hostname);
+               mgmt_udp_port, hostname);
   nexus_object = this;
 
   compute_freq_ghz();
@@ -71,7 +71,8 @@ void Nexus::unregister_hook(SessionMgmtHook *hook) {
 
   nexus_lock.lock();
 
-  size_t initial_size = reg_hooks.size();
+  size_t initial_size = reg_hooks.size(); /* Debug-only */
+  _unused(initial_size);
   reg_hooks.erase(std::remove(reg_hooks.begin(), reg_hooks.end(), hook),
                   reg_hooks.end());
   assert(reg_hooks.size() == initial_size - 1);
@@ -93,13 +94,13 @@ void Nexus::install_sigio_handler() {
 
   /*
    * Bind the socket to accept packets destined to any IP interface of this
-   * machine (INADDR_ANY), and to port @global_udp_port.
+   * machine (INADDR_ANY), and to port @mgmt_udp_port.
    */
   struct sockaddr_in server;
   memset(&server, 0, sizeof(server));
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons((uint16_t)udp_config.global_udp_port);
+  server.sin_port = htons((uint16_t)udp_config.mgmt_udp_port);
 
   if (bind(nexus_sock_fd, (struct sockaddr *)&server,
            sizeof(struct sockaddr_in)) < 0) {

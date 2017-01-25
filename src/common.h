@@ -49,11 +49,11 @@ struct udp_config_t {
    * The UDP port used by all Nexus-es in the cluster to listen on for
    * session management
    */
-  uint16_t global_udp_port;
+  uint16_t mgmt_udp_port;
   double drop_prob; /* Used to add packet loss to UDP traffic */
 
-  udp_config_t(uint16_t global_udp_port, double drop_prob)
-      : global_udp_port(global_udp_port), drop_prob(drop_prob) {}
+  udp_config_t(uint16_t mgmt_udp_port, double drop_prob)
+      : mgmt_udp_port(mgmt_udp_port), drop_prob(drop_prob) {}
 };
 
 // General constants

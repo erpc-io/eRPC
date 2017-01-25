@@ -173,15 +173,16 @@ class SessionMgmtPkt {
 
   /**
    * @brief Send this session management packet "as is" to \p dst_hostname on
-   * port \p global_udp_port.
+   * port \p mgmt_udp_port.
    */
   inline void send_to(const char *dst_hostname,
                       const udp_config_t *udp_config) {
     assert(dst_hostname != NULL);
 
-    UDPClient udp_client(dst_hostname, udp_config->global_udp_port,
+    UDPClient udp_client(dst_hostname, udp_config->mgmt_udp_port,
                          udp_config->drop_prob);
     ssize_t ret = udp_client.send((char *)this, sizeof(*this));
+    _unused(ret);
     assert(ret == sizeof(*this));
   }
 
