@@ -21,7 +21,8 @@ Session management
    management packets. If there are new packets, it invokes the appropriate
    handler, and frees the packet.
 
-### Connect requests and responses
- * A connect request is generated when the user calls `create_session`.
+## Connect requests and responses
+ * A connect request may be generated when the user calls `create_session`.
 
-### Disconnect requests and responses
+## Disconnect requests and responses
+ * A disconnect request may be generated when the user calls `destroy_session`.
