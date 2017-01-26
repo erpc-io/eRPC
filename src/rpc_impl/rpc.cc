@@ -4,6 +4,7 @@
  */
 
 #include <algorithm>
+#include <stdexcept>
 
 #include "rpc.h"
 #include "util/udp_client.h"
@@ -40,8 +41,14 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
     return;
   }
 
-  /* Initialize the transport */
-  transport = new Transport_();
+  try {
+    /* Initialize the hugepage allocator */
+    huge_alloc = new HugeAllocator(kInitialHugeAllocSize, numa_node);
+    transport = new Transport_(); /* Initialize the transport */
+  } catch (std::runtime_error err) {
+    throw err;
+    return;
+  }
 
   /* Register a hook with the Nexus */
   sm_hook.app_tid = app_tid;

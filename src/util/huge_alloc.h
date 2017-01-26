@@ -4,11 +4,9 @@
 #include <errno.h>
 #include <malloc.h>
 #include <numaif.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <stdexcept>
 #include <vector>
 
 #include "common.h"
@@ -20,8 +18,8 @@ namespace ERpc {
  * (a) Allocating and deallocating hugepage-backed individual 4K pages.
  * (b) Allocating, but *NOT* deallocating chunks of size >= 2MB.
  *
- * The allocator uses randomly generated SHM keys, and deallocates the SHM
- * regions when it is deleted.
+ * The allocator uses randomly generated positive SHM keys, and deallocates the
+ * SHM regions created when it is deleted.
  */
 class HugeAllocator {
  private:
@@ -69,7 +67,8 @@ class HugeAllocator {
     /* Begin by allocating the specified amount of memory in hugepages */
     bool success = reserve_hugepages(initial_size, numa_node);
     if (!success) {
-      fprintf(stderr, "eRPC HugeAllocator failed to initialize\n");
+      throw std::runtime_error("eRPC HugeAllocator: Failed to allocate memory");
+      return;
     }
   }
 
@@ -222,16 +221,20 @@ class HugeAllocator {
     int shm_key, shm_id;
 
     while (true) {
-      /* Choose a random SHM key */
+      /*
+       * Choose a positive SHM key. Negative is fine but it looks scary in the
+       * error message.
+       */
       shm_key = static_cast<int>(slow_rand.next_u64());
+      shm_key = std::abs(shm_key);
 
       /* Try to get an SHM region */
       shm_id = shmget(shm_key, size, IPC_CREAT | IPC_EXCL | 0666 | SHM_HUGETLB);
 
       if (shm_id == -1) {
-        /* shm_key did not work. Try again. */
         switch (errno) {
           case EEXIST:
+            /* @shm_key already exists. Try again. */
             fprintf(stderr,
                     "eRPC HugeAllocator: SHM malloc error: "
                     "Key %d exists. Trying again with different key.\n",

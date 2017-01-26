@@ -9,10 +9,12 @@
 #include "transport.h"
 #include "transport_impl/infiniband_transport.h"
 #include "util/buffer.h"
+#include "util/huge_alloc.h"
 #include "util/rand.h"
 
 namespace ERpc {
 
+static const size_t kInitialHugeAllocSize = (128 * MB(1)); /* 128 MB */
 static const size_t kSessionMgmtRetransMs = 5;  /* Retransmission for sm reqs */
 static const size_t kSessionMgmtTimeoutMs = 50; /* Timeout for sm reqs */
 
@@ -186,6 +188,13 @@ class Rpc {
 
   // Others
   Transport_ *transport; /* The unreliable transport */
+
+  /*
+   * The hugepage allocator used for memory allocation by this Rpc and its
+   * member objects. Using one allocator for all (large) allocations in this
+   * thread allows easier memory use accounting.
+   */
+  HugeAllocator *huge_alloc;
 
   /*
    * The append-only list of session pointers, indexed by session num.
