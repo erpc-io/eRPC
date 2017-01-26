@@ -1,3 +1,11 @@
+/**
+ * @file transport_types.h
+ * @brief The fabrics supported by eRPC. This stuff cannot go in transport.h
+ * because that will create a circular dependency between transport.h and
+ * session.h. (transport.h requires session.h, but session.h requires only
+ * TransportType nad RoutingInfo.)
+ */
+
 #ifndef ERPC_TRANSPORT_TYPE_H
 #define ERPC_TRANSPORT_TYPE_H
 

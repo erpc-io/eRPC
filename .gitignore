@@ -4,6 +4,7 @@
 *.obj
 *.elf
 main
+tags
 1
 
 # Precompiled Headers

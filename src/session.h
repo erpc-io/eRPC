@@ -15,8 +15,7 @@ namespace ERpc {
 
 /*
  * Maximum number of sessions (both as client and server) that can be created
- * by a thread through its lifetime. This is small only for testing; several
- * million sessions should be fine.
+ * by a thread through its lifetime. Increase this for more sessions.
  */
 static const size_t kMaxSessionsPerThread = 1024;
 static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),

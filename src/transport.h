@@ -1,3 +1,7 @@
+/**
+ * @file transport.h
+ * @brief General definitions for all transport types.
+ */
 #ifndef ERPC_TRANSPORT_H
 #define ERPC_TRANSPORT_H
 
@@ -8,7 +12,9 @@
 
 namespace ERpc {
 
-// Generic unreliable transport class
+/**
+ * @brief Generic mostly-reliable transport
+ */
 class Transport {
  public:
   void fill_routing_info(RoutingInfo *routing_info) const;

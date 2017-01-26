@@ -74,7 +74,7 @@ target_link_libraries(test_create_session_args
 add_test(NAME test_create_session_args COMMAND test_create_session_args)
 
 add_executable(test_destroy_session tests/test_destroy_session.cc)
-target_link_libraries(test_destroy_session erpc ${GTEST_LIBRARES} ${LIBRARIES})
+target_link_libraries(test_destroy_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 add_test(NAME test_destroy_session COMMAND test_destroy_session)
 
 add_executable(test_huge_alloc tests/test_huge_alloc.cc)
