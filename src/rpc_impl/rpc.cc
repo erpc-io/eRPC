@@ -13,12 +13,13 @@ namespace ERpc {
 template <class Transport_>
 Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
                      session_mgmt_handler_t session_mgmt_handler,
-                     uint8_t phy_port)
+                     uint8_t phy_port, uint8_t numa_node)
     : nexus(nexus),
       context(context),
       app_tid(app_tid),
       session_mgmt_handler(session_mgmt_handler),
-      phy_port(phy_port) {
+      phy_port(phy_port),
+      numa_node(numa_node) {
   if (nexus == nullptr) {
     throw std::invalid_argument("eRPC Rpc: Invalid nexus");
     return;
@@ -31,6 +32,11 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
   if (phy_port >= kMaxPhyPorts) {
     throw std::invalid_argument("eRPC Rpc: Invalid physical port");
+    return;
+  }
+
+  if (numa_node >= kMaxNumaNodes) {
+    throw std::invalid_argument("eRPC Rpc: Invalid NUMA node");
     return;
   }
 

@@ -14,7 +14,8 @@ using namespace ERpc;
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready;
-uint8_t phy_port = 0;
+const uint8_t phy_port = 0;
+const uint8_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
@@ -34,7 +35,7 @@ void client_thread_func(Nexus *nexus) {
 
   /* Create the Rpc */
   Rpc<InfiniBandTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port);
+                               &test_sm_hander, phy_port, numa_node);
 
   {
     /* Test: Correct args */
@@ -44,7 +45,7 @@ void client_thread_func(Nexus *nexus) {
   }
 
   {
-    /* Test: Unmanaged remote port */
+    /* Test: Invalid remote port, which can be detected locally */
     Session *session =
         rpc.create_session(local_hostname, SERVER_APP_TID, kMaxPhyPorts);
     ASSERT_TRUE(session == nullptr);
@@ -68,7 +69,7 @@ void client_thread_func(Nexus *nexus) {
 /* The server thread */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               phy_port);
+                               phy_port, numa_node);
 
   server_ready = true;
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);

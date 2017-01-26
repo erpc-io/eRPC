@@ -16,7 +16,8 @@ using namespace ERpc;
 std::atomic<bool> server_ready; /* Client starts after server is ready */
 std::atomic<bool> client_done;  /* Server ends after client is done */
 
-uint8_t phy_port = 0;
+const uint8_t phy_port = 0;
+const uint8_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
@@ -41,7 +42,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 /* The server thread used by all tests */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               phy_port);
+                               phy_port, numa_node);
 
   server_ready = true;
 
@@ -62,7 +63,7 @@ void simple_disconnect(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port);
+                               &test_sm_hander, phy_port, numa_node);
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
@@ -117,7 +118,7 @@ void disconnect_multi(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port);
+                               &test_sm_hander, phy_port, numa_node);
 
   for (size_t i = 0; i < 3; i++) {
     client_context->nb_sm_events = 0;
@@ -166,7 +167,7 @@ void disconnect_error(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port);
+                               &test_sm_hander, phy_port, numa_node);
 
   /* Try to connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;

@@ -48,7 +48,8 @@ class Rpc {
  public:
   // rpc.cc
   Rpc(Nexus *nexus, void *context, uint8_t app_tid,
-      session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port);
+      session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port = 0,
+      uint8_t numa_node = 0);
 
   ~Rpc();
 
@@ -62,7 +63,7 @@ class Rpc {
    * NULL if creation fails; a callback will not be invoked.
    */
   Session *create_session(const char *_rem_hostname, uint8_t rem_app_tid,
-                          uint8_t rem_phy_port);
+                          uint8_t rem_phy_port = 0);
 
   /**
    * @brief Disconnect and destroy a client session. \p session should not
@@ -181,6 +182,7 @@ class Rpc {
   uint8_t app_tid;
   session_mgmt_handler_t session_mgmt_handler;
   uint8_t phy_port;
+  uint8_t numa_node;
 
   // Others
   Transport_ *transport; /* The unreliable transport */
