@@ -14,7 +14,7 @@ using namespace ERpc;
 
 /* Shared between client and server thread */
 std::atomic<size_t> server_count;
-std::vector<uint8_t> port_vec = {0};
+uint8_t phy_port = 0;
 char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
@@ -45,9 +45,9 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 }
 
 /* The server thread used by all tests */
-void server_thread_func(Nexus *nexus, uint32_t app_tid) {
+void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               port_vec);
+                               phy_port);
 
   server_count++;
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
@@ -63,12 +63,12 @@ void simple_connect(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, port_vec);
+                               &test_sm_hander, phy_port);
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
-  Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                        SERVER_APP_TID, port_vec[0]);
+  Session *session =
+      rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
   ASSERT_TRUE(session != nullptr);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
@@ -96,12 +96,12 @@ void invalid_remote_port(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, port_vec);
+                               &test_sm_hander, phy_port);
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
-  Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                        SERVER_APP_TID, port_vec[0] + 1);
+  Session *session =
+      rpc.create_session(local_hostname, SERVER_APP_TID, phy_port + 1);
   ASSERT_TRUE(session != nullptr);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);

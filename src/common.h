@@ -60,7 +60,7 @@ struct udp_config_t {
 static const size_t kMaxNumaNodes = 16; /* Maximum number of NUMA nodes */
 static const size_t kPageSize = 4096;   /* Page size in bytes */
 static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
-static const size_t kMaxFabDevPorts = 4; /* Max fabric device ports */
+static const size_t kMaxPhyPorts = 4; /* Max fabric device ports */
 static const size_t kMaxHostnameLen = 128;
 static const size_t kMaxIssueMsgLen = /* Debug issue messages */
     (240 + kMaxHostnameLen * 2);      /* Three lines and two hostnames */

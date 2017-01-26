@@ -28,8 +28,7 @@ static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),
 static const uint8_t kInvalidAppTid = std::numeric_limits<uint8_t>::max();
 static const uint32_t kInvalidSessionNum = std::numeric_limits<uint32_t>::max();
 static const uint64_t kInvalidStartSeq = std::numeric_limits<uint64_t>::max();
-static const uint8_t kInvalidFdevPortIndex =
-    std::numeric_limits<uint8_t>::max();
+static const uint8_t kInvalidPhyPort = std::numeric_limits<uint8_t>::max();
 
 /**
  * @brief Session state that can only go forward.
@@ -90,8 +89,8 @@ class SessionMetadata {
  public:
   TransportType transport_type;
   char hostname[kMaxHostnameLen];
-  uint8_t app_tid;         ///< TID of the Rpc that created this end point
-  uint8_t fdev_port_index;  ///< Fabric port used by this end point
+  uint8_t app_tid;   ///< TID of the Rpc that created this end point
+  uint8_t phy_port;  ///< Fabric port used by this end point
   uint32_t session_num;
   uint64_t start_seq;
   RoutingInfo routing_info;
@@ -101,7 +100,7 @@ class SessionMetadata {
     transport_type = TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));
     app_tid = kInvalidAppTid;
-    fdev_port_index = kInvalidFdevPortIndex;
+    phy_port = kInvalidPhyPort;
     session_num = kInvalidSessionNum;
     start_seq = kInvalidStartSeq;
     memset((void *)&routing_info, 0, sizeof(routing_info));

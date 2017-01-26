@@ -16,7 +16,7 @@ using namespace ERpc;
 std::atomic<bool> server_ready; /* Client starts after server is ready */
 std::atomic<bool> client_done;  /* Server ends after client is done */
 
-std::vector<uint8_t> port_vec = {0};
+uint8_t phy_port = 0;
 char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
@@ -39,9 +39,9 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 }
 
 /* The server thread used by all tests */
-void server_thread_func(Nexus *nexus, uint32_t app_tid) {
+void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               port_vec);
+                               phy_port);
 
   server_ready = true;
 
@@ -62,12 +62,12 @@ void simple_disconnect(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, port_vec);
+                               &test_sm_hander, phy_port);
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
-  Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                        SERVER_APP_TID, port_vec[0]);
+  Session *session =
+      rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
 
   /* Try to disconnect the session before it is connected. This should fail. */
   ASSERT_EQ(rpc.destroy_session(session), false);
@@ -117,15 +117,15 @@ void disconnect_multi(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, port_vec);
+                               &test_sm_hander, phy_port);
 
   for (size_t i = 0; i < 3; i++) {
     client_context->nb_sm_events = 0;
     client_context->exp_err = SessionMgmtErrType::kNoError;
 
     /* Connect the session */
-    Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                          SERVER_APP_TID, port_vec[0]);
+    Session *session =
+        rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
 
     rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 
@@ -166,12 +166,12 @@ void disconnect_error(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, port_vec);
+                               &test_sm_hander, phy_port);
 
   /* Try to connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
-  Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                        SERVER_APP_TID, port_vec[0] + 1);
+  Session *session =
+      rpc.create_session(local_hostname, SERVER_APP_TID, phy_port + 1);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 

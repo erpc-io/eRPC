@@ -14,7 +14,7 @@ using namespace ERpc;
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready;
-std::vector<uint8_t> port_vec = {0};
+uint8_t phy_port = 0;
 char local_hostname[kMaxHostnameLen];
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
@@ -34,48 +34,41 @@ void client_thread_func(Nexus *nexus) {
 
   /* Create the Rpc */
   Rpc<InfiniBandTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID,
-                               &test_sm_hander, port_vec);
+                               &test_sm_hander, phy_port);
 
   {
     /* Test: Correct args */
-    Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                          SERVER_APP_TID, port_vec[0]);
+    Session *session =
+        rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
     ASSERT_TRUE(session != nullptr);
   }
 
   {
-    /* Test: Unmanaged local port */
-    Session *session = rpc.create_session(port_vec[0] + 1, local_hostname,
-                                          SERVER_APP_TID, port_vec[0]);
-    ASSERT_TRUE(session == nullptr);
-  }
-
-  {
     /* Test: Unmanaged remote port */
-    Session *session = rpc.create_session(port_vec[0] + 1, local_hostname,
-                                          SERVER_APP_TID, kMaxFabDevPorts);
+    Session *session =
+        rpc.create_session(local_hostname, SERVER_APP_TID, kMaxPhyPorts);
     ASSERT_TRUE(session == nullptr);
   }
 
   {
     /* Test: Try to create session to self */
-    Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                          CLIENT_APP_TID, port_vec[0]);
+    Session *session =
+        rpc.create_session(local_hostname, CLIENT_APP_TID, phy_port);
     ASSERT_TRUE(session == nullptr);
   }
 
   {
     /* Test: Try to create another session to the same remote Rpc. */
-    Session *session = rpc.create_session(port_vec[0], local_hostname,
-                                          SERVER_APP_TID, port_vec[0]);
+    Session *session =
+        rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
     ASSERT_TRUE(session == nullptr);
   }
 }
 
 /* The server thread */
-void server_thread_func(Nexus *nexus, uint32_t app_tid) {
+void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               port_vec);
+                               phy_port);
 
   server_ready = true;
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);

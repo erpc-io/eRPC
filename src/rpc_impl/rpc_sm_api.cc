@@ -15,33 +15,18 @@ namespace ERpc {
  * so the args checking is always enabled (i.e., no asserts).
  */
 template <class Transport_>
-Session *Rpc<Transport_>::create_session(uint8_t local_fdev_port_index,
-                                         const char *rem_hostname,
+Session *Rpc<Transport_>::create_session(const char *rem_hostname,
                                          uint8_t rem_app_tid,
-                                         uint8_t rem_fdev_port_index) {
+                                         uint8_t rem_phy_port) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %s: create_session() failed. Issue",
           get_name().c_str());
 
-  /* Check local fabric port */
-  if (local_fdev_port_index >= kMaxFabDevPorts) {
-    erpc_dprintf("%s: Invalid local fabric port %u\n", issue_msg,
-                 local_fdev_port_index);
-    return nullptr;
-  }
-
   /* Check remote fabric port */
-  if (rem_fdev_port_index >= kMaxFabDevPorts) {
+  if (rem_phy_port >= kMaxPhyPorts) {
     erpc_dprintf("%s: Invalid remote fabric port %u\n", issue_msg,
-                 rem_fdev_port_index);
-    return nullptr;
-  }
-
-  /* Ensure that the requested local port is managed by Rpc */
-  if (!is_fdev_port_managed(local_fdev_port_index)) {
-    erpc_dprintf("%s: eRPC Rpc: Local fabric port %u unmanaged.\n", issue_msg,
-                 local_fdev_port_index);
+                 rem_phy_port);
     return nullptr;
   }
 
@@ -97,7 +82,7 @@ Session *Rpc<Transport_>::create_session(uint8_t local_fdev_port_index,
   client_metadata.transport_type = transport->transport_type;
   strcpy((char *)client_metadata.hostname, nexus->hostname);
   client_metadata.app_tid = app_tid;
-  client_metadata.fdev_port_index = local_fdev_port_index;
+  client_metadata.phy_port = phy_port;
   client_metadata.session_num = session_vec.size();
   client_metadata.start_seq = generate_start_seq();
   transport->fill_routing_info(&client_metadata.routing_info);
@@ -106,7 +91,7 @@ Session *Rpc<Transport_>::create_session(uint8_t local_fdev_port_index,
   server_metadata.transport_type = transport->transport_type;
   strcpy((char *)server_metadata.hostname, rem_hostname);
   server_metadata.app_tid = rem_app_tid;
-  server_metadata.fdev_port_index = rem_fdev_port_index;
+  server_metadata.phy_port = rem_phy_port;
   // server_metadata.session_num = ??
   // server_metadata.start_seq = ??
   // server_metadata.routing_info = ??

@@ -13,12 +13,12 @@ namespace ERpc {
 template <class Transport_>
 Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
                      session_mgmt_handler_t session_mgmt_handler,
-                     std::vector<uint8_t> fdev_port_vec)
+                     uint8_t phy_port)
     : nexus(nexus),
       context(context),
       app_tid(app_tid),
       session_mgmt_handler(session_mgmt_handler),
-      num_fdev_ports(fdev_port_vec.size()) {
+      phy_port(phy_port) {
   if (nexus == nullptr) {
     throw std::invalid_argument("eRPC Rpc: Invalid nexus");
     return;
@@ -29,21 +29,9 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
     return;
   }
 
-  if (fdev_port_vec.size() == 0) {
-    throw std::invalid_argument("eRPC Rpc: Empty fdev_port_vec");
+  if (phy_port >= kMaxPhyPorts) {
+    throw std::invalid_argument("eRPC Rpc: Invalid physical port");
     return;
-  }
-
-  if (fdev_port_vec.size() > kMaxFabDevPorts) {
-    throw std::invalid_argument("eRPC Rpc: fdev_port_vec too large");
-    return;
-  }
-
-  /* Record the requested local ports in an array */
-  int i = 0;
-  for (uint8_t fdev_port : fdev_port_vec) {
-    fdev_port_arr[i] = fdev_port;
-    i++;
   }
 
   /* Initialize the transport */
@@ -178,16 +166,6 @@ std::string Rpc<Transport_>::get_name() {
   ret += std::to_string(app_tid);
   ret += std::string("]");
   return ret;
-}
-
-template <class Transport_>
-bool Rpc<Transport_>::is_fdev_port_managed(uint8_t fab_port_index) {
-  for (size_t i = 0; i < num_fdev_ports; i++) {
-    if (fdev_port_arr[i] == fab_port_index) {
-      return true;
-    }
-  }
-  return false;
 }
 
 template <class Transport_>

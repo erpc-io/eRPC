@@ -25,10 +25,10 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   sprintf(issue_msg, "eRPC Rpc %s: Received connect request from %s. Issue",
           get_name().c_str(), sm_pkt->client.name().c_str());
 
-  /* Check if the requested fabric port is managed by us */
-  if (!is_fdev_port_managed(sm_pkt->server.fdev_port_index)) {
+  /* Check if the requested physical port is correct */
+  if (sm_pkt->server.phy_port != phy_port) {
     erpc_dprintf("%s. Invalid server port %u. Sending response.\n", issue_msg,
-                 sm_pkt->server.fdev_port_index);
+                 sm_pkt->server.phy_port);
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
                           &nexus->udp_config);
