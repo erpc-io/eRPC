@@ -15,6 +15,25 @@ class InfiniBandTransport : public Transport {
 
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();
+
+ private:
+	// SEND
+	size_t nb_pending = 0; /* For selective signalling */
+	struct ibv_send_wr send_wr[kSendQueueSize + 1]; /* +1 for blind ->next */
+	struct ibv_sge send_sgl[kRecvQueueSize]; /* No need for +1 here */
+
+	// RECV
+	size_t recv_step = 0;	/* Step size into dgram_buf for RECV posting */
+	size_t recv_head = 0; /* Current un-posted RECV buffer */
+	size_t recv_slack = 0; /* RECVs to accumulate before post_recv() */
+	size_t recvs_to_post = 0; /* Current number of RECVs to post */
+
+	struct ibv_recv_wr recv_wr[kRecvQueueSize];
+	struct ibv_sge recv_sgl[kRecvQueueSize];
+	struct ibv_wc wc[kRecvQueueSize];
+
+	/* Once post_recvs_fast() is used, regular post_recv() must not be used */
+	bool fast_recv_used = false;
 };
 
 }  // End ERpc
