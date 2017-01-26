@@ -52,6 +52,7 @@ set(SOURCES
   src/session.h
   src/transport.h
   src/transport_impl/infiniband_transport.cc
+  src/transport_impl/infiniband_transport.h
   src/transport_types.h
   src/util/barrier.h
   src/util/buffer.cc

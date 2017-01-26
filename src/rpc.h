@@ -7,6 +7,7 @@
 #include "nexus.h"
 #include "session.h"
 #include "transport.h"
+#include "transport_impl/infiniband_transport.h"
 #include "util/buffer.h"
 #include "util/rand.h"
 

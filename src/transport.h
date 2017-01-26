@@ -25,17 +25,6 @@ class Transport {
   TransportType transport_type;
 };
 
-class InfiniBandTransport : public Transport {
- public:
-  InfiniBandTransport();
-  ~InfiniBandTransport();
-
-  void fill_routing_info(RoutingInfo *routing_info) const;
-
-  void send_message(Session *session, const Buffer *buffer);
-  void poll_completions();
-};
-
 }  // End ERpc
 
 #endif  // ERPC_TRANSPORT_H

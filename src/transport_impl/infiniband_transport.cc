@@ -1,5 +1,4 @@
-#include <infiniband/verbs.h>
-#include "transport.h"
+#include "infiniband_transport.h"
 #include "util/udp_client.h"
 
 namespace ERpc {
