@@ -34,8 +34,6 @@ class InfiniBandTransport : public Transport {
 
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();
-
-  TransportType transport_type;
 };
 
 }  // End ERpc
