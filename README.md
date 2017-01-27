@@ -4,6 +4,8 @@
     * Session number: `uint32_t`. We need one per session, and we may need
       more than 65,536.
     * Sequence numbers: `uint64_t` - not `size_t`
+    * Numa nodes: `size_t`. These are not transferred over the network, so no
+      need to shrink.
   * Use exceptions in constructors of Nexus and Rpc. These are the only two
     class types that the user is allowed to construct.
 
