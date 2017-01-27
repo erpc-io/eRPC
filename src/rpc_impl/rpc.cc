@@ -21,6 +21,12 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       session_mgmt_handler(session_mgmt_handler),
       phy_port(phy_port),
       numa_node(numa_node) {
+  /* Ensure that we're running as root */
+  if (getuid()) {
+    throw std::runtime_error("eRPC Rpc: You need to be root to use eRPC");
+    return;
+  }
+
   if (nexus == nullptr) {
     throw std::invalid_argument("eRPC Rpc: Invalid nexus");
     return;
@@ -57,6 +63,9 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
 template <class Transport_>
 Rpc<Transport_>::~Rpc() {
+  delete transport; /* Allow transport to do its cleanup */
+  delete huge_alloc; /* Free the hugepages */
+
   for (Session *session : session_vec) {
     if (session != nullptr) {
       /* Free this session */
