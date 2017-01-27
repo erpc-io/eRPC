@@ -58,7 +58,7 @@ struct udp_config_t {
 
 // General constants
 static const size_t kMaxNumaNodes = 8; /* Maximum number of NUMA nodes */
-static const size_t kPageSize = 4096;   /* Page size in bytes */
+static const size_t kPageSize = 4096;  /* Page size in bytes */
 static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
 static const size_t kMaxPhyPorts = 4; /* Max fabric device ports */
 static const size_t kMaxHostnameLen = 128;
@@ -73,16 +73,12 @@ static uint64_t rdtsc() {
   return (rdx << 32) | rax;
 }
 
-/**
- * @brief Convert cycles measured by rdtsc with frequence \p freq_ghz to seconds
- */
+/// Convert cycles measured by rdtsc with frequence \p freq_ghz to seconds
 static double to_sec(uint64_t cycles, double freq_ghz) {
   return (cycles / (freq_ghz * 1000000000));
 }
 
-/**
- * @brief Convert cycles measured by rdtsc with frequence \p freq_ghz to msec
- */
+/// Convert cycles measured by rdtsc with frequence \p freq_ghz to msec
 static double to_nsec(uint64_t cycles, double freq_ghz) {
   return (cycles / freq_ghz);
 }

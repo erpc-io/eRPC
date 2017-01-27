@@ -32,10 +32,10 @@ static const uint8_t kInvalidPhyPort = std::numeric_limits<uint8_t>::max();
 /// Session state that can only go forward.
 enum class SessionState {
   kConnectInProgress,
-  kConnected, ///< The only state for server-side sessions
+  kConnected,  ///< The only state for server-side sessions
   kDisconnectInProgress,
-  kDisconnected, ///< Temporary state just for the disconnected callback
-  kError         /// Only allowed for client-side sessions
+  kDisconnected,  ///< Temporary state just for the disconnected callback
+  kError          /// Only allowed for client-side sessions
 };
 
 static std::string session_state_str(SessionState state) {
@@ -54,9 +54,7 @@ static std::string session_state_str(SessionState state) {
   return std::string("[Invalid state]");
 }
 
-/**
- * @brief Events generated for application-level session management handler
- */
+/// Events generated for application-level session management handler
 enum class SessionMgmtEventType {
   kConnected,
   kConnectFailed,
@@ -79,15 +77,13 @@ static std::string session_mgmt_event_type_str(
   return std::string("[Invalid event type]");
 }
 
-/**
- * @brief Basic info about a session emd point filled in during initialization.
- */
+/// Basic info about a session emd point filled in during initialization.
 class SessionMetadata {
  public:
   TransportType transport_type;
   char hostname[kMaxHostnameLen];
-  uint8_t app_tid;   ///< TID of the Rpc that created this end point
-  uint8_t phy_port;  ///< Fabric port used by this end point
+  uint8_t app_tid;   ///< TID of the Rpc that created this endpoint
+  uint8_t phy_port;  ///< Fabric port used by this endpoint
   uint32_t session_num;
   uint64_t start_seq;
   RoutingInfo routing_info;
@@ -103,10 +99,8 @@ class SessionMetadata {
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
 
-  /**
-   * @brief Return a string with a name for this session end point, containing
-   * its hostname, Rpc TID, and the session number.
-   */
+  /// Return a string with a name for this session end point, containing
+  /// its hostname, Rpc TID, and the session number.
   inline std::string name() {
     std::string ret;
     ret += std::string("[H: "); /* Hostname */
@@ -124,10 +118,7 @@ class SessionMetadata {
     return ret;
   }
 
-  /**
-   * @brief Return a string with the name of the Rpc hosting this session
-   * end point.
-   */
+  /// Return a string with the name of the Rpc hosting this session end point.
   inline std::string rpc_name() {
     std::string ret;
     ret += std::string("[H: "); /* Hostname */
@@ -139,20 +130,16 @@ class SessionMetadata {
     return ret;
   }
 
-  /**
-   * @brief Compare the location fields of two SessionMetadata objects. This
-   * does not account for non-location fields (e.g., fabric port, routing info).
-   */
+  /// Compare the location fields of two SessionMetadata objects. This does not
+  /// account for non-location fields (e.g., fabric port, routing info).
   bool operator==(const SessionMetadata &other) {
     return strcmp(hostname, other.hostname) == 0 && app_tid == other.app_tid &&
            session_num == other.session_num;
   }
 };
 
-/**
- * @brief General-purpose session management packet sent by both Rpc clients
- * and servers. This is pretty large (~500 bytes), so use sparingly.
- */
+/// General-purpose session management packet sent by both Rpc clients and
+/// servers. This is pretty large (~500 bytes), so use sparingly.
 class SessionMgmtPkt {
  public:
   SessionMgmtPktType pkt_type;
@@ -167,10 +154,7 @@ class SessionMgmtPkt {
   SessionMgmtPkt() {}
   SessionMgmtPkt(SessionMgmtPktType pkt_type) : pkt_type(pkt_type) {}
 
-  /**
-   * @brief Send this session management packet "as is" to \p dst_hostname on
-   * port \p mgmt_udp_port.
-   */
+  /// Send this session management packet "as is"
   inline void send_to(const char *dst_hostname,
                       const udp_config_t *udp_config) {
     assert(dst_hostname != NULL);
@@ -184,10 +168,8 @@ class SessionMgmtPkt {
 
   /**
    * @brief Send the response to this session management request packet, using
-   * this packet as the response buffer.
-   *
-   * This function mutates the packet: it flips the packet type to response,
-   * and fills in the response type.
+   * this packet as the response buffer. This function mutates the packet: it
+   * flips the packet type to response, and fills in the response type.
    */
   inline void send_resp_mut(SessionMgmtErrType _err_type,
                             const udp_config_t *udp_config) {
@@ -201,9 +183,7 @@ class SessionMgmtPkt {
 static_assert(sizeof(SessionMgmtPkt) < 1400,
               "Session management packet too large for UDP");
 
-/**
- * @brief A one-to-one session class for all transports
- */
+/// A one-to-one session class for all transports
 class Session {
  public:
   enum class Role : bool { kServer, kClient };
@@ -213,14 +193,10 @@ class Session {
 
   std::string get_client_name();
 
-  /**
-   * @brief Enables congestion control for this session
-   */
+  /// Enable congestion control for this session
   void enable_congestion_control();
 
-  /**
-   * @brief Disables congestion control for this session
-   */
+  /// Disable congestion control for this session
   void disable_congestion_control();
 
   Role role;

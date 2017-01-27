@@ -110,9 +110,6 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   return;
 }
 
-/**
- * @brief Handle a session connect response.
- */
 template <class Transport_>
 void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);

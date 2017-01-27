@@ -48,14 +48,10 @@ class Nexus {
    */
   bool app_tid_exists(uint8_t app_tid);
 
-  /**
-   * @brief Register a previously unregistered hook.
-   */
+  /// Register a previously unregistered hook.
   void register_hook(SessionMgmtHook *hook);
 
-  /**
-   * @brief Unregister a previously registered hook.
-   */
+  /// Unregister a previously registered hook.
   void unregister_hook(SessionMgmtHook *hook);
 
   void install_sigio_handler();
@@ -89,9 +85,7 @@ class Nexus {
   std::vector<SessionMgmtHook *> reg_hooks;
 
  private:
-  /**
-   * @brief Compute the frequency of rdtsc and set @freq_ghz
-   */
+  /// Compute the frequency of rdtsc and set @freq_ghz
   void compute_freq_ghz();
 };
 

@@ -15,14 +15,11 @@
 
 namespace ERpc {
 
-static const size_t kMaxRoutingInfoSize = 128; ///< Space for routing info
-
+static const size_t kMaxRoutingInfoSize = 128;  ///< Space for routing info
 
 enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
 
-/**
- * @brief Generic class to store routing info for any transport.
- */
+/// Generic class to store routing info for any transport.
 struct RoutingInfo {
   uint8_t buf[kMaxRoutingInfoSize];
 };

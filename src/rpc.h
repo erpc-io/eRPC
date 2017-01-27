@@ -14,11 +14,11 @@
 
 namespace ERpc {
 
-static const size_t kSessionCredits = 8; ///< Credits per session endpoint
-static const size_t kRpcWindowSize = 20; ///< Max outstanding pkts per Rpc
+static const size_t kSessionCredits = 8;  ///< Credits per session endpoint
+static const size_t kRpcWindowSize = 20;  ///< Max outstanding pkts per Rpc
 static const size_t kInitialHugeAllocSize = (128 * MB(1));
 static const size_t kSessionMgmtRetransMs = 5;  ///< Timeout for management reqs
-static const size_t kSessionMgmtTimeoutMs = 50; ///< Fatal timeout for mgmt reqs
+static const size_t kSessionMgmtTimeoutMs = 50;  ///< Max time for mgmt reqs
 
 #define rpc_dprintf(fmt, ...)            \
   do {                                   \
@@ -85,9 +85,7 @@ class Rpc {
    */
   bool destroy_session(Session *session);
 
-  /**
-   * @brief Return the number of active server or client sessions.
-   */
+  /// Return the number of active server or client sessions.
   size_t num_active_sessions();
 
   // rpc_datapath.cc
@@ -96,23 +94,17 @@ class Rpc {
 
   // rpc_ev_loop.cc
 
-  /**
-   * @brief Run one iteration of the event loop
-   */
+  /// Run one iteration of the event loop
   void run_event_loop_one();
 
-  /**
-   * @brief Run the event loop forever
-   */
+  /// Run the event loop forever
   inline void run_event_loop() {
     while (true) {
       run_event_loop_one();
     }
   }
 
-  /**
-   * @brief Run the event loop for \p timeout_ms milliseconds
-   */
+  /// Run the event loop for timeout_ms milliseconds
   inline void run_event_loop_timeout(size_t timeout_ms) {
     uint64_t start_tsc = rdtsc();
 
@@ -129,9 +121,7 @@ class Rpc {
  private:
   // rpc.cc
 
-  /**
-   * @brief Return the hostname and app TID of this Rpc.
-   */
+  /// Return the hostname and app TID of this Rpc.
   std::string get_name();
 
   /**
@@ -140,24 +130,16 @@ class Rpc {
    */
   void handle_session_management();
 
-  /**
-   * @brief Generate the start sequence number for a session.
-   */
+  /// Generate the start sequence number for a session.
   uint64_t generate_start_seq();
 
-  /**
-   * @brief Destroy a session object and remove it from the session list.
-   */
+  /// Destroy a session object and remove it from the session list.
   void bury_session(Session *session);
 
-  /**
-   * @brief Check if this session pointer is a valid client session.
-   */
+  /// Check if this session pointer is a valid client session.
   bool is_session_ptr_client(Session *session);
 
-  /**
-   * @brief Check if this session pointer is a valid server session.
-   */
+  /// Check if this session pointer is a valid server session.
   bool is_session_ptr_server(Session *session);
 
   // rpc_connect_handlers.cc
@@ -175,9 +157,7 @@ class Rpc {
   bool is_in_flight(Session *session);
   void remove_from_in_flight(Session *session);
 
-  /**
-   * @brief Retry in-flight requests whose retry timeout has expired.
-   */
+  /// Retry in-flight requests whose retry timeout has expired.
   void retry_in_flight();
 
   // Constructor args

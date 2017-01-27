@@ -80,13 +80,9 @@ class HugeAllocator {
     }
   }
 
-  size_t get_numa_node() {
-    return numa_node;
-  }
+  size_t get_numa_node() { return numa_node; }
 
-  /**
-   * @brief Allocate a 4K page.
-   */
+  /// Allocate a 4K page.
   forceinline void *alloc_page() {
     if (page_freelist.size() != 0) {
       void *free_page = page_freelist.back();
@@ -184,26 +180,20 @@ class HugeAllocator {
     return hugebuf_addr;
   }
 
-  /**
-   * @brief Return the total amount of memory reserved as hugepages.
-   */
+  /// Return the total amount of memory reserved as hugepages.
   size_t get_reserved_memory() {
     assert(tot_memory_reserved % kHugepageSize == 0);
     return tot_memory_reserved;
   }
 
-  /**
-   * @brief Return the total amount of memory allocated to the user.
-   */
+  /// Return the total amount of memory allocated to the user.
   size_t get_allocated_memory() {
     assert(tot_memory_allocated % kPageSize == 0);
     return tot_memory_allocated;
   }
 
  private:
-  /**
-   * @brief Remove \p num_hugepages from the beginning of this SHM region.
-   */
+  /// Remove num_hugepages from the beginning of this SHM region.
   inline void pop_hugepages(shm_region_t &shm_region, size_t num_hugepages) {
     assert(shm_region.free_hugepages >= num_hugepages);
     shm_region.cur_buf =

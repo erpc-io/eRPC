@@ -5,9 +5,8 @@
 #include "common.h"
 
 namespace ERpc {
-/**
- * @brief High-level types of packets used for session management
- */
+
+/// High-level types of packets used for session management
 enum class SessionMgmtPktType : int {
   kConnectReq,
   kConnectResp,
@@ -30,9 +29,7 @@ static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
   return std::string("");
 }
 
-/**
- * @brief Check if a session management packet type is valid
- */
+/// Check if a session management packet type is valid
 static bool session_mgmt_is_valid_pkt_type(SessionMgmtPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
@@ -44,10 +41,8 @@ static bool session_mgmt_is_valid_pkt_type(SessionMgmtPktType sm_pkt_type) {
   return false;
 }
 
-/**
- * @brief Check if a valid session management packet type is a request type. Use
- * the complement of this to check if a packet is a response.
- */
+/// Check if a valid session management packet type is a request type. Use
+/// the complement of this to check if a packet is a response.
 static bool session_mgmt_is_pkt_type_req(SessionMgmtPktType sm_pkt_type) {
   assert(session_mgmt_is_valid_pkt_type(sm_pkt_type));
 
@@ -63,10 +58,8 @@ static bool session_mgmt_is_pkt_type_req(SessionMgmtPktType sm_pkt_type) {
   return false;
 }
 
-/**
- * @brief Convert the request session management packet type \p sm_pkt_type to
- * its corresponding response packet type.
- */
+/// Convert the request session management packet type sm_pkt_type to its
+/// corresponding response packet type.
 static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
     SessionMgmtPktType sm_pkt_type) {
   assert(session_mgmt_is_pkt_type_req(sm_pkt_type));
@@ -85,9 +78,7 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
   return static_cast<SessionMgmtPktType>(-1);
 }
 
-/**
- * @brief The types of responses to a session management packet
- */
+/// The types of responses to a session management packet
 enum class SessionMgmtErrType : int {
   kNoError,         /* The only non-error error type */
   kTooManySessions, /* Connect req failed because server is out of sessions */
