@@ -14,9 +14,11 @@
 
 namespace ERpc {
 
-static const size_t kInitialHugeAllocSize = (128 * MB(1)); /* 128 MB */
-static const size_t kSessionMgmtRetransMs = 5;  /* Retransmission for sm reqs */
-static const size_t kSessionMgmtTimeoutMs = 50; /* Timeout for sm reqs */
+static const size_t kSessionCredits = 8; ///< Credits per session endpoint
+static const size_t kRpcWindowSize = 20; ///< Max outstanding pkts per Rpc
+static const size_t kInitialHugeAllocSize = (128 * MB(1));
+static const size_t kSessionMgmtRetransMs = 5;  ///< Timeout for management reqs
+static const size_t kSessionMgmtTimeoutMs = 50; ///< Fatal timeout for mgmt reqs
 
 #define rpc_dprintf(fmt, ...)            \
   do {                                   \

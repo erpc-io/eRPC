@@ -13,18 +13,33 @@
 
 namespace ERpc {
 
+static const size_t kRecvQueueSize = 2048; ///< RECV queue size
+static const size_t kSendQueueSize = 64; ///< SEND queue size
+static const size_t kPostlist = 16; ///< Maximum post list size
+static_assert(is_power_of_two<size_t>(kRecvQueueSize), "");
+static_assert(is_power_of_two<size_t>(kSendQueueSize), "");
+
 /**
  * @brief Generic mostly-reliable transport
  */
 class Transport {
  public:
+  Transport(size_t mtu, TransportType transport_type, uint8_t phy_port,
+            HugeAllocator *huge_alloc) :
+      mtu(mtu),
+      transport_type(transport_type),
+      phy_port(phy_port),
+      huge_alloc(huge_alloc) {};
+
   void fill_routing_info(RoutingInfo *routing_info) const;
 
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();
 
   // Members that are needed by all transports
-  TransportType transport_type;
+  const size_t mtu;
+  const TransportType transport_type;
+  const uint8_t phy_port;
   HugeAllocator *huge_alloc; /* The parent Rpc's hugepage allocator */
 };
 

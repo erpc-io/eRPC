@@ -49,7 +49,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
   /* Initialize the hugepage allocator and transport */
   huge_alloc = new HugeAllocator(kInitialHugeAllocSize, numa_node);
-  transport = new Transport_(huge_alloc);
+  transport = new Transport_(huge_alloc, phy_port);
 
   /* Register a hook with the Nexus */
   sm_hook.app_tid = app_tid;

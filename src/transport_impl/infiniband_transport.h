@@ -8,7 +8,7 @@ namespace ERpc {
 
 class InfiniBandTransport : public Transport {
  public:
-  InfiniBandTransport(HugeAllocator *huge_alloc);
+  InfiniBandTransport(HugeAllocator *huge_alloc, uint8_t phy_port);
   ~InfiniBandTransport();
 
   void fill_routing_info(RoutingInfo *routing_info) const;
@@ -17,6 +17,11 @@ class InfiniBandTransport : public Transport {
   void poll_completions();
 
  private:
+	void init_non_zero_members();
+	/* Initialize unchanging fields of wr's for performance */
+	void init_send_wrs();
+	void init_recv_wrs();
+
   // SEND
   size_t nb_pending = 0;                          /* For selective signalling */
   struct ibv_send_wr send_wr[kSendQueueSize + 1]; /* +1 for blind ->next */

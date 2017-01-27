@@ -15,14 +15,8 @@
 
 namespace ERpc {
 
-static const size_t kRecvQueueSize = 2048; ///< RECV queue size
-static const size_t kSendQueueSize = 64; ///< SEND queue size
-static const size_t kSessionCredits = 8; ///< Credits per session endpoint
-static const size_t kRpcWindowSize = 20; ///< Max outstanding pkts per Rpc
 static const size_t kMaxRoutingInfoSize = 128; ///< Space for routing info
 
-static_assert(is_power_of_two<size_t>(kRecvQueueSize), "");
-static_assert(is_power_of_two<size_t>(kSendQueueSize), "");
 
 enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
 

@@ -3,10 +3,11 @@
 
 namespace ERpc {
 
-InfiniBandTransport::InfiniBandTransport(HugeAllocator *_huge_alloc) {
-  /* These are members of the base class, so can't use initializer list here */
-  transport_type = TransportType::kInfiniBand;
-  huge_alloc = _huge_alloc;
+static const size_t kInfiniBandMTU = 4096;
+
+InfiniBandTransport::InfiniBandTransport(HugeAllocator *huge_alloc,
+                                         uint8_t phy_port) :
+    Transport(kInfiniBandMTU, TransportType::kInfiniBand, phy_port, huge_alloc) {
 }
 
 InfiniBandTransport::~InfiniBandTransport() {
