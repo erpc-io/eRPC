@@ -3,11 +3,15 @@
 
 namespace ERpc {
 
-InfiniBandTransport::InfiniBandTransport() {
+InfiniBandTransport::InfiniBandTransport(HugeAllocator *_huge_alloc) {
+  /* These are members of the base class, so can't use initializer list here */
   transport_type = TransportType::kInfiniBand;
+  huge_alloc = _huge_alloc;
 }
 
-InfiniBandTransport::~InfiniBandTransport() {}
+InfiniBandTransport::~InfiniBandTransport() {
+  /* Do not destroy @huge_alloc; the parent Rpc will do it. */
+}
 
 void InfiniBandTransport::fill_routing_info(RoutingInfo *routing_info) const {
   memset((void *)routing_info, 0, kMaxRoutingInfoSize);

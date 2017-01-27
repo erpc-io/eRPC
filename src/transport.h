@@ -23,8 +23,9 @@ class Transport {
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();
 
+  // Members that are needed by all transports
   TransportType transport_type;
-  HugeAllocator *huge_alloc;
+  HugeAllocator *huge_alloc; /* The parent Rpc's hugepage allocator */
 };
 
 }  // End ERpc

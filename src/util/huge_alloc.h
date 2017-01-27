@@ -67,7 +67,8 @@ class HugeAllocator {
     /* Begin by allocating the specified amount of memory in hugepages */
     bool success = reserve_hugepages(initial_size, numa_node);
     if (!success) {
-      throw std::runtime_error("eRPC HugeAllocator: Failed to allocate memory");
+      throw std::runtime_error(
+          "eRPC HugeAllocator: Failed to allocate hugepage memory.");
       return;
     }
   }

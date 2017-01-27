@@ -47,14 +47,9 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
     return;
   }
 
-  try {
-    /* Initialize the hugepage allocator */
-    huge_alloc = new HugeAllocator(kInitialHugeAllocSize, numa_node);
-    transport = new Transport_(); /* Initialize the transport */
-  } catch (std::runtime_error err) {
-    throw err;
-    return;
-  }
+  /* Initialize the hugepage allocator and transport */
+  huge_alloc = new HugeAllocator(kInitialHugeAllocSize, numa_node);
+  transport = new Transport_(huge_alloc);
 
   /* Register a hook with the Nexus */
   sm_hook.app_tid = app_tid;
@@ -63,7 +58,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
 template <class Transport_>
 Rpc<Transport_>::~Rpc() {
-  delete transport; /* Allow transport to do its cleanup */
+  delete transport;  /* Allow transport to do its cleanup */
   delete huge_alloc; /* Free the hugepages */
 
   for (Session *session : session_vec) {
