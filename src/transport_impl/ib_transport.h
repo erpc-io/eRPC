@@ -6,12 +6,15 @@
 
 namespace ERpc {
 
-static const size_t kMaxInline = 60;
+class IBTransport : public Transport {
+  static const size_t kInfiniBandMTU = 4096;
+  static const size_t kRecvBufSize = (kInfiniBandMTU + 64); /* Space for GRH */
+  static const size_t kMaxInline = 60;
+  static const size_t kRecvSlack = 32;
 
-class InfiniBandTransport : public Transport {
  public:
-  InfiniBandTransport(HugeAllocator *huge_alloc, uint8_t phy_port);
-  ~InfiniBandTransport();
+  IBTransport(HugeAllocator *huge_alloc, uint8_t phy_port);
+  ~IBTransport();
 
   void fill_routing_info(RoutingInfo *routing_info) const;
 
@@ -19,7 +22,9 @@ class InfiniBandTransport : public Transport {
   void poll_completions();
 
  private:
-	void init_non_zero_members();
+  /// Initialize device context, queue pairs, memory regions etc
+  void init_infiniband_structs();
+
 	void init_send_wrs();
 	void init_recv_wrs();
 
@@ -35,10 +40,9 @@ class InfiniBandTransport : public Transport {
   // SEND
   size_t nb_pending = 0;                          /* For selective signalling */
   struct ibv_send_wr send_wr[kSendQueueSize + 1]; /* +1 for blind ->next */
-  struct ibv_sge send_sgl[kRecvQueueSize];        /* No need for +1 here */
+  struct ibv_sge send_sgl[kSendQueueSize];        /* No need for +1 here */
 
   // RECV
-  size_t recv_step = 0;     /* Step size into dgram_buf for RECV posting */
   size_t recv_head = 0;     /* Current un-posted RECV buffer */
   size_t recv_slack = 0;    /* RECVs to accumulate before post_recv() */
   size_t recvs_to_post = 0; /* Current number of RECVs to post */

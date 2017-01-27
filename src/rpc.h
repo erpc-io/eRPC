@@ -7,7 +7,7 @@
 #include "nexus.h"
 #include "session.h"
 #include "transport.h"
-#include "transport_impl/infiniband_transport.h"
+#include "transport_impl/ib_transport.h"
 #include "util/buffer.h"
 #include "util/huge_alloc.h"
 #include "util/rand.h"
@@ -196,7 +196,7 @@ class Rpc {
 };
 
 /* Instantiate required Rpc classes so they get compiled for the linker */
-template class Rpc<InfiniBandTransport>;
+template class Rpc<IBTransport>;
 
 }  // End ERpc
 

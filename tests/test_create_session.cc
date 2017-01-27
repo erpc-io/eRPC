@@ -47,7 +47,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
 /* The server thread used by all tests */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
+  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
                                phy_port, numa_node);
 
   server_count++;
@@ -63,7 +63,7 @@ void simple_connect(Nexus *nexus) {
   }
 
   auto *client_context = new client_context_t();
-  Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
+  Rpc<IBTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, phy_port, numa_node);
 
   /* Connect the session */
@@ -96,7 +96,7 @@ void invalid_remote_port(Nexus *nexus) {
   }
 
   auto *client_context = new client_context_t();
-  Rpc<InfiniBandTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
+  Rpc<IBTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
                                &test_sm_hander, phy_port, numa_node);
 
   /* Connect the session */

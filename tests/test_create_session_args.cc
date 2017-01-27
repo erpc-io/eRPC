@@ -34,7 +34,7 @@ void client_thread_func(Nexus *nexus) {
   }
 
   /* Create the Rpc */
-  Rpc<InfiniBandTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID,
+  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID,
                                &test_sm_hander, phy_port, numa_node);
 
   {
@@ -68,7 +68,7 @@ void client_thread_func(Nexus *nexus) {
 
 /* The server thread */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  Rpc<InfiniBandTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
+  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
                                phy_port, numa_node);
 
   server_ready = true;
