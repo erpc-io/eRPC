@@ -6,8 +6,11 @@ namespace ERpc {
 static const size_t kInfiniBandMTU = 4096;
 
 InfiniBandTransport::InfiniBandTransport(HugeAllocator *huge_alloc,
-                                         uint8_t phy_port) :
-    Transport(kInfiniBandMTU, TransportType::kInfiniBand, phy_port, huge_alloc) {
+                                         uint8_t phy_port)
+    : Transport(kInfiniBandMTU, TransportType::kInfiniBand, phy_port,
+                huge_alloc) {
+
+
 }
 
 InfiniBandTransport::~InfiniBandTransport() {

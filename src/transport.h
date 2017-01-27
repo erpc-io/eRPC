@@ -29,7 +29,8 @@ class Transport {
       mtu(mtu),
       transport_type(transport_type),
       phy_port(phy_port),
-      huge_alloc(huge_alloc) {};
+      huge_alloc(huge_alloc),
+      numa_node(huge_alloc->get_numa_node()){};
 
   void fill_routing_info(RoutingInfo *routing_info) const;
 
@@ -41,6 +42,7 @@ class Transport {
   const TransportType transport_type;
   const uint8_t phy_port;
   HugeAllocator *huge_alloc; /* The parent Rpc's hugepage allocator */
+  const size_t numa_node; /* Derived from @huge_alloc */
 };
 
 }  // End ERpc

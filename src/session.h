@@ -29,15 +29,13 @@ static const uint32_t kInvalidSessionNum = std::numeric_limits<uint32_t>::max();
 static const uint64_t kInvalidStartSeq = std::numeric_limits<uint64_t>::max();
 static const uint8_t kInvalidPhyPort = std::numeric_limits<uint8_t>::max();
 
-/**
- * @brief Session state that can only go forward.
- */
+/// Session state that can only go forward.
 enum class SessionState {
   kConnectInProgress,
-  kConnected, /*!< The only state for server-side sessions */
+  kConnected, ///< The only state for server-side sessions
   kDisconnectInProgress,
-  kDisconnected, /*!< Temporary state just for the disconnected callback */
-  kError         /*!< Only allowed for client-side sessions */
+  kDisconnected, ///< Temporary state just for the disconnected callback
+  kError         /// Only allowed for client-side sessions
 };
 
 static std::string session_state_str(SessionState state) {

@@ -80,6 +80,10 @@ class HugeAllocator {
     }
   }
 
+  size_t get_numa_node() {
+    return numa_node;
+  }
+
   /**
    * @brief Allocate a 4K page.
    */

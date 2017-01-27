@@ -6,6 +6,8 @@
 
 namespace ERpc {
 
+static const size_t kMaxInline = 60;
+
 class InfiniBandTransport : public Transport {
  public:
   InfiniBandTransport(HugeAllocator *huge_alloc, uint8_t phy_port);
@@ -18,9 +20,17 @@ class InfiniBandTransport : public Transport {
 
  private:
 	void init_non_zero_members();
-	/* Initialize unchanging fields of wr's for performance */
 	void init_send_wrs();
 	void init_recv_wrs();
+
+  // InfiniBand info
+  struct ibv_context *ctx;
+  int device_id; /* Resolved from @phy_port */
+  int dev_port_id; /* 1-based, unlike @phy_port */
+  struct ibv_qp *qp;
+  struct ibv_cq *cq;
+  struct ibv_mr *recv_buf_mr, *non_inline_buf_mr;
+  uint8_t *recv_buf, *non_inline_buf;
 
   // SEND
   size_t nb_pending = 0;                          /* For selective signalling */
