@@ -51,7 +51,7 @@ class Rpc {
   // rpc.cc
   Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port = 0,
-      uint8_t numa_node = 0);
+      size_t numa_node = 0);
 
   ~Rpc();
 
@@ -184,7 +184,7 @@ class Rpc {
   uint8_t app_tid;
   session_mgmt_handler_t session_mgmt_handler;
   uint8_t phy_port;
-  uint8_t numa_node;
+  size_t numa_node;
 
   // Others
   Transport_ *transport; /* The unreliable transport */

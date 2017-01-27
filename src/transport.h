@@ -9,6 +9,7 @@
 #include "session.h"
 #include "transport_types.h"
 #include "util/buffer.h"
+#include "util/huge_alloc.h"
 
 namespace ERpc {
 
@@ -23,6 +24,7 @@ class Transport {
   void poll_completions();
 
   TransportType transport_type;
+  HugeAllocator *huge_alloc;
 };
 
 }  // End ERpc

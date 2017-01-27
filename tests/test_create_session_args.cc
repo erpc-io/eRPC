@@ -15,7 +15,7 @@ using namespace ERpc;
 /* Shared between client and server thread */
 std::atomic<bool> server_ready;
 const uint8_t phy_port = 0;
-const uint8_t numa_node = 0;
+const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,

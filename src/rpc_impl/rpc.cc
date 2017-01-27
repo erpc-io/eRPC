@@ -14,7 +14,7 @@ namespace ERpc {
 template <class Transport_>
 Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
                      session_mgmt_handler_t session_mgmt_handler,
-                     uint8_t phy_port, uint8_t numa_node)
+                     uint8_t phy_port, size_t numa_node)
     : nexus(nexus),
       context(context),
       app_tid(app_tid),

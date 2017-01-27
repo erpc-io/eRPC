@@ -15,7 +15,7 @@ using namespace ERpc;
 /* Shared between client and server thread */
 std::atomic<size_t> server_count;
 const uint8_t phy_port = 0;
-const uint8_t numa_node = 0;
+const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {

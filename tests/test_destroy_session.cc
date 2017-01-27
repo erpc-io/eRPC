@@ -17,7 +17,7 @@ std::atomic<bool> server_ready; /* Client starts after server is ready */
 std::atomic<bool> client_done;  /* Server ends after client is done */
 
 const uint8_t phy_port = 0;
-const uint8_t numa_node = 0;
+const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
