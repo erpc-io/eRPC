@@ -7,8 +7,9 @@
 namespace ERpc {
 
 class IBTransport : public Transport {
-  static const size_t kInfiniBandMTU = 4096;
-  static const size_t kRecvBufSize = (kInfiniBandMTU + 64); /* Space for GRH */
+  // Transport-specific constants
+  static const size_t kMTU = 4096;
+  static const size_t kRecvBufSize = (kMTU + 64); /* Space for GRH */
   static const size_t kMaxInline = 60;
   static const size_t kRecvSlack = 32;
 
@@ -22,6 +23,9 @@ class IBTransport : public Transport {
   void poll_completions();
 
  private:
+  /// Fill in ctx, device_id, and dev_port_id using phy_port
+  void resolve_phy_port();
+
   /// Initialize device context, queue pairs, memory regions etc
   void init_infiniband_structs();
 
@@ -29,13 +33,13 @@ class IBTransport : public Transport {
 	void init_recv_wrs();
 
   // InfiniBand info
-  struct ibv_context *ctx;
-  int device_id; /* Resolved from @phy_port */
-  int dev_port_id; /* 1-based, unlike @phy_port */
-  struct ibv_qp *qp;
-  struct ibv_cq *cq;
-  struct ibv_mr *recv_buf_mr, *non_inline_buf_mr;
-  uint8_t *recv_buf, *non_inline_buf;
+  struct ibv_context *ib_ctx = nullptr;
+  int device_id = -1; /* Resolved from @phy_port */
+  int dev_port_id = -1; /* 1-based, unlike @phy_port */
+  struct ibv_qp *qp = nullptr;
+  struct ibv_cq *cq = nullptr;
+  struct ibv_mr *recv_buf_mr = nullptr, *non_inline_buf_mr = nullptr;
+  uint8_t *recv_buf = nullptr, *non_inline_buf = nullptr;
 
   // SEND
   size_t nb_pending = 0;                          /* For selective signalling */

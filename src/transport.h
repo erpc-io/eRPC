@@ -22,10 +22,9 @@ static_assert(is_power_of_two<size_t>(kSendQueueSize), "");
 /// Generic mostly-reliable transport
 class Transport {
  public:
-  Transport(size_t mtu, TransportType transport_type, uint8_t phy_port,
+  Transport(TransportType transport_type, uint8_t phy_port,
             HugeAllocator *huge_alloc)
-      : mtu(mtu),
-        transport_type(transport_type),
+      : transport_type(transport_type),
         phy_port(phy_port),
         huge_alloc(huge_alloc),
         numa_node(huge_alloc->get_numa_node()){};
@@ -36,7 +35,6 @@ class Transport {
   void poll_completions();
 
   // Members that are needed by all transports
-  const size_t mtu;
   const TransportType transport_type;
   const uint8_t phy_port;
   HugeAllocator *huge_alloc; /* The parent Rpc's hugepage allocator */
