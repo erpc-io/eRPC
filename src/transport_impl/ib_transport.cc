@@ -105,7 +105,7 @@ void IBTransport::init_infiniband_structs() {
         "eRPC IBTransport: Failed to create protection domain");
   }
 
-  send_cq = ibv_create_cq(ib_ctx, kSendQueueSize, nullptr, nullptr, 0);
+  send_cq = ibv_create_cq(ib_ctx, kSendQueueDepth, nullptr, nullptr, 0);
   if (send_cq == nullptr) {
     throw std::runtime_error("eRPC IBTransport: Failed to create SEND CQ");
   }
@@ -122,7 +122,7 @@ void IBTransport::init_infiniband_structs() {
   create_attr.recv_cq = recv_cq;
   create_attr.qp_type = IBV_QPT_UD;
 
-  create_attr.cap.max_send_wr = kSendQueueSize;
+  create_attr.cap.max_send_wr = kSendQueueDepth;
   create_attr.cap.max_recv_wr = kRecvQueueDepth;
   create_attr.cap.max_send_sge = 1;
   create_attr.cap.max_recv_sge = 1;
@@ -168,24 +168,25 @@ void IBTransport::init_recvs() {
   std::ostringstream xmsg; /* The exception message */
 
   /* Initialize the memory region for RECVs */
-  size_t recv_buf_size = kRecvQueueDepth * kRecvSize;
-  recv_buf = (uint8_t *)huge_alloc->alloc_huge(recv_buf_size);
-  if (recv_buf == nullptr) {
+  size_t size = kRecvQueueDepth * kRecvSize;
+  recv_extent = (uint8_t *)huge_alloc->alloc_huge(size);
+  if (recv_extent == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
-         << (double)recv_buf_size / MB(1) << "byte for RECV buffers. ";
+         << (double)size / MB(1) << "MB for RECV buffers.";
     throw std::runtime_error(xmsg.str());
   }
 
-  recv_buf_mr = ibv_reg_mr(pd, recv_buf, recv_buf_size, IBV_ACCESS_LOCAL_WRITE);
-  if (recv_buf_mr == nullptr) {
-    throw std::runtime_error("eRPC IBTransport: Failed to register mem region");
+  recv_extent_mr = ibv_reg_mr(pd, recv_extent, size, IBV_ACCESS_LOCAL_WRITE);
+  if (recv_extent_mr == nullptr) {
+    throw std::runtime_error(
+        "eRPC IBTransport: Failed to register RECV memory region");
   }
 
   /* Initialize constant fields of RECV descriptors */
   for (size_t wr_i = 0; wr_i < kRecvQueueDepth; wr_i++) {
     recv_sgl[wr_i].length = kRecvSize;
-    recv_sgl[wr_i].lkey = recv_buf_mr->lkey;
-    recv_sgl[wr_i].addr = (uintptr_t)&recv_buf[wr_i * kRecvSize];
+    recv_sgl[wr_i].lkey = recv_extent_mr->lkey;
+    recv_sgl[wr_i].addr = (uintptr_t)&recv_extent[wr_i * kRecvSize];
 
     recv_wr[wr_i].wr_id = recv_sgl[wr_i].addr; /* Debug */
     recv_wr[wr_i].sg_list = &recv_sgl[wr_i];
@@ -196,4 +197,17 @@ void IBTransport::init_recvs() {
         (wr_i < kRecvQueueDepth - 1) ? &recv_wr[wr_i + 1] : &recv_wr[0];
   }
 }
+
+void IBTransport::init_sends() {
+  for (size_t wr_i = 0; wr_i < kPostlist; wr_i++) {
+    send_sgl[wr_i].lkey = req_retrans_mr->lkey;
+
+    send_wr[wr_i].next = &send_wr[wr_i + 1];
+    send_wr[wr_i].wr.ud.remote_qkey = kQKey;
+    send_wr[wr_i].opcode = IBV_WR_SEND_WITH_IMM;
+    send_wr[wr_i].num_sge = 1;
+    send_wr[wr_i].sg_list = &send_sgl[wr_i];
+  }
 }
+
+}  // End ERpc

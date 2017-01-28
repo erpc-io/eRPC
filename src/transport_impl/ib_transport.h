@@ -16,8 +16,8 @@ class IBTransport : public Transport {
   static const size_t kRecvSlack = 32;   ///< RECVs accumulated before posting
   static const uint32_t kQKey = 0xffffffff;  ///< The secure queue key for eRPC
 
-  static_assert(kSendQueueSize >= 2 * kUnsigBatch, ""); /* Capacity check */
-  static_assert(kPostlist <= kUnsigBatch, "");          /* Postlist check */
+  static_assert(kSendQueueDepth >= 2 * kUnsigBatch, ""); /* Capacity check */
+  static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
 
  public:
   /// Construct the transport object. Throws \p runtime_error if creation fails.
@@ -49,15 +49,17 @@ class IBTransport : public Transport {
   int device_id = -1;   /* Resolved from @phy_port */
   int dev_port_id = -1; /* 1-based, unlike @phy_port */
   struct ibv_pd *pd = nullptr;
-  struct ibv_qp *qp = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
-  struct ibv_mr *recv_buf_mr = nullptr, *non_inline_buf_mr = nullptr;
-  uint8_t *recv_buf = nullptr, *non_inline_buf = nullptr;
+  struct ibv_qp *qp = nullptr;
+  uint8_t *recv_extent = nullptr;
+  struct ibv_mr *recv_extent_mr = nullptr;
+  uint8_t *req_retrans_extent = nullptr;
+  struct ibv_mr *req_retrans_mr = nullptr;
 
   // SEND
-  size_t nb_pending = 0;                          /* For selective signalling */
-  struct ibv_send_wr send_wr[kSendQueueSize + 1]; /* +1 for blind ->next */
-  struct ibv_sge send_sgl[kSendQueueSize];        /* No need for +1 here */
+  size_t nb_pending = 0;                     /* For selective signalling */
+  struct ibv_send_wr send_wr[kPostlist + 1]; /* +1 for blind ->next */
+  struct ibv_sge send_sgl[kPostlist];        /* No need for +1 here */
 
   // RECV
   size_t recv_head = 0;     /* Current un-posted RECV buffer */
