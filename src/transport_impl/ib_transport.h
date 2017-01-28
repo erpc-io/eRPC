@@ -8,13 +8,21 @@ namespace ERpc {
 
 class IBTransport : public Transport {
   // Transport-specific constants
-  static const size_t kMTU = 4096;
-  static const size_t kRecvBufSize = (kMTU + 64); /* Space for GRH */
-  static const size_t kMaxInline = 60;
-  static const size_t kRecvSlack = 32;
-  static const uint32_t kQKey = 0xffffffff; /* XXX: Should be env variable */
+  static const size_t kMTU = 4096;              ///< InfiniBand MTU
+  static const size_t kRecvSize = (kMTU + 64);  ///< RECV buf size (with GRH)
+  static const size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
+  static const size_t kPostlist = 16;    ///< Maximum postlist size for SENDs
+  static const size_t kMaxInline = 60;   ///< Maximum send wr inline data
+  static const size_t kRecvSlack = 32;   ///< RECVs accumulated before posting
+  static const uint32_t kQKey = 0xffffffff;  ///< The secure queue key for eRPC
+
+  static_assert(kSendQueueSize >= 2 * kUnsigBatch, ""); /* Capacity check */
+  static_assert(kPostlist <= kUnsigBatch, "");          /* Postlist check */
 
  public:
+  /// Construct the transport object. Throws \p runtime_error if creation fails.
+  /// This exception is caught in the creator Rpc, which then deletes
+  /// \p huge_alloc.
   IBTransport(HugeAllocator *huge_alloc, uint8_t phy_port);
   ~IBTransport();
 
@@ -30,8 +38,11 @@ class IBTransport : public Transport {
   /// Initialize device context, queue pairs, memory regions etc
   void init_infiniband_structs();
 
-  void init_send_wrs();
-  void init_recv_wrs();
+  /// Initialize RECV buffers and constant fields of RECV descriptors
+  void init_recvs();
+
+  /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
+  void init_sends();
 
   // InfiniBand info
   struct ibv_context *ib_ctx = nullptr;
@@ -53,9 +64,9 @@ class IBTransport : public Transport {
   size_t recv_slack = 0;    /* RECVs to accumulate before post_recv() */
   size_t recvs_to_post = 0; /* Current number of RECVs to post */
 
-  struct ibv_recv_wr recv_wr[kRecvQueueSize];
-  struct ibv_sge recv_sgl[kRecvQueueSize];
-  struct ibv_wc wc[kRecvQueueSize];
+  struct ibv_recv_wr recv_wr[kRecvQueueDepth];
+  struct ibv_sge recv_sgl[kRecvQueueDepth];
+  struct ibv_wc wc[kRecvQueueDepth];
 
   /* Once post_recvs_fast() is used, regular post_recv() must not be used */
   bool fast_recv_used = false;

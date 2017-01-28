@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <sstream>
 #include <stdexcept>
 
@@ -109,7 +110,7 @@ void IBTransport::init_infiniband_structs() {
     throw std::runtime_error("eRPC IBTransport: Failed to create SEND CQ");
   }
 
-  recv_cq = ibv_create_cq(ib_ctx, kRecvQueueSize, nullptr, nullptr, 0);
+  recv_cq = ibv_create_cq(ib_ctx, kRecvQueueDepth, nullptr, nullptr, 0);
   if (recv_cq == nullptr) {
     throw std::runtime_error("eRPC IBTransport: Failed to create SEND CQ");
   }
@@ -122,7 +123,7 @@ void IBTransport::init_infiniband_structs() {
   create_attr.qp_type = IBV_QPT_UD;
 
   create_attr.cap.max_send_wr = kSendQueueSize;
-  create_attr.cap.max_recv_wr = kRecvQueueSize;
+  create_attr.cap.max_recv_wr = kRecvQueueDepth;
   create_attr.cap.max_send_sge = 1;
   create_attr.cap.max_recv_sge = 1;
   create_attr.cap.max_inline_data = kMaxInline;
@@ -160,6 +161,39 @@ void IBTransport::init_infiniband_structs() {
 
   if (ibv_modify_qp(qp, &rtr_attr, IBV_QP_STATE | IBV_QP_SQ_PSN)) {
     throw std::runtime_error("eRPC IBTransport: Failed to modify QP to RTS");
+  }
+}
+
+void IBTransport::init_recvs() {
+  std::ostringstream xmsg; /* The exception message */
+
+  /* Initialize the memory region for RECVs */
+  size_t recv_buf_size = kRecvQueueDepth * kRecvSize;
+  recv_buf = (uint8_t *)huge_alloc->alloc_huge(recv_buf_size);
+  if (recv_buf == nullptr) {
+    xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
+         << (double)recv_buf_size / MB(1) << "byte for RECV buffers. ";
+    throw std::runtime_error(xmsg.str());
+  }
+
+  recv_buf_mr = ibv_reg_mr(pd, recv_buf, recv_buf_size, IBV_ACCESS_LOCAL_WRITE);
+  if (recv_buf_mr == nullptr) {
+    throw std::runtime_error("eRPC IBTransport: Failed to register mem region");
+  }
+
+  /* Initialize constant fields of RECV descriptors */
+  for (size_t wr_i = 0; wr_i < kRecvQueueDepth; wr_i++) {
+    recv_sgl[wr_i].length = kRecvSize;
+    recv_sgl[wr_i].lkey = recv_buf_mr->lkey;
+    recv_sgl[wr_i].addr = (uintptr_t)&recv_buf[wr_i * kRecvSize];
+
+    recv_wr[wr_i].wr_id = recv_sgl[wr_i].addr; /* Debug */
+    recv_wr[wr_i].sg_list = &recv_sgl[wr_i];
+    recv_wr[wr_i].num_sge = 1;
+
+    /* Circular link */
+    recv_wr[wr_i].next =
+        (wr_i < kRecvQueueDepth - 1) ? &recv_wr[wr_i + 1] : &recv_wr[0];
   }
 }
 }

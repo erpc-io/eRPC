@@ -13,10 +13,10 @@
 
 namespace ERpc {
 
-static const size_t kRecvQueueSize = 2048;  ///< RECV queue size
-static const size_t kSendQueueSize = 64;    ///< SEND queue size
-static const size_t kPostlist = 16;         ///< Maximum post list size
-static_assert(is_power_of_two<size_t>(kRecvQueueSize), "");
+static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
+static const size_t kSendQueueSize = 128;    ///< SEND queue size
+static const size_t kPostlist = 16;          ///< Maximum post list size
+static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
 static_assert(is_power_of_two<size_t>(kSendQueueSize), "");
 
 /// Generic mostly-reliable transport

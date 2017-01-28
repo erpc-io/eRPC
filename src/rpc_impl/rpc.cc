@@ -49,7 +49,14 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
   /* Initialize the hugepage allocator and transport */
   huge_alloc = new HugeAllocator(kInitialHugeAllocSize, numa_node);
-  transport = new Transport_(huge_alloc, phy_port);
+
+  try {
+    transport = new Transport_(huge_alloc, phy_port);
+  } catch (std::runtime_error e) {
+    /* Free any huge pages that \p transport might have created */
+    delete huge_alloc;
+    throw e;
+  }
 
   /* Register a hook with the Nexus */
   sm_hook.app_tid = app_tid;
