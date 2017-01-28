@@ -12,6 +12,7 @@ class IBTransport : public Transport {
   static const size_t kRecvBufSize = (kMTU + 64); /* Space for GRH */
   static const size_t kMaxInline = 60;
   static const size_t kRecvSlack = 32;
+  static const uint32_t kQKey = 0xffffffff; /* XXX: Should be env variable */
 
  public:
   IBTransport(HugeAllocator *huge_alloc, uint8_t phy_port);
@@ -29,15 +30,16 @@ class IBTransport : public Transport {
   /// Initialize device context, queue pairs, memory regions etc
   void init_infiniband_structs();
 
-	void init_send_wrs();
-	void init_recv_wrs();
+  void init_send_wrs();
+  void init_recv_wrs();
 
   // InfiniBand info
   struct ibv_context *ib_ctx = nullptr;
-  int device_id = -1; /* Resolved from @phy_port */
+  int device_id = -1;   /* Resolved from @phy_port */
   int dev_port_id = -1; /* 1-based, unlike @phy_port */
+  struct ibv_pd *pd = nullptr;
   struct ibv_qp *qp = nullptr;
-  struct ibv_cq *cq = nullptr;
+  struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_mr *recv_buf_mr = nullptr, *non_inline_buf_mr = nullptr;
   uint8_t *recv_buf = nullptr, *non_inline_buf = nullptr;
 
