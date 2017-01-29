@@ -23,22 +23,23 @@ static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 class Transport {
  public:
   Transport(TransportType transport_type, uint8_t phy_port,
-            HugeAllocator *huge_alloc)
-      : transport_type(transport_type),
-        phy_port(phy_port),
-        huge_alloc(huge_alloc),
-        numa_node(huge_alloc->get_numa_node()){};
+            HugeAllocator *huge_alloc, uint8_t app_tid);
+
+  ~Transport();
 
   void fill_routing_info(RoutingInfo *routing_info) const;
 
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();
 
-  // Members that are needed by all transports
+  // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
   const uint8_t phy_port;
   HugeAllocator *huge_alloc; /* The parent Rpc's hugepage allocator */
-  const size_t numa_node;    /* Derived from @huge_alloc */
+  uint8_t app_tid;           /* Debug-only */
+
+  // Derived members
+  const size_t numa_node; /* Derived from @huge_alloc */
 };
 
 }  // End ERpc

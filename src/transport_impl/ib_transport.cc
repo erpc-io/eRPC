@@ -7,8 +7,9 @@
 
 namespace ERpc {
 
-IBTransport::IBTransport(HugeAllocator *huge_alloc, uint8_t phy_port)
-    : Transport(TransportType::kInfiniBand, phy_port, huge_alloc) {
+IBTransport::IBTransport(HugeAllocator *huge_alloc, uint8_t phy_port,
+                         uint8_t app_tid)
+    : Transport(TransportType::kInfiniBand, phy_port, huge_alloc, app_tid) {
   resolve_phy_port();
   init_infiniband_structs();
 }

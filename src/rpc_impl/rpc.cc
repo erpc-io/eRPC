@@ -51,7 +51,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
   huge_alloc = new HugeAllocator(kInitialHugeAllocSize, numa_node);
 
   try {
-    transport = new Transport_(huge_alloc, phy_port);
+    transport = new Transport_(huge_alloc, phy_port, app_tid);
   } catch (std::runtime_error e) {
     /* Free any huge pages that \p transport might have created */
     delete huge_alloc;

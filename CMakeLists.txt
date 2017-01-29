@@ -50,6 +50,7 @@ set(SOURCES
   src/rpc_impl/rpc_sm_retry.cc
   src/session.cc
   src/session.h
+  src/transport.cc
   src/transport.h
   src/transport_impl/ib_transport.cc
   src/transport_impl/ib_transport.h
