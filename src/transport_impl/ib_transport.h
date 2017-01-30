@@ -32,7 +32,8 @@ class IBTransport : public Transport {
   void poll_completions();
 
  private:
-  /// Fill in ctx, device_id, and dev_port_id using phy_port
+  /// Fill in \p ib_ctx, \p device_id, and \p dev_port_id using phy_port.
+  /// If this function returns, these members are valid.
   void resolve_phy_port();
 
   /// Initialize device context, queue pairs, memory regions etc

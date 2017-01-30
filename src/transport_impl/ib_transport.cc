@@ -12,6 +12,9 @@ IBTransport::IBTransport(HugeAllocator *huge_alloc, uint8_t phy_port,
     : Transport(TransportType::kInfiniBand, phy_port, huge_alloc, app_tid) {
   resolve_phy_port();
   init_infiniband_structs();
+
+  erpc_dprintf("eRPC IBTransport: Created for TID %u. Device %s, port %d.\n",
+               app_tid, ib_ctx->device->name, dev_port_id);
 }
 
 IBTransport::~IBTransport() {
