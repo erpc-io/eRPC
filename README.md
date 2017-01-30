@@ -8,6 +8,8 @@
       need to shrink.
   * Use exceptions in constructors of Nexus and Rpc. These are the only two
     class types that the user is allowed to construct.
+  * Do not append integers directly to string streams. If the integer is
+    `uint8_t`, it will get interpreted as a character.
 
 ## API notes
 

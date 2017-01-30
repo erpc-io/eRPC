@@ -104,16 +104,18 @@ class SessionMetadata {
   /// its hostname, Rpc TID, and the session number.
   inline std::string name() {
     std::ostringstream ret;
-    ret << "[H: " << hostname << ", R: " << app_tid << ", S: "
-        << ((session_num == kInvalidSessionNum) ? "XX"
-                                                : std::to_string(session_num));
+    std::string session_num_str = (session_num == kInvalidSessionNum) ?
+        "XX" : std::to_string(session_num);
+                            
+    ret << "[H: " << hostname << ", R: " << std::to_string(app_tid) << ", S: "
+        << session_num_str << "]";
     return ret.str();
   }
 
   /// Return a string with the name of the Rpc hosting this session endpoint.
   inline std::string rpc_name() {
     std::ostringstream ret;
-    ret << "[H: " << hostname << ", R: " << app_tid << "]";
+    ret << "[H: " << hostname << ", R: " << std::to_string(app_tid) << "]";
     return ret.str();
   }
 

@@ -33,7 +33,14 @@ class IBTransport : public Transport {
   ~IBTransport();
 
   void fill_routing_info(RoutingInfo *routing_info) const;
-  std::string routing_info_str(RoutingInfo *routing_info) const;
+
+  static std::string routing_info_str(RoutingInfo *routing_info) {
+    ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
+    std::ostringstream ret;
+    ret << "[LID: " << std::to_string(ib_routing_info->port_lid)
+        << ", QPN: " << std::to_string(ib_routing_info->qpn) << "]";
+    return std::string(ret.str());
+  }
 
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();

@@ -2,7 +2,9 @@
 #include <atomic>
 #include <map>
 #include <thread>
+
 #include "rpc.h"
+#include "test_printf.h"
 
 using namespace ERpc;
 
@@ -74,6 +76,11 @@ void simple_connect(Nexus *nexus) {
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
   ASSERT_EQ(client_context->nb_sm_events, 1);
+
+  test_printf(
+      "simple_connect: Routing info: client %s, server %s.\n",
+      IBTransport::routing_info_str(&session->client.routing_info).c_str(),
+      IBTransport::routing_info_str(&session->server.routing_info).c_str());
 }
 
 TEST(SuccessfulConnect, SuccessfulConnect) {

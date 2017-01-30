@@ -28,14 +28,6 @@ void IBTransport::fill_routing_info(RoutingInfo *routing_info) const {
   ib_routing_info->qpn = qp->qp_num;
 }
 
-std::string IBTransport::routing_info_str(RoutingInfo *routing_info) const {
-  ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
-  std::ostringstream ret;
-  ret << "[LID: " << ib_routing_info->port_lid
-      << ", QPN: " << ib_routing_info->qpn << "]";
-  return ret.str();
-}
-
 void IBTransport::send_message(Session *session, const Buffer *buffer) {
   _unused(session);
   _unused(buffer);
@@ -60,14 +52,16 @@ void IBTransport::resolve_phy_port() {
   for (int dev_i = 0; dev_i < num_devices; dev_i++) {
     ib_ctx = ibv_open_device(dev_list[dev_i]);
     if (ib_ctx == nullptr) {
-      xmsg << "eRPC IBTransport: Failed to open InfiniBand device " << dev_i;
+      xmsg << "eRPC IBTransport: Failed to open InfiniBand device "
+           << std::to_string(dev_i);
       throw std::runtime_error(xmsg.str());
     }
 
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
     if (ibv_query_device(ib_ctx, &device_attr) != 0) {
-      xmsg << "eRPC IBTransport: Failed to query InfiniBand device " << dev_i;
+      xmsg << "eRPC IBTransport: Failed to query InfiniBand device "
+           << std::to_string(dev_i);
       throw std::runtime_error(xmsg.str());
     }
 
@@ -75,8 +69,8 @@ void IBTransport::resolve_phy_port() {
       /* Count this port only if it is enabled */
       struct ibv_port_attr port_attr;
       if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
-        xmsg << "eRPC IBTransport: Failed to query port " << port_i
-             << "on device " << dev_i;
+        xmsg << "eRPC IBTransport: Failed to query port "
+             << std::to_string(port_i) << " on device " << ib_ctx->device->name;
         throw std::runtime_error(xmsg.str());
       }
 
@@ -98,7 +92,8 @@ void IBTransport::resolve_phy_port() {
 
     /* Thank you Mario, but our port is in another device */
     if (ibv_close_device(ib_ctx) != 0) {
-      xmsg << "eRPC IBTransport: Failed to close InfiniBand device " << dev_i;
+      xmsg << "eRPC IBTransport: Failed to close InfiniBand device "
+           << ib_ctx->device->name;
       throw std::runtime_error(xmsg.str());
     }
   }
@@ -106,7 +101,7 @@ void IBTransport::resolve_phy_port() {
   /* If we are here, port resolution has failed */
   assert(device_id == -1 && dev_port_id == -1);
   xmsg << "eRPC IBTransport: Failed to resolve InfiniBand port index "
-       << phy_port;
+       << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
 
