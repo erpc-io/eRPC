@@ -23,7 +23,17 @@ IBTransport::~IBTransport() {
 
 void IBTransport::fill_routing_info(RoutingInfo *routing_info) const {
   memset((void *)routing_info, 0, kMaxRoutingInfoSize);
-  return;
+  ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
+  ib_routing_info->port_lid = port_lid;
+  ib_routing_info->qpn = qp->qp_num;
+}
+
+std::string IBTransport::routing_info_str(RoutingInfo *routing_info) const {
+  ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
+  std::ostringstream ret;
+  ret << "[LID: " << ib_routing_info->port_lid
+      << ", QPN: " << ib_routing_info->qpn << "]";
+  return ret.str();
 }
 
 void IBTransport::send_message(Session *session, const Buffer *buffer) {
@@ -79,6 +89,7 @@ void IBTransport::resolve_phy_port() {
         /* Resolution done. ib_ctx contains the resolved device context. */
         device_id = dev_i;
         dev_port_id = port_i;
+        port_lid = port_attr.lid;
         return;
       }
 

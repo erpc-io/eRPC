@@ -14,10 +14,16 @@ class IBTransport : public Transport {
   static const size_t kPostlist = 16;    ///< Maximum postlist size for SENDs
   static const size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static const size_t kRecvSlack = 32;   ///< RECVs accumulated before posting
-  static const uint32_t kQKey = 0xffffffff;  ///< The secure queue key for eRPC
+  static const uint32_t kQKey = 0xffffffff;  ///< Secure key for all eRPC nodes
 
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, ""); /* Capacity check */
   static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
+
+  struct ib_routing_info_t {
+    uint16_t port_lid;
+    uint32_t qpn;
+  };
+  static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 
  public:
   /// Construct the transport object. Throws \p runtime_error if creation fails.
@@ -27,6 +33,7 @@ class IBTransport : public Transport {
   ~IBTransport();
 
   void fill_routing_info(RoutingInfo *routing_info) const;
+  std::string routing_info_str(RoutingInfo *routing_info) const;
 
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();
@@ -47,8 +54,9 @@ class IBTransport : public Transport {
 
   // InfiniBand info
   struct ibv_context *ib_ctx = nullptr;
-  int device_id = -1;   /* Resolved from @phy_port */
-  int dev_port_id = -1; /* 1-based, unlike @phy_port */
+  int device_id = -1;    /* Resolved from \p phy_port */
+  int dev_port_id = -1;  /* 1-based, unlike \p phy_port */
+  uint16_t port_lid = 0; /* InfiniBand LID of \p phy_port. 0 is invalid. */
   struct ibv_pd *pd = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;

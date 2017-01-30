@@ -5,6 +5,7 @@
 #ifndef ERPC_TRANSPORT_H
 #define ERPC_TRANSPORT_H
 
+#include <string>
 #include "common.h"
 #include "session.h"
 #include "transport_types.h"
@@ -27,7 +28,11 @@ class Transport {
 
   ~Transport();
 
+  /// Fill-in the transport-specific routing information
   void fill_routing_info(RoutingInfo *routing_info) const;
+
+  /// Return a string representation of \p routing_info
+  std::string routing_info_str(RoutingInfo *routing_info) const;
 
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();

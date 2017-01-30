@@ -4,6 +4,7 @@
  */
 
 #include <algorithm>
+#include <sstream>
 #include <stdexcept>
 
 #include "rpc.h"
@@ -183,13 +184,9 @@ void Rpc<Transport_>::handle_session_management() {
 
 template <class Transport_>
 std::string Rpc<Transport_>::get_name() {
-  std::string ret;
-  ret += std::string("[");
-  ret += std::string(nexus->hostname);
-  ret += std::string(", ");
-  ret += std::to_string(app_tid);
-  ret += std::string("]");
-  return ret;
+  std::ostringstream ret;
+  ret << "[" << nexus->hostname << ", " << app_tid << "]";
+  return ret.str();
 }
 
 template <class Transport_>

@@ -18,15 +18,9 @@ Session::Session(Role role, SessionState state)
 Session::~Session(){};
 
 std::string Session::get_client_name() {
-  std::string ret;
-
-  ret += std::string("[");
-  ret += std::string(client.hostname);
-  ret += std::string(", ");
-  ret += std::to_string(client.app_tid);
-  ret += std::string("]");
-
-  return ret;
+  std::ostringstream ret;
+  ret << "[" << client.hostname << ", " << client.app_tid << "]";
+  return ret.str();
 }
 
 void Session::enable_congestion_control() { is_cc = true; }

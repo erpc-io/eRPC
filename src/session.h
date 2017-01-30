@@ -4,6 +4,7 @@
 #include <limits>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <string>
 
 #include "common.h"
@@ -99,35 +100,21 @@ class SessionMetadata {
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
 
-  /// Return a string with a name for this session end point, containing
+  /// Return a string with a name for this session endpoint, containing
   /// its hostname, Rpc TID, and the session number.
   inline std::string name() {
-    std::string ret;
-    ret += std::string("[H: "); /* Hostname */
-    ret += std::string(hostname);
-    ret += std::string(", R: "); /* Rpc */
-    ret += std::to_string(app_tid);
-    ret += std::string(", S: "); /* Session */
-    if (session_num == kInvalidSessionNum) {
-      ret += std::string("XX");
-    } else {
-      ret += std::to_string(session_num);
-    }
-    ret += std::string("]");
-
-    return ret;
+    std::ostringstream ret;
+    ret << "[H: " << hostname << ", R: " << app_tid << ", S: "
+        << ((session_num == kInvalidSessionNum) ? "XX"
+                                                : std::to_string(session_num));
+    return ret.str();
   }
 
-  /// Return a string with the name of the Rpc hosting this session end point.
+  /// Return a string with the name of the Rpc hosting this session endpoint.
   inline std::string rpc_name() {
-    std::string ret;
-    ret += std::string("[H: "); /* Hostname */
-    ret += std::string(hostname);
-    ret += std::string(", R: "); /* Rpc */
-    ret += std::to_string(app_tid);
-    ret += std::string("]");
-
-    return ret;
+    std::ostringstream ret;
+    ret << "[H: " << hostname << ", R: " << app_tid << "]";
+    return ret.str();
   }
 
   /// Compare the location fields of two SessionMetadata objects. This does not
