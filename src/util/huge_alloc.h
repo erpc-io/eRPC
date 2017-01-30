@@ -6,6 +6,7 @@
 #include <numaif.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -44,13 +45,20 @@ class HugeAllocator {
   SlowRand slow_rand; /* RNG to generate SHM keys */
   size_t numa_node;   /* NUMA node on which all memory is allocated */
 
-  /* SHM regions used by this allocator, in order of increasing size. */
+  /*
+   * SHM regions used by this allocator, in order of increasing allocation-time
+   * size.
+   */
   std::vector<shm_region_t> shm_list;
   std::vector<void *> page_freelist; /* Currently free 4k pages */
 
   size_t tot_free_hugepages; /* Number of free hugepages over all SHM regions */
-  size_t prev_allocation_size; /* The size of the previous SHM allocation */
 
+  /*
+   * The size of the previous hugepage allocation made internally by this
+   * allocator.
+   */
+  size_t prev_allocation_size;
   size_t tot_memory_reserved;  /* Total hugepage memory reserved by allocator */
   size_t tot_memory_allocated; /* Total memory allocated to users */
 
@@ -64,13 +72,11 @@ class HugeAllocator {
     assert(initial_size > 0 && initial_size <= kMaxAllocSize);
     assert(numa_node <= kMaxNumaNodes);
 
-    /* Begin by allocating the specified amount of memory in hugepages */
-    bool success = reserve_hugepages(initial_size, numa_node);
-    if (!success) {
-      throw std::runtime_error(
-          "eRPC HugeAllocator: Failed to allocate hugepage memory.");
-      return;
-    }
+    /*
+     * Reserve initial hugepages. \p reserve_hugepages will throw a runtime
+     * exception if reservation fails.
+     */
+    reserve_hugepages(initial_size, numa_node);
   }
 
   ~HugeAllocator() {
@@ -208,10 +214,13 @@ class HugeAllocator {
    * NUMA node \p numa_node.
    *
    * @return True if the allocation succeeds. False if the allocation fails
-   * because no more hugepages are available. If allocation fails for some
-   * other reason, an error message is printed and exit(-1) is called.
+   * because no more hugepages are available.
+   *
+   * @throw runtime_error If allocation fails for a reason other than out
+   * of memory.
    */
   bool reserve_hugepages(size_t size, size_t numa_node) {
+    std::ostringstream xmsg; /* The exception message */
     size = round_up<kHugepageSize>(size);
     int shm_key, shm_id;
 
@@ -230,37 +239,29 @@ class HugeAllocator {
         switch (errno) {
           case EEXIST:
             /* @shm_key already exists. Try again. */
-            fprintf(stderr,
-                    "eRPC HugeAllocator: SHM malloc error: "
-                    "Key %d exists. Trying again with different key.\n",
-                    shm_key);
             break;
+
           case EACCES:
-            fprintf(stderr,
-                    "eRPC HugeAllocator: SHM malloc error: "
-                    "Insufficient permissions.\n");
-            exit(-1);
-            break;
+            xmsg << "eRPC HugeAllocator: SHM allocation error. "
+                 << "Insufficient permissions.";
+            throw std::runtime_error(xmsg.str());
+
           case EINVAL:
-            fprintf(stderr,
-                    "eRPC HugeAllocator: SHM malloc error: SHMMAX/SHMIN "
-                    "mismatch. SHM key = %d, size = %lu (%lu MB).\n",
-                    shm_key, size, size / MB(1));
-            exit(-1);
-            break;
+            xmsg << "eRPC HugeAllocator: SHM malloc error: SHMMAX/SHMIN "
+                 << "mismatch. size = " << std::to_string(size) << " ("
+                 << std::to_string(size / MB(1)) << " MB)";
+            throw std::runtime_error(xmsg.str());
+
           case ENOMEM:
-            fprintf(stderr,
-                    "eRPC HugeAllocator: SHM malloc error: Insufficient "
-                    "memory. SHM key = %d, size = %lu (%lu MB).\n",
-                    shm_key, size, size / MB(1));
+            erpc_dprintf("eRPC HugeAllocator: SHM malloc error: Insufficient "
+                         "memory. SHM key = %d, size = %lu (%lu MB).\n",
+                         shm_key, size, size / MB(1));
             return false;
-            break;
+
           default:
-            printf(
-                "eRPC HugeAllocator: SHM malloc error: Wild SHM error: %s.\n",
-                strerror(errno));
-            exit(-1);
-            break;
+            xmsg << "eRPC HugeAllocator: Unexpected SHM malloc error "
+                 << strerror(errno);
+            throw std::runtime_error(xmsg.str());
         }
       } else {
         /* shm_key worked. Break out of the while loop */
