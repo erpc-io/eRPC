@@ -16,8 +16,11 @@
 namespace ERpc {
 /**
  * @brief An allocator that allows:
- * (a) Allocating and deallocating hugepage-backed individual 4K pages.
- * (b) Allocating, but *NOT* deallocating chunks of size >= 2MB.
+ * (a) Allocating and freeing hugepage-backed individual 4K pages.
+ *     Freed 4K pages do not coalesce to re-form a hugepage chunk.
+ * (b) Allocating and freeing multi-hugepage chunks of size >= 2MB.
+ *     Freed multi-hugepage chunks do coalesce to re-form larger contiguous
+ *     regions.
  *
  * The allocator uses randomly generated positive SHM keys, and deallocates the
  * SHM regions created when it is deleted.
@@ -25,6 +28,19 @@ namespace ERpc {
 class HugeAllocator {
  private:
   static const size_t kMaxAllocSize = (256 * 1024 * 1024 * 1024ull);
+
+  SlowRand slow_rand; ///< RNG to generate SHM keys
+  size_t numa_node;   ///< NUMA node on which all memory is allocated
+
+  size_t tot_free_hugepages; ///< Number of free hugepages over all SHM regions
+
+  /**
+   * The size of the previous hugepage allocation made internally by this
+   * allocator.
+   */
+  size_t prev_allocation_size;
+  size_t tot_memory_reserved;  ///< Total hugepage memory reserved by allocator
+  size_t tot_memory_allocated; ///< Total memory allocated to users
 
   /// Information about an SHM region
   struct shm_region_t {
@@ -59,25 +75,12 @@ class HugeAllocator {
     }
   };
 
-  SlowRand slow_rand; ///< RNG to generate SHM keys
-  size_t numa_node;   ///< NUMA node on which all memory is allocated
-
   /*
    * SHM regions used by this allocator, in order of increasing allocation-time
    * size.
    */
   std::vector<shm_region_t> shm_list;
   std::vector<void *> page_freelist; ///< Currently free 4k pages
-
-  size_t tot_free_hugepages; ///< Number of free hugepages over all SHM regions
-
-  /**
-   * The size of the previous hugepage allocation made internally by this
-   * allocator.
-   */
-  size_t prev_allocation_size;
-  size_t tot_memory_reserved;  ///< Total hugepage memory reserved by allocator
-  size_t tot_memory_allocated; ///< Total memory allocated to users
 
  public:
   HugeAllocator(size_t initial_size, size_t numa_node)
@@ -220,7 +223,7 @@ class HugeAllocator {
     }
 
     /* Find the SHM region that was used to allocate \p huge_buf */
-    for (shm_region_t shm_region : shm_list) {
+    for (shm_region_t &shm_region : shm_list) {
       void *hi = (void *)((char*)shm_region.alloc_buf + shm_region.alloc_size);
 
       if (huge_buf >= shm_region.alloc_buf && huge_buf < hi) {
@@ -230,13 +233,17 @@ class HugeAllocator {
         size_t nb_contig = shm_region.nb_contig_vec[hugepage_index];
         assert(nb_contig > 0);
 
-        /* Mark the hugepages as free */
+        /* Mark the freed as free */
         for (size_t i = 0; i < nb_contig; i++) {
           assert(shm_region.free_hugepage_vec[hugepage_index + i] == false);
           shm_region.free_hugepage_vec[hugepage_index + i] = true;
         }
 
+        /* Record the freeing */
         shm_region.nb_contig_vec[hugepage_index] = 0;
+        shm_region.free_hugepages += nb_contig;
+
+        tot_memory_allocated -= (nb_contig * kHugepageSize);
         return;
       }
     }
@@ -258,6 +265,34 @@ class HugeAllocator {
   size_t get_allocated_memory() {
     assert(tot_memory_allocated % kPageSize == 0);
     return tot_memory_allocated;
+  }
+
+  /// Print a summary of this allocator
+  void print_stats() {
+    fprintf(stderr, "eRPC HugeAllocator stats:\n");
+    fprintf(stderr, "Total reserved memory = %zu bytes (%.2f MB)\n",
+            tot_memory_reserved, (double)tot_memory_reserved / MB(1));
+    fprintf(stderr, "Total memory allocated to users = %zu bytes (%.2f MB)\n",
+            tot_memory_allocated, (double)tot_memory_allocated / MB(1));
+
+    fprintf(stderr, "%zu SHM regions\n", shm_list.size());
+    size_t shm_region_index = 0;
+    for (shm_region_t &shm_region : shm_list) {
+      fprintf(stderr, "Region %zu:\n", shm_region_index);
+      shm_region_index++;
+
+      fprintf(stderr, "\t%zu free hugepages\n", shm_region.free_hugepages);
+      std::string bitvector_str;
+      for (size_t i = 0; i < shm_region.alloc_hugepages; i++) {
+        if (shm_region.free_hugepage_vec[i]) {
+          bitvector_str += "1";
+        } else {
+          bitvector_str += "0";
+        }
+      }
+      fprintf(stderr, "\tBitvector (1 means free page): %s\n",
+              bitvector_str.c_str());
+    }
   }
 
  private:
@@ -306,10 +341,10 @@ class HugeAllocator {
         shm_region.free_hugepage_vec.at(start + i) = false;
       }
 
-      /* Record the allocation size */
+      /* Record the allocation */
       shm_region.nb_contig_vec.at(start) = num_hugepages;
-
       shm_region.free_hugepages -= num_hugepages;
+
       tot_free_hugepages -= num_hugepages;
 
       void *ret_buf =

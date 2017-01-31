@@ -1,6 +1,8 @@
 #include "util/huge_alloc.h"
 #include "test_printf.h"
+#include <algorithm>
 #include <gtest/gtest.h>
+#include <vector>
 
 #define SYSTEM_HUGEPAGES (512) /* The number of hugepages availabe */
 
@@ -34,34 +36,49 @@ TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
 }
 
 /**
- * @brief Try to allocate all memory as variable-length 2MB-aligned chunks.
- * When allocation finally fails, print out the memory efficiency.
+ * @brief Repeat: Try to allocate all memory as variable-length 2MB-aligned
+ * chunks. When allocation finally fails, print out the memory efficiency.
  */
 TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
   ERpc::HugeAllocator *allocator;
   allocator = new ERpc::HugeAllocator(1024, 0);
 
-  size_t app_memory = 0;
+  for (size_t i = 0; i < 10; i++) {
+    size_t app_memory = 0;
+    std::vector<void*> alloc_bufs;
 
-  while (true) {
-    size_t num_hugepages = 1ul + (unsigned)(std::rand() % 15);
-    void *buf = allocator->alloc_huge(num_hugepages * ERpc::kHugepageSize);
+    while (true) {
+      size_t num_hugepages = 1ul + (unsigned)(std::rand() % 15);
+      void *buf = allocator->alloc_huge(num_hugepages * ERpc::kHugepageSize);
 
-    if (buf == nullptr) {
-      EXPECT_EQ(allocator->get_allocated_memory(), app_memory);
+      if (buf == nullptr) {
+        ASSERT_EQ(allocator->get_allocated_memory(), app_memory);
 
-      test_printf("Fraction of system memory reserved by allocator at "
-                  "failure = %.2f\n",
-                  (double)allocator->get_reserved_memory() /
-                      (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
+        test_printf("Fraction of system memory reserved by allocator at "
+                    "failure = %.2f (best = 1.0)\n",
+                    (double)allocator->get_reserved_memory() /
+                        (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
 
-      test_printf("Fraction of memory reserved allocated to user = %.2f\n",
-                  ((double)allocator->get_allocated_memory() /
-                   allocator->get_reserved_memory()));
-      break;
-    } else {
-      app_memory += (num_hugepages * ERpc::kHugepageSize);
+        test_printf("Fraction of memory reserved allocated to user = %.2f "
+                    "(best = 1.0)\n",
+                    ((double)allocator->get_allocated_memory() /
+                     allocator->get_reserved_memory()));
+        break;
+      } else {
+        app_memory += (num_hugepages * ERpc::kHugepageSize);
+        alloc_bufs.push_back(buf);
+      }
     }
+
+    //allocator->print_stats();
+
+    /* Free all allocated hugepages in random order */
+    std::random_shuffle(alloc_bufs.begin(), alloc_bufs.end());
+    for (void* alloc_buf : alloc_bufs) {
+      allocator->free_huge(alloc_buf);
+    }
+
+    ASSERT_EQ(allocator->get_allocated_memory(), 0);
   }
 
   delete allocator;

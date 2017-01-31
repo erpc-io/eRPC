@@ -8,7 +8,7 @@ add_definitions(-std=c++11)
 
 add_definitions(-Wall -Wextra -Werror)
 add_definitions(-Wsign-conversion)
-add_definitions(-Winline)
+#add_definitions(-Winline)
 
 add_definitions(-Wno-unused-function)
 
