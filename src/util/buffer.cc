@@ -7,5 +7,4 @@ Buffer::~Buffer() {
   assert(buf != nullptr);
   free(buf);
 }
-
 }
