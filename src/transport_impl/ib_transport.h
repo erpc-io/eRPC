@@ -29,7 +29,7 @@ class IBTransport : public Transport {
   /// Construct the transport object. Throws \p runtime_error if creation fails.
   /// This exception is caught in the creator Rpc, which then deletes
   /// \p huge_alloc.
-  IBTransport(HugeAllocator *huge_alloc, uint8_t phy_port, uint8_t app_tid);
+  IBTransport(uint8_t phy_port, uint8_t app_tid, HugeAllocator *huge_alloc);
   ~IBTransport();
 
   void fill_routing_info(RoutingInfo *routing_info) const;

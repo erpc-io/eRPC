@@ -23,8 +23,8 @@ static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 /// Generic mostly-reliable transport
 class Transport {
  public:
-  Transport(TransportType transport_type, uint8_t phy_port,
-            HugeAllocator *huge_alloc, uint8_t app_tid);
+  Transport(TransportType transport_type, size_t mtu, uint8_t app_tid,
+            uint8_t phy_port, HugeAllocator *huge_alloc);
 
   ~Transport();
 
@@ -39,9 +39,10 @@ class Transport {
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
+  const size_t mtu;
+  const uint8_t app_tid; /* Debug-only */
   const uint8_t phy_port;
   HugeAllocator *huge_alloc; /* The parent Rpc's hugepage allocator */
-  uint8_t app_tid;           /* Debug-only */
 
   // Derived members
   const size_t numa_node; /* Derived from @huge_alloc */
