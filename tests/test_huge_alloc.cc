@@ -5,42 +5,106 @@
 #include "test_printf.h"
 #include "util/huge_alloc.h"
 
-#define SYSTEM_HUGEPAGES (512) /* The number of hugepages availabe */
+#define SYSTEM_HUGEPAGES (512) /* The number of hugepages available */
+#define SYSTEM_4K_PAGES (SYSTEM_HUGEPAGES * 512) /* Number of 4K pages*/
 
 /**
- * @brief Measure performance of page allocation
+ * @brief Measure performance of page allocation where all pages are allocated
+ * without first creating a page cache.
+ *
+ * E5-2450: 7.2 ns per page
  */
 TEST(HugeAllocatorTest, PageAllocPerf) {
-  ERpc::HugeAllocator *allocator;
+  /* Reserve all memory for high perf */
+  ERpc::HugeAllocator *allocator =
+      new ERpc::HugeAllocator(SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0);
 
-  for (size_t iter = 0; iter < 5; iter++) {
-    /* Reserve all memory for high perf */
-    allocator =
-        new ERpc::HugeAllocator(SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0);
+  size_t num_pages_allocated = 0;
 
-    size_t num_pages_allocated = 0;
+  struct timespec start, end;
+  clock_gettime(CLOCK_REALTIME, &start);
 
-    struct timespec start, end;
-    clock_gettime(CLOCK_REALTIME, &start);
-
-    while (true) {
-      void *buf = allocator->alloc(4 * 1024);
-      if (buf == nullptr) {
-        break;
-      }
-
-      num_pages_allocated++;
+  while (true) {
+    void *buf = allocator->alloc(4 * 1024);
+    if (buf == nullptr) {
+      break;
     }
 
-    clock_gettime(CLOCK_REALTIME, &end);
-    double nanoseconds = (end.tv_sec - start.tv_sec) * 1000000000 +
-                         (end.tv_nsec - start.tv_nsec);
-
-    test_printf("Iteration %zu: Time per page allocation = %.2f ns\n", iter,
-                nanoseconds / num_pages_allocated);
-
-    delete allocator;
+    num_pages_allocated++;
   }
+
+  clock_gettime(CLOCK_REALTIME, &end);
+  double nanoseconds =
+      (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
+
+  test_printf("Time per page allocation = %.2f ns\n",
+              nanoseconds / num_pages_allocated);
+
+  delete allocator;
+}
+
+/**
+ * @brief Measure performance of page allocation where pages are allocated from
+ * the cache.
+ */
+TEST(HugeAllocatorTest, PageAllocPerfWithCache) {
+  /* Reserve all memory for high perf */
+  ERpc::HugeAllocator *allocator =
+      new ERpc::HugeAllocator(SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0);
+
+  size_t page_cache_size = SYSTEM_4K_PAGES / 2;
+  allocator->create_4k_chunk_cache(page_cache_size);
+
+  struct timespec start, end;
+  clock_gettime(CLOCK_REALTIME, &start);
+
+  for (size_t i = 0; i < page_cache_size; i++) {
+    void *buf = allocator->alloc(4 * 1024);
+    if (buf == nullptr) {
+      break;
+    }
+  }
+
+  clock_gettime(CLOCK_REALTIME, &end);
+  double nanoseconds =
+      (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
+
+  test_printf("Time per page allocation with page cache = %.2f ns\n",
+              nanoseconds / page_cache_size);
+
+  delete allocator;
+}
+
+/**
+ * @brief Measure performance of page allocation where pages are allocated from
+ * the cache, and the specialized alloc_4k function is used.
+ */
+TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
+  /* Reserve all memory for high perf */
+  ERpc::HugeAllocator *allocator =
+      new ERpc::HugeAllocator(SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0);
+
+  size_t page_cache_size = SYSTEM_4K_PAGES / 2;
+  allocator->create_4k_chunk_cache(page_cache_size);
+
+  struct timespec start, end;
+  clock_gettime(CLOCK_REALTIME, &start);
+
+  for (size_t i = 0; i < page_cache_size; i++) {
+    void *buf = allocator->alloc_4k();
+    if (buf == nullptr) {
+      break;
+    }
+  }
+
+  clock_gettime(CLOCK_REALTIME, &end);
+  double nanoseconds =
+      (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
+
+  test_printf("Time per page allocation with page cache = %.2f ns\n",
+              nanoseconds / page_cache_size);
+
+  delete allocator;
 }
 
 /**

@@ -80,25 +80,27 @@ class HugeAllocator {
     return size_class;
   }
 
+  /// Split one chunk from class \p size_class into two chunks of the previous
+  /// class, which much be empty.
   forceinline void split(size_t size_class) {
     assert(size_class >= 1);
     assert(!freelist[size_class].empty());
     assert(freelist[size_class - 1].empty());
 
-    if (!freelist[size_class].empty()) {
-      void *chunk = freelist[size_class].back();
-      freelist[size_class].pop_back();
+    void *chunk = freelist[size_class].back();
+    freelist[size_class].pop_back();
 
-      size_t alloc_size = class_to_size(size_class);
+    size_t class_size = class_to_size(size_class);
 
-      void *chunk_0 = chunk;
-      void *chunk_1 = (void *)((char *)chunk + alloc_size / 2);
+    void *chunk_0 = chunk;
+    void *chunk_1 = (void *)((char *)chunk + class_size / 2);
 
-      freelist[size_class - 1].push_back(chunk_0);
-      freelist[size_class - 1].push_back(chunk_1);
-    }
+    freelist[size_class - 1].push_back(chunk_0);
+    freelist[size_class - 1].push_back(chunk_1);
   }
 
+  /// Allocate a chunk from class \p size_class, and add \p size bytes to
+  /// the allocated memory.
   forceinline void *alloc_from_class(size_t size_class, size_t size) {
     /* Use the chunks at the back to improve locality */
     void *chunk = freelist[size_class].back();
@@ -106,6 +108,15 @@ class HugeAllocator {
 
     tot_memory_allocated += size;
     return chunk;
+  }
+
+  /// Special simplified function for allocating 4 KB pages
+  forceinline void *alloc_4k() {
+    if (!freelist[0].empty()) {
+      return alloc_from_class(0, KB(4));
+    } else {
+      return alloc(KB(4));
+    }
   }
 
   /// Allocate
@@ -182,6 +193,9 @@ class HugeAllocator {
     assert(tot_memory_allocated % kPageSize == 0);
     return tot_memory_allocated;
   }
+
+  /// Populate the 4 KB class with at least \p num_chunks chunks.
+  bool create_4k_chunk_cache(size_t num_chunks);
 
   /// Print a summary of this allocator
   void print_stats();

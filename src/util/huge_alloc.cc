@@ -29,6 +29,32 @@ HugeAllocator::~HugeAllocator() {
   }
 }
 
+/*
+ * To create a cache of 4 KB pages, we first allocate the required number of
+ * pages and then free them. This puts them all into the 4 KB freelist.
+ */
+bool HugeAllocator::create_4k_chunk_cache(size_t cache_chunks) {
+  size_t reqd_chunks = cache_chunks - freelist[0].size();
+  if (reqd_chunks <= 0) {
+    return true;
+  }
+
+  std::vector<void *> free_buf_vec;
+  for (size_t i = 0; i < reqd_chunks; i++) {
+    void *buf = alloc(KB(4));
+    if (buf == nullptr) {
+      return false;
+    }
+    free_buf_vec.push_back(buf);
+  }
+
+  for (size_t i = 0; i < reqd_chunks; i++) {
+    free(free_buf_vec[i], KB(4));
+  }
+
+  return true;
+}
+
 void HugeAllocator::print_stats() {
   fprintf(stderr, "eRPC HugeAllocator stats:\n");
   fprintf(stderr, "Total reserved memory = %zu bytes (%.2f MB)\n",
