@@ -1,15 +1,19 @@
 #include "huge_alloc.h"
+#include <iostream>
 
 namespace ERpc {
 
 HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node)
     : numa_node(numa_node),
       tot_free_hugepages(0),
-      prev_allocation_size(initial_size),
       tot_memory_reserved(0),
       tot_memory_allocated(0) {
-  assert(initial_size > 0 && initial_size <= kMaxAllocSize);
   assert(numa_node <= kMaxNumaNodes);
+
+  if (initial_size < kMinInitialSize) {
+    initial_size = kMinInitialSize;
+  }
+  prev_allocation_size = initial_size;
 
   /*
    * Reserve initial hugepages. \p reserve_hugepages will throw a runtime
@@ -21,99 +25,8 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node)
 HugeAllocator::~HugeAllocator() {
   /* Delete the created SHM regions */
   for (shm_region_t &shm_region : shm_list) {
-    delete_shm(shm_region.key, shm_region.alloc_buf);
+    delete_shm(shm_region.key, shm_region.buf);
   }
-}
-
-void *HugeAllocator::alloc_huge(size_t size) {
-  assert(size >= ERpc::kHugepageSize && size <= kMaxAllocSize);
-
-  size = round_up<kHugepageSize>(size);
-  size_t reqd_hugepages = size / kHugepageSize;
-
-  /*
-   * Try to get contiguous hugepages from an existing SHM region, starting
-   * from the smallest (wrt allocation size).
-   */
-  for (shm_region_t &shm_region : shm_list) {
-    void *huge_buf = alloc_contiguous(shm_region, reqd_hugepages);
-    if (huge_buf != nullptr) {
-      tot_memory_allocated += size;
-      return huge_buf;
-    }
-  }
-
-  /*
-   * If we are here, no existing SHM region has sufficient hugepages. Increase
-   * the allocation size, and ensure that we can allocate at least \p size.
-   */
-  prev_allocation_size *= 2;
-  while (prev_allocation_size < size) {
-    prev_allocation_size *= 2;
-  }
-
-  bool success = reserve_hugepages(prev_allocation_size, numa_node);
-  if (!success) {
-    /* We're out of hugepages */
-    return nullptr;
-  }
-
-  /*
-   * Use the last SHM region in the list to allocate. Other regions don't
-   * have enough space.
-   */
-  shm_region_t &shm_region = shm_list.back();
-
-  /*
-   * This allocation must succeed - we allocated enough memory, and the SHM
-   * region is not fragmented yet.
-   */
-  void *hugebuf_addr = alloc_contiguous(shm_region, reqd_hugepages);
-  assert(hugebuf_addr != nullptr);
-
-  tot_memory_allocated += size;
-  return hugebuf_addr;
-}
-
-void HugeAllocator::free_huge(void *huge_buf) {
-  if ((size_t)huge_buf % kHugepageSize != 0) {
-    std::ostringstream xmsg;
-    xmsg << "eRPC HugeAllocator: free_huge("
-         << std::to_string((uintptr_t)huge_buf) << ") failed. ";
-    throw std::runtime_error(xmsg.str());
-  }
-
-  /* Find the SHM region that was used to allocate \p huge_buf */
-  for (shm_region_t &shm_region : shm_list) {
-    void *hi = (void *)((char *)shm_region.alloc_buf + shm_region.alloc_size);
-
-    if (huge_buf >= shm_region.alloc_buf && huge_buf < hi) {
-      /* This is the SHM region. Find the number of SHM regions to free. */
-      size_t hugepage_index =
-          ((size_t)huge_buf - (size_t)shm_region.alloc_buf) / kHugepageSize;
-      size_t nb_contig = shm_region.nb_contig_vec[hugepage_index];
-      assert(nb_contig > 0);
-
-      /* Mark the freed as free */
-      for (size_t i = 0; i < nb_contig; i++) {
-        assert(shm_region.free_hugepage_vec[hugepage_index + i] == false);
-        shm_region.free_hugepage_vec[hugepage_index + i] = true;
-      }
-
-      /* Record the freeing */
-      shm_region.nb_contig_vec[hugepage_index] = 0;
-      shm_region.free_hugepages += nb_contig;
-
-      tot_memory_allocated -= (nb_contig * kHugepageSize);
-      return;
-    }
-  }
-
-  /* We should never get here */
-  std::ostringstream xmsg;
-  xmsg << "eRPC HugeAllocator: free_huge("
-       << std::to_string((uintptr_t)huge_buf) << ") failed. ";
-  throw std::runtime_error(xmsg.str());
 }
 
 void HugeAllocator::print_stats() {
@@ -126,74 +39,27 @@ void HugeAllocator::print_stats() {
   fprintf(stderr, "%zu SHM regions\n", shm_list.size());
   size_t shm_region_index = 0;
   for (shm_region_t &shm_region : shm_list) {
-    fprintf(stderr, "Region %zu:\n", shm_region_index);
+    fprintf(stderr, "Region %zu, size %zu MB\n", shm_region_index,
+            shm_region.size / MB(1));
     shm_region_index++;
-
-    fprintf(stderr, "\t%zu free hugepages\n", shm_region.free_hugepages);
-    std::string bitvector_str;
-    for (size_t i = 0; i < shm_region.alloc_hugepages; i++) {
-      if (shm_region.free_hugepage_vec[i]) {
-        bitvector_str += "1";
-      } else {
-        bitvector_str += "0";
-      }
-    }
-    fprintf(stderr, "\tBitvector (1 means free page): %s\n",
-            bitvector_str.c_str());
-  }
-}
-
-void *HugeAllocator::alloc_contiguous(shm_region_t &shm_region,
-                                      size_t num_hugepages) {
-  if (shm_region.free_hugepages < num_hugepages) {
-    return nullptr;
   }
 
-  // Try to find a contiguous chunk of \p num_hugepages hugepages
-  size_t start = 0; /* The start index of the contiguous chunk */
-
-  while (start <= shm_region.alloc_hugepages - num_hugepages) {
-    bool start_valid = true;
-    size_t end = start;
-    /* Check if pages [start, ..., start + num_hugepages) are all free */
-    for (; end < start + num_hugepages; end++) {
-      if (shm_region.free_hugepage_vec.at(end) == false) {
-        start_valid = false;
-        break;
-      }
-    }
-
-    if (start_valid) {
-      assert(end == start + num_hugepages - 1);
-      assert(shm_region.free_hugepage_vec.at(end) == true);
-      break;
+  fprintf(stderr, "Size classes:\n");
+  for (size_t i = 0; i < kNumClasses; i++) {
+    size_t class_size = class_to_size(i);
+    if (class_size < MB(1)) {
+      fprintf(stderr, "\t%zu KB: %zu chunks\n", class_size / KB(1),
+              freelist[i].size());
     } else {
-      start = end + 1;
+      fprintf(stderr, "\t%zu MB: %zu chunks\n", class_size / MB(1),
+              freelist[i].size());
     }
-  }
-
-  if (start == shm_region.alloc_hugepages) {
-    /* We failed to find a valid chunk */
-    return nullptr;
-  } else {
-    /* We have a valid chunk. Mark the hugepages in this chunk not-free */
-    for (size_t i = 0; i < num_hugepages; i++) {
-      shm_region.free_hugepage_vec.at(start + i) = false;
-    }
-
-    /* Record the allocation */
-    shm_region.nb_contig_vec.at(start) = num_hugepages;
-    shm_region.free_hugepages -= num_hugepages;
-
-    tot_free_hugepages -= num_hugepages;
-
-    void *ret_buf =
-        (void *)((char *)shm_region.alloc_buf + start * kHugepageSize);
-    return ret_buf;
   }
 }
 
 bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
+  assert(size >= kMinInitialSize);
+
   std::ostringstream xmsg; /* The exception message */
   size = round_up<kHugepageSize>(size);
   int shm_key, shm_id;
@@ -221,16 +87,15 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
           throw std::runtime_error(xmsg.str());
 
         case EINVAL:
-          xmsg << "eRPC HugeAllocator: SHM malloc error: SHMMAX/SHMIN "
+          xmsg << "eRPC HugeAllocator: SHM allocation error: SHMMAX/SHMIN "
                << "mismatch. size = " << std::to_string(size) << " ("
                << std::to_string(size / MB(1)) << " MB)";
           throw std::runtime_error(xmsg.str());
 
         case ENOMEM:
           erpc_dprintf(
-              "eRPC HugeAllocator: SHM malloc error: Insufficient "
-              "memory. SHM key = %d, size = %lu (%lu MB).\n",
-              shm_key, size, size / MB(1));
+              "eRPC HugeAllocator: Insufficient memory. Can't reserve %lu MB\n",
+              size / MB(1));
           return false;
 
         default:
@@ -262,6 +127,14 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
 
   /* If we are here, the allocation succeeded. Record for deallocation. */
   memset(shm_buf, 0, size);
+
+  /* Add chunks to the largest class */
+  size_t num_chunks = size / kMaxAllocSize;
+  assert(num_chunks >= 1);
+  for (size_t i = 0; i < num_chunks; i++) {
+    void *chunk = (void *)((char *)shm_buf + (i * kMaxAllocSize));
+    freelist[kNumClasses - 1].push_back(chunk);
+  }
 
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size));
   tot_free_hugepages += (size / kHugepageSize);

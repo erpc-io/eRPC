@@ -26,8 +26,12 @@ namespace ERpc {
  * SHM regions created when it is deleted.
  */
 class HugeAllocator {
+#define class_to_size(c) (4ull * KB(1) * (1ull << (c)))
  private:
-  static const size_t kMaxAllocSize = (256 * 1024 * 1024 * 1024ull);
+  static const size_t kMaxAllocSize = (32 * 1024 * 1024);  ///< 32 MB
+  static const size_t kMinInitialSize = kMaxAllocSize;  ///< Need 1 32 MB chunk
+  static const size_t kNumClasses = 14;  ///< 4 KB, 8 KB, 16 KB, ..., 32 MB
+  static_assert(class_to_size(kNumClasses - 1) == kMaxAllocSize, "");
 
   SlowRand slow_rand;  ///< RNG to generate SHM keys
   size_t numa_node;    ///< NUMA node on which all memory is allocated
@@ -44,36 +48,13 @@ class HugeAllocator {
 
   /// Information about an SHM region
   struct shm_region_t {
-    const int key;            ///< The key used to create the SHM region
-    const void *alloc_buf;    ///< The start address of the allocated SHM buffer
-    const size_t alloc_size;  ///< The size in bytes of the allocated buffer
-    const size_t alloc_hugepages;  ///< The number of allocated hugepages
+    const int key;      ///< The key used to create the SHM region
+    const void *buf;    ///< The start address of the allocated SHM buffer
+    const size_t size;  ///< The size in bytes of the allocated buffer
 
-    std::vector<bool> free_hugepage_vec;  /// Bit-vector of free hugepages
-
-    /// For each index in \p free_hugepage_vec, store the number of contiguous
-    /// hugepages that were allocated using \p alloc_contiguous. This is
-    /// required do free allocated hugepages using just the address.
-    std::vector<size_t> nb_contig_vec;
-
-    size_t free_hugepages;  ///< The number of hugepages left in this region
-
-    shm_region_t(int key, void *buf, size_t alloc_size)
-        : key(key),
-          alloc_buf(buf),
-          alloc_size(alloc_size),
-          alloc_hugepages(alloc_size / kHugepageSize) {
-      assert(alloc_size % kHugepageSize == 0);
-
-      /* Mark all hugepages as free */
-      free_hugepage_vec.resize(alloc_hugepages);
-      nb_contig_vec.resize(alloc_hugepages);
-      for (size_t i = 0; i < alloc_hugepages; i++) {
-        free_hugepage_vec[i] = true;
-        nb_contig_vec[i] = 0;
-      }
-
-      free_hugepages = alloc_hugepages;
+    shm_region_t(int key, void *buf, size_t size)
+        : key(key), buf(buf), size(size) {
+      assert(size % kHugepageSize == 0);
     }
   };
 
@@ -82,66 +63,110 @@ class HugeAllocator {
    * size.
    */
   std::vector<shm_region_t> shm_list;
-  std::vector<void *> page_freelist;  ///< Currently free 4k pages
+  std::vector<void *> freelist[kNumClasses];  ///< Per-class freelist
 
  public:
   HugeAllocator(size_t initial_size, size_t numa_node);
   ~HugeAllocator();
 
-  /// Allocate a 4K page.
-  forceinline void *alloc_page() {
-    if (!page_freelist.empty()) {
-      /* Use the pages at the back to improve locality */
-      void *free_page = page_freelist.back();
-      page_freelist.pop_back();
+  forceinline size_t get_class(size_t size) {
+    size_t size_class = 0;        /* The size class for \p size */
+    size_t class_lim = 4 * KB(1); /* The max size for \p size_class */
+    while (size > class_lim) {
+      size_class++;
+      class_lim *= 2;
+    }
 
-      tot_memory_allocated += kPageSize;
-      return free_page;
+    return size_class;
+  }
+
+  forceinline void split(size_t size_class) {
+    assert(size_class >= 1);
+    assert(!freelist[size_class].empty());
+    assert(freelist[size_class - 1].empty());
+
+    if (!freelist[size_class].empty()) {
+      void *chunk = freelist[size_class].back();
+      freelist[size_class].pop_back();
+
+      size_t alloc_size = class_to_size(size_class);
+
+      void *chunk_0 = chunk;
+      void *chunk_1 = (void *)((char *)chunk + alloc_size / 2);
+
+      freelist[size_class - 1].push_back(chunk_0);
+      freelist[size_class - 1].push_back(chunk_1);
+    }
+  }
+
+  forceinline void *alloc_from_class(size_t size_class, size_t size) {
+    /* Use the chunks at the back to improve locality */
+    void *chunk = freelist[size_class].back();
+    freelist[size_class].pop_back();
+
+    tot_memory_allocated += size;
+    return chunk;
+  }
+
+  /// Allocate
+  forceinline void *alloc(size_t size) {
+    if (size >= kMaxAllocSize) {
+      throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
+    }
+
+    size_t size_class = get_class(size);
+    assert(size_class < kNumClasses);
+
+    if (!freelist[size_class].empty()) {
+      return alloc_from_class(size_class, size);
     } else {
-      /* There is no free 4K page. */
-      if (tot_free_hugepages == 0) {
+      /*
+       * There is no free chunk in this class. Find the first larger class with
+       * free chunks.
+       */
+      size_t next_class = size_class + 1;
+      for (; next_class < kNumClasses; next_class++) {
+        if (!freelist[next_class].empty()) {
+          break;
+        }
+      }
+
+      if (next_class == kNumClasses) {
+        /*
+         * There's no larger size class with free pages, we we need to allocate
+         * more hugepages. This adds some chunks to the largest class.
+         */
         prev_allocation_size *= 2;
         bool success = reserve_hugepages(prev_allocation_size, numa_node);
         if (!success) {
-          return nullptr; /* We're out of hugepages */
+          prev_allocation_size /= 2; /* Restore the previous allocation */
+          return nullptr;            /* We're out of hugepages */
+        } else {
+          next_class = kNumClasses - 1;
         }
       }
 
-      /*
-       * If we are here, there is at least one SHM region with a free hugepage.
-       * Pick the smallest (wrt allocation size) SHM region with a free hugepage
-       * and carve it into 4K pages. Note that multiple SHM regions can have
-       * free hugepages.
-       */
-      for (shm_region_t &shm_region : shm_list) {
-        if (shm_region.free_hugepages > 0) {
-          void *huge_buf = alloc_contiguous(shm_region, 1);
-          assert(huge_buf != nullptr); /* 1 hugepages should be available */
-          for (size_t i = 0; i < kHugepageSize; i += kPageSize) {
-            void *page_addr = (void *)((char *)huge_buf + i);
-            page_freelist.push_back(page_addr);
-          }
-
-          /* If we are here, we have a free 4K page */
-          assert(page_freelist.size() > 0);
-          void *free_page = page_freelist.back();
-          page_freelist.pop_back();
-
-          tot_memory_allocated += kPageSize;
-          return free_page;
-        }
+      /* If we're here, \p next_class has free chunks */
+      assert(next_class < kNumClasses);
+      while (next_class != size_class) {
+        split(next_class);
+        next_class--;
       }
+
+      assert(!freelist[size_class].empty());
+      return alloc_from_class(size_class, size);
     }
 
+    assert(false);
     exit(-1); /* We should never get here */
     return nullptr;
   }
 
-  forceinline void free_page(void *page) {
-    assert((uintptr_t)page % KB(4) == 0);
-    page_freelist.push_back(page);
+  forceinline void free(void *chunk, size_t size) {
+    size_t size_class = get_class(size);
+    freelist[size_class].push_back(chunk);
 
-    tot_memory_allocated -= kPageSize;
+    tot_memory_allocated -= size;
   }
 
   inline size_t get_numa_node() { return numa_node; }
@@ -157,12 +182,6 @@ class HugeAllocator {
     assert(tot_memory_allocated % kPageSize == 0);
     return tot_memory_allocated;
   }
-
-  /// Allocate a hugepage region with at least \p size bytes
-  void *alloc_huge(size_t size);
-
-  /// Free a hugepage memory region that was allocated using this allocator
-  void free_huge(void *huge_buf);
 
   /// Print a summary of this allocator
   void print_stats();

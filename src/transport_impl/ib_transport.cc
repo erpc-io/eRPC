@@ -180,7 +180,7 @@ void IBTransport::init_recvs() {
 
   /* Initialize the memory region for RECVs */
   size_t size = kRecvQueueDepth * kRecvSize;
-  recv_extent = (uint8_t *)huge_alloc->alloc_huge(size);
+  recv_extent = (uint8_t *)huge_alloc->alloc(size);
   if (recv_extent == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
          << (double)size / MB(1) << "MB for RECV buffers.";
