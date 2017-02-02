@@ -152,7 +152,7 @@ class SessionMgmtPkt {
                          udp_config->drop_prob);
     ssize_t ret = udp_client.send((char *)this, sizeof(*this));
     _unused(ret);
-    assert(ret == sizeof(*this));
+    assert(ret == (ssize_t)sizeof(*this));
   }
 
   /**
