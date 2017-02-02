@@ -1,6 +1,7 @@
 #ifndef ERPC_UDP_CLIENT_H
 #define ERPC_UDP_CLIENT_H
 
+#include <netdb.h>
 #include <stdlib.h>
 #include <string>
 #include "util/rand.h"

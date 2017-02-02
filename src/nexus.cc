@@ -153,7 +153,7 @@ void Nexus::session_mgnt_handler() {
   ssize_t recv_bytes =
       recvfrom(nexus_sock_fd, (void *)sm_pkt, sizeof(*sm_pkt), flags,
                (struct sockaddr *)&their_addr, &addr_len);
-  if (recv_bytes != sizeof(*sm_pkt)) {
+  if ((size_t)recv_bytes != sizeof(*sm_pkt)) {
     erpc_dprintf(
         "eRPC Nexus: FATAL. Received unexpected data size (%zd) from "
         "session management socket. Expected = %zu.\n",

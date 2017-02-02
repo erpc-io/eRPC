@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(eRPC)
 
-set(CMAKE_CXX_COMPILER g++-5)
-set(CMAKE_C_LINK_EXECUTABLE g++-5)
+set(CMAKE_CXX_COMPILER g++-6)
+set(CMAKE_C_LINK_EXECUTABLE g++-6)
 
 add_definitions(-std=c++11)
 
@@ -27,14 +27,16 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
+# In debug mode, O3 and LTO are disabled
 option(DEBUG "Enable debugging" OFF)
 if(DEBUG)
-  MESSAGE(WARNING "Debugging is ENABLED (to disable, run `cmake .. -DDEBUG=OFF`). Performance will be low.")
+  MESSAGE(WARNING "Debugging is enabled (to disable, run `cmake .. -DDEBUG=OFF`). O3 and LTO are disabled.")
   add_definitions(-Og)
 else(DEBUG)
-  MESSAGE(STATUS "Debugging is disabled (to enable, run `cmake .. -DDEBUG=ON`)")
+  MESSAGE(STATUS "Debugging is disabled (to enable, run `cmake .. -DDEBUG=ON`). O3 and LTO are enabled.")
   add_definitions(-DNDEBUG)
   add_definitions(-O3)
+  add_definitions(-flto)
 endif(DEBUG)
 
 set(SOURCES
@@ -65,23 +67,42 @@ set(SOURCES
   src/util/udp_client.cc
   src/util/udp_client.h)
 
-add_library(erpc ${SOURCES})
+if(DEBUG)
+  add_library(erpc ${SOURCES})
 
-add_executable(test_create_session tests/test_create_session.cc)
-target_link_libraries(test_create_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-add_test(NAME test_create_session COMMAND test_create_session)
+  add_executable(test_create_session tests/test_create_session.cc)
+  target_link_libraries(test_create_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_create_session COMMAND test_create_session)
 
-add_executable(test_create_session_args tests/test_create_session_args.cc)
-target_link_libraries(test_create_session_args
-                      erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-add_test(NAME test_create_session_args COMMAND test_create_session_args)
+  add_executable(test_create_session_args tests/test_create_session_args.cc)
+  target_link_libraries(test_create_session_args erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_create_session_args COMMAND test_create_session_args)
 
-add_executable(test_destroy_session tests/test_destroy_session.cc)
-target_link_libraries(test_destroy_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-add_test(NAME test_destroy_session COMMAND test_destroy_session)
+  add_executable(test_destroy_session tests/test_destroy_session.cc)
+  target_link_libraries(test_destroy_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_destroy_session COMMAND test_destroy_session)
 
-add_executable(test_huge_alloc tests/test_huge_alloc.cc)
-target_link_libraries(test_huge_alloc erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_executable(test_huge_alloc tests/test_huge_alloc.cc)
+  target_link_libraries(test_huge_alloc erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 
-add_executable(test_rand tests/test_rand.cc)
-target_link_libraries(test_rand erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_executable(test_rand tests/test_rand.cc)
+  target_link_libraries(test_rand erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+else(DEBUG)
+  add_executable(test_create_session tests/test_create_session.cc ${SOURCES})
+  target_link_libraries(test_create_session ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_create_session COMMAND test_create_session)
+
+  add_executable(test_create_session_args tests/test_create_session_args.cc ${SOURCES})
+  target_link_libraries(test_create_session_args ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_create_session_args COMMAND test_create_session_args)
+
+  add_executable(test_destroy_session tests/test_destroy_session.cc ${SOURCES})
+  target_link_libraries(test_destroy_session ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_destroy_session COMMAND test_destroy_session)
+
+  add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
+  target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
+
+  add_executable(test_rand tests/test_rand.cc ${SOURCES})
+  target_link_libraries(test_rand ${GTEST_LIBRARIES} ${LIBRARIES})
+endif(DEBUG)
