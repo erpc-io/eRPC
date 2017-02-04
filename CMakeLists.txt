@@ -41,10 +41,10 @@ endif(DEBUG)
 # LTO
 option(LTO "Enable link time optimization" OFF)
 if(LTO)
-  MESSAGE(WARNING "LTO is enabled (to disable, run `cmake . -DLTO=OFF`).")
-else(LTO)
-  MESSAGE(STATUS "LTO is disabled (to enable, run `cmake . -DLTO=ON`). Compilation will be slow.")
+  MESSAGE(WARNING "LTO is enabled (to disable, run `cmake . -DLTO=OFF`). Compilation will be slow.")
   add_definitions(-flto)
+else(LTO)
+  MESSAGE(STATUS "LTO is disabled (to enable, run `cmake . -DLTO=ON`).")
 endif(LTO)
 
 set(SOURCES

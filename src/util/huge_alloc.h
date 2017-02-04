@@ -14,58 +14,58 @@
 #include "util/rand.h"
 
 namespace ERpc {
+
+/// Information about an SHM region
+struct shm_region_t {
+  // Constructor args
+  const int shm_key;  ///< The key used to create the SHM region
+  const void *buf;    ///< The start address of the allocated SHM buffer
+  const size_t size;  ///< The size in bytes of the allocated buffer
+
+  // Filled in by Rpc when this region is registered
+  bool registered;  ///< Is this SHM region registered with the NIC?
+  uint32_t mr_key;  ///< The memory registration key filled by Rpc
+
+  shm_region_t(int shm_key, void *buf, size_t size)
+      : shm_key(shm_key), buf(buf), size(size) {
+    assert(size % kHugepageSize == 0);
+
+    /* Mark the region as unregistered */
+    registered = false;
+    mr_key = std::numeric_limits<uint32_t>::max();
+  }
+};
+
 /**
- * @brief A hugepage allocator that allows:
- * (a) Allocating and freeing hugepage-backed individual 4K pages. Freed 4K
- *     pages do NOT coalesce to re-form a hugepage chunk.
- * (b) Allocating and freeing multi-hugepage chunks of size >= 2MB. Freed,
- *     possibly multi-hugepage chunks coalesce to re-form larger contiguous
- *     regions.
+ * A hugepage allocator that uses per-class freelists. The minimum class size
+ * is 4 KB, and class size increases by a factor of 2 until kMaxAllocSize. When
+ * a new SHM region is added to the allocator, it is split into chunks of size
+ * kMaxAllocSize and added to that class. These chunks are later split to
+ * fill up smaller classes.
  *
  * The allocator uses randomly generated positive SHM keys, and deallocates the
  * SHM regions created when it is deleted.
  */
 class HugeAllocator {
-#define class_to_size(c) (4ull * KB(1) * (1ull << (c)))
+#define class_to_size(c) (KB(4) * (1ull << (c)))
  private:
   static const size_t kMaxAllocSize = (32 * 1024 * 1024);  ///< 32 MB
   static const size_t kMinInitialSize = kMaxAllocSize;  ///< Need 1 32 MB chunk
   static const size_t kNumClasses = 14;  ///< 4 KB, 8 KB, 16 KB, ..., 32 MB
   static_assert(class_to_size(kNumClasses - 1) == kMaxAllocSize, "");
 
+  std::vector<void *> freelist[kNumClasses];  ///< Per-class freelist
+
   SlowRand slow_rand;  ///< RNG to generate SHM keys
   size_t numa_node;    ///< NUMA node on which all memory is allocated
 
-  size_t tot_free_hugepages;  ///< Number of free hugepages over all SHM regions
-
-  /**
-   * The size of the previous hugepage allocation made internally by this
-   * allocator.
-   */
-  size_t prev_allocation_size;
-  size_t tot_memory_reserved;   ///< Total hugepage memory reserved by allocator
-  size_t tot_memory_allocated;  ///< Total memory allocated to users
-
-  /// Information about an SHM region
-  struct shm_region_t {
-    const int key;      ///< The key used to create the SHM region
-    const void *buf;    ///< The start address of the allocated SHM buffer
-    const size_t size;  ///< The size in bytes of the allocated buffer
-
-    shm_region_t(int key, void *buf, size_t size)
-        : key(key), buf(buf), size(size) {
-      assert(size % kHugepageSize == 0);
-    }
-  };
-
-  /*
-   * SHM regions used by this allocator, in order of increasing allocation-time
-   * size.
-   */
-  std::vector<shm_region_t> shm_list;
-  std::vector<void *> freelist[kNumClasses];  ///< Per-class freelist
+  size_t prev_allocation_size;  ///< Size of previous hugepage reservation
+  size_t stat_memory_reserved;  ///< Total hugepage memory reserved by allocator
+  size_t stat_memory_allocated;  ///< Total memory allocated to users
 
  public:
+  std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
+
   HugeAllocator(size_t initial_size, size_t numa_node);
   ~HugeAllocator();
 
@@ -106,7 +106,7 @@ class HugeAllocator {
     void *chunk = freelist[size_class].back();
     freelist[size_class].pop_back();
 
-    tot_memory_allocated += size;
+    stat_memory_allocated += size;
     return chunk;
   }
 
@@ -177,21 +177,21 @@ class HugeAllocator {
     size_t size_class = get_class(size);
     freelist[size_class].push_back(chunk);
 
-    tot_memory_allocated -= size;
+    stat_memory_allocated -= size;
   }
 
   inline size_t get_numa_node() { return numa_node; }
 
   /// Return the total amount of memory reserved as hugepages.
   inline size_t get_reserved_memory() {
-    assert(tot_memory_reserved % kHugepageSize == 0);
-    return tot_memory_reserved;
+    assert(stat_memory_reserved % kHugepageSize == 0);
+    return stat_memory_reserved;
   }
 
   /// Return the total amount of memory allocated to the user.
   size_t get_allocated_memory() {
-    assert(tot_memory_allocated % kPageSize == 0);
-    return tot_memory_allocated;
+    assert(stat_memory_allocated % kPageSize == 0);
+    return stat_memory_allocated;
   }
 
   /// Populate the 4 KB class with at least \p num_chunks chunks.

@@ -4,10 +4,7 @@
 namespace ERpc {
 
 HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node)
-    : numa_node(numa_node),
-      tot_free_hugepages(0),
-      tot_memory_reserved(0),
-      tot_memory_allocated(0) {
+    : numa_node(numa_node), stat_memory_reserved(0), stat_memory_allocated(0) {
   assert(numa_node <= kMaxNumaNodes);
 
   if (initial_size < kMinInitialSize) {
@@ -25,7 +22,7 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node)
 HugeAllocator::~HugeAllocator() {
   /* Delete the created SHM regions */
   for (shm_region_t &shm_region : shm_list) {
-    delete_shm(shm_region.key, shm_region.buf);
+    delete_shm(shm_region.shm_key, shm_region.buf);
   }
 }
 
@@ -58,9 +55,9 @@ bool HugeAllocator::create_4k_chunk_cache(size_t cache_chunks) {
 void HugeAllocator::print_stats() {
   fprintf(stderr, "eRPC HugeAllocator stats:\n");
   fprintf(stderr, "Total reserved memory = %zu bytes (%.2f MB)\n",
-          tot_memory_reserved, (double)tot_memory_reserved / MB(1));
+          stat_memory_reserved, (double)stat_memory_reserved / MB(1));
   fprintf(stderr, "Total memory allocated to users = %zu bytes (%.2f MB)\n",
-          tot_memory_allocated, (double)tot_memory_allocated / MB(1));
+          stat_memory_allocated, (double)stat_memory_allocated / MB(1));
 
   fprintf(stderr, "%zu SHM regions\n", shm_list.size());
   size_t shm_region_index = 0;
@@ -163,8 +160,7 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   }
 
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size));
-  tot_free_hugepages += (size / kHugepageSize);
-  tot_memory_reserved += size;
+  stat_memory_reserved += size;
 
   return true;
 }
