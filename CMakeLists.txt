@@ -27,17 +27,25 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
-# In debug mode, O3 and LTO are disabled
+# Debug mode
 option(DEBUG "Enable debugging" OFF)
 if(DEBUG)
-  MESSAGE(WARNING "Debugging is enabled (to disable, run `cmake .. -DDEBUG=OFF`). O3 and LTO are disabled.")
+  MESSAGE(WARNING "Debugging is enabled (to disable, run `cmake . -DDEBUG=OFF`).")
   add_definitions(-Og)
 else(DEBUG)
-  MESSAGE(STATUS "Debugging is disabled (to enable, run `cmake .. -DDEBUG=ON`). O3 and LTO are enabled.")
+  MESSAGE(STATUS "Debugging is disabled (to enable, run `cmake . -DDEBUG=ON`).")
   add_definitions(-DNDEBUG)
   add_definitions(-O3)
-  add_definitions(-flto)
 endif(DEBUG)
+
+# LTO
+option(LTO "Enable link time optimization" OFF)
+if(LTO)
+  MESSAGE(WARNING "LTO is enabled (to disable, run `cmake . -DLTO=OFF`).")
+else(LTO)
+  MESSAGE(STATUS "LTO is disabled (to enable, run `cmake . -DLTO=ON`). Compilation will be slow.")
+  add_definitions(-flto)
+endif(LTO)
 
 set(SOURCES
   src/common.h
@@ -67,7 +75,27 @@ set(SOURCES
   src/util/udp_client.cc
   src/util/udp_client.h)
 
-if(DEBUG)
+if(LTO)
+  # Using a compiled eRPC library with CMake and LTO is difficult.
+  # See Evernote for details.
+  add_executable(test_create_session tests/test_create_session.cc ${SOURCES})
+  target_link_libraries(test_create_session ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_create_session COMMAND test_create_session)
+
+  add_executable(test_create_session_args tests/test_create_session_args.cc ${SOURCES})
+  target_link_libraries(test_create_session_args ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_create_session_args COMMAND test_create_session_args)
+
+  add_executable(test_destroy_session tests/test_destroy_session.cc ${SOURCES})
+  target_link_libraries(test_destroy_session ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_destroy_session COMMAND test_destroy_session)
+
+  add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
+  target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
+
+  add_executable(test_rand tests/test_rand.cc ${SOURCES})
+  target_link_libraries(test_rand ${GTEST_LIBRARIES} ${LIBRARIES})
+else(LTO)
   add_library(erpc ${SOURCES})
 
   add_executable(test_create_session tests/test_create_session.cc)
@@ -87,22 +115,4 @@ if(DEBUG)
 
   add_executable(test_rand tests/test_rand.cc)
   target_link_libraries(test_rand erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-else(DEBUG)
-  add_executable(test_create_session tests/test_create_session.cc ${SOURCES})
-  target_link_libraries(test_create_session ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_create_session COMMAND test_create_session)
-
-  add_executable(test_create_session_args tests/test_create_session_args.cc ${SOURCES})
-  target_link_libraries(test_create_session_args ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_create_session_args COMMAND test_create_session_args)
-
-  add_executable(test_destroy_session tests/test_destroy_session.cc ${SOURCES})
-  target_link_libraries(test_destroy_session ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_destroy_session COMMAND test_destroy_session)
-
-  add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
-  target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
-
-  add_executable(test_rand tests/test_rand.cc ${SOURCES})
-  target_link_libraries(test_rand ${GTEST_LIBRARIES} ${LIBRARIES})
-endif(DEBUG)
+endif(LTO)
