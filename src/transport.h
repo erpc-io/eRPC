@@ -7,10 +7,10 @@
 
 #include <string>
 #include "common.h"
-#include "huge_alloc.h"
 #include "session.h"
 #include "transport_types.h"
 #include "util/buffer.h"
+#include "util/huge_alloc.h"
 
 namespace ERpc {
 

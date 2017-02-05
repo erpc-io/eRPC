@@ -49,8 +49,6 @@ endif(LTO)
 
 set(SOURCES
   src/common.h
-  src/huge_alloc.cc
-  src/huge_alloc.h
   src/nexus.cc
   src/nexus.h
   src/rpc.h
@@ -70,6 +68,8 @@ set(SOURCES
   src/util/barrier.h
   src/util/buffer.cc
   src/util/buffer.h
+  src/util/huge_alloc.cc
+  src/util/huge_alloc.h
   src/util/rand.cc
   src/util/rand.h
   src/util/udp_client.cc
