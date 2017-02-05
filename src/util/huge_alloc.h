@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common.h"
+#include "transport_types.h"
 #include "util/rand.h"
 
 namespace ERpc {
@@ -23,8 +24,8 @@ struct shm_region_t {
   const size_t size;  ///< The size in bytes of the allocated buffer
 
   // Filled in by Rpc when this region is registered
-  bool registered;  ///< Is this SHM region registered with the NIC?
-  uint32_t mr_key;  ///< The memory registration key filled by Rpc
+  bool registered;          ///< Is this SHM region registered with the NIC?
+  MemRegInfo mem_reg_info;  ///< The transport-specific memory registration info
 
   shm_region_t(int shm_key, void *buf, size_t size)
       : shm_key(shm_key), buf(buf), size(size) {
@@ -32,7 +33,7 @@ struct shm_region_t {
 
     /* Mark the region as unregistered */
     registered = false;
-    mr_key = std::numeric_limits<uint32_t>::max();
+    memset((void *)&mem_reg_info, 0, sizeof(mem_reg_info));
   }
 };
 
@@ -54,6 +55,7 @@ class HugeAllocator {
   static const size_t kNumClasses = 14;  ///< 4 KB, 8 KB, 16 KB, ..., 32 MB
   static_assert(class_to_size(kNumClasses - 1) == kMaxAllocSize, "");
 
+  std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
   std::vector<void *> freelist[kNumClasses];  ///< Per-class freelist
 
   SlowRand slow_rand;  ///< RNG to generate SHM keys
@@ -64,51 +66,8 @@ class HugeAllocator {
   size_t stat_memory_allocated;  ///< Total memory allocated to users
 
  public:
-  std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
-
   HugeAllocator(size_t initial_size, size_t numa_node);
   ~HugeAllocator();
-
-  forceinline size_t get_class(size_t size) {
-    size_t size_class = 0;        /* The size class for \p size */
-    size_t class_lim = 4 * KB(1); /* The max size for \p size_class */
-    while (size > class_lim) {
-      size_class++;
-      class_lim *= 2;
-    }
-
-    return size_class;
-  }
-
-  /// Split one chunk from class \p size_class into two chunks of the previous
-  /// class, which much be empty.
-  forceinline void split(size_t size_class) {
-    assert(size_class >= 1);
-    assert(!freelist[size_class].empty());
-    assert(freelist[size_class - 1].empty());
-
-    void *chunk = freelist[size_class].back();
-    freelist[size_class].pop_back();
-
-    size_t class_size = class_to_size(size_class);
-
-    void *chunk_0 = chunk;
-    void *chunk_1 = (void *)((char *)chunk + class_size / 2);
-
-    freelist[size_class - 1].push_back(chunk_0);
-    freelist[size_class - 1].push_back(chunk_1);
-  }
-
-  /// Allocate a chunk from class \p size_class, and add \p size bytes to
-  /// the allocated memory.
-  forceinline void *alloc_from_class(size_t size_class, size_t size) {
-    /* Use the chunks at the back to improve locality */
-    void *chunk = freelist[size_class].back();
-    freelist[size_class].pop_back();
-
-    stat_memory_allocated += size;
-    return chunk;
-  }
 
   /// Special simplified function for allocating 4 KB pages
   forceinline void *alloc_4k() {
@@ -119,9 +78,9 @@ class HugeAllocator {
     }
   }
 
-  /// Allocate
+  /// Allocate a chunk of with \p size bytes
   forceinline void *alloc(size_t size) {
-    if (size >= kMaxAllocSize) {
+    if (unlikely(size > kMaxAllocSize)) {
       throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
     }
 
@@ -173,6 +132,7 @@ class HugeAllocator {
     return nullptr;
   }
 
+  /// Free a chunk
   forceinline void free(void *chunk, size_t size) {
     size_t size_class = get_class(size);
     freelist[size_class].push_back(chunk);
@@ -201,14 +161,54 @@ class HugeAllocator {
   void print_stats();
 
  private:
-  /**
-   * @brief Try to allocate \p num_hugepages contiguous huge pages from \p
-   * shm_region. This uses the free hugepages bitvector in the SHM region.
-   *
-   * @return The address of the allocated buffer if allocation succeeds. NULL
-   * if allocation is not possible.
-   */
-  void *alloc_contiguous(shm_region_t &shm_region, size_t num_hugepages);
+  /// Get the class index for a chunk size
+  /// XXX: Use inline asm to improve perf
+  forceinline size_t get_class(size_t size) {
+    assert(size >= 1 && size <= kMaxAllocSize);
+
+    size_t size_class = 0;        /* The size class for \p size */
+    size_t class_lim = 4 * KB(1); /* The max size for \p size_class */
+    while (size > class_lim) {
+      size_class++;
+      class_lim *= 2;
+    }
+
+    return size_class;
+  }
+
+  /// Split one chunk from class \p size_class into two chunks of the previous
+  /// class, which much be empty.
+  forceinline void split(size_t size_class) {
+    assert(size_class >= 1);
+    assert(!freelist[size_class].empty());
+    assert(freelist[size_class - 1].empty());
+
+    void *chunk = freelist[size_class].back();
+    freelist[size_class].pop_back();
+
+    size_t class_size = class_to_size(size_class);
+
+    void *chunk_0 = chunk;
+    void *chunk_1 = (void *)((char *)chunk + class_size / 2);
+
+    freelist[size_class - 1].push_back(chunk_0);
+    freelist[size_class - 1].push_back(chunk_1);
+  }
+
+  /// Allocate a chunk from class \p size_class, and add \p size bytes to
+  /// the allocated memory.
+  forceinline void *alloc_from_class(size_t size_class, size_t size) {
+    assert(size_class < kNumClasses);
+    assert(size > (size_class == 0 ? 0 : class_to_size(size_class - 1)) &&
+           size <= class_to_size(size_class));
+
+    /* Use the chunks at the back to improve locality */
+    void *chunk = freelist[size_class].back();
+    freelist[size_class].pop_back();
+
+    stat_memory_allocated += size;
+    return chunk;
+  }
 
   /**
    * @brief Try to reserve \p size (rounded to 2MB) bytes as huge pages on

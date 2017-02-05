@@ -28,14 +28,14 @@ class Transport {
 
   ~Transport();
 
+  void send_message(Session *session, const Buffer *buffer);
+  void poll_completions();
+
   /// Fill-in the transport-specific routing information
   void fill_routing_info(RoutingInfo *routing_info) const;
 
   /// Return a string representation of \p routing_info
   std::string routing_info_str(RoutingInfo *routing_info) const;
-
-  void send_message(Session *session, const Buffer *buffer);
-  void poll_completions();
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;

@@ -1,9 +1,11 @@
 /**
  * @file transport_types.h
- * @brief The fabrics supported by eRPC. This stuff cannot go in transport.h
- * because that will create a circular dependency between transport.h and
- * session.h. (transport.h requires session.h, but session.h requires only
- * TransportType nad RoutingInfo.)
+ *
+ * @brief Generic definitions required to support multiple fabrics.
+ *
+ * This stuff cannot go in transport.h. Several classes (e.g., Session and
+ * HugeAlloc) require these generic definitions, and these classes are in turn
+ * required by the Transport class.
  */
 
 #ifndef ERPC_TRANSPORT_TYPE_H
@@ -16,13 +18,19 @@
 namespace ERpc {
 
 static const size_t kMaxRoutingInfoSize = 128;  ///< Space for routing info
+static const size_t kMaxMemRegInfoSize = 64;  ///< Space for memory registration
 
-enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
-
-/// Generic class to store routing info for any transport.
+/// Generic struct to store routing info for any transport.
 struct RoutingInfo {
   uint8_t buf[kMaxRoutingInfoSize];
 };
+
+/// Generic struct to store memory registration info for any transport.
+struct MemRegInfo {
+  uint8_t buf[kMaxMemRegInfoSize];
+};
+
+enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
 
 static std::string get_transport_name(TransportType transport_type) {
   switch (transport_type) {

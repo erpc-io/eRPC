@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(eRPC)
 
-set(CMAKE_CXX_COMPILER g++-6)
-set(CMAKE_C_LINK_EXECUTABLE g++-6)
+set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_C_LINK_EXECUTABLE g++)
 
 add_definitions(-std=c++11)
 
