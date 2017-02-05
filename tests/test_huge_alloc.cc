@@ -8,6 +8,22 @@
 #define SYSTEM_HUGEPAGES (512) /* The number of hugepages available */
 #define SYSTEM_4K_PAGES (SYSTEM_HUGEPAGES * 512) /* Number of 4K pages*/
 
+#define DUMMY_MR_PTR ((void *)0x3185)
+#define DUMMY_LKEY (3186)
+
+// Dummy registration and deregistration functions
+ERpc::MemRegInfo reg_mr_wrapper(void *buf, size_t size) {
+  _unused(buf);
+  _unused(size);
+  return ERpc::MemRegInfo(DUMMY_MR_PTR, DUMMY_LKEY); /* *transport_mr, lkey */
+}
+
+void dereg_mr_wrapper(ERpc::MemRegInfo mr) { _unused(mr); }
+
+using namespace std::placeholders;
+typename ERpc::reg_mr_func_t reg_mr_func = std::bind(reg_mr_wrapper, _1, _2);
+typename ERpc::dereg_mr_func_t dereg_mr_func = std::bind(dereg_mr_wrapper, _1);
+
 /**
  * @brief Measure performance of page allocation where all pages are allocated
  * without first creating a page cache.
@@ -16,8 +32,8 @@
  */
 TEST(HugeAllocatorTest, PageAllocPerf) {
   /* Reserve all memory for high perf */
-  ERpc::HugeAllocator *allocator =
-      new ERpc::HugeAllocator(SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0);
+  ERpc::HugeAllocator *allocator = new ERpc::HugeAllocator(
+      SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
 
   size_t num_pages_allocated = 0;
 
@@ -49,8 +65,8 @@ TEST(HugeAllocatorTest, PageAllocPerf) {
  */
 TEST(HugeAllocatorTest, PageAllocPerfWithCache) {
   /* Reserve all memory for high perf */
-  ERpc::HugeAllocator *allocator =
-      new ERpc::HugeAllocator(SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0);
+  ERpc::HugeAllocator *allocator = new ERpc::HugeAllocator(
+      SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
 
   size_t page_cache_size = SYSTEM_4K_PAGES / 2;
   allocator->create_4k_chunk_cache(page_cache_size);
@@ -81,8 +97,8 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCache) {
  */
 TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
   /* Reserve all memory for high perf */
-  ERpc::HugeAllocator *allocator =
-      new ERpc::HugeAllocator(SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0);
+  ERpc::HugeAllocator *allocator = new ERpc::HugeAllocator(
+      SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
 
   size_t page_cache_size = SYSTEM_4K_PAGES / 2;
   allocator->create_4k_chunk_cache(page_cache_size);
@@ -113,7 +129,7 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
 TEST(HugeAllocatorTest, 2MBChunksSingleRun) {
   ERpc::HugeAllocator *allocator;
 
-  allocator = new ERpc::HugeAllocator(1024, 0);
+  allocator = new ERpc::HugeAllocator(1024, 0, reg_mr_func, dereg_mr_func);
   size_t num_hugepages_allocated = 0;
   for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
     void *buf = allocator->alloc(2 * 1024 * 1024);
@@ -137,7 +153,7 @@ TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
   ERpc::HugeAllocator *allocator;
 
   for (int iters = 0; iters < 20; iters++) {
-    allocator = new ERpc::HugeAllocator(1024, 0);
+    allocator = new ERpc::HugeAllocator(1024, 0, reg_mr_func, dereg_mr_func);
     for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
       void *buf = allocator->alloc(2 * 1024 * 1024);
       if (buf == nullptr) {
@@ -162,7 +178,7 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
   };
 
   ERpc::HugeAllocator *allocator;
-  allocator = new ERpc::HugeAllocator(1024, 0);
+  allocator = new ERpc::HugeAllocator(1024, 0, reg_mr_func, dereg_mr_func);
 
   for (size_t i = 0; i < 10; i++) {
     size_t app_memory = 0;
@@ -215,7 +231,7 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
  */
 TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
   ERpc::HugeAllocator *allocator;
-  allocator = new ERpc::HugeAllocator(1024, 0);
+  allocator = new ERpc::HugeAllocator(1024, 0, reg_mr_func, dereg_mr_func);
 
   size_t app_memory = 0;
 

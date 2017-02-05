@@ -7,12 +7,16 @@
 
 namespace ERpc {
 
-IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port,
-                         HugeAllocator *huge_alloc)
-    : Transport(TransportType::kInfiniBand, kMTU, app_tid, phy_port,
-                huge_alloc) {
+/*
+ * Initialize the protection domain, queue pair, and memory registration and
+ * deregistration functions. RECVs will be initialized later when the hugepage
+ * allocator is provided.
+ */
+IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port)
+    : Transport(TransportType::kInfiniBand, kMTU, app_tid, phy_port) {
   resolve_phy_port();
   init_infiniband_structs();
+  init_mem_reg_funcs();
 
   erpc_dprintf("eRPC IBTransport: Created for TID %u. Device %s, port %d.\n",
                app_tid, ib_ctx->device->name, dev_port_id);
@@ -173,6 +177,14 @@ void IBTransport::init_infiniband_structs() {
   if (ibv_modify_qp(qp, &rtr_attr, IBV_QP_STATE | IBV_QP_SQ_PSN)) {
     throw std::runtime_error("eRPC IBTransport: Failed to modify QP to RTS");
   }
+}
+
+void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc) {
+  this->huge_alloc = huge_alloc;
+  this->numa_node = huge_alloc->get_numa_node();
+
+  init_recvs();
+  init_sends();
 }
 
 void IBTransport::init_recvs() {

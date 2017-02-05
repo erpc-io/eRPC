@@ -27,13 +27,9 @@ struct shm_region_t {
   bool registered;          ///< Is this SHM region registered with the NIC?
   MemRegInfo mem_reg_info;  ///< The transport-specific memory registration info
 
-  shm_region_t(int shm_key, void *buf, size_t size)
-      : shm_key(shm_key), buf(buf), size(size) {
+  shm_region_t(int shm_key, void *buf, size_t size, MemRegInfo mem_reg_info)
+      : shm_key(shm_key), buf(buf), size(size), mem_reg_info(mem_reg_info) {
     assert(size % kHugepageSize == 0);
-
-    /* Mark the region as unregistered */
-    registered = false;
-    memset((void *)&mem_reg_info, 0, sizeof(mem_reg_info));
   }
 };
 
@@ -61,12 +57,16 @@ class HugeAllocator {
   SlowRand slow_rand;  ///< RNG to generate SHM keys
   size_t numa_node;    ///< NUMA node on which all memory is allocated
 
+  reg_mr_func_t reg_mr_func;
+  dereg_mr_func_t dereg_mr_func;
+
   size_t prev_allocation_size;  ///< Size of previous hugepage reservation
   size_t stat_memory_reserved;  ///< Total hugepage memory reserved by allocator
   size_t stat_memory_allocated;  ///< Total memory allocated to users
 
  public:
-  HugeAllocator(size_t initial_size, size_t numa_node);
+  HugeAllocator(size_t initial_size, size_t numa_node,
+                reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func);
   ~HugeAllocator();
 
   /// Special simplified function for allocating 4 KB pages

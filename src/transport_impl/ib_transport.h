@@ -26,10 +26,18 @@ class IBTransport : public Transport {
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 
  public:
-  /// Construct the transport object. Throws \p runtime_error if creation fails.
-  /// This exception is caught in the creator Rpc, which then deletes
-  /// \p huge_alloc.
-  IBTransport(uint8_t phy_port, uint8_t app_tid, HugeAllocator *huge_alloc);
+  /**
+   * @brief Partially construct the transport object without using eRPC's
+   * hugepage allocator. The device driver is allowed to use its own hugepages.
+   *
+   * This function must initialize \p reg_mr_func and \p dereg_mr_func.
+   *
+   * @throw \p runtime_error if creation fails.
+   */
+  IBTransport(uint8_t phy_port, uint8_t app_tid);
+
+  void init_hugepage_structures(HugeAllocator *huge_alloc);
+
   ~IBTransport();
 
   void fill_routing_info(RoutingInfo *routing_info) const;
@@ -50,8 +58,40 @@ class IBTransport : public Transport {
   /// If this function returns, these members are valid.
   void resolve_phy_port();
 
-  /// Initialize device context, queue pairs, memory regions etc
+  /// Initialize device context, protection domain, and queue pair, without
+  /// using hugepages.
   void init_infiniband_structs();
+
+  /// A function wrapper whose \p pd argument is later bound to generate
+  /// \p reg_mr_func
+  static MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
+                                       size_t size) {
+    struct ibv_mr *mr = ibv_reg_mr(pd, buf, size, IBV_ACCESS_LOCAL_WRITE);
+    if (mr == nullptr) {
+      throw std::runtime_error(
+          "eRPC IBTransport: Failed to register memory region");
+    }
+    return MemRegInfo(mr, mr->lkey);
+  }
+
+  /// A function wrapper used to generate \p dereg_mr_func
+  static void ibv_dereg_mr_wrapper(MemRegInfo mr) {
+    struct ibv_mr *ib_mr = (struct ibv_mr *)mr.transport_mr;
+    int ret = ibv_dereg_mr(ib_mr);
+
+    if (ret != 0) {
+      throw std::runtime_error(
+          "eRPC IBTransport: Failed to deregister memory region");
+    }
+  }
+
+  /// Initialize the memory registration and deregistratin functions
+  void init_mem_reg_funcs() {
+    assert(pd != nullptr);
+    using namespace std::placeholders;
+    reg_mr_func = std::bind(ibv_reg_mr_wrapper, pd, _1, _2);
+    dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
+  }
 
   /// Initialize RECV buffers and constant fields of RECV descriptors
   void init_recvs();

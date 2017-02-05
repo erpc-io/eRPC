@@ -24,7 +24,15 @@ static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 class Transport {
  public:
   Transport(TransportType transport_type, size_t mtu, uint8_t app_tid,
-            uint8_t phy_port, HugeAllocator *huge_alloc);
+            uint8_t phy_port);
+
+  /// Initialize transport structures that require hugepages.
+  /// Throws \p runtime_error if initialization fails. This exception is caught
+  /// in the creator Rpc, which then deletes \p huge_alloc.
+  void init_hugepage_structures(HugeAllocator *huge_alloc);
+
+  /// Initialize the memory registration and deregistratin functions
+  void init_mem_reg_funcs();
 
   ~Transport();
 
@@ -42,10 +50,14 @@ class Transport {
   const size_t mtu;
   const uint8_t app_tid; /* Debug-only */
   const uint8_t phy_port;
-  HugeAllocator *huge_alloc; /* The parent Rpc's hugepage allocator */
 
-  // Derived members
-  const size_t numa_node; /* Derived from @huge_alloc */
+  // Other members
+  reg_mr_func_t reg_mr_func;      ///< The memory registration function
+  dereg_mr_func_t dereg_mr_func;  ///< The memory deregistration function
+
+  // Members initialized after the hugepage allocator is provided
+  HugeAllocator *huge_alloc;  ///< The parent Rpc's hugepage allocator
+  size_t numa_node;           ///< Derived from \p huge_alloc
 };
 
 }  // End ERpc

@@ -3,8 +3,14 @@
 
 namespace ERpc {
 
-HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node)
-    : numa_node(numa_node), stat_memory_reserved(0), stat_memory_allocated(0) {
+HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
+                             reg_mr_func_t reg_mr_func,
+                             dereg_mr_func_t dereg_mr_func)
+    : numa_node(numa_node),
+      reg_mr_func(reg_mr_func),
+      dereg_mr_func(dereg_mr_func),
+      stat_memory_reserved(0),
+      stat_memory_allocated(0) {
   assert(numa_node <= kMaxNumaNodes);
 
   if (initial_size < kMinInitialSize) {
@@ -148,8 +154,15 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
     throw std::runtime_error(xmsg.str());
   }
 
-  /* If we are here, the allocation succeeded. Record for deallocation. */
+  /*
+   * If we are here, the allocation succeeded. Register the allocated buffer and
+   * record in the \p shm_list.
+   */
   memset(shm_buf, 0, size);
+  MemRegInfo reg_info = reg_mr_func(shm_buf, size);
+
+  shm_list.push_back(shm_region_t(shm_key, shm_buf, size, reg_info));
+  stat_memory_reserved += size;
 
   /* Add chunks to the largest class */
   size_t num_chunks = size / kMaxAllocSize;
@@ -158,9 +171,6 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
     void *chunk = (void *)((char *)shm_buf + (i * kMaxAllocSize));
     freelist[kNumClasses - 1].push_back(chunk);
   }
-
-  shm_list.push_back(shm_region_t(shm_key, shm_buf, size));
-  stat_memory_reserved += size;
 
   return true;
 }

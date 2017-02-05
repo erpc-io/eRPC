@@ -12,6 +12,7 @@
 #define ERPC_TRANSPORT_TYPE_H
 
 #include <strings.h>
+#include <functional>
 #include <string>
 #include "common.h"
 
@@ -27,8 +28,15 @@ struct RoutingInfo {
 
 /// Generic struct to store memory registration info for any transport.
 struct MemRegInfo {
-  uint8_t buf[kMaxMemRegInfoSize];
+  void *transport_mr;
+  uint32_t lkey;
+
+  MemRegInfo(void *transport_mr, uint32_t lkey)
+      : transport_mr(transport_mr), lkey(lkey) {}
 };
+
+typedef std::function<MemRegInfo(void *, size_t)> reg_mr_func_t;
+typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
 
 enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
 

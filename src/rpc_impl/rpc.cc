@@ -49,11 +49,20 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
     return;
   }
 
-  /* Initialize the hugepage allocator and transport */
-  huge_alloc = new HugeAllocator(kInitialHugeAllocSize, numa_node);
+  /*
+   * Partially initialize the transport without using hugepages. This
+   * initializes the transport's memory registration functions required for
+   * the hugepage allocator.
+   */
+  transport = new Transport_(app_tid, phy_port);
+
+  huge_alloc =
+      new HugeAllocator(kInitialHugeAllocSize, numa_node,
+                        transport->reg_mr_func, transport->dereg_mr_func);
 
   try {
-    transport = new Transport_(app_tid, phy_port, huge_alloc);
+    /* Complete transport initialization using the hugepage allocator */
+    transport->init_hugepage_structures(huge_alloc);
   } catch (std::runtime_error e) {
     /* Free any huge pages that \p transport might have created */
     delete huge_alloc;
