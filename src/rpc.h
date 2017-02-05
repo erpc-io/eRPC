@@ -4,12 +4,12 @@
 #include <random>
 #include <vector>
 #include "common.h"
+#include "huge_alloc.h"
 #include "nexus.h"
 #include "session.h"
 #include "transport.h"
 #include "transport_impl/ib_transport.h"
 #include "util/buffer.h"
-#include "util/huge_alloc.h"
 #include "util/rand.h"
 
 namespace ERpc {
