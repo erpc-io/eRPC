@@ -33,6 +33,13 @@ struct shm_region_t {
   }
 };
 
+struct chunk_t {
+  void *buf;
+  uint32_t lkey;
+
+  chunk_t(void *buf, uint32_t lkey) : buf(buf), lkey(lkey){};
+};
+
 /**
  * A hugepage allocator that uses per-class freelists. The minimum class size
  * is 4 KB, and class size increases by a factor of 2 until kMaxAllocSize. When
@@ -52,7 +59,7 @@ class HugeAllocator {
   static_assert(class_to_size(kNumClasses - 1) == kMaxAllocSize, "");
 
   std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
-  std::vector<void *> freelist[kNumClasses];  ///< Per-class freelist
+  std::vector<chunk_t> freelist[kNumClasses];  ///< Per-class freelist
 
   SlowRand slow_rand;  ///< RNG to generate SHM keys
   size_t numa_node;    ///< NUMA node on which all memory is allocated
@@ -70,16 +77,16 @@ class HugeAllocator {
   ~HugeAllocator();
 
   /// Special simplified function for allocating 4 KB pages
-  forceinline void *alloc_4k() {
+  forceinline void *alloc_4k(uint32_t *lkey) {
     if (!freelist[0].empty()) {
-      return alloc_from_class(0, KB(4));
+      return alloc_from_class(0, KB(4), lkey);
     } else {
-      return alloc(KB(4));
+      return alloc(KB(4), lkey);
     }
   }
 
   /// Allocate a chunk of with \p size bytes
-  forceinline void *alloc(size_t size) {
+  forceinline void *alloc(size_t size, uint32_t *lkey) {
     if (unlikely(size > kMaxAllocSize)) {
       throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
     }
@@ -88,7 +95,7 @@ class HugeAllocator {
     assert(size_class < kNumClasses);
 
     if (!freelist[size_class].empty()) {
-      return alloc_from_class(size_class, size);
+      return alloc_from_class(size_class, size, lkey);
     } else {
       /*
        * There is no free chunk in this class. Find the first larger class with
@@ -124,7 +131,7 @@ class HugeAllocator {
       }
 
       assert(!freelist[size_class].empty());
-      return alloc_from_class(size_class, size);
+      return alloc_from_class(size_class, size, lkey);
     }
 
     assert(false);
@@ -133,7 +140,7 @@ class HugeAllocator {
   }
 
   /// Free a chunk
-  forceinline void free(void *chunk, size_t size) {
+  forceinline void free(chunk_t chunk, size_t size) {
     size_t size_class = get_class(size);
     freelist[size_class].push_back(chunk);
 
@@ -183,31 +190,36 @@ class HugeAllocator {
     assert(!freelist[size_class].empty());
     assert(freelist[size_class - 1].empty());
 
-    void *chunk = freelist[size_class].back();
-    freelist[size_class].pop_back();
-
     size_t class_size = class_to_size(size_class);
 
-    void *chunk_0 = chunk;
-    void *chunk_1 = (void *)((char *)chunk + class_size / 2);
+    chunk_t &chunk = freelist[size_class].back();
 
+    auto chunk_0 = chunk_t(chunk.buf, chunk.lkey);
+    auto chunk_1 =
+        chunk_t((void *)((char *)chunk.buf + class_size / 2), chunk.lkey);
+
+    freelist[size_class].pop_back(); /* Pop after we don't need the reference */
     freelist[size_class - 1].push_back(chunk_0);
     freelist[size_class - 1].push_back(chunk_1);
   }
 
   /// Allocate a chunk from class \p size_class, and add \p size bytes to
-  /// the allocated memory.
-  forceinline void *alloc_from_class(size_t size_class, size_t size) {
+  /// the allocated memory statistic.
+  forceinline void *alloc_from_class(size_t size_class, size_t size,
+                                     uint32_t *lkey) {
     assert(size_class < kNumClasses);
     assert(size > (size_class == 0 ? 0 : class_to_size(size_class - 1)) &&
            size <= class_to_size(size_class));
 
     /* Use the chunks at the back to improve locality */
-    void *chunk = freelist[size_class].back();
+    chunk_t &chunk = freelist[size_class].back();
+    void *ret = chunk.buf;
+    *lkey = chunk.lkey;
+
     freelist[size_class].pop_back();
 
     stat_memory_allocated += size;
-    return chunk;
+    return ret;
   }
 
   /**

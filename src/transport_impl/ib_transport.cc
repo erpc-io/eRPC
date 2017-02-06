@@ -22,8 +22,36 @@ IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port)
                app_tid, ib_ctx->device->name, dev_port_id);
 }
 
+/*
+ * The transport destructore is called after \p huge_alloc has already been
+ * destroyed by \p Rpc. Deleting \p huge_alloc deregisters and frees all SHM
+ * memory regions.
+ *
+ * We only need to clean up non-hugepage structures.
+ */
 IBTransport::~IBTransport() {
-  /* Do not destroy @huge_alloc; the parent Rpc will do it. */
+  // Destroy QPs and CQs. QPs must be destroyed before CQs.
+  if (ibv_destroy_qp(qp)) {
+    throw std::runtime_error("eRPC IBTransport: Failed to destroy QP.");
+  }
+
+  if (ibv_destroy_cq(send_cq)) {
+    throw std::runtime_error("eRPC IBTransport: Failed to destroy send CQ.");
+  }
+
+  if (ibv_destroy_cq(recv_cq)) {
+    throw std::runtime_error("eRPC IBTransport: Failed to destroy recv CQ.");
+  }
+
+  // Destroy protection domain and device context
+  if (ibv_dealloc_pd(pd)) {
+    throw std::runtime_error(
+        "eRPC IBTransport: Failed to deallocate protection domain.");
+  }
+
+  if (ibv_close_device(ib_ctx)) {
+    throw std::runtime_error("eRPC IBTransport: Failed to close device.");
+  }
 }
 
 void IBTransport::fill_routing_info(RoutingInfo *routing_info) const {
@@ -32,13 +60,6 @@ void IBTransport::fill_routing_info(RoutingInfo *routing_info) const {
   ib_routing_info->port_lid = port_lid;
   ib_routing_info->qpn = qp->qp_num;
 }
-
-void IBTransport::send_message(Session *session, const Buffer *buffer) {
-  _unused(session);
-  _unused(buffer);
-}
-
-void IBTransport::poll_completions() {}
 
 void IBTransport::resolve_phy_port() {
   std::ostringstream xmsg; /* The exception message */
@@ -179,6 +200,13 @@ void IBTransport::init_infiniband_structs() {
   }
 }
 
+void IBTransport::init_mem_reg_funcs() {
+  using namespace std::placeholders;
+  assert(pd != nullptr);
+  reg_mr_func = std::bind(ibv_reg_mr_wrapper, pd, _1, _2);
+  dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
+}
+
 void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc) {
   this->huge_alloc = huge_alloc;
   this->numa_node = huge_alloc->get_numa_node();
@@ -192,23 +220,17 @@ void IBTransport::init_recvs() {
 
   /* Initialize the memory region for RECVs */
   size_t size = kRecvQueueDepth * kRecvSize;
-  recv_extent = (uint8_t *)huge_alloc->alloc(size);
+  recv_extent = (uint8_t *)huge_alloc->alloc(size, &recv_extent_lkey);
   if (recv_extent == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
          << (double)size / MB(1) << "MB for RECV buffers.";
     throw std::runtime_error(xmsg.str());
   }
 
-  recv_extent_mr = ibv_reg_mr(pd, recv_extent, size, IBV_ACCESS_LOCAL_WRITE);
-  if (recv_extent_mr == nullptr) {
-    throw std::runtime_error(
-        "eRPC IBTransport: Failed to register RECV memory region");
-  }
-
   /* Initialize constant fields of RECV descriptors */
   for (size_t wr_i = 0; wr_i < kRecvQueueDepth; wr_i++) {
     recv_sgl[wr_i].length = kRecvSize;
-    recv_sgl[wr_i].lkey = recv_extent_mr->lkey;
+    recv_sgl[wr_i].lkey = recv_extent_lkey;
     recv_sgl[wr_i].addr = (uintptr_t)&recv_extent[wr_i * kRecvSize];
 
     recv_wr[wr_i].wr_id = recv_sgl[wr_i].addr; /* Debug */
@@ -223,7 +245,7 @@ void IBTransport::init_recvs() {
 
 void IBTransport::init_sends() {
   for (size_t wr_i = 0; wr_i < kPostlist; wr_i++) {
-    send_sgl[wr_i].lkey = req_retrans_mr->lkey;
+    send_sgl[wr_i].lkey = req_retrans_extent_lkey;
 
     send_wr[wr_i].next = &send_wr[wr_i + 1];
     send_wr[wr_i].wr.ud.remote_qkey = kQKey;

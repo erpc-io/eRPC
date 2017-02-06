@@ -76,8 +76,15 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
 template <class Transport_>
 Rpc<Transport_>::~Rpc() {
-  delete transport;  /* Allow transport to do its cleanup */
-  delete huge_alloc; /* Free the hugepages */
+  /*
+   * First delete the hugepage allocator. This deregisters and deletes the
+   * SHM regions. Deregistration is done using \p transport's deregistration
+   * function, so \p transport is deleted later.
+   */
+  delete huge_alloc;
+
+  /* Allow \p transport to clean up non-hugepage structures */
+  delete transport;
 
   for (Session *session : session_vec) {
     if (session != nullptr) {

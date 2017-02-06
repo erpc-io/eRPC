@@ -36,6 +36,11 @@ class IBTransport : public Transport {
    */
   IBTransport(uint8_t phy_port, uint8_t app_tid);
 
+  /**
+   * @brief Finish transport initialization using \p huge_alloc
+   *
+   * @throw \p runtime_error if initialization fails.
+   */
   void init_hugepage_structures(HugeAllocator *huge_alloc);
 
   ~IBTransport();
@@ -50,6 +55,7 @@ class IBTransport : public Transport {
     return std::string(ret.str());
   }
 
+  // ib_transport_datapath.cc
   void send_message(Session *session, const Buffer *buffer);
   void poll_completions();
 
@@ -85,13 +91,8 @@ class IBTransport : public Transport {
     }
   }
 
-  /// Initialize the memory registration and deregistratin functions
-  void init_mem_reg_funcs() {
-    assert(pd != nullptr);
-    using namespace std::placeholders;
-    reg_mr_func = std::bind(ibv_reg_mr_wrapper, pd, _1, _2);
-    dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
-  }
+  /// Initialize the memory registration and deregistration functions
+  void init_mem_reg_funcs();
 
   /// Initialize RECV buffers and constant fields of RECV descriptors
   void init_recvs();
@@ -107,10 +108,8 @@ class IBTransport : public Transport {
   struct ibv_pd *pd = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
-  uint8_t *recv_extent = nullptr;
-  struct ibv_mr *recv_extent_mr = nullptr;
-  uint8_t *req_retrans_extent = nullptr;
-  struct ibv_mr *req_retrans_mr = nullptr;
+  uint8_t *recv_extent = nullptr, *req_retrans_extent = nullptr;
+  uint32_t recv_extent_lkey, req_retrans_extent_lkey;
 
   // SEND
   size_t nb_pending = 0;                     /* For selective signalling */

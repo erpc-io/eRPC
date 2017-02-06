@@ -26,8 +26,9 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
 }
 
 HugeAllocator::~HugeAllocator() {
-  /* Delete the created SHM regions */
+  /* Deregister and delete the created SHM regions */
   for (shm_region_t &shm_region : shm_list) {
+    dereg_mr_func(shm_region.mem_reg_info);
     delete_shm(shm_region.shm_key, shm_region.buf);
   }
 }
@@ -42,17 +43,20 @@ bool HugeAllocator::create_4k_chunk_cache(size_t cache_chunks) {
     return true;
   }
 
-  std::vector<void *> free_buf_vec;
+  std::vector<chunk_t> free_chunk_vec;
+
   for (size_t i = 0; i < reqd_chunks; i++) {
-    void *buf = alloc(KB(4));
+    uint32_t lkey;
+    void *buf = alloc(KB(4), &lkey);
     if (buf == nullptr) {
       return false;
     }
-    free_buf_vec.push_back(buf);
+
+    free_chunk_vec.push_back(chunk_t(buf, lkey));
   }
 
   for (size_t i = 0; i < reqd_chunks; i++) {
-    free(free_buf_vec[i], KB(4));
+    free(free_chunk_vec[i], KB(4));
   }
 
   return true;
@@ -168,8 +172,10 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   size_t num_chunks = size / kMaxAllocSize;
   assert(num_chunks >= 1);
   for (size_t i = 0; i < num_chunks; i++) {
-    void *chunk = (void *)((char *)shm_buf + (i * kMaxAllocSize));
-    freelist[kNumClasses - 1].push_back(chunk);
+    void *buf = (void *)((char *)shm_buf + (i * kMaxAllocSize));
+    uint32_t lkey = reg_info.lkey;
+
+    freelist[kNumClasses - 1].push_back(chunk_t(buf, lkey));
   }
 
   return true;

@@ -18,7 +18,11 @@ ERpc::MemRegInfo reg_mr_wrapper(void *buf, size_t size) {
   return ERpc::MemRegInfo(DUMMY_MR_PTR, DUMMY_LKEY); /* *transport_mr, lkey */
 }
 
-void dereg_mr_wrapper(ERpc::MemRegInfo mr) { _unused(mr); }
+void dereg_mr_wrapper(ERpc::MemRegInfo mr) {
+  _unused(mr);
+  assert(mr.lkey == DUMMY_LKEY);
+  assert(mr.transport_mr == DUMMY_MR_PTR);
+}
 
 using namespace std::placeholders;
 typename ERpc::reg_mr_func_t reg_mr_func = std::bind(reg_mr_wrapper, _1, _2);
@@ -40,8 +44,9 @@ TEST(HugeAllocatorTest, PageAllocPerf) {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
 
+  uint32_t lkey;
   while (true) {
-    void *buf = allocator->alloc(4 * 1024);
+    void *buf = allocator->alloc(4 * 1024, &lkey);
     if (buf == nullptr) {
       break;
     }
@@ -56,6 +61,7 @@ TEST(HugeAllocatorTest, PageAllocPerf) {
   test_printf("Time per page allocation = %.2f ns\n",
               nanoseconds / num_pages_allocated);
 
+  EXPECT_EQ(lkey, DUMMY_LKEY);
   delete allocator;
 }
 
@@ -74,8 +80,9 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCache) {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
 
+  uint32_t lkey;
   for (size_t i = 0; i < page_cache_size; i++) {
-    void *buf = allocator->alloc(4 * 1024);
+    void *buf = allocator->alloc(4 * 1024, &lkey);
     if (buf == nullptr) {
       break;
     }
@@ -88,6 +95,7 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCache) {
   test_printf("Time per page allocation with page cache = %.2f ns\n",
               nanoseconds / page_cache_size);
 
+  EXPECT_EQ(lkey, DUMMY_LKEY);
   delete allocator;
 }
 
@@ -106,8 +114,9 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
 
+  uint32_t lkey;
   for (size_t i = 0; i < page_cache_size; i++) {
-    void *buf = allocator->alloc_4k();
+    void *buf = allocator->alloc_4k(&lkey);
     if (buf == nullptr) {
       break;
     }
@@ -120,6 +129,7 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
   test_printf("Time per page allocation with page cache = %.2f ns\n",
               nanoseconds / page_cache_size);
 
+  EXPECT_EQ(lkey, DUMMY_LKEY);
   delete allocator;
 }
 
@@ -131,9 +141,12 @@ TEST(HugeAllocatorTest, 2MBChunksSingleRun) {
 
   allocator = new ERpc::HugeAllocator(1024, 0, reg_mr_func, dereg_mr_func);
   size_t num_hugepages_allocated = 0;
+
   for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
-    void *buf = allocator->alloc(2 * 1024 * 1024);
+    uint32_t lkey;
+    void *buf = allocator->alloc(2 * 1024 * 1024, &lkey);
     if (buf != nullptr) {
+      EXPECT_EQ(lkey, DUMMY_LKEY);
       num_hugepages_allocated++;
     } else {
       test_printf("Allocated %zu of %zu hugepages\n", num_hugepages_allocated,
@@ -155,10 +168,13 @@ TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
   for (int iters = 0; iters < 20; iters++) {
     allocator = new ERpc::HugeAllocator(1024, 0, reg_mr_func, dereg_mr_func);
     for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
-      void *buf = allocator->alloc(2 * 1024 * 1024);
+      uint32_t lkey;
+      void *buf = allocator->alloc(2 * 1024 * 1024, &lkey);
       if (buf == nullptr) {
         break;
       }
+
+      EXPECT_EQ(lkey, DUMMY_LKEY);
     }
 
     delete allocator;
@@ -171,10 +187,10 @@ TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
  */
 TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
   struct free_info_t {
-    void *buf;
+    ERpc::chunk_t chunk;
     size_t size;
 
-    free_info_t(void *buf, size_t size) : buf(buf), size(size) {}
+    free_info_t(ERpc::chunk_t chunk, size_t size) : chunk(chunk), size(size) {}
   };
 
   ERpc::HugeAllocator *allocator;
@@ -189,7 +205,8 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
     while (true) {
       size_t num_hugepages = 1ul + (unsigned)(std::rand() % 15);
       size_t size = num_hugepages * ERpc::kHugepageSize;
-      void *buf = allocator->alloc(size);
+      uint32_t lkey;
+      void *buf = allocator->alloc(size, &lkey);
 
       if (buf == nullptr) {
         ASSERT_EQ(allocator->get_allocated_memory(), app_memory);
@@ -207,15 +224,16 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
              allocator->get_reserved_memory()));
         break;
       } else {
+        EXPECT_EQ(lkey, DUMMY_LKEY);
         app_memory += (num_hugepages * ERpc::kHugepageSize);
-        free_info_vec.push_back(free_info_t(buf, size));
+        free_info_vec.push_back(free_info_t(ERpc::chunk_t(buf, lkey), size));
       }
     }
 
     /* Free all allocated hugepages in random order */
     std::random_shuffle(free_info_vec.begin(), free_info_vec.end());
     for (free_info_t &free_info : free_info_vec) {
-      allocator->free(free_info.buf, free_info.size);
+      allocator->free(free_info.chunk, free_info.size);
     }
 
     ASSERT_EQ(allocator->get_allocated_memory(), 0);
@@ -240,13 +258,14 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
 
     bool alloc_hugepages = (std::rand() % 100) == 0;
     size_t new_app_memory;
+    uint32_t lkey;
 
     if (alloc_hugepages) {
       size_t num_hugepages = 1ul + (unsigned)(std::rand() % 15);
-      buf = allocator->alloc(num_hugepages * ERpc::kHugepageSize);
+      buf = allocator->alloc(num_hugepages * ERpc::kHugepageSize, &lkey);
       new_app_memory = (num_hugepages * ERpc::kHugepageSize);
     } else {
-      buf = allocator->alloc(4 * KB(1));
+      buf = allocator->alloc(4 * KB(1), &lkey);
       new_app_memory = ERpc::kPageSize;
     }
 
@@ -263,6 +282,7 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
                    allocator->get_reserved_memory()));
       break;
     } else {
+      EXPECT_EQ(lkey, DUMMY_LKEY);
       app_memory += new_app_memory;
     }
   }
