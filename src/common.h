@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits>
+#include <string>
 
 namespace ERpc {
 
@@ -36,7 +37,7 @@ namespace ERpc {
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 #define forceinline inline __attribute__((always_inline))
-#define _unused(x) ((void)(x)) /* Make production builds happy */
+#define _unused(x) ((void)(x)) /* Make production build happy */
 
 #define KB(x) ((size_t)(x) << 10)
 #define KB_(x) (KB(x) - 1)
@@ -44,6 +45,8 @@ namespace ERpc {
 #define MB_(x) (MB(x) - 1)
 
 // General typedefs and structs
+
+/// UDP config used throughout eRPC
 struct udp_config_t {
   /*
    * The UDP port used by all Nexus-es in the cluster to listen on for
@@ -66,6 +69,8 @@ static const size_t kMaxIssueMsgLen = /* Debug issue messages */
     (240 + kMaxHostnameLen * 2);      /* Three lines and two hostnames */
 
 // Simple methods
+
+/// Return the TSC
 static uint64_t rdtsc() {
   uint64_t rax;
   uint64_t rdx;
@@ -81,6 +86,16 @@ static double to_sec(uint64_t cycles, double freq_ghz) {
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to msec
 static double to_nsec(uint64_t cycles, double freq_ghz) {
   return (cycles / freq_ghz);
+}
+
+/// Emulab hostnames are very long, so trim it to just the node name.
+static std::string trim_hostname(std::string hostname) {
+  if (hostname.find("emulab.net") != std::string::npos) {
+    std::string trimmed_hostname = hostname.substr(0, hostname.find("."));
+    return trimmed_hostname;
+  } else {
+    return hostname;
+  }
 }
 
 template <typename T>

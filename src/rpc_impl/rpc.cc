@@ -202,8 +202,8 @@ void Rpc<Transport_>::handle_session_management() {
 template <class Transport_>
 std::string Rpc<Transport_>::get_name() {
   std::ostringstream ret;
-  ret << "[" << std::string(nexus->hostname) << ", " << std::to_string(app_tid)
-      << "]";
+  ret << "[" << trim_hostname(std::string(nexus->hostname)) << ", "
+      << std::to_string(app_tid) << "]";
   return ret.str();
 }
 

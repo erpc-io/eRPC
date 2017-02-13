@@ -77,18 +77,27 @@ class IBTransport : public Transport {
       throw std::runtime_error(
           "eRPC IBTransport: Failed to register memory region");
     }
+
+    erpc_dprintf("eRPC IBTransport: Registered %zu MB (lkey = %u)\n",
+                 size / MB(1), mr->lkey);
     return MemRegInfo(mr, mr->lkey);
   }
 
   /// A function wrapper used to generate \p dereg_mr_func
   static void ibv_dereg_mr_wrapper(MemRegInfo mr) {
     struct ibv_mr *ib_mr = (struct ibv_mr *)mr.transport_mr;
+    size_t size = ib_mr->length;
+    uint32_t lkey = ib_mr->lkey;
+
     int ret = ibv_dereg_mr(ib_mr);
 
     if (ret != 0) {
       throw std::runtime_error(
           "eRPC IBTransport: Failed to deregister memory region");
     }
+
+    erpc_dprintf("eRPC IBTransport: Deregistered %zu MB (lkey = %u)\n",
+                 size / MB(1), lkey);
   }
 
   /// Initialize the memory registration and deregistration functions

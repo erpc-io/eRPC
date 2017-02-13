@@ -30,6 +30,8 @@ IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port)
  * We only need to clean up non-hugepage structures.
  */
 IBTransport::~IBTransport() {
+  erpc_dprintf("eRPC IBTransport: Destroying transport for TID %u\n", app_tid);
+
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
   if (ibv_destroy_qp(qp)) {
     throw std::runtime_error("eRPC IBTransport: Failed to destroy QP.");

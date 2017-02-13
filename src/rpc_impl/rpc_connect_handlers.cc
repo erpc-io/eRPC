@@ -27,7 +27,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Check if the requested physical port is correct */
   if (sm_pkt->server.phy_port != phy_port) {
-    erpc_dprintf("%s. Invalid server port %u. Sending response.\n", issue_msg,
+    erpc_dprintf("%s: Invalid server port %u. Sending response.\n", issue_msg,
                  sm_pkt->server.phy_port);
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
