@@ -76,8 +76,8 @@ class HugeAllocator {
                 reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func);
   ~HugeAllocator();
 
-  /// Special simplified function for allocating 4 KB pages
-  forceinline void *alloc_4k(uint32_t *lkey) {
+  /// Allocate a 4K page and save the lkey of the page to \p lkey
+  inline void *alloc_4k(uint32_t *lkey) {
     if (!freelist[0].empty()) {
       return alloc_from_class(0, KB(4), lkey);
     } else {
@@ -85,8 +85,9 @@ class HugeAllocator {
     }
   }
 
-  /// Allocate a chunk of with \p size bytes
-  forceinline void *alloc(size_t size, uint32_t *lkey) {
+  /// Allocate a chunk with at least \p size bytes, and save the lkey of the
+  /// chunk to \p lkey.
+  inline void *alloc(size_t size, uint32_t *lkey) {
     if (unlikely(size > kMaxAllocSize)) {
       throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
     }
@@ -140,7 +141,7 @@ class HugeAllocator {
   }
 
   /// Free a chunk
-  forceinline void free(chunk_t chunk, size_t size) {
+  inline void free(chunk_t chunk, size_t size) {
     size_t size_class = get_class(size);
     freelist[size_class].push_back(chunk);
 
@@ -170,7 +171,7 @@ class HugeAllocator {
  private:
   /// Get the class index for a chunk size
   /// XXX: Use inline asm to improve perf
-  forceinline size_t get_class(size_t size) {
+  inline size_t get_class(size_t size) {
     assert(size >= 1 && size <= kMaxAllocSize);
 
     size_t size_class = 0;        /* The size class for \p size */
@@ -184,8 +185,8 @@ class HugeAllocator {
   }
 
   /// Split one chunk from class \p size_class into two chunks of the previous
-  /// class, which much be empty.
-  forceinline void split(size_t size_class) {
+  /// class, which must be an empty class.
+  inline void split(size_t size_class) {
     assert(size_class >= 1);
     assert(!freelist[size_class].empty());
     assert(freelist[size_class - 1].empty());
@@ -203,10 +204,10 @@ class HugeAllocator {
     freelist[size_class - 1].push_back(chunk_1);
   }
 
-  /// Allocate a chunk from class \p size_class, and add \p size bytes to
-  /// the allocated memory statistic.
-  forceinline void *alloc_from_class(size_t size_class, size_t size,
-                                     uint32_t *lkey) {
+  /// Allocate a chunk from class \p size_class, add \p size to the allocated
+  /// memory statistic, and save the lkey of the chunk to \p lkey.
+  inline void *alloc_from_class(size_t size_class, size_t size,
+                                uint32_t *lkey) {
     assert(size_class < kNumClasses);
     assert(size > (size_class == 0 ? 0 : class_to_size(size_class - 1)) &&
            size <= class_to_size(size_class));
@@ -224,7 +225,7 @@ class HugeAllocator {
 
   /**
    * @brief Try to reserve \p size (rounded to 2MB) bytes as huge pages on
-   * NUMA node \p numa_node.
+   * \p numa_node.
    *
    * @return True if the allocation succeeds. False if the allocation fails
    * because no more hugepages are available.
