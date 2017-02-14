@@ -49,8 +49,8 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
 /* The server thread used by all tests */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               phy_port, numa_node);
+  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander, phy_port,
+                       numa_node);
 
   server_count++;
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
@@ -66,7 +66,7 @@ void simple_connect(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<IBTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port, numa_node);
+                       &test_sm_hander, phy_port, numa_node);
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
@@ -104,7 +104,7 @@ void invalid_remote_port(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<IBTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port, numa_node);
+                       &test_sm_hander, phy_port, numa_node);
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;

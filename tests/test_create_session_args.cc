@@ -34,8 +34,8 @@ void client_thread_func(Nexus *nexus) {
   }
 
   /* Create the Rpc */
-  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port, numa_node);
+  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID, &test_sm_hander,
+                       phy_port, numa_node);
 
   {
     /* Test: Correct args */
@@ -68,8 +68,8 @@ void client_thread_func(Nexus *nexus) {
 
 /* The server thread */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               phy_port, numa_node);
+  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander, phy_port,
+                       numa_node);
 
   server_ready = true;
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);

@@ -41,8 +41,8 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
 /* The server thread used by all tests */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander,
-                               phy_port, numa_node);
+  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander, phy_port,
+                       numa_node);
 
   server_ready = true;
 
@@ -63,7 +63,7 @@ void simple_disconnect(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<IBTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port, numa_node);
+                       &test_sm_hander, phy_port, numa_node);
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
@@ -118,7 +118,7 @@ void disconnect_multi(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<IBTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port, numa_node);
+                       &test_sm_hander, phy_port, numa_node);
 
   for (size_t i = 0; i < 3; i++) {
     client_context->nb_sm_events = 0;
@@ -167,7 +167,7 @@ void disconnect_error(Nexus *nexus) {
 
   auto *client_context = new client_context_t();
   Rpc<IBTransport> rpc(nexus, (void *)client_context, CLIENT_APP_TID,
-                               &test_sm_hander, phy_port, numa_node);
+                       &test_sm_hander, phy_port, numa_node);
 
   /* Try to connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;

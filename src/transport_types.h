@@ -35,6 +35,7 @@ struct MemRegInfo {
       : transport_mr(transport_mr), lkey(lkey) {}
 };
 
+/// Generic types for memory registration and deregistration functions.
 typedef std::function<MemRegInfo(void *, size_t)> reg_mr_func_t;
 typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
 
