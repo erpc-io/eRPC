@@ -70,6 +70,7 @@ class HugeAllocator {
   size_t prev_allocation_size;  ///< Size of previous hugepage reservation
   size_t stat_memory_reserved;  ///< Total hugepage memory reserved by allocator
   size_t stat_memory_allocated;  ///< Total memory allocated to users
+  size_t stat_4k_cache_misses;   ///< alloc_4k calls that missed the cache
 
  public:
   HugeAllocator(size_t initial_size, size_t numa_node,
@@ -81,6 +82,7 @@ class HugeAllocator {
     if (!freelist[0].empty()) {
       return alloc_from_class(0, KB(4), lkey);
     } else {
+      stat_4k_cache_misses++;
       return alloc(KB(4), lkey);
     }
   }
@@ -161,6 +163,9 @@ class HugeAllocator {
     assert(stat_memory_allocated % kPageSize == 0);
     return stat_memory_allocated;
   }
+
+  /// Return the number of alloc_4k calls that missed the 4k chunk cache
+  size_t get_4k_cache_misses() { return stat_4k_cache_misses; }
 
   /// Populate the 4 KB class with at least \p num_chunks chunks.
   bool create_4k_chunk_cache(size_t num_chunks);

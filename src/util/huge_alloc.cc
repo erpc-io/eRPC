@@ -10,7 +10,8 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
       reg_mr_func(reg_mr_func),
       dereg_mr_func(dereg_mr_func),
       stat_memory_reserved(0),
-      stat_memory_allocated(0) {
+      stat_memory_allocated(0),
+      stat_4k_cache_misses(0) {
   assert(numa_node <= kMaxNumaNodes);
 
   if (initial_size < kMinInitialSize) {
@@ -68,6 +69,8 @@ void HugeAllocator::print_stats() {
           stat_memory_reserved, (double)stat_memory_reserved / MB(1));
   fprintf(stderr, "Total memory allocated to users = %zu bytes (%.2f MB)\n",
           stat_memory_allocated, (double)stat_memory_allocated / MB(1));
+  fprintf(stderr, "Number of 4k allocations that missed cache = %zu\n",
+          stat_4k_cache_misses);
 
   fprintf(stderr, "%zu SHM regions\n", shm_list.size());
   size_t shm_region_index = 0;

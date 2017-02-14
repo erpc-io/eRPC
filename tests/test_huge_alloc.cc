@@ -126,8 +126,10 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
   double nanoseconds =
       (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
 
-  test_printf("Time per page allocation with page cache = %.2f ns\n",
-              nanoseconds / page_cache_size);
+  test_printf(
+      "Time per page allocation with page cache and alloc_4k = "
+      "%.2f ns\n",
+      nanoseconds / page_cache_size);
 
   EXPECT_EQ(lkey, DUMMY_LKEY);
   delete allocator;
