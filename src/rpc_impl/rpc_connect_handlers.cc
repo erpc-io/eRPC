@@ -96,7 +96,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Set the server metadata fields in the packet */
   sm_pkt->server.session_num = session_vec.size();
-  sm_pkt->server.start_seq = generate_start_seq();
+  sm_pkt->server.start_seq = gen_start_seq();
   transport->fill_routing_info(&(sm_pkt->server.routing_info));
 
   /* Copy the packet's metadata to the created session */

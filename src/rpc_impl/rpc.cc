@@ -95,12 +95,6 @@ Rpc<Transport_>::~Rpc() {
 }
 
 template <class Transport_>
-uint64_t Rpc<Transport_>::generate_start_seq() {
-  uint64_t rand = slow_rand.next_u64();
-  return (rand & kStartSeqMask);
-}
-
-template <class Transport_>
 void Rpc<Transport_>::bury_session(Session *session) {
   /* XXX: When is the session destroyed? */
   assert(session != nullptr);

@@ -55,7 +55,7 @@ bool HugeAllocator::create_4k_cache(size_t num_buffers) {
   }
 
   for (size_t i = 0; i < reqd_buffers; i++) {
-    free(free_buffer_vec[i]);
+    free_buf(free_buffer_vec[i]);
   }
 
   return true;

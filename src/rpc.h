@@ -124,7 +124,7 @@ class Rpc {
   inline Buffer alloc(size_t size) { return huge_alloc->alloc(size); }
 
   /// Free the buffer
-  inline void free(Buffer buffer) { huge_alloc->free(buffer); }
+  inline void free_buf(Buffer buffer) { huge_alloc->free_buf(buffer); }
 
   /// Run the event loop for \p timeout_ms milliseconds
   inline void run_event_loop_timeout(size_t timeout_ms) {
@@ -146,22 +146,22 @@ class Rpc {
   /// Return the hostname and app TID of this Rpc.
   std::string get_name();
 
-  /// Process all session management events in the queue and free them.
-  /// The handlers for individual request/response types should not free
-  /// packets.
-  void handle_session_management();
-
-  /// Generate the start sequence number for a session
-  uint64_t generate_start_seq();
-
-  /// Destroy a session object and mark it as NULL in the session vector
-  void bury_session(Session *session);
-
   /// Check if this session pointer is a client session in this Rpc's sessions
   bool is_session_ptr_client(Session *session);
 
   /// Check if this session pointer is a server session in this Rpc's sessions
   bool is_session_ptr_server(Session *session);
+
+  /// Process all session management events in the queue and free them.
+  /// The handlers for individual request/response types should not free
+  /// packets.
+  void handle_session_management();
+
+  /// Destroy a session object and mark it as NULL in the session vector
+  void bury_session(Session *session);
+
+  /// Generate the start sequence number for a session when it is created
+  uint64_t gen_start_seq() { return (slow_rand.next_u64() & kStartSeqMask); }
 
   // rpc_connect_handlers.cc
   void handle_session_connect_req(SessionMgmtPkt *pkt);

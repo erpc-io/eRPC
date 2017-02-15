@@ -84,7 +84,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   client_metadata.app_tid = app_tid;
   client_metadata.phy_port = phy_port;
   client_metadata.session_num = session_vec.size();
-  client_metadata.start_seq = generate_start_seq();
+  client_metadata.start_seq = gen_start_seq();
   transport->fill_routing_info(&client_metadata.routing_info);
 
   SessionMetadata &server_metadata = session->server;
