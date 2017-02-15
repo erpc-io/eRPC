@@ -12,6 +12,7 @@
 
 #include "common.h"
 #include "transport_types.h"
+#include "util/buffer.h"
 #include "util/rand.h"
 
 namespace ERpc {
@@ -33,19 +34,15 @@ struct shm_region_t {
   }
 };
 
-struct chunk_t {
-  void *buf;
-  uint32_t lkey;
-
-  chunk_t(void *buf, uint32_t lkey) : buf(buf), lkey(lkey){};
-};
-
 /**
  * A hugepage allocator that uses per-class freelists. The minimum class size
  * is 4 KB, and class size increases by a factor of 2 until kMaxAllocSize. When
- * a new SHM region is added to the allocator, it is split into chunks of size
- * kMaxAllocSize and added to that class. These chunks are later split to
+ * a new SHM region is added to the allocator, it is split into Buffers of size
+ * kMaxAllocSize and added to that class. These Buffers are later split to
  * fill up smaller classes.
+ *
+ * The size of allocated buffers is always equal to a class size, even when
+ * a smaller buffer is requested.
  *
  * The allocator uses randomly generated positive SHM keys, and deallocates the
  * SHM regions created when it is deleted.
@@ -54,12 +51,12 @@ class HugeAllocator {
 #define class_to_size(c) (KB(4) * (1ull << (c)))
  private:
   static const size_t kMaxAllocSize = (32 * 1024 * 1024);  ///< 32 MB
-  static const size_t kMinInitialSize = kMaxAllocSize;  ///< Need 1 32 MB chunk
+  static const size_t kMinInitialSize = kMaxAllocSize;  ///< Need 1 32 MB Buffer
   static const size_t kNumClasses = 14;  ///< 4 KB, 8 KB, 16 KB, ..., 32 MB
   static_assert(class_to_size(kNumClasses - 1) == kMaxAllocSize, "");
 
   std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
-  std::vector<chunk_t> freelist[kNumClasses];  ///< Per-class freelist
+  std::vector<Buffer> freelist[kNumClasses];  ///< Per-class freelist
 
   SlowRand slow_rand;  ///< RNG to generate SHM keys
   size_t numa_node;    ///< NUMA node on which all memory is allocated
@@ -69,8 +66,7 @@ class HugeAllocator {
 
   size_t prev_allocation_size;  ///< Size of previous hugepage reservation
   size_t stat_memory_reserved;  ///< Total hugepage memory reserved by allocator
-  size_t stat_memory_allocated;  ///< Total memory allocated to users
-  size_t stat_4k_cache_misses;   ///< alloc_4k calls that missed the cache
+  size_t stat_4k_cache_misses;  ///< alloc_4k calls that missed the cache
 
  public:
   /**
@@ -81,28 +77,26 @@ class HugeAllocator {
                 reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func);
   ~HugeAllocator();
 
-  /// Allocate a 4K page and save the lkey of the page to \p lkey
-  inline void *alloc_4k(uint32_t *lkey) {
+  /// Allocate a 4K Buffer
+  inline Buffer alloc_4k() {
     if (!freelist[0].empty()) {
-      return alloc_from_class(0, KB(4), lkey);
+      return alloc_from_class(0);
     } else {
       stat_4k_cache_misses++;
-      return alloc(KB(4), lkey);
+      return alloc(KB(4));
     }
   }
 
   /**
-   * @brief Allocate a chunk
+   * @brief Allocate a Buffer
    *
-   * @param size Minimum size of the chunk
-   * @param lkey Lkey of the allocated chunk is saved here
-   *
-   * @return Pointer to the chunk if allocation succeeds
+   * @param size Minimum size of the allocated Buffer. \p size need not equal
+   * a class size, but the allocated Buffer's size is a class size.
    *
    * @throw \p runtime_error if \p size is too large for this allocator
    * @throw \p runtime_error if hugepage reservation fails
    */
-  inline void *alloc(size_t size, uint32_t *lkey) {
+  inline Buffer alloc(size_t size) {
     if (unlikely(size > kMaxAllocSize)) {
       throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
     }
@@ -111,11 +105,11 @@ class HugeAllocator {
     assert(size_class < kNumClasses);
 
     if (!freelist[size_class].empty()) {
-      return alloc_from_class(size_class, size, lkey);
+      return alloc_from_class(size_class);
     } else {
       /*
-       * There is no free chunk in this class. Find the first larger class with
-       * free chunks.
+       * There is no free Buffer in this class. Find the first larger class with
+       * free Buffers.
        */
       size_t next_class = size_class + 1;
       for (; next_class < kNumClasses; next_class++) {
@@ -127,19 +121,19 @@ class HugeAllocator {
       if (next_class == kNumClasses) {
         /*
          * There's no larger size class with free pages, we we need to allocate
-         * more hugepages. This adds some chunks to the largest class.
+         * more hugepages. This adds some Buffers to the largest class.
          */
         prev_allocation_size *= 2;
         bool success = reserve_hugepages(prev_allocation_size, numa_node);
         if (!success) {
           prev_allocation_size /= 2; /* Restore the previous allocation */
-          return nullptr;            /* We're out of hugepages */
+          return Buffer::get_invalid_buffer(); /* We're out of hugepages */
         } else {
           next_class = kNumClasses - 1;
         }
       }
 
-      /* If we're here, \p next_class has free chunks */
+      /* If we're here, \p next_class has free Buffers */
       assert(next_class < kNumClasses);
       while (next_class != size_class) {
         split(next_class);
@@ -147,20 +141,19 @@ class HugeAllocator {
       }
 
       assert(!freelist[size_class].empty());
-      return alloc_from_class(size_class, size, lkey);
+      return alloc_from_class(size_class);
     }
 
     assert(false);
     exit(-1); /* We should never get here */
-    return nullptr;
+    return Buffer::get_invalid_buffer();
   }
 
-  /// Free a chunk
-  inline void free(chunk_t chunk, size_t size) {
-    size_t size_class = get_class(size);
-    freelist[size_class].push_back(chunk);
-
-    stat_memory_allocated -= size;
+  /// Free a Buffer
+  inline void free(Buffer buffer) {
+    assert(buffer.is_valid());
+    size_t size_class = get_class(buffer.size);
+    freelist[size_class].push_back(buffer);
   }
 
   inline size_t get_numa_node() { return numa_node; }
@@ -171,23 +164,17 @@ class HugeAllocator {
     return stat_memory_reserved;
   }
 
-  /// Return the total amount of memory allocated to the user.
-  size_t get_allocated_memory() {
-    assert(stat_memory_allocated % kPageSize == 0);
-    return stat_memory_allocated;
-  }
-
-  /// Return the number of alloc_4k calls that missed the 4k chunk cache
+  /// Return the number of alloc_4k calls that missed the 4k Buffer cache
   size_t get_4k_cache_misses() { return stat_4k_cache_misses; }
 
-  /// Populate the 4 KB class with at least \p num_chunks chunks.
-  bool create_4k_chunk_cache(size_t num_chunks);
+  /// Populate the 4 KB class with at least \p num_buffers Buffers
+  bool create_4k_cache(size_t num_buffers);
 
   /// Print a summary of this allocator
   void print_stats();
 
  private:
-  /// Get the class index for a chunk size
+  /// Get the class index for a Buffer size
   /// XXX: Use inline asm to improve perf
   inline size_t get_class(size_t size) {
     assert(size >= 1 && size <= kMaxAllocSize);
@@ -202,51 +189,38 @@ class HugeAllocator {
     return size_class;
   }
 
-  /// Split one chunk from class \p size_class into two chunks of the previous
-  /// class, which must be an empty class.
+  /// Split one Buffers from class \p size_class into two Buffers of the
+  /// previous class, which must be an empty class.
   inline void split(size_t size_class) {
     assert(size_class >= 1);
     assert(!freelist[size_class].empty());
     assert(freelist[size_class - 1].empty());
 
-    size_t class_size = class_to_size(size_class);
+    Buffer &buffer = freelist[size_class].back();
+    assert(buffer.size = class_to_size(size_class));
 
-    chunk_t &chunk = freelist[size_class].back();
-
-    auto chunk_0 = chunk_t(chunk.buf, chunk.lkey);
-    auto chunk_1 =
-        chunk_t((void *)((char *)chunk.buf + class_size / 2), chunk.lkey);
+    Buffer buffer_0 = Buffer(buffer.buf, buffer.size / 2, buffer.lkey);
+    Buffer buffer_1 = Buffer((void *)((char *)buffer.buf + buffer.size / 2),
+                             buffer.size / 2, buffer.lkey);
 
     freelist[size_class].pop_back(); /* Pop after we don't need the reference */
-    freelist[size_class - 1].push_back(chunk_0);
-    freelist[size_class - 1].push_back(chunk_1);
+    freelist[size_class - 1].push_back(buffer_0);
+    freelist[size_class - 1].push_back(buffer_1);
   }
 
   /**
-   * @brief Allocate a chunk from a non-empty class
-   *
+   * @brief Allocate a Buffer from a non-empty class
    * @param size_class Non-empty size class to allocate from
-   * @param size Bytes to add to the allocated memory statistics. This may be
-   * smaller than the largest chunk size in \p size_class.
-   * @param lkey The lkey of the allocated chunk is saved here
-   *
-   * @return Pointer to the allocated chunk
+   * @return The allocated Buffer
    */
-  inline void *alloc_from_class(size_t size_class, size_t size,
-                                uint32_t *lkey) {
+  inline Buffer alloc_from_class(size_t size_class) {
     assert(size_class < kNumClasses);
-    assert(size > (size_class == 0 ? 0 : class_to_size(size_class - 1)) &&
-           size <= class_to_size(size_class));
 
-    /* Use the chunks at the back to improve locality */
-    chunk_t &chunk = freelist[size_class].back();
-    void *ret = chunk.buf;
-    *lkey = chunk.lkey;
-
+    /* Use the Buffers at the back to improve locality */
+    Buffer buffer = freelist[size_class].back();
     freelist[size_class].pop_back();
 
-    stat_memory_allocated += size;
-    return ret;
+    return buffer;
   }
 
   /**

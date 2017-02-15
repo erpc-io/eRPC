@@ -136,8 +136,7 @@ class IBTransport : public Transport {
   struct ibv_pd *pd = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
-  uint8_t *recv_extent = nullptr, *req_retrans_extent = nullptr;
-  uint32_t recv_extent_lkey, req_retrans_extent_lkey;
+  Buffer recv_extent, req_retrans_extent;
 
   // SEND
   size_t nb_pending = 0;                     /* For selective signalling */

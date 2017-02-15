@@ -109,6 +109,11 @@ class Rpc {
     }
   }
 
+  /**
+   * @brief Create a Buffer for the application
+   * @param size The minimum size of the created Buffer
+   * @return The allocated Buffer
+   */
   Buffer alloc(size_t size) {
     _unused(size);
     return Buffer(nullptr, 0, 0);

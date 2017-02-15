@@ -222,8 +222,8 @@ void IBTransport::init_recvs() {
 
   /* Initialize the memory region for RECVs */
   size_t size = kRecvQueueDepth * kRecvSize;
-  recv_extent = (uint8_t *)huge_alloc->alloc(size, &recv_extent_lkey);
-  if (recv_extent == nullptr) {
+  recv_extent = huge_alloc->alloc(size);
+  if (!recv_extent.is_valid()) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
          << (double)size / MB(1) << "MB for RECV buffers.";
     throw std::runtime_error(xmsg.str());
@@ -231,9 +231,11 @@ void IBTransport::init_recvs() {
 
   /* Initialize constant fields of RECV descriptors */
   for (size_t wr_i = 0; wr_i < kRecvQueueDepth; wr_i++) {
+    uint8_t *buf = (uint8_t *)recv_extent.buf;
+
     recv_sgl[wr_i].length = kRecvSize;
-    recv_sgl[wr_i].lkey = recv_extent_lkey;
-    recv_sgl[wr_i].addr = (uintptr_t)&recv_extent[wr_i * kRecvSize];
+    recv_sgl[wr_i].lkey = recv_extent.lkey;
+    recv_sgl[wr_i].addr = (uintptr_t)&buf[wr_i * kRecvSize];
 
     recv_wr[wr_i].wr_id = recv_sgl[wr_i].addr; /* Debug */
     recv_wr[wr_i].sg_list = &recv_sgl[wr_i];
@@ -247,7 +249,7 @@ void IBTransport::init_recvs() {
 
 void IBTransport::init_sends() {
   for (size_t wr_i = 0; wr_i < kPostlist; wr_i++) {
-    send_sgl[wr_i].lkey = req_retrans_extent_lkey;
+    send_sgl[wr_i].lkey = req_retrans_extent.lkey;
 
     send_wr[wr_i].next = &send_wr[wr_i + 1];
     send_wr[wr_i].wr.ud.remote_qkey = kQKey;

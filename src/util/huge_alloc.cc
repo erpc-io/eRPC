@@ -10,7 +10,6 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
       reg_mr_func(reg_mr_func),
       dereg_mr_func(dereg_mr_func),
       stat_memory_reserved(0),
-      stat_memory_allocated(0),
       stat_4k_cache_misses(0) {
   assert(numa_node <= kMaxNumaNodes);
 
@@ -35,29 +34,28 @@ HugeAllocator::~HugeAllocator() {
 }
 
 /*
- * To create a cache of 4 KB pages, we first allocate the required number of
+ * To create a cache of 4 KB Buffers, we first allocate the required number of
  * pages and then free them. This puts them all into the 4 KB freelist.
  */
-bool HugeAllocator::create_4k_chunk_cache(size_t cache_chunks) {
-  size_t reqd_chunks = cache_chunks - freelist[0].size();
-  if (reqd_chunks <= 0) {
+bool HugeAllocator::create_4k_cache(size_t num_buffers) {
+  size_t reqd_buffers = num_buffers - freelist[0].size();
+  if (reqd_buffers <= 0) {
     return true;
   }
 
-  std::vector<chunk_t> free_chunk_vec;
+  std::vector<Buffer> free_buffer_vec;
 
-  for (size_t i = 0; i < reqd_chunks; i++) {
-    uint32_t lkey;
-    void *buf = alloc(KB(4), &lkey);
-    if (buf == nullptr) {
+  for (size_t i = 0; i < reqd_buffers; i++) {
+    Buffer buffer = alloc(KB(4));
+    if (!buffer.is_valid()) {
       return false;
     }
 
-    free_chunk_vec.push_back(chunk_t(buf, lkey));
+    free_buffer_vec.push_back(buffer);
   }
 
-  for (size_t i = 0; i < reqd_chunks; i++) {
-    free(free_chunk_vec[i], KB(4));
+  for (size_t i = 0; i < reqd_buffers; i++) {
+    free(free_buffer_vec[i]);
   }
 
   return true;
@@ -67,8 +65,6 @@ void HugeAllocator::print_stats() {
   fprintf(stderr, "eRPC HugeAllocator stats:\n");
   fprintf(stderr, "Total reserved memory = %zu bytes (%.2f MB)\n",
           stat_memory_reserved, (double)stat_memory_reserved / MB(1));
-  fprintf(stderr, "Total memory allocated to users = %zu bytes (%.2f MB)\n",
-          stat_memory_allocated, (double)stat_memory_allocated / MB(1));
   fprintf(stderr, "Number of 4k allocations that missed cache = %zu\n",
           stat_4k_cache_misses);
 
@@ -84,10 +80,10 @@ void HugeAllocator::print_stats() {
   for (size_t i = 0; i < kNumClasses; i++) {
     size_t class_size = class_to_size(i);
     if (class_size < MB(1)) {
-      fprintf(stderr, "\t%zu KB: %zu chunks\n", class_size / KB(1),
+      fprintf(stderr, "\t%zu KB: %zu Buffers\n", class_size / KB(1),
               freelist[i].size());
     } else {
-      fprintf(stderr, "\t%zu MB: %zu chunks\n", class_size / MB(1),
+      fprintf(stderr, "\t%zu MB: %zu Buffers\n", class_size / MB(1),
               freelist[i].size());
     }
   }
@@ -171,14 +167,14 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size, reg_info));
   stat_memory_reserved += size;
 
-  /* Add chunks to the largest class */
-  size_t num_chunks = size / kMaxAllocSize;
-  assert(num_chunks >= 1);
-  for (size_t i = 0; i < num_chunks; i++) {
+  /* Add Buffers to the largest class */
+  size_t num_buffers = size / kMaxAllocSize;
+  assert(num_buffers >= 1);
+  for (size_t i = 0; i < num_buffers; i++) {
     void *buf = (void *)((char *)shm_buf + (i * kMaxAllocSize));
     uint32_t lkey = reg_info.lkey;
 
-    freelist[kNumClasses - 1].push_back(chunk_t(buf, lkey));
+    freelist[kNumClasses - 1].push_back(Buffer(buf, kMaxAllocSize, lkey));
   }
 
   return true;
