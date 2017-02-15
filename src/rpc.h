@@ -110,16 +110,23 @@ class Rpc {
   }
 
   /**
-   * @brief Create a Buffer for the application
-   * @param size The minimum size of the created Buffer
-   * @return The allocated Buffer
+   * @brief Create a Buffer for the eRPC user application
+   * @param size The minimum size of the created Buffer. The size of the
+   * allocated buffer can be larger than \p size.
+   *
+   * @return The allocated Buffer. The buffer is invalid if we ran out of
+   * memory.
+   *
+   * @throw \p runtime_error if \p size is invalid, or if hugepage reservation
+   * failure is catastrophic (i.e., an exception is *not* thrown if allocation
+   * fails simply because we ran out of memory).
    */
-  Buffer alloc(size_t size) {
-    _unused(size);
-    return Buffer(nullptr, 0, 0);
-  }
+  inline Buffer alloc(size_t size) { return huge_alloc->alloc(size); }
 
-  /// Run the event loop for timeout_ms milliseconds
+  /// Free the buffer
+  inline void free(Buffer buffer) { huge_alloc->free(buffer); }
+
+  /// Run the event loop for \p timeout_ms milliseconds
   inline void run_event_loop_timeout(size_t timeout_ms) {
     uint64_t start_tsc = rdtsc();
 
@@ -139,22 +146,21 @@ class Rpc {
   /// Return the hostname and app TID of this Rpc.
   std::string get_name();
 
-  /**
-   * @brief Process all session management events in the queue and free them.
-   * The handlers for individual request/response types should not free packets.
-   */
+  /// Process all session management events in the queue and free them.
+  /// The handlers for individual request/response types should not free
+  /// packets.
   void handle_session_management();
 
-  /// Generate the start sequence number for a session.
+  /// Generate the start sequence number for a session
   uint64_t generate_start_seq();
 
-  /// Destroy a session object and remove it from the session list.
+  /// Destroy a session object and mark it as NULL in the session vector
   void bury_session(Session *session);
 
-  /// Check if this session pointer is a valid client session.
+  /// Check if this session pointer is a client session in this Rpc's sessions
   bool is_session_ptr_client(Session *session);
 
-  /// Check if this session pointer is a valid server session.
+  /// Check if this session pointer is a server session in this Rpc's sessions
   bool is_session_ptr_server(Session *session);
 
   // rpc_connect_handlers.cc

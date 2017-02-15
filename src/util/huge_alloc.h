@@ -77,13 +77,19 @@ class HugeAllocator {
                 reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func);
   ~HugeAllocator();
 
-  /// Allocate a 4K Buffer
+  /**
+   * @brief Allocate a 4k buffer, trying to use the cache first
+   * @return The allocated buffer. The buffer is invalid if we ran out of
+   * memory.
+   *
+   * @throw \p runtime_error if allocation fails
+   */
   inline Buffer alloc_4k() {
     if (!freelist[0].empty()) {
       return alloc_from_class(0);
     } else {
       stat_4k_cache_misses++;
-      return alloc(KB(4));
+      return alloc(KB(4)); /* Can throw */
     }
   }
 
@@ -93,8 +99,11 @@ class HugeAllocator {
    * @param size Minimum size of the allocated Buffer. \p size need not equal
    * a class size, but the allocated Buffer's size is a class size.
    *
-   * @throw \p runtime_error if \p size is too large for this allocator
-   * @throw \p runtime_error if hugepage reservation fails
+   * @return The allocated buffer. The buffer is invalid if we ran out of
+   * memory.
+   *
+   * @throw \p runtime_error if \p size is invalid, or if hugepage reservation
+   * failure is catastrophic
    */
   inline Buffer alloc(size_t size) {
     if (unlikely(size > kMaxAllocSize)) {
@@ -230,8 +239,8 @@ class HugeAllocator {
    * @return True if the allocation succeeds. False if the allocation fails
    * because no more hugepages are available.
    *
-   * @throw runtime_error If allocation fails for a reason other than out
-   * of memory.
+   * @throw \p runtime_error if allocation is \a catastrophic (i.e., it fails
+   * due to reasons other than out-of-memory).
    */
   bool reserve_hugepages(size_t size, size_t numa_node);
 

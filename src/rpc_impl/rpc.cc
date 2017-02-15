@@ -102,6 +102,7 @@ uint64_t Rpc<Transport_>::generate_start_seq() {
 
 template <class Transport_>
 void Rpc<Transport_>::bury_session(Session *session) {
+  /* XXX: When is the session destroyed? */
   assert(session != nullptr);
 
   uint32_t session_num;
@@ -112,7 +113,6 @@ void Rpc<Transport_>::bury_session(Session *session) {
     session_num = session->client.session_num;
   } else {
     assert(is_session_ptr_server(session));
-
     session_num = session->server.session_num;
   }
 
