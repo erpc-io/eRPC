@@ -6,8 +6,8 @@
     * Sequence numbers: `uint64_t` - not `size_t`
     * Numa nodes: `size_t`. These are not transferred over the network, so no
       need to shrink.
-  * Use exceptions in constructors of Nexus and Rpc. These are the only two
-    class types that the user is allowed to construct.
+  * Use exceptions in constructors. No exceptions in destructors.
+  * If a function throws an exception, its documentation should say so.
   * Do not append integers directly to string streams. If the integer is
     `uint8_t`, it will get interpreted as a character.
 

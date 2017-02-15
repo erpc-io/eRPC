@@ -73,6 +73,10 @@ class HugeAllocator {
   size_t stat_4k_cache_misses;   ///< alloc_4k calls that missed the cache
 
  public:
+  /**
+   * @brief Construct the hugepage allocator
+   * @throw \p runtime_error if construction fails
+   */
   HugeAllocator(size_t initial_size, size_t numa_node,
                 reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func);
   ~HugeAllocator();
@@ -87,8 +91,17 @@ class HugeAllocator {
     }
   }
 
-  /// Allocate a chunk with at least \p size bytes, and save the lkey of the
-  /// chunk to \p lkey.
+  /**
+   * @brief Allocate a chunk
+   *
+   * @param size Minimum size of the chunk
+   * @param lkey Lkey of the allocated chunk is saved here
+   *
+   * @return Pointer to the chunk if allocation succeeds
+   *
+   * @throw \p runtime_error if \p size is too large for this allocator
+   * @throw \p runtime_error if hugepage reservation fails
+   */
   inline void *alloc(size_t size, uint32_t *lkey) {
     if (unlikely(size > kMaxAllocSize)) {
       throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
@@ -209,8 +222,16 @@ class HugeAllocator {
     freelist[size_class - 1].push_back(chunk_1);
   }
 
-  /// Allocate a chunk from class \p size_class, add \p size to the allocated
-  /// memory statistic, and save the lkey of the chunk to \p lkey.
+  /**
+   * @brief Allocate a chunk from a non-empty class
+   *
+   * @param size_class Non-empty size class to allocate from
+   * @param size Bytes to add to the allocated memory statistics. This may be
+   * smaller than the largest chunk size in \p size_class.
+   * @param lkey The lkey of the allocated chunk is saved here
+   *
+   * @return Pointer to the allocated chunk
+   */
   inline void *alloc_from_class(size_t size_class, size_t size,
                                 uint32_t *lkey) {
     assert(size_class < kNumClasses);

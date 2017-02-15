@@ -51,6 +51,11 @@ class Rpc {
 
  public:
   // rpc.cc
+
+  /**
+   * @brief Construct the Rpc object
+   * @throw \p runtime_error if construction fails
+   */
   Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port = 0,
       size_t numa_node = 0);
@@ -102,6 +107,11 @@ class Rpc {
     while (true) {
       run_event_loop_one();
     }
+  }
+
+  Buffer alloc(size_t size) {
+    _unused(size);
+    return Buffer(nullptr, 0, 0);
   }
 
   /// Run the event loop for timeout_ms milliseconds

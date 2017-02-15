@@ -60,16 +60,26 @@ class IBTransport : public Transport {
   void poll_completions();
 
  private:
-  /// Fill in \p ib_ctx, \p device_id, and \p dev_port_id using phy_port.
-  /// If this function returns, these members are valid.
+  /**
+   * @brief Fill in \p ib_ctx, \p device_id, and \p dev_port using \p phy_port.
+   * @throw \p runtime_error if the port cannot be resolved.
+   */
   void resolve_phy_port();
 
-  /// Initialize device context, protection domain, and queue pair, without
-  /// using hugepages.
+  /**
+   * @brief Initialize structures that do not require eRPC hugepages: device
+   * context, protection domain, and queue pair.
+   *
+   * @throw \p runtime_error if initialization fails.
+   */
   void init_infiniband_structs();
 
-  /// A function wrapper whose \p pd argument is later bound to generate
-  /// \p reg_mr_func
+  /**
+   * @brief A function wrapper whose \p pd argument is later bound to generate
+   * this transport's \p reg_mr_func
+   *
+   * @throw \p runtime_error if memory registration fails.
+   */
   static MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
                                        size_t size) {
     struct ibv_mr *mr = ibv_reg_mr(pd, buf, size, IBV_ACCESS_LOCAL_WRITE);
@@ -83,7 +93,10 @@ class IBTransport : public Transport {
     return MemRegInfo(mr, mr->lkey);
   }
 
-  /// A function wrapper used to generate \p dereg_mr_func
+  /**
+   * @brief A function wrapper used to generate this transport's
+   * \p dereg_mr_func
+   */
   static void ibv_dereg_mr_wrapper(MemRegInfo mr) {
     struct ibv_mr *ib_mr = (struct ibv_mr *)mr.transport_mr;
     size_t size = ib_mr->length;
@@ -92,8 +105,11 @@ class IBTransport : public Transport {
     int ret = ibv_dereg_mr(ib_mr);
 
     if (ret != 0) {
-      throw std::runtime_error(
-          "eRPC IBTransport: Failed to deregister memory region");
+      fprintf(stderr,
+              "eRPC IBTransport: Memory deregistration failed. "
+              "size = %zu MB, lkey = %u.\n",
+              size, lkey);
+      return;
     }
 
     erpc_dprintf("eRPC IBTransport: Deregistered %zu MB (lkey = %u)\n",
@@ -103,7 +119,10 @@ class IBTransport : public Transport {
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
 
-  /// Initialize RECV buffers and constant fields of RECV descriptors
+  /**
+   * @brief Initialize RECV buffers and constant fields of RECV descriptors
+   * @throw \p runtime_error if RECV buffer hugepage allocation fails
+   */
   void init_recvs();
 
   /// Initialize non-inline SEND buffers and constant fields of SEND descriptors

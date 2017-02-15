@@ -20,8 +20,8 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
   prev_allocation_size = initial_size;
 
   /*
-   * Reserve initial hugepages. \p reserve_hugepages will throw a runtime
-   * exception if reservation fails.
+   * Reserve initial hugepages. \p reserve_hugepages will throw runtime_error
+   * if reservation fails.
    */
   reserve_hugepages(initial_size, numa_node);
 }
@@ -129,6 +129,7 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
           throw std::runtime_error(xmsg.str());
 
         case ENOMEM:
+          /* Out of memory - this is OK */
           erpc_dprintf(
               "eRPC HugeAllocator: Insufficient memory. Can't reserve %lu MB\n",
               size / MB(1));
@@ -161,11 +162,10 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
     throw std::runtime_error(xmsg.str());
   }
 
-  /*
-   * If we are here, the allocation succeeded. Register the allocated buffer and
-   * record in the \p shm_list.
-   */
+  /* If we are here, the allocation succeeded. */
   memset(shm_buf, 0, size);
+
+  /* Register the allocated buffer. This may throw, which is OK. */
   MemRegInfo reg_info = reg_mr_func(shm_buf, size);
 
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size, reg_info));
@@ -219,9 +219,7 @@ void HugeAllocator::delete_shm(int shm_key, const void *shm_buf) {
 
   ret = shmdt(shm_buf);
   if (ret != 0) {
-    fprintf(stderr,
-            "HugeAllocator: Error freeing SHM buf %p. "
-            "(SHM key = %d)\n",
+    fprintf(stderr, "HugeAllocator: Error freeing SHM buf %p. (SHM key = %d)\n",
             shm_buf, shm_key);
     exit(-1);
   }

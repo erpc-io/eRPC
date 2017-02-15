@@ -5,14 +5,18 @@
 
 namespace ERpc {
 
-// Variable-sized buffer
+/// Variable-sized buffer
 class Buffer {
  public:
-  Buffer(size_t size);
+  Buffer(void *buf, size_t size, uint32_t lkey)
+      : buf(buf), size(size), lkey(lkey) {}
+
+  /// Since \p Buffer does not allocate its own \p buf, do nothing here.
   ~Buffer();
 
-  size_t size;
   void *buf;
+  size_t size;
+  uint32_t lkey;
 };
 
 }  // End ERpc

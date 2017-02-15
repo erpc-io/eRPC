@@ -21,6 +21,8 @@ class Nexus {
    *
    * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
    * listen for session management packets.
+   *
+   * @throw \p runtime_error if Nexus creation fails.
    */
   Nexus(uint16_t mgmt_udp_port);
 
@@ -34,6 +36,8 @@ class Nexus {
    * @param udp_drop_prob The probability that a session management packet
    * will be dropped. This is useful for testing session management packet
    * retransmission.
+   *
+   * @throw \p runtime_error if Nexus creation fails.
    */
   Nexus(uint16_t mgmt_udp_port, double udp_drop_prob);
 

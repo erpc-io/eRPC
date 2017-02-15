@@ -66,7 +66,6 @@ set(SOURCES
   src/transport_impl/ib_transport.h
   src/transport_types.h
   src/util/barrier.h
-  src/util/buffer.cc
   src/util/buffer.h
   src/util/huge_alloc.cc
   src/util/huge_alloc.h
