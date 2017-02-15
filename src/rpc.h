@@ -62,6 +62,23 @@ class Rpc {
 
   ~Rpc();
 
+  /**
+   * @brief Create a Buffer for the eRPC user application
+   * @param size The minimum size of the created Buffer. The size of the
+   * allocated buffer can be larger than \p size.
+   *
+   * @return The allocated Buffer. The buffer is invalid if we ran out of
+   * memory.
+   *
+   * @throw \p runtime_error if \p size is invalid, or if hugepage reservation
+   * failure is catastrophic (i.e., an exception is *not* thrown if allocation
+   * fails simply because we ran out of memory).
+   */
+  inline Buffer alloc(size_t size) { return huge_alloc->alloc(size); }
+
+  /// Free the buffer
+  inline void free_buf(Buffer buffer) { huge_alloc->free_buf(buffer); }
+
   // rpc_sm_api.cc
 
   /**
@@ -108,23 +125,6 @@ class Rpc {
       run_event_loop_one();
     }
   }
-
-  /**
-   * @brief Create a Buffer for the eRPC user application
-   * @param size The minimum size of the created Buffer. The size of the
-   * allocated buffer can be larger than \p size.
-   *
-   * @return The allocated Buffer. The buffer is invalid if we ran out of
-   * memory.
-   *
-   * @throw \p runtime_error if \p size is invalid, or if hugepage reservation
-   * failure is catastrophic (i.e., an exception is *not* thrown if allocation
-   * fails simply because we ran out of memory).
-   */
-  inline Buffer alloc(size_t size) { return huge_alloc->alloc(size); }
-
-  /// Free the buffer
-  inline void free_buf(Buffer buffer) { huge_alloc->free_buf(buffer); }
 
   /// Run the event loop for \p timeout_ms milliseconds
   inline void run_event_loop_timeout(size_t timeout_ms) {
