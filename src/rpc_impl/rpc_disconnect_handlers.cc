@@ -38,8 +38,8 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
   }
 
   /*
-   * If the session was not already disconnected, the session metadata
-   * (hostname, app TID, session num) from the pkt should match our local copy.
+   * If the session was not already disconnected, the session endpoints
+   * (hostname, app TID, session num) in the pkt should match our local copy.
    */
   Session *session = session_vec.at(session_num); /* The server end point */
   assert(session->role == Session::Role::kServer);
@@ -93,8 +93,8 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   mgmt_retry_queue_remove(session);
 
   /*
-   * If the session was not already disconnected, the session metadata
-   * (hostname, app TID, session num) from the pkt should match our local copy.
+   * If the session was not already disconnected, the session endpoints
+   * (hostname, app TID, session num) in the pkt should match our local copy.
    */
   assert(session->server == sm_pkt->server);
   assert(session->client == sm_pkt->client);

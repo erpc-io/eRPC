@@ -22,9 +22,7 @@ static const size_t kMaxSessionsPerThread = 1024;
 static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),
               "Session number must fit in 32 bits");
 
-/*
- * Invalid values that need to be filled in session metadata.
- */
+/* Invalid metadata values for session endpoint initialization */
 static const uint8_t kInvalidAppTid = std::numeric_limits<uint8_t>::max();
 static const uint32_t kInvalidSessionNum = std::numeric_limits<uint32_t>::max();
 static const uint64_t kInvalidStartSeq = std::numeric_limits<uint64_t>::max();
@@ -78,8 +76,8 @@ static std::string session_mgmt_event_type_str(
   return std::string("[Invalid event type]");
 }
 
-/// Basic info about a session emd point filled in during initialization.
-class SessionMetadata {
+/// Basic metadata about a session end point filled when the session is created
+class SessionEndpoint {
  public:
   TransportType transport_type;
   char hostname[kMaxHostnameLen];
@@ -90,7 +88,7 @@ class SessionMetadata {
   RoutingInfo routing_info;
 
   /* Fill invalid metadata to aid debugging */
-  SessionMetadata() {
+  SessionEndpoint() {
     transport_type = TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));
     app_tid = kInvalidAppTid;
@@ -122,9 +120,9 @@ class SessionMetadata {
     return ret.str();
   }
 
-  /// Compare the location fields of two SessionMetadata objects. This does not
+  /// Compare the location fields of two SessionEndpoint objects. This does not
   /// account for non-location fields (e.g., fabric port, routing info).
-  bool operator==(const SessionMetadata &other) {
+  bool operator==(const SessionEndpoint &other) {
     return strcmp(hostname, other.hostname) == 0 && app_tid == other.app_tid &&
            session_num == other.session_num;
   }
@@ -137,11 +135,7 @@ class SessionMgmtPkt {
   SessionMgmtPktType pkt_type;
   SessionMgmtErrType err_type; /* For responses only */
 
-  /*
-   * Each session management packet contains two copies of session metadata,
-   * filled in by the client and server Rpc.
-   */
-  SessionMetadata client, server;
+  SessionEndpoint client, server; /* Filled in by client and server Rpc */
 
   SessionMgmtPkt() {}
   SessionMgmtPkt(SessionMgmtPktType pkt_type) : pkt_type(pkt_type) {}
@@ -183,17 +177,15 @@ class Session {
   Session(Role role, SessionState state);
   ~Session();
 
-  std::string get_client_name();
-
   /// Enable congestion control for this session
-  void enable_congestion_control();
+  void enable_congestion_control() { is_cc = true; }
 
   /// Disable congestion control for this session
-  void disable_congestion_control();
+  void disable_congestion_control() { is_cc = false; }
 
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
-  SessionMetadata client, server;  ///< The two endpoints of this session
+  SessionEndpoint client, server;  ///< The two endpoints of this session
   uint64_t mgmt_req_tsc;           ///< Timestamp of the last management request
   bool is_cc;  ///< True if congestion control is enabled for this session
 };

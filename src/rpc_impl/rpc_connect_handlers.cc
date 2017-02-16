@@ -66,7 +66,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
       assert(old_session->role == Session::Role::kServer);
       assert(old_session->state == SessionState::kConnected);
 
-      /* There's a valid session, so client's metadata cannot have changed. */
+      /* There's a valid session, so client endpoint metadata is unchanged */
       assert(memcmp((void *)&old_session->client, (void *)&sm_pkt->client,
                     sizeof(old_session->client)) == 0);
 
@@ -74,7 +74,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
                    issue_msg);
 
       /* Send a connect success response */
-      sm_pkt->server = old_session->server; /* Fill in server metadata */
+      sm_pkt->server = old_session->server; /* Fill server endpoint metadata */
       sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
       return;
     }
@@ -94,12 +94,12 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   Session *session =
       new Session(Session::Role::kServer, SessionState::kConnected);
 
-  /* Set the server metadata fields in the packet */
+  /* Set the server endpoint metadata fields in the packet */
   sm_pkt->server.session_num = session_vec.size();
   sm_pkt->server.start_seq = gen_start_seq();
   transport->fill_routing_info(&(sm_pkt->server.routing_info));
 
-  /* Copy the packet's metadata to the created session */
+  /* Copy the packet's endpoint metadata to the created session */
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 
@@ -164,13 +164,16 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   mgmt_retry_queue_remove(session);
 
   /*
-   * If the session was not already disconnected, the session metadata
+   * If the session was not already disconnected, the session endpoint metadata
    * (hostname, app TID, session num) from the pkt should match our local copy.
-   * We don't have the server's session number yet.
+   *
+   * We don't have the server's session number locally yet, so we cannot use
+   * SessionEndpoint comparator to compare server endpoint metadata.
    */
   assert(strcmp(session->server.hostname, sm_pkt->server.hostname) == 0);
   assert(session->server.app_tid == sm_pkt->server.app_tid);
   assert(session->server.session_num == kInvalidSessionNum);
+
   assert(session->client == sm_pkt->client);
 
   /*
@@ -189,8 +192,8 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
     return;
   }
 
-  session->server = sm_pkt->server; /* Save server metadata from packet */
-  session->state = SessionState::kConnected; /* Mark session connected */
+  session->server = sm_pkt->server; /* Save server endpoint metadata from pkt */
+  session->state = SessionState::kConnected;
 
   erpc_dprintf("%s: None. Session connected.\n", issue_msg);
   session_mgmt_handler(session, SessionMgmtEventType::kConnected,
