@@ -10,8 +10,8 @@ void Rpc<Transport_>::run_event_loop_one() {
   }
 
   /* Then check if we need to retransmit any session management requests */
-  if (unlikely(in_flight_vec.size() > 0)) {
-    retry_in_flight();
+  if (unlikely(mgmt_retry_queue.size() > 0)) {
+    mgmt_retry();
   }
 };
 

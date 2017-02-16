@@ -33,58 +33,52 @@ void Rpc<Transport_>::send_disconnect_req_one(Session *session) {
 }
 
 template <class Transport_>
-bool Rpc<Transport_>::is_in_flight(Session *session) {
-  for (in_flight_req_t &req : in_flight_vec) {
-    if (req.session == session) {
-      return true;
-    }
-  }
-
-  return false;
+bool Rpc<Transport_>::mgmt_retry_queue_contains(Session *session) {
+  return std::find(mgmt_retry_queue.begin(), mgmt_retry_queue.end(), session) !=
+         mgmt_retry_queue.end();
 }
 
 template <class Transport_>
-void Rpc<Transport_>::add_to_in_flight(Session *session) {
+void Rpc<Transport_>::mgmt_retry_queue_add(Session *session) {
   assert(is_session_ptr_client(session));
 
-  /* Only client-mode sessions can have requests in flight */
+  /* Only client-mode sessions can be in the management retry queue */
   assert(session->role == Session::Role::kClient);
 
-  /* Ensure that we don't have this session in flight already */
-  assert(!is_in_flight(session));
+  /* Ensure that we don't have an in-flight management req for this session */
+  assert(!mgmt_retry_queue_contains(session));
 
-  uint64_t tsc = rdtsc();
-  in_flight_vec.push_back(in_flight_req_t(tsc, session));
+  session->mgmt_req_tsc = rdtsc(); /* Save tsc for retry */
+  mgmt_retry_queue.push_back(session);
 }
 
 template <class Transport_>
-void Rpc<Transport_>::remove_from_in_flight(Session *session) {
+void Rpc<Transport_>::mgmt_retry_queue_remove(Session *session) {
   assert(is_session_ptr_client(session));
-  assert(is_in_flight(session));
+  assert(mgmt_retry_queue_contains(session));
 
-  size_t initial_size = in_flight_vec.size(); /* Debug-only */
+  size_t initial_size = mgmt_retry_queue.size(); /* Debug-only */
   _unused(initial_size);
 
-  in_flight_req_t dummy_req(0, session); /* Dummy for std::remove */
-  in_flight_vec.erase(
-      std::remove(in_flight_vec.begin(), in_flight_vec.end(), dummy_req),
-      in_flight_vec.end());
+  mgmt_retry_queue.erase(
+      std::remove(mgmt_retry_queue.begin(), mgmt_retry_queue.end(), session),
+      mgmt_retry_queue.end());
 
-  assert(in_flight_vec.size() == initial_size - 1);
+  assert(mgmt_retry_queue.size() == initial_size - 1);
 }
 
 template <class Transport_>
-void Rpc<Transport_>::retry_in_flight() {
-  assert(in_flight_vec.size() > 0);
+void Rpc<Transport_>::mgmt_retry() {
+  assert(mgmt_retry_queue.size() > 0);
   uint64_t cur_tsc = rdtsc();
 
-  for (in_flight_req_t &req : in_flight_vec) {
-    assert(req.session != nullptr);
-    SessionState state = req.session->state;
+  for (Session *session : mgmt_retry_queue) {
+    assert(session != nullptr);
+    SessionState state = session->state;
     assert(state == SessionState::kConnectInProgress ||
            state == SessionState::kDisconnectInProgress);
 
-    uint64_t elapsed_cycles = cur_tsc - req.prev_tsc;
+    uint64_t elapsed_cycles = cur_tsc - session->mgmt_req_tsc;
     assert(elapsed_cycles > 0);
 
     double elapsed_ms = to_sec(elapsed_cycles, nexus->freq_ghz) * 1000;
@@ -92,17 +86,17 @@ void Rpc<Transport_>::retry_in_flight() {
       /* We need to retransmit */
       switch (state) {
         case SessionState::kConnectInProgress:
-          send_connect_req_one(req.session);
+          send_connect_req_one(session);
           break; /* Process other in-flight requests */
         case SessionState::kDisconnectInProgress:
-          send_disconnect_req_one(req.session);
+          send_disconnect_req_one(session);
           break; /* Process other in-flight requests */
         default:
           assert(false);
+          exit(-1);
       }
 
-      /* Update the timestamp of the in-flight request. (@req is a reference) */
-      req.prev_tsc = cur_tsc;
+      session->mgmt_req_tsc = rdtsc(); /* Update mgmt tsc for retry */
     }
   }
 }

@@ -102,7 +102,7 @@ void Rpc<Transport_>::bury_session(Session *session) {
   uint32_t session_num;
   if (session->role == Session::Role::kClient) {
     assert(is_session_ptr_client(session));
-    assert(!is_in_flight(session));
+    assert(!mgmt_retry_queue_contains(session));
 
     session_num = session->client.session_num;
   } else {

@@ -33,22 +33,6 @@ template <class Transport_>
 class Rpc {
   const uint64_t kStartSeqMask = ((1ull << 48) - 1ull);
 
-  struct in_flight_req_t {
-    uint64_t prev_tsc; /* The tsc at which a request was last sent */
-    Session *session;
-
-    in_flight_req_t(uint64_t tsc, Session *session)
-        : prev_tsc(tsc), session(session) {}
-
-    /*
-     * The in-flight request vector contains distinct sessions, so we can
-     * ignore the timestamp for comparison.
-     */
-    bool operator==(const in_flight_req_t &other) {
-      return (session == other.session);
-    }
-  };
-
  public:
   // rpc.cc
 
@@ -172,14 +156,24 @@ class Rpc {
   void handle_session_disconnect_resp(SessionMgmtPkt *pkt);
 
   // rpc_sm_retry.cc
-  void send_connect_req_one(Session *session);
-  void send_disconnect_req_one(Session *session);
-  void add_to_in_flight(Session *session);
-  bool is_in_flight(Session *session);
-  void remove_from_in_flight(Session *session);
 
-  /// Retry in-flight requests whose retry timeout has expired.
-  void retry_in_flight();
+  /// Send a (possibly retried) connect request for this session
+  void send_connect_req_one(Session *session);
+
+  /// Send a (possibly retried) disconnect request for this session
+  void send_disconnect_req_one(Session *session);
+
+  /// Add this session to the session managment retry queue
+  void mgmt_retry_queue_add(Session *session);
+
+  /// Remove this session from the session managment retry queue
+  void mgmt_retry_queue_remove(Session *session);
+
+  /// Check if the session managment retry queue contains this session
+  bool mgmt_retry_queue_contains(Session *session);
+
+  /// Retry in-flight session management requests whose timeout has expired
+  void mgmt_retry();
 
   // Constructor args
   Nexus *nexus;
@@ -206,11 +200,8 @@ class Rpc {
    */
   std::vector<Session *> session_vec;
 
-  /*
-   * List of client sessions for which session management requests are in
-   * flight.
-   */
-  std::vector<in_flight_req_t> in_flight_vec;
+  /* List of sessions for which a management request is in flight */
+  std::vector<Session *> mgmt_retry_queue;
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;

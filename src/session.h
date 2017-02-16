@@ -191,11 +191,11 @@ class Session {
   /// Disable congestion control for this session
   void disable_congestion_control();
 
-  Role role;
-  SessionState state;
-  SessionMetadata client, server;
-
-  bool is_cc; /* Is congestion control enabled for this session? */
+  Role role;           ///< The role (server/client) of this session endpoint
+  SessionState state;  ///< The management state of this session endpoint
+  SessionMetadata client, server;  ///< The two endpoints of this session
+  uint64_t mgmt_req_tsc;           ///< Timestamp of the last management request
+  bool is_cc;  ///< True if congestion control is enabled for this session
 };
 
 typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType,

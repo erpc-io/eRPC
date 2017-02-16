@@ -97,7 +97,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   // server_metadata.routing_info = ??
 
   session_vec.push_back(session); /* Add to list of all sessions */
-  add_to_in_flight(session); /* Add to list of sessions w/ in-flight sm reqs */
+  mgmt_retry_queue_add(session);  /* Record management request for retry */
   send_connect_req_one(session);
 
   return session;
@@ -120,24 +120,24 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
   switch (session->state) {
     case SessionState::kConnectInProgress:
       /* Can't disconnect right now. User needs to wait. */
-      assert(is_in_flight(session));
+      assert(mgmt_retry_queue_contains(session));
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
       return false;
 
     case SessionState::kConnected:
       /* This is the only case where we send the disconnect packet */
       session->state = SessionState::kDisconnectInProgress;
-      add_to_in_flight(session); /* Ensures that @session is not in flight */
+      mgmt_retry_queue_add(session); /* Ensures that session is not in flight */
       send_disconnect_req_one(session);
       return true;
 
     case SessionState::kDisconnectInProgress:
-      assert(is_in_flight(session));
+      assert(mgmt_retry_queue_contains(session));
       erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
       return false;
 
     case SessionState::kDisconnected:
-      assert(!is_in_flight(session));
+      assert(!mgmt_retry_queue_contains(session));
       erpc_dprintf_noargs(
           "eRPC Rpc: destroy_session() failed. Issue: "
           "Session already disconnected.\n");
@@ -149,9 +149,9 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
        * or that the connect request timed out. In either case, we don't need
        * to send a disconnect request.
        */
-      assert(!is_in_flight(session));
+      assert(!mgmt_retry_queue_contains(session));
       erpc_dprintf(
-          "eRPC Rpc %s: destroy_session() succeeded for error session %u.\n",
+          "eRPC Rpc %s: destroy_session() succeeded for error-ed session %u.\n",
           get_name().c_str(), session_num);
 
       session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,

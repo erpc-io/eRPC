@@ -136,7 +136,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * a disconnect response. If so, the callback is not invoked.
    */
   if (session == nullptr) {
-    assert(!is_in_flight(session));
+    assert(!mgmt_retry_queue_contains(session));
     erpc_dprintf("%s: Client session is already disconnected.\n", issue_msg);
     return;
   }
@@ -149,7 +149,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * response and the callback is not invoked.
    */
   if (session->state > SessionState::kConnectInProgress) {
-    assert(!is_in_flight(session));
+    assert(!mgmt_retry_queue_contains(session));
     erpc_dprintf("%s: Ignoring. Client is in state %s.\n", issue_msg,
                  session_state_str(session->state).c_str());
     return;
@@ -160,8 +160,8 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * should be in flight. It's not possible to also have a disconnect request in
    * flight, since disconnect must wait for the first connect response.
    */
-  assert(is_in_flight(session));
-  remove_from_in_flight(session);
+  assert(mgmt_retry_queue_contains(session));
+  mgmt_retry_queue_remove(session);
 
   /*
    * If the session was not already disconnected, the session metadata

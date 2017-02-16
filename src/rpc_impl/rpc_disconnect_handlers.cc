@@ -76,7 +76,7 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
    * we get a duplicate disconnect response. If so, the callback is not invoked.
    */
   if (session == nullptr) {
-    assert(!is_in_flight(session));
+    assert(!mgmt_retry_queue_contains(session));
     erpc_dprintf("%s: Client session is already disconnected.\n", issue_msg);
     return;
   }
@@ -89,9 +89,8 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
    * the connect response is removed from the in-flight list.
    */
   assert(session->state == SessionState::kDisconnectInProgress);
-
-  assert(is_in_flight(session));
-  remove_from_in_flight(session);
+  assert(mgmt_retry_queue_contains(session));
+  mgmt_retry_queue_remove(session);
 
   /*
    * If the session was not already disconnected, the session metadata
