@@ -162,7 +162,7 @@ void Nexus::session_mgnt_handler() {
     exit(-1);
   }
 
-  if (!session_mgmt_is_valid_pkt_type(sm_pkt->pkt_type)) {
+  if (!session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type)) {
     erpc_dprintf(
         "eRPC Nexus: FATAL. Received session management packet of "
         "unexpected type %d.\n",
@@ -176,7 +176,7 @@ void Nexus::session_mgnt_handler() {
   uint8_t source_app_tid; /* Debug-only */
   _unused(source_app_tid);
 
-  bool is_sm_req = session_mgmt_is_pkt_type_req(sm_pkt->pkt_type);
+  bool is_sm_req = session_mgmt_pkt_type_is_req(sm_pkt->pkt_type);
 
   if (is_sm_req) {
     target_app_tid = sm_pkt->server.app_tid;

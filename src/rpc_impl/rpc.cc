@@ -158,7 +158,7 @@ void Rpc<Transport_>::handle_session_management() {
   /* Handle all session management requests */
   for (SessionMgmtPkt *sm_pkt : sm_hook.session_mgmt_pkt_list) {
     /* The sender of a packet cannot be this Rpc */
-    if (session_mgmt_is_pkt_type_req(sm_pkt->pkt_type)) {
+    if (session_mgmt_pkt_type_is_req(sm_pkt->pkt_type)) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) == 0 &&
                sm_pkt->client.app_tid == app_tid));
     } else {

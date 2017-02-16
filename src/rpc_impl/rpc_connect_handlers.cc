@@ -114,7 +114,7 @@ template <class Transport_>
 void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
-  assert(session_mgmt_is_valid_err_type(sm_pkt->err_type));
+  assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));
 
   /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
