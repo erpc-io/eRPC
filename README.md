@@ -1,8 +1,9 @@
 ## Code notes
   * Major types
     * App TIDs: `uint8_t`. We need one per thread, so 256 is enough.
-    * Session number: `uint32_t`. We need one per session, and we may need
-      more than 65,536.
+    * Session number: `uint16_t`. We need one per session, and we don't expect
+      to support over 65,536 sessions per thread. More sessions can be supported
+      with multiple threads.
     * Sequence numbers: `uint64_t` - not `size_t`
     * Numa nodes: `size_t`. These are not transferred over the network, so no
       need to shrink.

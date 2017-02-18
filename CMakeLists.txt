@@ -94,6 +94,9 @@ if(LTO)
 
   add_executable(test_rand tests/test_rand.cc ${SOURCES})
   target_link_libraries(test_rand ${GTEST_LIBRARIES} ${LIBRARIES})
+
+  add_executable(test_fixed_vector tests/test_fixed_vector.cc ${SOURCES})
+  target_link_libraries(test_fixed_vector ${GTEST_LIBRARIES} ${LIBRARIES})
 else(LTO)
   add_library(erpc ${SOURCES})
 
@@ -114,4 +117,7 @@ else(LTO)
 
   add_executable(test_rand tests/test_rand.cc)
   target_link_libraries(test_rand erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+
+  add_executable(test_fixed_vector tests/test_fixed_vector.cc)
+  target_link_libraries(test_fixed_vector ${GTEST_LIBRARIES} ${LIBRARIES})
 endif(LTO)

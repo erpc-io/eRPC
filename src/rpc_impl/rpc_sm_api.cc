@@ -111,7 +111,7 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
     return false;
   }
 
-  uint32_t session_num = session->client.session_num;
+  uint16_t session_num = session->client.session_num;
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "eRPC Rpc %s: destroy_session() failed for session %u. Issue",

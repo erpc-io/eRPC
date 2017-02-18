@@ -15,12 +15,12 @@ namespace ERpc {
  * by an Rpc through its lifetime. Increase this for more sessions.
  */
 static const size_t kMaxSessionsPerThread = 1024;
-static_assert(kMaxSessionsPerThread < std::numeric_limits<uint32_t>::max(),
+static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(),
               "Session number must fit in 32 bits");
 
 /* Invalid metadata values for session endpoint initialization */
 static const uint8_t kInvalidAppTid = std::numeric_limits<uint8_t>::max();
-static const uint32_t kInvalidSessionNum = std::numeric_limits<uint32_t>::max();
+static const uint16_t kInvalidSessionNum = std::numeric_limits<uint16_t>::max();
 static const uint64_t kInvalidStartSeq = std::numeric_limits<uint64_t>::max();
 static const uint8_t kInvalidPhyPort = std::numeric_limits<uint8_t>::max();
 
@@ -189,11 +189,11 @@ class SessionEndpoint {
  public:
   TransportType transport_type;
   char hostname[kMaxHostnameLen];
-  uint8_t app_tid;   ///< TID of the Rpc that created this endpoint
-  uint8_t phy_port;  ///< Fabric port used by this endpoint
-  uint32_t session_num;
-  uint64_t start_seq;
-  RoutingInfo routing_info;
+  uint8_t app_tid;       ///< TID of the Rpc that created this endpoint
+  uint8_t phy_port;      ///< Fabric port used by this endpoint
+  uint16_t session_num;  ///< The session number of this endpoint in its Rpc
+  uint64_t start_seq;    ///< The start sequence number chosen by this endpoint
+  RoutingInfo routing_info;  ///< Generic routing info for this endpoint
 
   /* Fill invalid metadata to aid debugging */
   SessionEndpoint() {

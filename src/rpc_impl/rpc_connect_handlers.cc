@@ -125,7 +125,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
           sm_pkt->client.session_num);
 
   /* Try to locate the requester session for this response */
-  uint32_t session_num = sm_pkt->client.session_num;
+  uint16_t session_num = sm_pkt->client.session_num;
   assert(session_num < session_vec.size());
 
   Session *session = session_vec[session_num];

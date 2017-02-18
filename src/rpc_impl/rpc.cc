@@ -99,7 +99,7 @@ void Rpc<Transport_>::bury_session(Session *session) {
   /* XXX: When is the session destroyed? */
   assert(session != nullptr);
 
-  uint32_t session_num;
+  uint16_t session_num;
   if (session->role == Session::Role::kClient) {
     assert(is_session_ptr_client(session));
     assert(!mgmt_retry_queue_contains(session));
