@@ -14,12 +14,6 @@
 
 namespace ERpc {
 
-static const size_t kSessionCredits = 8;  ///< Credits per session endpoint
-static const size_t kRpcWindowSize = 20;  ///< Max outstanding pkts per Rpc
-static const size_t kInitialHugeAllocSize = (128 * MB(1));
-static const size_t kSessionMgmtRetransMs = 5;  ///< Timeout for management reqs
-static const size_t kSessionMgmtTimeoutMs = 50;  ///< Max time for mgmt reqs
-
 #define rpc_dprintf(fmt, ...)            \
   do {                                   \
     if (RPC_DPRINTF) {                   \
@@ -31,9 +25,22 @@ static const size_t kSessionMgmtTimeoutMs = 50;  ///< Max time for mgmt reqs
 // Per-thread RPC object
 template <class Transport_>
 class Rpc {
-  const uint64_t kStartSeqMask = ((1ull << 48) - 1ull);
-
  public:
+  static const size_t kRpcWindowSize = 20;  ///< Max outstanding pkts per Rpc
+  static const size_t kReqNumBits = 48;
+  static const size_t kInitialHugeAllocSize = (128 * MB(1));
+
+  /// The header in each RPC packet
+  struct pkthdr_t {
+    uint32_t tot_size;         ///< Total message size across multiple packets
+    uint16_t rem_session_num;  ///< Session number of the remote packet target
+    uint32_t is_req : 1;       ///< 1 if this packet is a request packet
+    uint32_t is_first : 1;     ///< 1 if this packet is the first message packet
+    uint32_t pkt_num : 14;     ///< Packet number in the request
+    uint64_t req_num : kReqNumBits;  ///< Request number of this packet
+  };
+  static_assert(sizeof(pkthdr_t) == 16, "");
+
   // rpc.cc
 
   /**
@@ -143,9 +150,6 @@ class Rpc {
 
   /// Destroy a session object and mark it as NULL in the session vector
   void bury_session(Session *session);
-
-  /// Generate the start sequence number for a session when it is created
-  uint64_t gen_start_seq() { return (slow_rand.next_u64() & kStartSeqMask); }
 
   // rpc_connect_handlers.cc
   void handle_session_connect_req(SessionMgmtPkt *pkt);

@@ -14,6 +14,8 @@ namespace ERpc {
 /// A one-to-one session class for all transports
 class Session {
  public:
+  static const size_t kSessionCredits = 8;  ///< Credits per session endpoint
+
   enum class Role : bool { kServer, kClient };
 
   Session(Role role, SessionState state);
@@ -25,14 +27,13 @@ class Session {
   /// Disable congestion control for this session
   void disable_congestion_control() { is_cc = false; }
 
-  // Cold data
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< The two endpoints of this session
   uint64_t mgmt_req_tsc;           ///< Timestamp of the last management request
   bool is_cc;  ///< True if congestion control is enabled for this session
-
-  // Hot data
+  uint64_t cur_req_num;  ///< Current request number
+  uint16_t cur_pkt_num;  ///< Packet number in current request
 };
 
 typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType,

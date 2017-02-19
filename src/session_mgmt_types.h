@@ -15,14 +15,19 @@ namespace ERpc {
  * by an Rpc through its lifetime. Increase this for more sessions.
  */
 static const size_t kMaxSessionsPerThread = 1024;
-static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(),
-              "Session number must fit in 32 bits");
+static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(), "");
+
+static const size_t kSecretBits = 32;  ///< Session secret for security
+static_assert(kSecretBits <= 32, "");  /* Secret must fit in 32 bits */
+
+static const size_t kSessionMgmtRetransMs = 5;  ///< Timeout for management reqs
+static const size_t kSessionMgmtTimeoutMs = 50;  ///< Max time for mgmt reqs
 
 /* Invalid metadata values for session endpoint initialization */
+static const uint8_t kInvalidPhyPort = std::numeric_limits<uint8_t>::max();
 static const uint8_t kInvalidAppTid = std::numeric_limits<uint8_t>::max();
 static const uint16_t kInvalidSessionNum = std::numeric_limits<uint16_t>::max();
-static const uint64_t kInvalidStartSeq = std::numeric_limits<uint64_t>::max();
-static const uint8_t kInvalidPhyPort = std::numeric_limits<uint8_t>::max();
+static const uint32_t kInvalidSecret = 0;
 
 /// Session state that can only go forward.
 enum class SessionState {
@@ -188,21 +193,21 @@ static std::string session_mgmt_event_type_str(
 class SessionEndpoint {
  public:
   TransportType transport_type;
-  char hostname[kMaxHostnameLen];
+  char hostname[kMaxHostnameLen];  ///< Hostname of this endpoint
+  uint8_t phy_port;                ///< Fabric port used by this endpoint
   uint8_t app_tid;       ///< TID of the Rpc that created this endpoint
-  uint8_t phy_port;      ///< Fabric port used by this endpoint
   uint16_t session_num;  ///< The session number of this endpoint in its Rpc
-  uint64_t start_seq;    ///< The start sequence number chosen by this endpoint
-  RoutingInfo routing_info;  ///< Generic routing info for this endpoint
+  uint32_t secret : kSecretBits;  ///< Secret for both session endpoints
+  RoutingInfo routing_info;       ///< Generic routing info for this endpoint
 
   /* Fill invalid metadata to aid debugging */
   SessionEndpoint() {
     transport_type = TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));
-    app_tid = kInvalidAppTid;
     phy_port = kInvalidPhyPort;
+    app_tid = kInvalidAppTid;
     session_num = kInvalidSessionNum;
-    start_seq = kInvalidStartSeq;
+    secret = kInvalidSecret;
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
 

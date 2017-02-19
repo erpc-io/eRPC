@@ -17,23 +17,14 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
 
   /* Ensure that server fields known by the client were filled correctly */
-  assert(sm_pkt->server.app_tid == app_tid);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0);
+  assert(sm_pkt->server.app_tid == app_tid);
+  assert(sm_pkt->server.secret == sm_pkt->client.secret);
 
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %s: Received connect request from %s. Issue",
           get_name().c_str(), sm_pkt->client.name().c_str());
-
-  /* Check if the requested physical port is correct */
-  if (sm_pkt->server.phy_port != phy_port) {
-    erpc_dprintf("%s: Invalid server port %u. Sending response.\n", issue_msg,
-                 sm_pkt->server.phy_port);
-
-    sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
-                          &nexus->udp_config);
-    return;
-  }
 
   /* Check that the transport matches */
   if (sm_pkt->server.transport_type != transport->transport_type) {
@@ -41,6 +32,16 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
                  get_transport_name(sm_pkt->server.transport_type).c_str());
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidTransport,
+                          &nexus->udp_config);
+    return;
+  }
+
+  /* Check if the requested physical port is correct */
+  if (sm_pkt->server.phy_port != phy_port) {
+    erpc_dprintf("%s: Invalid server port %u. Sending response.\n", issue_msg,
+                 sm_pkt->server.phy_port);
+
+    sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
                           &nexus->udp_config);
     return;
   }
@@ -94,12 +95,14 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   Session *session =
       new Session(Session::Role::kServer, SessionState::kConnected);
 
-  /* Set the server endpoint metadata fields in the packet */
+  /*
+   * Set the server endpoint metadata fields in the received packet, which we
+   * will then send back to the client.
+   */
   sm_pkt->server.session_num = session_vec.size();
-  sm_pkt->server.start_seq = gen_start_seq();
   transport->fill_routing_info(&(sm_pkt->server.routing_info));
 
-  /* Copy the packet's endpoint metadata to the created session */
+  /* Save the packet's endpoint metadata into the created session */
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 

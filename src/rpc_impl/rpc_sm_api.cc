@@ -81,19 +81,19 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
 
   client_endpoint.transport_type = transport->transport_type;
   strcpy((char *)client_endpoint.hostname, nexus->hostname);
-  client_endpoint.app_tid = app_tid;
   client_endpoint.phy_port = phy_port;
+  client_endpoint.app_tid = app_tid;
   client_endpoint.session_num = session_vec.size();
-  client_endpoint.start_seq = gen_start_seq();
+  client_endpoint.secret = slow_rand.next_u64() & ((1ull << kSecretBits) - 1);
   transport->fill_routing_info(&client_endpoint.routing_info);
 
   SessionEndpoint &server_endpoint = session->server;
   server_endpoint.transport_type = transport->transport_type;
   strcpy((char *)server_endpoint.hostname, rem_hostname);
-  server_endpoint.app_tid = rem_app_tid;
   server_endpoint.phy_port = rem_phy_port;
+  server_endpoint.app_tid = rem_app_tid;
   // server_endpoint.session_num = ??
-  // server_endpoint.start_seq = ??
+  server_endpoint.secret = client_endpoint.secret; /* Secret is shared */
   // server_endpoint.routing_info = ??
 
   session_vec.push_back(session); /* Add to list of all sessions */
