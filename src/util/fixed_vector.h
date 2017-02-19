@@ -6,6 +6,12 @@
 
 namespace ERpc {
 
+/**
+ * @brief A static-sized vector that supports push, pop, and random access
+ *
+ * @tparam T The type of elements stored in the vector
+ * @tparam N The size of the vector
+ */
 template <typename T, size_t N>
 class FixedVector {
  public:
