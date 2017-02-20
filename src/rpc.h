@@ -27,8 +27,8 @@ template <class Transport_>
 class Rpc {
  public:
   static const size_t kRpcWindowSize = 20;  ///< Max outstanding pkts per Rpc
-  static const size_t kReqNumBits = 48;
-  static const size_t kInitialHugeAllocSize = (128 * MB(1));
+  static const size_t kInitialHugeAllocSize =
+      (128 * MB(1));  ///< Initial capacity of the hugepage allocator
 
   /// The header in each RPC packet
   struct pkthdr_t {
@@ -36,8 +36,8 @@ class Rpc {
     uint16_t rem_session_num;  ///< Session number of the remote packet target
     uint32_t is_req : 1;       ///< 1 if this packet is a request packet
     uint32_t is_first : 1;     ///< 1 if this packet is the first message packet
-    uint32_t pkt_num : 14;     ///< Packet number in the request
-    uint64_t req_num : kReqNumBits;  ///< Request number of this packet
+    uint32_t pkt_num : Session::kPktNumBits;  ///< Packet number in the request
+    uint64_t req_num : Session::kReqNumBits;  ///< Request number of this packet
   };
   static_assert(sizeof(pkthdr_t) == 16, "");
 

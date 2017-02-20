@@ -48,7 +48,7 @@ void Rpc<Transport_>::mgmt_retry_queue_add(Session *session) {
   /* Ensure that we don't have an in-flight management req for this session */
   assert(!mgmt_retry_queue_contains(session));
 
-  session->mgmt_req_tsc = rdtsc(); /* Save tsc for retry */
+  session->client_info.mgmt_req_tsc = rdtsc(); /* Save tsc for retry */
   mgmt_retry_queue.push_back(session);
 }
 
@@ -78,7 +78,7 @@ void Rpc<Transport_>::mgmt_retry() {
     assert(state == SessionState::kConnectInProgress ||
            state == SessionState::kDisconnectInProgress);
 
-    uint64_t elapsed_cycles = cur_tsc - session->mgmt_req_tsc;
+    uint64_t elapsed_cycles = cur_tsc - session->client_info.mgmt_req_tsc;
     assert(elapsed_cycles > 0);
 
     double elapsed_ms = to_sec(elapsed_cycles, nexus->freq_ghz) * 1000;
@@ -96,7 +96,7 @@ void Rpc<Transport_>::mgmt_retry() {
           exit(-1);
       }
 
-      session->mgmt_req_tsc = rdtsc(); /* Update mgmt tsc for retry */
+      session->client_info.mgmt_req_tsc = rdtsc(); /* Update for retry */
     }
   }
 }

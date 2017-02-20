@@ -14,15 +14,15 @@
 
 namespace ERpc {
 
-static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
-static const size_t kSendQueueDepth = 128;   ///< SEND queue size
-static const size_t kPostlist = 16;          ///< Maximum post list size
-static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
-static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
-
 /// Generic mostly-reliable transport
 class Transport {
  public:
+  static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
+  static const size_t kSendQueueDepth = 128;   ///< SEND queue size
+  static const size_t kPostlist = 16;          ///< Maximum post list size
+  static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
+  static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
+
   Transport(TransportType transport_type, size_t mtu, uint8_t app_tid,
             uint8_t phy_port);
 
