@@ -26,12 +26,15 @@ namespace ERpc {
 template <class Transport_>
 class Rpc {
  public:
+  /// Initial capacity of the hugepage allocator
+  static const size_t kInitialHugeAllocSize = (128 * MB(1));
+
+  /// Max number of "unexpected" packets kept outstanding by this Rpc
+  static const size_t kUnexpWindowSize = 20;
+
   static const size_t kMaxMsgSize = MB(8);  ///< Max request/response size
   static const size_t kReqNumBits = 48;     ///< Bits for request number
-  static const size_t kPktNumBits = 14;  ///< Bits for packet number in request
-  static const size_t kRpcWindowSize = 20;  ///< Max outstanding pkts per Rpc
-  static const size_t kInitialHugeAllocSize =
-      (128 * MB(1));  ///< Initial capacity of the hugepage allocator
+  static const size_t kPktNumBits = 13;  ///< Bits for packet number in request
 
   static_assert(kReqNumBits <= 64, "");
   static_assert(kPktNumBits <= 16, "");
@@ -43,6 +46,7 @@ class Rpc {
     uint16_t rem_session_num;  ///< Session number of the remote packet target
     uint32_t is_req : 1;       ///< 1 if this packet is a request packet
     uint32_t is_first : 1;     ///< 1 if this packet is the first message packet
+    uint32_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
     uint32_t pkt_num : kPktNumBits;  ///< Packet number in the request
     uint64_t req_num : kReqNumBits;  ///< Request number of this packet
   };
@@ -188,30 +192,23 @@ class Rpc {
 
   // Constructor args
   Nexus *nexus;
-  void *context; /* The application context */
+  void *context;  ///< The application context
   uint8_t app_tid;
   session_mgmt_handler_t session_mgmt_handler;
   uint8_t phy_port;
   size_t numa_node;
 
   // Others
-  Transport_ *transport; /* The unreliable transport */
+  Transport_ *transport = nullptr;      ///< The unreliable transport
+  HugeAllocator *huge_alloc = nullptr;  ///< This thread's hugepage allocator
+  size_t cur_unexp_pkts = 0;  ///< Currently outstanding unexpected packets
 
-  /*
-   * The hugepage allocator used for memory allocation by this Rpc and its
-   * member objects. Using one allocator for all hugepage allocations in this
-   * thread allows easier memory use accounting.
-   */
-  HugeAllocator *huge_alloc;
-
-  /*
-   * The append-only list of session pointers, indexed by session num.
-   * Disconnected sessions are denoted by null pointers. This grows as sessions
-   * are repeatedly connected and disconnected, but 8 bytes per session is OK.
-   */
+  /// The append-only list of session pointers, indexed by session num.
+  /// Disconnected sessions are denoted by null pointers. This grows as sessions
+  /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
 
-  /* List of sessions for which a management request is in flight */
+  /// List of sessions for which a management request is in flight
   std::vector<Session *> mgmt_retry_queue;
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
