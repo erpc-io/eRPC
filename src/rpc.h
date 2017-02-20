@@ -26,9 +26,16 @@ namespace ERpc {
 template <class Transport_>
 class Rpc {
  public:
+  static const size_t kMaxMsgSize = MB(8);  ///< Max request/response size
+  static const size_t kReqNumBits = 48;     ///< Bits for request number
+  static const size_t kPktNumBits = 14;  ///< Bits for packet number in request
   static const size_t kRpcWindowSize = 20;  ///< Max outstanding pkts per Rpc
   static const size_t kInitialHugeAllocSize =
       (128 * MB(1));  ///< Initial capacity of the hugepage allocator
+
+  static_assert(kReqNumBits <= 64, "");
+  static_assert(kPktNumBits <= 16, "");
+  static_assert((1ull << kPktNumBits) * Transport::kMinMtu >= kMaxMsgSize, "");
 
   /// The header in each RPC packet
   struct pkthdr_t {
@@ -36,8 +43,8 @@ class Rpc {
     uint16_t rem_session_num;  ///< Session number of the remote packet target
     uint32_t is_req : 1;       ///< 1 if this packet is a request packet
     uint32_t is_first : 1;     ///< 1 if this packet is the first message packet
-    uint32_t pkt_num : Session::kPktNumBits;  ///< Packet number in the request
-    uint64_t req_num : Session::kReqNumBits;  ///< Request number of this packet
+    uint32_t pkt_num : kPktNumBits;  ///< Packet number in the request
+    uint64_t req_num : kReqNumBits;  ///< Request number of this packet
   };
   static_assert(sizeof(pkthdr_t) == 16, "");
 
@@ -192,7 +199,7 @@ class Rpc {
 
   /*
    * The hugepage allocator used for memory allocation by this Rpc and its
-   * member objects. Using one allocator for all (large) allocations in this
+   * member objects. Using one allocator for all hugepage allocations in this
    * thread allows easier memory use accounting.
    */
   HugeAllocator *huge_alloc;

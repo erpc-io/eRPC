@@ -16,6 +16,7 @@ class IBTransport : public Transport {
   static const size_t kRecvSlack = 32;   ///< RECVs accumulated before posting
   static const uint32_t kQKey = 0xffffffff;  ///< Secure key for all eRPC nodes
 
+  static_assert(kMTU >= kMinMtu, "");
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, ""); /* Capacity check */
   static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
 

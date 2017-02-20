@@ -17,19 +17,23 @@ namespace ERpc {
 /// Generic mostly-reliable transport
 class Transport {
  public:
+  /// Min MTU for any transport. Smaller than 4096 for prime RECV cachelines.
+  static const size_t kMinMtu = 3800;
+  static const size_t kPostlist = 16;          ///< Maximum post list size
   static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
   static const size_t kSendQueueDepth = 128;   ///< SEND queue size
-  static const size_t kPostlist = 16;          ///< Maximum post list size
+
   static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
   static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 
   Transport(TransportType transport_type, size_t mtu, uint8_t app_tid,
             uint8_t phy_port);
 
-  /// Initialize transport structures that require hugepages.
-  /// Throws \p runtime_error if initialization fails. This exception is caught
-  /// in the creator Rpc, which then deletes \p huge_alloc.
-  /// XXX: Fix documentation style
+  /**
+   * @brief Initialize transport structures that require hugepages
+   * @throw runtime_error if initialization fails. This exception is caught
+   * in the parent Rpc, which then deletes \p huge_alloc so we don't need to.
+   */
   void init_hugepage_structures(HugeAllocator *huge_alloc);
 
   /// Initialize the memory registration and deregistratin functions

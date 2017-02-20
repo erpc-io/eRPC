@@ -15,8 +15,6 @@ namespace ERpc {
 class Session {
  public:
   static const size_t kSessionCredits = 8;  ///< Credits per session endpoint
-  static const size_t kReqNumBits = 48;     ///< Bits for request number
-  static const size_t kPktNumBits = 14;     ///< Bits for packet number
 
   enum class Role : bool { kServer, kClient };
 
