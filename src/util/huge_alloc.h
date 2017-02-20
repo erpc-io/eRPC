@@ -68,7 +68,7 @@ class HugeAllocator {
 
   /**
    * @brief Construct the hugepage allocator
-   * @throw \p runtime_error if construction fails
+   * @throw runtime_error if construction fails
    */
   HugeAllocator(size_t initial_size, size_t numa_node,
                 reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func);
@@ -83,7 +83,7 @@ class HugeAllocator {
    * @return The allocated buffer. The buffer is invalid if we ran out of
    * memory.
    *
-   * @throw \p runtime_error if \p size is invalid, or if hugepage reservation
+   * @throw runtime_error if \p size is invalid, or if hugepage reservation
    * failure is catastrophic
    */
   inline Buffer alloc(size_t size) {
@@ -224,7 +224,7 @@ class HugeAllocator {
    * @return True if the allocation succeeds. False if the allocation fails
    * because no more hugepages are available.
    *
-   * @throw \p runtime_error if allocation is \a catastrophic (i.e., it fails
+   * @throw runtime_error if allocation is \a catastrophic (i.e., it fails
    * due to reasons other than out-of-memory).
    */
   bool reserve_hugepages(size_t size, size_t numa_node);

@@ -39,7 +39,8 @@ class Session {
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 
-  size_t remote_credits = kSessionCredits;  ///< Current eRPC credits
+  /// The number of credits currently avaliable to the remote endpoint
+  size_t remote_credits = kSessionCredits;
 
   /* Information that is required only at the client endpoint */
   struct {

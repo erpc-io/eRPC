@@ -29,6 +29,7 @@ class Transport {
   /// Initialize transport structures that require hugepages.
   /// Throws \p runtime_error if initialization fails. This exception is caught
   /// in the creator Rpc, which then deletes \p huge_alloc.
+  /// XXX: Fix documentation style
   void init_hugepage_structures(HugeAllocator *huge_alloc);
 
   /// Initialize the memory registration and deregistratin functions

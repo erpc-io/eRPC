@@ -45,7 +45,7 @@ class Rpc {
 
   /**
    * @brief Construct the Rpc object
-   * @throw \p runtime_error if construction fails
+   * @throw runtime_error if construction fails
    */
   Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port = 0,
@@ -58,10 +58,10 @@ class Rpc {
    * @param size The minimum size of the created Buffer. The size of the
    * allocated buffer can be larger than \p size.
    *
-   * @return The allocated Buffer. The buffer is invalid if we ran out of
+   * @return \p The allocated Buffer. The buffer is invalid if we ran out of
    * memory.
    *
-   * @throw \p runtime_error if \p size is invalid, or if hugepage reservation
+   * @throw runtime_error if \p size is invalid, or if hugepage reservation
    * failure is catastrophic (i.e., an exception is *not* thrown if allocation
    * fails simply because we ran out of memory).
    */

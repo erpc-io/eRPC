@@ -32,14 +32,14 @@ class IBTransport : public Transport {
    *
    * This function must initialize \p reg_mr_func and \p dereg_mr_func.
    *
-   * @throw \p runtime_error if creation fails.
+   * @throw runtime_error if creation fails
    */
   IBTransport(uint8_t phy_port, uint8_t app_tid);
 
   /**
    * @brief Finish transport initialization using \p huge_alloc
    *
-   * @throw \p runtime_error if initialization fails.
+   * @throw runtime_error if initialization fails
    */
   void init_hugepage_structures(HugeAllocator *huge_alloc);
 
@@ -61,8 +61,8 @@ class IBTransport : public Transport {
 
  private:
   /**
-   * @brief Fill in \p ib_ctx, \p device_id, and \p dev_port using \p phy_port.
-   * @throw \p runtime_error if the port cannot be resolved.
+   * @brief Fill in \p ib_ctx, \p device_id, and \p dev_port using \p phy_port
+   * @throw runtime_error if the port cannot be resolved
    */
   void resolve_phy_port();
 
@@ -70,7 +70,7 @@ class IBTransport : public Transport {
    * @brief Initialize structures that do not require eRPC hugepages: device
    * context, protection domain, and queue pair.
    *
-   * @throw \p runtime_error if initialization fails.
+   * @throw runtime_error if initialization fails
    */
   void init_infiniband_structs();
 
@@ -78,7 +78,7 @@ class IBTransport : public Transport {
    * @brief A function wrapper whose \p pd argument is later bound to generate
    * this transport's \p reg_mr_func
    *
-   * @throw \p runtime_error if memory registration fails.
+   * @throw runtime_error if memory registration fails
    */
   static MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
                                        size_t size) {
@@ -121,7 +121,7 @@ class IBTransport : public Transport {
 
   /**
    * @brief Initialize RECV buffers and constant fields of RECV descriptors
-   * @throw \p runtime_error if RECV buffer hugepage allocation fails
+   * @throw runtime_error if RECV buffer hugepage allocation fails
    */
   void init_recvs();
 
