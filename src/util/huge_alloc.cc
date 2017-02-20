@@ -9,12 +9,11 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
     : numa_node(numa_node),
       reg_mr_func(reg_mr_func),
       dereg_mr_func(dereg_mr_func),
-      stat_memory_reserved(0),
-      stat_4k_cache_misses(0) {
+      stat_memory_reserved(0) {
   assert(numa_node <= kMaxNumaNodes);
 
-  if (initial_size < kMinInitialSize) {
-    initial_size = kMinInitialSize;
+  if (initial_size < kMaxClassSize) {
+    initial_size = kMaxClassSize;
   }
   prev_allocation_size = initial_size;
 
@@ -34,11 +33,12 @@ HugeAllocator::~HugeAllocator() {
 }
 
 /*
- * To create a cache of 4 KB Buffers, we first allocate the required number of
- * pages and then free them. This puts them all into the 4 KB freelist.
+ * To create a cache of Buffers, we first allocate the required number of
+ * Buffers and then free them.
  */
-bool HugeAllocator::create_4k_cache(size_t num_buffers) {
-  size_t reqd_buffers = num_buffers - freelist[0].size();
+bool HugeAllocator::create_cache(size_t size, size_t num_buffers) {
+  size_t size_class = get_class(size);
+  size_t reqd_buffers = num_buffers - freelist[size_class].size();
   if (reqd_buffers <= 0) {
     return true;
   }
@@ -46,7 +46,7 @@ bool HugeAllocator::create_4k_cache(size_t num_buffers) {
   std::vector<Buffer> free_buffer_vec;
 
   for (size_t i = 0; i < reqd_buffers; i++) {
-    Buffer buffer = alloc(KB(4));
+    Buffer buffer = alloc(size);
     if (!buffer.is_valid()) {
       return false;
     }
@@ -65,8 +65,6 @@ void HugeAllocator::print_stats() {
   fprintf(stderr, "eRPC HugeAllocator stats:\n");
   fprintf(stderr, "Total reserved memory = %zu bytes (%.2f MB)\n",
           stat_memory_reserved, (double)stat_memory_reserved / MB(1));
-  fprintf(stderr, "Number of 4k allocations that missed cache = %zu\n",
-          stat_4k_cache_misses);
 
   fprintf(stderr, "%zu SHM regions\n", shm_list.size());
   size_t shm_region_index = 0;
@@ -79,7 +77,9 @@ void HugeAllocator::print_stats() {
   fprintf(stderr, "Size classes:\n");
   for (size_t i = 0; i < kNumClasses; i++) {
     size_t class_size = class_to_size(i);
-    if (class_size < MB(1)) {
+    if (class_size < KB(1)) {
+      fprintf(stderr, "\t%zu B: %zu Buffers\n", class_size, freelist[i].size());
+    } else if (class_size < MB(1)) {
       fprintf(stderr, "\t%zu KB: %zu Buffers\n", class_size / KB(1),
               freelist[i].size());
     } else {
@@ -90,7 +90,7 @@ void HugeAllocator::print_stats() {
 }
 
 bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
-  assert(size >= kMinInitialSize);
+  assert(size >= kMaxClassSize); /* We need at least one max-sized buffer */
 
   std::ostringstream xmsg; /* The exception message */
   size = round_up<kHugepageSize>(size);
@@ -168,13 +168,13 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   stat_memory_reserved += size;
 
   /* Add Buffers to the largest class */
-  size_t num_buffers = size / kMaxAllocSize;
+  size_t num_buffers = size / kMaxClassSize;
   assert(num_buffers >= 1);
   for (size_t i = 0; i < num_buffers; i++) {
-    void *buf = (void *)((char *)shm_buf + (i * kMaxAllocSize));
+    void *buf = (void *)((char *)shm_buf + (i * kMaxClassSize));
     uint32_t lkey = reg_info.lkey;
 
-    freelist[kNumClasses - 1].push_back(Buffer(buf, kMaxAllocSize, lkey));
+    freelist[kNumClasses - 1].push_back(Buffer(buf, kMaxClassSize, lkey));
   }
 
   return true;

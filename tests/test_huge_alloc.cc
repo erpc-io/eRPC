@@ -52,64 +52,35 @@ TEST(HugeAllocatorTest, PageAllocPerf) {
   double nanoseconds =
       (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
 
-  test_printf("Time per page allocation = %.2f ns\n",
-              nanoseconds / num_pages_allocated);
+  test_printf(
+      "Time per page allocation = %.2f ns. "
+      "Fraction of pages allocated = %.2f (best = 1.0)\n",
+      nanoseconds / num_pages_allocated,
+      (double)num_pages_allocated / SYSTEM_4K_PAGES);
 
   delete allocator;
 }
 
-/**
- * @brief Measure performance of page allocation where pages are allocated from
- * the cache.
- */
+/// Measure performance of page allocation with a cache
 TEST(HugeAllocatorTest, PageAllocPerfWithCache) {
   /* Reserve all memory for high perf */
   ERpc::HugeAllocator *allocator = new ERpc::HugeAllocator(
       SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
 
   size_t page_cache_size = SYSTEM_4K_PAGES / 2;
-  allocator->create_4k_cache(page_cache_size);
+  allocator->create_cache(KB(4), page_cache_size);
 
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
 
+  size_t num_pages_allocated = 0;
   for (size_t i = 0; i < page_cache_size; i++) {
     ERpc::Buffer buffer = allocator->alloc(KB(4));
     if (!buffer.is_valid()) {
       break;
     }
-  }
 
-  clock_gettime(CLOCK_REALTIME, &end);
-  double nanoseconds =
-      (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
-
-  test_printf("Time per page allocation with page cache = %.2f ns\n",
-              nanoseconds / page_cache_size);
-
-  delete allocator;
-}
-
-/**
- * @brief Measure performance of page allocation where pages are allocated from
- * the cache, and the specialized alloc_4k function is used.
- */
-TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
-  /* Reserve all memory for high perf */
-  ERpc::HugeAllocator *allocator = new ERpc::HugeAllocator(
-      SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
-
-  size_t page_cache_size = SYSTEM_4K_PAGES / 2;
-  allocator->create_4k_cache(page_cache_size);
-
-  struct timespec start, end;
-  clock_gettime(CLOCK_REALTIME, &start);
-
-  for (size_t i = 0; i < page_cache_size; i++) {
-    ERpc::Buffer buffer = allocator->alloc_4k();
-    if (!buffer.is_valid()) {
-      break;
-    }
+    num_pages_allocated++;
   }
 
   clock_gettime(CLOCK_REALTIME, &end);
@@ -117,16 +88,15 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCacheWithSpecialAlloc) {
       (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
 
   test_printf(
-      "Time per page allocation with page cache and alloc_4k = "
-      "%.2f ns\n",
-      nanoseconds / page_cache_size);
+      "Time per page allocation with page cache = %.2f ns. "
+      "Fraction of pages allocated = %.2f (best = 1.0)\n",
+      nanoseconds / page_cache_size,
+      (double)num_pages_allocated / page_cache_size);
 
   delete allocator;
 }
 
-/**
- * @brief Allocate all hugepages as 2MB chunks once.
- */
+/// Allocate all hugepages as 2MB chunks once.
 TEST(HugeAllocatorTest, 2MBChunksSingleRun) {
   ERpc::HugeAllocator *allocator;
 
@@ -149,9 +119,7 @@ TEST(HugeAllocatorTest, 2MBChunksSingleRun) {
   delete allocator;
 }
 
-/**
- * @brief Repeatedly allocate all huge pages as 2MB chunks.
- */
+/// Repeatedly allocate all huge pages as 2MB chunks.
 TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
   ERpc::HugeAllocator *allocator;
 
@@ -185,7 +153,7 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
     std::vector<ERpc::Buffer> buffer_vec;
 
     while (true) {
-      size_t num_hugepages = 1ul + (unsigned)(std::rand() % 15);
+      size_t num_hugepages = 1ul + (unsigned)(std::rand() % 4);
       size_t size = num_hugepages * ERpc::kHugepageSize;
       ERpc::Buffer buffer = allocator->alloc(size);
 
@@ -236,7 +204,7 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
     size_t new_app_memory;
 
     if (alloc_hugepages) {
-      size_t num_hugepages = 1ul + (unsigned)(std::rand() % 15);
+      size_t num_hugepages = 1ul + (unsigned)(std::rand() % 4);
       buffer = allocator->alloc(num_hugepages * ERpc::kHugepageSize);
       new_app_memory = (num_hugepages * ERpc::kHugepageSize);
     } else {

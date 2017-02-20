@@ -36,9 +36,11 @@ struct shm_region_t {
 
 /**
  * A hugepage allocator that uses per-class freelists. The minimum class size
- * is 4 KB, and class size increases by a factor of 2 until kMaxAllocSize. When
- * a new SHM region is added to the allocator, it is split into Buffers of size
- * kMaxAllocSize and added to that class. These Buffers are later split to
+ * is kMinClassSize, and class size increases by a factor of 2 until
+ * kMaxClassSize.
+ *
+ * When a new SHM region is added to the allocator, it is split into Buffers of
+ * size kMaxClassSize and added to that class. These Buffers are later split to
  * fill up smaller classes.
  *
  * The size of allocated buffers is always equal to a class size, even when
@@ -48,27 +50,22 @@ struct shm_region_t {
  * SHM regions created when it is deleted.
  */
 class HugeAllocator {
-#define class_to_size(c) (KB(4) * (1ull << (c)))
- private:
-  static const size_t kMaxAllocSize = (32 * 1024 * 1024);  ///< 32 MB
-  static const size_t kMinInitialSize = kMaxAllocSize;  ///< Need 1 32 MB Buffer
-  static const size_t kNumClasses = 14;  ///< 4 KB, 8 KB, 16 KB, ..., 32 MB
-  static_assert(class_to_size(kNumClasses - 1) == kMaxAllocSize, "");
-
-  std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
-  std::vector<Buffer> freelist[kNumClasses];  ///< Per-class freelist
-
-  SlowRand slow_rand;  ///< RNG to generate SHM keys
-  size_t numa_node;    ///< NUMA node on which all memory is allocated
-
-  reg_mr_func_t reg_mr_func;
-  dereg_mr_func_t dereg_mr_func;
-
-  size_t prev_allocation_size;  ///< Size of previous hugepage reservation
-  size_t stat_memory_reserved;  ///< Total hugepage memory reserved by allocator
-  size_t stat_4k_cache_misses;  ///< alloc_4k calls that missed the cache
-
  public:
+  static const size_t kMinClassSize = 64;     ///< Min allocation size
+  static const size_t kMinClassBitShift = 6;  ///< For division by kMinClassSize
+  static_assert((kMinClassSize >> kMinClassBitShift) == 1, "");
+
+  static const size_t kMaxClassSize = MB(8);  ///< Max allocation size
+  static_assert(kMaxClassSize <= std::numeric_limits<int>::max(), "");
+
+  static const size_t kNumClasses = 18;  ///< 64 B (2^6), ..., 8 MB (2^23)
+  static_assert(kMaxClassSize == kMinClassSize << (kNumClasses - 1), "");
+
+  /// Return the maximum size of a class
+  static constexpr size_t class_to_size(size_t class_i) {
+    return kMinClassSize * (1ull << class_i);
+  }
+
   /**
    * @brief Construct the hugepage allocator
    * @throw \p runtime_error if construction fails
@@ -78,26 +75,10 @@ class HugeAllocator {
   ~HugeAllocator();
 
   /**
-   * @brief Allocate a 4k buffer, trying to use the cache first
-   * @return The allocated buffer. The buffer is invalid if we ran out of
-   * memory.
-   *
-   * @throw \p runtime_error if allocation fails
-   */
-  inline Buffer alloc_4k() {
-    if (!freelist[0].empty()) {
-      return alloc_from_class(0);
-    } else {
-      stat_4k_cache_misses++;
-      return alloc(KB(4)); /* Can throw */
-    }
-  }
-
-  /**
    * @brief Allocate a Buffer
    *
    * @param size Minimum size of the allocated Buffer. \p size need not equal
-   * a class size, but the allocated Buffer's size is a class size.
+   * a class size, but the allocated Buffer's \p size is a class size.
    *
    * @return The allocated buffer. The buffer is invalid if we ran out of
    * memory.
@@ -106,7 +87,7 @@ class HugeAllocator {
    * failure is catastrophic
    */
   inline Buffer alloc(size_t size) {
-    if (unlikely(size > kMaxAllocSize)) {
+    if (unlikely(size > kMaxClassSize)) {
       throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
     }
 
@@ -173,23 +154,27 @@ class HugeAllocator {
     return stat_memory_reserved;
   }
 
-  /// Return the number of alloc_4k calls that missed the 4k Buffer cache
-  size_t get_4k_cache_misses() { return stat_4k_cache_misses; }
-
-  /// Populate the 4 KB class with at least \p num_buffers Buffers
-  bool create_4k_cache(size_t num_buffers);
+  /// Create a cache of at lease \p num_buffers Buffers of size at least
+  /// \p size. Return true if creation succeeds.
+  bool create_cache(size_t size, size_t num_buffers);
 
   /// Print a summary of this allocator
   void print_stats();
 
  private:
   /// Get the class index for a Buffer size
-  /// XXX: Use inline asm to improve perf
   inline size_t get_class(size_t size) {
-    assert(size >= 1 && size <= kMaxAllocSize);
+    assert(size >= 1 && size <= kMaxClassSize);
+    /* Use bit shift instead of division to make debug-mode code a faster */
+    return msb_index((int)((size - 1) >> kMinClassBitShift));
+  }
 
-    size_t size_class = 0;        /* The size class for \p size */
-    size_t class_lim = 4 * KB(1); /* The max size for \p size_class */
+  /// Reference function for the optimized \p get_class function above
+  inline size_t get_class_slow(size_t size) {
+    assert(size >= 1 && size <= kMaxClassSize);
+
+    size_t size_class = 0;            /* The size class for \p size */
+    size_t class_lim = kMinClassSize; /* The max size for \p size_class */
     while (size > class_lim) {
       size_class++;
       class_lim *= 2;
@@ -246,6 +231,18 @@ class HugeAllocator {
 
   /// Delete the SHM region specified by \p shm_key and \p shm_buf
   void delete_shm(int shm_key, const void *shm_buf);
+
+  std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
+  std::vector<Buffer> freelist[kNumClasses];  ///< Per-class freelist
+
+  SlowRand slow_rand;  ///< RNG to generate SHM keys
+  size_t numa_node;    ///< NUMA node on which all memory is allocated
+
+  reg_mr_func_t reg_mr_func;
+  dereg_mr_func_t dereg_mr_func;
+
+  size_t prev_allocation_size;  ///< Size of previous hugepage reservation
+  size_t stat_memory_reserved;  ///< Total hugepage memory reserved by allocator
 };
 }  // End ERpc
 
