@@ -191,7 +191,7 @@ void Rpc<Transport_>::handle_session_management() {
   sm_hook.session_mgmt_pkt_list.clear();
   sm_hook.session_mgmt_ev_counter = 0;
   sm_hook.session_mgmt_mutex.unlock();
-};
+}
 
 template <class Transport_>
 std::string Rpc<Transport_>::get_name() {
@@ -200,19 +200,5 @@ std::string Rpc<Transport_>::get_name() {
       << std::to_string(app_tid) << "]";
   return ret.str();
 }
-
-template <class Transport_>
-void Rpc<Transport_>::send_request(const Session *session,
-                                   const Buffer *buffer) {
-  _unused(session);
-  _unused(buffer);
-}
-
-template <class Transport_>
-void Rpc<Transport_>::send_response(const Session *session,
-                                    const Buffer *buffer) {
-  _unused(session);
-  _unused(buffer);
-};
 
 }  // End ERpc

@@ -140,8 +140,8 @@ class Rpc {
   size_t num_active_sessions();
 
   // rpc_datapath.cc
-  void send_request(const Session *session, const Buffer *buffer);
-  void send_response(const Session *session, const Buffer *buffer);
+  bool send_request(Session *session, Buffer *buffer);
+  void send_response(Session *session, Buffer *buffer);
 
   // rpc_ev_loop.cc
 
