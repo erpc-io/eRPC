@@ -106,7 +106,7 @@ TEST(HugeAllocatorTest, 2MBChunksSingleRun) {
   for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
     ERpc::Buffer buffer = allocator->alloc(MB(2));
     if (buffer.is_valid()) {
-      EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+      EXPECT_EQ(buffer.get_lkey(), DUMMY_LKEY);
       num_hugepages_allocated++;
     } else {
       test_printf("Allocated %zu of %zu hugepages\n", num_hugepages_allocated,
@@ -131,7 +131,7 @@ TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
         break;
       }
 
-      EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+      EXPECT_EQ(buffer.get_lkey(), DUMMY_LKEY);
     }
 
     delete allocator;
@@ -171,7 +171,7 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
 
         break;
       } else {
-        EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+        EXPECT_EQ(buffer.get_lkey(), DUMMY_LKEY);
         app_memory += (num_hugepages * ERpc::kHugepageSize);
         buffer_vec.push_back(buffer);
       }
@@ -223,7 +223,7 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
                   ((double)app_memory / allocator->get_reserved_memory()));
       break;
     } else {
-      EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+      EXPECT_EQ(buffer.get_lkey(), DUMMY_LKEY);
       app_memory += new_app_memory;
     }
   }

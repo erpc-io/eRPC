@@ -9,19 +9,29 @@
 #include "common.h"
 #include "session_mgmt_types.h"
 #include "util/buffer.h"
+#include "util/fixed_vector.h"
 
 namespace ERpc {
 
 /// A one-to-one session class for all transports
 class Session {
+ public:
+  /// Info maintained about a request or response message
   struct msg_info_t {
-    Buffer buffer;
+    Buffer pkt_buffer;  ///< Packet buffer. Also contains the \p req_num below.
+    size_t data_bytes_sent = 0;  ///< Number of non-header bytes already sent
+    size_t req_num;  ///< The req number for this message (also in pkt_buffer)
+
+    msg_info_t() {}
+    msg_info_t(Buffer pkt_buffer) : pkt_buffer(pkt_buffer) {}
   };
 
- public:
-  static const size_t kSessionCredits = 8;  ///< Credits per session endpoint
-
   enum class Role : bool { kServer, kClient };
+
+  static const size_t kSessionCredits = 8;  ///< Credits per endpoint
+
+  /// Max number of unexpected *requests* kept outstanding by this session
+  static const size_t kSessionReqWindow = 8;
 
   Session(Role role, SessionState state);
   ~Session();
@@ -42,6 +52,9 @@ class Session {
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;           ///< Read-only endpoint metadata
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
+
+  msg_info_t msg_arr[kSessionReqWindow];
+  FixedVector<size_t, kSessionReqWindow> msg_arr_free_vec;
 
   /// Information that is required only at the client endpoint
   struct {

@@ -234,7 +234,7 @@ void IBTransport::init_recvs() {
     uint8_t *buf = (uint8_t *)recv_extent.buf;
 
     recv_sgl[wr_i].length = kRecvSize;
-    recv_sgl[wr_i].lkey = recv_extent.lkey;
+    recv_sgl[wr_i].lkey = recv_extent.get_lkey();
     recv_sgl[wr_i].addr = (uintptr_t)&buf[wr_i * kRecvSize];
 
     recv_wr[wr_i].wr_id = recv_sgl[wr_i].addr; /* Debug */
@@ -249,7 +249,7 @@ void IBTransport::init_recvs() {
 
 void IBTransport::init_sends() {
   for (size_t wr_i = 0; wr_i < kPostlist; wr_i++) {
-    send_sgl[wr_i].lkey = req_retrans_extent.lkey;
+    send_sgl[wr_i].lkey = req_retrans_extent.get_lkey();
 
     send_wr[wr_i].next = &send_wr[wr_i + 1];
     send_wr[wr_i].wr.ud.remote_qkey = kQKey;

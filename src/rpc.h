@@ -29,8 +29,8 @@ class Rpc {
   /// Initial capacity of the hugepage allocator
   static const size_t kInitialHugeAllocSize = (128 * MB(1));
 
-  /// Max number of "unexpected" packets kept outstanding by this Rpc
-  static const size_t kUnexpWindowSize = 20;
+  /// Max number of unexpected *packets* kept outstanding by this Rpc
+  static const size_t kRpcPktWindow = 20;
   static const size_t kMaxMsgSize = MB(8);  ///< Max request/response size
   static const size_t kPktNumBits = 13;  ///< Bits for packet number in request
   static const size_t kReqNumBits = 44;  ///< Bits for request number
@@ -52,7 +52,7 @@ class Rpc {
     uint64_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
     uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
     uint64_t req_num : kReqNumBits;     ///< Request number of this packet
-    uint64_t magic : kPktHdrMagicBits;  ///< Magic installed by alloc_pktbuf()
+    uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_pkt_buffer()
   };
   static_assert(sizeof(pkthdr_t) == 16, "");
 
@@ -83,29 +83,35 @@ class Rpc {
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
    * if allocation fails simply because we ran out of memory.
    */
-  inline Buffer alloc_pktbuf(size_t size) {
-    Buffer buffer = huge_alloc->alloc(size + sizeof(pkthdr_t));
+  inline Buffer alloc_pkt_buffer(size_t size) {
+    Buffer pkt_buffer = huge_alloc->alloc(size + sizeof(pkthdr_t));
 
-    if (buffer.is_valid()) {
-      pkthdr_t *pkthdr = (pkthdr_t *)buffer.buf;
+    if (pkt_buffer.is_valid()) {
+      pkthdr_t *pkthdr = (pkthdr_t *)pkt_buffer.buf;
       pkthdr->magic = kPktHdrMagic; /* Install the packet header magic */
-      buffer.buf += sizeof(pkthdr_t);
-      return buffer;
+      pkt_buffer.buf += sizeof(pkthdr_t);
+      return pkt_buffer;
     } else {
       return Buffer::get_invalid_buffer();
     }
   }
 
-  /// Free a packet buffer allocated using alloc_pktbuf()
-  inline void free_pktbuf(Buffer buffer) {
-    assert(buffer.is_valid());
-    buffer.buf -= sizeof(pkthdr_t); /* Go back to before the packet header */
+  /// Free a packet Buffer allocated using alloc_pkt_buffer()
+  inline void free_pkt_buffer(Buffer pkt_buffer) {
+    assert(pkt_buffer.is_valid());
+    pkt_buffer.buf -= sizeof(pkthdr_t); /* Restore pointer for future use */
 
-    pkthdr_t *pkthdr = (pkthdr_t *)buffer.buf;
+    pkthdr_t *pkthdr = (pkthdr_t *)pkt_buffer.buf;
     _unused(pkthdr);
     assert(pkthdr->magic == kPktHdrMagic);
 
-    huge_alloc->free_buf(buffer);
+    huge_alloc->free_buf(pkt_buffer);
+  }
+
+  /// Check if a packet Buffer's header magic is valid
+  inline bool check_pkthdr(Buffer pkt_buffer) {
+    pkthdr_t *pkthdr = (pkthdr_t *)(pkt_buffer.buf - sizeof(pkthdr_t));
+    return (pkthdr->magic == kPktHdrMagic);
   }
 
   // rpc_sm_api.cc
@@ -140,8 +146,8 @@ class Rpc {
   size_t num_active_sessions();
 
   // rpc_datapath.cc
-  bool send_request(Session *session, Buffer *buffer);
-  void send_response(Session *session, Buffer *buffer);
+  bool send_request(Session *session, Buffer buffer);
+  void send_response(Session *session, Buffer buffer);
 
   // rpc_ev_loop.cc
 
@@ -226,9 +232,9 @@ class Rpc {
   size_t numa_node;
 
   // Others
-  Transport_ *transport = nullptr;      ///< The unreliable transport
-  HugeAllocator *huge_alloc = nullptr;  ///< This thread's hugepage allocator
-  size_t unexp_credits = kUnexpWindowSize;  ///< Available unexpected pkt slots
+  Transport_ *transport = nullptr;       ///< The unreliable transport
+  HugeAllocator *huge_alloc = nullptr;   ///< This thread's hugepage allocator
+  size_t unexp_credits = kRpcPktWindow;  ///< Available unexpected pkt slots
 
   /// The append-only list of session pointers, indexed by session num.
   /// Disconnected sessions are denoted by null pointers. This grows as sessions

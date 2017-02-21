@@ -12,6 +12,10 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
   } else {
     assert(state == SessionState::kConnected);
   }
+
+  for (size_t i = 0; i < kSessionReqWindow; i++) {
+    msg_arr_free_vec.push_back(i);
+  }
 }
 
 Session::~Session(){};

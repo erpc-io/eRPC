@@ -142,7 +142,7 @@ class HugeAllocator {
   /// Free a Buffer
   inline void free_buf(Buffer buffer) {
     assert(buffer.is_valid());
-    size_t size_class = get_class(buffer.size);
+    size_t size_class = get_class(buffer.get_size());
     freelist[size_class].push_back(buffer);
   }
 
@@ -190,14 +190,16 @@ class HugeAllocator {
     assert(!freelist[size_class].empty());
     assert(freelist[size_class - 1].empty());
 
-    Buffer &buffer = freelist[size_class].back();
-    assert(buffer.size = class_to_size(size_class));
+    Buffer buffer = freelist[size_class].back();
+    freelist[size_class].pop_back();
+    assert(buffer.get_size() == class_to_size(size_class));
 
-    Buffer buffer_0 = Buffer(buffer.buf, buffer.size / 2, buffer.lkey);
+    Buffer buffer_0 = Buffer(buffer.buf, (uint32_t)(buffer.get_size() / 2),
+                             buffer.get_lkey());
     Buffer buffer_1 =
-        Buffer(buffer.buf + buffer.size / 2, buffer.size / 2, buffer.lkey);
+        Buffer(buffer.buf + buffer.get_size() / 2,
+               (uint32_t)(buffer.get_size() / 2), buffer.get_lkey());
 
-    freelist[size_class].pop_back(); /* Pop after we don't need the reference */
     freelist[size_class - 1].push_back(buffer_0);
     freelist[size_class - 1].push_back(buffer_1);
   }
