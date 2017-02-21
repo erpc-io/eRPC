@@ -142,7 +142,7 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
     }
   }
 
-  void *shm_buf = shmat(shm_id, nullptr, 0);
+  uint8_t *shm_buf = (uint8_t *)shmat(shm_id, nullptr, 0);
   if (shm_buf == nullptr) {
     xmsg << "eRPC HugeAllocator: SHM malloc error: shmat() failed for key "
          << std::to_string(shm_key);
@@ -171,7 +171,7 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   size_t num_buffers = size / kMaxClassSize;
   assert(num_buffers >= 1);
   for (size_t i = 0; i < num_buffers; i++) {
-    void *buf = (void *)((char *)shm_buf + (i * kMaxClassSize));
+    uint8_t *buf = shm_buf + (i * kMaxClassSize);
     uint32_t lkey = reg_info.lkey;
 
     freelist[kNumClasses - 1].push_back(Buffer(buf, kMaxClassSize, lkey));
@@ -180,7 +180,7 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   return true;
 }
 
-void HugeAllocator::delete_shm(int shm_key, const void *shm_buf) {
+void HugeAllocator::delete_shm(int shm_key, const uint8_t *shm_buf) {
   int shmid = shmget(shm_key, 0, 0);
   if (shmid == -1) {
     switch (errno) {
@@ -213,7 +213,7 @@ void HugeAllocator::delete_shm(int shm_key, const void *shm_buf) {
     exit(-1);
   }
 
-  ret = shmdt(shm_buf);
+  ret = shmdt((void *)shm_buf);
   if (ret != 0) {
     fprintf(stderr, "HugeAllocator: Error freeing SHM buf %p. (SHM key = %d)\n",
             shm_buf, shm_key);

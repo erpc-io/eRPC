@@ -8,11 +8,16 @@
 
 #include "common.h"
 #include "session_mgmt_types.h"
+#include "util/buffer.h"
 
 namespace ERpc {
 
 /// A one-to-one session class for all transports
 class Session {
+  struct msg_info_t {
+    Buffer buffer;
+  };
+
  public:
   static const size_t kSessionCredits = 8;  ///< Credits per session endpoint
 
@@ -35,17 +40,16 @@ class Session {
 
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
-  SessionEndpoint client, server;  ///< Read-only endpoint metadata
+  SessionEndpoint client, server;           ///< Read-only endpoint metadata
+  size_t remote_credits = kSessionCredits;  ///< This session's current credits
 
-  /// The number of credits currently avaliable to the remote endpoint
-  size_t remote_credits = kSessionCredits;
-
-  /* Information that is required only at the client endpoint */
+  /// Information that is required only at the client endpoint
   struct {
     uint64_t mgmt_req_tsc;  ///< Timestamp of the last management request
     bool is_cc = false;     ///< True if this session is congestion controlled
-    uint64_t cur_req_num = 0;  ///< Current request number
-    uint16_t cur_pkt_num = 0;  ///< Packet number in current request
+
+    /// The next request number to use. Not a bitfield for simplicity.
+    size_t next_req_num = 0;
   } client_info;
 };
 

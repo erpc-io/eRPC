@@ -7,7 +7,7 @@ namespace ERpc {
 
 class Buffer {
  public:
-  Buffer(void *buf, size_t size, uint32_t lkey)
+  Buffer(uint8_t *buf, size_t size, uint32_t lkey)
       : buf(buf), size(size), lkey(lkey) {}
 
   Buffer() : buf(nullptr) {}
@@ -19,7 +19,7 @@ class Buffer {
 
   static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
 
-  void *buf;
+  uint8_t *buf;
   size_t size;
   uint32_t lkey;
 };

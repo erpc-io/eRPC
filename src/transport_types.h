@@ -28,8 +28,8 @@ struct RoutingInfo {
 
 /// Generic struct to store memory registration info for any transport.
 struct MemRegInfo {
-  void *transport_mr;
-  uint32_t lkey;
+  void *transport_mr;  ///< The transport-specific memory region (e.g., ibv_mr)
+  uint32_t lkey;       ///< The lkey of the memory region
 
   MemRegInfo(void *transport_mr, uint32_t lkey)
       : transport_mr(transport_mr), lkey(lkey) {}

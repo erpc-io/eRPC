@@ -20,15 +20,15 @@ namespace ERpc {
 /// Information about an SHM region
 struct shm_region_t {
   // Constructor args
-  const int shm_key;  ///< The key used to create the SHM region
-  const void *buf;    ///< The start address of the allocated SHM buffer
-  const size_t size;  ///< The size in bytes of the allocated buffer
+  const int shm_key;   ///< The key used to create the SHM region
+  const uint8_t *buf;  ///< The start address of the allocated SHM buffer
+  const size_t size;   ///< The size in bytes of the allocated buffer
 
   // Filled in by Rpc when this region is registered
   bool registered;          ///< Is this SHM region registered with the NIC?
   MemRegInfo mem_reg_info;  ///< The transport-specific memory registration info
 
-  shm_region_t(int shm_key, void *buf, size_t size, MemRegInfo mem_reg_info)
+  shm_region_t(int shm_key, uint8_t *buf, size_t size, MemRegInfo mem_reg_info)
       : shm_key(shm_key), buf(buf), size(size), mem_reg_info(mem_reg_info) {
     assert(size % kHugepageSize == 0);
   }
@@ -83,8 +83,8 @@ class HugeAllocator {
    * @return The allocated buffer. The buffer is invalid if we ran out of
    * memory.
    *
-   * @throw runtime_error if \p size is invalid, or if hugepage reservation
-   * failure is catastrophic
+   * @throw runtime_error if \p size is too large for the allocator, or if
+   * hugepage reservation failure is catastrophic
    */
   inline Buffer alloc(size_t size) {
     if (unlikely(size > kMaxClassSize)) {
@@ -194,8 +194,8 @@ class HugeAllocator {
     assert(buffer.size = class_to_size(size_class));
 
     Buffer buffer_0 = Buffer(buffer.buf, buffer.size / 2, buffer.lkey);
-    Buffer buffer_1 = Buffer((void *)((char *)buffer.buf + buffer.size / 2),
-                             buffer.size / 2, buffer.lkey);
+    Buffer buffer_1 =
+        Buffer(buffer.buf + buffer.size / 2, buffer.size / 2, buffer.lkey);
 
     freelist[size_class].pop_back(); /* Pop after we don't need the reference */
     freelist[size_class - 1].push_back(buffer_0);
@@ -230,7 +230,7 @@ class HugeAllocator {
   bool reserve_hugepages(size_t size, size_t numa_node);
 
   /// Delete the SHM region specified by \p shm_key and \p shm_buf
-  void delete_shm(int shm_key, const void *shm_buf);
+  void delete_shm(int shm_key, const uint8_t *shm_buf);
 
   std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
   std::vector<Buffer> freelist[kNumClasses];  ///< Per-class freelist

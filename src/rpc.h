@@ -31,24 +31,28 @@ class Rpc {
 
   /// Max number of "unexpected" packets kept outstanding by this Rpc
   static const size_t kUnexpWindowSize = 20;
-
   static const size_t kMaxMsgSize = MB(8);  ///< Max request/response size
-  static const size_t kReqNumBits = 48;     ///< Bits for request number
   static const size_t kPktNumBits = 13;  ///< Bits for packet number in request
+  static const size_t kReqNumBits = 44;  ///< Bits for request number
+
+  static const size_t kPktHdrMagicBits = 4;  ///< Debug bits for magic number
+  static const size_t kPktHdrMagic = 11;
 
   static_assert(kReqNumBits <= 64, "");
   static_assert(kPktNumBits <= 16, "");
   static_assert((1ull << kPktNumBits) * Transport::kMinMtu >= kMaxMsgSize, "");
+  static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 
   /// The header in each RPC packet
   struct pkthdr_t {
     uint32_t tot_size;         ///< Total message size across multiple packets
     uint16_t rem_session_num;  ///< Session number of the remote packet target
-    uint32_t is_req : 1;       ///< 1 if this packet is a request packet
-    uint32_t is_first : 1;     ///< 1 if this packet is the first message packet
-    uint32_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
-    uint32_t pkt_num : kPktNumBits;  ///< Packet number in the request
-    uint64_t req_num : kReqNumBits;  ///< Request number of this packet
+    uint64_t is_req : 1;       ///< 1 if this packet is a request packet
+    uint64_t is_first : 1;     ///< 1 if this packet is the first message packet
+    uint64_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
+    uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
+    uint64_t req_num : kReqNumBits;     ///< Request number of this packet
+    uint64_t magic : kPktHdrMagicBits;  ///< Magic installed by alloc_pktbuf()
   };
   static_assert(sizeof(pkthdr_t) == 16, "");
 
@@ -65,21 +69,44 @@ class Rpc {
   ~Rpc();
 
   /**
-   * @brief Create a Buffer for the eRPC user application
-   * @param size The minimum size of the created Buffer. The size of the
-   * allocated buffer can be larger than \p size.
+   * @brief Create a hugepage-backed packet Buffer for the eRPC user. The
+   * returned Buffer's \p buf is preceeeded by a packet header that the user
+   * must not modify.
+   *
+   * @param size The minimum number of bytes in the created buffer available
+   * to the user
    *
    * @return \p The allocated Buffer. The buffer is invalid if we ran out of
    * memory.
    *
-   * @throw runtime_error if \p size is invalid, or if hugepage reservation
-   * failure is catastrophic (i.e., an exception is *not* thrown if allocation
-   * fails simply because we ran out of memory).
+   * @throw runtime_error if \p size is too large for the allocator, or if
+   * hugepage reservation failure is catastrophic. An exception is *not* thrown
+   * if allocation fails simply because we ran out of memory.
    */
-  inline Buffer alloc(size_t size) { return huge_alloc->alloc(size); }
+  inline Buffer alloc_pktbuf(size_t size) {
+    Buffer buffer = huge_alloc->alloc(size + sizeof(pkthdr_t));
 
-  /// Free the buffer
-  inline void free_buf(Buffer buffer) { huge_alloc->free_buf(buffer); }
+    if (buffer.is_valid()) {
+      pkthdr_t *pkthdr = (pkthdr_t *)buffer.buf;
+      pkthdr->magic = kPktHdrMagic; /* Install the packet header magic */
+      buffer.buf += sizeof(pkthdr_t);
+      return buffer;
+    } else {
+      return Buffer::get_invalid_buffer();
+    }
+  }
+
+  /// Free a packet buffer allocated using alloc_pktbuf()
+  inline void free_pktbuf(Buffer buffer) {
+    assert(buffer.is_valid());
+    buffer.buf -= sizeof(pkthdr_t); /* Go back to before the packet header */
+
+    pkthdr_t *pkthdr = (pkthdr_t *)buffer.buf;
+    _unused(pkthdr);
+    assert(pkthdr->magic == kPktHdrMagic);
+
+    huge_alloc->free_buf(buffer);
+  }
 
   // rpc_sm_api.cc
 
@@ -201,7 +228,7 @@ class Rpc {
   // Others
   Transport_ *transport = nullptr;      ///< The unreliable transport
   HugeAllocator *huge_alloc = nullptr;  ///< This thread's hugepage allocator
-  size_t cur_unexp_pkts = 0;  ///< Currently outstanding unexpected packets
+  size_t unexp_credits = kUnexpWindowSize;  ///< Available unexpected pkt slots
 
   /// The append-only list of session pointers, indexed by session num.
   /// Disconnected sessions are denoted by null pointers. This grows as sessions
