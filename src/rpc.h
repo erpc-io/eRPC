@@ -45,9 +45,10 @@ class Rpc {
 
   /// The header in each RPC packet
   struct pkthdr_t {
-    uint32_t tot_size;         ///< Total message size across multiple packets
-    uint16_t rem_session_num;  ///< Session number of the remote packet target
-    uint64_t is_req : 1;       ///< 1 if this packet is a request packet
+    uint64_t req_type : 9;   /// RPC request type
+    uint64_t tot_size : 23;  ///< Total message size across multiple packets
+    uint64_t rem_session_num : 16;  ///< Session number of the remote session
+    uint64_t is_req : 1;            ///< 1 if this packet is a request packet
     uint64_t is_first : 1;     ///< 1 if this packet is the first message packet
     uint64_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
     uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
@@ -146,8 +147,22 @@ class Rpc {
   size_t num_active_sessions();
 
   // rpc_datapath.cc
-  bool send_request(Session *session, Buffer buffer);
-  void send_response(Session *session, Buffer buffer);
+
+  /**
+   * @brief Try to begin transmission of an RPC request
+   *
+   * @param session The client session to send the request on
+   * @param buffer The packet buffer containing the request. If this call
+   * succeeds, eRPC owns \p buffer until the request completes by invoking
+   * the callback.
+   *
+   * @param req_bytes Number of non-header bytes to send from the packet
+   * buffer
+   *
+   * @return 0 on success, i.e., if the request was sent or queued. An error
+   * code is returned if the request can neither be sent nor queued.
+   */
+  int send_request(Session *session, Buffer buffer, size_t req_bytes);
 
   // rpc_ev_loop.cc
 

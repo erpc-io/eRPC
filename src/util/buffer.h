@@ -5,6 +5,8 @@
 
 namespace ERpc {
 
+/// A class to hold a fixed-size buffer. The size of the buffer is read-only
+/// after the Buffer is created.
 class Buffer {
  public:
   Buffer(uint8_t *buf, uint32_t size, uint32_t lkey)
