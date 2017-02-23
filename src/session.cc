@@ -18,6 +18,4 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
   }
 }
 
-Session::~Session(){};
-
 }  // End ERpc

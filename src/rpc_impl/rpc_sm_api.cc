@@ -108,7 +108,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
 
 template <class Transport_>
 bool Rpc<Transport_>::destroy_session(Session *session) {
-  if (!is_session_ptr_client(session)) {
+  if (session == nullptr || session->role != Session::Role::kClient) {
     erpc_dprintf("eRPC Rpc %s: destroy_session() failed. Invalid session.\n",
                  get_name().c_str());
     return false;

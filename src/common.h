@@ -13,11 +13,14 @@
 
 namespace ERpc {
 
-// Debug printing for ERPC classes without special needs.
-#define ERPC_DPRINTF 1
+// Debug macros
+static const size_t kVerbose = 1;  ///< Debug printing for non-datapath stuff
+static const size_t kDatapathVerbose = 1;  ///< Debug printing in datapatg
+static const size_t kDatapathChecks = 1;   ///< Disable for max perf datapath
+
 #define erpc_dprintf(fmt, ...)           \
   do {                                   \
-    if (ERPC_DPRINTF) {                  \
+    if (kVerbose) {                      \
       fprintf(stderr, fmt, __VA_ARGS__); \
       fflush(stderr);                    \
     }                                    \
@@ -25,14 +28,27 @@ namespace ERpc {
 
 #define erpc_dprintf_noargs(fmt) \
   do {                           \
-    if (ERPC_DPRINTF) {          \
+    if (kVerbose) {              \
       fprintf(stderr, fmt);      \
       fflush(stderr);            \
     }                            \
   } while (0)
 
-// Debug-mode printing for classes with special needs
-#define RPC_DPRINTF 1
+#define dpath_dprintf(fmt, ...)          \
+  do {                                   \
+    if (kDatapathVerbose) {              \
+      fprintf(stderr, fmt, __VA_ARGS__); \
+      fflush(stderr);                    \
+    }                                    \
+  } while (0)
+
+#define dpath_dprintf_noargs(fmt) \
+  do {                            \
+    if (kDatapathVerbose) {       \
+      fprintf(stderr, fmt);       \
+      fflush(stderr);             \
+    }                             \
+  } while (0)
 
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)

@@ -15,6 +15,8 @@
 ## API notes
 
 ## TODOs
+ * Optimize `is_session_ptr_client` and `is_session_ptr_server` because they
+   will be used in non-max-perf datapath.
  * Need to have a test for session management request timeouts.
  * What happens in the following case:
    1. Requester sends a connect packet (packet 1). Packet 1 gets delayed.

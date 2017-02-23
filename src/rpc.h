@@ -196,12 +196,6 @@ class Rpc {
   /// Return the hostname and app TID of this Rpc.
   std::string get_name();
 
-  /// Check if this session pointer is a client session in this Rpc's sessions
-  bool is_session_ptr_client(Session *session);
-
-  /// Check if this session pointer is a server session in this Rpc's sessions
-  bool is_session_ptr_server(Session *session);
-
   /// Process all session management events in the queue and free them.
   /// The handlers for individual request/response types should not free
   /// packets.

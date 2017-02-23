@@ -16,7 +16,11 @@ namespace ERpc {
 /// A one-to-one session class for all transports
 class Session {
  public:
-  enum class Role : bool { kServer, kClient };
+  enum class Role : int {
+    /* Weird numbers to help detect use of freed session pointers */
+    kServer = 37,
+    kClient = 95
+  };
 
   /// Max number of unexpected *requests* kept outstanding by this session
   static const size_t kSessionReqWindow = 8;
@@ -33,7 +37,9 @@ class Session {
   };
 
   Session(Role role, SessionState state);
-  ~Session();
+
+  /// Session resources are freed in bury_session(), so this is empty
+  ~Session() {}
 
   /// Enable congestion control for this session
   void enable_congestion_control() {

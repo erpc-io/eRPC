@@ -113,53 +113,15 @@ void Rpc<Transport_>::bury_session(Session *session) {
   /* Second, mark the session as NULL in the session vector */
   uint16_t session_num;
   if (session->role == Session::Role::kClient) {
-    assert(is_session_ptr_client(session));
     assert(!mgmt_retry_queue_contains(session));
 
     session_num = session->client.session_num;
   } else {
-    assert(is_session_ptr_server(session));
     session_num = session->server.session_num;
   }
 
   session_vec.at(session_num) = nullptr;
   delete session;
-}
-
-template <class Transport_>
-bool Rpc<Transport_>::is_session_ptr_client(Session *session) {
-  if (session == nullptr) {
-    return false;
-  }
-
-  if (std::find(session_vec.begin(), session_vec.end(), session) ==
-      session_vec.end()) {
-    return false;
-  }
-
-  if (session->role != Session::Role::kClient) {
-    return false;
-  }
-
-  return true;
-}
-
-template <class Transport_>
-bool Rpc<Transport_>::is_session_ptr_server(Session *session) {
-  if (session == nullptr) {
-    return false;
-  }
-
-  if (std::find(session_vec.begin(), session_vec.end(), session) ==
-      session_vec.end()) {
-    return false;
-  }
-
-  if (session->role != Session::Role::kServer) {
-    return false;
-  }
-
-  return true;
 }
 
 template <class Transport_>
