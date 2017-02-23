@@ -7,6 +7,7 @@
 namespace ERpc {
 
 class IBTransport : public Transport {
+ public:
   // Transport-specific constants
   static const size_t kMTU = 3840;              ///< Make (kRecvSize / 64) prime
   static const size_t kRecvSize = (kMTU + 64);  ///< RECV buf size (with GRH)
@@ -26,7 +27,6 @@ class IBTransport : public Transport {
   };
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 
- public:
   /**
    * @brief Partially construct the transport object without using eRPC's
    * hugepage allocator. The device driver is allowed to use its own hugepages.

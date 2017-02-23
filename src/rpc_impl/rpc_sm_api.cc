@@ -69,9 +69,12 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
     return nullptr;
   }
 
-  /* Create a new session. XXX: Use pool? */
+  /* Create a new session and fill prealloc packet buffers. XXX: Use pool? */
   Session *session =
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    session->msg_arr[i].prealloc = huge_alloc->alloc(Transport_::kMTU);
+  }
 
   /*
    * Fill in client and server endpoint metadata. Commented server fields will
@@ -140,7 +143,7 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
       assert(!mgmt_retry_queue_contains(session));
       erpc_dprintf_noargs(
           "eRPC Rpc: destroy_session() failed. Issue: "
-          "Session already disconnected.\n");
+          "Session already destroyed.\n");
       return false;
 
     case SessionState::kError:

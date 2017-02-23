@@ -10,7 +10,7 @@ class Buffer {
   Buffer(uint8_t *buf, uint32_t size, uint32_t lkey)
       : buf(buf), size(size), lkey(lkey) {}
 
-  Buffer() : buf(nullptr), size(0), lkey(0) {}
+  Buffer() {}
 
   /// Since \p Buffer does not allocate its own \p buf, do nothing here.
   ~Buffer() {}
@@ -21,11 +21,11 @@ class Buffer {
   size_t get_size() { return (size_t)size; }
   uint32_t get_lkey() { return lkey; }
 
-  uint8_t *buf;
+  uint8_t *buf = nullptr;
 
  private:
-  uint32_t size; /* Make Buffer fit in 16 bytes */
-  uint32_t lkey;
+  uint32_t size = 0; /* We could use size_t, we need to keep Buffer small */
+  uint32_t lkey = 0;
 };
 
 /* We need to keep sizeof(Buffer) small so we can use it in call-by-value */

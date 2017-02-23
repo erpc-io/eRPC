@@ -96,9 +96,21 @@ Rpc<Transport_>::~Rpc() {
 
 template <class Transport_>
 void Rpc<Transport_>::bury_session(Session *session) {
-  /* XXX: When is the session destroyed? */
   assert(session != nullptr);
 
+  /* First, free session resources */
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    /* Free the preallocated packet buffer */
+    assert(session->msg_arr[i].prealloc.is_valid());
+    huge_alloc->free_buf(session->msg_arr[i].prealloc);
+
+    /* Free the overflow buffer, if any */
+    if (session->msg_arr[i].overflow.is_valid()) {
+      huge_alloc->free_buf(session->msg_arr[i].overflow);
+    }
+  }
+
+  /* Second, mark the session as NULL in the session vector */
   uint16_t session_num;
   if (session->role == Session::Role::kClient) {
     assert(is_session_ptr_client(session));

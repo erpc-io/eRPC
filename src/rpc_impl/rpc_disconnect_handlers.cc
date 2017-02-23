@@ -48,7 +48,8 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
 
   erpc_dprintf("%s. None. Sending response.\n", issue_msg);
   sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
-  bury_session(session);
+
+  bury_session(session); /* Free session resources + NULL-ify in session_vec */
 }
 
 template <class Transport_>
@@ -103,12 +104,11 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->err_type == SessionMgmtErrType::kNoError);
 
   session->state = SessionState::kDisconnected; /* Mark session connected */
-
-  /* Invoke the handler and bury the session */
   erpc_dprintf("%s: None. Session disconnected.\n", issue_msg);
   session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
                        SessionMgmtErrType::kNoError, context);
-  bury_session(session);
+
+  bury_session(session); /* Free session resources + NULL-ify in session_vec */
 }
 
 }  // End ERpc

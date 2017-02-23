@@ -91,9 +91,15 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     return;
   }
 
-  /* If we are here, it's OK to create a new session */
+  /*
+   * If we are here, create a new session and fill prealloc packet buffers.
+   * XXX: Use pool?
+   */
   Session *session =
       new Session(Session::Role::kServer, SessionState::kConnected);
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    session->msg_arr[i].prealloc = huge_alloc->alloc(Transport_::kMTU);
+  }
 
   /*
    * Set the server endpoint metadata fields in the received packet, which we

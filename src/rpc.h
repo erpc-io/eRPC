@@ -31,12 +31,12 @@ class Rpc {
 
   /// Max number of unexpected *packets* kept outstanding by this Rpc
   static const size_t kRpcPktWindow = 20;
-  static const size_t kMaxMsgSize = MB(8);  ///< Max request/response size
+
+  static const size_t kMaxMsgSize = MB(8);  ///< Max request or response size
   static const size_t kPktNumBits = 13;  ///< Bits for packet number in request
   static const size_t kReqNumBits = 44;  ///< Bits for request number
-
   static const size_t kPktHdrMagicBits = 4;  ///< Debug bits for magic number
-  static const size_t kPktHdrMagic = 11;
+  static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
   static_assert(kReqNumBits <= 64, "");
   static_assert(kPktNumBits <= 16, "");
@@ -192,7 +192,7 @@ class Rpc {
   /// packets.
   void handle_session_management();
 
-  /// Destroy a session object and mark it as NULL in the session vector
+  /// Free session resources and mark it as NULL in the session vector
   void bury_session(Session *session);
 
   // rpc_connect_handlers.cc
