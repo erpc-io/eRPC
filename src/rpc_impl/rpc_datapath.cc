@@ -20,6 +20,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     assert(pkt_buffer.is_valid() && check_pkthdr(pkt_buffer));
     assert(msg_size > 0 && msg_size <= kMaxMsgSize);
   } else {
+    /* If datapath checks are enabled, return meaningful error codes */
     if (unlikely(session == nullptr ||
                  session->role != Session::Role::kClient)) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
@@ -39,7 +40,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   }
 
   if (session->msg_arr_free_vec.size() == 0) {
-    /* No free message slots left in session - we can't queue this request. */
+    /* No free message slots left in session, so we can't queue this request */
     return static_cast<int>(RpcDatapathErrCode::kNoSessionMsgSlots);
   }
 
@@ -57,19 +58,25 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   /* Find a free message slot in the session */
   size_t msg_arr_slot = session->msg_arr_free_vec.pop_back();
   assert(msg_arr_slot < Session::kSessionReqWindow);
+  assert(!session->msg_arr[msg_arr_slot].in_use);
 
-  /*
-   * Generate a request number for this slot. Session::kSessionReqWindow is a
-   * power of 2, so the multiplication below uses a bit shift.
-   */
+  /* Generate a request number for this slot */
   pkthdr->req_num =
-      (req_num_arr[msg_arr_slot] * Session::kSessionReqWindow) + msg_arr_slot;
+      (req_num_arr[msg_arr_slot] * Session::kSessionReqWindow) + /* Bit shift */
+      msg_arr_slot;
   req_num_arr[msg_arr_slot]++;
 
-  /* Fill in the message slot */
+  /* Fill in the session message slot */
   session->msg_arr[msg_arr_slot].pkt_buffer = pkt_buffer;
   session->msg_arr[msg_arr_slot].msg_size = msg_size;
   session->msg_arr[msg_arr_slot].msg_bytes_sent = 0;
+  session->msg_arr[msg_arr_slot].in_use = true;
+
+  /* Add \p session to the work queue if it's not already present */
+  if (!session->in_work_queue) {
+    session->in_work_queue = true;
+    session_work_queue.push_back(session);
+  }
 
   return 0;
 }
