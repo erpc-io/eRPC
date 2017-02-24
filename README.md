@@ -1,5 +1,6 @@
 ## Code notes
   * Major types
+    * Request type: `uint8_t`. 256 request types should be enough.
     * App TIDs: `uint8_t`. We need one per thread, so 256 is enough.
     * Session number: `uint16_t`. We need one per session, and we don't expect
       to support over 65,536 sessions per thread. More sessions can be supported

@@ -14,30 +14,27 @@
 
 namespace ERpc {
 
-#define rpc_dprintf(fmt, ...)            \
-  do {                                   \
-    if (RPC_DPRINTF) {                   \
-      fprintf(stderr, fmt, __VA_ARGS__); \
-      fflush(stderr);                    \
-    }                                    \
-  } while (0)
-
 // Per-thread RPC object
 template <class Transport_>
 class Rpc {
  public:
+  /// Max request or response size, excluding packet headers
+  static const size_t kMaxMsgSize = MB(8);
+
   /// Initial capacity of the hugepage allocator
   static const size_t kInitialHugeAllocSize = (128 * MB(1));
 
   /// Max number of unexpected *packets* kept outstanding by this Rpc
   static const size_t kRpcPktWindow = 20;
 
-  static const size_t kMaxMsgSize = MB(8);  ///< Max request or response size
-  static const size_t kPktNumBits = 13;  ///< Bits for packet number in request
-  static const size_t kReqNumBits = 44;  ///< Bits for request number
+  // Packet header bitfield sizes
+  static const size_t kMsgSizeBits = 24;  ///< Bits for message size
+  static const size_t kPktNumBits = 13;   ///< Bits for packet number in request
+  static const size_t kReqNumBits = 44;   ///< Bits for request number
   static const size_t kPktHdrMagicBits = 4;  ///< Debug bits for magic number
   static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
+  static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert(kReqNumBits <= 64, "");
   static_assert(kPktNumBits <= 16, "");
   static_assert((1ull << kPktNumBits) * Transport::kMinMtu >= kMaxMsgSize, "");
@@ -45,8 +42,8 @@ class Rpc {
 
   /// The header in each RPC packet
   struct pkthdr_t {
-    uint64_t req_type : 9;   /// RPC request type
-    uint64_t tot_size : 23;  ///< Total message size across multiple packets
+    uint8_t req_type;        /// RPC request type
+    uint64_t msg_size : 24;  ///< Total req/resp msg size, excluding headers
     uint64_t rem_session_num : 16;  ///< Session number of the remote session
     uint64_t is_req : 1;            ///< 1 if this packet is a request packet
     uint64_t is_first : 1;     ///< 1 if this packet is the first message packet
@@ -56,6 +53,31 @@ class Rpc {
     uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_pkt_buffer()
   };
   static_assert(sizeof(pkthdr_t) == 16, "");
+
+  /// Error codes returned by the Rpc datapath
+  enum class RpcDatapathErrCode : int {
+    kInvalidSessionArg,
+    kInvalidPktBufferArg,
+    kInvalidMsgSizeArg,
+    kNoSessionMsgSlots
+  };
+
+  static std::string rpc_err_code_str(RpcDatapathErrCode e) {
+    switch (e) {
+      case RpcDatapathErrCode::kInvalidSessionArg:
+        return std::string("[Invalid session argument]");
+      case RpcDatapathErrCode::kInvalidPktBufferArg:
+        return std::string("[Invalid packet buffer argument]");
+      case RpcDatapathErrCode::kInvalidMsgSizeArg:
+        return std::string("[Invalid message size argument]");
+      case RpcDatapathErrCode::kNoSessionMsgSlots:
+        return std::string("[No session message slots]");
+    };
+
+    assert(false);
+    exit(-1);
+    return std::string("");
+  }
 
   // rpc.cc
 
@@ -109,10 +131,14 @@ class Rpc {
     huge_alloc->free_buf(pkt_buffer);
   }
 
+  /// Return a pointer to the packet header of this packet Buffer
+  pkthdr_t *pkt_buffer_hdr(Buffer pkt_buffer) {
+    return (pkthdr_t *)(pkt_buffer.buf - sizeof(pkthdr_t));
+  }
+
   /// Check if a packet Buffer's header magic is valid
   inline bool check_pkthdr(Buffer pkt_buffer) {
-    pkthdr_t *pkthdr = (pkthdr_t *)(pkt_buffer.buf - sizeof(pkthdr_t));
-    return (pkthdr->magic == kPktHdrMagic);
+    return (pkt_buffer_hdr(pkt_buffer)->magic == kPktHdrMagic);
   }
 
   // rpc_sm_api.cc
@@ -152,17 +178,19 @@ class Rpc {
    * @brief Try to begin transmission of an RPC request
    *
    * @param session The client session to send the request on
+   * @param req_type The type of the request
    * @param buffer The packet buffer containing the request. If this call
    * succeeds, eRPC owns \p buffer until the request completes by invoking
    * the callback.
    *
-   * @param req_bytes Number of non-header bytes to send from the packet
+   * @param msg_size Number of non-header bytes to send from the packet
    * buffer
    *
    * @return 0 on success, i.e., if the request was sent or queued. An error
    * code is returned if the request can neither be sent nor queued.
    */
-  int send_request(Session *session, Buffer buffer, size_t req_bytes);
+  int send_request(Session *session, uint8_t req_type, Buffer buffer,
+                   size_t msg_size);
 
   // rpc_ev_loop.cc
 
@@ -245,13 +273,20 @@ class Rpc {
   HugeAllocator *huge_alloc = nullptr;   ///< This thread's hugepage allocator
   size_t unexp_credits = kRpcPktWindow;  ///< Available unexpected pkt slots
 
-  /// The append-only list of session pointers, indexed by session num.
+  /// The next request number prefix for each session request window slot
+  size_t req_num_arr[Session::kSessionReqWindow] = {0};
+
+  /// The append-only list of session pointers, indexed by session number.
   /// Disconnected sessions are denoted by null pointers. This grows as sessions
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
 
-  /// List of sessions for which a management request is in flight
+  /// Sessions for which a management request is in flight. This can be a vector
+  /// because session management is not performance-critical.
   std::vector<Session *> mgmt_retry_queue;
+
+  /// Sessions for which more request or response packets need to be sent
+  std::vector<Session *> session_work_queue;
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;

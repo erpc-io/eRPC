@@ -98,7 +98,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   Session *session =
       new Session(Session::Role::kServer, SessionState::kConnected);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    session->msg_arr[i].prealloc = huge_alloc->alloc(Transport_::kMTU);
+    session->msg_arr[i]._prealloc = huge_alloc->alloc(Transport_::kMTU);
   }
 
   /*

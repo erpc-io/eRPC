@@ -14,9 +14,9 @@
 namespace ERpc {
 
 // Debug macros
-static const size_t kVerbose = 1;  ///< Debug printing for non-datapath stuff
-static const size_t kDatapathVerbose = 1;  ///< Debug printing in datapatg
-static const size_t kDatapathChecks = 1;   ///< Disable for max perf datapath
+static const bool kVerbose = true;  ///< Debug printing for non-datapath stuff
+static const bool kDatapathVerbose = true;  ///< Debug printing in datapatg
+static const bool kDatapathChecks = true;   ///< Disable for max perf datapath
 
 #define erpc_dprintf(fmt, ...)           \
   do {                                   \

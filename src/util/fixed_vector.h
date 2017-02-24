@@ -32,8 +32,10 @@ class FixedVector {
     return t;
   }
 
+  /// Similar to std::vector::size()
   inline size_t size() { return free_index; }
 
+  /// Return the maximum capacity of the FixedVector
   inline size_t capacity() { return N; }
 
   inline T operator[](size_t i) {

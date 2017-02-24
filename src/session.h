@@ -22,18 +22,18 @@ class Session {
     kClient = 95
   };
 
-  /// Max number of unexpected *requests* kept outstanding by this session
-  static const size_t kSessionReqWindow = 8;
+  static const size_t kSessionReqWindow = 8;  ///< *Request* window size
+  static const size_t kSessionCredits = 8;    ///< *Packet* credits per endpoint
 
-  static const size_t kSessionCredits = 8;  ///< Packet credits per endpoint
+  /* Needed for fast modulo calculation during request number assignment */
+  static_assert(is_power_of_two(kSessionReqWindow), "");
 
   /// Buffers and metadata maintained about a request or response message
   struct msg_info_t {
-    Buffer prealloc;  ///< The pre-allocated MTU-sized packet buffer
-    Buffer overflow;  ///< The larger packet buffer allocated on demand
-
-    size_t data_bytes_sent = 0;  ///< Number of non-header bytes already sent
-    size_t req_num = 0;          ///< The req number for this message
+    Buffer pkt_buffer;  ///< The packet buffer for this message
+    Buffer _prealloc;   ///< A pre-allocated 4K buffer. Currently unused
+    size_t msg_size;  ///< Total msg size, excluding header (also in pkt_buffer)
+    size_t msg_bytes_sent;  ///< Number of non-header bytes already sent
   };
 
   Session(Role role, SessionState state);

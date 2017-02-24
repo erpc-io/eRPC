@@ -18,6 +18,17 @@ Nexus::Nexus(uint16_t mgmt_udp_port) : Nexus(mgmt_udp_port, 0.0) {}
 
 Nexus::Nexus(uint16_t mgmt_udp_port, double udp_drop_prob)
     : udp_config(mgmt_udp_port, udp_drop_prob) {
+  /* Print configuration messages if verbose printing or checking is enabled */
+  if (kDatapathVerbose) {
+    fprintf(stderr,
+            "eRPC Nexus: Datapath verbose enabled. Performance will be low");
+  }
+
+  if (kDatapathChecks) {
+    fprintf(stderr,
+            "eRPC Nexus: Datapath checks enabled. Performance will be low");
+  }
+
   /* Get the local hostname */
   int ret = get_hostname(hostname);
   if (ret == -1) {

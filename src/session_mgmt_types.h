@@ -90,6 +90,8 @@ static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kDisconnectResp:
       return std::string("[Disconnect response]");
   };
+
+  assert(false);
   exit(-1);
   return std::string("");
 }
@@ -119,6 +121,8 @@ static bool session_mgmt_pkt_type_is_req(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kDisconnectResp:
       return false;
   }
+
+  assert(false);
   exit(-1);
   return false;
 }
@@ -139,6 +143,7 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
       break;
   }
 
+  assert(false);
   exit(-1);
   return static_cast<SessionMgmtPktType>(-1);
 }
@@ -170,6 +175,8 @@ static std::string session_mgmt_err_type_str(SessionMgmtErrType err_type) {
     case SessionMgmtErrType::kInvalidTransport:
       return std::string("[Invalid transport]");
   }
+
+  assert(false);
   exit(-1);
   return std::string("");
 }

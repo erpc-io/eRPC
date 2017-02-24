@@ -101,13 +101,10 @@ void Rpc<Transport_>::bury_session(Session *session) {
   /* First, free session resources */
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     /* Free the preallocated packet buffer */
-    assert(session->msg_arr[i].prealloc.is_valid());
-    huge_alloc->free_buf(session->msg_arr[i].prealloc);
+    assert(session->msg_arr[i]._prealloc.is_valid());
+    huge_alloc->free_buf(session->msg_arr[i]._prealloc);
 
-    /* Free the overflow buffer, if any */
-    if (session->msg_arr[i].overflow.is_valid()) {
-      huge_alloc->free_buf(session->msg_arr[i].overflow);
-    }
+    /* XXX: Who frees msg_arr[i].pkt_buffer? */
   }
 
   /* Second, mark the session as NULL in the session vector */

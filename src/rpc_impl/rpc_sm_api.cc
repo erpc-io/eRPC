@@ -73,7 +73,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   Session *session =
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    session->msg_arr[i].prealloc = huge_alloc->alloc(Transport_::kMTU);
+    session->msg_arr[i]._prealloc = huge_alloc->alloc(Transport_::kMTU);
   }
 
   /*
