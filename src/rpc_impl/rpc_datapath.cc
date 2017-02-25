@@ -73,9 +73,9 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   session->msg_arr[msg_arr_slot].in_use = true;
 
   /* Add \p session to the work queue if it's not already present */
-  if (!session->in_work_queue) {
-    session->in_work_queue = true;
-    session_work_queue.push_back(session);
+  if (!session->in_datapath_work_queue) {
+    session->in_datapath_work_queue = true;
+    datapath_work_queue.push_back(session);
   }
 
   return 0;

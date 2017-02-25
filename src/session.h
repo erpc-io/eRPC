@@ -58,7 +58,7 @@ class Session {
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;           ///< Read-only endpoint metadata
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
-  bool in_work_queue;  ///< True iff this Session is in the Rpc's work queue
+  bool in_datapath_work_queue;  ///< True iff session is in datapath work queue
 
   msg_info_t msg_arr[kSessionReqWindow];  ///< The message slots
   FixedVector<size_t, kSessionReqWindow> msg_arr_free_vec;  ///< Free slots

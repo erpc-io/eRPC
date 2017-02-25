@@ -286,7 +286,7 @@ class Rpc {
   std::vector<Session *> mgmt_retry_queue;
 
   /// Sessions for which (more) request or response packets need to be sent
-  std::vector<Session *> session_work_queue;
+  std::vector<Session *> datapath_work_queue;
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
