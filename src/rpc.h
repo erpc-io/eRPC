@@ -132,12 +132,12 @@ class Rpc {
   }
 
   /// Return a pointer to the packet header of this packet Buffer
-  pkthdr_t *pkt_buffer_hdr(Buffer pkt_buffer) {
-    return (pkthdr_t *)(pkt_buffer.buf - sizeof(pkthdr_t));
+  pkthdr_t *pkt_buffer_hdr(Buffer *pkt_buffer) {
+    return (pkthdr_t *)(pkt_buffer->buf - sizeof(pkthdr_t));
   }
 
   /// Check if a packet Buffer's header magic is valid
-  inline bool check_pkthdr(Buffer pkt_buffer) {
+  inline bool check_pkthdr(Buffer *pkt_buffer) {
     return (pkt_buffer_hdr(pkt_buffer)->magic == kPktHdrMagic);
   }
 
@@ -189,7 +189,7 @@ class Rpc {
    * @return 0 on success, i.e., if the request was sent or queued. An error
    * code is returned if the request can neither be sent nor queued.
    */
-  int send_request(Session *session, uint8_t req_type, Buffer buffer,
+  int send_request(Session *session, uint8_t req_type, Buffer *buffer,
                    size_t msg_size);
 
   // rpc_ev_loop.cc
@@ -287,6 +287,13 @@ class Rpc {
 
   /// Sessions for which (more) request or response packets need to be sent
   std::vector<Session *> datapath_work_queue;
+
+  /// Packet batch information for transport
+  //@{
+  RoutingInfo *routing_info_arr[Transport_::kPostlist];
+  Buffer *pkt_buffer_arr[Transport_::kPostlist];
+  size_t offset_arr[Transport_::kPostlist];
+  //@}
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;

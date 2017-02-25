@@ -41,7 +41,10 @@ class Transport {
 
   ~Transport();
 
-  void send_message(Session *session, const Buffer *buffer);
+  void send_packet_batch(const RoutingInfo **routing_info_arr,
+                         const Buffer **pkt_buffer_arr,
+                         const size_t *offset_arr, size_t num_pkts);
+
   void poll_completions();
 
   /// Fill-in the transport-specific routing information

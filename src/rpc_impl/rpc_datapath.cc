@@ -13,24 +13,22 @@ namespace ERpc {
 
 template <class Transport_>
 int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
-                                  Buffer pkt_buffer, size_t msg_size) {
+                                  Buffer *pkt_buffer, size_t msg_size) {
   if (!kDatapathChecks) {
     assert(session != nullptr && session->role == Session::Role::kClient);
     assert(session->state == SessionState::kConnected);
-    assert(pkt_buffer.is_valid() && check_pkthdr(pkt_buffer));
+    assert(pkt_buffer->is_valid() && check_pkthdr(pkt_buffer));
     assert(msg_size > 0 && msg_size <= kMaxMsgSize);
   } else {
     /* If datapath checks are enabled, return meaningful error codes */
     if (unlikely(session == nullptr ||
-                 session->role != Session::Role::kClient)) {
+                 session->role != Session::Role::kClient ||
+                 session->state == SessionState::kConnected)) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
     }
 
-    if (unlikely(session->state != SessionState::kConnected)) {
-      return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
-    }
-
-    if (unlikely(!pkt_buffer.is_valid() || !check_pkthdr(pkt_buffer))) {
+    if (unlikely(pkt_buffer == nullptr || !pkt_buffer->is_valid() ||
+                 !check_pkthdr(pkt_buffer))) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidPktBufferArg);
     }
 

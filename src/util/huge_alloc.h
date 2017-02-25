@@ -194,11 +194,10 @@ class HugeAllocator {
     freelist[size_class].pop_back();
     assert(buffer.get_size() == class_to_size(size_class));
 
-    Buffer buffer_0 = Buffer(buffer.buf, (uint32_t)(buffer.get_size() / 2),
-                             buffer.get_lkey());
-    Buffer buffer_1 =
-        Buffer(buffer.buf + buffer.get_size() / 2,
-               (uint32_t)(buffer.get_size() / 2), buffer.get_lkey());
+    Buffer buffer_0 =
+        Buffer(buffer.buf, buffer.get_size() / 2, buffer.get_lkey());
+    Buffer buffer_1 = Buffer(buffer.buf + buffer.get_size() / 2,
+                             buffer.get_size() / 2, buffer.get_lkey());
 
     freelist[size_class - 1].push_back(buffer_0);
     freelist[size_class - 1].push_back(buffer_1);

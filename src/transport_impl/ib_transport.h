@@ -57,7 +57,9 @@ class IBTransport : public Transport {
   }
 
   // ib_transport_datapath.cc
-  void send_message(Session *session, const Buffer *buffer);
+  void send_packet_batch(RoutingInfo **routing_info_arr,
+                         const Buffer **pkt_buffer_arr,
+                         const size_t *offset_arr, size_t num_pkts);
   void poll_completions();
 
  private:

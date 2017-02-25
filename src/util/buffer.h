@@ -9,7 +9,7 @@ namespace ERpc {
 /// after the Buffer is created.
 class Buffer {
  public:
-  Buffer(uint8_t *buf, uint32_t size, uint32_t lkey)
+  Buffer(uint8_t *buf, size_t size, uint32_t lkey)
       : buf(buf), size(size), lkey(lkey) {}
 
   Buffer() {}
@@ -26,12 +26,9 @@ class Buffer {
   uint8_t *buf = nullptr;
 
  private:
-  uint32_t size = 0; /* We could use size_t, we need to keep Buffer small */
+  size_t size = 0;
   uint32_t lkey = 0;
 };
-
-/* We need to keep sizeof(Buffer) small so we can use it in call-by-value */
-static_assert(sizeof(Buffer) == 16, "");
 
 }  // End ERpc
 
