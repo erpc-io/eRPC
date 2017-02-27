@@ -41,11 +41,35 @@ class Transport {
 
   ~Transport();
 
-  void send_packet_batch(RoutingInfo const* const* routing_info_arr,
-                         Buffer const* const* pkt_buffer_arr,
-                         size_t const* offset_arr, size_t num_pkts);
+  /**
+   * @brief The generic packet transmission function
+   *
+   * For each packet, a packet Buffer and an offset into the Buffer is
+   * specified. The total size of the message, and the packet header can be
+   * inferred from the packet Buffer.
+   *
+   * Packets for which the offset is non-zero use 2 DMAs (header and data).
+   * Small packets have \p offset = 0, and use inline or single-DMA transfers.
+   */
+  void tx_burst(RoutingInfo const* const* routing_info_arr,
+                Buffer const* const* pkt_buffer_arr, size_t const* offset_arr,
+                size_t num_pkts);
 
-  void poll_completions();
+  /**
+   * @brief The generic packet reception function
+   *
+   * This function returns pointers to the transport's RECV DMA ring buffers,
+   * so it must not re-post the returned ring buffers to the NIC (because then
+   * the NIC could overwrite the buffers while the Rpc layer  is processing
+   * them.
+   *
+   * The Rpc layer controls posting of RECV descriptors explicitly using
+   * the post_recvs() function.
+   */
+  void rx_burst(Buffer* pkt_buffer_arr, size_t* num_pkts);
+
+  /// Post RECVs to the receive queue after processing \p rx_burst results
+  void post_recvs(size_t num_recvs);
 
   /// Fill-in the transport-specific routing information
   void fill_routing_info(RoutingInfo* routing_info) const;

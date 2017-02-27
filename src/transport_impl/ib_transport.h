@@ -57,10 +57,12 @@ class IBTransport : public Transport {
   }
 
   // ib_transport_datapath.cc
-  void send_packet_batch(RoutingInfo const *const *routing_info_arr,
-                         Buffer const *const *pkt_buffer_arr,
-                         size_t const *offset_arr, size_t num_pkts);
-  void poll_completions();
+  void tx_burst(RoutingInfo const *const *routing_info_arr,
+                Buffer const *const *pkt_buffer_arr, size_t const *offset_arr,
+                size_t num_pkts);
+
+  void rx_burst(Buffer *pkt_buffer_arr, size_t *num_pkts);
+  void post_recvs(size_t num_recvs);
 
  private:
   /**

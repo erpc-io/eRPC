@@ -47,11 +47,12 @@ void Rpc<Transport_>::process_datapath_work_queue() {
           tx_routing_info_arr[batch_i] = session->remote_routing_info;
           tx_pkt_buffer_arr[batch_i] = msg_info->pkt_buffer;
           tx_offset_arr[batch_i] = 0;
+          msg_info->msg_bytes_sent = msg_info->msg_size; /* All will be sent */
 
           batch_i++;
           if (batch_i == Transport_::kPostlist) {
-            transport->send_packet_batch(tx_routing_info_arr, tx_pkt_buffer_arr,
-                                         tx_offset_arr, batch_i);
+            transport->tx_burst(tx_routing_info_arr, tx_pkt_buffer_arr,
+                                tx_offset_arr, batch_i);
             batch_i = 0;
           }
 
@@ -65,8 +66,8 @@ void Rpc<Transport_>::process_datapath_work_queue() {
   }   /* End loop over datapath work queue sessions */
 
   if (batch_i > 0) {
-    transport->send_packet_batch(tx_routing_info_arr, tx_pkt_buffer_arr,
-                                 tx_offset_arr, batch_i);
+    transport->tx_burst(tx_routing_info_arr, tx_pkt_buffer_arr, tx_offset_arr,
+                        batch_i);
     batch_i = 0;
   }
 };

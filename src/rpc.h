@@ -293,12 +293,15 @@ class Rpc {
   /// Sessions for which (more) request or response packets need to be sent
   std::vector<Session *> datapath_work_queue;
 
-  /// Packet batch information for transport
+  /// Tx batch information for \p tx_burst
   //@{
   RoutingInfo *tx_routing_info_arr[Transport_::kPostlist];
   Buffer *tx_pkt_buffer_arr[Transport_::kPostlist];
   size_t tx_offset_arr[Transport_::kPostlist];
   //@}
+
+  /// Rx batch information for \p rx_burst
+  Buffer rx_pkt_buffer_arr[Transport_::kPostlist];
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
