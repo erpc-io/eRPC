@@ -59,9 +59,12 @@ class Session {
   SessionEndpoint client, server;           ///< Read-only endpoint metadata
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
   bool in_datapath_work_queue;  ///< True iff session is in datapath work queue
-
   msg_info_t msg_arr[kSessionReqWindow];  ///< The message slots
   FixedVector<size_t, kSessionReqWindow> msg_arr_free_vec;  ///< Free slots
+
+  /// Depending on this session's role, save a pointer to \p server's or
+  /// \p client's RoutingInfo for faster unconditional access
+  RoutingInfo *remote_routing_info;
 
   /// Information that is required only at the client endpoint
   struct {

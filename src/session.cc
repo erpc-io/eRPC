@@ -9,8 +9,10 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
    */
   if (role == Session::Role::kClient) {
     assert(state == SessionState::kConnectInProgress);
+    remote_routing_info = &server.routing_info;
   } else {
     assert(state == SessionState::kConnected);
+    remote_routing_info = &client.routing_info;
   }
 
   for (size_t i = 0; i < kSessionReqWindow; i++) {

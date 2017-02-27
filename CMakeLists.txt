@@ -64,6 +64,7 @@ set(SOURCES
   src/transport.cc
   src/transport.h
   src/transport_impl/ib_transport.cc
+  src/transport_impl/ib_transport_datapath.cc
   src/transport_impl/ib_transport.h
   src/transport_types.h
   src/util/barrier.h

@@ -260,6 +260,11 @@ class Rpc {
   /// Retry in-flight session management requests whose timeout has expired
   void mgmt_retry();
 
+  // rpc_ev_loop.cc
+
+  /// Process the datapath work queue
+  void process_datapath_work_queue();
+
   // Constructor args
   Nexus *nexus;
   void *context;  ///< The application context
@@ -290,9 +295,9 @@ class Rpc {
 
   /// Packet batch information for transport
   //@{
-  RoutingInfo *routing_info_arr[Transport_::kPostlist];
-  Buffer *pkt_buffer_arr[Transport_::kPostlist];
-  size_t offset_arr[Transport_::kPostlist];
+  RoutingInfo *tx_routing_info_arr[Transport_::kPostlist];
+  Buffer *tx_pkt_buffer_arr[Transport_::kPostlist];
+  size_t tx_offset_arr[Transport_::kPostlist];
   //@}
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
