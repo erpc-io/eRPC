@@ -20,39 +20,17 @@ class Rpc {
  public:
   /// Max request or response size, excluding packet headers
   static const size_t kMaxMsgSize = MB(8);
+  static_assert((1ull << Transport::kMsgSizeBits) >= kMaxMsgSize, "");
+  static_assert((1ull << Transport::kPktNumBits) *
+                        (Transport::kMinMtu - sizeof(Transport::pkthdr_t)) >=
+                    kMaxMsgSize,
+                "");
 
   /// Initial capacity of the hugepage allocator
   static const size_t kInitialHugeAllocSize = (128 * MB(1));
 
   /// Max number of unexpected *packets* kept outstanding by this Rpc
   static const size_t kRpcPktWindow = 20;
-
-  // Packet header bitfield sizes
-  static const size_t kMsgSizeBits = 24;  ///< Bits for message size
-  static const size_t kPktNumBits = 13;   ///< Bits for packet number in request
-  static const size_t kReqNumBits = 44;   ///< Bits for request number
-  static const size_t kPktHdrMagicBits = 4;  ///< Debug bits for magic number
-  static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
-
-  static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
-  static_assert(kReqNumBits <= 64, "");
-  static_assert(kPktNumBits <= 16, "");
-  static_assert((1ull << kPktNumBits) * Transport::kMinMtu >= kMaxMsgSize, "");
-  static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
-
-  /// The header in each RPC packet
-  struct pkthdr_t {
-    uint8_t req_type;        /// RPC request type
-    uint64_t msg_size : 24;  ///< Total req/resp msg size, excluding headers
-    uint64_t rem_session_num : 16;  ///< Session number of the remote session
-    uint64_t is_req : 1;            ///< 1 if this packet is a request packet
-    uint64_t is_first : 1;     ///< 1 if this packet is the first message packet
-    uint64_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
-    uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
-    uint64_t req_num : kReqNumBits;     ///< Request number of this packet
-    uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_pkt_buffer()
-  };
-  static_assert(sizeof(pkthdr_t) == 16, "");
 
   /// Error codes returned by the Rpc datapath
   enum class RpcDatapathErrCode : int {
@@ -107,12 +85,12 @@ class Rpc {
    * if allocation fails simply because we ran out of memory.
    */
   inline Buffer alloc_pkt_buffer(size_t size) {
-    Buffer pkt_buffer = huge_alloc->alloc(size + sizeof(pkthdr_t));
+    Buffer pkt_buffer = huge_alloc->alloc(size + sizeof(Transport::pkthdr_t));
 
     if (pkt_buffer.is_valid()) {
-      pkthdr_t *pkthdr = (pkthdr_t *)pkt_buffer.buf;
-      pkthdr->magic = kPktHdrMagic; /* Install the packet header magic */
-      pkt_buffer.buf += sizeof(pkthdr_t);
+      Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)pkt_buffer.buf;
+      pkthdr->magic = Transport::kPktHdrMagic;
+      pkt_buffer.buf += sizeof(Transport::pkthdr_t);
       return pkt_buffer;
     } else {
       return Buffer::get_invalid_buffer();
@@ -122,23 +100,25 @@ class Rpc {
   /// Free a packet Buffer allocated using alloc_pkt_buffer()
   inline void free_pkt_buffer(Buffer pkt_buffer) {
     assert(pkt_buffer.is_valid());
-    pkt_buffer.buf -= sizeof(pkthdr_t); /* Restore pointer for future use */
+    /* Restore bumped pointer before freeing into the allocator*/
+    pkt_buffer.buf -= sizeof(Transport::pkthdr_t);
 
-    pkthdr_t *pkthdr = (pkthdr_t *)pkt_buffer.buf;
+    Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)pkt_buffer.buf;
     _unused(pkthdr);
-    assert(pkthdr->magic == kPktHdrMagic);
+    assert(pkthdr->magic == Transport::kPktHdrMagic);
 
     huge_alloc->free_buf(pkt_buffer);
   }
 
   /// Return a pointer to the packet header of this packet Buffer
-  pkthdr_t *pkt_buffer_hdr(Buffer *pkt_buffer) {
-    return (pkthdr_t *)(pkt_buffer->buf - sizeof(pkthdr_t));
+  Transport::pkthdr_t *pkt_buffer_hdr(Buffer *pkt_buffer) {
+    return (Transport::pkthdr_t *)(pkt_buffer->buf -
+                                   sizeof(Transport::pkthdr_t));
   }
 
   /// Check if a packet Buffer's header magic is valid
   inline bool check_pkthdr(Buffer *pkt_buffer) {
-    return (pkt_buffer_hdr(pkt_buffer)->magic == kPktHdrMagic);
+    return (pkt_buffer_hdr(pkt_buffer)->magic == Transport::kPktHdrMagic);
   }
 
   // rpc_sm_api.cc

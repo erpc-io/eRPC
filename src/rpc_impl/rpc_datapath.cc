@@ -43,7 +43,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   }
 
   // Fill in the packet header
-  pkthdr_t *pkthdr = pkt_buffer_hdr(pkt_buffer);
+  Transport::pkthdr_t *pkthdr = pkt_buffer_hdr(pkt_buffer);
   pkthdr->req_type = req_type;
   pkthdr->msg_size = msg_size;
   pkthdr->rem_session_num = session->server.session_num;

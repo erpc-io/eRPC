@@ -38,7 +38,8 @@ void Rpc<Transport_>::process_datapath_work_queue() {
         }
 
         /* Optimize for small messages that fit in one packet */
-        if (msg_info->msg_size <= Transport_::kMTU - sizeof(pkthdr_t)) {
+        if (msg_info->msg_size <=
+            Transport_::kMTU - sizeof(Transport::pkthdr_t)) {
           assert(msg_info->msg_bytes_sent == 0);
           assert(msg_info->pkt_buffer->is_valid());
           assert(check_pkthdr(msg_info->pkt_buffer));

@@ -19,12 +19,36 @@ class Transport {
  public:
   /// Min MTU for any transport. Smaller than 4096 for prime RECV cachelines.
   static const size_t kMinMtu = 3800;
-  static const size_t kPostlist = 16;          ///< Maximum post list size
+  static const size_t kPostlist = 16;  ///< Maximum post list size
+
+  // Queue depths
   static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
   static const size_t kSendQueueDepth = 128;   ///< SEND queue size
 
   static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
   static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
+
+  // Packet header
+  static const size_t kMsgSizeBits = 24;  ///< Bits for message size
+  static const size_t kPktNumBits = 13;   ///< Bits for packet number in request
+  static const size_t kReqNumBits = 44;   ///< Bits for request number
+  static const size_t kPktHdrMagicBits = 4;  ///< Debug bits for magic number
+  static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
+
+  static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
+
+  struct pkthdr_t {
+    uint8_t req_type;        /// RPC request type
+    uint64_t msg_size : 24;  ///< Total req/resp msg size, excluding headers
+    uint64_t rem_session_num : 16;  ///< Session number of the remote session
+    uint64_t is_req : 1;            ///< 1 if this packet is a request packet
+    uint64_t is_first : 1;     ///< 1 if this packet is the first message packet
+    uint64_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
+    uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
+    uint64_t req_num : kReqNumBits;     ///< Request number of this packet
+    uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_pkt_buffer()
+  };
+  static_assert(sizeof(pkthdr_t) == 16, "");
 
   Transport(TransportType transport_type, size_t mtu, uint8_t app_tid,
             uint8_t phy_port);
