@@ -71,6 +71,9 @@ void Rpc<Transport_>::process_datapath_work_queue() {
                         batch_i);
     batch_i = 0;
   }
+
+  /* Number of sessions left in the datapath work queue = write_index */
+  datapath_work_queue.resize(write_index);
 };
 
 }  // End ERpc

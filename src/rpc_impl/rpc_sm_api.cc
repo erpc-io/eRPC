@@ -88,7 +88,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   client_endpoint.app_tid = app_tid;
   client_endpoint.session_num = session_vec.size();
   client_endpoint.secret = slow_rand.next_u64() & ((1ull << kSecretBits) - 1);
-  transport->fill_routing_info(&client_endpoint.routing_info);
+  transport->fill_local_routing_info(&client_endpoint.routing_info);
 
   SessionEndpoint &server_endpoint = session->server;
   server_endpoint.transport_type = transport->transport_type;

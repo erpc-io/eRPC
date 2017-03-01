@@ -22,8 +22,11 @@ class IBTransport : public Transport {
   static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
 
   struct ib_routing_info_t {
+    // Filled in locally
     uint16_t port_lid;
     uint32_t qpn;
+    // Resolved by remote host
+    struct ibv_ah ah;
   };
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 
@@ -46,7 +49,8 @@ class IBTransport : public Transport {
 
   ~IBTransport();
 
-  void fill_routing_info(RoutingInfo *routing_info) const;
+  void fill_local_routing_info(RoutingInfo *routing_info) const;
+  bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
 
   static std::string routing_info_str(RoutingInfo *routing_info) {
     ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
@@ -135,23 +139,23 @@ class IBTransport : public Transport {
 
   // InfiniBand info
   struct ibv_context *ib_ctx = nullptr;
-  int device_id = -1;    /* Resolved from \p phy_port */
-  int dev_port_id = -1;  /* 1-based, unlike \p phy_port */
-  uint16_t port_lid = 0; /* InfiniBand LID of \p phy_port. 0 is invalid. */
+  int device_id = -1;       ///< Physical device ID resolved from phy_port
+  uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
+  uint16_t port_lid = 0;    ///< InfiniBand LID of phy_port. 0 is invalid.
   struct ibv_pd *pd = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
-  Buffer recv_extent, req_retrans_extent;
+  Buffer recv_extent;
 
   // SEND
   size_t nb_pending = 0;                     /* For selective signalling */
   struct ibv_send_wr send_wr[kPostlist + 1]; /* +1 for blind ->next */
-  struct ibv_sge send_sgl[kPostlist];        /* No need for +1 here */
+  struct ibv_sge send_sgl[kPostlist][2];     /* 2 SGE/wr for header & payload */
 
   // RECV
-  size_t recv_head = 0;     /* Current un-posted RECV buffer */
-  size_t recv_slack = 0;    /* RECVs to accumulate before post_recv() */
-  size_t recvs_to_post = 0; /* Current number of RECVs to post */
+  size_t recv_head = 0;      ///< Current un-posted RECV buffer
+  size_t recv_slack = 0;     ///< RECVs to accumulate before post_recv()
+  size_t recvs_to_post = 0;  ///< Current number of RECVs to post
 
   struct ibv_recv_wr recv_wr[kRecvQueueDepth];
   struct ibv_sge recv_sgl[kRecvQueueDepth];

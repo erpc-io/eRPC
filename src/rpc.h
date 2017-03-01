@@ -250,7 +250,7 @@ class Rpc {
   void *context;  ///< The application context
   uint8_t app_tid;
   session_mgmt_handler_t session_mgmt_handler;
-  uint8_t phy_port;
+  uint8_t phy_port;  ///< Zero-based physical port specified by application
   size_t numa_node;
 
   // Others

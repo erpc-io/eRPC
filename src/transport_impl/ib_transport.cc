@@ -56,11 +56,38 @@ IBTransport::~IBTransport() {
   }
 }
 
-void IBTransport::fill_routing_info(RoutingInfo *routing_info) const {
+void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
+  assert(routing_info != nullptr);
   memset((void *)routing_info, 0, kMaxRoutingInfoSize);
   ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
   ib_routing_info->port_lid = port_lid;
   ib_routing_info->qpn = qp->qp_num;
+}
+
+bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
+  assert(routing_info != nullptr);
+  assert(dev_port_id != 0); /* dev_port_id is resolved on object construction */
+
+  ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
+
+  struct ibv_ah_attr ah_attr;
+  memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
+  ah_attr.is_global = 0;
+  ah_attr.dlid = ib_routing_info->port_lid;
+  ah_attr.sl = 0;
+  ah_attr.src_path_bits = 0;
+
+  ah_attr.port_num = dev_port_id; /* Local port */
+  struct ibv_ah *ah = ibv_create_ah(pd, &ah_attr);
+
+  if (ah != nullptr) {
+    /* Copy the created address handle to the routing info */
+    memcpy((void *)&ib_routing_info->ah, (void *)ah, sizeof(struct ibv_ah));
+    free(ah); /* ibv_destroy_ah (mlx4 and mlx5) does just this */
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void IBTransport::resolve_phy_port() {
@@ -127,14 +154,14 @@ void IBTransport::resolve_phy_port() {
   }
 
   /* If we are here, port resolution has failed */
-  assert(device_id == -1 && dev_port_id == -1);
+  assert(device_id == -1 && dev_port_id == 0);
   xmsg << "eRPC IBTransport: Failed to resolve InfiniBand port index "
        << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
 
 void IBTransport::init_infiniband_structs() {
-  assert(ib_ctx != nullptr && device_id != -1 && dev_port_id != -1);
+  assert(ib_ctx != nullptr && device_id != -1);
 
   /* Create protection domain, send CQ, and recv CQ */
   pd = ibv_alloc_pd(ib_ctx);
@@ -249,13 +276,11 @@ void IBTransport::init_recvs() {
 
 void IBTransport::init_sends() {
   for (size_t wr_i = 0; wr_i < kPostlist; wr_i++) {
-    send_sgl[wr_i].lkey = req_retrans_extent.get_lkey();
-
     send_wr[wr_i].next = &send_wr[wr_i + 1];
     send_wr[wr_i].wr.ud.remote_qkey = kQKey;
     send_wr[wr_i].opcode = IBV_WR_SEND_WITH_IMM;
     send_wr[wr_i].num_sge = 1;
-    send_wr[wr_i].sg_list = &send_sgl[wr_i];
+    send_wr[wr_i].sg_list = &send_sgl[wr_i][0];
   }
 }
 

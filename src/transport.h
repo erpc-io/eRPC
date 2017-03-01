@@ -95,8 +95,17 @@ class Transport {
   /// Post RECVs to the receive queue after processing \p rx_burst results
   void post_recvs(size_t num_recvs);
 
-  /// Fill-in the transport-specific routing information
-  void fill_routing_info(RoutingInfo* routing_info) const;
+  /// Fill-in local routing information
+  void fill_local_routing_info(RoutingInfo* routing_info) const;
+
+  /**
+   * @brief Try to resolve routing information received from remote host. (e.g.,
+   * for InfiniBand, this involves creating the address handle using the remote
+   * port LID.)
+   *
+   * @return True if resolution succeeds, false otherwise.
+   */
+  bool resolve_remote_routing_info(RoutingInfo* routing_info) const;
 
   /// Return a string representation of \p routing_info
   std::string routing_info_str(RoutingInfo* routing_info) const;
@@ -104,8 +113,8 @@ class Transport {
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
   const size_t mtu;
-  const uint8_t app_tid; /* Debug-only */
-  const uint8_t phy_port;
+  const uint8_t app_tid;   /* Debug-only */
+  const uint8_t phy_port;  ///< 0-based physical port specified by application
 
   // Other members
   reg_mr_func_t reg_mr_func;      ///< The memory registration function

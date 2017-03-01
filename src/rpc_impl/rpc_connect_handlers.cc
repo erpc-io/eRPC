@@ -106,7 +106,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
    * will then send back to the client.
    */
   sm_pkt->server.session_num = session_vec.size();
-  transport->fill_routing_info(&(sm_pkt->server.routing_info));
+  transport->fill_local_routing_info(&(sm_pkt->server.routing_info));
 
   /* Save the packet's endpoint metadata into the created session */
   session->server = sm_pkt->server;
