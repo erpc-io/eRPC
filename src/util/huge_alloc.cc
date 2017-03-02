@@ -76,7 +76,7 @@ void HugeAllocator::print_stats() {
 
   fprintf(stderr, "Size classes:\n");
   for (size_t i = 0; i < kNumClasses; i++) {
-    size_t class_size = class_to_size(i);
+    size_t class_size = class_max_size(i);
     if (class_size < KB(1)) {
       fprintf(stderr, "\t%zu B: %zu Buffers\n", class_size, freelist[i].size());
     } else if (class_size < MB(1)) {

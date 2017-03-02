@@ -22,7 +22,7 @@ struct shm_region_t {
   // Constructor args
   const int shm_key;   ///< The key used to create the SHM region
   const uint8_t *buf;  ///< The start address of the allocated SHM buffer
-  const size_t size;   ///< The size in bytes of the allocated buffer
+  const size_t size;   ///< The size in bytes of the allocated SHM buffer
 
   // Filled in by Rpc when this region is registered
   bool registered;          ///< Is this SHM region registered with the NIC?
@@ -43,11 +43,11 @@ struct shm_region_t {
  * size kMaxClassSize and added to that class. These Buffers are later split to
  * fill up smaller classes.
  *
- * The size of allocated buffers is always equal to a class size, even when
- * a smaller buffer is requested.
+ * The \p size field of allocated Buffers equals the requested size, i.e., it's
+ * not rounded to the class size.
  *
  * The allocator uses randomly generated positive SHM keys, and deallocates the
- * SHM regions created when it is deleted.
+ * SHM regions it creates when deleted.
  */
 class HugeAllocator {
  public:
@@ -62,7 +62,7 @@ class HugeAllocator {
   static_assert(kMaxClassSize == kMinClassSize << (kNumClasses - 1), "");
 
   /// Return the maximum size of a class
-  static constexpr size_t class_to_size(size_t class_i) {
+  static constexpr size_t class_max_size(size_t class_i) {
     return kMinClassSize * (1ull << class_i);
   }
 
@@ -77,8 +77,8 @@ class HugeAllocator {
   /**
    * @brief Allocate a Buffer
    *
-   * @param size Minimum size of the allocated Buffer. \p size need not equal
-   * a class size, but the allocated Buffer's \p size is a class size.
+   * @param size Size of the allocated Buffer, which is equal to
+   * the returned Buffer's \p size. \p size need not equal a class size.
    *
    * @return The allocated buffer. The buffer is invalid if we ran out of
    * memory.
@@ -95,7 +95,7 @@ class HugeAllocator {
     assert(size_class < kNumClasses);
 
     if (!freelist[size_class].empty()) {
-      return alloc_from_class(size_class);
+      return alloc_from_class(size_class, size);
     } else {
       /*
        * There is no free Buffer in this class. Find the first larger class with
@@ -131,7 +131,7 @@ class HugeAllocator {
       }
 
       assert(!freelist[size_class].empty());
-      return alloc_from_class(size_class);
+      return alloc_from_class(size_class, size);
     }
 
     assert(false);
@@ -143,6 +143,7 @@ class HugeAllocator {
   inline void free_buf(Buffer buffer) {
     assert(buffer.is_valid());
     size_t size_class = get_class(buffer.get_size());
+    buffer.set_size(class_max_size(size_class)); /* Restore to class size */
     freelist[size_class].push_back(buffer);
   }
 
@@ -162,7 +163,10 @@ class HugeAllocator {
   void print_stats();
 
  private:
-  /// Get the class index for a Buffer size
+  /**
+   * @brief Get the class index for a Buffer size
+   * @param size The size of the buffer, which may or may not be a class size
+   */
   inline size_t get_class(size_t size) {
     assert(size >= 1 && size <= kMaxClassSize);
     /* Use bit shift instead of division to make debug-mode code a faster */
@@ -192,7 +196,7 @@ class HugeAllocator {
 
     Buffer buffer = freelist[size_class].back();
     freelist[size_class].pop_back();
-    assert(buffer.get_size() == class_to_size(size_class));
+    assert(buffer.get_size() == class_max_size(size_class));
 
     Buffer buffer_0 =
         Buffer(buffer.buf, buffer.get_size() / 2, buffer.get_lkey());
@@ -206,13 +210,16 @@ class HugeAllocator {
   /**
    * @brief Allocate a Buffer from a non-empty class
    * @param size_class Non-empty size class to allocate from
-   * @return The allocated Buffer
+   * @param size The size of the allocated Buffer
    */
-  inline Buffer alloc_from_class(size_t size_class) {
+  inline Buffer alloc_from_class(size_t size_class, size_t size) {
     assert(size_class < kNumClasses);
+    assert(size <= class_max_size(size_class) &&
+           ((size_class == 0) || size > class_max_size(size_class - 1)));
 
     /* Use the Buffers at the back to improve locality */
     Buffer buffer = freelist[size_class].back();
+    buffer.set_size(size);
     freelist[size_class].pop_back();
 
     return buffer;
