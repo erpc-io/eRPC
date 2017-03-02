@@ -13,12 +13,12 @@ namespace ERpc {
 
 template <class Transport_>
 int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
-                                  Buffer *pkt_buffer, size_t msg_size) {
+                                  PktBuffer *pkt_buffer) {
   if (!kDatapathChecks) {
     assert(session != nullptr && session->role == Session::Role::kClient);
     assert(session->state == SessionState::kConnected);
     assert(pkt_buffer->is_valid() && check_pkthdr(pkt_buffer));
-    assert(msg_size > 0 && msg_size <= kMaxMsgSize);
+    assert(pkt_buffer->get_size() > 0 && pkt_buffer->get_size() <= kMaxMsgSize);
   } else {
     /* If datapath checks are enabled, return meaningful error codes */
     if (unlikely(session == nullptr ||
@@ -32,7 +32,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       return static_cast<int>(RpcDatapathErrCode::kInvalidPktBufferArg);
     }
 
-    if (unlikely(msg_size == 0 || msg_size > kMaxMsgSize)) {
+    if (unlikely(pkt_buffer->get_size() == 0 ||
+                 pkt_buffer->get_size() > kMaxMsgSize)) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidPktBufferArg);
     }
   }
@@ -45,7 +46,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   // Fill in the packet header
   Transport::pkthdr_t *pkthdr = pkt_buffer_hdr(pkt_buffer);
   pkthdr->req_type = req_type;
-  pkthdr->msg_size = msg_size;
+  pkthdr->msg_size = pkt_buffer->get_size();
   pkthdr->rem_session_num = session->server.session_num;
   pkthdr->is_req = 1;
   pkthdr->is_first = 1;
@@ -66,7 +67,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
 
   /* Fill in the session message slot */
   session->msg_arr[msg_arr_slot].pkt_buffer = pkt_buffer;
-  session->msg_arr[msg_arr_slot].msg_size = msg_size;
+  session->msg_arr[msg_arr_slot].msg_size = pkt_buffer->get_size();
   session->msg_arr[msg_arr_slot].msg_bytes_sent = 0;
   session->msg_arr[msg_arr_slot].in_use = true;
 

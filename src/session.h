@@ -28,11 +28,11 @@ class Session {
   /* Needed for fast modulo calculation during request number assignment */
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
-  /// Buffers and metadata maintained about a request or response message
+  /// PktBuffers and metadata maintained about a request or response message
   struct msg_info_t {
     bool in_use;         ///< True iff this slot is in use
-    Buffer *pkt_buffer;  ///< The packet buffer for this message
-    Buffer _prealloc;    ///< A pre-allocated 4K buffer. XXX: unused
+    PktBuffer *pkt_buffer;  ///< The PktBuffer for this message
+    PktBuffer _prealloc;    ///< A pre-allocated 4K packet Pktuffer. XXX: unused
     size_t msg_size;  ///< Total msg size, excluding header (also in pkt_buffer)
     size_t msg_bytes_sent;  ///< Number of non-header bytes already sent
   };

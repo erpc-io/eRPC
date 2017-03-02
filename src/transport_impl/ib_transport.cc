@@ -257,30 +257,30 @@ void IBTransport::init_recvs() {
   }
 
   /* Initialize constant fields of RECV descriptors */
-  for (size_t wr_i = 0; wr_i < kRecvQueueDepth; wr_i++) {
+  for (size_t i = 0; i < kRecvQueueDepth; i++) {
     uint8_t *buf = (uint8_t *)recv_extent.buf;
 
-    recv_sgl[wr_i].length = kRecvSize;
-    recv_sgl[wr_i].lkey = recv_extent.get_lkey();
-    recv_sgl[wr_i].addr = (uintptr_t)&buf[wr_i * kRecvSize];
+    recv_sgl[i].length = kRecvSize;
+    recv_sgl[i].lkey = recv_extent.get_lkey();
+    recv_sgl[i].addr = (uintptr_t)&buf[i * kRecvSize];
 
-    recv_wr[wr_i].wr_id = recv_sgl[wr_i].addr; /* Debug */
-    recv_wr[wr_i].sg_list = &recv_sgl[wr_i];
-    recv_wr[wr_i].num_sge = 1;
+    recv_wr[i].wr_id = recv_sgl[i].addr; /* Debug */
+    recv_wr[i].sg_list = &recv_sgl[i];
+    recv_wr[i].num_sge = 1;
 
     /* Circular link */
-    recv_wr[wr_i].next =
-        (wr_i < kRecvQueueDepth - 1) ? &recv_wr[wr_i + 1] : &recv_wr[0];
+    recv_wr[i].next =
+        (i < kRecvQueueDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
   }
 }
 
 void IBTransport::init_sends() {
-  for (size_t wr_i = 0; wr_i < kPostlist; wr_i++) {
-    send_wr[wr_i].next = &send_wr[wr_i + 1];
-    send_wr[wr_i].wr.ud.remote_qkey = kQKey;
-    send_wr[wr_i].opcode = IBV_WR_SEND_WITH_IMM;
-    send_wr[wr_i].num_sge = 1;
-    send_wr[wr_i].sg_list = &send_sgl[wr_i][0];
+  for (size_t i = 0; i < kPostlist; i++) {
+    send_wr[i].next = &send_wr[i + 1];
+    send_wr[i].wr.ud.remote_qkey = kQKey;
+    send_wr[i].opcode = IBV_WR_SEND_WITH_IMM;
+    send_wr[i].num_sge = 1;
+    send_wr[i].sg_list = &send_sgl[i][0];
   }
 }
 

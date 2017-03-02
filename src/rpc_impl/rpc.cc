@@ -100,7 +100,7 @@ void Rpc<Transport_>::bury_session(Session *session) {
 
   /* First, free session resources */
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    /* Free the preallocated packet buffer */
+    /* Free the preallocated PktBuffer */
     assert(session->msg_arr[i]._prealloc.is_valid());
     huge_alloc->free_buf(session->msg_arr[i]._prealloc);
 

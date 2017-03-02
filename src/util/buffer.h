@@ -21,13 +21,25 @@ class Buffer {
 
   static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
   size_t get_size() { return (size_t)size; }
+  void set_size(size_t new_size)  { size = new_size; }
   uint32_t get_lkey() { return lkey; }
 
   uint8_t *buf = nullptr;
 
  private:
+  /// The size requested by the user (may not be an allocator class size)
   size_t size = 0;
-  uint32_t lkey = 0;
+  uint32_t lkey = 0;   ///< The memory registration lkey
+};
+
+/// Augment Buffer with additional packet info to avoid polluting Buffer
+class PktBuffer : public Buffer {
+ public:
+  PktBuffer(Buffer buffer) : Buffer(buffer), data_bytes_sent(0) {}
+  PktBuffer() {}
+  ~PktBuffer() {}
+
+  size_t data_bytes_sent = 0;
 };
 
 }  // End ERpc

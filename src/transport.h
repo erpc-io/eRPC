@@ -68,9 +68,7 @@ class Transport {
   /**
    * @brief The generic packet transmission function
    *
-   * For each packet, a packet Buffer and an offset into the Buffer is
-   * specified. The total size of the message, and the packet header can be
-   * inferred from the packet Buffer.
+   * For each packet, a PktBuffer is specified. Packets for which 
    *
    * Packets for which the offset is non-zero use 2 DMAs (header and data).
    * Small packets have \p offset = 0, and use inline or single-DMA transfers.

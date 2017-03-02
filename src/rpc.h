@@ -45,7 +45,7 @@ class Rpc {
       case RpcDatapathErrCode::kInvalidSessionArg:
         return std::string("[Invalid session argument]");
       case RpcDatapathErrCode::kInvalidPktBufferArg:
-        return std::string("[Invalid packet buffer argument]");
+        return std::string("[Invalid PktBuffer argument]");
       case RpcDatapathErrCode::kInvalidMsgSizeArg:
         return std::string("[Invalid message size argument]");
       case RpcDatapathErrCode::kNoSessionMsgSlots:
@@ -70,22 +70,23 @@ class Rpc {
   ~Rpc();
 
   /**
-   * @brief Create a hugepage-backed packet Buffer for the eRPC user. The
-   * returned Buffer's \p buf is preceeeded by a packet header that the user
-   * must not modify.
+   * @brief Create a hugepage-backed PktBuffer for the eRPC user. The returned
+   * PktBuffer's \p buf is preceeeded by a packet header that the user must not
+   * modify.
    *
-   * @param size The minimum number of bytes in the created buffer available
-   * to the user
+   * @param size Non-header bytes in the returned PktBuffer (equal to the
+   * \p size field of the returned PktBuffer)
    *
-   * @return \p The allocated Buffer. The buffer is invalid if we ran out of
-   * memory.
+   * @return \p The allocated PktBuffer. The PktBuffer is invalid if we ran out
+   * of memory.
    *
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
    * if allocation fails simply because we ran out of memory.
    */
-  inline Buffer alloc_pkt_buffer(size_t size) {
-    Buffer pkt_buffer = huge_alloc->alloc(size + sizeof(Transport::pkthdr_t));
+  inline PktBuffer alloc_pkt_buffer(size_t size) {
+    PktBuffer pkt_buffer =
+        huge_alloc->alloc(size + sizeof(Transport::pkthdr_t));
 
     if (pkt_buffer.is_valid()) {
       Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)pkt_buffer.buf;
@@ -97,8 +98,8 @@ class Rpc {
     }
   }
 
-  /// Free a packet Buffer allocated using alloc_pkt_buffer()
-  inline void free_pkt_buffer(Buffer pkt_buffer) {
+  /// Free a PktBuffer allocated using alloc_pkt_buffer()
+  inline void free_pkt_buffer(PktBuffer pkt_buffer) {
     assert(pkt_buffer.is_valid());
     /* Restore bumped pointer before freeing into the allocator*/
     pkt_buffer.buf -= sizeof(Transport::pkthdr_t);
@@ -110,14 +111,14 @@ class Rpc {
     huge_alloc->free_buf(pkt_buffer);
   }
 
-  /// Return a pointer to the packet header of this packet Buffer
-  Transport::pkthdr_t *pkt_buffer_hdr(Buffer *pkt_buffer) {
+  /// Return a pointer to the packet header of this PktBuffer
+  Transport::pkthdr_t *pkt_buffer_hdr(PktBuffer *pkt_buffer) {
     return (Transport::pkthdr_t *)(pkt_buffer->buf -
                                    sizeof(Transport::pkthdr_t));
   }
 
-  /// Check if a packet Buffer's header magic is valid
-  inline bool check_pkthdr(Buffer *pkt_buffer) {
+  /// Check if a PktBuffer's header magic is valid
+  inline bool check_pkthdr(PktBuffer *pkt_buffer) {
     return (pkt_buffer_hdr(pkt_buffer)->magic == Transport::kPktHdrMagic);
   }
 
@@ -162,18 +163,14 @@ class Rpc {
    *
    * @param session The client session to send the request on
    * @param req_type The type of the request
-   * @param buffer The packet buffer containing the request. If this call
-   * succeeds, eRPC owns \p buffer until the request completes by invoking
+   * @param pkt_buffer The PktBuffer containing the request. If this call
+   * succeeds, eRPC owns \p pkt_buffer until the request completes by invoking
    * the callback.
-   *
-   * @param msg_size Number of non-header bytes to send from the packet
-   * buffer
    *
    * @return 0 on success, i.e., if the request was sent or queued. An error
    * code is returned if the request can neither be sent nor queued.
    */
-  int send_request(Session *session, uint8_t req_type, Buffer *buffer,
-                   size_t msg_size);
+  int send_request(Session *session, uint8_t req_type, PktBuffer *pkt_buffer);
 
   // rpc_ev_loop.cc
 
