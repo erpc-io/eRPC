@@ -46,7 +46,7 @@ class Transport {
     uint64_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
     uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
     uint64_t req_num : kReqNumBits;     ///< Request number of this packet
-    uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_pkt_buffer()
+    uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
   };
   static_assert(sizeof(pkthdr_t) == 16, "");
 
@@ -68,14 +68,11 @@ class Transport {
   /**
    * @brief The generic packet transmission function
    *
-   * For each packet, a PktBuffer is specified. Packets for which 
-   *
    * Packets for which the offset is non-zero use 2 DMAs (header and data).
    * Small packets have \p offset = 0, and use inline or single-DMA transfers.
    */
   void tx_burst(RoutingInfo const* const* routing_info_arr,
-                Buffer const* const* pkt_buffer_arr, size_t const* offset_arr,
-                size_t num_pkts);
+                MsgBuffer** msg_buffer_arr, size_t num_pkts);
 
   /**
    * @brief The generic packet reception function
@@ -88,7 +85,7 @@ class Transport {
    * The Rpc layer controls posting of RECV descriptors explicitly using
    * the post_recvs() function.
    */
-  void rx_burst(Buffer* pkt_buffer_arr, size_t* num_pkts);
+  void rx_burst(Buffer* msg_buffer_arr, size_t* num_pkts);
 
   /// Post RECVs to the receive queue after processing \p rx_burst results
   void post_recvs(size_t num_recvs);

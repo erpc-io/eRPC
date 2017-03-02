@@ -35,7 +35,7 @@ class Rpc {
   /// Error codes returned by the Rpc datapath
   enum class RpcDatapathErrCode : int {
     kInvalidSessionArg,
-    kInvalidPktBufferArg,
+    kInvalidMsgBufferArg,
     kInvalidMsgSizeArg,
     kNoSessionMsgSlots
   };
@@ -44,8 +44,8 @@ class Rpc {
     switch (e) {
       case RpcDatapathErrCode::kInvalidSessionArg:
         return std::string("[Invalid session argument]");
-      case RpcDatapathErrCode::kInvalidPktBufferArg:
-        return std::string("[Invalid PktBuffer argument]");
+      case RpcDatapathErrCode::kInvalidMsgBufferArg:
+        return std::string("[Invalid MsgBuffer argument]");
       case RpcDatapathErrCode::kInvalidMsgSizeArg:
         return std::string("[Invalid message size argument]");
       case RpcDatapathErrCode::kNoSessionMsgSlots:
@@ -70,56 +70,56 @@ class Rpc {
   ~Rpc();
 
   /**
-   * @brief Create a hugepage-backed PktBuffer for the eRPC user. The returned
-   * PktBuffer's \p buf is preceeeded by a packet header that the user must not
+   * @brief Create a hugepage-backed MsgBuffer for the eRPC user. The returned
+   * MsgBuffer's \p buf is preceeeded by a packet header that the user must not
    * modify.
    *
-   * @param size Non-header bytes in the returned PktBuffer (equal to the
-   * \p size field of the returned PktBuffer)
+   * @param size Non-header bytes in the returned MsgBuffer (equal to the
+   * \p size field of the returned MsgBuffer)
    *
-   * @return \p The allocated PktBuffer. The PktBuffer is invalid if we ran out
+   * @return \p The allocated MsgBuffer. The MsgBuffer is invalid if we ran out
    * of memory.
    *
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
    * if allocation fails simply because we ran out of memory.
    */
-  inline PktBuffer alloc_pkt_buffer(size_t size) {
-    PktBuffer pkt_buffer =
+  inline MsgBuffer alloc_msg_buffer(size_t size) {
+    MsgBuffer msg_buffer =
         huge_alloc->alloc(size + sizeof(Transport::pkthdr_t));
 
-    if (pkt_buffer.is_valid()) {
-      Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)pkt_buffer.buf;
+    if (msg_buffer.is_valid()) {
+      Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)msg_buffer.buf;
       pkthdr->magic = Transport::kPktHdrMagic;
-      pkt_buffer.buf += sizeof(Transport::pkthdr_t);
-      return pkt_buffer;
+      msg_buffer.buf += sizeof(Transport::pkthdr_t);
+      return msg_buffer;
     } else {
       return Buffer::get_invalid_buffer();
     }
   }
 
-  /// Free a PktBuffer allocated using alloc_pkt_buffer()
-  inline void free_pkt_buffer(PktBuffer pkt_buffer) {
-    assert(pkt_buffer.is_valid());
+  /// Free a MsgBuffer allocated using alloc_msg_buffer()
+  inline void free_msg_buffer(MsgBuffer msg_buffer) {
+    assert(msg_buffer.is_valid());
     /* Restore bumped pointer before freeing into the allocator*/
-    pkt_buffer.buf -= sizeof(Transport::pkthdr_t);
+    msg_buffer.buf -= sizeof(Transport::pkthdr_t);
 
-    Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)pkt_buffer.buf;
+    Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)msg_buffer.buf;
     _unused(pkthdr);
     assert(pkthdr->magic == Transport::kPktHdrMagic);
 
-    huge_alloc->free_buf(pkt_buffer);
+    huge_alloc->free_buf(msg_buffer);
   }
 
-  /// Return a pointer to the packet header of this PktBuffer
-  Transport::pkthdr_t *pkt_buffer_hdr(PktBuffer *pkt_buffer) {
-    return (Transport::pkthdr_t *)(pkt_buffer->buf -
+  /// Return a pointer to the packet header of this MsgBuffer
+  Transport::pkthdr_t *msg_buffer_hdr(MsgBuffer *msg_buffer) {
+    return (Transport::pkthdr_t *)(msg_buffer->buf -
                                    sizeof(Transport::pkthdr_t));
   }
 
-  /// Check if a PktBuffer's header magic is valid
-  inline bool check_pkthdr(PktBuffer *pkt_buffer) {
-    return (pkt_buffer_hdr(pkt_buffer)->magic == Transport::kPktHdrMagic);
+  /// Check if a MsgBuffer's header magic is valid
+  inline bool check_pkthdr(MsgBuffer *msg_buffer) {
+    return (msg_buffer_hdr(msg_buffer)->magic == Transport::kPktHdrMagic);
   }
 
   // rpc_sm_api.cc
@@ -163,14 +163,14 @@ class Rpc {
    *
    * @param session The client session to send the request on
    * @param req_type The type of the request
-   * @param pkt_buffer The PktBuffer containing the request. If this call
-   * succeeds, eRPC owns \p pkt_buffer until the request completes by invoking
+   * @param msg_buffer The MsgBuffer containing the request. If this call
+   * succeeds, eRPC owns \p msg_buffer until the request completes by invoking
    * the callback.
    *
    * @return 0 on success, i.e., if the request was sent or queued. An error
    * code is returned if the request can neither be sent nor queued.
    */
-  int send_request(Session *session, uint8_t req_type, PktBuffer *pkt_buffer);
+  int send_request(Session *session, uint8_t req_type, MsgBuffer *msg_buffer);
 
   // rpc_ev_loop.cc
 
@@ -276,12 +276,11 @@ class Rpc {
   /// Tx batch information for \p tx_burst
   //@{
   RoutingInfo *tx_routing_info_arr[Transport_::kPostlist];
-  Buffer *tx_pkt_buffer_arr[Transport_::kPostlist];
-  size_t tx_offset_arr[Transport_::kPostlist];
+  MsgBuffer *tx_msg_buffer_arr[Transport_::kPostlist];
   //@}
 
   /// Rx batch information for \p rx_burst
-  Buffer rx_pkt_buffer_arr[Transport_::kPostlist];
+  MsgBuffer rx_msg_buffer_arr[Transport_::kPostlist];
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;

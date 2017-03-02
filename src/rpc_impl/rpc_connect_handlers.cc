@@ -102,7 +102,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   }
 
   /*
-   * If we are here, create a new session and fill prealloc PktBuffers.
+   * If we are here, create a new session and fill prealloc MsgBuffers.
    * XXX: Use pool?
    */
   Session *session =

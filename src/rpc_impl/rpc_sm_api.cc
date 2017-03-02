@@ -69,7 +69,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
     return nullptr;
   }
 
-  /* Create a new session and fill prealloc PktBuffers. XXX: Use pool? */
+  /* Create a new session and fill prealloc MsgBuffers. XXX: Use pool? */
   Session *session =
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {

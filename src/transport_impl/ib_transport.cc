@@ -269,8 +269,7 @@ void IBTransport::init_recvs() {
     recv_wr[i].num_sge = 1;
 
     /* Circular link */
-    recv_wr[i].next =
-        (i < kRecvQueueDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
+    recv_wr[i].next = (i < kRecvQueueDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
   }
 }
 

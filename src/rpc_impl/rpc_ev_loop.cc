@@ -27,9 +27,13 @@ void Rpc<Transport_>::process_datapath_work_queue() {
 
     for (size_t msg_i = 0; msg_i < Session::kSessionReqWindow; msg_i++) {
       Session::msg_info_t *msg_info = &session->msg_arr[msg_i];
+      MsgBuffer *msg_buffer = msg_info->msg_buffer;
+      assert(msg_buffer->is_valid());
+      assert(check_pkthdr(msg_buffer));
 
       /* Find a message slot for which we need to send packets */
-      if (msg_info->in_use && msg_info->msg_bytes_sent != msg_info->msg_size) {
+      if (msg_info->in_use &&
+          msg_buffer->data_bytes_sent != msg_buffer->get_size()) {
         /* If we don't have credits, save this session for later & bail */
         if (session->remote_credits == 0) {
           assert(write_index < datapath_work_queue.size());
@@ -38,22 +42,19 @@ void Rpc<Transport_>::process_datapath_work_queue() {
         }
 
         /* Optimize for small messages that fit in one packet */
-        if (msg_info->msg_size <=
+        if (msg_buffer->get_size() <=
             Transport_::kMTU - sizeof(Transport::pkthdr_t)) {
-          assert(msg_info->msg_bytes_sent == 0);
-          assert(msg_info->pkt_buffer->is_valid());
-          assert(check_pkthdr(msg_info->pkt_buffer));
+          assert(msg_buffer->data_bytes_sent == 0);
 
           assert(batch_i < Transport_::kPostlist);
           tx_routing_info_arr[batch_i] = session->remote_routing_info;
-          tx_pkt_buffer_arr[batch_i] = msg_info->pkt_buffer;
-          tx_offset_arr[batch_i] = 0;
-          msg_info->msg_bytes_sent = msg_info->msg_size; /* All will be sent */
+          tx_msg_buffer_arr[batch_i] = msg_info->msg_buffer;
+          msg_buffer->data_bytes_sent = msg_buffer->get_size();
 
           batch_i++;
           if (batch_i == Transport_::kPostlist) {
-            transport->tx_burst(tx_routing_info_arr, tx_pkt_buffer_arr,
-                                tx_offset_arr, batch_i);
+            transport->tx_burst(tx_routing_info_arr, tx_msg_buffer_arr,
+                                batch_i);
             batch_i = 0;
           }
 
@@ -67,8 +68,7 @@ void Rpc<Transport_>::process_datapath_work_queue() {
   }   /* End loop over datapath work queue sessions */
 
   if (batch_i > 0) {
-    transport->tx_burst(tx_routing_info_arr, tx_pkt_buffer_arr, tx_offset_arr,
-                        batch_i);
+    transport->tx_burst(tx_routing_info_arr, tx_msg_buffer_arr, batch_i);
     batch_i = 0;
   }
 
