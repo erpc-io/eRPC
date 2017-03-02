@@ -108,7 +108,7 @@ class Transport {
   bool resolve_remote_routing_info(RoutingInfo* routing_info) const;
 
   /// Return a string representation of \p routing_info
-  std::string routing_info_str(RoutingInfo* routing_info) const;
+  static std::string routing_info_str(RoutingInfo* routing_info);
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;

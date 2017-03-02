@@ -126,9 +126,11 @@ class Rpc {
   /**
    * @brief Create a Session and initiate session connection.
    *
-   * @return A pointer to the created session if creation succeeds; a callback
-   * will be invoked later when connection establishment succeeds/fails.
-   * NULL if creation fails; a callback will not be invoked.
+   * @return A pointer to the created session if creation succeeds and the
+   * connect request is sent, NULL otherwise.
+   *
+   * A callback of type \p kConnected or \p kConnectFailed will be invoked if
+   * this call is successful.
    */
   Session *create_session(const char *_rem_hostname, uint8_t rem_app_tid,
                           uint8_t rem_phy_port = 0);
@@ -143,6 +145,7 @@ class Rpc {
    * disconnect callback will be invoked later, or if (b) there was no need for
    * a disconnect packet since the session is in an error state. In the latter
    * case, the callback is invoked before this function returns.
+   * The possible callback types are \p kDisconnected and \p kDisconnectFailed.
    *
    * False if the session cannot be disconnected right now since connection
    * establishment is in progress , or if the \p session argument is invalid.
@@ -285,6 +288,12 @@ class Rpc {
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
+
+ public:
+  // Fault injection for testing
+
+  /// Fail remote routing info resolution at client
+  bool testing_fail_resolve_remote_rinfo_client = false;
 };
 
 /* Instantiate required Rpc classes so they get compiled for the linker */

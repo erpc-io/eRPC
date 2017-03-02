@@ -56,10 +56,10 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     /*
      * This check ensures that we own the session as the server.
      *
-     * If the check succeeds, we cannot own @old_session as the client:
-     * @sm_pkt was sent by a different Rpc than us, since an Rpc cannot send
+     * If the check succeeds, we cannot own old_session as the client:
+     * sm_pkt was sent by a different Rpc than us, since an Rpc cannot send
      * session management packets to itself. So the client hostname and app_tid
-     * in the located session cannot be ours, since they are same as @sm_pkt's.
+     * in the located session cannot be ours, since they are same as sm_pkt's.
      */
     if ((old_session != nullptr) &&
         strcmp(old_session->client.hostname, sm_pkt->client.hostname) == 0 &&
@@ -68,8 +68,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
       assert(old_session->state == SessionState::kConnected);
 
       /* There's a valid session, so client endpoint metadata is unchanged */
-      assert(memcmp((void *)&old_session->client, (void *)&sm_pkt->client,
-                    sizeof(old_session->client)) == 0);
+      assert(old_session->client == sm_pkt->client);
 
       erpc_dprintf("%s: Duplicate session connect request. Sending response.\n",
                    issue_msg);
@@ -91,6 +90,17 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     return;
   }
 
+  /* Try to resolve the client's routing info into the packet */
+  RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
+  bool resolve_success = transport->resolve_remote_routing_info(client_rinfo);
+  if (!resolve_success) {
+    erpc_dprintf("%s: Unable to resolve routing info %s. Sending response.\n",
+                 issue_msg, Transport_::routing_info_str(client_rinfo).c_str());
+    sm_pkt->send_resp_mut(SessionMgmtErrType::kRoutingResolutionFailure,
+                          &nexus->udp_config);
+    return;
+  }
+
   /*
    * If we are here, create a new session and fill prealloc packet buffers.
    * XXX: Use pool?
@@ -108,7 +118,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   sm_pkt->server.session_num = session_vec.size();
   transport->fill_local_routing_info(&(sm_pkt->server.routing_info));
 
-  /* Save the packet's endpoint metadata into the created session */
+  /* Save endpoint metadata from pkt. This saves the resolved routing info. */
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 
@@ -186,22 +196,58 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   assert(session->client == sm_pkt->client);
 
   /*
-   * If the connect request failed, move the session to the error state and
-   * invoke the callback.
+   * If the connect response has an error, the server has not allocated a
+   * Session. Move the session to an error state and invoke the callback.
    */
   if (sm_pkt->err_type != SessionMgmtErrType::kNoError) {
     erpc_dprintf("%s: Error %s.\n", issue_msg,
                  session_mgmt_err_type_str(sm_pkt->err_type).c_str());
 
-    session->state = SessionState::kError;
-
+    session->state = SessionState::kErrorServerEndpointAbsent;
     session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
                          sm_pkt->err_type, context);
 
     return;
   }
 
-  session->server = sm_pkt->server; /* Save server endpoint metadata from pkt */
+  /*
+   * If we are here, the server has created a session endpoint.
+   *
+   * Try to resolve the server's routing information into the packet. If this
+   * fails, invoke kConnectFailed callback.
+   */
+  bool resolve_success;
+  if (!testing_fail_resolve_remote_rinfo_client) {
+    resolve_success =
+        transport->resolve_remote_routing_info(&(sm_pkt->server.routing_info));
+  } else {
+    resolve_success = false; /* Inject error for testing */
+  }
+
+  if (!resolve_success) {
+    erpc_dprintf("%s: Client failed to resolve server routing info.\n",
+                 issue_msg);
+
+    /*
+     * The server's response didn't have an error, and the server has allocated
+     * a Session. We'll try to free server resources when the client calls
+     * destroy_session().
+     *
+     * We need to save the server's endpoint metadata from the packet so we
+     * can send it in the subsequent disconnect request.
+     */
+    session->server = sm_pkt->server;
+    session->state = SessionState::kErrorServerEndpointExists;
+
+    /* This is a local error (i.e., sm_pkt did not have an error) */
+    session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
+                         SessionMgmtErrType::kRoutingResolutionFailure,
+                         context);
+    return;
+  }
+
+  /* Save server endpoint metadata. This saves the resolved routing info.  */
+  session->server = sm_pkt->server;
   session->state = SessionState::kConnected;
 
   erpc_dprintf("%s: None. Session connected.\n", issue_msg);

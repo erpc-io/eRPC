@@ -42,7 +42,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
     ASSERT_EQ(session->state, SessionState::kConnected);
     ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnected);
   } else {
-    ASSERT_EQ(session->state, SessionState::kError);
+    ASSERT_EQ(session->state, SessionState::kErrorServerEndpointAbsent);
     ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnectFailed);
   }
 }

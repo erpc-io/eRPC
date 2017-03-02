@@ -128,7 +128,7 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
       return false;
 
     case SessionState::kConnected:
-      /* This is the only case where we send the disconnect packet */
+    case SessionState::kErrorServerEndpointExists:
       session->state = SessionState::kDisconnectInProgress;
       mgmt_retry_queue_add(session); /* Ensures that session is not in flight */
       send_disconnect_req_one(session);
@@ -146,11 +146,11 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
           "Session already destroyed.\n");
       return false;
 
-    case SessionState::kError:
+    case SessionState::kErrorServerEndpointAbsent:
       /*
-       * This means that the either we got a connect response with an error,
-       * or that the connect request timed out. In either case, we don't need
-       * to send a disconnect request.
+       * This happens when either we get a connect response containing an error,
+       * or when the connect request times out. In either case, we don't send a
+       * disconnect request. In case of a timeout, we leak memory at the server.
        */
       assert(!mgmt_retry_queue_contains(session));
       erpc_dprintf(

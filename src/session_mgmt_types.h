@@ -32,10 +32,11 @@ static const uint32_t kInvalidSecret = 0;
 /// Session state that can only go forward.
 enum class SessionState {
   kConnectInProgress,
-  kConnected,  ///< The only state for server-side sessions
+  kConnected,                  ///< The only state for server-side sessions
+  kErrorServerEndpointExists,  ///< Only for client-side sessions
   kDisconnectInProgress,
   kDisconnected,  ///< Temporary state just for the disconnected callback
-  kError          /// Only allowed for client-side sessions
+  kErrorServerEndpointAbsent  ///< Only for client-side sessions
 };
 
 /// High-level types of packets used for session management
@@ -48,8 +49,9 @@ enum class SessionMgmtPktType : int {
 
 /// The types of responses to a session management packet
 enum class SessionMgmtErrType : int {
-  kNoError,         /* The only non-error error type */
-  kTooManySessions, /* Connect req failed because server is out of sessions */
+  kNoError,          ///< The only non-error error type
+  kTooManySessions,  ///< Connect req failed because server is out of sessions
+  kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
   kInvalidRemoteAppTid,
   kInvalidRemotePort,
   kInvalidTransport
@@ -69,12 +71,14 @@ static std::string session_state_str(SessionState state) {
       return std::string("[Connect in progress]");
     case SessionState::kConnected:
       return std::string("[Connected]");
+    case SessionState::kErrorServerEndpointExists:
+      return std::string("[Error (but server endpoint exists)");
     case SessionState::kDisconnectInProgress:
       return std::string("[Disconnect in progress]");
     case SessionState::kDisconnected:
       return std::string("[Disconnected]");
-    case SessionState::kError:
-      return std::string("[Error]");
+    case SessionState::kErrorServerEndpointAbsent:
+      return std::string("[Error (and server endpoint is absent)]");
   }
   return std::string("[Invalid state]");
 }
@@ -151,6 +155,7 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
 static bool session_mgmt_err_type_is_valid(SessionMgmtErrType err_type) {
   switch (err_type) {
     case SessionMgmtErrType::kNoError:
+    case SessionMgmtErrType::kRoutingResolutionFailure:
     case SessionMgmtErrType::kTooManySessions:
     case SessionMgmtErrType::kInvalidRemoteAppTid:
     case SessionMgmtErrType::kInvalidRemotePort:
@@ -166,6 +171,8 @@ static std::string session_mgmt_err_type_str(SessionMgmtErrType err_type) {
   switch (err_type) {
     case SessionMgmtErrType::kNoError:
       return std::string("[No error]");
+    case SessionMgmtErrType::kRoutingResolutionFailure:
+      return std::string("[Routing resolution failure]");
     case SessionMgmtErrType::kTooManySessions:
       return std::string("[Too many sessions]");
     case SessionMgmtErrType::kInvalidRemoteAppTid:
@@ -240,11 +247,13 @@ class SessionEndpoint {
     return ret.str();
   }
 
-  /// Compare the location fields of two SessionEndpoint objects. This does not
-  /// account for non-location fields (e.g., fabric port, routing info).
+  /// Compare two endpoints. RoutingInfo is left out because the SessionEndpoint
+  /// object in session managament packets may not have routing info.
   bool operator==(const SessionEndpoint &other) {
-    return strcmp(hostname, other.hostname) == 0 && app_tid == other.app_tid &&
-           session_num == other.session_num;
+    return transport_type == other.transport_type &&
+           strcmp(hostname, other.hostname) == 0 &&
+           phy_port == other.phy_port && app_tid == other.app_tid &&
+           session_num == other.session_num && secret == other.secret;
   }
 };
 
