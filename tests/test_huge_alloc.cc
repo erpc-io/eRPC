@@ -41,7 +41,7 @@ TEST(HugeAllocatorTest, PageAllocPerf) {
 
   while (true) {
     ERpc::Buffer buffer = allocator->alloc(KB(4));
-    if (!buffer.is_valid()) {
+    if (buffer.buf == nullptr) {
       break;
     }
 
@@ -76,7 +76,7 @@ TEST(HugeAllocatorTest, PageAllocPerfWithCache) {
   size_t num_pages_allocated = 0;
   for (size_t i = 0; i < page_cache_size; i++) {
     ERpc::Buffer buffer = allocator->alloc(KB(4));
-    if (!buffer.is_valid()) {
+    if (buffer.buf == nullptr) {
       break;
     }
 
@@ -105,7 +105,7 @@ TEST(HugeAllocatorTest, 2MBChunksSingleRun) {
 
   for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
     ERpc::Buffer buffer = allocator->alloc(MB(2));
-    if (buffer.is_valid()) {
+    if (buffer.buf != nullptr) {
       EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
       num_hugepages_allocated++;
     } else {
@@ -127,7 +127,7 @@ TEST(HugeAllocatorTest, 2MBChunksMultiRun) {
     allocator = new ERpc::HugeAllocator(1024, 0, reg_mr_func, dereg_mr_func);
     for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
       ERpc::Buffer buffer = allocator->alloc(MB(2));
-      if (!buffer.is_valid()) {
+      if (buffer.buf == nullptr) {
         break;
       }
 
@@ -157,7 +157,7 @@ TEST(HugeAllocatorTest, VarMBChunksSingleRun) {
       size_t size = num_hugepages * ERpc::kHugepageSize;
       ERpc::Buffer buffer = allocator->alloc(size);
 
-      if (!buffer.is_valid()) {
+      if (buffer.buf == nullptr) {
         test_printf(
             "Fraction of system memory reserved by allocator at "
             "failure = %.2f (best = 1.0)\n",
@@ -212,7 +212,7 @@ TEST(HugeAllocatorTest, MixedPageHugepageSingleRun) {
       new_app_memory = ERpc::kPageSize;
     }
 
-    if (!buffer.is_valid()) {
+    if (buffer.buf == nullptr) {
       test_printf(
           "Fraction of system memory reserved by allocator at "
           "failure = %.2f\n",

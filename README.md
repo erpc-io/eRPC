@@ -16,7 +16,9 @@
 ## API notes
 
 ## Short-term TODOs
- * Need to increment `data_bytes_sent`. 
+ * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
+   RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
+
 ## Long-term TODOs
  * Optimize Mellanox drivers memcpy and function pointers. If inline size is
    fixed at 60 bytes, optimized that.

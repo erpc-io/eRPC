@@ -141,7 +141,7 @@ class HugeAllocator {
 
   /// Free a Buffer
   inline void free_buf(Buffer buffer) {
-    assert(buffer.is_valid());
+    assert(buffer.buf != nullptr);
     size_t size_class = get_class(buffer.size);
     buffer.size = class_max_size(size_class); /* Restore to class size */
     freelist[size_class].push_back(buffer);

@@ -28,8 +28,8 @@ void Rpc<Transport_>::process_datapath_work_queue() {
     for (size_t msg_i = 0; msg_i < Session::kSessionReqWindow; msg_i++) {
       Session::msg_info_t *msg_info = &session->msg_arr[msg_i];
       MsgBuffer *msg_buffer = msg_info->msg_buffer;
-      assert(msg_buffer->is_valid());
-      assert(Transport::check_pkthdr(msg_buffer));
+      assert(msg_buffer->buf != nullptr);
+      assert(Transport::check_pkthdr_0(msg_buffer));
 
       /* Find a message slot for which we need to send packets */
       if (msg_info->in_use && msg_buffer->data_bytes_sent != msg_buffer->size) {

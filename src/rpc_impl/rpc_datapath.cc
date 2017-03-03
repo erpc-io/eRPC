@@ -17,7 +17,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   if (!kDatapathChecks) {
     assert(session != nullptr && session->role == Session::Role::kClient);
     assert(session->state == SessionState::kConnected);
-    assert(msg_buffer->is_valid() && Transport::check_pkthdr(msg_buffer));
+    assert(msg_buffer != nullptr && msg_buffer->buf != nullptr &&
+           Transport::check_pkthdr_0(msg_buffer));
     assert(msg_buffer->size > 0 && msg_buffer->size <= kMaxMsgSize);
   } else {
     /* If datapath checks are enabled, return meaningful error codes */
@@ -27,8 +28,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
     }
 
-    if (unlikely(msg_buffer == nullptr || !msg_buffer->is_valid() ||
-                 !Transport::check_pkthdr(msg_buffer))) {
+    if (unlikely(msg_buffer == nullptr || msg_buffer->buf == nullptr ||
+                 !Transport::check_pkthdr_0(msg_buffer))) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidMsgBufferArg);
     }
 
@@ -42,8 +43,19 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     return static_cast<int>(RpcDatapathErrCode::kNoSessionMsgSlots);
   }
 
+  /* Find a free message slot in the session */
+  size_t msg_arr_slot = session->msg_arr_free_vec.pop_back();
+  assert(msg_arr_slot < Session::kSessionReqWindow);
+  assert(!session->msg_arr[msg_arr_slot].in_use);
+
+  /* Generate the next request number for this slot */
+  size_t req_num =
+      (req_num_arr[msg_arr_slot]++ * Session::kSessionReqWindow) + /* Shift */
+      msg_arr_slot;
+
   // Fill in the packet header
-  Transport::pkthdr_t *pkthdr = Transport::msg_buffer_hdr(msg_buffer);
+  // XXX: Fill all packet headers here.
+  Transport::pkthdr_t *pkthdr = Transport::get_pkthdr_0(msg_buffer);
   pkthdr->req_type = req_type;
   pkthdr->msg_size = msg_buffer->size;
   pkthdr->rem_session_num = session->server.session_num;
@@ -51,18 +63,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   pkthdr->is_first = 1;
   pkthdr->is_expected = 0;
   pkthdr->pkt_num = 0;
+  pkthdr->req_num = req_num;
   /* pkthdr->magic is already filled in */
-
-  /* Find a free message slot in the session */
-  size_t msg_arr_slot = session->msg_arr_free_vec.pop_back();
-  assert(msg_arr_slot < Session::kSessionReqWindow);
-  assert(!session->msg_arr[msg_arr_slot].in_use);
-
-  /* Generate a request number for this slot */
-  pkthdr->req_num =
-      (req_num_arr[msg_arr_slot] * Session::kSessionReqWindow) + /* Bit shift */
-      msg_arr_slot;
-  req_num_arr[msg_arr_slot]++;
 
   /* Fill in the session message slot */
   session->msg_arr[msg_arr_slot].msg_buffer = msg_buffer;

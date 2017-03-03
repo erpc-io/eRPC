@@ -104,14 +104,22 @@ class Transport {
   /// Return a string representation of \p routing_info
   static std::string routing_info_str(RoutingInfo* routing_info);
 
-  /// Return a pointer to the packet header of this MsgBuffer
-  static inline pkthdr_t* msg_buffer_hdr(MsgBuffer* msg_buffer) {
+  /// Return a pointer to the pre-appended packet header of this MsgBuffer
+  static inline pkthdr_t* get_pkthdr_0(MsgBuffer* msg_buffer) {
     return (pkthdr_t*)(msg_buffer->buf - sizeof(pkthdr_t));
   }
 
+  /// Return a pointer to the nth (n >= 1) packet header of this MsgBuffer
+  static inline pkthdr_t* get_pkthdr_n(MsgBuffer* msg_buffer, size_t n) {
+    assert(n >= 1);
+    return (pkthdr_t*)(msg_buffer->buf +
+                       round_up<sizeof(size_t)>(msg_buffer->size) +
+                       (n - 1) * sizeof(pkthdr_t));
+  }
+
   /// Check if a MsgBuffer's header magic is valid
-  static inline bool check_pkthdr(MsgBuffer* msg_buffer) {
-    return (msg_buffer_hdr(msg_buffer)->magic == kPktHdrMagic);
+  static inline bool check_pkthdr_0(MsgBuffer* msg_buffer) {
+    return (get_pkthdr_0(msg_buffer)->magic == kPktHdrMagic);
   }
 
   // Members that are needed by all transports. Constructor args first.

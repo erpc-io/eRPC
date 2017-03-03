@@ -86,7 +86,7 @@ static const size_t kMaxIssueMsgLen = /* Debug issue messages */
 // Simple methods
 
 /// Return the TSC
-static uint64_t rdtsc() {
+static inline uint64_t rdtsc() {
   uint64_t rax;
   uint64_t rdx;
   asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
@@ -114,12 +114,12 @@ static std::string trim_hostname(std::string hostname) {
 }
 
 template <typename T>
-static constexpr bool is_power_of_two(T x) {
+static constexpr inline bool is_power_of_two(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
 
 template <uint64_t power_of_two_number, typename T>
-static constexpr T round_up(T x) {
+static constexpr inline T round_up(T x) {
   static_assert(is_power_of_two(power_of_two_number),
                 "PowerOfTwoNumber must be a power of 2");
   return ((x) + T(power_of_two_number - 1)) & (~T(power_of_two_number - 1));
@@ -127,14 +127,14 @@ static constexpr T round_up(T x) {
 
 /// Return the index of the least significant bit of x. The index of the 2^0
 /// bit is 1. (x = 0 returns 0, x = 1 returns 1.)
-static size_t lsb_index(int x) {
+static inline size_t lsb_index(int x) {
   assert(x != 0);
   return static_cast<size_t>(__builtin_ffs(x));
 }
 
 /// Return the index of the most significant bit of x. The index of the 2^0
 /// bit is 1. (x = 0 returns 0, x = 1 returns 1.)
-static size_t msb_index(int x) {
+static inline size_t msb_index(int x) {
   assert(x < std::numeric_limits<int>::max() / 2);
   int index;
   asm("bsrl %1, %0" : "=r"(index) : "r"(x << 1));

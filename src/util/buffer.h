@@ -17,8 +17,6 @@ class Buffer {
   /// Since \p Buffer does not allocate its own \p buf, do nothing here.
   ~Buffer() {}
 
-  inline bool is_valid() { return buf != nullptr; }
-
   static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
 
   uint8_t *buf = nullptr;
@@ -30,11 +28,12 @@ class Buffer {
 /// Augment Buffer with additional packet info to avoid polluting Buffer
 class MsgBuffer : public Buffer {
  public:
-  MsgBuffer(Buffer buffer) : Buffer(buffer), data_bytes_sent(0) {}
+  MsgBuffer(Buffer buffer) : Buffer(buffer) {}
   MsgBuffer() {}
   ~MsgBuffer() {}
 
   size_t data_bytes_sent = 0;
+  size_t pkts_sent = 0;
 };
 
 }  // End ERpc

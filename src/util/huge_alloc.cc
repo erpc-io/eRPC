@@ -47,7 +47,7 @@ bool HugeAllocator::create_cache(size_t size, size_t num_buffers) {
 
   for (size_t i = 0; i < reqd_buffers; i++) {
     Buffer buffer = alloc(size);
-    if (!buffer.is_valid()) {
+    if (buffer.buf == nullptr) {
       return false;
     }
 

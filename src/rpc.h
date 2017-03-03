@@ -71,14 +71,14 @@ class Rpc {
 
   /**
    * @brief Create a hugepage-backed MsgBuffer for the eRPC user. The returned
-   * MsgBuffer's \p buf is preceeeded by a packet header that the user must not
+   * MsgBuffer's \p buf is surrounded by packet headers that the user must not
    * modify.
    *
    * @param size Non-header bytes in the returned MsgBuffer (equal to the
    * \p size field of the returned MsgBuffer)
    *
-   * @return \p The allocated MsgBuffer. The MsgBuffer is invalid if we ran out
-   * of memory.
+   * @return \p The allocated MsgBuffer. The MsgBuffer is invalid (i.e., its
+   * \p buf is NULL) if we ran out of memory.
    *
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
@@ -88,7 +88,7 @@ class Rpc {
     MsgBuffer msg_buffer =
         huge_alloc->alloc(size + sizeof(Transport::pkthdr_t));
 
-    if (msg_buffer.is_valid()) {
+    if (msg_buffer.buf != nullptr) {
       Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)msg_buffer.buf;
       pkthdr->magic = Transport::kPktHdrMagic;
       msg_buffer.buf += sizeof(Transport::pkthdr_t);
@@ -100,8 +100,8 @@ class Rpc {
 
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
-    assert(msg_buffer.is_valid());
-    assert(Transport::check_pkthdr(&msg_buffer));
+    assert(msg_buffer.buf != nullptr);
+    assert(Transport::check_pkthdr_0(&msg_buffer));
 
     /* Restore bumped pointer before freeing into the allocator*/
     msg_buffer.buf -= sizeof(Transport::pkthdr_t);
