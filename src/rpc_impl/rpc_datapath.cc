@@ -18,7 +18,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     assert(session != nullptr && session->role == Session::Role::kClient);
     assert(session->state == SessionState::kConnected);
     assert(msg_buffer->is_valid() && Transport::check_pkthdr(msg_buffer));
-    assert(msg_buffer->get_size() > 0 && msg_buffer->get_size() <= kMaxMsgSize);
+    assert(msg_buffer->size > 0 && msg_buffer->size <= kMaxMsgSize);
   } else {
     /* If datapath checks are enabled, return meaningful error codes */
     if (unlikely(session == nullptr ||
@@ -32,8 +32,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       return static_cast<int>(RpcDatapathErrCode::kInvalidMsgBufferArg);
     }
 
-    if (unlikely(msg_buffer->get_size() == 0 ||
-                 msg_buffer->get_size() > kMaxMsgSize)) {
+    if (unlikely(msg_buffer->size == 0 || msg_buffer->size > kMaxMsgSize)) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidMsgBufferArg);
     }
   }
@@ -46,7 +45,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   // Fill in the packet header
   Transport::pkthdr_t *pkthdr = Transport::msg_buffer_hdr(msg_buffer);
   pkthdr->req_type = req_type;
-  pkthdr->msg_size = msg_buffer->get_size();
+  pkthdr->msg_size = msg_buffer->size;
   pkthdr->rem_session_num = session->server.session_num;
   pkthdr->is_req = 1;
   pkthdr->is_first = 1;

@@ -20,13 +20,8 @@ class Buffer {
   inline bool is_valid() { return buf != nullptr; }
 
   static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
-  size_t get_size() { return (size_t)size; }
-  void set_size(size_t new_size) { size = new_size; }
-  uint32_t get_lkey() { return lkey; }
 
   uint8_t *buf = nullptr;
-
- private:
   /// The size requested by the user (may not be an allocator class size)
   size_t size = 0;
   uint32_t lkey = 0;  ///< The memory registration lkey

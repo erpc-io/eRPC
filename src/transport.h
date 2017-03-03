@@ -50,8 +50,7 @@ class Transport {
   };
   static_assert(sizeof(pkthdr_t) == 16, "");
 
-  Transport(TransportType transport_type, size_t mtu, uint8_t app_tid,
-            uint8_t phy_port);
+  Transport(TransportType transport_type, uint8_t app_tid, uint8_t phy_port);
 
   /**
    * @brief Initialize transport structures that require hugepages
@@ -117,7 +116,6 @@ class Transport {
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
-  const size_t mtu;
   const uint8_t app_tid;   /* Debug-only */
   const uint8_t phy_port;  ///< 0-based physical port specified by application
 

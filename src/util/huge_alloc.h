@@ -142,8 +142,8 @@ class HugeAllocator {
   /// Free a Buffer
   inline void free_buf(Buffer buffer) {
     assert(buffer.is_valid());
-    size_t size_class = get_class(buffer.get_size());
-    buffer.set_size(class_max_size(size_class)); /* Restore to class size */
+    size_t size_class = get_class(buffer.size);
+    buffer.size = class_max_size(size_class); /* Restore to class size */
     freelist[size_class].push_back(buffer);
   }
 
@@ -196,12 +196,11 @@ class HugeAllocator {
 
     Buffer buffer = freelist[size_class].back();
     freelist[size_class].pop_back();
-    assert(buffer.get_size() == class_max_size(size_class));
+    assert(buffer.size == class_max_size(size_class));
 
-    Buffer buffer_0 =
-        Buffer(buffer.buf, buffer.get_size() / 2, buffer.get_lkey());
-    Buffer buffer_1 = Buffer(buffer.buf + buffer.get_size() / 2,
-                             buffer.get_size() / 2, buffer.get_lkey());
+    Buffer buffer_0 = Buffer(buffer.buf, buffer.size / 2, buffer.lkey);
+    Buffer buffer_1 =
+        Buffer(buffer.buf + buffer.size / 2, buffer.size / 2, buffer.lkey);
 
     freelist[size_class - 1].push_back(buffer_0);
     freelist[size_class - 1].push_back(buffer_1);
@@ -219,7 +218,7 @@ class HugeAllocator {
 
     /* Use the Buffers at the back to improve locality */
     Buffer buffer = freelist[size_class].back();
-    buffer.set_size(size);
+    buffer.size = size;
     freelist[size_class].pop_back();
 
     return buffer;

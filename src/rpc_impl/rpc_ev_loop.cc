@@ -32,8 +32,7 @@ void Rpc<Transport_>::process_datapath_work_queue() {
       assert(Transport::check_pkthdr(msg_buffer));
 
       /* Find a message slot for which we need to send packets */
-      if (msg_info->in_use &&
-          msg_buffer->data_bytes_sent != msg_buffer->get_size()) {
+      if (msg_info->in_use && msg_buffer->data_bytes_sent != msg_buffer->size) {
         /* If we don't have credits, save this session for later & bail */
         if (session->remote_credits == 0) {
           assert(write_index < datapath_work_queue.size());
@@ -42,14 +41,12 @@ void Rpc<Transport_>::process_datapath_work_queue() {
         }
 
         /* Optimize for small messages that fit in one packet */
-        if (msg_buffer->get_size() <=
-            Transport_::kMTU - sizeof(Transport::pkthdr_t)) {
+        if (msg_buffer->size <= Transport_::kMaxDataPerPkt) {
           assert(msg_buffer->data_bytes_sent == 0);
 
           assert(batch_i < Transport_::kPostlist);
           tx_routing_info_arr[batch_i] = session->remote_routing_info;
           tx_msg_buffer_arr[batch_i] = msg_info->msg_buffer;
-          msg_buffer->data_bytes_sent = msg_buffer->get_size();
 
           batch_i++;
           if (batch_i == Transport_::kPostlist) {

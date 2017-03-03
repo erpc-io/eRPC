@@ -13,7 +13,7 @@ namespace ERpc {
  * allocator is provided.
  */
 IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port)
-    : Transport(TransportType::kInfiniBand, kMTU, app_tid, phy_port) {
+    : Transport(TransportType::kInfiniBand, app_tid, phy_port) {
   resolve_phy_port();
   init_infiniband_structs();
   init_mem_reg_funcs();
@@ -261,7 +261,7 @@ void IBTransport::init_recvs() {
     uint8_t *buf = (uint8_t *)recv_extent.buf;
 
     recv_sgl[i].length = kRecvSize;
-    recv_sgl[i].lkey = recv_extent.get_lkey();
+    recv_sgl[i].lkey = recv_extent.lkey;
     recv_sgl[i].addr = (uintptr_t)&buf[i * kRecvSize];
 
     recv_wr[i].wr_id = recv_sgl[i].addr; /* Debug */

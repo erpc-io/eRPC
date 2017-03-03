@@ -21,6 +21,11 @@ class IBTransport : public Transport {
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, ""); /* Capacity check */
   static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
 
+  // Derived constants
+
+  /// Maximum data bytes (i.e., non-header) in a packet
+  static const size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
+
   struct ib_routing_info_t {
     // Filled in locally
     uint16_t port_lid;
