@@ -72,6 +72,47 @@ class IBTransport : public Transport {
   void rx_burst(MsgBuffer *msg_buffer_arr, size_t *num_pkts);
   void post_recvs(size_t num_recvs);
 
+  /// Poll RECV CQ. Fill \p wc with \p num_comps completions from \p recv_cq.
+  inline void poll_recv_cq(int num_comps) {
+    int comps = 0;
+
+    while (comps < num_comps) {
+      int new_comps = ibv_poll_cq(recv_cq, num_comps - comps, &recv_wc[comps]);
+      if (new_comps != 0) {
+        // Ideally, we should check from comps -> new_comps - 1
+        if (recv_wc[comps].status != 0) {
+          fprintf(stderr, "Bad wc status %d\n", recv_wc[comps].status);
+          exit(0);
+        }
+
+        comps += new_comps;
+      }
+    }
+  }
+
+  /// Get the current signaling flag, and poll the send CQ if we need to.
+  /// Poll the send CQ if we need to.
+  inline int get_signaled_flag() {
+    int flag = (nb_pending == 0) ? IBV_SEND_SIGNALED : 0;
+    if (nb_pending == kUnsigBatch - 1) {
+      struct ibv_wc wc;
+      while (ibv_poll_cq(send_cq, 1, &wc) != 1) {
+        /* Do nothing */
+      }
+
+      /* XXX: Don't exit! */
+      if (wc.status != 0) {
+        fprintf(stderr, "Bad SEND wc status %d\n", wc.status);
+        exit(-1);
+      }
+      nb_pending = 0;
+    } else {
+      nb_pending = 0;
+    }
+
+    return flag;
+  }
+
  private:
   /**
    * @brief Fill in \p ib_ctx, \p device_id, and \p dev_port using \p phy_port
@@ -163,7 +204,7 @@ class IBTransport : public Transport {
 
   struct ibv_recv_wr recv_wr[kRecvQueueDepth];
   struct ibv_sge recv_sgl[kRecvQueueDepth];
-  struct ibv_wc wc[kRecvQueueDepth];
+  struct ibv_wc recv_wc[kRecvQueueDepth];
 
   /* Once post_recvs_fast() is used, regular post_recv() must not be used */
   bool fast_recv_used = false;

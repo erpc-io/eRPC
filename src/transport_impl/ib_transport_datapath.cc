@@ -7,12 +7,10 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
   assert(msg_buffer_arr != nullptr);
   assert(num_pkts >= 1 && num_pkts <= kPostlist);
 
-  _unused(routing_info_arr);
-  _unused(msg_buffer_arr);
-  _unused(num_pkts);
-
   for (size_t i = 0; i < num_pkts; i++) {
     struct ibv_send_wr& wr = send_wr[i];
+    struct ibv_sge* sgl = send_sgl[i];
+
     MsgBuffer* msg_buffer = msg_buffer_arr[i];
     assert(msg_buffer->size > msg_buffer->data_bytes_sent);
 
@@ -20,27 +18,59 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     assert(wr.next == &send_wr[i + 1]); /* +1 is valid */
     assert(wr.wr.ud.remote_qkey == kQKey);
     assert(wr.opcode == IBV_WR_SEND_WITH_IMM);
-    assert(wr.sg_list == &send_sgl[i][0]);
+    assert(wr.sg_list == sgl);
 
-    size_t data_bytes_pending =
-        (msg_buffer->size - msg_buffer->data_bytes_sent);
-    size_t data_bytes_now_sending =
-        data_bytes_pending < kMaxDataPerPkt ? msg_buffer->size : kMaxDataPerPkt;
+    /* Set signaling flag. The work request is non-inline by default. */
+    wr.send_flags = get_signaled_flag();
+
+    /* Data bytes left to send in the message */
+    size_t data_bytes_left = (msg_buffer->size - msg_buffer->data_bytes_sent);
+
+    /* Number of data bytes that will be sent with this work request */
+    size_t data_bytes_to_send =
+        data_bytes_left < kMaxDataPerPkt ? data_bytes_left : kMaxDataPerPkt;
 
     /* Encode variable fields */
-    size_t num_sge;
     if (msg_buffer->data_bytes_sent == 0) {
       /* If this is the first packet, we need only 1 SGE */
-      send_sgl[i][0].addr = (uint64_t)msg_buffer_hdr(msg_buffer);
-      send_sgl[i][0].length = (uint32_t)data_bytes_now_sending;
-      send_sgl[i][0].lkey = msg_buffer->lkey;
-      num_sge = 1;
+      sgl[0].addr = (uint64_t)msg_buffer_hdr(msg_buffer);
+      sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + data_bytes_to_send);
+      sgl[0].lkey = msg_buffer->lkey;
+
+      /* Only single-sge work requests are made inline */
+      wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
+      wr.num_sge = 1;
     } else {
-      num_sge = 2;
+      /* If this is not the first packet, we need 2 SGEs */
+      send_sgl[i][0].addr = (uint64_t)msg_buffer_hdr(msg_buffer);
+      send_sgl[i][0].length = (uint32_t)sizeof(pkthdr_t);
+      send_sgl[i][0].lkey = msg_buffer->lkey;
+
+      send_sgl[i][1].addr =
+          (uint64_t) & (msg_buffer->buf[msg_buffer->data_bytes_sent]);
+      send_sgl[i][1].length = (uint32_t)data_bytes_to_send;
+      send_sgl[i][1].lkey = msg_buffer->lkey;
+
+      wr.num_sge = 2;
     }
 
-    _unused(num_sge);
+    auto ib_routing_info = (struct ib_routing_info_t*)routing_info_arr[i];
+    wr.wr.ud.remote_qpn = ib_routing_info->qpn;
+    wr.wr.ud.ah = &ib_routing_info->ah;
   }
+
+  send_wr[num_pkts - 1].next = nullptr; /* Breaker of chains */
+
+  struct ibv_send_wr* bad_wr;
+
+  /* Handle failure. XXX: Don't exit. */
+  int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
+  if (ret != 0) {
+    fprintf(stderr, "ibv_post_send failed. ret = %d\n", ret);
+    exit(-1);
+  }
+
+  send_wr[num_pkts - 1].next = &send_wr[num_pkts]; /* Restore chain; safe */
 }
 
 void IBTransport::rx_burst(MsgBuffer* msg_buffer_arr, size_t* num_pkts) {

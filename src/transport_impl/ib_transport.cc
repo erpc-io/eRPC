@@ -278,7 +278,6 @@ void IBTransport::init_sends() {
     send_wr[i].next = &send_wr[i + 1];
     send_wr[i].wr.ud.remote_qkey = kQKey;
     send_wr[i].opcode = IBV_WR_SEND_WITH_IMM;
-    send_wr[i].num_sge = 1;
     send_wr[i].sg_list = &send_sgl[i][0];
   }
 }

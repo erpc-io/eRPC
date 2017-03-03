@@ -15,7 +15,9 @@
 
 ## API notes
 
-## TODOs
+## Short-term TODOs
+ * Need to increment `data_bytes_sent`. 
+## Long-term TODOs
  * Optimize Mellanox drivers memcpy and function pointers. If inline size is
    fixed at 60 bytes, optimized that.
  * Need to have a test for session management request timeouts.
