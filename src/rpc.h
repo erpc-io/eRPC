@@ -101,25 +101,11 @@ class Rpc {
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     assert(msg_buffer.is_valid());
+    assert(Transport::check_pkthdr(&msg_buffer));
+
     /* Restore bumped pointer before freeing into the allocator*/
     msg_buffer.buf -= sizeof(Transport::pkthdr_t);
-
-    Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)msg_buffer.buf;
-    _unused(pkthdr);
-    assert(pkthdr->magic == Transport::kPktHdrMagic);
-
     huge_alloc->free_buf(msg_buffer);
-  }
-
-  /// Return a pointer to the packet header of this MsgBuffer
-  Transport::pkthdr_t *msg_buffer_hdr(MsgBuffer *msg_buffer) {
-    return (Transport::pkthdr_t *)(msg_buffer->buf -
-                                   sizeof(Transport::pkthdr_t));
-  }
-
-  /// Check if a MsgBuffer's header magic is valid
-  inline bool check_pkthdr(MsgBuffer *msg_buffer) {
-    return (msg_buffer_hdr(msg_buffer)->magic == Transport::kPktHdrMagic);
   }
 
   // rpc_sm_api.cc

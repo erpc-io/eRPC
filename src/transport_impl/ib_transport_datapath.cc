@@ -12,19 +12,18 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
   _unused(num_pkts);
 
   for (size_t i = 0; i < num_pkts; i++) {
-    auto& wr = send_wr[i];
-    _unused(wr);
     /* Verify constant fields */
-    assert(wr.next == &send_wr[i + 1]); /* +1 is valid */
-    assert(wr.wr.ud.remote_qkey == kQKey);
-    assert(wr.opcode == IBV_WR_SEND_WITH_IMM);
-    assert(wr.sg_list == &send_sgl[i][0]);
+    assert(send_wr[i].next == &send_wr[i + 1]); /* +1 is valid */
+    assert(send_wr[i].wr.ud.remote_qkey == kQKey);
+    assert(send_wr[i].opcode == IBV_WR_SEND_WITH_IMM);
+    assert(send_wr[i].sg_list == &send_sgl[i][0]);
 
     /* Encode variable fields */
     size_t num_sge;
     _unused(num_sge);
     if (msg_buffer_arr[i]->data_bytes_sent == 0) {
       num_sge = 1;
+      send_sgl[i][0].addr = (uint64_t)msg_buffer_hdr(msg_buffer_arr[i]);
     } else {
       num_sge = 2;
     }

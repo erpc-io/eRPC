@@ -29,7 +29,7 @@ void Rpc<Transport_>::process_datapath_work_queue() {
       Session::msg_info_t *msg_info = &session->msg_arr[msg_i];
       MsgBuffer *msg_buffer = msg_info->msg_buffer;
       assert(msg_buffer->is_valid());
-      assert(check_pkthdr(msg_buffer));
+      assert(Transport::check_pkthdr(msg_buffer));
 
       /* Find a message slot for which we need to send packets */
       if (msg_info->in_use &&

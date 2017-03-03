@@ -105,6 +105,16 @@ class Transport {
   /// Return a string representation of \p routing_info
   static std::string routing_info_str(RoutingInfo* routing_info);
 
+  /// Return a pointer to the packet header of this MsgBuffer
+  static inline pkthdr_t* msg_buffer_hdr(MsgBuffer* msg_buffer) {
+    return (pkthdr_t*)(msg_buffer->buf - sizeof(pkthdr_t));
+  }
+
+  /// Check if a MsgBuffer's header magic is valid
+  static inline bool check_pkthdr(MsgBuffer* msg_buffer) {
+    return (msg_buffer_hdr(msg_buffer)->magic == kPktHdrMagic);
+  }
+
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
   const size_t mtu;
