@@ -84,28 +84,29 @@ class Rpc {
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
    * if allocation fails simply because we ran out of memory.
    */
-  inline MsgBuffer alloc_msg_buffer(size_t size) {
+  inline MsgBuffer alloc_msg_buffer(size_t data_size) {
     size_t num_pkts;
 
     /* Avoid division for small packets */
-    if (size <= Transport_::kMaxDataPerPkt) {
+    if (small_msg_likely(data_size <= Transport_::kMaxDataPerPkt)) {
       num_pkts = 1;
     } else {
-      num_pkts = (size + (Transport_::kMaxDataPerPkt - 1)) /
+      num_pkts = (data_size + (Transport_::kMaxDataPerPkt - 1)) /
                  Transport_::kMaxDataPerPkt;
     }
 
     /* This multiplication is a shift */
     static_assert(is_power_of_two(sizeof(pkthdr_t)), "");
-    Buffer buffer = huge_alloc->alloc(size + (num_pkts * sizeof(pkthdr_t)));
+    Buffer buffer =
+        huge_alloc->alloc(data_size + (num_pkts * sizeof(pkthdr_t)));
     if (unlikely(buffer.buf == nullptr)) {
-      return MsgBuffer(Buffer::get_invalid_buffer(), 0);
+      return MsgBuffer(Buffer::get_invalid_buffer(), 0, 0);
     }
 
-    MsgBuffer msg_buffer(buffer, size);
+    MsgBuffer msg_buffer(buffer, data_size, num_pkts);
 
     /* Set the packet header magic in the 0th header */
-    pkthdr_t *pkthdr = Transport::get_pkthdr_0(&msg_buffer);
+    pkthdr_t *pkthdr = msg_buffer.get_pkthdr_0();
     pkthdr->magic = kPktHdrMagic;
     return msg_buffer;
   }
@@ -113,7 +114,7 @@ class Rpc {
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     assert(msg_buffer.buf != nullptr);
-    assert(Transport::check_pkthdr_0(&msg_buffer));
+    assert(msg_buffer.check_pkthdr_0());
 
     huge_alloc->free_buf(msg_buffer.buffer);
   }
@@ -155,16 +156,17 @@ class Rpc {
   // rpc_datapath.cc
 
   /**
-   * @brief Try to begin transmission of an RPC request
+   * @brief Try to enqueue a request MsgBuffer for transmission. This function
+   * initializes all the packet headers of the MsgBuffer.
    *
    * @param session The client session to send the request on
    * @param req_type The type of the request
    * @param msg_buffer The MsgBuffer containing the request. If this call
-   * succeeds, eRPC owns \p msg_buffer until the request completes by invoking
-   * the callback.
+   * succeeds, eRPC owns \p msg_buffer until the request completes (i.e., the
+   * callback is invoked).
    *
-   * @return 0 on success, i.e., if the request was sent or queued. An error
-   * code is returned if the request can neither be sent nor queued.
+   * @return 0 on success, i.e., if the request was queued. An error code is
+   * returned if the request cannot be queued.
    */
   int send_request(Session *session, uint8_t req_type, MsgBuffer *msg_buffer);
 
@@ -276,7 +278,7 @@ class Rpc {
   //@}
 
   /// Rx batch information for \p rx_burst
-  MsgBuffer rx_msg_buffer_arr[Transport_::kPostlist];
+  Buffer rx_msg_buffer_arr[Transport_::kPostlist];
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;

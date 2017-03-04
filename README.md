@@ -38,3 +38,8 @@
       that session_vec[sm_pkt->client.session_num] == nullptr. This causes a
       memory leak at the server since the allocated server-side endpoint will
       never get destroyed.)
+
+## Perf notes
+ * Flags that control performance:
+   * kDataPathChecks
+   * `small_msg_likely`

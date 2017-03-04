@@ -31,22 +31,19 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     /* Set signaling flag. The work request is non-inline by default. */
     wr.send_flags = get_signaled_flag();
 
-    /* Encode variable fields */
     if (msg_buffer->pkts_sent == 0) {
-      pkthdr_t* pkthdr = get_pkthdr_0(msg_buffer);
-
-      /* If this is the first packet, we need only 1 SGE */
+      /* This is the first packet, so we need only 1 SGE */
+      pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + data_bytes_to_send);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      /* Only single-sge work requests are made inline */
+      /* Only single-sge work requests are inlined */
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
       wr.num_sge = 1;
     } else {
-      pkthdr_t* pkthdr = get_pkthdr_n(msg_buffer, msg_buffer->pkts_sent);
-
-      /* If this is not the first packet, we need 2 SGEs */
+      /* This is not the first packet, so we need 2 SGEs */
+      pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(msg_buffer->pkts_sent);
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)sizeof(pkthdr_t);
       sgl[0].lkey = msg_buffer->buffer.lkey;
@@ -56,15 +53,16 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
       send_sgl[i][1].length = (uint32_t)data_bytes_to_send;
       send_sgl[i][1].lkey = msg_buffer->buffer.lkey;
 
-      /* XXX: Set pkthdr fields */
-      pkthdr->is_first = false;
-
       wr.num_sge = 2;
     }
 
     auto ib_routing_info = (struct ib_routing_info_t*)routing_info_arr[i];
     wr.wr.ud.remote_qpn = ib_routing_info->qpn;
     wr.wr.ud.ah = &ib_routing_info->ah;
+
+    /* Update MsgBuffer progress tracking metadata */
+    msg_buffer->data_sent += data_bytes_to_send;
+    msg_buffer->pkts_sent++;
   }
 
   send_wr[num_pkts - 1].next = nullptr; /* Breaker of chains */
@@ -81,10 +79,10 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
   send_wr[num_pkts - 1].next = &send_wr[num_pkts]; /* Restore chain; safe */
 }
 
-void IBTransport::rx_burst(MsgBuffer* msg_buffer_arr, size_t* num_pkts) {
-  assert(msg_buffer_arr != nullptr);
+void IBTransport::rx_burst(Buffer* buffer_arr, size_t* num_pkts) {
+  assert(buffer_arr != nullptr);
   assert(num_pkts != nullptr);
-  _unused(msg_buffer_arr);
+  _unused(buffer_arr);
   _unused(num_pkts);
 }
 

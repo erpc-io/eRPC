@@ -50,9 +50,11 @@ static const bool kDatapathChecks = true;   ///< Disable for max perf datapath
     }                             \
   } while (0)
 
+#define _unused(x) ((void)(x)) /* Make production build happy */
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
-#define _unused(x) ((void)(x)) /* Make production build happy */
+#define small_msg_likely(x) likely(x)
+//#define small_msg_likely(x) (x)
 
 #define KB(x) ((size_t)(x) << 10)
 #define KB_(x) (KB(x) - 1)

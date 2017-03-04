@@ -69,7 +69,7 @@ class IBTransport : public Transport {
   void tx_burst(RoutingInfo const *const *routing_info_arr,
                 MsgBuffer **msg_buffer_arr, size_t num_pkts);
 
-  void rx_burst(MsgBuffer *msg_buffer_arr, size_t *num_pkts);
+  void rx_burst(Buffer *buffer_arr, size_t *num_pkts);
   void post_recvs(size_t num_recvs);
 
   /// Poll RECV CQ. Fill \p wc with \p num_comps completions from \p recv_cq.
