@@ -77,8 +77,8 @@ class HugeAllocator {
   /**
    * @brief Allocate a Buffer
    *
-   * @param size Size of the allocated Buffer, which is equal to
-   * the returned Buffer's \p size. \p size need not equal a class size.
+   * @param size The minimum size of the allocated Buffer. \p size need not
+   * equal a class size.
    *
    * @return The allocated buffer. The buffer is invalid if we ran out of
    * memory.
@@ -95,7 +95,7 @@ class HugeAllocator {
     assert(size_class < kNumClasses);
 
     if (!freelist[size_class].empty()) {
-      return alloc_from_class(size_class, size);
+      return alloc_from_class(size_class);
     } else {
       /*
        * There is no free Buffer in this class. Find the first larger class with
@@ -131,7 +131,7 @@ class HugeAllocator {
       }
 
       assert(!freelist[size_class].empty());
-      return alloc_from_class(size_class, size);
+      return alloc_from_class(size_class);
     }
 
     assert(false);
@@ -142,8 +142,8 @@ class HugeAllocator {
   /// Free a Buffer
   inline void free_buf(Buffer buffer) {
     assert(buffer.buf != nullptr);
-    size_t size_class = get_class(buffer.size);
-    buffer.size = class_max_size(size_class); /* Restore to class size */
+    size_t size_class = get_class(buffer.class_size);
+    assert(class_max_size(size_class) == buffer.class_size);
     freelist[size_class].push_back(buffer);
   }
 
@@ -196,11 +196,11 @@ class HugeAllocator {
 
     Buffer buffer = freelist[size_class].back();
     freelist[size_class].pop_back();
-    assert(buffer.size == class_max_size(size_class));
+    assert(buffer.class_size == class_max_size(size_class));
 
-    Buffer buffer_0 = Buffer(buffer.buf, buffer.size / 2, buffer.lkey);
-    Buffer buffer_1 =
-        Buffer(buffer.buf + buffer.size / 2, buffer.size / 2, buffer.lkey);
+    Buffer buffer_0 = Buffer(buffer.buf, buffer.class_size / 2, buffer.lkey);
+    Buffer buffer_1 = Buffer(buffer.buf + buffer.class_size / 2,
+                             buffer.class_size / 2, buffer.lkey);
 
     freelist[size_class - 1].push_back(buffer_0);
     freelist[size_class - 1].push_back(buffer_1);
@@ -208,17 +208,14 @@ class HugeAllocator {
 
   /**
    * @brief Allocate a Buffer from a non-empty class
-   * @param size_class Non-empty size class to allocate from
-   * @param size The size of the allocated Buffer
+   * @param size_class Index of the non-empty size class to allocate from
    */
-  inline Buffer alloc_from_class(size_t size_class, size_t size) {
+  inline Buffer alloc_from_class(size_t size_class) {
     assert(size_class < kNumClasses);
-    assert(size <= class_max_size(size_class) &&
-           ((size_class == 0) || size > class_max_size(size_class - 1)));
 
     /* Use the Buffers at the back to improve locality */
     Buffer buffer = freelist[size_class].back();
-    buffer.size = size;
+    assert(buffer.class_size = class_max_size(size_class));
     freelist[size_class].pop_back();
 
     return buffer;

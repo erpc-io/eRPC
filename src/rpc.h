@@ -20,9 +20,9 @@ class Rpc {
  public:
   /// Max request or response size, excluding packet headers
   static const size_t kMaxMsgSize = MB(8);
-  static_assert((1ull << Transport::kMsgSizeBits) >= kMaxMsgSize, "");
-  static_assert((1ull << Transport::kPktNumBits) *
-                        (Transport::kMinMtu - sizeof(Transport::pkthdr_t)) >=
+  static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
+  static_assert((1ull << kPktNumBits) *
+                        (Transport::kMinMtu - sizeof(pkthdr_t)) >=
                     kMaxMsgSize,
                 "");
 
@@ -85,17 +85,29 @@ class Rpc {
    * if allocation fails simply because we ran out of memory.
    */
   inline MsgBuffer alloc_msg_buffer(size_t size) {
-    MsgBuffer msg_buffer =
-        huge_alloc->alloc(size + sizeof(Transport::pkthdr_t));
+    size_t num_pkts;
 
-    if (msg_buffer.buf != nullptr) {
-      Transport::pkthdr_t *pkthdr = (Transport::pkthdr_t *)msg_buffer.buf;
-      pkthdr->magic = Transport::kPktHdrMagic;
-      msg_buffer.buf += sizeof(Transport::pkthdr_t);
-      return msg_buffer;
+    /* Avoid division for small packets */
+    if (size <= Transport_::kMaxDataPerPkt) {
+      num_pkts = 1;
     } else {
-      return Buffer::get_invalid_buffer();
+      num_pkts = (size + (Transport_::kMaxDataPerPkt - 1)) /
+                 Transport_::kMaxDataPerPkt;
     }
+
+    /* This multiplication is a shift */
+    static_assert(is_power_of_two(sizeof(pkthdr_t)), "");
+    Buffer buffer = huge_alloc->alloc(size + (num_pkts * sizeof(pkthdr_t)));
+    if (unlikely(buffer.buf == nullptr)) {
+      return MsgBuffer(Buffer::get_invalid_buffer(), 0);
+    }
+
+    MsgBuffer msg_buffer(buffer, size);
+
+    /* Set the packet header magic in the 0th header */
+    pkthdr_t *pkthdr = Transport::get_pkthdr_0(&msg_buffer);
+    pkthdr->magic = kPktHdrMagic;
+    return msg_buffer;
   }
 
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
@@ -103,9 +115,7 @@ class Rpc {
     assert(msg_buffer.buf != nullptr);
     assert(Transport::check_pkthdr_0(&msg_buffer));
 
-    /* Restore bumped pointer before freeing into the allocator*/
-    msg_buffer.buf -= sizeof(Transport::pkthdr_t);
-    huge_alloc->free_buf(msg_buffer);
+    huge_alloc->free_buf(msg_buffer.buffer);
   }
 
   // rpc_sm_api.cc

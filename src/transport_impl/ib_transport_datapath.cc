@@ -15,7 +15,7 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     assert(msg_buffer->buf != nullptr);
 
     /* Data bytes left to send in the message */
-    size_t data_bytes_left = (msg_buffer->size - msg_buffer->data_bytes_sent);
+    size_t data_bytes_left = (msg_buffer->data_size - msg_buffer->data_sent);
     assert(data_bytes_left > 0);
 
     /* Number of data bytes that will be sent with this work request */
@@ -38,7 +38,7 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
       /* If this is the first packet, we need only 1 SGE */
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + data_bytes_to_send);
-      sgl[0].lkey = msg_buffer->lkey;
+      sgl[0].lkey = msg_buffer->buffer.lkey;
 
       /* Only single-sge work requests are made inline */
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
@@ -47,14 +47,14 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
       pkthdr_t* pkthdr = get_pkthdr_n(msg_buffer, msg_buffer->pkts_sent);
 
       /* If this is not the first packet, we need 2 SGEs */
-      send_sgl[i][0].addr = (uint64_t)pkthdr;
-      send_sgl[i][0].length = (uint32_t)sizeof(pkthdr_t);
-      send_sgl[i][0].lkey = msg_buffer->lkey;
+      sgl[0].addr = (uint64_t)pkthdr;
+      sgl[0].length = (uint32_t)sizeof(pkthdr_t);
+      sgl[0].lkey = msg_buffer->buffer.lkey;
 
       send_sgl[i][1].addr =
-          (uint64_t) & (msg_buffer->buf[msg_buffer->data_bytes_sent]);
+          (uint64_t) & (msg_buffer->buf[msg_buffer->data_sent]);
       send_sgl[i][1].length = (uint32_t)data_bytes_to_send;
-      send_sgl[i][1].lkey = msg_buffer->lkey;
+      send_sgl[i][1].lkey = msg_buffer->buffer.lkey;
 
       /* XXX: Set pkthdr fields */
       pkthdr->is_first = false;

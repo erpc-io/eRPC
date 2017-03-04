@@ -32,7 +32,9 @@ class Session {
   struct msg_info_t {
     bool in_use;            ///< True iff this slot is in use
     MsgBuffer *msg_buffer;  ///< The MsgBuffer for this message
-    MsgBuffer _prealloc;    ///< A pre-allocated 4K packet Pktuffer. XXX: unused
+
+    ///< A pre-allocated 4K packet buffer. XXX: unused
+    Buffer _prealloc;
   };
 
   Session(Role role, SessionState state);

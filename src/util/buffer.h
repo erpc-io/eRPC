@@ -9,8 +9,8 @@ namespace ERpc {
 /// after the Buffer is created.
 class Buffer {
  public:
-  Buffer(uint8_t *buf, size_t size, uint32_t lkey)
-      : buf(buf), size(size), lkey(lkey) {}
+  Buffer(uint8_t *buf, size_t class_size, uint32_t lkey)
+      : buf(buf), class_size(class_size), lkey(lkey) {}
 
   Buffer() {}
 
@@ -20,20 +20,8 @@ class Buffer {
   static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
 
   uint8_t *buf = nullptr;
-  /// The size requested by the user (may not be an allocator class size)
-  size_t size = 0;
-  uint32_t lkey = 0;  ///< The memory registration lkey
-};
-
-/// Augment Buffer with additional packet info to avoid polluting Buffer
-class MsgBuffer : public Buffer {
- public:
-  MsgBuffer(Buffer buffer) : Buffer(buffer) {}
-  MsgBuffer() {}
-  ~MsgBuffer() {}
-
-  size_t data_bytes_sent = 0;
-  size_t pkts_sent = 0;
+  size_t class_size = 0;  ///< The class size
+  uint32_t lkey = 0;      ///< The memory registration lkey
 };
 
 }  // End ERpc
