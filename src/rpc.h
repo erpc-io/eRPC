@@ -247,6 +247,8 @@ class Rpc {
   /// Sessions for which all packets can be sent are removed from the queue.
   void process_datapath_tx_work_queue();
 
+  void process_completions();
+
   // Constructor args
   Nexus *nexus;
   void *context;  ///< The application context

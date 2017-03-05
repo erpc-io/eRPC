@@ -15,6 +15,7 @@ void Rpc<Transport_>::run_event_loop_one() {
   }
 
   process_datapath_tx_work_queue();
+  process_completions();
 }
 
 template <class Transport_>
@@ -28,12 +29,19 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     for (size_t msg_i = 0; msg_i < Session::kSessionReqWindow; msg_i++) {
       Session::msg_info_t *msg_info = &session->msg_arr[msg_i];
       MsgBuffer *msg_buffer = msg_info->msg_buffer;
-      assert(msg_buffer->buf != nullptr);
-      assert(msg_buffer->check_pkthdr_0());
 
       /* Find a message slot for which we need to send packets */
       if (!msg_info->in_use || msg_buffer->pkts_sent == msg_buffer->num_pkts) {
         continue;
+      }
+
+      /* Sanity check */
+      assert(msg_buffer->buf != nullptr);
+      assert(msg_buffer->check_pkthdr_0());
+      if (session->role == Session::Role::kClient) {
+        assert(msg_buffer->get_pkthdr_0()->is_req == 1);
+      } else {
+        assert(msg_buffer->get_pkthdr_0()->is_req == 0);
       }
 
       /*
