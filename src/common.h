@@ -18,6 +18,7 @@ static const bool kVerbose = true;  ///< Debug printing for non-datapath stuff
 static const bool kDatapathVerbose = true;  ///< Debug printing in datapatg
 static const bool kDatapathChecks = true;   ///< Disable for max perf datapath
 
+/// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \
   do {                                   \
     if (kVerbose) {                      \
@@ -34,6 +35,7 @@ static const bool kDatapathChecks = true;   ///< Disable for max perf datapath
     }                            \
   } while (0)
 
+/// High-frequency debug message printing (e.g., fabric RX and TX)
 #define dpath_dprintf(fmt, ...)          \
   do {                                   \
     if (kDatapathVerbose) {              \

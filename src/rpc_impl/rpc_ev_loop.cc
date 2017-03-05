@@ -37,12 +37,15 @@ void Rpc<Transport_>::process_datapath_work_queue() {
       }
 
       /*
-       * If we are here, we need to send packet for this message.
+       * If we are here, this message needs packet transmission.
        * If we don't have credits, save this session for later & bail.
        */
       if (session->remote_credits == 0) {
         assert(write_index < datapath_work_queue.size());
         datapath_work_queue[write_index++] = session;
+
+        dpath_dprintf("eRPC Rpc: Session %u out of credits. Re-queueing.\n",
+                      session->client.session_num);
         break; /* Try the next session */
       }
 
@@ -61,6 +64,10 @@ void Rpc<Transport_>::process_datapath_work_queue() {
         batch_i++;
         session->remote_credits--;
 
+        dpath_dprintf(
+            "eRPC Rpc: Sending single-packet message %zu in session %u.\n",
+            msg_i, session->client.session_num);
+
         if (batch_i == Transport_::kPostlist) {
           /* This will increment msg_buffer's pkts_sent and data_sent */
           transport->tx_burst(tx_routing_info_arr, tx_msg_buffer_arr, batch_i);
@@ -76,9 +83,17 @@ void Rpc<Transport_>::process_datapath_work_queue() {
 
       if (pkts_pending <= session->remote_credits) {
         now_sending = pkts_pending; /* All pkts of this message can be sent */
+        dpath_dprintf(
+            "eRPC Rpc: Sending all remaining %zu packets for "
+            "multi-packet message %zu in session %u.\n",
+            now_sending, msg_i, session->client.session_num);
       } else {
         /* We cannot send all msg packets, so save this session for later */
         now_sending = session->remote_credits;
+        dpath_dprintf(
+            "eRPC Rpc: Sending %zu of %zu remaining packets for "
+            "multi-packet message %zu in session %u.\n",
+            now_sending, pkts_pending, msg_i, session->client.session_num);
 
         assert(write_index < datapath_work_queue.size());
         datapath_work_queue[write_index++] = session;

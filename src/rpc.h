@@ -240,7 +240,7 @@ class Rpc {
 
   // rpc_ev_loop.cc
 
-  /// Process the datapath work queue
+  /// Try to transmit packets for Sessions in the \p datapath_work_queue.
   void process_datapath_work_queue();
 
   // Constructor args
