@@ -38,7 +38,7 @@ void Rpc<Transport_>::process_datapath_work_queue() {
 
       /*
        * If we are here, we need to send packet for this message.
-       * If we don't have credits, save this session for later & bail
+       * If we don't have credits, save this session for later & bail.
        */
       if (session->remote_credits == 0) {
         assert(write_index < datapath_work_queue.size());
@@ -72,9 +72,21 @@ void Rpc<Transport_>::process_datapath_work_queue() {
 
       /* Handle multi-packet messages */
       size_t pkts_pending = msg_buffer->num_pkts - msg_buffer->pkts_sent;
-      size_t now_sending = std::min(pkts_pending, session->remote_credits);
+      size_t now_sending;
+
+      if (pkts_pending <= session->remote_credits) {
+        now_sending = pkts_pending; /* All pkts of this message can be sent */
+      } else {
+        /* We cannot send all msg packets, so save this session for later */
+        now_sending = session->remote_credits;
+
+        assert(write_index < datapath_work_queue.size());
+        datapath_work_queue[write_index++] = session;
+      }
+
       session->remote_credits -= now_sending;
 
+      /* Put all packets to send in the tx batch */
       for (size_t i = 0; i < now_sending; i++) {
         tx_routing_info_arr[batch_i] = session->remote_routing_info;
         tx_msg_buffer_arr[batch_i] = msg_info->msg_buffer;

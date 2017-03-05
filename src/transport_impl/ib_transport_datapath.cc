@@ -1,6 +1,12 @@
 #include "ib_transport.h"
 
 namespace ERpc {
+
+/*
+ * Packets that are the first packet in their MsgBuffer use one DMA, and may
+ * be inlined. Packets that are not the first packet use two DMAs, and are never
+ * inlined for simplicity.
+ */
 void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
                            MsgBuffer** msg_buffer_arr, size_t num_pkts) {
   assert(routing_info_arr != nullptr);
@@ -38,7 +44,7 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
       sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + data_bytes_to_send);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      /* Only single-sge work requests are inlined */
+      /* Only single-SGE work requests are inlined */
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
       wr.num_sge = 1;
     } else {
@@ -60,7 +66,10 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     wr.wr.ud.remote_qpn = ib_routing_info->qpn;
     wr.wr.ud.ah = &ib_routing_info->ah;
 
-    /* Update MsgBuffer progress tracking metadata */
+    /*
+     * Update MsgBuffer progress tracking metadata. This ensures that subsequent
+     * packets in this batch that belong to this MsgBuffer get sent correctly.
+     */
     msg_buffer->data_sent += data_bytes_to_send;
     msg_buffer->pkts_sent++;
   }

@@ -19,7 +19,6 @@ class Transport {
  public:
   /// Min MTU for any transport. Smaller than 4096 for prime RECV cachelines.
   static const size_t kMinMtu = 3800;
-  static const size_t kPostlist = 16;  ///< Maximum post list size
 
   // Queue depths
   static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
@@ -43,10 +42,16 @@ class Transport {
   ~Transport();
 
   /**
-   * @brief The generic packet transmission function
+   * @brief Transmit a batch of packets, and for each packet, update its
+   * MsgBuffer's progress tracking information.
    *
-   * Packets for which the offset is non-zero use 2 DMAs (header and data).
-   * Small packets have \p offset = 0, and use inline or single-DMA transfers.
+   * Multiple packets may belong to the same MsgBuffer. The transport determines
+   * the offset of each of these packets by updating the \p data_sent and
+   * \p pkts_sent field of the shared MsgBuffer.
+   *
+   * @param routing_info_arr Per-packet RoutingInfo
+   * @param msg_buffer_arr The MsgBuffer for each packet
+   * @param num_pkts The total number of packets to transmit (up to kPostlist)
    */
   void tx_burst(RoutingInfo const* const* routing_info_arr,
                 MsgBuffer** msg_buffer_arr, size_t num_pkts);
