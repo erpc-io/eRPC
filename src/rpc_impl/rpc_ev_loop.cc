@@ -14,16 +14,16 @@ void Rpc<Transport_>::run_event_loop_one() {
     mgmt_retry();
   }
 
-  process_datapath_work_queue();
+  process_datapath_tx_work_queue();
 }
 
 template <class Transport_>
-void Rpc<Transport_>::process_datapath_work_queue() {
+void Rpc<Transport_>::process_datapath_tx_work_queue() {
   size_t batch_i = 0;     /* Current batch index (<= kPostlist)*/
   size_t write_index = 0; /* Sessions that need more work are re-added here */
 
-  for (size_t i = 0; i < datapath_work_queue.size(); i++) {
-    Session *session = datapath_work_queue[i];
+  for (size_t i = 0; i < datapath_tx_work_queue.size(); i++) {
+    Session *session = datapath_tx_work_queue[i];
 
     for (size_t msg_i = 0; msg_i < Session::kSessionReqWindow; msg_i++) {
       Session::msg_info_t *msg_info = &session->msg_arr[msg_i];
@@ -41,8 +41,8 @@ void Rpc<Transport_>::process_datapath_work_queue() {
        * If we don't have credits, save this session for later & bail.
        */
       if (session->remote_credits == 0) {
-        assert(write_index < datapath_work_queue.size());
-        datapath_work_queue[write_index++] = session;
+        assert(write_index < datapath_tx_work_queue.size());
+        datapath_tx_work_queue[write_index++] = session;
 
         dpath_dprintf("eRPC Rpc: Session %u out of credits. Re-queueing.\n",
                       session->client.session_num);
@@ -95,8 +95,8 @@ void Rpc<Transport_>::process_datapath_work_queue() {
             "multi-packet message %zu in session %u.\n",
             now_sending, pkts_pending, msg_i, session->client.session_num);
 
-        assert(write_index < datapath_work_queue.size());
-        datapath_work_queue[write_index++] = session;
+        assert(write_index < datapath_tx_work_queue.size());
+        datapath_tx_work_queue[write_index++] = session;
       }
 
       session->remote_credits -= now_sending;
@@ -122,7 +122,7 @@ void Rpc<Transport_>::process_datapath_work_queue() {
   }
 
   /* Number of sessions left in the datapath work queue = write_index */
-  datapath_work_queue.resize(write_index);
+  datapath_tx_work_queue.resize(write_index);
 };
 
 }  // End ERpc

@@ -155,8 +155,12 @@ class Rpc {
   // rpc_datapath.cc
 
   /**
-   * @brief Try to enqueue a request MsgBuffer for transmission. This function
-   * initializes all the packet headers of the MsgBuffer.
+   * @brief Try to enqueue a request for transmission.
+   *
+   * If a message slot is available for this session, the request will be
+   * enqueued. In this case, a request number is assigned using the slot index,
+   * all packet headers of \p are filled in, and \p session is inserted into the
+   * datapath TX work queue.
    *
    * @param session The client session to send the request on
    * @param req_type The type of the request
@@ -239,9 +243,9 @@ class Rpc {
 
   // rpc_ev_loop.cc
 
-  /// Try to transmit packets for Sessions in the \p datapath_work_queue.
+  /// Try to transmit packets for Sessions in the \p datapath_tx_work_queue.
   /// Sessions for which all packets can be sent are removed from the queue.
-  void process_datapath_work_queue();
+  void process_datapath_tx_work_queue();
 
   // Constructor args
   Nexus *nexus;
@@ -269,7 +273,7 @@ class Rpc {
   std::vector<Session *> mgmt_retry_queue;
 
   /// Sessions for which (more) request or response packets need to be sent
-  std::vector<Session *> datapath_work_queue;
+  std::vector<Session *> datapath_tx_work_queue;
 
   /// Tx batch information for \p tx_burst
   //@{

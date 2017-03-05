@@ -59,7 +59,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       (req_num_arr[msg_arr_slot]++ * Session::kSessionReqWindow) + /* Shift */
       msg_arr_slot;
 
-  // Fill in the packet 0's header
+  // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = msg_buffer->get_pkthdr_0();
   pkthdr_0->req_type = req_type;
   pkthdr_0->msg_size = msg_buffer->data_size;
@@ -71,9 +71,11 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   pkthdr_0->req_num = req_num;
   /* pkthdr->magic is already filled in */
 
-  if (msg_buffer->num_pkts > 1) {
+  if (small_msg_likely(msg_buffer->num_pkts == 1)) {
+    /* Nothing else needs to be done for small packets */
+  } else {
     /*
-     * Headers for other packets are created by copying the 0th header, and
+     * Headers for non-zeroth packets are created by copying the 0th header, and
      * changing only the required fields. All request packets are Unexpected.
      */
     for (size_t i = 1; i < msg_buffer->num_pkts; i++) {
@@ -89,9 +91,9 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   session->msg_arr[msg_arr_slot].in_use = true;
 
   /* Add \p session to the work queue if it's not already present */
-  if (!session->in_datapath_work_queue) {
-    session->in_datapath_work_queue = true;
-    datapath_work_queue.push_back(session);
+  if (!session->in_datapath_tx_work_queue) {
+    session->in_datapath_tx_work_queue = true;
+    datapath_tx_work_queue.push_back(session);
   }
 
   return 0;
