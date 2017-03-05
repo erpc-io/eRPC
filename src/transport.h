@@ -17,9 +17,6 @@ namespace ERpc {
 /// Generic mostly-reliable transport
 class Transport {
  public:
-  /// Min MTU for any transport. Smaller than 4096 for prime RECV cachelines.
-  static const size_t kMinMtu = 3800;
-
   // Queue depths
   static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
   static const size_t kSendQueueDepth = 128;   ///< SEND queue size

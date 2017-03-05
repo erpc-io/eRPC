@@ -19,7 +19,7 @@ void Rpc<Transport_>::run_event_loop_one() {
 
 template <class Transport_>
 void Rpc<Transport_>::process_datapath_work_queue() {
-  size_t batch_i = 0;     /* Batch index of the packet */
+  size_t batch_i = 0;     /* Current batch index (<= kPostlist)*/
   size_t write_index = 0; /* Sessions that need more work are re-added here */
 
   for (size_t i = 0; i < datapath_work_queue.size(); i++) {

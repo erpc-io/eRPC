@@ -21,8 +21,7 @@ class Rpc {
   /// Max request or response size, excluding packet headers
   static const size_t kMaxMsgSize = MB(8);
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
-  static_assert((1ull << kPktNumBits) *
-                        (Transport::kMinMtu - sizeof(pkthdr_t)) >=
+  static_assert((1ull << kPktNumBits) * Transport_::kMaxDataPerPkt >=
                     kMaxMsgSize,
                 "");
 
@@ -241,6 +240,7 @@ class Rpc {
   // rpc_ev_loop.cc
 
   /// Try to transmit packets for Sessions in the \p datapath_work_queue.
+  /// Sessions for which all packets can be sent are removed from the queue.
   void process_datapath_work_queue();
 
   // Constructor args
