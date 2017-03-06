@@ -70,11 +70,11 @@ class MsgBuffer {
   /// \p buf must have space for \p data_bytes and one packet header.
   MsgBuffer(uint8_t *buf, size_t data_size)
       : buffer(Buffer::get_invalid_buffer()),
-        buf(buf),
+        buf(buf + sizeof(pkthdr_t)),
         data_size(data_size),
-        num_pkts(1) {
-    this->buf = buf + sizeof(pkthdr_t);
-  }
+        num_pkts(1) {}
+
+  MsgBuffer() : buffer(Buffer::get_invalid_buffer()) {}
 
   ~MsgBuffer() {}
 
@@ -95,12 +95,11 @@ class MsgBuffer {
     return (get_pkthdr_0()->magic == kPktHdrMagic);
   }
 
-  const Buffer buffer;     ///< The (optional) backing hugepage Buffer
-  const uint8_t *buf;      ///< Pointer to the first data byte
-  const size_t data_size;  ///< Total data bytes in the MsgBuffer
-  const size_t num_pkts;   ///< Total number of packets in this message
-
-  size_t data_sent = 0;  ///< Bytes of data already sent
+  Buffer buffer;           ///< The (optional) backing hugepage Buffer
+  uint8_t *buf = nullptr;  ///< Pointer to the first data byte
+  size_t data_size = 0;    ///< Total data bytes in the MsgBuffer
+  size_t num_pkts = 0;     ///< Total number of packets in this message
+  size_t data_sent = 0;    ///< Bytes of data already sent
   union {
     size_t pkts_sent = 0;  ///< Packets already sent (for tx MsgBuffers)
     size_t pkts_rcvd;      ///< Packets already received (for rx MsgBuffers)

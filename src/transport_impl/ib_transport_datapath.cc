@@ -88,9 +88,30 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
   send_wr[num_pkts - 1].next = &send_wr[num_pkts]; /* Restore chain; safe */
 }
 
-void IBTransport::rx_burst(Buffer* buffer_arr, size_t* num_pkts) {
+void IBTransport::rx_burst(MsgBuffer* buffer_arr, size_t* num_pkts) {
   assert(buffer_arr != nullptr);
   assert(num_pkts != nullptr);
+
+  int new_comps = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
+  assert(new_comps >= 0); /* When can this fail? */
+
+  if (new_comps == 0) {
+    num_pkts = 0;
+    return;
+  }
+
+  for (int i = 0; i < new_comps; i++) {
+    if (recv_wc[i].status != 0) {
+      fprintf(stderr, "Bad wc status %d\n", recv_wc[i].status);
+      exit(-1);
+    }
+  }
+
+  for (int i = 0; i < new_comps; i++) {
+    /* wc.byte_len includes GRH, whether or not GRH is DMA-ed */
+    size_t wc_len = recv_wc[i].byte_len - kGRHBytes;
+  }
+
   _unused(buffer_arr);
   _unused(num_pkts);
 }

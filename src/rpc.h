@@ -285,7 +285,7 @@ class Rpc {
   //@}
 
   /// Rx batch information for \p rx_burst
-  Buffer rx_msg_buffer_arr[Transport_::kPostlist];
+  MsgBuffer rx_msg_buffer_arr[Transport_::kPostlist];
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;

@@ -64,7 +64,7 @@ class Transport {
    * The Rpc layer controls posting of RECV descriptors explicitly using
    * the post_recvs() function.
    */
-  void rx_burst(Buffer* msg_buffer_arr, size_t* num_pkts);
+  void rx_burst(MsgBuffer* msg_buffer_arr, size_t* num_pkts);
 
   /// Post RECVs to the receive queue after processing \p rx_burst results
   void post_recvs(size_t num_recvs);

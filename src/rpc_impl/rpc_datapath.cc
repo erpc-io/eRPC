@@ -58,7 +58,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       (req_num_arr[free_sslot_i]++ * Session::kSessionReqWindow) + /* Shift */
       free_sslot_i;
 
-  // Fill in packet 0's header
+  /* Fill in packet 0's header. XXX: Optimize using preconstructed headers. */
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
   pkthdr_0->req_type = req_type;
   pkthdr_0->msg_size = req_msgbuf->data_size;
@@ -71,7 +71,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   /* pkthdr->magic is already filled in */
 
   if (small_msg_likely(req_msgbuf->num_pkts == 1)) {
-    /* Nothing else needs to be done for small packets */
+    /* Nothing more needs to be done for small packets */
   } else {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and

@@ -139,6 +139,9 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 }
 
 template <class Transport_>
-void Rpc<Transport_>::process_completions() {}
+void Rpc<Transport_>::process_completions() {
+  size_t num_pkts;
+  transport->rx_burst(rx_msg_buffer_arr, &num_pkts);
+}
 
 }  // End ERpc

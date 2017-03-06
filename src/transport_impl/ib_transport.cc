@@ -259,10 +259,11 @@ void IBTransport::init_recvs() {
   /* Initialize constant fields of RECV descriptors */
   for (size_t i = 0; i < kRecvQueueDepth; i++) {
     uint8_t *buf = (uint8_t *)recv_extent.buf;
+    size_t offset = (i * kRecvSize) + (64 - kGRHBytes);
 
     recv_sgl[i].length = kRecvSize;
     recv_sgl[i].lkey = recv_extent.lkey;
-    recv_sgl[i].addr = (uintptr_t)&buf[i * kRecvSize];
+    recv_sgl[i].addr = (uintptr_t)&buf[offset];
 
     recv_wr[i].wr_id = recv_sgl[i].addr; /* Debug */
     recv_wr[i].sg_list = &recv_sgl[i];

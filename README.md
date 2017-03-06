@@ -20,7 +20,8 @@
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
 
 ## Long-term TODOs
- * Optimize Mellanox drivers memcpy and function pointers. If inline size is
+ * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,
+   function pointers, and unused opcodes/QP types/cases. If inline size is
    fixed at 60 bytes, optimized that.
  * Need to have a test for session management request timeouts.
  * What happens in the following case:

@@ -16,6 +16,7 @@ class IBTransport : public Transport {
   static const size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static const size_t kRecvSlack = 32;   ///< RECVs accumulated before posting
   static const uint32_t kQKey = 0xffffffff;  ///< Secure key for all eRPC nodes
+  static const size_t kGRHBytes = 40;
 
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, ""); /* Capacity check */
   static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
@@ -67,27 +68,8 @@ class IBTransport : public Transport {
   // ib_transport_datapath.cc
   void tx_burst(RoutingInfo const *const *routing_info_arr,
                 MsgBuffer **msg_buffer_arr, size_t num_pkts);
-
-  void rx_burst(Buffer *buffer_arr, size_t *num_pkts);
+  void rx_burst(MsgBuffer *msg_buffer_arr, size_t *num_pkts);
   void post_recvs(size_t num_recvs);
-
-  /// Poll RECV CQ. Fill \p wc with \p num_comps completions from \p recv_cq.
-  inline void poll_recv_cq(int num_comps) {
-    int comps = 0;
-
-    while (comps < num_comps) {
-      int new_comps = ibv_poll_cq(recv_cq, num_comps - comps, &recv_wc[comps]);
-      if (new_comps != 0) {
-        // Ideally, we should check from comps -> new_comps - 1
-        if (recv_wc[comps].status != 0) {
-          fprintf(stderr, "Bad wc status %d\n", recv_wc[comps].status);
-          exit(0);
-        }
-
-        comps += new_comps;
-      }
-    }
-  }
 
   /// Get the current signaling flag, and poll the send CQ if we need to.
   /// Poll the send CQ if we need to.
@@ -198,7 +180,6 @@ class IBTransport : public Transport {
 
   // RECV
   size_t recv_head = 0;      ///< Current un-posted RECV buffer
-  size_t recv_slack = 0;     ///< RECVs to accumulate before post_recv()
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
 
   struct ibv_recv_wr recv_wr[kRecvQueueDepth];
