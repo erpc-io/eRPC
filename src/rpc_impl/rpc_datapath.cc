@@ -50,14 +50,13 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   }
 
   /* Find a free message slot in the session */
-  size_t free_sslot = session->sslot_free_vec.pop_back();
-  assert(free_sslot < Session::kSessionReqWindow);
-  assert(!session->sslot_arr[free_sslot].in_use);
+  size_t free_sslot_i = session->sslot_free_vec.pop_back();
+  assert(free_sslot_i < Session::kSessionReqWindow);
 
   /* Generate the next request number for this slot */
   size_t req_num =
-      (req_num_arr[free_sslot]++ * Session::kSessionReqWindow) + /* Shift */
-      free_sslot;
+      (req_num_arr[free_sslot_i]++ * Session::kSessionReqWindow) + /* Shift */
+      free_sslot_i;
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
@@ -87,8 +86,12 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   }
 
   /* Fill in the session message slot */
-  session->sslot_arr[free_sslot].req_msgbuf = req_msgbuf;
-  session->sslot_arr[free_sslot].in_use = true;
+  Session::sslot_t &free_sslot = session->sslot_arr[free_sslot_i];
+  assert(free_sslot.in_use == false);
+  assert(free_sslot.req_msgbuf == nullptr && free_sslot.resp_msgbuf == nullptr);
+
+  free_sslot.req_msgbuf = req_msgbuf;
+  free_sslot.in_use = true;
 
   /* Add \p session to the work queue if it's not already present */
   if (!session->in_datapath_tx_work_queue) {

@@ -30,9 +30,9 @@ class Session {
 
   /// Session slot = metadata maintained about an Rpc
   struct sslot_t {
-    bool in_use;             ///< True iff this slot is in use
-    MsgBuffer *req_msgbuf;   ///< The request MsgBuffer for this slot
-    MsgBuffer *resp_msgbuf;  ///< The response MsgBuffer for this slot
+    bool in_use = false;               ///< True iff this slot is in use
+    MsgBuffer *req_msgbuf = nullptr;   ///< The request MsgBuffer for this slot
+    MsgBuffer *resp_msgbuf = nullptr;  ///< The response MsgBuffer for this slot
 
     ///< A pre-allocated 4K packet buffer. XXX: unused
     Buffer _prealloc;
