@@ -25,13 +25,15 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
   for (size_t i = 0; i < datapath_tx_work_queue.size(); i++) {
     Session *session = datapath_tx_work_queue[i];
+    bool is_client = (session->role == Session::Role::kClient);
 
-    for (size_t msg_i = 0; msg_i < Session::kSessionReqWindow; msg_i++) {
-      Session::msg_info_t *msg_info = &session->msg_arr[msg_i];
-      MsgBuffer *msg_buffer = msg_info->msg_buffer;
+    for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
+      Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
+      MsgBuffer *msg_buffer =
+          is_client ? sslot->req_msgbuf : sslot->resp_msgbuf;
 
       /* Find a message slot for which we need to send packets */
-      if (!msg_info->in_use || msg_buffer->pkts_sent == msg_buffer->num_pkts) {
+      if (!sslot->in_use || msg_buffer->pkts_sent == msg_buffer->num_pkts) {
         continue;
       }
 
@@ -68,13 +70,14 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
         assert(batch_i < Transport_::kPostlist);
         tx_routing_info_arr[batch_i] = session->remote_routing_info;
-        tx_msg_buffer_arr[batch_i] = msg_info->msg_buffer;
+        tx_msg_buffer_arr[batch_i] = msg_buffer;
         batch_i++;
         session->remote_credits--;
 
         dpath_dprintf(
-            "eRPC Rpc: Sending single-packet message %zu in session %u.\n",
-            msg_i, session->client.session_num);
+            "eRPC Rpc: Sending single-packet %s (slot %zu in session %u).\n",
+            is_client ? "request" : "response", sslot_i,
+            session->client.session_num);
 
         if (batch_i == Transport_::kPostlist) {
           /* This will increment msg_buffer's pkts_sent and data_sent */
@@ -93,15 +96,17 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         now_sending = pkts_pending; /* All pkts of this message can be sent */
         dpath_dprintf(
             "eRPC Rpc: Sending all remaining %zu packets for "
-            "multi-packet message %zu in session %u.\n",
-            now_sending, msg_i, session->client.session_num);
+            "multi-packet %s (slot %zu in session %u).\n",
+            now_sending, is_client ? "request" : "response", sslot_i,
+            session->client.session_num);
       } else {
         /* We cannot send all msg packets, so save this session for later */
         now_sending = session->remote_credits;
         dpath_dprintf(
             "eRPC Rpc: Sending %zu of %zu remaining packets for "
-            "multi-packet message %zu in session %u.\n",
-            now_sending, pkts_pending, msg_i, session->client.session_num);
+            "multi-packet %s  (slot %zu in session %u).\n",
+            now_sending, pkts_pending, is_client ? "request" : "response",
+            sslot_i, session->client.session_num);
 
         assert(write_index < datapath_tx_work_queue.size());
         datapath_tx_work_queue[write_index++] = session;
@@ -112,7 +117,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       /* Put all packets to send in the tx batch */
       for (size_t i = 0; i < now_sending; i++) {
         tx_routing_info_arr[batch_i] = session->remote_routing_info;
-        tx_msg_buffer_arr[batch_i] = msg_info->msg_buffer;
+        tx_msg_buffer_arr[batch_i] = msg_buffer;
         batch_i++;
 
         if (batch_i == Transport_::kPostlist) {
@@ -131,6 +136,9 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
   /* Number of sessions left in the datapath work queue = write_index */
   datapath_tx_work_queue.resize(write_index);
-};
+}
+
+template <class Transport_>
+void Rpc<Transport_>::process_completions() {}
 
 }  // End ERpc

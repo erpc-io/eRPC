@@ -277,7 +277,8 @@ class Rpc {
   /// Sessions for which (more) request or response packets need to be sent
   std::vector<Session *> datapath_tx_work_queue;
 
-  /// Tx batch information for \p tx_burst
+  /// Tx batch information for interfacing between the event loop and the
+  /// transport.
   //@{
   RoutingInfo *tx_routing_info_arr[Transport_::kPostlist];
   MsgBuffer *tx_msg_buffer_arr[Transport_::kPostlist];

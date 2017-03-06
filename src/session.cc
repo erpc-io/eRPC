@@ -16,7 +16,7 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
   }
 
   for (size_t i = 0; i < kSessionReqWindow; i++) {
-    msg_arr_free_vec.push_back(i);
+    sslot_free_vec.push_back(i);
   }
 }
 

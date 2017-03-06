@@ -43,3 +43,14 @@
  * Flags that control performance:
    * kDataPathChecks
    * `small_msg_likely`
+
+
+
+    /* Avoid division for small packets */
+    if (small_msg_likely(data_size <= Transport_::kMaxDataPerPkt)) {
+      num_pkts = 1;
+    } else {
+      num_pkts = (data_size + (Transport_::kMaxDataPerPkt - 1)) /
+                 Transport_::kMaxDataPerPkt;
+    }
+

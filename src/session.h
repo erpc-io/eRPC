@@ -28,10 +28,11 @@ class Session {
   /* Needed for fast modulo calculation during request number assignment */
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
-  /// MsgBuffers and metadata maintained about a request or response message
-  struct msg_info_t {
-    bool in_use;            ///< True iff this slot is in use
-    MsgBuffer *msg_buffer;  ///< The MsgBuffer for this message
+  /// Session slot = metadata maintained about an Rpc
+  struct sslot_t {
+    bool in_use;             ///< True iff this slot is in use
+    MsgBuffer *req_msgbuf;   ///< The request MsgBuffer for this slot
+    MsgBuffer *resp_msgbuf;  ///< The response MsgBuffer for this slot
 
     ///< A pre-allocated 4K packet buffer. XXX: unused
     Buffer _prealloc;
@@ -59,8 +60,8 @@ class Session {
   SessionEndpoint client, server;           ///< Read-only endpoint metadata
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
   bool in_datapath_tx_work_queue;  ///< True iff session is in tx work queue
-  msg_info_t msg_arr[kSessionReqWindow];  ///< The message slots
-  FixedVector<size_t, kSessionReqWindow> msg_arr_free_vec;  ///< Free slots
+  sslot_t sslot_arr[kSessionReqWindow];                   ///< The session slots
+  FixedVector<size_t, kSessionReqWindow> sslot_free_vec;  ///< Free slots
 
   /// Depending on this session's role, save a pointer to \p server's or
   /// \p client's RoutingInfo for faster unconditional access
@@ -70,9 +71,6 @@ class Session {
   struct {
     uint64_t mgmt_req_tsc;  ///< Timestamp of the last management request
     bool is_cc = false;     ///< True if this session is congestion controlled
-
-    /// The next request number. For simplicitity, this is not a bitfield.
-    size_t next_req_num = 0;
   } client_info;
 };
 
