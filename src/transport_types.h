@@ -54,12 +54,26 @@ static_assert(8 + kMsgSizeBits + 16 + 1 + 1 + 1 + kPktNumBits + kReqNumBits +
                   128,
               "");
 
-/// A message buffer with headroom
+/// A message buffer with headers at the beginning and end
 class MsgBuffer {
  public:
+  /// Construct a MsgBuffer with a Buffer allocated by eRPC. The zeroth packet
+  /// header is stored at \p buffer.buf. \p buffer must have space for
+  /// \p data_bytes, and \p num_pkts packet headers.
   MsgBuffer(Buffer buffer, size_t data_size, size_t num_pkts)
       : buffer(buffer), data_size(data_size), num_pkts(num_pkts) {
+    assert(buffer.class_size >= data_size + num_pkts * sizeof(pkthdr_t));
     buf = buffer.buf + sizeof(pkthdr_t);
+  }
+
+  /// Construct a single-packet MsgBuffer using an arbitrary chunk of memory.
+  /// \p buf must have space for \p data_bytes and one packet header.
+  MsgBuffer(uint8_t *buf, size_t data_size)
+      : buffer(Buffer::get_invalid_buffer()),
+        buf(buf),
+        data_size(data_size),
+        num_pkts(1) {
+    this->buf = buf + sizeof(pkthdr_t);
   }
 
   ~MsgBuffer() {}
@@ -81,13 +95,16 @@ class MsgBuffer {
     return (get_pkthdr_0()->magic == kPktHdrMagic);
   }
 
-  const Buffer buffer;           ///< The backing hugepage Buffer
-  const uint8_t *buf = nullptr;  ///< Pointer to the first data byte
-  const size_t data_size = 0;    ///< Total data bytes in the MsgBuffer
-  const size_t num_pkts = 0;     ///< Total number of packets that will be sent
+  const Buffer buffer;     ///< The (optional) backing hugepage Buffer
+  const uint8_t *buf;      ///< Pointer to the first data byte
+  const size_t data_size;  ///< Total data bytes in the MsgBuffer
+  const size_t num_pkts;   ///< Total number of packets in this message
 
   size_t data_sent = 0;  ///< Bytes of data already sent
-  size_t pkts_sent = 0;  ///< Number of packets already sent
+  union {
+    size_t pkts_sent = 0;  ///< Packets already sent (for tx MsgBuffers)
+    size_t pkts_rcvd;      ///< Packets already received (for rx MsgBuffers)
+  };
 };
 
 /// Generic struct to store routing info for any transport.
