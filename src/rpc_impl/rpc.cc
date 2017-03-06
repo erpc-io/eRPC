@@ -62,7 +62,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
   try {
     /* Complete transport initialization using the hugepage allocator */
-    transport->init_hugepage_structures(huge_alloc);
+    transport->init_hugepage_structures(huge_alloc, rx_ring);
   } catch (std::runtime_error e) {
     /* Free any huge pages that \p transport might have created */
     delete huge_alloc;

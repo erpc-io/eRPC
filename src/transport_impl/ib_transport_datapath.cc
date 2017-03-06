@@ -88,37 +88,62 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
   send_wr[num_pkts - 1].next = &send_wr[num_pkts]; /* Restore chain; safe */
 }
 
-void IBTransport::rx_burst(MsgBuffer* buffer_arr, size_t* num_pkts) {
-  assert(buffer_arr != nullptr);
-  assert(num_pkts != nullptr);
-
+size_t IBTransport::rx_burst() {
   int new_comps = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
   assert(new_comps >= 0); /* When can this fail? */
 
-  if (new_comps == 0) {
-    num_pkts = 0;
-    return;
-  }
-
-  for (int i = 0; i < new_comps; i++) {
-    if (recv_wc[i].status != 0) {
-      fprintf(stderr, "Bad wc status %d\n", recv_wc[i].status);
-      exit(-1);
+  if (kDatapathChecks) {
+    for (int i = 0; i < new_comps; i++) {
+      if (unlikely(recv_wc[i].status != 0)) {
+        fprintf(stderr, "Bad wc status %d\n", recv_wc[i].status);
+        exit(-1);
+      }
     }
   }
 
-  for (int i = 0; i < new_comps; i++) {
-    /* wc.byte_len includes GRH, whether or not GRH is DMA-ed */
-    size_t wc_len = recv_wc[i].byte_len - kGRHBytes;
-  }
-
-  _unused(buffer_arr);
-  _unused(num_pkts);
+  return (size_t)new_comps;
 }
 
 void IBTransport::post_recvs(size_t num_recvs) {
-  assert(num_recvs > 0);
-  _unused(num_recvs);
+  assert(!fast_recv_used);              /* Not supported yet */
+  assert(num_recvs <= kRecvQueueDepth); /* num_recvs can be 0 */
+  assert(recvs_to_post < kRecvSlack);
+
+  recvs_to_post += num_recvs;
+  if (recvs_to_post < kRecvSlack) {
+    return;
+  }
+
+  /* The recvs posted are @first_wr through @last_wr, inclusive */
+  struct ibv_recv_wr *first_wr, *last_wr, *temp_wr, *bad_wr;
+
+  int ret;
+  size_t first_wr_i = recv_head;
+  size_t last_wr_i = first_wr_i + (recvs_to_post - 1);
+  if (last_wr_i >= kRecvQueueDepth) {
+    last_wr_i -= kRecvQueueDepth;
+  }
+
+  first_wr = &recv_wr[first_wr_i];
+  last_wr = &recv_wr[last_wr_i];
+  temp_wr = last_wr->next;
+
+  last_wr->next = nullptr; /* Breaker of chains */
+
+  ret = ibv_post_recv(qp, first_wr, &bad_wr);
+  if (ret != 0) {
+    fprintf(stderr, "eRPC IBTransport: ibv_post_recv error %d\n", ret);
+    exit(-1);
+  }
+
+  last_wr->next = temp_wr; /* Restore circularity */
+
+  /* Update RECV head: go to the last wr posted and take 1 more step */
+  recv_head = last_wr_i;
+  recv_head = mod_add_one<kRecvQueueDepth>(recv_head);
+
+  /* Reset slack counter */
+  recvs_to_post = 0;
 }
 
 }  // End ERpc

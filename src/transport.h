@@ -24,14 +24,26 @@ class Transport {
   static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
   static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 
+  /**
+   * @brief Partially construct the transport object without using eRPC's
+   * hugepage allocator. The device driver is allowed to use its own hugepages
+   * (with a different allocator).
+   *
+   * This function must initialize \p reg_mr_func and \p dereg_mr_func, which
+   * will be used to construct the allocator.
+   *
+   * @throw runtime_error if creation fails
+   */
   Transport(TransportType transport_type, uint8_t app_tid, uint8_t phy_port);
 
   /**
-   * @brief Initialize transport structures that require hugepages
+   * @brief Initialize transport structures that require hugepages, and fill
+   * the RX ring.
+   *
    * @throw runtime_error if initialization fails. This exception is caught
    * in the parent Rpc, which then deletes \p huge_alloc so we don't need to.
    */
-  void init_hugepage_structures(HugeAllocator* huge_alloc);
+  void init_hugepage_structures(HugeAllocator* huge_alloc, void** rx_ring);
 
   /// Initialize the memory registration and deregistratin functions
   void init_mem_reg_funcs();
@@ -56,17 +68,18 @@ class Transport {
   /**
    * @brief The generic packet reception function
    *
-   * This function returns pointers to the transport's RECV DMA ring buffers,
-   * so it must not re-post the returned ring buffers to the NIC (because then
-   * the NIC could overwrite the buffers while the Rpc layer  is processing
-   * them.
+   * This function returns the number of new packets available in the RX ring.
    *
    * The Rpc layer controls posting of RECV descriptors explicitly using
    * the post_recvs() function.
    */
-  void rx_burst(MsgBuffer* msg_buffer_arr, size_t* num_pkts);
+  size_t rx_burst();
 
-  /// Post RECVs to the receive queue after processing \p rx_burst results
+  /**
+   * @brief Post RECVs to the receive queue
+   *
+   * @param num_recvs The zero or more RECVs to post
+   */
   void post_recvs(size_t num_recvs);
 
   /// Fill-in local routing information

@@ -22,7 +22,7 @@
 ## Long-term TODOs
  * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,
    function pointers, and unused opcodes/QP types/cases. If inline size is
-   fixed at 60 bytes, optimized that.
+   fixed at 60 bytes, optimized that. Add fast RECV posting.
  * Need to have a test for session management request timeouts.
  * What happens in the following case:
    1. Requester sends a connect packet (packet 1). Packet 1 gets delayed.

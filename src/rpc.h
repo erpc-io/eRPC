@@ -29,7 +29,7 @@ class Rpc {
   static const size_t kInitialHugeAllocSize = (128 * MB(1));
 
   /// Max number of unexpected *packets* kept outstanding by this Rpc
-  static const size_t kRpcPktWindow = 20;
+  static const size_t kRpcUnexpPktWindow = 20;
 
   /// Error codes returned by the Rpc datapath
   enum class RpcDatapathErrCode : int {
@@ -258,9 +258,12 @@ class Rpc {
   size_t numa_node;
 
   // Others
-  Transport_ *transport = nullptr;       ///< The unreliable transport
-  HugeAllocator *huge_alloc = nullptr;   ///< This thread's hugepage allocator
-  size_t unexp_credits = kRpcPktWindow;  ///< Available unexpected pkt slots
+  Transport_ *transport = nullptr;      ///< The unreliable transport
+  HugeAllocator *huge_alloc = nullptr;  ///< This thread's hugepage allocator
+  size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available unexpe pkt slots
+
+  void *rx_ring[Transport_::kRecvQueueDepth];  ///< The transport's RX ring
+  size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
 
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};

@@ -35,22 +35,8 @@ class IBTransport : public Transport {
   };
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 
-  /**
-   * @brief Partially construct the transport object without using eRPC's
-   * hugepage allocator. The device driver is allowed to use its own hugepages.
-   *
-   * This function must initialize \p reg_mr_func and \p dereg_mr_func.
-   *
-   * @throw runtime_error if creation fails
-   */
   IBTransport(uint8_t phy_port, uint8_t app_tid);
-
-  /**
-   * @brief Finish transport initialization using \p huge_alloc
-   *
-   * @throw runtime_error if initialization fails
-   */
-  void init_hugepage_structures(HugeAllocator *huge_alloc);
+  void init_hugepage_structures(HugeAllocator *huge_alloc, void **rx_ring);
 
   ~IBTransport();
 
@@ -68,7 +54,7 @@ class IBTransport : public Transport {
   // ib_transport_datapath.cc
   void tx_burst(RoutingInfo const *const *routing_info_arr,
                 MsgBuffer **msg_buffer_arr, size_t num_pkts);
-  void rx_burst(MsgBuffer *msg_buffer_arr, size_t *num_pkts);
+  size_t rx_burst();
   void post_recvs(size_t num_recvs);
 
   /// Get the current signaling flag, and poll the send CQ if we need to.
@@ -155,10 +141,12 @@ class IBTransport : public Transport {
   void init_mem_reg_funcs();
 
   /**
-   * @brief Initialize RECV buffers and constant fields of RECV descriptors
+   * @brief Initialize RECV buffers and constant fields of RECV descriptors.
+   * Fill in the Rpc's RX ring.
+   *
    * @throw runtime_error if RECV buffer hugepage allocation fails
    */
-  void init_recvs();
+  void init_recvs(void **rx_ring);
 
   /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
   void init_sends();
@@ -179,7 +167,7 @@ class IBTransport : public Transport {
   struct ibv_sge send_sgl[kPostlist][2];     /* 2 SGE/wr for header & payload */
 
   // RECV
-  size_t recv_head = 0;      ///< Current un-posted RECV buffer
+  size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
 
   struct ibv_recv_wr recv_wr[kRecvQueueDepth];

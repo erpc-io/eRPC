@@ -236,30 +236,43 @@ void IBTransport::init_mem_reg_funcs() {
   dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
 }
 
-void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc) {
+void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc,
+                                           void **rx_ring) {
+  assert(huge_alloc != nullptr);
+  assert(rx_ring != nullptr);
+
   this->huge_alloc = huge_alloc;
   this->numa_node = huge_alloc->get_numa_node();
 
-  init_recvs();
+  init_recvs(rx_ring);
   init_sends();
 }
 
-void IBTransport::init_recvs() {
+void IBTransport::init_recvs(void **rx_ring) {
+  assert(rx_ring != nullptr);
+
   std::ostringstream xmsg; /* The exception message */
 
   /* Initialize the memory region for RECVs */
-  size_t size = kRecvQueueDepth * kRecvSize;
-  recv_extent = huge_alloc->alloc(size);
+  size_t recv_extent_size = kRecvQueueDepth * kRecvSize;
+  recv_extent = huge_alloc->alloc(recv_extent_size);
   if (recv_extent.buf == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
-         << (double)size / MB(1) << "MB for RECV buffers.";
+         << (double)recv_extent_size / MB(1) << "MB for RECV buffers.";
     throw std::runtime_error(xmsg.str());
   }
 
   /* Initialize constant fields of RECV descriptors */
   for (size_t i = 0; i < kRecvQueueDepth; i++) {
     uint8_t *buf = (uint8_t *)recv_extent.buf;
+
+    /*
+     * From each slot of size kRecvSize = (kMTU + 64), we give up the first
+     * (64 - kGRHBytes) bytes. Each slot is still large enough to receive the
+     * GRH and kMTU payload bytes.
+     */
     size_t offset = (i * kRecvSize) + (64 - kGRHBytes);
+    assert(offset + (kGRHBytes + kMTU) <= recv_extent_size);
 
     recv_sgl[i].length = kRecvSize;
     recv_sgl[i].lkey = recv_extent.lkey;
@@ -271,7 +284,12 @@ void IBTransport::init_recvs() {
 
     /* Circular link */
     recv_wr[i].next = (i < kRecvQueueDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
+
+    /* RX ring entry */
+    rx_ring[i] = &buf[offset + kGRHBytes];
   }
+
+  post_recvs(kRecvQueueDepth);
 }
 
 void IBTransport::init_sends() {
