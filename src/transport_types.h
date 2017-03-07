@@ -29,28 +29,31 @@ static const size_t kReqNumBits = 44;   ///< Bits for request number
 
 /// Debug bits for packet header. Also useful for sizing pkthdr_t to 128 bits.
 static const size_t kPktHdrMagicBits =
-    128 - (8 + kMsgSizeBits + 16 + 1 + 1 + 1 + kPktNumBits + kReqNumBits);
+    128 - (8 + kMsgSizeBits + 16 + 1 + 1 + 1 + 1 + kPktNumBits + kReqNumBits);
 static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
-static_assert(kPktHdrMagicBits == 20, ""); /* Just to keep track */
+static_assert(kPktHdrMagicBits == 19, ""); /* Just to keep track */
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 
 struct pkthdr_t {
-  uint8_t req_type;                  /// RPC request type
+  uint64_t req_type : 8;             /// RPC request type
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t rem_session_num : 16;     ///< Session number of the remote session
-  uint64_t is_req : 1;               ///< 1 if this packet is a request packet
-  uint64_t is_first : 1;     ///< 1 if this packet is the first message packet
-  uint64_t is_expected : 1;  ///< 1 if this packet is an "expected" packet
+  uint64_t is_credit_return : 1;     ///< 1 if this packet is a credit return
+  uint64_t is_req : 1;   ///< 1 if this packet is a request data packet
+  uint64_t is_resp : 1;  ///< 1 if this packet is a response data packet
+  /// 1 if this packet is unexpected. This can be computed using is_req,
+  /// is_resp, and pkt_num, but it's useful to have it separately.
+  uint64_t is_unexp : 1;
   uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
   uint64_t req_num : kReqNumBits;     ///< Request number of this packet
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
-};
+} __attribute__((packed));
 
 static_assert(sizeof(pkthdr_t) == 16, "");
 /* Cover all the bitfields to make copying cheaper */
-static_assert(8 + kMsgSizeBits + 16 + 1 + 1 + 1 + kPktNumBits + kReqNumBits +
-                      kPktHdrMagicBits ==
+static_assert(8 + kMsgSizeBits + 16 + 1 + 1 + 1 + 1 + kPktNumBits +
+                      kReqNumBits + kPktHdrMagicBits ==
                   128,
               "");
 

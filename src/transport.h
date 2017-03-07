@@ -43,7 +43,7 @@ class Transport {
    * @throw runtime_error if initialization fails. This exception is caught
    * in the parent Rpc, which then deletes \p huge_alloc so we don't need to.
    */
-  void init_hugepage_structures(HugeAllocator* huge_alloc, void** rx_ring);
+  void init_hugepage_structures(HugeAllocator* huge_alloc, uint8_t** rx_ring);
 
   /// Initialize the memory registration and deregistratin functions
   void init_mem_reg_funcs();

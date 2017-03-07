@@ -237,7 +237,7 @@ void IBTransport::init_mem_reg_funcs() {
 }
 
 void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc,
-                                           void **rx_ring) {
+                                           uint8_t **rx_ring) {
   assert(huge_alloc != nullptr);
   assert(rx_ring != nullptr);
 
@@ -248,7 +248,7 @@ void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc,
   init_sends();
 }
 
-void IBTransport::init_recvs(void **rx_ring) {
+void IBTransport::init_recvs(uint8_t **rx_ring) {
   assert(rx_ring != nullptr);
 
   std::ostringstream xmsg; /* The exception message */
@@ -289,6 +289,7 @@ void IBTransport::init_recvs(void **rx_ring) {
     rx_ring[i] = &buf[offset + kGRHBytes];
   }
 
+  /* Fill the RECV queue */
   post_recvs(kRecvQueueDepth);
 }
 

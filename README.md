@@ -16,8 +16,10 @@
 ## API notes
 
 ## Short-term TODOs
+ * How are credit return packets handled in `process_datapath_tx_work_queue`?
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
+ * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
 
 ## Long-term TODOs
  * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,

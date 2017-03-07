@@ -63,9 +63,10 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   pkthdr_0->req_type = req_type;
   pkthdr_0->msg_size = req_msgbuf->data_size;
   pkthdr_0->rem_session_num = session->server.session_num;
+  pkthdr_0->is_credit_return = 0;
   pkthdr_0->is_req = 1;
-  pkthdr_0->is_first = 1;
-  pkthdr_0->is_expected = 0;
+  pkthdr_0->is_resp = 0;
+  pkthdr_0->is_unexp = 1; /* Request packets are unexpected */
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = req_num;
   /* pkthdr->magic is already filled in */
@@ -80,7 +81,6 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     for (size_t i = 1; i < req_msgbuf->num_pkts; i++) {
       pkthdr_t *pkthdr_i = req_msgbuf->get_pkthdr_n(i);
       *pkthdr_i = *pkthdr_0;
-      pkthdr_i->is_first = 0;
       pkthdr_i->pkt_num = i;
     }
   }

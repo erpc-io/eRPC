@@ -16,7 +16,19 @@ namespace ERpc {
 // Debug macros
 static const bool kVerbose = true;  ///< Debug printing for non-datapath stuff
 static const bool kDatapathVerbose = true;  ///< Debug printing in datapatg
-static const bool kDatapathChecks = true;   ///< Disable for max perf datapath
+
+// Performance settings - disable for max perf, less usable datapath
+
+/// When enabled, the datapath performs sanity checks on user arguments
+static const bool kDatapathChecks = true;
+
+/// When enabled, the datapath handles sessions for which session credits are
+/// temporarily exhaused. Do not enable if multi-packet messages will be used.
+static const bool kHandleSessionCredits = true;
+
+/// When enabled, the datapath handles cases where Rpc runs out of Unexpected
+/// window slots. Do not enable if multi-pkt messages will be used.
+static const bool kHandleUnexpWindow = true;
 
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \
@@ -123,7 +135,7 @@ static std::string trim_hostname(std::string hostname) {
 
 /// Optimized (x + 1) % N
 template <size_t N>
-static constexpr size_t mod_add_one(size_t &x) {
+static constexpr size_t mod_add_one(size_t x) {
   return (x + 1) == N ? 0 : x + 1;
 }
 

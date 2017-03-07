@@ -247,6 +247,13 @@ class Rpc {
   /// Sessions for which all packets can be sent are removed from the queue.
   void process_datapath_tx_work_queue();
 
+  /// Try to transmit a multi-packet message
+  void process_datapath_tx_work_queue_multi_pkt_one(Session *session,
+                                                    MsgBuffer *msg_buffer,
+                                                    size_t sslot_i,
+                                                    size_t &batch_i,
+                                                    size_t &write_index);
+
   void process_completions();
 
   // Constructor args
@@ -262,7 +269,7 @@ class Rpc {
   HugeAllocator *huge_alloc = nullptr;  ///< This thread's hugepage allocator
   size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available unexpe pkt slots
 
-  void *rx_ring[Transport_::kRecvQueueDepth];  ///< The transport's RX ring
+  uint8_t *rx_ring[Transport_::kRecvQueueDepth];  ///< The transport's RX ring
   size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
 
   /// The next request number prefix for each session request window slot

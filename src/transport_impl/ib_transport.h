@@ -36,7 +36,7 @@ class IBTransport : public Transport {
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 
   IBTransport(uint8_t phy_port, uint8_t app_tid);
-  void init_hugepage_structures(HugeAllocator *huge_alloc, void **rx_ring);
+  void init_hugepage_structures(HugeAllocator *huge_alloc, uint8_t **rx_ring);
 
   ~IBTransport();
 
@@ -141,12 +141,12 @@ class IBTransport : public Transport {
   void init_mem_reg_funcs();
 
   /**
-   * @brief Initialize RECV buffers and constant fields of RECV descriptors.
-   * Fill in the Rpc's RX ring.
+   * @brief Initialize constant fields of RECV descriptors, fill in the Rpc's
+   * RX ring, and fill the RECV queue.
    *
    * @throw runtime_error if RECV buffer hugepage allocation fails
    */
-  void init_recvs(void **rx_ring);
+  void init_recvs(uint8_t **rx_ring);
 
   /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
   void init_sends();
