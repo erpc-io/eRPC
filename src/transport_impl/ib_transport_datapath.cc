@@ -20,9 +20,16 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     MsgBuffer* msg_buffer = msg_buffer_arr[i];
     assert(msg_buffer->buf != nullptr);
 
-    /* Data bytes left to send in the message */
+    /*
+     * Compute the data bytes left to send in the message. This can be zero for
+     * credit return packets only.
+     */
+    assert(msg_buffer->data_size >= msg_buffer->data_sent);
     size_t data_bytes_left = (msg_buffer->data_size - msg_buffer->data_sent);
-    assert(data_bytes_left > 0);
+    if (data_bytes_left == 0) {
+      assert(msg_buffer->num_pkts == 1);
+      assert(msg_buffer->get_pkthdr_0()->is_credit_return == 1);
+    }
 
     /* Number of data bytes that will be sent with this work request */
     size_t data_bytes_to_send =
@@ -38,7 +45,10 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     wr.send_flags = get_signaled_flag();
 
     if (msg_buffer->pkts_sent == 0) {
-      /* This is the first packet, so we need only 1 SGE */
+      /*
+       * This is the first packet, so we need only 1 SGE. This can be a credit
+       * return packet.
+       */
       pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + data_bytes_to_send);

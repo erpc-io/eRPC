@@ -27,10 +27,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     Session *session = datapath_tx_work_queue[i];
     bool is_req = (session->role == Session::Role::kClient);
 
-    /*
-     * XXX: Is it better to loop over the in_use slots only. Doing so will
-     * require an additional vector in Session to store in_use slots.
-     */
+    /* XXX: Should we loop over only the in_use slots? */
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
       Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
       MsgBuffer *msg_buffer = is_req ? sslot->req_msgbuf : sslot->resp_msgbuf;
@@ -65,7 +62,10 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
       /* If we are here, we have session credits */
       if (small_msg_likely(msg_buffer->num_pkts == 1)) {
-        /* Optimize for small messages that fit in one packet. */
+        /*
+         * Optimize for small messages that fit in one packet. This takes care
+         * of credit return packets.
+         */
         assert(msg_buffer->data_sent == 0);
         assert(msg_buffer->pkts_sent == 0);
 
