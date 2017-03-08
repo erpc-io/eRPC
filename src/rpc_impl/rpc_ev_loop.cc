@@ -14,8 +14,8 @@ void Rpc<Transport_>::run_event_loop_one() {
     mgmt_retry();
   }
 
-  process_datapath_tx_work_queue();
-  process_completions();
+  process_completions();            /* RX */
+  process_datapath_tx_work_queue(); /* TX */
 }
 
 template <class Transport_>
@@ -30,15 +30,15 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     /* XXX: Should we loop over only the in_use slots? */
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
       Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
-      MsgBuffer *msg_buffer = is_req ? sslot->req_msgbuf : sslot->resp_msgbuf;
+      MsgBuffer *msg_buffer = is_req ? &sslot->req_msgbuf : &sslot->resp_msgbuf;
 
       /* Find a message slot for which we need to send packets */
       if (!sslot->in_use || msg_buffer->pkts_sent == msg_buffer->num_pkts) {
         continue;
       }
 
-      /* Sanity check */
-      assert(msg_buffer != nullptr && msg_buffer->buf != nullptr);
+      /* If we are here, this message needs packet TX. */
+      assert(msg_buffer->buf != nullptr);
       assert(msg_buffer->check_pkthdr_0());
       if (is_req) {
         assert(msg_buffer->get_pkthdr_0()->is_req == 1);
@@ -46,11 +46,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         assert(msg_buffer->get_pkthdr_0()->is_req == 0);
       }
 
-      /*
-       * If we are here, this message needs packet TX.
-       *
-       * If session credits are enabled, save & bail if we're out of credits.
-       */
+      /* If session credits are enabled, save & bail if we're out of credits. */
       if (kHandleSessionCredits && session->remote_credits == 0) {
         assert(write_index < datapath_tx_work_queue.size());
         datapath_tx_work_queue[write_index++] = session;
@@ -60,12 +56,8 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         break; /* Try the next session */
       }
 
-      /* If we are here, we have session credits */
       if (small_msg_likely(msg_buffer->num_pkts == 1)) {
-        /*
-         * Optimize for small messages that fit in one packet. This takes care
-         * of credit return packets.
-         */
+        /* Optimize for small/credit-return messages that fit in one packet */
         assert(msg_buffer->data_sent == 0);
         assert(msg_buffer->pkts_sent == 0);
 
@@ -132,15 +124,14 @@ template <class Transport_>
 void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
     Session *session, MsgBuffer *msg_buffer, size_t sslot_i, size_t &batch_i,
     size_t &write_index) {
-  /* Preconditions from process_datapath_tx_work_queue() */
+  /*
+   * Preconditions from process_datapath_tx_work_queue(). Session credits and
+   * Unexpected window must be enabled if large packts are used.
+   */
   assert(session != nullptr);
-  assert(msg_buffer != nullptr);
   assert(msg_buffer->num_pkts > 1); /* Must be a multi-packet message */
-  assert(msg_buffer->pkts_sent < msg_buffer->num_pkts);
-  assert(session->remote_credits > 1);
-
-  /* Session credits and Unexpected window must be enabled for larget pkts */
-  assert(kHandleSessionCredits);
+  assert(msg_buffer->num_pkts > msg_buffer->pkts_sent);
+  assert(kHandleSessionCredits && session->remote_credits > 1);
   assert(kHandleUnexpWindow);
 
   bool is_req = (session->role == Session::Role::kClient);
@@ -148,7 +139,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
 
   /*
    * First compute the number of packets we would send if we did not care
-   * about the Unexpected window. Due to preconditions, there is at lease one.
+   * about the Unexpected window. Due to preconditions, this is >= 1.
    */
   size_t without_unexp_window = std::min(pkts_pending, session->remote_credits);
   assert(without_unexp_window >= 1);

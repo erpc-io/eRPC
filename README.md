@@ -16,7 +16,6 @@
 ## API notes
 
 ## Short-term TODOs
- * How are credit return packets handled in `process_datapath_tx_work_queue`?
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
@@ -25,6 +24,8 @@
  * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,
    function pointers, and unused opcodes/QP types/cases. If inline size is
    fixed at 60 bytes, optimized that. Add fast RECV posting.
+ * Are we losing some performance by using `size_t` instead of `uint32_t` in
+   in-memory structs like Buffer and MsgBuffer?
  * Need to have a test for session management request timeouts.
  * What happens in the following case:
    1. Requester sends a connect packet (packet 1). Packet 1 gets delayed.

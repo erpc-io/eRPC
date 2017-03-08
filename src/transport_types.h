@@ -99,7 +99,9 @@ class MsgBuffer {
   }
 
   Buffer buffer;           ///< The (optional) backing hugepage Buffer
-  uint8_t *buf = nullptr;  ///< Pointer to the first data byte
+  /// Pointer to the first *data* byte. (\p buffer.buf does not point to the
+  /// first data byte.) A MsgBuffer is invalid if this is NULL.
+  uint8_t *buf = nullptr;
   size_t data_size = 0;    ///< Total data bytes in the MsgBuffer
   size_t num_pkts = 0;     ///< Total number of packets in this message
   size_t data_sent = 0;    ///< Bytes of data already sent

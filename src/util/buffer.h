@@ -19,6 +19,7 @@ class Buffer {
 
   static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
 
+  /// The backing memory of this Buffer. The Buffer is invalid if this is NULL.
   uint8_t *buf = nullptr;
   size_t class_size = 0;  ///< The class size
   uint32_t lkey = 0;      ///< The memory registration lkey

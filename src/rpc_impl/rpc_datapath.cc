@@ -88,9 +88,10 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   /* Fill in the session message slot */
   Session::sslot_t &free_sslot = session->sslot_arr[free_sslot_i];
   assert(free_sslot.in_use == false);
-  assert(free_sslot.req_msgbuf == nullptr && free_sslot.resp_msgbuf == nullptr);
+  assert(free_sslot.req_msgbuf.buf == nullptr &&
+         free_sslot.resp_msgbuf.buf == nullptr);
 
-  free_sslot.req_msgbuf = req_msgbuf;
+  free_sslot.req_msgbuf = *req_msgbuf; /* Copy the request MsgBuffer */
   free_sslot.in_use = true;
 
   /* Add \p session to the work queue if it's not already present */
