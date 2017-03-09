@@ -205,7 +205,7 @@ void Rpc<Transport_>::process_completions() {
 
     pkthdr_t *pkthdr = (pkthdr_t *)pkt;
     assert(pkthdr->magic == kPktHdrMagic);
-    assert(pkthdr->msg_size <= kMaxMsgSize);
+    assert(pkthdr->msg_size <= kMaxMsgSize); /* msg_size can be 0 here */
 
     uint16_t session_num = pkthdr->rem_session_num; /* Local session */
     assert(session_num < session_vec.size());
@@ -213,7 +213,8 @@ void Rpc<Transport_>::process_completions() {
     Session *session = session_vec[session_num];
     if (unlikely(session == nullptr)) {
       fprintf(stderr,
-              "eRPC Rpc: Warning: Received packet for buried session %u.\n",
+              "eRPC Rpc: Warning: Received packet for buried session %u. "
+              "Dropping packet.\n",
               session_num);
       continue;
     }
@@ -221,12 +222,12 @@ void Rpc<Transport_>::process_completions() {
     if (unlikely(session->state != SessionState::kConnected)) {
       fprintf(stderr,
               "eRPC Rpc: Warning: Received packet for unconnected session %u. "
-              "Session state is %s.\n",
+              "Session state is %s. Dropping packet.\n",
               session_num, session_state_str(session->state).c_str());
       continue;
     }
 
-    /* If we are here, we have a valid packet for a connection session */
+    /* If we are here, we have a valid packet for a connected session */
     dpath_dprintf("eRPC Rpc: Received packet %s.\n",
                   pkthdr->to_string().c_str());
 
@@ -244,30 +245,22 @@ void Rpc<Transport_>::process_completions() {
       unexp_credits++;
     }
 
-    /*
-     * XXX: Credits (session and Unexp window) can be handled here by looking
-     * at the packet header's unexp field.
-     */
-
-    size_t req_num = pkthdr->req_num;
-    size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
-    _unused(sslot_i);
-    size_t pkt_num = pkthdr->pkt_num;
-
     if (small_msg_likely(pkthdr->msg_size <= Transport_::kMaxDataPerPkt)) {
-      /* Optimize for small packets */
-      switch (pkthdr->pkt_type) {
-        case kPktTypeReq:
-          break;
-        case kPktTypeResp:
-          if (kHandleSessionCredits && pkt_num == 0) {
-            assert(session->remote_credits < Session::kSessionCredits);
-            session->remote_credits++;
-          }
+      assert(pkthdr->pkt_num == 0);
+      assert(pkthdr->msg_size > 0);
 
-          /* Which response packets cause unexp_credits to go up? */
+      size_t req_num = pkthdr->req_num;
+      size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
+      Session::sslot_t &slot = session->sslot_arr[sslot_i];
+      assert(!slot.in_use);
+      slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
-          break;
+      /* Optimize for small pkts. We've already handled credit returns above. */
+      if (pkthdr->pkt_type == kPktTypeReq) {
+      } else if (pkthdr->pkt_type == kPktTypeResp) {
+      } else {
+        assert(false);
+        exit(-1);
       }
     } else {
     }

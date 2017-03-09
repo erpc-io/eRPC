@@ -86,8 +86,6 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   /* Fill in the session message slot */
   Session::sslot_t &free_sslot = session->sslot_arr[free_sslot_i];
   assert(free_sslot.in_use == false);
-  assert(free_sslot.rx_msgbuf.buf == nullptr &&
-         free_sslot.tx_msgbuf.buf == nullptr);
 
   free_sslot.tx_msgbuf = *req_msgbuf; /* Copy the request MsgBuffer */
   free_sslot.in_use = true;

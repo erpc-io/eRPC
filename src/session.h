@@ -31,7 +31,9 @@ class Session {
    */
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
-  /// Session slot = metadata maintained about an Rpc
+  /// Session slot metadata maintained about an Rpc. A session slot is invalid
+  /// if \p in_use is false. In this case, \p rx_msgbuf and \p tx_msgbuf can
+  /// contain garbage.
   struct sslot_t {
     bool in_use = false;  ///< True iff this slot is in use
     MsgBuffer rx_msgbuf;  ///< The RX MsgBuffer for this slot

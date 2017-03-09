@@ -95,7 +95,8 @@ static_assert(8 + kMsgSizeBits + 16 + 2 + 1 + kPktNumBits + kReqNumBits +
                   128,
               "");
 
-/// A message buffer with headers at the beginning and end
+/// A message buffer with headers at the beginning and end. A MsgBuffer is
+/// invalid if its \p buf field is NULL.
 class MsgBuffer {
  public:
   /// Construct a MsgBuffer with a Buffer allocated by eRPC. The zeroth packet
@@ -138,7 +139,7 @@ class MsgBuffer {
 
   Buffer buffer;  ///< The (optional) backing hugepage Buffer
   /// Pointer to the first *data* byte. (\p buffer.buf does not point to the
-  /// first data byte.) A MsgBuffer is invalid if this is NULL.
+  /// first data byte.)
   uint8_t *buf = nullptr;
   size_t data_size = 0;  ///< Total data bytes in the MsgBuffer
   size_t num_pkts = 0;   ///< Total number of packets in this message
