@@ -249,12 +249,22 @@ class Rpc {
 
   /// Try to transmit a multi-packet message
   void process_datapath_tx_work_queue_multi_pkt_one(Session *session,
-                                                    MsgBuffer *msg_buffer,
+                                                    MsgBuffer *tx_msgbuf,
                                                     size_t sslot_i,
                                                     size_t &batch_i,
                                                     size_t &write_index);
 
+  /**
+   * @brief Process received packets and post RECVs. The ring buffers received
+   * from `rx_burst` must not be used after new RECVs are posted.
+   *
+   * Although none of the polled RX ring buffers cannot be overwritten by the
+   * NIC until we send at least one response/CR packet back, we do not control
+   * the order or time at which these packets are sent, due to constrains like
+   * session credits and packet pacing.
+   */
   void process_completions();
+  void process_completions_multi_pkt_one(uint8_t *pkt);
 
   // Constructor args
   Nexus *nexus;

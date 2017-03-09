@@ -28,7 +28,7 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     size_t data_bytes_left = (msg_buffer->data_size - msg_buffer->data_sent);
     if (data_bytes_left == 0) {
       assert(msg_buffer->num_pkts == 1);
-      assert(msg_buffer->get_pkthdr_0()->is_credit_return == 1);
+      assert(msg_buffer->get_pkthdr_0()->pkt_type == kPktTypeCreditReturn);
     }
 
     /* Number of data bytes that will be sent with this work request */

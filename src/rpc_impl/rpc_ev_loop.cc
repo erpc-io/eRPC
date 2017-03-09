@@ -25,25 +25,26 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
   for (size_t i = 0; i < datapath_tx_work_queue.size(); i++) {
     Session *session = datapath_tx_work_queue[i];
-    bool is_req = (session->role == Session::Role::kClient);
 
     /* XXX: Should we loop over only the in_use slots? */
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
       Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
-      MsgBuffer *msg_buffer = is_req ? &sslot->req_msgbuf : &sslot->resp_msgbuf;
+      MsgBuffer *tx_msgbuf = &sslot->tx_msgbuf;
 
-      /* Find a message slot for which we need to send packets */
-      if (!sslot->in_use || msg_buffer->pkts_sent == msg_buffer->num_pkts) {
+      /* Check if this slot needs TX */
+      if (!sslot->in_use || tx_msgbuf->pkts_sent == tx_msgbuf->num_pkts) {
         continue;
       }
 
       /* If we are here, this message needs packet TX. */
-      assert(msg_buffer->buf != nullptr);
-      assert(msg_buffer->check_pkthdr_0());
-      if (is_req) {
-        assert(msg_buffer->get_pkthdr_0()->is_req == 1);
+      assert(tx_msgbuf->buf != nullptr);
+      assert(tx_msgbuf->check_pkthdr_0());
+      uint64_t pkt_type = tx_msgbuf->get_pkthdr_0()->pkt_type; /* Debug-only */
+      _unused(pkt_type);
+      if (session->role == Session::Role::kClient) {
+        assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeCreditReturn);
       } else {
-        assert(msg_buffer->get_pkthdr_0()->is_req == 0);
+        assert(pkt_type == kPktTypeResp || pkt_type == kPktTypeCreditReturn);
       }
 
       /* If session credits are enabled, save & bail if we're out of credits. */
@@ -56,14 +57,14 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         break; /* Try the next session */
       }
 
-      if (small_msg_likely(msg_buffer->num_pkts == 1)) {
+      if (small_msg_likely(tx_msgbuf->num_pkts == 1)) {
         /* Optimize for small/credit-return messages that fit in one packet */
-        assert(msg_buffer->data_sent == 0);
-        assert(msg_buffer->pkts_sent == 0);
+        assert(tx_msgbuf->data_sent == 0);
+        assert(tx_msgbuf->pkts_sent == 0);
 
         /* If Unexpected window is enabled, save & bail if we're out of slots */
-        if (kHandleUnexpWindow && msg_buffer->get_pkthdr_0()->is_unexp == 1) {
-          assert(is_req); /* Single-packet responses are always expected */
+        if (kHandleUnexpWindow && tx_msgbuf->get_pkthdr_0()->is_unexp == 1) {
+          assert(pkt_type != kPktTypeResp); /* Single-pkt resps are expected */
 
           if (unexp_credits == 0) {
             assert(write_index < datapath_tx_work_queue.size());
@@ -83,7 +84,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
         assert(batch_i < Transport_::kPostlist);
         tx_routing_info_arr[batch_i] = session->remote_routing_info;
-        tx_msg_buffer_arr[batch_i] = msg_buffer;
+        tx_msg_buffer_arr[batch_i] = tx_msgbuf;
         batch_i++;
 
         if (kHandleSessionCredits) {
@@ -92,7 +93,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
         dpath_dprintf(
             "eRPC Rpc %u: Sending single-packet %s (slot %zu in session %u).\n",
-            app_tid, is_req ? "request" : "response", sslot_i,
+            app_tid, pkt_type_str(pkt_type).c_str(), sslot_i,
             session->client.session_num);
 
         if (batch_i == Transport_::kPostlist) {
@@ -105,7 +106,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       }           /* End handling single-packet messages */
 
       /* If we're here, msg_buffer is a multi-packet message */
-      process_datapath_tx_work_queue_multi_pkt_one(session, msg_buffer, sslot_i,
+      process_datapath_tx_work_queue_multi_pkt_one(session, tx_msgbuf, sslot_i,
                                                    batch_i, write_index);
 
     } /* End loop over messages of a session */
@@ -122,20 +123,23 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
 template <class Transport_>
 void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
-    Session *session, MsgBuffer *msg_buffer, size_t sslot_i, size_t &batch_i,
+    Session *session, MsgBuffer *tx_msgbuf, size_t sslot_i, size_t &batch_i,
     size_t &write_index) {
   /*
    * Preconditions from process_datapath_tx_work_queue(). Session credits and
    * Unexpected window must be enabled if large packts are used.
    */
   assert(session != nullptr);
-  assert(msg_buffer->num_pkts > 1); /* Must be a multi-packet message */
-  assert(msg_buffer->num_pkts > msg_buffer->pkts_sent);
+  assert(tx_msgbuf->num_pkts > 1); /* Must be a multi-packet message */
+  assert(tx_msgbuf->num_pkts > tx_msgbuf->pkts_sent);
   assert(kHandleSessionCredits && session->remote_credits > 1);
   assert(kHandleUnexpWindow);
 
-  bool is_req = (session->role == Session::Role::kClient);
-  size_t pkts_pending = msg_buffer->num_pkts - msg_buffer->pkts_sent;
+  /* A multi-packet message cannot be a credit return */
+  uint64_t pkt_type = tx_msgbuf->get_pkthdr_0()->pkt_type;
+  assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeResp);
+
+  size_t pkts_pending = tx_msgbuf->num_pkts - tx_msgbuf->pkts_sent;
 
   /*
    * First compute the number of packets we would send if we did not care
@@ -145,7 +149,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
   assert(without_unexp_window >= 1);
 
   size_t now_sending;
-  if (is_req || msg_buffer->pkts_sent >= 1) {
+  if (pkt_type == kPktTypeReq || tx_msgbuf->pkts_sent >= 1) {
     /* All request packets, and non-first response packets are Unexpected */
     now_sending = std::min(without_unexp_window, unexp_credits);
     unexp_credits -= now_sending;
@@ -165,7 +169,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
   dpath_dprintf(
       "eRPC Rpc %u: Sending %zu of %zu remaining packets for "
       "multi-packet %s (slot %zu in session %u).\n",
-      app_tid, now_sending, pkts_pending, is_req ? "request" : "response",
+      app_tid, now_sending, pkts_pending, pkt_type_str(pkt_type).c_str(),
       sslot_i, session->client.session_num);
 
   /* If we cannot send all packets, save session for later */
@@ -177,7 +181,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
   /* Put all packets to send in the tx batch */
   for (size_t i = 0; i < now_sending; i++) {
     tx_routing_info_arr[batch_i] = session->remote_routing_info;
-    tx_msg_buffer_arr[batch_i] = msg_buffer;
+    tx_msg_buffer_arr[batch_i] = tx_msgbuf;
     batch_i++;
 
     if (batch_i == Transport_::kPostlist) {
@@ -199,9 +203,14 @@ void Rpc<Transport_>::process_completions() {
   for (size_t i = 0; i < num_pkts; i++) {
     uint8_t *pkt = rx_ring[rx_ring_head];
     rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
-
     pkthdr_t *pkthdr = (pkthdr_t *)pkt;
-    _unused(pkthdr);
+    assert(pkthdr->magic == kPktHdrMagic);
+
+    if (small_msg_likely(pkthdr->msg_size <= Transport_::kMaxDataPerPkt)) {
+      /* Optimize for small packets */
+
+    } else {
+    }
   }
 
   /*
@@ -209,10 +218,6 @@ void Rpc<Transport_>::process_completions() {
    * even in the rx_burst() code.
    */
   transport->post_recvs(num_pkts);
-
-  // Do processing
-
-  // Send responses
 }
 
 }  // End ERpc

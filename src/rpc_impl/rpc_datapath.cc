@@ -63,9 +63,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   pkthdr_0->req_type = req_type;
   pkthdr_0->msg_size = req_msgbuf->data_size;
   pkthdr_0->rem_session_num = session->server.session_num;
-  pkthdr_0->is_credit_return = 0;
-  pkthdr_0->is_req = 1;
-  pkthdr_0->is_resp = 0;
+  pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->is_unexp = 1; /* Request packets are unexpected */
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = req_num;
@@ -88,10 +86,10 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   /* Fill in the session message slot */
   Session::sslot_t &free_sslot = session->sslot_arr[free_sslot_i];
   assert(free_sslot.in_use == false);
-  assert(free_sslot.req_msgbuf.buf == nullptr &&
-         free_sslot.resp_msgbuf.buf == nullptr);
+  assert(free_sslot.rx_msgbuf.buf == nullptr &&
+         free_sslot.tx_msgbuf.buf == nullptr);
 
-  free_sslot.req_msgbuf = *req_msgbuf; /* Copy the request MsgBuffer */
+  free_sslot.tx_msgbuf = *req_msgbuf; /* Copy the request MsgBuffer */
   free_sslot.in_use = true;
 
   /* Add \p session to the work queue if it's not already present */
