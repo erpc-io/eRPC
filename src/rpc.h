@@ -264,7 +264,7 @@ class Rpc {
    * session credits and packet pacing.
    */
   void process_completions();
-  void process_completions_multi_pkt_one(uint8_t *pkt);
+  void process_completions_multi_pkt_one();
 
   // Constructor args
   Nexus *nexus;

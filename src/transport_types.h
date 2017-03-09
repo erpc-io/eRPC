@@ -13,6 +13,7 @@
 
 #include <strings.h>
 #include <functional>
+#include <sstream>
 #include <string>
 #include "common.h"
 #include "util/buffer.h"
@@ -38,9 +39,11 @@ static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 /// These packet types are stored as bitfields in the packet header, so don't
 /// use an enum class here to avoid casting all over the place.
 enum PktType : uint64_t {
-  kPktTypeReq,          ///< An Rpc request packet
-  kPktTypeResp,         ///< An Rpc response packet
-  kPktTypeCreditReturn  ///< A credit return packet (header-only)
+  kPktTypeReq,   ///< An Rpc request packet
+  kPktTypeResp,  ///< An Rpc response packet
+  /// An *explicit* credit return packet. The first response packet is also
+  /// a credit return.
+  kPktTypeCreditReturn
 };
 
 static std::string pkt_type_str(uint64_t pkt_type) {
@@ -71,6 +74,18 @@ struct pkthdr_t {
   uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
   uint64_t req_num : kReqNumBits;     ///< Request number of this packet
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
+
+  /// Return a string representation of a packet header. Credit return packets
+  /// are marked with an asterisk.
+  std::string to_string() {
+    std::ostringstream ret;
+    ret << "[Req " << req_num << ", "
+        << "pkt " << pkt_num << ", "
+        << "msg size " << msg_size << ", "
+        << "pkt type " << pkt_type_str(pkt_type) << "]"
+        << (is_unexp == 0 ? "*" : ""); /* Mark credit return packets */
+    return ret.str();
+  }
 } __attribute__((packed));
 
 static_assert(sizeof(pkthdr_t) == 16, "");

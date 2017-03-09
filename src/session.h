@@ -25,7 +25,10 @@ class Session {
   static const size_t kSessionReqWindow = 8;  ///< *Request* window size
   static const size_t kSessionCredits = 8;    ///< *Packet* credits per endpoint
 
-  /* Needed for fast modulo calculation during request number assignment */
+  /*
+   * Required for fast multiplication and modulo calculation during request
+   * number assignment and slot number decoding, respectively.
+   */
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
   /// Session slot = metadata maintained about an Rpc
