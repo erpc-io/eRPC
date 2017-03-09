@@ -4,7 +4,10 @@
 #include <random>
 #include <vector>
 #include "common.h"
+#include "msg_buffer.h"
 #include "nexus.h"
+#include "ops.h"
+#include "pkthdr.h"
 #include "session.h"
 #include "transport.h"
 #include "transport_impl/ib_transport.h"
@@ -18,6 +21,8 @@ namespace ERpc {
 template <class Transport_>
 class Rpc {
  public:
+  static const size_t kMaxReqTypes = std::numeric_limits<uint8_t>::max();
+
   /// Max request or response size, excluding packet headers
   static const size_t kMaxMsgSize = MB(8);
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
@@ -31,11 +36,13 @@ class Rpc {
   /// Max number of unexpected *packets* kept outstanding by this Rpc
   static const size_t kRpcUnexpPktWindow = 20;
 
-  /// Error codes returned by the Rpc datapath
+  /// Error codes returned by the Rpc datapath. 0 means no error.
   enum class RpcDatapathErrCode : int {
-    kInvalidSessionArg,
+    kInvalidSessionArg = 1,
     kInvalidMsgBufferArg,
     kInvalidMsgSizeArg,
+    kInvalidReqTypeArg,
+    kInvalidOpsArg,
     kNoSessionMsgSlots
   };
 
@@ -47,6 +54,10 @@ class Rpc {
         return std::string("[Invalid MsgBuffer argument]");
       case RpcDatapathErrCode::kInvalidMsgSizeArg:
         return std::string("[Invalid message size argument]");
+      case RpcDatapathErrCode::kInvalidReqTypeArg:
+        return std::string("[Invalid request type argument]");
+      case RpcDatapathErrCode::kInvalidOpsArg:
+        return std::string("[Invalid Ops argument]");
       case RpcDatapathErrCode::kNoSessionMsgSlots:
         return std::string("[No session message slots]");
     };
@@ -199,6 +210,26 @@ class Rpc {
     }
   }
 
+  /// Register application-defined operations for a request type
+  int register_ops(uint8_t req_type, Ops app_ops) {
+    Ops &arr_ops = ops_arr[req_type];
+
+    /* Check if this request type is already registered */
+    if (arr_ops.erpc_req_handler != nullptr ||
+        arr_ops.erpc_resp_handler != nullptr) {
+      return static_cast<int>(RpcDatapathErrCode::kInvalidReqTypeArg);
+    }
+
+    /* Check if the application's Ops is valid */
+    if (app_ops.erpc_req_handler == nullptr ||
+        app_ops.erpc_resp_handler == nullptr) {
+      return static_cast<int>(RpcDatapathErrCode::kInvalidOpsArg);
+    }
+
+    arr_ops = app_ops;
+    return 0;
+  }
+
  private:
   // rpc.cc
 
@@ -281,6 +312,8 @@ class Rpc {
 
   uint8_t *rx_ring[Transport_::kRecvQueueDepth];  ///< The transport's RX ring
   size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
+
+  Ops ops_arr[kMaxReqTypes];
 
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};

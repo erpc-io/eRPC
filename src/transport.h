@@ -7,6 +7,8 @@
 
 #include <string>
 #include "common.h"
+#include "msg_buffer.h"
+#include "pkthdr.h"
 #include "session.h"
 #include "transport_types.h"
 #include "util/buffer.h"

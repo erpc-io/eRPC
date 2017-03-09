@@ -51,6 +51,9 @@ set(SOURCES
   src/common.h
   src/nexus.cc
   src/nexus.h
+  src/msg_buffer.h
+  src/ops.h
+  src/pkthdr.h
   src/rpc.h
   src/rpc_impl/rpc.cc
   src/rpc_impl/rpc_datapath.cc

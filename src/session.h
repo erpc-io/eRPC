@@ -7,6 +7,8 @@
 #include <string>
 
 #include "common.h"
+#include "msg_buffer.h"
+#include "ops.h"
 #include "session_mgmt_types.h"
 #include "util/buffer.h"
 #include "util/fixed_vector.h"
@@ -38,6 +40,8 @@ class Session {
     bool in_use = false;  ///< True iff this slot is in use
     MsgBuffer rx_msgbuf;  ///< The RX MsgBuffer for this slot
     MsgBuffer tx_msgbuf;  ///< The TX MsgBuffer for this slot
+
+    app_resp_t app_resp;  ///< The application's response to a request
 
     ///< A pre-allocated 4K packet buffer. XXX: unused
     Buffer _prealloc;
