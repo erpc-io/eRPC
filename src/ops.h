@@ -26,7 +26,7 @@ typedef void (*erpc_resp_handler_t)(const MsgBuffer *resp_msgbuf);
 class Ops {
  public:
   erpc_req_handler_t erpc_req_handler = nullptr;
-  erpc_req_handler_t erpc_resp_handler = nullptr;
+  erpc_resp_handler_t erpc_resp_handler = nullptr;
 };
 }
 

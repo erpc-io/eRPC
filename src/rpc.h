@@ -80,12 +80,12 @@ class Rpc {
   ~Rpc();
 
   /**
-   * @brief Create a hugepage-backed MsgBuffer for the eRPC user. The returned
-   * MsgBuffer's \p buf is surrounded by packet headers that the user must not
-   * modify.
+   * @brief Create a hugepage-backed MsgBuffer for the eRPC user.
+   * The returned MsgBuffer's \p buf is surrounded by packet headers that the
+   * user must not modify. This function does not fill in these message headers,
+   * though it sets the magic field in the zeroth header.
    *
-   * @param size Non-header bytes in the returned MsgBuffer (equal to the
-   * \p size field of the returned MsgBuffer)
+   * @param max_data_size Maximum non-header bytes in the returned MsgBuffer
    *
    * @return \p The allocated MsgBuffer. The MsgBuffer is invalid (i.e., its
    * \p buf is NULL) if we ran out of memory.
@@ -94,30 +94,49 @@ class Rpc {
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
    * if allocation fails simply because we ran out of memory.
    */
-  inline MsgBuffer alloc_msg_buffer(size_t data_size) {
-    size_t num_pkts;
+  inline MsgBuffer alloc_msg_buffer(size_t max_data_size) {
+    size_t max_num_pkts;
 
     /* Avoid division for small packets */
-    if (small_msg_likely(data_size <= Transport_::kMaxDataPerPkt)) {
-      num_pkts = 1;
+    if (small_msg_likely(max_data_size <= Transport_::kMaxDataPerPkt)) {
+      max_num_pkts = 1;
     } else {
-      num_pkts = (data_size + (Transport_::kMaxDataPerPkt - 1)) /
-                 Transport_::kMaxDataPerPkt;
+      max_num_pkts = (max_data_size + (Transport_::kMaxDataPerPkt - 1)) /
+                     Transport_::kMaxDataPerPkt;
     }
 
     static_assert(is_power_of_two(sizeof(pkthdr_t)), ""); /* For bit shift */
     Buffer buffer =
-        huge_alloc->alloc(data_size + (num_pkts * sizeof(pkthdr_t)));
+        huge_alloc->alloc(max_data_size + (max_num_pkts * sizeof(pkthdr_t)));
     if (unlikely(buffer.buf == nullptr)) {
       return MsgBuffer::get_invalid_msgbuf();
     }
 
-    MsgBuffer msg_buffer(buffer, data_size, num_pkts);
+    MsgBuffer msg_buffer(buffer, max_data_size, max_num_pkts);
 
     /* Set the packet header magic in the 0th header */
     pkthdr_t *pkthdr = msg_buffer.get_pkthdr_0();
     pkthdr->magic = kPktHdrMagic;
     return msg_buffer;
+  }
+
+  /// Resize a MsgBuffer. This does not modify any headers.
+  inline void resize_msg_buffer(MsgBuffer *msg_buffer, size_t new_data_size) {
+    assert(msg_buffer != nullptr);
+    assert(new_data_size < msg_buffer->max_data_size);
+    assert(msg_buffer->check_pkthdr_0());
+
+    size_t new_num_pkts;
+
+    /* Avoid division for small packets */
+    if (small_msg_likely(new_data_size <= Transport_::kMaxDataPerPkt)) {
+      new_num_pkts = 1;
+    } else {
+      new_num_pkts = (new_data_size + (Transport_::kMaxDataPerPkt - 1)) /
+                     Transport_::kMaxDataPerPkt;
+    }
+
+    msg_buffer->resize(new_data_size, new_num_pkts);
   }
 
   /// Free a MsgBuffer allocated using alloc_msg_buffer()

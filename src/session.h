@@ -37,9 +37,9 @@ class Session {
   /// if \p in_use is false. In this case, \p rx_msgbuf and \p tx_msgbuf can
   /// contain garbage.
   struct sslot_t {
-    bool in_use = false;  ///< True iff this slot is in use
-    MsgBuffer rx_msgbuf;  ///< The RX MsgBuffer for this slot
-    MsgBuffer tx_msgbuf;  ///< The TX MsgBuffer for this slot
+    bool in_use = false;   ///< True iff this slot is in use
+    MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer for this slot
+    MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer for this slot
 
     app_resp_t app_resp;  ///< The application's response to a request
   };

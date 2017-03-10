@@ -29,7 +29,12 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     /* XXX: Should we loop over only the in_use slots? */
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
       Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
-      MsgBuffer *tx_msgbuf = &sslot->tx_msgbuf;
+      MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
+
+      /*
+       * XXX: Are we guaranteed that if in_use is true, then tx_msgbuf is not
+       * NULL?
+       */
 
       /* Check if this slot needs TX */
       if (!sslot->in_use || tx_msgbuf->pkts_sent == tx_msgbuf->num_pkts) {
@@ -227,6 +232,15 @@ void Rpc<Transport_>::process_completions() {
       continue;
     }
 
+    Ops &ops = ops_arr[pkthdr->req_type];
+    if (unlikely(ops.erpc_req_handler == nullptr)) {
+      fprintf(stderr,
+              "eRPC Rpc: Warning: Received packet for unknown request type %u. "
+              "Dropping packet.\n",
+              (uint8_t)pkthdr->req_type);
+      continue;
+    }
+
     /* If we are here, we have a valid packet for a connected session */
     dpath_dprintf("eRPC Rpc: Received packet %s.\n",
                   pkthdr->to_string().c_str());
@@ -246,6 +260,7 @@ void Rpc<Transport_>::process_completions() {
     }
 
     if (small_msg_likely(pkthdr->msg_size <= Transport_::kMaxDataPerPkt)) {
+      /* Optimize for small pkts */
       assert(pkthdr->pkt_num == 0);
       assert(pkthdr->msg_size > 0);
 
@@ -255,9 +270,20 @@ void Rpc<Transport_>::process_completions() {
       assert(!slot.in_use);
       slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
-      /* Optimize for small pkts. We've already handled credit returns above. */
       if (pkthdr->pkt_type == kPktTypeReq) {
+        /* Handle request */
+        ops.erpc_req_handler(&slot.rx_msgbuf, &slot.app_resp);
+        app_resp_t &app_resp = slot.app_resp;
+        size_t resp_size = app_resp.resp_size;
+        assert(resp_size > 0);
+
+        if (small_msg_likely(app_resp.prealloc_used)) {
+        } else {
+        }
+
       } else if (pkthdr->pkt_type == kPktTypeResp) {
+        /* Handle response */
+        ops.erpc_resp_handler(&slot.rx_msgbuf);
       } else {
         assert(false);
         exit(-1);
