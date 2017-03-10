@@ -303,10 +303,7 @@ void Rpc<Transport_>::process_completions() {
           pkthdr_0->req_num = req_num;
 
           slot.tx_msgbuf = &app_resp.pre_resp_msgbuf;
-          if (!session->in_datapath_tx_work_queue) {
-            session->in_datapath_tx_work_queue = true;
-            datapath_tx_work_queue.push_back(session);
-          }
+          upsert_datapath_tx_work_queue(session);
         } else {
           /* A large response to a small request */
           assert(false);

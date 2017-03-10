@@ -90,12 +90,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   free_sslot.tx_msgbuf = req_msgbuf;
   free_sslot.in_use = true;
 
-  /* Add \p session to the work queue if it's not already present */
-  if (!session->in_datapath_tx_work_queue) {
-    session->in_datapath_tx_work_queue = true;
-    datapath_tx_work_queue.push_back(session);
-  }
-
+  upsert_datapath_tx_work_queue(session);
   return 0;
 }
 

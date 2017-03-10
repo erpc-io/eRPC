@@ -292,6 +292,15 @@ class Rpc {
 
   // rpc_ev_loop.cc
 
+  /// Add \p session to the TX work queue if it's not already present
+  inline void upsert_datapath_tx_work_queue(Session *session) {
+    assert(session != nullptr);
+    if (!session->in_datapath_tx_work_queue) {
+      session->in_datapath_tx_work_queue = true;
+      datapath_tx_work_queue.push_back(session);
+    }
+  }
+
   /// Try to transmit packets for Sessions in the \p datapath_tx_work_queue.
   /// Sessions for which all packets can be sent are removed from the queue.
   void process_datapath_tx_work_queue();
