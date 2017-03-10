@@ -7,13 +7,12 @@
 #define ERPC_RPC_TYPES_H
 
 #include "msg_buffer.h"
-#include "util/buffer.h"
 
 namespace ERpc {
 struct app_resp_t {
   bool prealloc_used;
-  Buffer prealloc_resp_buffer;
-  Buffer *resp_buffer;
+  MsgBuffer pre_resp_msgbuf;
+  MsgBuffer *resp_msgbuf;
   size_t resp_size;
 };
 

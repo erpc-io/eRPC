@@ -73,8 +73,13 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   Session *session =
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    session->sslot_arr[i].app_resp.prealloc_resp_buffer =
-        huge_alloc->alloc(Transport_::kMTU);
+    MsgBuffer &msg_buffer = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
+    msg_buffer = alloc_msg_buffer(Transport_::kMaxDataPerPkt);
+
+    if (msg_buffer.buf == nullptr) {
+      erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
+      return nullptr;
+    }
   }
 
   /*

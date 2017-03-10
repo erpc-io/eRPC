@@ -110,7 +110,7 @@ class Rpc {
     Buffer buffer =
         huge_alloc->alloc(data_size + (num_pkts * sizeof(pkthdr_t)));
     if (unlikely(buffer.buf == nullptr)) {
-      return MsgBuffer(Buffer::get_invalid_buffer(), 0, 0);
+      return MsgBuffer::get_invalid_msgbuf();
     }
 
     MsgBuffer msg_buffer(buffer, data_size, num_pkts);

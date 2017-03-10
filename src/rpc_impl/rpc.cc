@@ -101,10 +101,10 @@ void Rpc<Transport_>::bury_session(Session *session) {
   /* First, free session resources */
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     /* Free the preallocated MsgBuffer */
-    assert(session->sslot_arr[i].app_resp.prealloc_resp_buffer.buf != nullptr);
-    huge_alloc->free_buf(session->sslot_arr[i].app_resp.prealloc_resp_buffer);
+    MsgBuffer &msg_buf = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
+    free_msg_buffer(msg_buf);
 
-    /* XXX: Who frees msg_arr[i].msg_buffer? */
+    /* XXX: Who frees the other message buffers in the slot? */
   }
 
   /* Second, mark the session as NULL in the session vector */

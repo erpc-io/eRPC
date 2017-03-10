@@ -102,14 +102,14 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   }
 
   /*
-   * If we are here, create a new session and fill prealloc Buffers.
+   * If we are here, create a new session and fill preallocated MsgBuffers.
    * XXX: Use pool?
    */
   Session *session =
       new Session(Session::Role::kServer, SessionState::kConnected);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    session->sslot_arr[i].app_resp.prealloc_resp_buffer =
-        huge_alloc->alloc(Transport_::kMTU);
+    session->sslot_arr[i].app_resp.pre_resp_msgbuf =
+        alloc_msg_buffer(Transport_::kMaxDataPerPkt);
   }
 
   /*

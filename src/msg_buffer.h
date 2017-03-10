@@ -19,11 +19,14 @@ class MsgBuffer {
   friend class IBTransport;
   friend class Rpc<IBTransport>;
 
-  /// Construct a MsgBuffer with a Buffer allocated by eRPC. The zeroth packet
-  /// header is stored at \p buffer.buf. \p buffer must have space for
-  /// at least \p data_bytes, and \p num_pkts packet headers.
+  /// Construct a MsgBuffer with a valid Buffer allocated by eRPC.
+  /// The zeroth packet header is stored at \p buffer.buf. \p buffer must have
+  /// space for at least \p data_bytes, and \p num_pkts packet headers.
   MsgBuffer(Buffer buffer, size_t data_size, size_t num_pkts)
       : buffer(buffer), data_size(data_size), num_pkts(num_pkts) {
+    assert(buffer.buf != nullptr); /* buffer must be valid */
+    /* data_size can be 0 */
+    assert(num_pkts >= 1);
     assert(buffer.class_size >= data_size + num_pkts * sizeof(pkthdr_t));
     buf = buffer.buf + sizeof(pkthdr_t);
   }
@@ -34,9 +37,16 @@ class MsgBuffer {
       : buf(buf + sizeof(pkthdr_t)),
         buffer(Buffer::get_invalid_buffer()),
         data_size(data_size),
-        num_pkts(1) {}
+        num_pkts(1) {
+    assert(buf != nullptr);
+    /* data_size can be zero */
+  }
 
-  MsgBuffer() : buffer(Buffer::get_invalid_buffer()) {}
+  /// Default constructor. The \p buf field is NULL, indicating invalid state.
+  MsgBuffer() {}
+
+  /// Return an invalid MsgBuffer, i.e., \p buf is NULL.
+  static MsgBuffer get_invalid_msgbuf() { return MsgBuffer(); }
 
   ~MsgBuffer() {}
 
