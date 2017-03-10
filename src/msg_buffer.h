@@ -7,10 +7,18 @@
 
 namespace ERpc {
 
+// Forward declarations
+class IBTransport;
+template <typename T>
+class Rpc;
+
 /// A message buffer with headers at the beginning and end. A MsgBuffer is
 /// invalid if its \p buf field is NULL.
 class MsgBuffer {
  public:
+  friend class IBTransport;
+  friend class Rpc<IBTransport>;
+
   /// Construct a MsgBuffer with a Buffer allocated by eRPC. The zeroth packet
   /// header is stored at \p buffer.buf. \p buffer must have space for
   /// at least \p data_bytes, and \p num_pkts packet headers.
@@ -23,8 +31,8 @@ class MsgBuffer {
   /// Construct a single-packet MsgBuffer using an arbitrary chunk of memory.
   /// \p buf must have space for \p data_bytes and one packet header.
   MsgBuffer(uint8_t *buf, size_t data_size)
-      : buffer(Buffer::get_invalid_buffer()),
-        buf(buf + sizeof(pkthdr_t)),
+      : buf(buf + sizeof(pkthdr_t)),
+        buffer(Buffer::get_invalid_buffer()),
         data_size(data_size),
         num_pkts(1) {}
 
@@ -49,10 +57,11 @@ class MsgBuffer {
     return (get_pkthdr_0()->magic == kPktHdrMagic);
   }
 
-  Buffer buffer;  ///< The (optional) backing hugepage Buffer
+  uint8_t *buf = nullptr;
   /// Pointer to the first *data* byte. (\p buffer.buf does not point to the
   /// first data byte.)
-  uint8_t *buf = nullptr;
+ private:
+  Buffer buffer;         ///< The (optional) backing hugepage Buffer
   size_t data_size = 0;  ///< Total data bytes in the MsgBuffer
   size_t num_pkts = 0;   ///< Total number of packets in this message
   size_t data_sent = 0;  ///< Bytes of data already sent

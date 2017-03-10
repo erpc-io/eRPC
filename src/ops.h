@@ -12,7 +12,7 @@
 namespace ERpc {
 struct app_resp_t {
   bool prealloc_used;
-  Buffer *prealloc_resp_buffer;
+  Buffer prealloc_resp_buffer;
   Buffer *resp_buffer;
   size_t resp_size;
 };

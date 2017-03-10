@@ -101,8 +101,8 @@ void Rpc<Transport_>::bury_session(Session *session) {
   /* First, free session resources */
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     /* Free the preallocated MsgBuffer */
-    assert(session->sslot_arr[i]._prealloc.buf != nullptr);
-    huge_alloc->free_buf(session->sslot_arr[i]._prealloc);
+    assert(session->sslot_arr[i].app_resp.prealloc_resp_buffer.buf != nullptr);
+    huge_alloc->free_buf(session->sslot_arr[i].app_resp.prealloc_resp_buffer);
 
     /* XXX: Who frees msg_arr[i].msg_buffer? */
   }

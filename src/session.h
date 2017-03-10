@@ -42,9 +42,6 @@ class Session {
     MsgBuffer tx_msgbuf;  ///< The TX MsgBuffer for this slot
 
     app_resp_t app_resp;  ///< The application's response to a request
-
-    ///< A pre-allocated 4K packet buffer. XXX: unused
-    Buffer _prealloc;
   };
 
   Session(Role role, SessionState state);
