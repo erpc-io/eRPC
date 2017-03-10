@@ -111,9 +111,9 @@ void Rpc<Transport_>::bury_session(Session *session) {
   uint16_t session_num;
   if (session->role == Session::Role::kClient) {
     assert(!mgmt_retry_queue_contains(session));
-
     session_num = session->client.session_num;
   } else {
+    /* Server-mode sessions can never be in the retry queue */
     session_num = session->server.session_num;
   }
 

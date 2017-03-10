@@ -51,6 +51,7 @@ enum class SessionMgmtPktType : int {
 enum class SessionMgmtErrType : int {
   kNoError,          ///< The only non-error error type
   kTooManySessions,  ///< Connect req failed because server is out of sessions
+  kOutOfMemory,      ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
   kInvalidRemoteAppTid,
   kInvalidRemotePort,
@@ -155,8 +156,9 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
 static bool session_mgmt_err_type_is_valid(SessionMgmtErrType err_type) {
   switch (err_type) {
     case SessionMgmtErrType::kNoError:
-    case SessionMgmtErrType::kRoutingResolutionFailure:
     case SessionMgmtErrType::kTooManySessions:
+    case SessionMgmtErrType::kOutOfMemory:
+    case SessionMgmtErrType::kRoutingResolutionFailure:
     case SessionMgmtErrType::kInvalidRemoteAppTid:
     case SessionMgmtErrType::kInvalidRemotePort:
     case SessionMgmtErrType::kInvalidTransport:
@@ -171,10 +173,12 @@ static std::string session_mgmt_err_type_str(SessionMgmtErrType err_type) {
   switch (err_type) {
     case SessionMgmtErrType::kNoError:
       return std::string("[No error]");
-    case SessionMgmtErrType::kRoutingResolutionFailure:
-      return std::string("[Routing resolution failure]");
     case SessionMgmtErrType::kTooManySessions:
       return std::string("[Too many sessions]");
+    case SessionMgmtErrType::kOutOfMemory:
+      return std::string("[Out of memory]");
+    case SessionMgmtErrType::kRoutingResolutionFailure:
+      return std::string("[Routing resolution failure]");
     case SessionMgmtErrType::kInvalidRemoteAppTid:
       return std::string("[Invalid remote app TID]");
     case SessionMgmtErrType::kInvalidRemotePort:

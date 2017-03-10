@@ -108,8 +108,22 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   Session *session =
       new Session(Session::Role::kServer, SessionState::kConnected);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    session->sslot_arr[i].app_resp.pre_resp_msgbuf =
-        alloc_msg_buffer(Transport_::kMaxDataPerPkt);
+    MsgBuffer &msgbuf_i = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
+    msgbuf_i = alloc_msg_buffer(Transport_::kMaxDataPerPkt);
+
+    if (msgbuf_i.buf == nullptr) {
+      /* We haven't assigned a session number yet, so just free 0 -- (i - 1) */
+      for (size_t j = 0; j < i; j++) {
+        MsgBuffer &msgbuf_j = session->sslot_arr[j].app_resp.pre_resp_msgbuf;
+        assert(msgbuf_j.buf != nullptr);
+        free_msg_buffer(msgbuf_j);
+      }
+
+      erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
+      sm_pkt->send_resp_mut(SessionMgmtErrType::kOutOfMemory,
+                            &nexus->udp_config);
+      return;
+    }
   }
 
   /*

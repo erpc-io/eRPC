@@ -105,8 +105,7 @@ class Rpc {
                  Transport_::kMaxDataPerPkt;
     }
 
-    /* This multiplication is a shift */
-    static_assert(is_power_of_two(sizeof(pkthdr_t)), "");
+    static_assert(is_power_of_two(sizeof(pkthdr_t)), ""); /* For bit shift */
     Buffer buffer =
         huge_alloc->alloc(data_size + (num_pkts * sizeof(pkthdr_t)));
     if (unlikely(buffer.buf == nullptr)) {

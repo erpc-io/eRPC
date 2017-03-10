@@ -46,7 +46,7 @@ class Session {
 
   Session(Role role, SessionState state);
 
-  /// Session resources are freed in bury_session(), so this is empty
+  /// Session resources are freed in Rpc::bury_session(), so this is empty
   ~Session() {}
 
   /// Enable congestion control for this session
