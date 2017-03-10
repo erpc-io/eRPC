@@ -232,65 +232,104 @@ void Rpc<Transport_>::process_completions() {
       continue;
     }
 
-    Ops &ops = ops_arr[pkthdr->req_type];
-    if (unlikely(ops.erpc_req_handler == nullptr)) {
-      fprintf(stderr,
-              "eRPC Rpc: Warning: Received packet for unknown request type %u. "
-              "Dropping packet.\n",
-              (uint8_t)pkthdr->req_type);
-      continue;
-    }
-
     /* If we are here, we have a valid packet for a connected session */
     dpath_dprintf("eRPC Rpc: Received packet %s.\n",
                   pkthdr->to_string().c_str());
 
     /*
-     * Handle session & Unexpected window credits early for simplicity. All
-     * Expected packets are session/window credit returns, and vice versa.
+     * Handle session & Unexpected window credits early for simplicity.
+     * All Expected packets are session/window credit returns, and vice versa.
      */
-    if (kHandleSessionCredits && pkthdr->is_unexp == 0) {
-      assert(session->remote_credits < Session::kSessionCredits);
-      session->remote_credits++;
-    }
-
     if (kHandleUnexpWindow && pkthdr->is_unexp == 0) {
       assert(unexp_credits < kRpcUnexpPktWindow);
       unexp_credits++;
     }
 
+    if (kHandleSessionCredits && pkthdr->is_unexp == 0) {
+      assert(session->remote_credits < Session::kSessionCredits);
+      session->remote_credits++;
+    }
+
+    /* We're done handling credit return packets */
+    if ((kHandleSessionCredits || kHandleUnexpWindow) &&
+        pkthdr->pkt_type == kPktTypeCreditReturn) {
+      continue;
+    }
+
     if (small_msg_likely(pkthdr->msg_size <= Transport_::kMaxDataPerPkt)) {
-      /* Optimize for small pkts */
+      /* Optimize for when the received packet is a single-packet message */
       assert(pkthdr->pkt_num == 0);
-      assert(pkthdr->msg_size > 0);
+      assert(pkthdr->msg_size > 0); /* Credit returns already handled */
+
+      Ops &ops = ops_arr[pkthdr->req_type];
+      if (unlikely(ops.erpc_req_handler == nullptr)) {
+        fprintf(stderr,
+                "eRPC Rpc: Warning: Received packet for unknown "
+                "request type %u. Dropping packet.\n",
+                (uint8_t)pkthdr->req_type);
+        continue;
+      }
 
       size_t req_num = pkthdr->req_num;
       size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
       Session::sslot_t &slot = session->sslot_arr[sslot_i];
-      assert(!slot.in_use);
-      slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
       if (pkthdr->pkt_type == kPktTypeReq) {
-        /* Handle request */
-        ops.erpc_req_handler(&slot.rx_msgbuf, &slot.app_resp);
+        assert(session->role == Session::Role::kServer);
+        assert(!slot.in_use);
+        slot.in_use = true;
+        slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
+
+        ops.erpc_req_handler(&slot.rx_msgbuf, &slot.app_resp, context);
         app_resp_t &app_resp = slot.app_resp;
         size_t resp_size = app_resp.resp_size;
         assert(resp_size > 0);
 
         if (small_msg_likely(app_resp.prealloc_used)) {
-        } else {
-        }
+          assert(resp_size <= Transport_::kMaxDataPerPkt);
 
-      } else if (pkthdr->pkt_type == kPktTypeResp) {
-        /* Handle response */
-        ops.erpc_resp_handler(&slot.rx_msgbuf);
+          MsgBuffer &resp_msgbuf = app_resp.pre_resp_msgbuf;
+          resp_msgbuf.resize(resp_size, 1);
+
+          /* Fill in packet 0's header */
+          /* XXX: Optimize using preconstructed headers. */
+          pkthdr_t *pkthdr_0 = resp_msgbuf.get_pkthdr_0();
+          pkthdr_0->req_type = pkthdr->req_type;
+          pkthdr_0->msg_size = resp_size;
+          pkthdr_0->rem_session_num = session->client.session_num;
+          pkthdr_0->pkt_type = kPktTypeResp;
+          pkthdr_0->is_unexp = 0; /* First response packet is unexpected */
+          pkthdr_0->pkt_num = 0;
+          pkthdr_0->req_num = req_num;
+
+          slot.tx_msgbuf = &app_resp.pre_resp_msgbuf;
+          if (!session->in_datapath_tx_work_queue) {
+            session->in_datapath_tx_work_queue = true;
+            datapath_tx_work_queue.push_back(session);
+          }
+        } else {
+          /* A large response to a small request */
+          assert(false);
+        }
       } else {
-        assert(false);
-        exit(-1);
+        assert(pkthdr->pkt_type == kPktTypeResp);
+        assert(slot.in_use);
+
+        /* Sanity-check the req MsgBuffer and match it against the response */
+        assert(slot.tx_msgbuf != nullptr);
+        assert(slot.tx_msgbuf->check_pkthdr_0());
+        assert(slot.tx_msgbuf->get_pkthdr_0()->pkt_type == kPktTypeReq);
+        assert(slot.tx_msgbuf->get_pkthdr_0()->req_num == req_num);
+
+        /* Invoke the response callback */
+        ops.erpc_resp_handler(slot.tx_msgbuf, &slot.rx_msgbuf, context);
+        slot.in_use = false;
       }
     } else {
+      /* Handle large packets */
+      assert(false);
     }
-  }
+  } /* End loop over received packets */
 
   /*
    * Technically, these RECVs can be posted immediately after rx_burst(), or

@@ -9,17 +9,23 @@
 #include "msg_buffer.h"
 
 namespace ERpc {
+
+/// A structure to hold the application's response
 struct app_resp_t {
-  bool prealloc_used;
-  MsgBuffer pre_resp_msgbuf;
-  MsgBuffer *resp_msgbuf;
-  size_t resp_size;
+  bool prealloc_used;         ///< Did the app use pre_resp_msgbuf?
+  MsgBuffer pre_resp_msgbuf;  ///< Preallocated storage for small responses
+  MsgBuffer *resp_msgbuf;     ///< Storage for large responses
+  size_t resp_size;  ///< The number of data bytes in the app's response
 };
 
+/// The application-defined request handler
 typedef void (*erpc_req_handler_t)(const MsgBuffer *req_msgbuf,
-                                   app_resp_t *app_resp);
+                                   app_resp_t *app_resp, void *context);
 
-typedef void (*erpc_resp_handler_t)(const MsgBuffer *resp_msgbuf);
+/// The application-defined response handler
+typedef void (*erpc_resp_handler_t)(const MsgBuffer *req_msgbuf,
+                                    const MsgBuffer *resp_msgbuf,
+                                    void *context);
 
 /// The application-specified eRPC request and response handlers. An \p Ops
 /// object is invalid if either of the two function pointers are NULL.
