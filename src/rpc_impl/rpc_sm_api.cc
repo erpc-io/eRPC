@@ -51,11 +51,11 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
     if (strcmp(existing_session->server.hostname, rem_hostname) == 0 &&
         existing_session->server.app_tid == rem_app_tid) {
       /*
-       * @existing_session->server != this Rpc, since @existing_session->server
-       * matches (@rem_hostname, @rem_app_tid), which does match this
+       * existing_session->server != this Rpc, since existing_session->server
+       * matches (rem_hostname, rem_app_tid), which does match this
        * Rpc (checked earlier). So we must be the client.
        */
-      assert(existing_session->role == Session::Role::kClient);
+      assert(existing_session->is_client());
       erpc_dprintf("%s: Session to %s already exists.\n", issue_msg,
                    existing_session->server.rpc_name().c_str());
       return nullptr;
@@ -124,7 +124,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
 
 template <class Transport_>
 bool Rpc<Transport_>::destroy_session(Session *session) {
-  if (session == nullptr || session->role != Session::Role::kClient) {
+  if (session == nullptr || !session->is_client()) {
     erpc_dprintf("eRPC Rpc %s: destroy_session() failed. Invalid session.\n",
                  get_name().c_str());
     return false;

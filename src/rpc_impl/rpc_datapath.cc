@@ -15,7 +15,7 @@ template <class Transport_>
 int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
                                   MsgBuffer *req_msgbuf) {
   if (!kDatapathChecks) {
-    assert(session != nullptr && session->role == Session::Role::kClient);
+    assert(session != nullptr && session->is_client());
     assert(session->state == SessionState::kConnected);
     assert(req_msgbuf != nullptr && req_msgbuf->buf != nullptr &&
            req_msgbuf->check_pkthdr_0());

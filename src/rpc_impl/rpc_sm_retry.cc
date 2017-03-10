@@ -12,7 +12,7 @@ namespace ERpc {
 
 template <class Transport_>
 void Rpc<Transport_>::send_connect_req_one(Session *session) {
-  assert(session != nullptr && session->role == Session::Role::kClient);
+  assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kConnectInProgress);
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kConnectReq);
@@ -23,7 +23,7 @@ void Rpc<Transport_>::send_connect_req_one(Session *session) {
 
 template <class Transport_>
 void Rpc<Transport_>::send_disconnect_req_one(Session *session) {
-  assert(session != nullptr && session->role == Session::Role::kClient);
+  assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kDisconnectInProgress);
 
   SessionMgmtPkt connect_req(SessionMgmtPktType::kDisconnectReq);
@@ -40,10 +40,10 @@ bool Rpc<Transport_>::mgmt_retry_queue_contains(Session *session) {
 
 template <class Transport_>
 void Rpc<Transport_>::mgmt_retry_queue_add(Session *session) {
-  assert(session != nullptr && session->role == Session::Role::kClient);
+  assert(session != nullptr && session->is_client());
 
   /* Only client-mode sessions can be in the management retry queue */
-  assert(session->role == Session::Role::kClient);
+  assert(session->is_client());
 
   /* Ensure that we don't have an in-flight management req for this session */
   assert(!mgmt_retry_queue_contains(session));
@@ -54,7 +54,7 @@ void Rpc<Transport_>::mgmt_retry_queue_add(Session *session) {
 
 template <class Transport_>
 void Rpc<Transport_>::mgmt_retry_queue_remove(Session *session) {
-  assert(session != nullptr && session->role == Session::Role::kClient);
+  assert(session != nullptr && session->is_client());
   assert(mgmt_retry_queue_contains(session));
 
   size_t initial_size = mgmt_retry_queue.size(); /* Debug-only */

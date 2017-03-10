@@ -42,7 +42,7 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
    * (hostname, app TID, session num) in the pkt should match our local copy.
    */
   Session *session = session_vec.at(session_num); /* The server end point */
-  assert(session->role == Session::Role::kServer);
+  assert(session->is_server());
   assert(session->server == sm_pkt->server);
   assert(session->client == sm_pkt->client);
 

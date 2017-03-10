@@ -109,7 +109,7 @@ void Rpc<Transport_>::bury_session(Session *session) {
 
   /* Second, mark the session as NULL in the session vector */
   uint16_t session_num;
-  if (session->role == Session::Role::kClient) {
+  if (session->is_client()) {
     assert(!mgmt_retry_queue_contains(session));
     session_num = session->client.session_num;
   } else {

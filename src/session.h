@@ -61,6 +61,9 @@ class Session {
     client_info.is_cc = false;
   }
 
+  inline bool is_client() const { return role == Role::kClient; }
+  inline bool is_server() const { return role == Role::kServer; }
+
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;           ///< Read-only endpoint metadata

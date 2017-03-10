@@ -46,7 +46,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       assert(tx_msgbuf->check_pkthdr_0());
       uint64_t pkt_type = tx_msgbuf->get_pkthdr_0()->pkt_type; /* Debug-only */
       _unused(pkt_type);
-      if (session->role == Session::Role::kClient) {
+      if (session->is_client()) {
         assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeCreditReturn);
       } else {
         assert(pkt_type == kPktTypeResp || pkt_type == kPktTypeCreditReturn);
@@ -275,7 +275,7 @@ void Rpc<Transport_>::process_completions() {
       Session::sslot_t &slot = session->sslot_arr[sslot_i];
 
       if (pkthdr->pkt_type == kPktTypeReq) {
-        assert(session->role == Session::Role::kServer);
+        assert(session->is_server());
         assert(!slot.in_use);
         slot.in_use = true;
         slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
