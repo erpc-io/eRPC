@@ -77,7 +77,10 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
     msgbuf_i = alloc_msg_buffer(Transport_::kMaxDataPerPkt);
 
     if (msgbuf_i.buf == nullptr) {
-      /* We haven't assigned a session number yet, so just free 0 -- (i - 1) */
+      /*
+       * We haven't assigned a session number or allocated non-prealloc
+       * MsgBuffers yet, so just free prealloc MsgBuffers 0 -- (i - 1).
+       */
       for (size_t j = 0; j < i; j++) {
         MsgBuffer &msgbuf_j = session->sslot_arr[j].app_resp.pre_resp_msgbuf;
         assert(msgbuf_j.buf != nullptr);
