@@ -82,6 +82,7 @@ class MsgBuffer {
     return (get_pkthdr_0()->magic == kPktHdrMagic);
   }
 
+ public:
   /// Pointer to the first *data* byte. (\p buffer.buf does not point to the
   /// first data byte.)
   uint8_t *buf = nullptr;

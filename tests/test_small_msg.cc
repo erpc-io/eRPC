@@ -1,12 +1,14 @@
 #include <gtest/gtest.h>
+#include <string.h>
 #include <atomic>
-#include <map>
 #include <thread>
 #include "rpc.h"
+#include "test_printf.h"
 
 using namespace ERpc;
 
 static const uint16_t kAppNexusUdpPort = 31851;
+static const double kAppNexusPktDropProb = 0.0;
 static const size_t kAppEventLoopMs = 2000;
 static const uint8_t kAppServerAppTid = 100;
 static const uint8_t kAppClientAppTid = 200;
@@ -23,6 +25,8 @@ char local_hostname[kMaxHostnameLen];
 struct app_context_t {
   bool is_client;
   Rpc<IBTransport> *rpc;
+
+  size_t num_resps = 0; /* Client-only */
 };
 
 void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
@@ -30,8 +34,16 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
   assert(req_msgbuf != nullptr);
   assert(app_resp != nullptr);
   assert(_context != nullptr);
+
   auto *context = (app_context_t *)_context;
   assert(!context->is_client);
+  _unused(context); /* Debug only in this test */
+
+  test_printf("Server: Received request %s\n", req_msgbuf->buf);
+
+  strcpy((char *)app_resp->pre_resp_msgbuf.buf, (char *)req_msgbuf->buf);
+  app_resp->resp_size = strlen((char *)req_msgbuf->buf);
+  app_resp->prealloc_used = true;
 }
 
 void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
@@ -39,8 +51,12 @@ void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
   assert(req_msgbuf != nullptr);
   assert(resp_msgbuf != nullptr);
   assert(_context != nullptr);
+
+  test_printf("Server: Received request %s\n", req_msgbuf->buf);
+
   auto *context = (app_context_t *)_context;
   assert(context->is_client);
+  _unused(context); /* Debug-only in this test */
 }
 
 void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
@@ -59,9 +75,14 @@ void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
 /* The server thread used by all tests */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &sm_hander, phy_port,
+  app_context_t context;
+  context.is_client = false;
+
+  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, phy_port,
                        numa_node);
   rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
+  context.rpc = &rpc;
 
   server_ready = true;
 
@@ -78,9 +99,14 @@ void simple_small_msg(Nexus *nexus) {
     usleep(1);
   }
 
-  auto *context = new app_context_t();
-  Rpc<IBTransport> rpc(nexus, (void *)context, kAppClientAppTid, &sm_hander,
+  app_context_t context;
+  context.is_client = true;
+
+  Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_hander,
                        phy_port, numa_node);
+  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
+  context.rpc = &rpc;
 
   /* Connect the session */
   Session *session =
@@ -90,6 +116,15 @@ void simple_small_msg(Nexus *nexus) {
 
   ASSERT_EQ(session->state, SessionState::kConnected);
 
+  /* Send a message */
+  MsgBuffer req_msgbuf = rpc.alloc_msg_buffer(strlen("APP_MSG"));
+  test_printf("test: Sending request\n");
+  rpc.send_request(session, kAppReqType, &req_msgbuf);
+
+  /* Run the event loop -- we expect one response when the event loop returns */
+  rpc.run_event_loop_timeout(kAppEventLoopMs);
+  ASSERT_EQ(context.num_resps, 1);
+
   /* Disconnect the session */
   rpc.destroy_session(session);
   rpc.run_event_loop_timeout(kAppEventLoopMs);
@@ -98,7 +133,7 @@ void simple_small_msg(Nexus *nexus) {
 }
 
 TEST(SimpleSmallMsg, SimpleSmallMsg) {
-  Nexus nexus(kAppNexusUdpPort, .8);
+  Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
   server_ready = false;
   client_done = false;
 
