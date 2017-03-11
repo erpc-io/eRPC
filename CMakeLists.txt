@@ -94,6 +94,10 @@ if(LTO)
   target_link_libraries(test_destroy_session ${GTEST_LIBRARIES} ${LIBRARIES})
   add_test(NAME test_destroy_session COMMAND test_destroy_session)
 
+  add_executable(test_small_msg tests/test_small_msg.cc ${SOURCES})
+  target_link_libraries(test_small_msg ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_small_msg COMMAND test_small_msg)
+
   add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
   target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
 
@@ -116,6 +120,10 @@ else(LTO)
   add_executable(test_destroy_session tests/test_destroy_session.cc)
   target_link_libraries(test_destroy_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
   add_test(NAME test_destroy_session COMMAND test_destroy_session)
+
+  add_executable(test_small_msg tests/test_small_msg.cc)
+  target_link_libraries(test_small_msg erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  add_test(NAME test_small_msg COMMAND test_small_msg)
 
   add_executable(test_huge_alloc tests/test_huge_alloc.cc)
   target_link_libraries(test_huge_alloc erpc ${GTEST_LIBRARIES} ${LIBRARIES})

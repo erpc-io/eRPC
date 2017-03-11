@@ -262,7 +262,7 @@ void Rpc<Transport_>::process_completions() {
       assert(pkthdr->msg_size > 0); /* Credit returns already handled */
 
       Ops &ops = ops_arr[pkthdr->req_type];
-      if (unlikely(ops.erpc_req_handler == nullptr)) {
+      if (unlikely(!ops.is_valid())) {
         fprintf(stderr,
                 "eRPC Rpc: Warning: Received packet for unknown "
                 "request type %u. Dropping packet.\n",
@@ -280,7 +280,7 @@ void Rpc<Transport_>::process_completions() {
         slot.in_use = true;
         slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
-        ops.erpc_req_handler(&slot.rx_msgbuf, &slot.app_resp, context);
+        ops.req_handler(&slot.rx_msgbuf, &slot.app_resp, context);
         app_resp_t &app_resp = slot.app_resp;
         size_t resp_size = app_resp.resp_size;
         assert(resp_size > 0);
@@ -319,7 +319,7 @@ void Rpc<Transport_>::process_completions() {
         assert(slot.tx_msgbuf->get_pkthdr_0()->req_num == req_num);
 
         /* Invoke the response callback */
-        ops.erpc_resp_handler(slot.tx_msgbuf, &slot.rx_msgbuf, context);
+        ops.resp_handler(slot.tx_msgbuf, &slot.rx_msgbuf, context);
         slot.in_use = false;
       }
     } else {

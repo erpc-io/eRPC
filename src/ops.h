@@ -31,8 +31,19 @@ typedef void (*erpc_resp_handler_t)(const MsgBuffer *req_msgbuf,
 /// object is invalid if either of the two function pointers are NULL.
 class Ops {
  public:
-  erpc_req_handler_t erpc_req_handler = nullptr;
-  erpc_resp_handler_t erpc_resp_handler = nullptr;
+  erpc_req_handler_t req_handler = nullptr;
+  erpc_resp_handler_t resp_handler = nullptr;
+
+  Ops() {}
+  Ops(erpc_req_handler_t req_handler, erpc_resp_handler_t resp_handler)
+      : req_handler(req_handler), resp_handler(resp_handler) {
+    assert(req_handler != nullptr);
+    assert(resp_handler != nullptr);
+  }
+
+  inline bool is_valid() const {
+    return req_handler != nullptr; /* Checking one is good enough */
+  }
 };
 }
 

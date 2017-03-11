@@ -233,14 +233,12 @@ class Rpc {
     Ops &arr_ops = ops_arr[req_type];
 
     /* Check if this request type is already registered */
-    if (arr_ops.erpc_req_handler != nullptr ||
-        arr_ops.erpc_resp_handler != nullptr) {
+    if (arr_ops.is_valid()) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidReqTypeArg);
     }
 
     /* Check if the application's Ops is valid */
-    if (app_ops.erpc_req_handler == nullptr ||
-        app_ops.erpc_resp_handler == nullptr) {
+    if (!app_ops.is_valid()) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidOpsArg);
     }
 
