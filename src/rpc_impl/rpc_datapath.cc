@@ -23,9 +23,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     assert(req_msgbuf->num_pkts > 0);
   } else {
     /* If datapath checks are enabled, return meaningful error codes */
-    if (unlikely(session == nullptr ||
-                 session->role != Session::Role::kClient ||
-                 session->state == SessionState::kConnected)) {
+    if (unlikely(session == nullptr || !session->is_client() ||
+                 session->state != SessionState::kConnected)) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
     }
 

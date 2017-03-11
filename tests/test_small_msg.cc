@@ -119,7 +119,12 @@ void simple_small_msg(Nexus *nexus) {
   /* Send a message */
   MsgBuffer req_msgbuf = rpc.alloc_msg_buffer(strlen("APP_MSG"));
   test_printf("test: Sending request\n");
-  rpc.send_request(session, kAppReqType, &req_msgbuf);
+  int ret = rpc.send_request(session, kAppReqType, &req_msgbuf);
+  if (ret != 0) {
+    test_printf("test: send_request error %s\n",
+                rpc.rpc_datapath_err_code_str(ret).c_str());
+  }
+  ASSERT_EQ(ret, 0);
 
   /* Run the event loop -- we expect one response when the event loop returns */
   rpc.run_event_loop_timeout(kAppEventLoopMs);

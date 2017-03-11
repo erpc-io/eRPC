@@ -46,7 +46,10 @@ class Rpc {
     kNoSessionMsgSlots
   };
 
-  static std::string rpc_err_code_str(RpcDatapathErrCode e) {
+  /// Return a string representation of a datapath error code
+  static std::string rpc_datapath_err_code_str(int datapath_err_code) {
+    auto e = static_cast<RpcDatapathErrCode>(datapath_err_code);
+
     switch (e) {
       case RpcDatapathErrCode::kInvalidSessionArg:
         return std::string("[Invalid session argument]");
