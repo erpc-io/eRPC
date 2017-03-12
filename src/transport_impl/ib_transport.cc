@@ -90,16 +90,9 @@ bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
   ah_attr.src_path_bits = 0;
 
   ah_attr.port_num = dev_port_id; /* Local port */
-  struct ibv_ah *ah = ibv_create_ah(pd, &ah_attr);
+  ib_routing_info->ah = ibv_create_ah(pd, &ah_attr);
 
-  if (ah != nullptr) {
-    /* Copy the created address handle to the routing info */
-    memcpy((void *)&ib_routing_info->ah, (void *)ah, sizeof(struct ibv_ah));
-    free(ah); /* ibv_destroy_ah (mlx4 and mlx5) does just this */
-    return true;
-  } else {
-    return false;
-  }
+  return (ib_routing_info->ah != nullptr);
 }
 
 void IBTransport::resolve_phy_port() {

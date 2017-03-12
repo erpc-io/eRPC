@@ -19,10 +19,15 @@
 
 namespace ERpc {
 
-static const size_t kMaxRoutingInfoSize = 128;  ///< Space for routing info
+static const size_t kMaxRoutingInfoSize = 32;  ///< Space for routing info
 static const size_t kMaxMemRegInfoSize = 64;  ///< Space for memory registration
 
-/// Generic struct to store routing info for any transport.
+/**
+ * @brief Generic struct to store routing info for any transport.
+ *
+ * This can contain both cluster-wide valid members (e.g., LID, QPN), and
+ * members that are only locally valid (e.g., a pointer to \p ibv_ah).
+ */
 struct RoutingInfo {
   uint8_t buf[kMaxRoutingInfoSize];
 };

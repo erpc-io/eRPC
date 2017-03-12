@@ -9,7 +9,7 @@ using namespace ERpc;
 
 static const uint16_t kAppNexusUdpPort = 31851;
 static const double kAppNexusPktDropProb = 0.0;
-static const size_t kAppEventLoopMs = 2000;
+static const size_t kAppEventLoopMs = 200;
 static const uint8_t kAppServerAppTid = 100;
 static const uint8_t kAppClientAppTid = 200;
 static const uint8_t kAppReqType = 3;
@@ -27,7 +27,7 @@ struct app_context_t {
   Rpc<IBTransport> *rpc;
 
   bool sm_connect_resp_received = false; /* Client-only */
-  size_t num_resps = 0; /* Client-only */
+  size_t num_resps = 0;                  /* Client-only */
 };
 
 void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
@@ -53,11 +53,11 @@ void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
   assert(resp_msgbuf != nullptr);
   assert(_context != nullptr);
 
-  test_printf("Server: Received request %s\n", req_msgbuf->buf);
+  test_printf("Client: Received response %s\n", req_msgbuf->buf);
 
   auto *context = (app_context_t *)_context;
   assert(context->is_client);
-  _unused(context); /* Debug-only in this test */
+  context->num_resps++;
 }
 
 void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
@@ -123,7 +123,9 @@ void simple_small_msg(Nexus *nexus) {
 
   /* Send a message */
   MsgBuffer req_msgbuf = rpc.alloc_msg_buffer(strlen("APP_MSG"));
-  test_printf("test: Sending request\n");
+  strcpy((char *)req_msgbuf.buf, "APP_MSG");
+
+  test_printf("test: Sending request %s\n", (char *)req_msgbuf.buf);
   int ret = rpc.send_request(session, kAppReqType, &req_msgbuf);
   if (ret != 0) {
     test_printf("test: send_request error %s\n",
@@ -131,11 +133,7 @@ void simple_small_msg(Nexus *nexus) {
   }
   ASSERT_EQ(ret, 0);
 
-  /* Run the event loop -- we expect one response when the event loop returns */
-  for (size_t i = 0; i < 10; i++) {
-    fprintf(stderr, "Client running event loop. Iteration %zu.\n", i);
-    rpc.run_event_loop_timeout(200);
-  }
+  rpc.run_event_loop_timeout(kAppEventLoopMs);
   ASSERT_EQ(context.num_resps, 1);
 
   /* Disconnect the session */

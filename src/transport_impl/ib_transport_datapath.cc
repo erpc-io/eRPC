@@ -74,7 +74,7 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
 
     auto ib_routing_info = (struct ib_routing_info_t*)routing_info_arr[i];
     wr.wr.ud.remote_qpn = ib_routing_info->qpn;
-    wr.wr.ud.ah = &ib_routing_info->ah;
+    wr.wr.ud.ah = ib_routing_info->ah;
 
     /*
      * Update MsgBuffer progress tracking metadata. This ensures that subsequent

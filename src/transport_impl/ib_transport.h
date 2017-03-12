@@ -26,12 +26,24 @@ class IBTransport : public Transport {
   /// Maximum data bytes (i.e., non-header) in a packet
   static const size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
 
+  /**
+   * @brief Session endpoint routing info for InfiniBand.
+   *
+   * The client fills in its \p port_lid and \p qpn, which are resolved into
+   * the address handle by the server. Similarly for the server.
+   *
+   * \p port_lid and \p qpn have cluster-wide meaning, but \p ah is specific
+   * to this machine. The \p ibv_ah struct cannot be inlined into a RoutingInfo
+   * struct because the device driver internally uses a larger struct (e.g.,
+   * \p mlx4_ah for ConnectX-3) which contains \p ibv_ah.
+   */
   struct ib_routing_info_t {
-    // Filled in locally
+    // Meaningful cluster-wide
     uint16_t port_lid;
     uint32_t qpn;
-    // Resolved by remote host
-    struct ibv_ah ah;
+
+    // Meaningful only locally
+    struct ibv_ah *ah;
   };
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 

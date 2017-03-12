@@ -7,7 +7,7 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
    * A session may be created by the client in kConnectInProgress state, or
    * by the server in kConnected statet.
    */
-  if (role == Session::Role::kClient) {
+  if (is_client()) {
     assert(state == SessionState::kConnectInProgress);
     remote_routing_info = &server.routing_info;
   } else {

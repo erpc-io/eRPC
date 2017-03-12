@@ -90,10 +90,13 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
     return;
   }
 
-  /* Try to resolve the client's routing info into the packet */
+  /*
+   * Try to resolve the client's routing info into the packet. If session
+   * creation succeeds, we'll copy it to the server's session endpoint.
+   */
   RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
-  erpc_dprintf("eRPC Rpc %u: Resolving client's routing info (= %s).\n",
-               app_tid, Transport_::routing_info_str(client_rinfo).c_str());
+  erpc_dprintf("eRPC Rpc %u: Resolving client's routing info %s.\n", app_tid,
+               Transport_::routing_info_str(client_rinfo).c_str());
 
   bool resolve_success = transport->resolve_remote_routing_info(client_rinfo);
   if (!resolve_success) {
@@ -241,8 +244,8 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * fails, invoke kConnectFailed callback.
    */
   RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
-  erpc_dprintf("eRPC Rpc %u: Resolving server's routing info (= %s).\n",
-               app_tid, Transport_::routing_info_str(srv_routing_info).c_str());
+  erpc_dprintf("eRPC Rpc %u: Resolving server's routing info %s.\n", app_tid,
+               Transport_::routing_info_str(srv_routing_info).c_str());
 
   bool resolve_success;
   if (!testing_fail_resolve_remote_rinfo_client) {
@@ -273,7 +276,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
     return;
   }
 
-  /* Save server endpoint metadata. This saves the resolved routing info.  */
+  /* Save server endpoint metadata. This saves the resolved routing info. */
   session->server = sm_pkt->server;
   session->state = SessionState::kConnected;
 
