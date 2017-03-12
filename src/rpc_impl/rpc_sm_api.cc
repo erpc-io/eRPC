@@ -20,8 +20,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
                                          uint8_t rem_phy_port) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg, "eRPC Rpc %s: create_session() failed. Issue",
-          get_name().c_str());
+  sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", app_tid);
 
   /* Check remote fabric port */
   if (rem_phy_port >= kMaxPhyPorts) {
@@ -119,8 +118,8 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   mgmt_retry_queue_add(session);  /* Record management request for retry */
 
   erpc_dprintf(
-      "eRPC Rpc %s: Sending first session connect req for session %u to %s.\n",
-      get_name().c_str(), client_endpoint.session_num, rem_hostname);
+      "eRPC Rpc %u: Sending first session connect req for session %u to %s.\n",
+      app_tid, client_endpoint.session_num, rem_hostname);
   send_connect_req_one(session);
 
   return session;
@@ -129,16 +128,16 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
 template <class Transport_>
 bool Rpc<Transport_>::destroy_session(Session *session) {
   if (session == nullptr || !session->is_client()) {
-    erpc_dprintf("eRPC Rpc %s: destroy_session() failed. Invalid session.\n",
-                 get_name().c_str());
+    erpc_dprintf("eRPC Rpc %u: destroy_session() failed. Invalid session.\n",
+                 app_tid);
     return false;
   }
 
   uint16_t session_num = session->client.session_num;
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %s: destroy_session() failed for session %u. Issue",
-          get_name().c_str(), session_num);
+          "eRPC Rpc %u: destroy_session() failed for session %u. Issue",
+          app_tid, session_num);
 
   switch (session->state) {
     case SessionState::kConnectInProgress:
@@ -153,8 +152,8 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
       mgmt_retry_queue_add(session); /* Checks that session is not in flight */
 
       erpc_dprintf(
-          "eRPC Rpc %s: Sending first session disconnect req for session %u.\n",
-          get_name().c_str(), session->client.session_num);
+          "eRPC Rpc %u: Sending first session disconnect req for session %u.\n",
+          app_tid, session->client.session_num);
       send_disconnect_req_one(session);
       return true;
 
@@ -178,8 +177,8 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
        */
       assert(!mgmt_retry_queue_contains(session));
       erpc_dprintf(
-          "eRPC Rpc %s: destroy_session() succeeded for error-ed session %u.\n",
-          get_name().c_str(), session_num);
+          "eRPC Rpc %u: destroy_session() succeeded for error-ed session %u.\n",
+          app_tid, session_num);
 
       session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
                            SessionMgmtErrType::kNoError, context);

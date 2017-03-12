@@ -23,8 +23,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg, "eRPC Rpc %s: Received connect request from %s. Issue",
-          get_name().c_str(), sm_pkt->client.name().c_str());
+  sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",
+          app_tid, sm_pkt->client.name().c_str());
 
   /* Check that the transport matches */
   if (sm_pkt->server.transport_type != transport->transport_type) {
@@ -136,6 +136,10 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   sm_pkt->server.session_num = session_vec.size();
   transport->fill_local_routing_info(&(sm_pkt->server.routing_info));
 
+  // TEMP
+  fprintf(stderr, "Server routing info = %s\n",
+          Transport_::routing_info_str(&(sm_pkt->server.routing_info)).c_str());
+
   /* Save endpoint metadata from pkt. This saves the resolved routing info. */
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
@@ -156,10 +160,9 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %s: Received connect response from %s for session %u. "
+          "eRPC Rpc %u: Received connect response from %s for session %u. "
           "Issue",
-          get_name().c_str(), sm_pkt->server.name().c_str(),
-          sm_pkt->client.session_num);
+          app_tid, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
 
   /* Try to locate the requester session for this response */
   uint16_t session_num = sm_pkt->client.session_num;

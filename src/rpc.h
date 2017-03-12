@@ -252,9 +252,6 @@ class Rpc {
  private:
   // rpc.cc
 
-  /// Return the hostname and app TID of this Rpc.
-  std::string get_name();
-
   /// Process all session management events in the queue and free them.
   /// The handlers for individual request/response types should not free
   /// packets.

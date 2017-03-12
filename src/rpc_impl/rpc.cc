@@ -164,12 +164,4 @@ void Rpc<Transport_>::handle_session_management() {
   sm_hook.session_mgmt_mutex.unlock();
 }
 
-template <class Transport_>
-std::string Rpc<Transport_>::get_name() {
-  std::ostringstream ret;
-  ret << "[" << trim_hostname(std::string(nexus->hostname)) << ", "
-      << std::to_string(app_tid) << "]";
-  return ret.str();
-}
-
 }  // End ERpc

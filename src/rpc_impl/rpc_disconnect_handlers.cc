@@ -22,8 +22,8 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg, "eRPC Rpc %s: Received disconnect request from %s. Issue",
-          get_name().c_str(), sm_pkt->client.name().c_str());
+  sprintf(issue_msg, "eRPC Rpc %u: Received disconnect request from %s. Issue",
+          app_tid, sm_pkt->client.name().c_str());
 
   uint16_t session_num = sm_pkt->server.session_num;
   assert(session_num < session_vec.size());
@@ -61,9 +61,9 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   /* Create the basic issue message using only the packet */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %s: Received disconnect response from %s for "
-          "session %u. Issue",
-          get_name().c_str(), sm_pkt->server.name().c_str(),
+          "eRPC Rpc %u: Received disconnect response from %s for session %u. "
+          "Issue",
+          app_tid, sm_pkt->server.name().c_str(),
           sm_pkt->client.session_num);
 
   /* Try to locate the requester session for this response */
