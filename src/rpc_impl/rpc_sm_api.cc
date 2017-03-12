@@ -117,6 +117,10 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
 
   session_vec.push_back(session); /* Add to list of all sessions */
   mgmt_retry_queue_add(session);  /* Record management request for retry */
+
+  erpc_dprintf(
+      "eRPC Rpc %s: Sending first session connect req for session %u to %s.\n",
+      get_name().c_str(), client_endpoint.session_num, rem_hostname);
   send_connect_req_one(session);
 
   return session;
@@ -146,7 +150,11 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
     case SessionState::kConnected:
     case SessionState::kErrorServerEndpointExists:
       session->state = SessionState::kDisconnectInProgress;
-      mgmt_retry_queue_add(session); /* Ensures that session is not in flight */
+      mgmt_retry_queue_add(session); /* Checks that session is not in flight */
+
+      erpc_dprintf(
+          "eRPC Rpc %s: Sending first session disconnect req for session %u.\n",
+          get_name().c_str(), session->client.session_num);
       send_disconnect_req_one(session);
       return true;
 

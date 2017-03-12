@@ -26,6 +26,7 @@ struct app_context_t {
   bool is_client;
   Rpc<IBTransport> *rpc;
 
+  bool sm_connect_resp_received = false; /* Client-only */
   size_t num_resps = 0; /* Client-only */
 };
 
@@ -65,6 +66,8 @@ void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
   auto *context = (app_context_t *)_context;
   assert(context->is_client);
+  context->sm_connect_resp_received = true;
+
   if (sm_event_type == SessionMgmtEventType::kConnected) {
     assert(sm_err_type == SessionMgmtErrType::kNoError);
     // Do something
@@ -99,7 +102,7 @@ void simple_small_msg(Nexus *nexus) {
     usleep(1);
   }
 
-  app_context_t context;
+  volatile app_context_t context;
   context.is_client = true;
 
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_hander,
@@ -112,7 +115,9 @@ void simple_small_msg(Nexus *nexus) {
   Session *session =
       rpc.create_session(local_hostname, kAppServerAppTid, phy_port);
 
-  rpc.run_event_loop_timeout(kAppEventLoopMs);
+  while (!context.sm_connect_resp_received) {
+    rpc.run_event_loop_one();
+  }
 
   ASSERT_EQ(session->state, SessionState::kConnected);
 
@@ -127,7 +132,10 @@ void simple_small_msg(Nexus *nexus) {
   ASSERT_EQ(ret, 0);
 
   /* Run the event loop -- we expect one response when the event loop returns */
-  rpc.run_event_loop_timeout(kAppEventLoopMs);
+  for (size_t i = 0; i < 10; i++) {
+    fprintf(stderr, "Client running event loop. Iteration %zu.\n", i);
+    rpc.run_event_loop_timeout(200);
+  }
   ASSERT_EQ(context.num_resps, 1);
 
   /* Disconnect the session */

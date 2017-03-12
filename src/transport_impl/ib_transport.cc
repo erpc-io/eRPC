@@ -22,6 +22,18 @@ IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port)
                app_tid, ib_ctx->device->name, dev_port_id);
 }
 
+void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc,
+                                           uint8_t **rx_ring) {
+  assert(huge_alloc != nullptr);
+  assert(rx_ring != nullptr);
+
+  this->huge_alloc = huge_alloc;
+  this->numa_node = huge_alloc->get_numa_node();
+
+  init_recvs(rx_ring);
+  init_sends();
+}
+
 /*
  * The transport destructore is called after \p huge_alloc has already been
  * destroyed by \p Rpc. Deleting \p huge_alloc deregisters and frees all SHM
@@ -234,18 +246,6 @@ void IBTransport::init_mem_reg_funcs() {
   assert(pd != nullptr);
   reg_mr_func = std::bind(ibv_reg_mr_wrapper, pd, _1, _2);
   dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
-}
-
-void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc,
-                                           uint8_t **rx_ring) {
-  assert(huge_alloc != nullptr);
-  assert(rx_ring != nullptr);
-
-  this->huge_alloc = huge_alloc;
-  this->numa_node = huge_alloc->get_numa_node();
-
-  init_recvs(rx_ring);
-  init_sends();
 }
 
 void IBTransport::init_recvs(uint8_t **rx_ring) {

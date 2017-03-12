@@ -86,9 +86,17 @@ void Rpc<Transport_>::mgmt_retry() {
       /* We need to retransmit */
       switch (state) {
         case SessionState::kConnectInProgress:
+          erpc_dprintf(
+              "eRPC Rpc %s: Retrying session connect req for session %u.\n",
+              get_name().c_str(), session->client.session_num);
+
           send_connect_req_one(session);
           break; /* Process other in-flight requests */
         case SessionState::kDisconnectInProgress:
+          erpc_dprintf(
+              "eRPC Rpc %s: Retrying session disconnect req for session %u.\n",
+              get_name().c_str(), session->client.session_num);
+
           send_disconnect_req_one(session);
           break; /* Process other in-flight requests */
         default:
