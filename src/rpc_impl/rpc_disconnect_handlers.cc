@@ -63,8 +63,7 @@ void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   sprintf(issue_msg,
           "eRPC Rpc %u: Received disconnect response from %s for session %u. "
           "Issue",
-          app_tid, sm_pkt->server.name().c_str(),
-          sm_pkt->client.session_num);
+          app_tid, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
 
   /* Try to locate the requester session for this response */
   uint16_t session_num = sm_pkt->client.session_num;

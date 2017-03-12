@@ -369,9 +369,11 @@ class Rpc {
   SlowRand slow_rand;
 
  public:
-  // Fault injection for testing
+  // Fault injection for testing. These cannot be static or const.
 
-  /// Fail remote routing info resolution at client
+  /// Fail remote routing info resolution at client. This is used to test the
+  /// case where the server creates a session in response to a connect request,
+  /// but the client fails to resolve the routing info sent by the server.
   bool testing_fail_resolve_remote_rinfo_client = false;
 };
 

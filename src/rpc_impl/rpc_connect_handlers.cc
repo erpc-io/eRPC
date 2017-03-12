@@ -92,6 +92,9 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Try to resolve the client's routing info into the packet */
   RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
+  erpc_dprintf("eRPC Rpc %u: Resolving client's routing info (= %s).\n",
+               app_tid, Transport_::routing_info_str(client_rinfo).c_str());
+
   bool resolve_success = transport->resolve_remote_routing_info(client_rinfo);
   if (!resolve_success) {
     erpc_dprintf("%s: Unable to resolve routing info %s. Sending response.\n",
@@ -237,10 +240,13 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * Try to resolve the server's routing information into the packet. If this
    * fails, invoke kConnectFailed callback.
    */
+  RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
+  erpc_dprintf("eRPC Rpc %u: Resolving server's routing info (= %s).\n",
+               app_tid, Transport_::routing_info_str(srv_routing_info).c_str());
+
   bool resolve_success;
   if (!testing_fail_resolve_remote_rinfo_client) {
-    resolve_success =
-        transport->resolve_remote_routing_info(&(sm_pkt->server.routing_info));
+    resolve_success = transport->resolve_remote_routing_info(srv_routing_info);
   } else {
     resolve_success = false; /* Inject error for testing */
   }

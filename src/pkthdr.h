@@ -62,10 +62,10 @@ struct pkthdr_t {
   /// are marked with an asterisk.
   std::string to_string() {
     std::ostringstream ret;
-    ret << "[Req " << req_num << ", "
+    ret << "[type " << pkt_type_str(pkt_type) << ", "
+        << "req " << req_num << ", "
         << "pkt " << pkt_num << ", "
-        << "msg size " << msg_size << ", "
-        << "pkt type " << pkt_type_str(pkt_type) << "]"
+        << "msg size " << msg_size << "]"
         << (is_unexp == 0 ? "*" : ""); /* Mark credit return packets */
     return ret.str();
   }

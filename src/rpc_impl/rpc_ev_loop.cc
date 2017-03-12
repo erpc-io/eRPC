@@ -44,12 +44,16 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       /* If we are here, this message needs packet TX. */
       assert(tx_msgbuf->buf != nullptr);
       assert(tx_msgbuf->check_pkthdr_0());
-      uint64_t pkt_type = tx_msgbuf->get_pkthdr_0()->pkt_type; /* Debug-only */
-      _unused(pkt_type);
+
+      pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0(); /* Debug-only */
+      _unused(pkthdr_0);
+
       if (session->is_client()) {
-        assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeCreditReturn);
+        assert(pkthdr_0->pkt_type == kPktTypeReq ||
+               pkthdr_0->pkt_type == kPktTypeCreditReturn);
       } else {
-        assert(pkt_type == kPktTypeResp || pkt_type == kPktTypeCreditReturn);
+        assert(pkthdr_0->pkt_type == kPktTypeResp ||
+               pkthdr_0->pkt_type == kPktTypeCreditReturn);
       }
 
       /* If session credits are enabled, save & bail if we're out of credits. */
@@ -69,7 +73,8 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
         /* If Unexpected window is enabled, save & bail if we're out of slots */
         if (kHandleUnexpWindow && tx_msgbuf->get_pkthdr_0()->is_unexp == 1) {
-          assert(pkt_type != kPktTypeResp); /* Single-pkt resps are expected */
+          /* Single-packet responses cannot be Unexpected */
+          assert(pkthdr_0->pkt_type != kPktTypeResp);
 
           if (unexp_credits == 0) {
             assert(write_index < datapath_tx_work_queue.size());
@@ -97,9 +102,10 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         }
 
         dpath_dprintf(
-            "eRPC Rpc %u: Sending single-packet %s (slot %zu in session %u).\n",
-            app_tid, pkt_type_str(pkt_type).c_str(), sslot_i,
-            session->client.session_num);
+            "eRPC Rpc %u: Sending single-packet message %s. "
+            "Session = %u, slot = %zu.\n",
+            app_tid, pkthdr_0->to_string().c_str(), session->client.session_num,
+            sslot_i);
 
         if (batch_i == Transport_::kPostlist) {
           /* This will increment msg_buffer's pkts_sent and data_sent */
