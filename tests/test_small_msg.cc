@@ -120,7 +120,6 @@ void one_small_rpc(Nexus *nexus) {
   while (!context.sm_connect_resp_received) {
     rpc.run_event_loop_one();
   }
-
   ASSERT_EQ(session->state, SessionState::kConnected);
 
   /* Send a message */
@@ -138,6 +137,8 @@ void one_small_rpc(Nexus *nexus) {
   rpc.run_event_loop_timeout(kAppEventLoopMs);
   ASSERT_EQ(context.num_resps, 1);
 
+  rpc.free_msg_buffer(req_msgbuf);
+
   /* Disconnect the session */
   rpc.destroy_session(session);
   rpc.run_event_loop_timeout(kAppEventLoopMs);
@@ -152,6 +153,83 @@ TEST(OneSmallRpc, OneSmallRpc) {
 
   std::thread server_thread(server_thread_func, &nexus, kAppServerAppTid);
   std::thread client_thread(one_small_rpc, &nexus);
+  server_thread.join();
+  client_thread.join();
+}
+
+/// Test: Repeat: Multiple small Rpcs on one session
+void multi_small_rpc_one_session(Nexus *nexus) {
+  while (!server_ready) { /* Wait for server */
+    usleep(1);
+  }
+
+  volatile app_context_t context;
+  context.is_client = true;
+
+  Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_hander,
+                       phy_port, numa_node);
+  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
+  context.rpc = &rpc;
+
+  /* Connect the session */
+  Session *session =
+      rpc.create_session(local_hostname, kAppServerAppTid, phy_port);
+
+  while (!context.sm_connect_resp_received) {
+    rpc.run_event_loop_one();
+  }
+  ASSERT_EQ(session->state, SessionState::kConnected);
+
+  for (size_t iter = 0; iter < 3; iter++) {
+    context.num_resps = 0;
+
+    /* Enqueue as many requests as one session allows */
+    MsgBuffer req_msgbuf[Session::kSessionCredits];
+
+    for (size_t i = 0; i < Session::kSessionCredits; i++) {
+      std::string req_msg = std::string("APP_MSG-") + std::to_string(i);
+      req_msgbuf[i] = rpc.alloc_msg_buffer(req_msg.length());
+      strcpy((char *)req_msgbuf[i].buf, req_msg.c_str());
+
+      test_printf("test: Sending request %s\n", (char *)req_msgbuf[i].buf);
+      int ret = rpc.send_request(session, kAppReqType, &req_msgbuf[i]);
+      if (ret != 0) {
+        test_printf("test: send_request error %s\n",
+                    rpc.rpc_datapath_err_code_str(ret).c_str());
+      }
+      ASSERT_EQ(ret, 0);
+    }
+
+    /* Try to enqueue one more request - this should fail */
+    int ret = rpc.send_request(session, kAppReqType, &req_msgbuf[0]);
+    ASSERT_NE(ret, 0);
+
+    rpc.run_event_loop_timeout(kAppEventLoopMs);
+
+    size_t exp_resps = Session::kSessionCredits; /* Make gtest happy */
+    ASSERT_EQ(context.num_resps, exp_resps);
+
+    /* Free the request MsgBuffers */
+    for (size_t i = 0; i < Session::kSessionCredits; i++) {
+      rpc.free_msg_buffer(req_msgbuf[i]);
+    }
+  }
+
+  /* Disconnect the session */
+  rpc.destroy_session(session);
+  rpc.run_event_loop_timeout(kAppEventLoopMs);
+
+  client_done = true;
+}
+
+TEST(MultiSmallRpcOneSession, MultiSmallRpcOneSession) {
+  Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
+  server_ready = false;
+  client_done = false;
+
+  std::thread server_thread(server_thread_func, &nexus, kAppServerAppTid);
+  std::thread client_thread(multi_small_rpc_one_session, &nexus);
   server_thread.join();
   client_thread.join();
 }

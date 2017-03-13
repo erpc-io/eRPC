@@ -328,7 +328,10 @@ void Rpc<Transport_>::process_completions() {
 
         /* Invoke the response callback */
         ops.resp_handler(slot.tx_msgbuf, &slot.rx_msgbuf, context);
+
+        /* Free the slot */
         slot.in_use = false;
+        session->sslot_free_vec.push_back(sslot_i);
       }
     } else {
       /* Handle large packets */

@@ -15,8 +15,9 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
     remote_routing_info = &client.routing_info;
   }
 
+  /* Arrange the slot vector so that slots are popped in increasing order */
   for (size_t i = 0; i < kSessionReqWindow; i++) {
-    sslot_free_vec.push_back(i);
+    sslot_free_vec.push_back(kSessionReqWindow - 1 - i);
   }
 }
 
