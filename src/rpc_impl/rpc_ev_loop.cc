@@ -33,7 +33,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
       /*
        * XXX: Are we guaranteed that if in_use is true, then tx_msgbuf is not
-       * NULL?
+       * NULL? (e.g., can in_use be made true on pkt RX?)
        */
 
       /* Check if this slot needs TX */
@@ -276,15 +276,16 @@ void Rpc<Transport_>::process_completions() {
         continue;
       }
 
+      /* Create the RX MsgBuffer in the message's session slot */
       size_t req_num = pkthdr->req_num;
       size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
       Session::sslot_t &slot = session->sslot_arr[sslot_i];
+      slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
       if (pkthdr->pkt_type == kPktTypeReq) {
         assert(session->is_server());
         assert(!slot.in_use);
         slot.in_use = true;
-        slot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
         ops.req_handler(&slot.rx_msgbuf, &slot.app_resp, context);
         app_resp_t &app_resp = slot.app_resp;
@@ -316,9 +317,10 @@ void Rpc<Transport_>::process_completions() {
         }
       } else {
         assert(pkthdr->pkt_type == kPktTypeResp);
+        assert(session->is_client());
         assert(slot.in_use);
 
-        /* Sanity-check the req MsgBuffer and match it against the response */
+        /* Sanity-check the req MsgBuffer */
         assert(slot.tx_msgbuf != nullptr);
         assert(slot.tx_msgbuf->check_pkthdr_0());
         assert(slot.tx_msgbuf->get_pkthdr_0()->pkt_type == kPktTypeReq);

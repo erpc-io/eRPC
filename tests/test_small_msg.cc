@@ -30,15 +30,16 @@ struct app_context_t {
   size_t num_resps = 0;                  /* Client-only */
 };
 
+/// The common request handler for all subtests. Copies the request string to
+/// the response.
 void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
                  void *_context) {
-  assert(req_msgbuf != nullptr);
-  assert(app_resp != nullptr);
-  assert(_context != nullptr);
+  ASSERT_NE(req_msgbuf, nullptr);
+  ASSERT_NE(app_resp, nullptr);
+  ASSERT_NE(_context, nullptr);
 
   auto *context = (app_context_t *)_context;
-  assert(!context->is_client);
-  _unused(context); /* Debug only in this test */
+  ASSERT_FALSE(context->is_client);
 
   test_printf("Server: Received request %s\n", req_msgbuf->buf);
 
@@ -47,16 +48,20 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
   app_resp->prealloc_used = true;
 }
 
+/// The common response handler for all subtests. Just increments the number of
+/// responses in the context.
 void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
                   void *_context) {
-  assert(req_msgbuf != nullptr);
-  assert(resp_msgbuf != nullptr);
-  assert(_context != nullptr);
+  ASSERT_NE(req_msgbuf, nullptr);
+  ASSERT_NE(resp_msgbuf, nullptr);
+  ASSERT_NE(_context, nullptr);
 
-  test_printf("Client: Received response %s\n", req_msgbuf->buf);
+  test_printf("Client: Received response %s (request was %s)\n",
+              (char *)resp_msgbuf->buf, (char *)req_msgbuf->buf);
+  ASSERT_STREQ((char *)req_msgbuf->buf, (char *)resp_msgbuf->buf);
 
   auto *context = (app_context_t *)_context;
-  assert(context->is_client);
+  ASSERT_TRUE(context->is_client);
   context->num_resps++;
 }
 
@@ -65,18 +70,15 @@ void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
   _unused(session);
 
   auto *context = (app_context_t *)_context;
-  assert(context->is_client);
+  ASSERT_TRUE(context->is_client);
   context->sm_connect_resp_received = true;
 
-  if (sm_event_type == SessionMgmtEventType::kConnected) {
-    assert(sm_err_type == SessionMgmtErrType::kNoError);
-    // Do something
-  } else {
-    // Do something else
-  }
+  ASSERT_EQ(sm_err_type, SessionMgmtErrType::kNoError);
+  ASSERT_TRUE(sm_event_type == SessionMgmtEventType::kConnected ||
+              sm_event_type == SessionMgmtEventType::kDisconnected);
 }
 
-/* The server thread used by all tests */
+/// The server thread used for all subtests
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   app_context_t context;
   context.is_client = false;
@@ -84,9 +86,7 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, phy_port,
                        numa_node);
   rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
-
   context.rpc = &rpc;
-
   server_ready = true;
 
   while (!client_done) { /* Wait for the client */
@@ -97,7 +97,9 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   ASSERT_EQ(rpc.num_active_sessions(), 0);
 }
 
-void simple_small_msg(Nexus *nexus) {
+/// Test: Send one small request packet and check that we receive the
+/// correct response
+void one_small_rpc(Nexus *nexus) {
   while (!server_ready) { /* Wait for server */
     usleep(1);
   }
@@ -143,13 +145,13 @@ void simple_small_msg(Nexus *nexus) {
   client_done = true;
 }
 
-TEST(SimpleSmallMsg, SimpleSmallMsg) {
+TEST(OneSmallRpc, OneSmallRpc) {
   Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
   server_ready = false;
   client_done = false;
 
   std::thread server_thread(server_thread_func, &nexus, kAppServerAppTid);
-  std::thread client_thread(simple_small_msg, &nexus);
+  std::thread client_thread(one_small_rpc, &nexus);
   server_thread.join();
   client_thread.join();
 }

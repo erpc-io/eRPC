@@ -72,10 +72,14 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
   /* Register a hook with the Nexus */
   sm_hook.app_tid = app_tid;
   nexus->register_hook((SessionMgmtHook *)&sm_hook);
+
+  erpc_dprintf("eRPC Rpc: Created with app TID = %u.\n", app_tid);
 }
 
 template <class Transport_>
 Rpc<Transport_>::~Rpc() {
+  erpc_dprintf("eRPC Rpc: Destroying for app TID = %u.\n", app_tid);
+
   /*
    * First delete the hugepage allocator. This deregisters and deletes the
    * SHM regions. Deregistration is done using \p transport's deregistration

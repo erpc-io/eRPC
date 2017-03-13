@@ -38,12 +38,13 @@ Nexus::Nexus(uint16_t mgmt_udp_port, double udp_drop_prob)
     return;
   }
 
-  erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
-               mgmt_udp_port, hostname);
   nexus_object = this;
 
   compute_freq_ghz();
   install_sigio_handler();
+
+  erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
+               mgmt_udp_port, hostname);
 }
 
 Nexus::~Nexus() {
