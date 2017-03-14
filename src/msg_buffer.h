@@ -48,6 +48,9 @@ class MsgBuffer {
     return (get_pkthdr_0()->magic == kPktHdrMagic);
   }
 
+  /// Used by applications to get the current data size of a MsgBuffer
+  inline size_t get_data_size() const { return data_size; }
+
  private:
   /// Construct a MsgBuffer with a valid Buffer allocated by eRPC.
   /// The zeroth packet header is stored at \p buffer.buf. \p buffer must have

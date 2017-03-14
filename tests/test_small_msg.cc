@@ -49,7 +49,8 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
   app_resp->prealloc_used = true;
 }
 
-/// The common response handler for all subtests. Just increments the number of
+/// The common response handler for all subtests. This checks that the request
+/// buffer is identical to the response buffer, and increments the number of
 /// responses in the context.
 void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
                   void *_context) {
@@ -59,6 +60,8 @@ void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
 
   test_printf("Client: Received response %s (request was %s)\n",
               (char *)resp_msgbuf->buf, (char *)req_msgbuf->buf);
+
+  ASSERT_EQ(req_msgbuf->get_data_size(), resp_msgbuf->get_data_size());
   ASSERT_STREQ((char *)req_msgbuf->buf, (char *)resp_msgbuf->buf);
 
   auto *context = (app_context_t *)_context;
@@ -188,12 +191,14 @@ void multi_small_rpc_one_session(Nexus *nexus) {
     req_msgbuf[i] = rpc.alloc_msg_buffer(kAppMaxMsgSize);
   }
 
-  for (size_t iter = 0; iter < 3; iter++) {
+  size_t req_i = 0;
+
+  for (size_t iter = 0; iter < 5; iter++) {
     context.num_resps = 0;
 
     /* Enqueue as many requests as one session allows */
     for (size_t i = 0; i < Session::kSessionCredits; i++) {
-      std::string req_msg = std::string("APP_MSG-") + std::to_string(i);
+      std::string req_msg = std::string("APP_MSG-") + std::to_string(req_i++);
       rpc.resize_msg_buffer(&req_msgbuf[i], req_msg.length());
 
       strcpy((char *)req_msgbuf[i].buf, req_msg.c_str());
