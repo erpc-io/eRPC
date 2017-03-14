@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include "common.h"
+#include "msg_buffer.h"
 
 namespace ERpc {
 
@@ -39,6 +40,14 @@ struct MemRegInfo {
 
   MemRegInfo(void *transport_mr, uint32_t lkey)
       : transport_mr(transport_mr), lkey(lkey) {}
+};
+
+/// Info about a packet that needs TX
+struct tx_burst_item_t {
+  RoutingInfo *routing_info;  ///< Routing info for this packet
+  MsgBuffer *msg_buffer;      ///< The MsgBuffer for this packet
+  size_t offset;              ///< The offset for this packet in the MsgBuffer
+  size_t data_bytes;          ///< The number of data bytes to TX from \p offset
 };
 
 /// Generic types for memory registration and deregistration functions.

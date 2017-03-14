@@ -33,11 +33,16 @@ class Session {
    */
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
-  /// Session slot metadata maintained about an Rpc. A session slot is invalid
-  /// if \p in_use is false. In this case, \p rx_msgbuf and \p tx_msgbuf can
-  /// contain garbage.
+  /// Session slot metadata maintained about an Rpc. Session slots that are
+  /// in \p sslot_free_vec are invalid and may contain garbage.
   struct sslot_t {
-    bool in_use = false;   ///< True iff this slot is in use
+    bool in_free_vec;  ///< True iff this slot is in \p sslot_free_vec
+
+    /// True iff this slot hasn't yet been queued for \p tx_burst
+    bool needs_tx_queueing;
+
+    bool needs_resp;       ///< True iff this slot is waiting for a response
+    size_t req_num;        ///< The request number for this slot
     MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer for this slot
     MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer for this slot
 
@@ -69,12 +74,17 @@ class Session {
   SessionEndpoint client, server;           ///< Read-only endpoint metadata
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
   bool in_datapath_tx_work_queue;  ///< True iff session is in tx work queue
+
   sslot_t sslot_arr[kSessionReqWindow];                   ///< The session slots
   FixedVector<size_t, kSessionReqWindow> sslot_free_vec;  ///< Free slots
 
   /// Depending on this session's role, save a pointer to \p server's or
   /// \p client's RoutingInfo for faster unconditional access
   RoutingInfo *remote_routing_info;
+
+  /// Depending on this session's role, save the local endpoint's session number
+  /// for faster unconditional access
+  uint16_t local_session_num;
 
   /// Information that is required only at the client endpoint
   struct {

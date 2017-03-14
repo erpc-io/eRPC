@@ -114,6 +114,8 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   server_endpoint.secret = client_endpoint.secret; /* Secret is shared */
   // server_endpoint.routing_info = ??
 
+  session->local_session_num = client_endpoint.session_num;
+
   session_vec.push_back(session); /* Add to list of all sessions */
   mgmt_retry_queue_add(session);  /* Record management request for retry */
 

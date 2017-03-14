@@ -49,13 +49,13 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   }
 
   /* Find a free message slot in the session */
-  size_t free_sslot_i = session->sslot_free_vec.pop_back();
-  assert(free_sslot_i < Session::kSessionReqWindow);
+  size_t sslot_i = session->sslot_free_vec.pop_back();
+  assert(sslot_i < Session::kSessionReqWindow);
 
   /* Generate the next request number for this slot */
   size_t req_num =
-      (req_num_arr[free_sslot_i]++ * Session::kSessionReqWindow) + /* Shift */
-      free_sslot_i;
+      (req_num_arr[sslot_i]++ * Session::kSessionReqWindow) + /* Shift */
+      sslot_i;
 
   /* Fill in packet 0's header. XXX: Optimize using preconstructed headers. */
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
@@ -69,7 +69,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   /* pkthdr->magic is already filled in */
 
   if (small_msg_likely(req_msgbuf->num_pkts == 1)) {
-    /* Nothing more needs to be done for small packets */
+    /* Small packets just need pkthdr_0, so we're done */
   } else {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and
@@ -83,11 +83,12 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   }
 
   /* Fill in the session message slot */
-  Session::sslot_t &free_sslot = session->sslot_arr[free_sslot_i];
-  assert(free_sslot.in_use == false);
-
-  free_sslot.tx_msgbuf = req_msgbuf;
-  free_sslot.in_use = true;
+  Session::sslot_t &sslot = session->sslot_arr[sslot_i];
+  sslot.in_free_vec = false;
+  sslot.needs_tx_queueing = true;
+  sslot.needs_resp = true;
+  sslot.req_num = req_num;
+  sslot.tx_msgbuf = req_msgbuf;
 
   upsert_datapath_tx_work_queue(session);
   return 0;

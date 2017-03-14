@@ -150,6 +150,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   session->server = sm_pkt->server;
   session->client = sm_pkt->client;
 
+  session->local_session_num = sm_pkt->server.session_num;
+
   session_vec.push_back(session); /* Add to list of all sessions */
 
   erpc_dprintf("%s: None. Sending response.\n", issue_msg);

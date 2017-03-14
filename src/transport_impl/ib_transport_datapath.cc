@@ -7,35 +7,30 @@ namespace ERpc {
  * be inlined. Packets that are not the first packet use two DMAs, and are never
  * inlined for simplicity.
  */
-void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
-                           MsgBuffer** msg_buffer_arr, size_t num_pkts) {
-  assert(routing_info_arr != nullptr);
-  assert(msg_buffer_arr != nullptr);
-  assert(num_pkts >= 1 && num_pkts <= kPostlist);
+void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
+                           size_t num_pkts) {
+  assert(tx_burst_arr != nullptr);
 
   for (size_t i = 0; i < num_pkts; i++) {
-    struct ibv_send_wr& wr = send_wr[i];
-    struct ibv_sge* sgl = send_sgl[i];
+    const tx_burst_item_t& item = tx_burst_arr[i];
+    assert(item.routing_info != nullptr);
+    assert(item.msg_buffer != nullptr);
 
-    MsgBuffer* msg_buffer = msg_buffer_arr[i];
+    const MsgBuffer* msg_buffer = item.msg_buffer;
     assert(msg_buffer->buf != nullptr);
 
-    /*
-     * Compute the data bytes left to send in the message. This can be zero for
-     * credit return packets only.
-     */
-    assert(msg_buffer->data_size >= msg_buffer->data_sent);
-    size_t data_bytes_left = (msg_buffer->data_size - msg_buffer->data_sent);
-    if (data_bytes_left == 0) {
-      assert(msg_buffer->num_pkts == 1);
+    assert(sizeof(pkthdr_t) + item.data_bytes <= kMaxDataPerPkt);
+    assert(item.offset + item.data_bytes <= msg_buffer->data_size);
+
+    if (item.data_bytes == 0) {
+      /* This must be a credit return */
       assert(msg_buffer->get_pkthdr_0()->pkt_type == kPktTypeCreditReturn);
     }
 
-    /* Number of data bytes that will be sent with this work request */
-    size_t data_bytes_to_send =
-        data_bytes_left < kMaxDataPerPkt ? data_bytes_left : kMaxDataPerPkt;
-
     /* Verify constant fields of work request */
+    struct ibv_send_wr& wr = send_wr[i];
+    struct ibv_sge* sgl = send_sgl[i];
+
     assert(wr.next == &send_wr[i + 1]); /* +1 is valid */
     assert(wr.wr.ud.remote_qkey == kQKey);
     assert(wr.opcode == IBV_WR_SEND_WITH_IMM);
@@ -44,44 +39,41 @@ void IBTransport::tx_burst(RoutingInfo const* const* routing_info_arr,
     /* Set signaling flag. The work request is non-inline by default. */
     wr.send_flags = get_signaled_flag();
 
-    if (msg_buffer->pkts_sent == 0) {
+    if (small_msg_likely(item.offset == 0)) {
       /*
        * This is the first packet, so we need only 1 SGE. This can be a credit
        * return packet.
        */
       pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = (uint64_t)pkthdr;
-      sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + data_bytes_to_send);
+      sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + item.data_bytes);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
       /* Only single-SGE work requests are inlined */
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
       wr.num_sge = 1;
     } else {
-      /* This is not the first packet, so we need 2 SGEs */
-      pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(msg_buffer->pkts_sent);
+      /*
+       * This is not the first packet, so we need 2 SGEs. The offset_to_pkt_num
+       * function is expensive, but it's OK because we're dealing with a
+       * multi-pkt message.
+       */
+      size_t pkt_num = offset_to_pkt_num(item.offset);
+      pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)sizeof(pkthdr_t);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      send_sgl[i][1].addr =
-          (uint64_t) & (msg_buffer->buf[msg_buffer->data_sent]);
-      send_sgl[i][1].length = (uint32_t)data_bytes_to_send;
+      send_sgl[i][1].addr = (uint64_t) & (msg_buffer->buf[item.offset]);
+      send_sgl[i][1].length = (uint32_t)item.data_bytes;
       send_sgl[i][1].lkey = msg_buffer->buffer.lkey;
 
       wr.num_sge = 2;
     }
 
-    auto ib_routing_info = (struct ib_routing_info_t*)routing_info_arr[i];
+    auto ib_routing_info = (struct ib_routing_info_t*)item.routing_info;
     wr.wr.ud.remote_qpn = ib_routing_info->qpn;
     wr.wr.ud.ah = ib_routing_info->ah;
-
-    /*
-     * Update MsgBuffer progress tracking metadata. This ensures that subsequent
-     * packets in this batch that belong to this MsgBuffer get sent correctly.
-     */
-    msg_buffer->data_sent += data_bytes_to_send;
-    msg_buffer->pkts_sent++;
   }
 
   send_wr[num_pkts - 1].next = nullptr; /* Breaker of chains */

@@ -53,19 +53,15 @@ class Transport {
   ~Transport();
 
   /**
-   * @brief Transmit a batch of packets, and for each packet, update its
-   * MsgBuffer's progress tracking information.
+   * @brief Transmit a batch of packets
    *
    * Multiple packets may belong to the same MsgBuffer. The transport determines
-   * the offset of each of these packets by updating the \p data_sent and
-   * \p pkts_sent field of the shared MsgBuffer.
+   * the offset of each of these packets using \p offset_arr.
    *
-   * @param routing_info_arr Per-packet RoutingInfo
-   * @param msg_buffer_arr The MsgBuffer for each packet
-   * @param num_pkts The total number of packets to transmit (up to kPostlist)
+   * @param tx_burst_arr Info about the packets to TX
+   * @param num_pkts The total number of packets to transmit (<= \p kPostlist)
    */
-  void tx_burst(RoutingInfo const* const* routing_info_arr,
-                MsgBuffer** msg_buffer_arr, size_t num_pkts);
+  void tx_burst(const tx_burst_item_t* tx_burst_arr, size_t num_pkts);
 
   /**
    * @brief The generic packet reception function

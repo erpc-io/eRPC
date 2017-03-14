@@ -63,9 +63,19 @@ class IBTransport : public Transport {
     return std::string(ret.str());
   }
 
+  /// Returns the packet number for an MsgBuffer offset.
+  /// XXX: When we change the size of the first packet, this function will
+  /// need to change.
+  static size_t offset_to_pkt_num(size_t offset) {
+    if (small_msg_likely(offset < kMaxDataPerPkt)) {
+      return 0;
+    } else {
+      return 1 + ((offset - kMaxDataPerPkt) / kMaxDataPerPkt);
+    }
+  }
+
   // ib_transport_datapath.cc
-  void tx_burst(RoutingInfo const *const *routing_info_arr,
-                MsgBuffer **msg_buffer_arr, size_t num_pkts);
+  void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
   size_t rx_burst();
   void post_recvs(size_t num_recvs);
 

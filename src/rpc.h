@@ -352,15 +352,14 @@ class Rpc {
   /// because session management is not performance-critical.
   std::vector<Session *> mgmt_retry_queue;
 
-  /// Sessions for which (more) request or response packets need to be sent
+  /// Sessions that need TX. We don't need a std::list to support efficient
+  /// deletes because sessions are implicitly deleted while processing the
+  /// work queue.
   std::vector<Session *> datapath_tx_work_queue;
 
   /// Tx batch information for interfacing between the event loop and the
   /// transport.
-  //@{
-  RoutingInfo *tx_routing_info_arr[Transport_::kPostlist];
-  MsgBuffer *tx_msg_buffer_arr[Transport_::kPostlist];
-  //@}
+  tx_burst_item_t tx_burst_arr[Transport_::kPostlist];
 
   /// Rx batch information for \p rx_burst
   MsgBuffer rx_msg_buffer_arr[Transport_::kPostlist];
