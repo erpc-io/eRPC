@@ -307,8 +307,7 @@ class Rpc {
   void process_datapath_tx_work_queue_multi_pkt_one(Session *session,
                                                     MsgBuffer *tx_msgbuf,
                                                     size_t sslot_i,
-                                                    size_t &batch_i,
-                                                    size_t &write_index);
+                                                    size_t &batch_i);
 
   /**
    * @brief Process received packets and post RECVs. The ring buffers received

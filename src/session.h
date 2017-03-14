@@ -36,15 +36,15 @@ class Session {
   /// Session slot metadata maintained about an Rpc. Session slots that are
   /// in \p sslot_free_vec are invalid and may contain garbage.
   struct sslot_t {
-    bool in_free_vec;  ///< True iff this slot is in \p sslot_free_vec
+    bool in_free_vec = false;  ///< True iff this slot is in \p sslot_free_vec
 
-    /// True iff this slot hasn't yet been queued for \p tx_burst
-    bool needs_tx_queueing;
+    /// True iff this slot needs TX queueing using \p tx_burst
+    bool needs_tx_queueing = false;
 
-    bool needs_resp;       ///< True iff this slot is waiting for a response
-    size_t req_num;        ///< The request number for this slot
-    MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer for this slot
-    MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer for this slot
+    bool needs_resp = false;  ///< True iff this slot is waiting for a response
+    size_t req_num;           ///< The request number for this slot
+    MsgBuffer rx_msgbuf;      ///< The RX MsgBuffer for this slot
+    MsgBuffer *tx_msgbuf;     ///< The TX MsgBuffer for this slot
 
     app_resp_t app_resp;  ///< The application's response to a request
   };

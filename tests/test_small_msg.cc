@@ -13,6 +13,7 @@ static const size_t kAppEventLoopMs = 200;
 static const uint8_t kAppServerAppTid = 100;
 static const uint8_t kAppClientAppTid = 200;
 static const uint8_t kAppReqType = 3;
+static const size_t kAppMaxMsgSize = 64;
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready; /* Client starts after server is ready */
@@ -181,15 +182,20 @@ void multi_small_rpc_one_session(Nexus *nexus) {
   }
   ASSERT_EQ(session->state, SessionState::kConnected);
 
+  /* Pre-create MsgBuffers so we can test reuse and resizing */
+  MsgBuffer req_msgbuf[Session::kSessionCredits];
+  for (size_t i = 0; i < Session::kSessionCredits; i++) {
+    req_msgbuf[i] = rpc.alloc_msg_buffer(kAppMaxMsgSize);
+  }
+
   for (size_t iter = 0; iter < 3; iter++) {
     context.num_resps = 0;
 
     /* Enqueue as many requests as one session allows */
-    MsgBuffer req_msgbuf[Session::kSessionCredits];
-
     for (size_t i = 0; i < Session::kSessionCredits; i++) {
       std::string req_msg = std::string("APP_MSG-") + std::to_string(i);
-      req_msgbuf[i] = rpc.alloc_msg_buffer(req_msg.length());
+      rpc.resize_msg_buffer(&req_msgbuf[i], req_msg.length());
+
       strcpy((char *)req_msgbuf[i].buf, req_msg.c_str());
 
       test_printf("test: Sending request %s\n", (char *)req_msgbuf[i].buf);

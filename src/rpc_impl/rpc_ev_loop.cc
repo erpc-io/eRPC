@@ -31,6 +31,9 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
   for (size_t i = 0; i < datapath_tx_work_queue.size(); i++) {
     Session *session = datapath_tx_work_queue[i];
 
+    /* Does this session need more TX after the loop over slots below? */
+    bool session_needs_more_tx = false;
+
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
       Session::sslot_t &sslot = session->sslot_arr[sslot_i];
 
@@ -61,32 +64,26 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         assert(tx_msgbuf->data_size <= Transport_::kMaxDataPerPkt);
 
         bool is_unexp = (tx_msgbuf->get_pkthdr_0()->is_unexp == 1);
-        if (is_unexp) {
-          /* If the message is single-pkt and Unexpected, it must be a req */
-          assert(tx_msgbuf->get_pkthdr_0()->is_req());
-        }
 
         /* If session credits are on, save & bail if we're out of credits */
-        if (kHandleSessionCredits && session->remote_credits == 0 && is_unexp) {
-          assert(write_index < datapath_tx_work_queue.size());
-          datapath_tx_work_queue[write_index++] = session;
-
+        if (kHandleSessionCredits && is_unexp && session->remote_credits == 0) {
+          session_needs_more_tx = true;
           dpath_dprintf(
               "eRPC Rpc %u: Session %u out of credits. Re-queueing.\n", app_tid,
               session->local_session_num);
-          continue; /* Try the next slot - it may be an Expected message */
+          continue; /* Try the next slot - we can still TX Expected packets */
         }
 
         /* If Unexpected window is enabled, save & bail if we're out of slots */
-        if (kHandleUnexpWindow && unexp_credits == 0 && is_unexp) {
-          assert(write_index < datapath_tx_work_queue.size());
-          datapath_tx_work_queue[write_index++] = session;
-
+        if (kHandleUnexpWindow && is_unexp && unexp_credits == 0) {
+          session_needs_more_tx = true;
           dpath_dprintf(
               "eRPC Rpc %u: Rpc out of window slots. Re-queueing session %u.",
               app_tid, session->local_session_num);
+          continue; /* Try the next slot - we can still TX expecetd packets */
         }
 
+        // Consume credits if this packet is Unexpected
         if (kHandleUnexpWindow && is_unexp) {
           unexp_credits--;
         }
@@ -108,6 +105,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
          * This function will execute to completion unless the machine crashes,
          * so it's safe to mark/unmark queueing progress variables now.
          */
+        session->in_datapath_tx_work_queue = false;
         sslot.needs_tx_queueing = false;
         tx_msgbuf->pkts_queued = 1;
 
@@ -128,10 +126,23 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
       /* If we're here, msg_buffer is a multi-packet message */
       process_datapath_tx_work_queue_multi_pkt_one(session, tx_msgbuf, sslot_i,
-                                                   batch_i, write_index);
+                                                   batch_i);
+
+      /* If sslot still needs TX, the session needs to stay in the work queue */
+      if (sslot.needs_tx_queueing) {
+        session_needs_more_tx = true;
+      }
 
     } /* End loop over messages of a session */
-  }   /* End loop over datapath work queue sessions */
+
+    if (session_needs_more_tx) {
+      assert(session->in_datapath_tx_work_queue);
+      assert(write_index < datapath_tx_work_queue.size());
+      datapath_tx_work_queue[write_index++] = session;
+    } else {
+      session->in_datapath_tx_work_queue = false;
+    }
+  } /* End loop over datapath work queue sessions */
 
   if (batch_i > 0) {
     transport->tx_burst(tx_burst_arr, batch_i);
@@ -144,8 +155,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
 template <class Transport_>
 void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
-    Session *session, MsgBuffer *tx_msgbuf, size_t sslot_i, size_t &batch_i,
-    size_t &write_index) {
+    Session *session, MsgBuffer *tx_msgbuf, size_t sslot_i, size_t &batch_i) {
   /*
    * Preconditions from process_datapath_tx_work_queue(). Session credits and
    * Unexpected window must be enabled if large packts are used.
@@ -180,12 +190,6 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
     /* Response packets except the first use Unexpected credits */
     unexp_credits -= (now_sending - 1);
     session->remote_credits -= (now_sending - 1);
-  }
-
-  if (now_sending != pkts_pending) {
-    /* If we cannot send all packets, save session for later */
-    assert(write_index < datapath_tx_work_queue.size());
-    datapath_tx_work_queue[write_index++] = session;
   }
 
   if (now_sending == 0) {
