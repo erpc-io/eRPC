@@ -43,7 +43,6 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       assert(tx_msgbuf != nullptr);
       assert(tx_msgbuf->buf != nullptr);
       assert(tx_msgbuf->check_pkthdr_0());
-      assert(tx_msgbuf->data_queued < tx_msgbuf->data_size);
       assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 
       /* If we are here, this message needs packet TX. */
@@ -60,7 +59,6 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
       if (small_msg_likely(tx_msgbuf->num_pkts == 1)) {
         /* Optimize for small/credit-return messages that fit in one packet */
-        assert(tx_msgbuf->data_queued == 0);
         assert(tx_msgbuf->pkts_queued == 0);
         assert(tx_msgbuf->data_size <= Transport_::kMaxDataPerPkt);
 
@@ -113,7 +111,6 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
          * so it's safe to mark/unmark queueing progress variables now.
          */
         sslot.needs_tx_queueing = false;
-        tx_msgbuf->data_queued = tx_msgbuf->data_size;
         tx_msgbuf->pkts_queued = 1;
 
         dpath_dprintf(
@@ -228,7 +225,6 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
      */
     session->sslot_arr[sslot_i].needs_tx_queueing =
         (now_sending == pkts_pending);
-    tx_msgbuf->data_queued += item.data_bytes;
     tx_msgbuf->pkts_queued++;
 
     batch_i++;

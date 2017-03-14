@@ -97,7 +97,6 @@ class MsgBuffer {
   size_t num_pkts = 0;       ///< Current number of packets in this MsgBuffer
 
   // Progress tracking info
-  size_t data_queued = 0;  ///< Bytes of data queued for tx_burst
   union {
     size_t pkts_queued = 0;  ///< Packets queued for tx_burst
     size_t pkts_rcvd;        ///< Packets received from rx_burst
