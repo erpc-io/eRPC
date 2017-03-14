@@ -38,12 +38,16 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       Session::sslot_t &sslot = session->sslot_arr[sslot_i];
 
       /* Process only slots that are busy and need TX */
-      if (sslot.in_free_vec || !sslot.needs_tx_queueing) {
+      if (sslot.in_free_vec) {
         continue;
       }
 
       MsgBuffer *tx_msgbuf = sslot.tx_msgbuf;
-      assert(tx_msgbuf != nullptr);
+      if (tx_msgbuf == nullptr ||
+          tx_msgbuf->pkts_queued == tx_msgbuf->num_pkts) {
+        continue;
+      }
+
       assert(tx_msgbuf->buf != nullptr);
       assert(tx_msgbuf->check_pkthdr_0());
       assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
@@ -100,13 +104,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         item.data_bytes = tx_msgbuf->data_size;
         batch_i++;
 
-        /*
-         * If we're here, we're going to enqueue this message for tx_burst.
-         * This function will execute to completion unless the machine crashes,
-         * so it's safe to mark/unmark queueing progress variables now.
-         */
-        session->in_datapath_tx_work_queue = false;
-        sslot.needs_tx_queueing = false;
+        /* If we're here, we're going to enqueue this message for tx_burst */
         tx_msgbuf->pkts_queued = 1;
 
         dpath_dprintf(
@@ -129,7 +127,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
                                                    batch_i);
 
       /* If sslot still needs TX, the session needs to stay in the work queue */
-      if (sslot.needs_tx_queueing) {
+      if (tx_msgbuf->pkts_queued != tx_msgbuf->num_pkts) {
         session_needs_more_tx = true;
       }
 
@@ -220,13 +218,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
             ? Transport_::kMaxDataPerPkt
             : (tx_msgbuf->data_size - item.offset);
 
-    /*
-     * If we're here, we're going to enqueue part or all or this message for
-     * tx_burst. This function will execute to completion unless the machine
-     * crashes, so it's safe to mark/unmark queueing progress variables now.
-     */
-    session->sslot_arr[sslot_i].needs_tx_queueing =
-        (now_sending == pkts_pending);
+    /* If we're here, we will enqueue all/part of tx_msgbuf for tx_burst */
     tx_msgbuf->pkts_queued++;
 
     batch_i++;
@@ -316,17 +308,18 @@ void Rpc<Transport_>::process_completions() {
       size_t req_num = pkthdr->req_num;
       size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
       Session::sslot_t &sslot = session->sslot_arr[sslot_i];
-      assert(!sslot.needs_tx_queueing);
 
       sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
       if (pkthdr->is_req()) {
+        // Handle requests
         assert(session->is_server());
-
-        assert(!sslot.needs_resp); /* Server sslots never need resps */
         /* The sslot may or may not be in sslot_free_vec */
 
-        /* Invoke the request handler */
+        /*
+         * Invoke the request handler. needs_resp might be useful if the
+         * request handler is asynchronous.
+         */
         ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
 
         app_resp_t &app_resp = sslot.app_resp;
@@ -336,12 +329,10 @@ void Rpc<Transport_>::process_completions() {
         if (small_msg_likely(app_resp.prealloc_used)) {
           assert(resp_size <= Transport_::kMaxDataPerPkt);
 
-          MsgBuffer &resp_msgbuf = app_resp.pre_resp_msgbuf;
-          resp_msgbuf.resize(resp_size, 1);
+          app_resp.pre_resp_msgbuf.resize(resp_size, 1);
 
           /* Fill in packet 0's header */
-          /* XXX: Optimize using preconstructed headers. */
-          pkthdr_t *pkthdr_0 = resp_msgbuf.get_pkthdr_0();
+          pkthdr_t *pkthdr_0 = app_resp.pre_resp_msgbuf.get_pkthdr_0();
           pkthdr_0->req_type = pkthdr->req_type;
           pkthdr_0->msg_size = resp_size;
           pkthdr_0->rem_session_num = session->client.session_num;
@@ -350,11 +341,17 @@ void Rpc<Transport_>::process_completions() {
           pkthdr_0->pkt_num = 0;
           pkthdr_0->req_num = req_num;
 
+          /*
+           * Fill in the session message slot. Record that we have a valid
+           * request \p req_num and the response.
+           */
           sslot.in_free_vec = false;
-          sslot.needs_tx_queueing = true;
-          sslot.needs_resp = false;
           sslot.req_num = req_num;
-          sslot.tx_msgbuf = &app_resp.pre_resp_msgbuf;
+          assert(sslot.rx_msgbuf.buf != nullptr);      /* Valid request */
+          sslot.tx_msgbuf = &app_resp.pre_resp_msgbuf; /* Valid response */
+
+          /* Reset queueing progress */
+          sslot.tx_msgbuf->pkts_queued = 0;
 
           upsert_datapath_tx_work_queue(session);
         } else {
@@ -362,22 +359,25 @@ void Rpc<Transport_>::process_completions() {
           assert(false);
         }
       } else {
+        // Handle responses
         assert(pkthdr->is_resp()); /* Cannot be credit return */
         assert(session->is_client());
 
         assert(!sslot.in_free_vec);
-        assert(sslot.needs_resp);
 
         /* Sanity-check the req MsgBuffer */
-        assert(sslot.tx_msgbuf != nullptr);
-        assert(sslot.tx_msgbuf->check_pkthdr_0());
-        assert(sslot.tx_msgbuf->get_pkthdr_0()->is_req());
-        assert(sslot.tx_msgbuf->get_pkthdr_0()->req_num == req_num);
+        MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
+        assert(req_msgbuf != nullptr);
+        assert(req_msgbuf->buf != nullptr);
+        assert(req_msgbuf->check_pkthdr_0());
+        assert(req_msgbuf->get_pkthdr_0()->is_req());
+        assert(req_msgbuf->get_pkthdr_0()->req_num == req_num);
+        assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 
         /* Invoke the response callback */
         ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
 
-        /* Free the slot */
+        /* Free the slot, indicating that everything in the slot is garbage */
         sslot.in_free_vec = true;
         session->sslot_free_vec.push_back(sslot_i);
       }

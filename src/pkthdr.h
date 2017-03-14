@@ -19,6 +19,8 @@ static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 static_assert(kPktHdrMagicBits == 20, ""); /* Just to keep track */
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 
+static const size_t kInvalidReqNum = ((1ull << kReqNumBits) - 1);
+
 /// These packet types are stored as bitfields in the packet header, so don't
 /// use an enum class here to avoid casting all over the place.
 enum PktType : uint64_t {

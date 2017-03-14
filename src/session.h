@@ -33,20 +33,29 @@ class Session {
    */
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
-  /// Session slot metadata maintained about an Rpc. Session slots that are
-  /// in \p sslot_free_vec are invalid and may contain garbage.
+  /**
+   * @brief Session slot metadata maintained about an Rpc
+   *
+   * Session slots that are in \p sslot_free_vec (i.e., \p in_free_vec is true)
+   * are invalid and may contain garbage.
+   *
+   * This slot structure is used by both server and client sessions.
+   *
+   * The validity/existence of a request or response in a slot is inferred from
+   * \p rx_msgbuf or \p tx_msgbuf. Doing so avoids maintaining additional
+   * boolean fields (such as \em is_req_received and \em is_resp_generated).
+   */
   struct sslot_t {
-    bool in_free_vec = false;  ///< True iff this slot is in \p sslot_free_vec
+    // Fields that are meaningful for both server and client mode sessions
+    bool in_free_vec;      ///< True iff this slot is in \p sslot_free_vec
+    size_t req_num;        ///< The request number for this slot
+    MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer for this slot
+    MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer for this slot
 
-    /// True iff this slot needs TX queueing using \p tx_burst
-    bool needs_tx_queueing = false;
+    // Server-only fields
 
-    bool needs_resp = false;  ///< True iff this slot is waiting for a response
-    size_t req_num;           ///< The request number for this slot
-    MsgBuffer rx_msgbuf;      ///< The RX MsgBuffer for this slot
-    MsgBuffer *tx_msgbuf;     ///< The TX MsgBuffer for this slot
-
-    app_resp_t app_resp;  ///< The application's response to a request
+    /// The application's response. This contains a preallocated MsgBuffer.
+    app_resp_t app_resp;
   };
 
   Session(Role role, SessionState state);

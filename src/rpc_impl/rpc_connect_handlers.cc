@@ -184,20 +184,25 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * a disconnect response. If so, the callback is not invoked.
    */
   if (session == nullptr) {
-    assert(!mgmt_retry_queue_contains(session));
     erpc_dprintf("%s: Client session is already disconnected.\n", issue_msg);
     return;
   }
+
+  assert(session->is_client());
 
   /*
    * If we are here, we still have the requester session as Client.
    *
    * Check if the session state has advanced beyond kConnectInProgress (due to
-   * a prior duplicate connect response). If so, we are not interested in this
-   * response and the callback is not invoked.
+   * a prior connect response). If so, we are not interested in this response
+   * and the callback is not invoked.
    */
   if (session->state > SessionState::kConnectInProgress) {
-    assert(!mgmt_retry_queue_contains(session));
+    /* We may have a disconnect request outstanding */
+    if (mgmt_retry_queue_contains(session)) {
+      assert(session->state == SessionState::kDisconnectInProgress);
+    }
+
     erpc_dprintf("%s: Ignoring. Client is in state %s.\n", issue_msg,
                  session_state_str(session->state).c_str());
     return;

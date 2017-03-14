@@ -40,10 +40,11 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     }
   }
 
-  if (session->sslot_free_vec.size() == 0) {
+  if (unlikely(session->sslot_free_vec.size() == 0)) {
     /*
      * No free message slots left in session, so we can't queue this request.
-     * This needs to be done even without kDatapathChecks.
+     * This needs to be done even when kDatapathChecks, kHandleSessionCredits,
+     * and kHandleUnexpWindow are all disabled.
      */
     return static_cast<int>(RpcDatapathErrCode::kNoSessionMsgSlots);
   }
@@ -57,7 +58,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       (req_num_arr[sslot_i]++ * Session::kSessionReqWindow) + /* Shift */
       sslot_i;
 
-  /* Fill in packet 0's header. XXX: Optimize using preconstructed headers. */
+  /* Fill in packet 0's header */
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
   pkthdr_0->req_type = req_type;
   pkthdr_0->msg_size = req_msgbuf->data_size;
@@ -82,13 +83,19 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     }
   }
 
-  /* Fill in the session message slot */
+  /*
+   * Fill in the session message slot. Record that we have a valid request
+   * \p req_num, but not the response.
+   */
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
+  assert(sslot.in_free_vec);
   sslot.in_free_vec = false;
-  sslot.needs_tx_queueing = true;
-  sslot.needs_resp = true;
   sslot.req_num = req_num;
-  sslot.tx_msgbuf = req_msgbuf;
+  sslot.tx_msgbuf = req_msgbuf;   /* Valid request */
+  sslot.rx_msgbuf.buf = nullptr;  /* Invalid response */
+
+  /* Reset queueing progress */
+  sslot.tx_msgbuf->pkts_queued = 0;
 
   upsert_datapath_tx_work_queue(session);
   return 0;

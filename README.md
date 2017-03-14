@@ -1,17 +1,24 @@
 ## Code notes
-  * Major types
-    * Request type: `uint8_t`. 256 request types should be enough.
-    * App TIDs: `uint8_t`. We need one per thread, so 256 is enough.
-    * Session number: `uint16_t`. We need one per session, and we don't expect
-      to support over 65,536 sessions per thread. More sessions can be supported
-      with multiple threads.
-    * Sequence numbers: `uint64_t` - not `size_t`
-    * Numa nodes: `size_t`. These are not transferred over the network, so no
-      need to shrink.
-  * Use exceptions in constructors. No exceptions in destructors.
-  * If a function throws an exception, its documentation should say so.
-  * Do not append integers directly to string streams. If the integer is
-    `uint8_t`, it will get interpreted as a character.
+ * An important simplifying insight is that all functions invoked by the event
+   loop run to completion, i.e., we cannot be preempted. So we don't need to
+   worry about cases such as one where the request number and response buffer
+   in a session slot do not correspond.
+ * Major types
+   * Request type: `uint8_t`. 256 request types should be enough.
+   * App TIDs: `uint8_t`. We need one per thread, so 256 is enough.
+   * Session number: `uint16_t`. We need one per session, and we don't expect
+     to support over 65,536 sessions per thread. More sessions can be supported
+     with multiple threads.
+   * Sequence numbers: `uint64_t` - not `size_t`
+   * Numa nodes: `size_t`. These are not transferred over the network, so no
+     need to shrink.
+ * Use exceptions in constructors. No exceptions in destructors.
+ * If a function throws an exception, its documentation should say so.
+ * Do not append integers directly to string streams. If the integer is
+   `uint8_t`, it will get interpreted as a character.
+ * Do not initialize struct/class members in the struct/class definition
+   (except maybe in major classes like Rpc/Nexus/Session). This just causes
+   confusion.
 
 ## API notes
 
@@ -22,6 +29,7 @@
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
 
 ## Long-term TODOs
+ * Optimize `pkthdr_0` filling using preconstructed headers.
  * The first packet size limit should be much smaller than MTU to improve RTT
    measurement accuracy (e.g., it could be around 256 bytes). This will need
    many changes, including `offset_to_pkt_num`.

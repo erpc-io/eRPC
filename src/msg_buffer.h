@@ -9,6 +9,7 @@ namespace ERpc {
 
 // Forward declarations
 class IBTransport;
+
 template <typename T>
 class Rpc;
 
@@ -19,12 +20,15 @@ class MsgBuffer {
   friend class IBTransport;
   friend class Rpc<IBTransport>;
 
-  /// Default constructor. The \p buf field is NULL, indicating invalid state.
   MsgBuffer() {}
   ~MsgBuffer() {}
 
   /// Return an invalid MsgBuffer, i.e., \p buf is NULL.
-  static MsgBuffer get_invalid_msgbuf() { return MsgBuffer(); }
+  static inline MsgBuffer get_invalid_msgbuf() {
+    MsgBuffer msg_buffer;
+    msg_buffer.buf = nullptr;
+    return msg_buffer;
+  }
 
   /// Return a pointer to the pre-appended packet header of this MsgBuffer
   inline pkthdr_t *get_pkthdr_0() const {
@@ -75,6 +79,7 @@ class MsgBuffer {
     /* data_size can be zero */
   }
 
+  /// Resize this MsgBuffer to any size smaller than its maximum allocation
   inline void resize(size_t new_data_size, size_t new_num_pkts) {
     assert(new_data_size <= max_data_size);
     assert(new_num_pkts <= max_num_pkts);
@@ -85,21 +90,21 @@ class MsgBuffer {
  public:
   /// Pointer to the first *data* byte. (\p buffer.buf does not point to the
   /// first data byte.)
-  uint8_t *buf = nullptr;
+  uint8_t *buf;
 
  private:
   Buffer buffer;  ///< The (optional) backing hugepage Buffer
 
   // Size info
-  size_t max_data_size = 0;  ///< Max data bytes in the MsgBuffer
-  size_t data_size = 0;      ///< Current data bytes in the MsgBuffer
-  size_t max_num_pkts = 0;   ///< Max number of packets in this MsgBuffer
-  size_t num_pkts = 0;       ///< Current number of packets in this MsgBuffer
+  size_t max_data_size;  ///< Max data bytes in the MsgBuffer
+  size_t data_size;      ///< Current data bytes in the MsgBuffer
+  size_t max_num_pkts;   ///< Max number of packets in this MsgBuffer
+  size_t num_pkts;       ///< Current number of packets in this MsgBuffer
 
   // Progress tracking info
   union {
-    size_t pkts_queued = 0;  ///< Packets queued for tx_burst
-    size_t pkts_rcvd;        ///< Packets received from rx_burst
+    size_t pkts_queued;  ///< Packets queued for tx_burst
+    size_t pkts_rcvd;    ///< Packets received from rx_burst
   };
 };
 }
