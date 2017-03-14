@@ -50,11 +50,9 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       _unused(pkthdr_0);
 
       if (session->is_client()) {
-        assert(pkthdr_0->pkt_type == kPktTypeReq ||
-               pkthdr_0->pkt_type == kPktTypeCreditReturn);
+        assert(pkthdr_0->is_req() || pkthdr_0->is_credit_return());
       } else {
-        assert(pkthdr_0->pkt_type == kPktTypeResp ||
-               pkthdr_0->pkt_type == kPktTypeCreditReturn);
+        assert(pkthdr_0->is_resp() || pkthdr_0->is_credit_return());
       }
 
       if (small_msg_likely(tx_msgbuf->num_pkts == 1)) {
@@ -65,7 +63,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         bool is_unexp = (tx_msgbuf->get_pkthdr_0()->is_unexp == 1);
         if (is_unexp) {
           /* If the message is single-pkt and Unexpected, it must be a req */
-          assert(tx_msgbuf->get_pkthdr_0()->req_type == kPktTypeReq);
+          assert(tx_msgbuf->get_pkthdr_0()->is_req());
         }
 
         /* If session credits are on, save & bail if we're out of credits */
@@ -292,7 +290,7 @@ void Rpc<Transport_>::process_completions() {
 
     /* We're done handling credit return packets */
     if ((kHandleSessionCredits || kHandleUnexpWindow) &&
-        pkthdr->pkt_type == kPktTypeCreditReturn) {
+        pkthdr->is_credit_return()) {
       continue;
     }
 
@@ -318,7 +316,7 @@ void Rpc<Transport_>::process_completions() {
 
       sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
 
-      if (pkthdr->pkt_type == kPktTypeReq) {
+      if (pkthdr->is_req()) {
         assert(session->is_server());
 
         assert(!sslot.needs_resp); /* Server sslots never need resps */
@@ -360,7 +358,7 @@ void Rpc<Transport_>::process_completions() {
           assert(false);
         }
       } else {
-        assert(pkthdr->pkt_type == kPktTypeResp);
+        assert(pkthdr->is_resp()); /* Cannot be credit return */
         assert(session->is_client());
 
         assert(!sslot.in_free_vec);
@@ -369,7 +367,7 @@ void Rpc<Transport_>::process_completions() {
         /* Sanity-check the req MsgBuffer */
         assert(sslot.tx_msgbuf != nullptr);
         assert(sslot.tx_msgbuf->check_pkthdr_0());
-        assert(sslot.tx_msgbuf->get_pkthdr_0()->pkt_type == kPktTypeReq);
+        assert(sslot.tx_msgbuf->get_pkthdr_0()->is_req());
         assert(sslot.tx_msgbuf->get_pkthdr_0()->req_num == req_num);
 
         /* Invoke the response callback */

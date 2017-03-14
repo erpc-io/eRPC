@@ -23,8 +23,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
     if (item.data_bytes == 0) {
-      /* This must be a credit return */
-      assert(msg_buffer->get_pkthdr_0()->pkt_type == kPktTypeCreditReturn);
+      assert(msg_buffer->get_pkthdr_0()->is_credit_return());
     }
 
     /* Verify constant fields of work request */

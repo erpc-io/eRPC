@@ -60,7 +60,7 @@ struct pkthdr_t {
 
   /// Return a string representation of a packet header. Credit return packets
   /// are marked with an asterisk.
-  std::string to_string() {
+  std::string to_string() const {
     std::ostringstream ret;
     ret << "[type " << pkt_type_str(pkt_type) << ", "
         << "req " << req_num << ", "
@@ -68,6 +68,13 @@ struct pkthdr_t {
         << "msg size " << msg_size << "]"
         << (is_unexp == 0 ? "*" : ""); /* Mark credit return packets */
     return ret.str();
+  }
+
+  inline bool is_req() const { return pkt_type == kPktTypeReq; }
+  inline bool is_resp() const { return pkt_type == kPktTypeResp; }
+
+  inline bool is_credit_return() const {
+    return pkt_type == kPktTypeCreditReturn;
   }
 } __attribute__((packed));
 
