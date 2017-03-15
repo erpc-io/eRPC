@@ -55,7 +55,8 @@ class Session {
     /// The application's response. This contains a preallocated MsgBuffer.
     app_resp_t app_resp;
 
-    /// Return a string representation of this session slot
+    /// Return a string representation of this session slot, excluding
+    /// \p app_resp
     std::string to_string() const {
       if (in_free_vec) {
         return std::string("[Invalid]");

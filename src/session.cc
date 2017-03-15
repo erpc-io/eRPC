@@ -3,6 +3,9 @@
 
 namespace ERpc {
 
+const size_t Session::kSessionReqWindow;
+const size_t Session::kSessionCredits;
+
 Session::Session(Role role, SessionState state) : role(role), state(state) {
   /*
    * A session may be created by the client in kConnectInProgress state, or

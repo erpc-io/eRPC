@@ -221,8 +221,7 @@ void multi_small_rpc_one_session(Nexus *nexus) {
 
     rpc.run_event_loop_timeout(kAppEventLoopMs);
 
-    size_t exp_resps = Session::kSessionCredits; /* Make gtest happy */
-    ASSERT_EQ(context.num_rpc_resps, exp_resps);
+    ASSERT_EQ(context.num_rpc_resps, Session::kSessionCredits);
   }
 
   /* Free the request MsgBuffers */
@@ -322,8 +321,7 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
     rpc.run_event_loop_timeout(kAppEventLoopMs);
 
-    size_t exp_resps = tot_reqs_per_iter; /* Make gtest happy */
-    ASSERT_EQ(context.num_rpc_resps, exp_resps);
+    ASSERT_EQ(context.num_rpc_resps, tot_reqs_per_iter);
   }
 
   /* Free the request MsgBuffers */

@@ -4,7 +4,7 @@ namespace ERpc {
 
 template <class Transport_>
 void Rpc<Transport_>::process_datapath_tx_work_queue() {
-  size_t batch_i = 0; /* Current batch index (<= kPostlist)*/
+  tx_batch_i = 0;
 
   /*
    * If we're unable to complete TX for *any* slot of a session, the session is
@@ -34,7 +34,6 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
       }
 
       assert(session->in_datapath_tx_work_queue); /* This session needs TX */
-
       assert(tx_msgbuf->buf != nullptr);
       assert(tx_msgbuf->check_pkthdr_0());
       assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
@@ -87,35 +86,32 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
           session->remote_credits--;
         }
 
-        assert(batch_i < Transport_::kPostlist);
-        tx_burst_item_t &item = tx_burst_arr[batch_i];
+        assert(tx_batch_i < Transport_::kPostlist);
+        tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
         item.routing_info = session->remote_routing_info;
         item.msg_buffer = tx_msgbuf;
         item.offset = 0;
         item.data_bytes = tx_msgbuf->data_size;
-        batch_i++;
+        tx_batch_i++;
 
         /* If we're here, we're going to enqueue this message for tx_burst */
         tx_msgbuf->pkts_queued = 1;
 
         dpath_dprintf(
-            "eRPC Rpc %u: Sending single-packet message %s. "
-            "Session = %u, slot = %zu.\n",
-            app_tid, pkthdr_0->to_string().c_str(), session->local_session_num,
-            sslot_i);
+            "eRPC Rpc %u: Sending single-packet message %s (session %u)\n",
+            app_tid, pkthdr_0->to_string().c_str(), session->local_session_num);
 
-        if (batch_i == Transport_::kPostlist) {
+        if (tx_batch_i == Transport_::kPostlist) {
           /* This will increment tx_msgbuf's pkts_sent and data_sent */
-          transport->tx_burst(tx_burst_arr, batch_i);
-          batch_i = 0;
+          transport->tx_burst(tx_burst_arr, Transport_::kPostlist);
+          tx_batch_i = 0;
         }
 
         continue; /* We're done with this message, try the next one */
       }           /* End handling single-packet messages */
 
       /* If we're here, msg_buffer is a multi-packet message */
-      process_datapath_tx_work_queue_multi_pkt_one(session, tx_msgbuf, sslot_i,
-                                                   batch_i);
+      process_datapath_tx_work_queue_multi_pkt_one(session, tx_msgbuf);
 
       /* If sslot still needs TX, the session needs to stay in the work queue */
       if (tx_msgbuf->pkts_queued != tx_msgbuf->num_pkts) {
@@ -133,9 +129,9 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     }
   } /* End loop over datapath work queue sessions */
 
-  if (batch_i > 0) {
-    transport->tx_burst(tx_burst_arr, batch_i);
-    batch_i = 0;
+  if (tx_batch_i > 0) {
+    transport->tx_burst(tx_burst_arr, tx_batch_i);
+    tx_batch_i = 0;
   }
 
   /* Number of sessions left in the datapath work queue = write_index */
@@ -144,7 +140,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
 
 template <class Transport_>
 void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
-    Session *session, MsgBuffer *tx_msgbuf, size_t sslot_i, size_t &batch_i) {
+    Session *session, MsgBuffer *tx_msgbuf) {
   /*
    * Preconditions from process_datapath_tx_work_queue(). Session credits and
    * Unexpected window must be enabled if large packts are used.
@@ -198,32 +194,33 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
 
   dpath_dprintf(
       "eRPC Rpc %u: Sending %zu of %zu remaining packets for "
-      "multi-packet %s (slot %zu in session %u).\n",
+      "multi-packet %s (session %u).\n",
       app_tid, now_sending, pkts_pending, pkt_type_str(pkt_type).c_str(),
-      sslot_i, session->client.session_num);
+      session->client.session_num);
 
   for (size_t i = 0; i < now_sending; i++) {
-    tx_burst_item_t &item = tx_burst_arr[batch_i];
+    tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = session->remote_routing_info;
     item.msg_buffer = tx_msgbuf;
     item.offset = tx_msgbuf->pkts_queued * Transport_::kMaxDataPerPkt;
-    item.data_bytes =
-        (tx_msgbuf->data_size - item.offset) >= Transport_::kMaxDataPerPkt
-            ? Transport_::kMaxDataPerPkt
-            : (tx_msgbuf->data_size - item.offset);
+    item.data_bytes = std::min(tx_msgbuf->data_size - item.offset,
+                               Transport_::kMaxDataPerPkt);
 
     /* If we're here, we will enqueue all/part of tx_msgbuf for tx_burst */
     tx_msgbuf->pkts_queued++;
 
-    batch_i++;
+    tx_batch_i++;
 
-    if (batch_i == Transport_::kPostlist) {
-      /* This will increment msg_buffer's pkts_sent and data_sent */
-      transport->tx_burst(tx_burst_arr, batch_i);
-      batch_i = 0;
+    if (tx_batch_i == Transport_::kPostlist) {
+      transport->tx_burst(tx_burst_arr, Transport_::kPostlist);
+      tx_batch_i = 0;
     }
+  }
+
+  if (tx_batch_i > 0) {
+    transport->tx_burst(tx_burst_arr, tx_batch_i);
+    tx_batch_i = 0;
   }
 }
 
 }  // End ERpc
-

@@ -316,11 +316,13 @@ class Rpc {
   /// Sessions for which all packets can be sent are removed from the queue.
   void process_datapath_tx_work_queue();
 
-  /// Try to transmit a multi-packet message
+  /// Try to enqueue a single-packet message
+  void process_datapath_tx_work_queue_single_pkt_one(Session *session,
+                                                     MsgBuffer *tx_msgbuf);
+
+  /// Try to enqueue a multi-packet message
   void process_datapath_tx_work_queue_multi_pkt_one(Session *session,
-                                                    MsgBuffer *tx_msgbuf,
-                                                    size_t sslot_i,
-                                                    size_t &batch_i);
+                                                    MsgBuffer *tx_msgbuf);
 
   /**
    * @brief Process received packets and post RECVs. The ring buffers received
@@ -372,6 +374,7 @@ class Rpc {
   /// Tx batch information for interfacing between the event loop and the
   /// transport.
   tx_burst_item_t tx_burst_arr[Transport_::kPostlist];
+  size_t tx_batch_i;  ///< The batch index for \p tx_burst_arr
 
   /// Rx batch information for \p rx_burst
   MsgBuffer rx_msg_buffer_arr[Transport_::kPostlist];
