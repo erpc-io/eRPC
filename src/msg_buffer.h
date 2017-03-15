@@ -51,6 +51,17 @@ class MsgBuffer {
   /// Used by applications to get the current data size of a MsgBuffer
   inline size_t get_data_size() const { return data_size; }
 
+  /// Return a string representation of this MsgBuffer
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[buf " << (void *)buf << ", "
+        << "buffer " << buffer.to_string() << ", "
+        << "data " << data_size << "(" << max_data_size << "), "
+        << "pkts " << num_pkts << "(" << max_num_pkts << "), "
+        << "pkts queued/rcvd " << pkts_queued << "]";
+    return ret.str();
+  }
+
  private:
   /// Construct a MsgBuffer with a valid Buffer allocated by eRPC.
   /// The zeroth packet header is stored at \p buffer.buf. \p buffer must have

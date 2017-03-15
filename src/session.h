@@ -54,6 +54,20 @@ class Session {
 
     /// The application's response. This contains a preallocated MsgBuffer.
     app_resp_t app_resp;
+
+    /// Return a string representation of this session slot
+    std::string to_string() const {
+      if (in_free_vec) {
+        return std::string("[Invalid]");
+      }
+
+      std::ostringstream ret;
+      ret << "[req " << std::to_string(req_num) << ", "
+          << "rx_msgbuf " << rx_msgbuf.to_string() << ", "
+          << "tx_msgbuf "
+          << (tx_msgbuf == nullptr ? "0x0" : tx_msgbuf->to_string()) << "]";
+      return ret.str();
+    }
   };
 
   Session(Role role, SessionState state);
@@ -80,7 +94,7 @@ class Session {
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;           ///< Read-only endpoint metadata
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
-  bool in_datapath_tx_work_queue;  ///< True iff session is in tx work queue
+  bool in_datapath_tx_work_queue = false;   ///< Is session in tx work queue?
 
   sslot_t sslot_arr[kSessionReqWindow];                   ///< The session slots
   FixedVector<size_t, kSessionReqWindow> sslot_free_vec;  ///< Free slots

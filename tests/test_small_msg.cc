@@ -10,8 +10,8 @@ using namespace ERpc;
 static const uint16_t kAppNexusUdpPort = 31851;
 static const double kAppNexusPktDropProb = 0.0;
 static const size_t kAppEventLoopMs = 200;
-static const uint8_t kAppServerAppTid = 100;
-static const uint8_t kAppClientAppTid = 200;
+static const uint8_t kAppClientAppTid = 100;
+static const uint8_t kAppServerAppTid = 200;
 static const uint8_t kAppReqType = 3;
 static const size_t kAppMaxMsgSize = 64;
 

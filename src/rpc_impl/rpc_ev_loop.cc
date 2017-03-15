@@ -258,22 +258,22 @@ void Rpc<Transport_>::process_completions() {
     Session *session = session_vec[session_num];
     if (unlikely(session == nullptr)) {
       fprintf(stderr,
-              "eRPC Rpc: Warning: Received packet for buried session %u. "
+              "eRPC Rpc %u: Warning: Received packet for buried session %u. "
               "Dropping packet.\n",
-              session_num);
+              app_tid, session_num);
       continue;
     }
 
     if (unlikely(session->state != SessionState::kConnected)) {
       fprintf(stderr,
-              "eRPC Rpc: Warning: Received packet for unconnected session %u. "
-              "Session state is %s. Dropping packet.\n",
-              session_num, session_state_str(session->state).c_str());
+              "eRPC Rpc %u: Warning: Received packet for unconnected "
+              "session %u. Session state is %s. Dropping packet.\n",
+              app_tid, session_num, session_state_str(session->state).c_str());
       continue;
     }
 
     /* If we are here, we have a valid packet for a connected session */
-    dpath_dprintf("eRPC Rpc: Received packet %s.\n",
+    dpath_dprintf("eRPC Rpc %u: Received packet %s.\n", app_tid,
                   pkthdr->to_string().c_str());
 
     /*
@@ -304,9 +304,9 @@ void Rpc<Transport_>::process_completions() {
       Ops &ops = ops_arr[pkthdr->req_type];
       if (unlikely(!ops.is_valid())) {
         fprintf(stderr,
-                "eRPC Rpc: Warning: Received packet for unknown "
+                "eRPC Rpc %u: Warning: Received packet for unknown "
                 "request type %u. Dropping packet.\n",
-                (uint8_t)pkthdr->req_type);
+                app_tid, (uint8_t)pkthdr->req_type);
         continue;
       }
 
@@ -374,6 +374,7 @@ void Rpc<Transport_>::process_completions() {
 
         /* Sanity-check the req MsgBuffer */
         MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
+        _unused(req_msgbuf);
         assert(req_msgbuf != nullptr);
         assert(req_msgbuf->buf != nullptr);
         assert(req_msgbuf->check_pkthdr_0());

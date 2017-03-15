@@ -19,7 +19,13 @@ class Buffer {
 
   static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
 
-  std::string to_string() const { return std::string(""); }
+  /// Return a string representation of this Buffer (excluding lkey)
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[buf " << (void *)buf << ", "
+        << "class sz " << class_size << "]";
+    return ret.str();
+  }
 
   /// The backing memory of this Buffer. The Buffer is invalid if this is NULL.
   uint8_t *buf = nullptr;
