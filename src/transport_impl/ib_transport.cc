@@ -1,5 +1,4 @@
 #include <iomanip>
-#include <sstream>
 #include <stdexcept>
 
 #include "ib_transport.h"

@@ -6,7 +6,6 @@
 #include <numaif.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#include <sstream>
 #include <stdexcept>
 #include <vector>
 

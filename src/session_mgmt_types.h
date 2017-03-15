@@ -2,8 +2,6 @@
 #define ERPC_SESSION_MGMT_PKT_TYPE_H
 
 #include <mutex>
-#include <sstream>
-#include <string>
 #include "common.h"
 #include "transport_types.h"
 #include "util/udp_client.h"
@@ -20,7 +18,7 @@ static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(), "");
 static const size_t kSecretBits = 32;  ///< Session secret for security
 static_assert(kSecretBits <= 32, "");  /* Secret must fit in 32 bits */
 
-static const size_t kSessionMgmtRetransMs = 10;  ///< Timeout for mgmt reqs
+static const size_t kSessionMgmtRetransMs = 10;   ///< Timeout for mgmt reqs
 static const size_t kSessionMgmtTimeoutMs = 200;  ///< Max time for mgmt reqs
 
 /* Invalid metadata values for session endpoint initialization */

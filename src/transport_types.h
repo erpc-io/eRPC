@@ -13,8 +13,6 @@
 
 #include <strings.h>
 #include <functional>
-#include <sstream>
-#include <string>
 #include "common.h"
 #include "msg_buffer.h"
 

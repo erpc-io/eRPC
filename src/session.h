@@ -3,8 +3,6 @@
 
 #include <limits>
 #include <queue>
-#include <sstream>
-#include <string>
 
 #include "common.h"
 #include "msg_buffer.h"

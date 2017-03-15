@@ -1,7 +1,6 @@
 #ifndef ERPC_PKTHDR_H
 #define ERPC_PKTHDR_H
 
-#include <sstream>
 #include "common.h"
 
 namespace ERpc {

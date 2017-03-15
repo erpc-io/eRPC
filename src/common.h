@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits>
+#include <sstream>
 #include <string>
 
 namespace ERpc {
@@ -19,7 +20,9 @@ static const bool kDatapathVerbose = true;  ///< Debug printing in datapatg
 
 // Performance settings - disable for max perf, less usable datapath
 
-/// When enabled, the datapath performs sanity checks on user arguments
+/// When enabled, the datapath performs sanity checks on user arguments and
+/// returns useful errors. When disabled, behavior with invalid user arguments
+/// is undefined.
 static const bool kDatapathChecks = true;
 
 /// When enabled, the datapath handles sessions for which session credits are
