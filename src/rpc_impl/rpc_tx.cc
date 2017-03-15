@@ -21,16 +21,19 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
       Session::sslot_t &sslot = session->sslot_arr[sslot_i];
 
-      /* Process only slots that are busy and need TX */
+      /* Process only slots that are busy */
       if (sslot.in_free_vec) {
         continue;
       }
 
+      /* Process only slots that need TX */
       MsgBuffer *tx_msgbuf = sslot.tx_msgbuf;
       if (tx_msgbuf == nullptr ||
           tx_msgbuf->pkts_queued == tx_msgbuf->num_pkts) {
         continue;
       }
+
+      assert(session->in_datapath_tx_work_queue); /* This session needs TX */
 
       assert(tx_msgbuf->buf != nullptr);
       assert(tx_msgbuf->check_pkthdr_0());
@@ -147,6 +150,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
    * Unexpected window must be enabled if large packts are used.
    */
   assert(session != nullptr);
+  assert(session->in_datapath_tx_work_queue);
   assert(tx_msgbuf->num_pkts > 1); /* Must be a multi-packet message */
   assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
   assert(kHandleSessionCredits && kHandleUnexpWindow);
