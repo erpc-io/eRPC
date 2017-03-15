@@ -208,7 +208,20 @@ class Rpc {
   // rpc_ev_loop.cc
 
   /// Run one iteration of the event loop
-  void run_event_loop_one();
+  void run_event_loop_one() {
+    /* Handle session management events, if any */
+    if (unlikely(sm_hook.session_mgmt_ev_counter > 0)) {
+      handle_session_management(); /* Callee grabs the hook lock */
+    }
+
+    /* Check if we need to retransmit any session management requests */
+    if (unlikely(mgmt_retry_queue.size() > 0)) {
+      mgmt_retry();
+    }
+
+    process_completions();            /* RX */
+    process_datapath_tx_work_queue(); /* TX */
+  }
 
   /// Run the event loop forever
   inline void run_event_loop() {

@@ -56,8 +56,9 @@ set(SOURCES
   src/pkthdr.h
   src/rpc.h
   src/rpc_impl/rpc.cc
-  src/rpc_impl/rpc_datapath.cc
-  src/rpc_impl/rpc_ev_loop.cc
+  src/rpc_impl/rpc_send_request.cc
+  src/rpc_impl/rpc_rx.cc
+  src/rpc_impl/rpc_tx.cc
   src/rpc_impl/rpc_connect_handlers.cc
   src/rpc_impl/rpc_disconnect_handlers.cc
   src/rpc_impl/rpc_sm_api.cc
