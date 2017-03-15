@@ -72,18 +72,22 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         /* If session credits are on, save & bail if we're out of credits */
         if (kHandleSessionCredits && is_unexp && session->remote_credits == 0) {
           session_needs_more_tx = true;
+          /* XXX: Convert to Rpc's debug stats
           dpath_dprintf(
               "eRPC Rpc %u: Session %u out of credits. Re-queueing.\n", app_tid,
               session->local_session_num);
+          */
           continue; /* Try the next slot - we can still TX Expected packets */
         }
 
         /* If Unexpected window is enabled, save & bail if we're out of slots */
         if (kHandleUnexpWindow && is_unexp && unexp_credits == 0) {
           session_needs_more_tx = true;
+          /* XXX: Convert to Rpc's debug stats
           dpath_dprintf(
               "eRPC Rpc %u: Rpc out of window slots. Re-queueing session %u.",
               app_tid, session->local_session_num);
+          */
           continue; /* Try the next slot - we can still TX expecetd packets */
         }
 
@@ -191,6 +195,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
   }
 
   if (now_sending == 0) {
+    /* XXX: Convert to Rpc's debug stats
     dpath_dprintf(
         "eRPC Rpc %u: Cannot send any of %zu remaining packets for "
         "multi-packet %s. Session = %u, slot %zu. "
@@ -199,6 +204,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
         session->local_session_num, sslot_i,
         session->remote_credits == 0 ? "NO" : "YES",
         unexp_credits == 0 ? "NO" : "YES");
+    */
     return;
   }
 
@@ -351,6 +357,7 @@ void Rpc<Transport_>::process_completions() {
           sslot.tx_msgbuf = &app_resp.pre_resp_msgbuf; /* Valid response */
 
           /* Reset queueing progress */
+          assert(sslot.tx_msgbuf->num_pkts == 1);
           sslot.tx_msgbuf->pkts_queued = 0;
 
           upsert_datapath_tx_work_queue(session);

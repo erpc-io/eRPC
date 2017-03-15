@@ -193,14 +193,15 @@ void multi_small_rpc_one_session(Nexus *nexus) {
     req_msgbuf[i] = rpc.alloc_msg_buffer(kAppMaxMsgSize);
   }
 
-  size_t req_i = 0;
+  size_t req_suffix = 0; /* The integer suffix after every request message */
 
   for (size_t iter = 0; iter < 2; iter++) {
     context.num_rpc_resps = 0;
 
     /* Enqueue as many requests as one session allows */
     for (size_t i = 0; i < Session::kSessionCredits; i++) {
-      std::string req_msg = std::string("APP_MSG-") + std::to_string(req_i++);
+      std::string req_msg =
+          std::string("APP_MSG-") + std::to_string(req_suffix++);
       rpc.resize_msg_buffer(&req_msgbuf[i], req_msg.length());
 
       strcpy((char *)req_msgbuf[i].buf, req_msg.c_str());
@@ -286,6 +287,7 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
     ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
   }
 
+  size_t req_suffix = 0; /* The integer suffix after every request message */
   for (size_t iter = 0; iter < 5; iter++) {
     context.num_rpc_resps = 0;
 
@@ -295,8 +297,9 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
         size_t req_i = (sess_i * Session::kSessionCredits) + crd_i;
         assert(req_i < tot_reqs_per_iter);
 
-        std::string req_msg = std::string("APP_MSG-") + std::to_string(req_i++);
-        rpc.resize_msg_buffer(&req_msgbuf[req_i], req_msg.length());
+        std::string req_msg =
+            std::string("APP_MSG-") + std::to_string(req_suffix++);
+        rpc.resize_msg_buffer(&(req_msgbuf[req_i]), req_msg.length());
 
         strcpy((char *)req_msgbuf[req_i].buf, req_msg.c_str());
 
