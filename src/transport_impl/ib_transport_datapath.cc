@@ -17,13 +17,13 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(item.msg_buffer != nullptr);
 
     const MsgBuffer* msg_buffer = item.msg_buffer;
-    assert(msg_buffer->buf != nullptr);
+    assert(msg_buffer != nullptr && msg_buffer->is_valid());
 
     assert(sizeof(pkthdr_t) + item.data_bytes <= kMaxDataPerPkt);
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
     if (item.data_bytes == 0) {
-      assert(msg_buffer->get_pkthdr_0()->is_credit_return());
+      assert(msg_buffer->is_credit_return());
     }
 
     /* Verify constant fields of work request */
@@ -58,7 +58,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
        * multi-pkt message.
        */
       size_t pkt_num = offset_to_pkt_num(item.offset);
-      pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
+      const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)sizeof(pkthdr_t);
       sgl[0].lkey = msg_buffer->buffer.lkey;
@@ -70,7 +70,8 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       wr.num_sge = 2;
     }
 
-    auto ib_routing_info = (struct ib_routing_info_t*)item.routing_info;
+    const ib_routing_info_t* ib_routing_info =
+        (struct ib_routing_info_t*)item.routing_info;
     wr.wr.ud.remote_qpn = ib_routing_info->qpn;
     wr.wr.ud.ah = ib_routing_info->ah;
   }

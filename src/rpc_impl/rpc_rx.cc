@@ -10,10 +10,10 @@ void Rpc<Transport_>::process_completions() {
   }
 
   for (size_t i = 0; i < num_pkts; i++) {
-    uint8_t *pkt = rx_ring[rx_ring_head];
+    const uint8_t *pkt = rx_ring[rx_ring_head];
     rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
 
-    pkthdr_t *pkthdr = (pkthdr_t *)pkt;
+    const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
     assert(pkthdr->is_valid());
     assert(pkthdr->msg_size <= kMaxMsgSize); /* msg_size can be 0 here */
 
@@ -74,11 +74,12 @@ void Rpc<Transport_>::process_completions() {
 template <class Transport_>
 void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
                                                         uint8_t *pkt) {
-  pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
+  const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
   assert(pkthdr->pkt_num == 0);
   assert(pkthdr->msg_size > 0); /* Credit returns already handled */
+  assert(pkthdr->is_req() || pkthdr->is_resp());
 
-  Ops &ops = ops_arr[pkthdr->req_type];
+  const Ops &ops = ops_arr[pkthdr->req_type];
   if (unlikely(!ops.is_valid())) {
     fprintf(stderr,
             "eRPC Rpc %u: Warning: Received packet for unknown "
@@ -96,7 +97,9 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
   if (pkthdr->is_req()) {
     // Handle single-packet request message
     assert(session->is_server());
-    /* The sslot may or may not be in sslot_free_vec */
+
+    /* Sanity-check the session slot. It may or may not be valid */
+    assert(sslot.req_num <= req_num);
 
     sslot.in_free_vec = false;
     sslot.req_type = pkthdr->req_type;
@@ -107,16 +110,19 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
     send_response(session, sslot);
   } else {
     // Handle a single-packet response message
-    assert(pkthdr->is_resp()); /* Cannot be credit return */
     assert(session->is_client());
-    assert(sslot.is_valid());
 
-    /* Sanity-check the req MsgBuffer */
-    MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
+    /* Sanity-check the session slot */
+    assert(sslot.is_valid());
+    assert(sslot.req_num == req_num);
+    assert(sslot.req_type == pkthdr->req_type);
+
+    /* Sanity-check the old req MsgBuffer */
+    const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
     assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
-    assert(req_msgbuf->get_pkthdr_0()->is_req());
-    assert(req_msgbuf->get_pkthdr_0()->req_num == req_num);
+    assert(req_msgbuf->is_req());
+    assert(req_msgbuf->get_req_num() == req_num);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 
     /* Invoke the response callback */

@@ -145,7 +145,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
   assert(tx_msgbuf->num_pkts > 1); /* Must be a multi-packet message */
 
   /* A multi-packet message cannot be a credit return */
-  uint64_t pkt_type = tx_msgbuf->get_pkthdr_0()->pkt_type;
+  uint64_t pkt_type = tx_msgbuf->get_pkt_type();
   assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeResp);
 
   size_t pkts_pending = tx_msgbuf->num_pkts - tx_msgbuf->pkts_queued; /* >= 1 */
