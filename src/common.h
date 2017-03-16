@@ -17,21 +17,8 @@ namespace ERpc {
 // Debug macros
 static const bool kVerbose = true;  ///< Debug printing for non-datapath stuff
 static const bool kDatapathVerbose = true;  ///< Debug printing in datapatg
-
-// Performance settings - disable for max perf, less usable datapath
-
-/// When enabled, the datapath performs sanity checks on user arguments and
-/// returns useful errors. When disabled, behavior with invalid user arguments
-/// is undefined.
-static const bool kDatapathChecks = true;
-
-/// When enabled, the datapath handles sessions for which session credits are
-/// temporarily exhaused. Do not enable if multi-packet messages will be used.
-static const bool kHandleSessionCredits = true;
-
-/// When enabled, the datapath handles cases where Rpc runs out of Unexpected
-/// window slots. Do not enable if multi-pkt messages will be used.
-static const bool kHandleUnexpWindow = true;
+static const bool kDatapathChecks = true;   ///< Return errors on invalid args
+static const bool kDatapathStats = true;    ///< Collect stats on the datapath
 
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \
@@ -81,8 +68,6 @@ static const bool kHandleUnexpWindow = true;
 #define KB_(x) (KB(x) - 1)
 #define MB(x) ((size_t)(x) << 20)
 #define MB_(x) (MB(x) - 1)
-
-// General typedefs and structs
 
 /// UDP config used throughout eRPC
 struct udp_config_t {
@@ -168,6 +153,15 @@ static inline size_t msb_index(int x) {
   int index;
   asm("bsrl %1, %0" : "=r"(index) : "r"(x << 1));
   return static_cast<size_t>(index);
+}
+
+/// Collect datapath stats if datapath stats are enabled
+static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
+  if (!kDatapathStats) {
+    return;
+  } else {
+    *stat += val;
+  }
 }
 
 }  // End ERpc

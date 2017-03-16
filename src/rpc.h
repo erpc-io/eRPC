@@ -209,6 +209,8 @@ class Rpc {
 
   /// Run one iteration of the event loop
   void run_event_loop_one() {
+    dpath_stat_inc(&dpath_stats.ev_loop_calls);
+
     /* Handle session management events, if any */
     if (unlikely(sm_hook.session_mgmt_ev_counter > 0)) {
       handle_session_management(); /* Callee grabs the hook lock */
@@ -316,11 +318,27 @@ class Rpc {
   /// Sessions for which all packets can be sent are removed from the queue.
   void process_datapath_tx_work_queue();
 
-  /// Try to enqueue a single-packet message
+  /**
+   * @brief Try to enqueue a single-packet message
+   *
+   * @param session The session to send the message on. This session is in
+   * the datapath TX work queue and it is connected.
+   *
+   * @param tx_msgbuf A valid single-packet MsgBuffer that needs one packet to
+   * be queued
+   */
   void process_datapath_tx_work_queue_single_pkt_one(Session *session,
                                                      MsgBuffer *tx_msgbuf);
 
-  /// Try to enqueue a multi-packet message
+  /**
+   * @brief Try to enqueue a multi-packet message
+   *
+   * @param session The session to send the message on. This session is in
+   * the datapath TX work queue and it is connected.
+   *
+   * @param tx_msgbuf A valid multi-packet MsgBuffer that needs one or more
+   * packets to be queued
+   */
   void process_datapath_tx_work_queue_multi_pkt_one(Session *session,
                                                     MsgBuffer *tx_msgbuf);
 
@@ -381,6 +399,12 @@ class Rpc {
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
+
+  // Stats
+  struct {
+    size_t ev_loop_calls = 0;
+    size_t unexp_credits_exhausted = 0;
+  } dpath_stats;
 
  public:
   // Fault injection for testing. These cannot be static or const.

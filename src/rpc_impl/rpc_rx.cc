@@ -41,25 +41,20 @@ void Rpc<Transport_>::process_completions() {
     dpath_dprintf("eRPC Rpc %u: Received packet %s.\n", app_tid,
                   pkthdr->to_string().c_str());
 
-    /*
-     * Handle session & Unexpected window credits early for simplicity.
-     * All Expected packets are session/window credit returns, and vice versa.
-     */
-    if (kHandleUnexpWindow && pkthdr->is_unexp == 0) {
+    /* All Expected packets are session/window credit returns, and vice versa */
+    if (pkthdr->is_unexp == 0) {
       assert(unexp_credits < kRpcUnexpPktWindow);
-      unexp_credits++;
-    }
-
-    if (kHandleSessionCredits && pkthdr->is_unexp == 0) {
       assert(session->remote_credits < Session::kSessionCredits);
+      unexp_credits++;
       session->remote_credits++;
+
+      /* Nothing more to do for credit returns */
+      if (pkthdr->is_credit_return()) {
+        continue;
+      }
     }
 
-    /* We're done handling credit return packets */
-    if ((kHandleSessionCredits || kHandleUnexpWindow) &&
-        pkthdr->is_credit_return()) {
-      continue;
-    }
+    assert(pkthdr->is_req() || pkthdr->is_resp());
 
     if (small_msg_likely(pkthdr->msg_size <= Transport_::kMaxDataPerPkt)) {
       /* Optimize for when the received packet is a single-packet message */

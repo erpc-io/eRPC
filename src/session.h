@@ -108,6 +108,10 @@ class Session {
   /// for faster unconditional access
   uint16_t local_session_num;
 
+  struct {
+    size_t remote_credits_exhaused = 0;
+  } dpath_stats;
+
   /// Information that is required only at the client endpoint
   struct {
     uint64_t mgmt_req_tsc;  ///< Timestamp of the last management request
