@@ -29,7 +29,7 @@ void Rpc<Transport_>::process_completions() {
       continue;
     }
 
-    if (unlikely(session->state != SessionState::kConnected)) {
+    if (unlikely(!session->is_connected())) {
       fprintf(stderr,
               "eRPC Rpc %u: Warning: Received packet for unconnected "
               "session %u. Session state is %s. Dropping packet.\n",
@@ -74,6 +74,9 @@ void Rpc<Transport_>::process_completions() {
 template <class Transport_>
 void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
                                                         const uint8_t *pkt) {
+  assert(session != nullptr && session->is_connected());
+  assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
+
   const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
   assert(pkthdr->pkt_num == 0);
   assert(pkthdr->msg_size > 0); /* Credit returns already handled */
@@ -137,8 +140,9 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
 template <class Transport_>
 void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
                                                         const uint8_t *pkt) {
-  _unused(session);
-  _unused(pkt);
+  assert(session != nullptr && session->is_connected());
+  assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
+
   assert(false);
 }
 

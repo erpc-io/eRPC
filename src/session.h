@@ -95,6 +95,7 @@ class Session {
 
   inline bool is_client() const { return role == Role::kClient; }
   inline bool is_server() const { return role == Role::kServer; }
+  inline bool is_connected() const { return state == SessionState::kConnected; }
 
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint

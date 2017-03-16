@@ -9,14 +9,14 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
                                   MsgBuffer *req_msgbuf) {
   if (!kDatapathChecks) {
     assert(session != nullptr && session->is_client());
-    assert(session->state == SessionState::kConnected);
+    assert(session->is_connected());
     assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
     assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
     assert(req_msgbuf->num_pkts > 0);
   } else {
     /* If datapath checks are enabled, return meaningful error codes */
     if (unlikely(session == nullptr || !session->is_client() ||
-                 session->state != SessionState::kConnected)) {
+                 !session->is_connected())) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
     }
 

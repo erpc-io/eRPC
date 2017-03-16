@@ -17,7 +17,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     assert(session->in_datapath_tx_work_queue);
 
     /* The session cannot be disconnected if it's in TX work queue */
-    assert(session->state == SessionState::kConnected);
+    assert(session->is_connected());
 
     /* Does this session need more TX after the loop over slots below? */
     bool session_needs_more_tx = false;

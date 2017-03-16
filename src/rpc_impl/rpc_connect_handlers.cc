@@ -65,7 +65,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
         strcmp(old_session->client.hostname, sm_pkt->client.hostname) == 0 &&
         (old_session->client.app_tid == sm_pkt->client.app_tid)) {
       assert(old_session->is_server());
-      assert(old_session->state == SessionState::kConnected);
+      assert(old_session->is_connected());
 
       /* There's a valid session, so client endpoint metadata is unchanged */
       assert(old_session->client == sm_pkt->client);
