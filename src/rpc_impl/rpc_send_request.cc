@@ -1,13 +1,6 @@
-/**
- * @file rpc_datapath.cc
- * @brief Performance-critical Rpc datapath functions
- */
-
-#include <iostream>
 #include <stdexcept>
 
 #include "rpc.h"
-#include "util/udp_client.h"
 
 namespace ERpc {
 
@@ -70,7 +63,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   /* pkthdr->magic is already filled in */
 
   if (small_msg_likely(req_msgbuf->num_pkts == 1)) {
-    /* Small packets just need pkthdr_0, so we're done */
+    /* Small messages just need pkthdr_0, so we're done */
   } else {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and
@@ -91,8 +84,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   assert(sslot.in_free_vec);
   sslot.in_free_vec = false;
   sslot.req_num = req_num;
-  sslot.tx_msgbuf = req_msgbuf;   /* Valid request */
-  sslot.rx_msgbuf.buf = nullptr;  /* Invalid response */
+  sslot.tx_msgbuf = req_msgbuf;  /* Valid request */
+  sslot.rx_msgbuf.buf = nullptr; /* Invalid response */
 
   /* Reset queueing progress */
   sslot.tx_msgbuf->pkts_queued = 0;

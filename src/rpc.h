@@ -205,6 +205,9 @@ class Rpc {
    */
   int send_request(Session *session, uint8_t req_type, MsgBuffer *msg_buffer);
 
+  void send_response(Session *session, pkthdr_t *req_pkthdr,
+                     Session::sslot_t &sslot);
+
   // rpc_ev_loop.cc
 
   /// Run one iteration of the event loop

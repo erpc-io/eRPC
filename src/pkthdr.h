@@ -77,6 +77,8 @@ struct pkthdr_t {
   inline bool is_credit_return() const {
     return pkt_type == kPktTypeCreditReturn;
   }
+
+  inline bool is_magic_valid() const { return magic == kPktHdrMagic; }
 } __attribute__((packed));
 
 static_assert(sizeof(pkthdr_t) == 16, "");
