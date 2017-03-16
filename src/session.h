@@ -35,7 +35,7 @@ class Session {
    * @brief Session slot metadata maintained about an Rpc
    *
    * Session slots that are in \p sslot_free_vec (i.e., \p in_free_vec is true)
-   * are invalid and may contain garbage.
+   * contain garbage.
    *
    * This slot structure is used by both server and client sessions.
    *
@@ -46,24 +46,29 @@ class Session {
   struct sslot_t {
     // Fields that are meaningful for both server and client mode sessions
     bool in_free_vec;      ///< True iff this slot is in \p sslot_free_vec
-    size_t req_num;        ///< The request number for this slot
-    MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer for this slot
-    MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer for this slot
+    uint8_t req_type;      ///< The eRPC request type
+    size_t req_num;        ///< The eRPC request number
+    MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
+    MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
 
     // Server-only fields
 
-    /// The application's response. This contains a preallocated MsgBuffer.
+    /// The application's response, containing a preallocated MsgBuffer.
     app_resp_t app_resp;
+
+    /// A session slot is valid if it's not in the free slot vector
+    bool is_valid() const { return !in_free_vec; }
 
     /// Return a string representation of this session slot, excluding
     /// \p app_resp
     std::string to_string() const {
-      if (in_free_vec) {
+      if (!is_valid()) {
         return std::string("[Invalid]");
       }
 
       std::ostringstream ret;
-      ret << "[req " << std::to_string(req_num) << ", "
+      ret << "[req num" << std::to_string(req_num) << ", "
+          << "req type " << std::to_string(req_type) << ", "
           << "rx_msgbuf " << rx_msgbuf.to_string() << ", "
           << "tx_msgbuf "
           << (tx_msgbuf == nullptr ? "0x0" : tx_msgbuf->to_string()) << "]";

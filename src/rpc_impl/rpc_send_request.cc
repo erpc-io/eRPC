@@ -10,8 +10,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   if (!kDatapathChecks) {
     assert(session != nullptr && session->is_client());
     assert(session->state == SessionState::kConnected);
-    assert(req_msgbuf != nullptr && req_msgbuf->buf != nullptr &&
-           req_msgbuf->check_pkthdr_0());
+    assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
     assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
     assert(req_msgbuf->num_pkts > 0);
   } else {
@@ -21,8 +20,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
     }
 
-    if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
-                 !req_msgbuf->check_pkthdr_0())) {
+    if (unlikely(req_msgbuf == nullptr || !req_msgbuf->is_valid())) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidMsgBufferArg);
     }
 
@@ -36,8 +34,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   if (unlikely(session->sslot_free_vec.size() == 0)) {
     /*
      * No free message slots left in session, so we can't queue this request.
-     * This needs to be done even when kDatapathChecks, kHandleSessionCredits,
-     * and kHandleUnexpWindow are all disabled.
+     * This needs to be done even when kDatapathChecks is disabled.
      */
     return static_cast<int>(RpcDatapathErrCode::kNoSessionMsgSlots);
   }
@@ -78,11 +75,12 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
 
   /*
    * Fill in the session message slot. Record that we have a valid request
-   * \p req_num, but not the response.
+   * for req_num, but not the response.
    */
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
   assert(sslot.in_free_vec);
   sslot.in_free_vec = false;
+  sslot.req_type = req_type;
   sslot.req_num = req_num;
   sslot.tx_msgbuf = req_msgbuf;  /* Valid request */
   sslot.rx_msgbuf.buf = nullptr; /* Invalid response */

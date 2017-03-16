@@ -13,8 +13,7 @@ class IBTransport;
 template <typename T>
 class Rpc;
 
-/// A message buffer with headers at the beginning and end. A MsgBuffer is
-/// invalid if its \p buf field is NULL.
+/// A message buffer with headers at the beginning and end
 class MsgBuffer {
  public:
   friend class IBTransport;
@@ -43,9 +42,17 @@ class MsgBuffer {
                         (n - 1) * sizeof(pkthdr_t));
   }
 
-  /// Check if a MsgBuffer's header magic is valid
-  inline bool check_pkthdr_0() const {
-    return (get_pkthdr_0()->magic == kPktHdrMagic);
+  /// Check if a MsgBuffer is valid
+  bool is_valid() const {
+    if (buf == nullptr) {
+      return false;
+    }
+
+    if (get_pkthdr_0()->magic != kPktHdrMagic) {
+      return false;
+    }
+
+    return true;
   }
 
   /// Used by applications to get the current data size of a MsgBuffer
@@ -53,6 +60,10 @@ class MsgBuffer {
 
   /// Return a string representation of this MsgBuffer
   std::string to_string() const {
+    if (buf == nullptr) {
+      return "[Invalid]";
+    }
+
     std::ostringstream ret;
     ret << "[buf " << (void *)buf << ", "
         << "buffer " << buffer.to_string() << ", "
@@ -72,7 +83,8 @@ class MsgBuffer {
         max_data_size(max_data_size),
         data_size(max_data_size),
         max_num_pkts(max_num_pkts),
-        num_pkts(max_num_pkts) {
+        num_pkts(max_num_pkts),
+        pkts_queued(0) {
     assert(buffer.buf != nullptr); /* buffer must be valid */
     /* data_size can be 0 */
     assert(max_num_pkts >= 1);
@@ -80,15 +92,16 @@ class MsgBuffer {
            max_data_size + max_num_pkts * sizeof(pkthdr_t));
   }
 
-  /// Construct a single-packet MsgBuffer using an arbitrary chunk of memory.
-  /// \p buf must have space for \p max_data_bytes and one packet header.
-  MsgBuffer(uint8_t *buf, size_t max_data_size)
-      : buf(buf + sizeof(pkthdr_t)),
+  /// Construct a single-packet MsgBuffer using a received packet.
+  /// \p pkt must have space for \p max_data_bytes and one packet header.
+  MsgBuffer(uint8_t *pkt, size_t max_data_size)
+      : buf(pkt + sizeof(pkthdr_t)),
         buffer(Buffer::get_invalid_buffer()),
         max_data_size(max_data_size),
         data_size(max_data_size),
         max_num_pkts(1),
-        num_pkts(1) {
+        num_pkts(1),
+        pkts_queued(0) {
     assert(buf != nullptr);
     /* data_size can be zero */
   }
@@ -103,7 +116,7 @@ class MsgBuffer {
 
  public:
   /// Pointer to the first *data* byte. (\p buffer.buf does not point to the
-  /// first data byte.)
+  /// first data byte.) The MsgBuffer is invalid if this is NULL.
   uint8_t *buf;
 
  private:

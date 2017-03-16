@@ -3,11 +3,9 @@
 namespace ERpc {
 
 template <class Transport_>
-void Rpc<Transport_>::send_response(Session *session, pkthdr_t *req_pkthdr,
-                                    Session::sslot_t &sslot) {
+void Rpc<Transport_>::send_response(Session *session, Session::sslot_t &sslot) {
   assert(session != nullptr && session->is_server());
-  assert(req_pkthdr != nullptr && req_pkthdr->is_magic_valid() &&
-         req_pkthdr->is_req());
+  assert(sslot.is_valid());
 
   MsgBuffer *resp_msgbuf;
   app_resp_t &app_resp = sslot.app_resp;
@@ -27,13 +25,13 @@ void Rpc<Transport_>::send_response(Session *session, pkthdr_t *req_pkthdr,
 
   /* Fill in packet 0's header */
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
-  resp_pkthdr_0->req_type = req_pkthdr->req_type;
+  resp_pkthdr_0->req_type = sslot.req_type;
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
   resp_pkthdr_0->rem_session_num = session->client.session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
   resp_pkthdr_0->is_unexp = 0; /* First response packet is unexpected */
   resp_pkthdr_0->pkt_num = 0;
-  resp_pkthdr_0->req_num = req_pkthdr->req_num;
+  resp_pkthdr_0->req_num = sslot.req_num;
 
   if (small_msg_likely(resp_msgbuf->num_pkts == 1)) {
     /* Small messages just need pkthdr_0, so we're done */
@@ -50,11 +48,9 @@ void Rpc<Transport_>::send_response(Session *session, pkthdr_t *req_pkthdr,
   }
 
   /*
-   * Fill in the session slot. Record that we have a valid request for
-   * \p req_num and the response.
+   * Fill in the session slot's tx_msgbuf. This records that we have a valid
+   * request for request req_num and the response.
    */
-  sslot.in_free_vec = false;
-  sslot.req_num = req_pkthdr->req_num;
   assert(sslot.rx_msgbuf.buf != nullptr); /* Valid request */
   sslot.tx_msgbuf = resp_msgbuf;          /* Valid response */
 

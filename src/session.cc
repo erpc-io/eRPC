@@ -23,12 +23,8 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
   for (size_t i = 0; i < kSessionReqWindow; i++) {
     size_t sslot_i = (kSessionReqWindow - 1 - i);
     sslot_t &sslot = sslot_arr[sslot_i];
-
-    sslot.in_free_vec = true;
-    sslot.req_num = kInvalidReqNum;
-    sslot.rx_msgbuf.buf = nullptr;
-    sslot.tx_msgbuf = nullptr;
-
+    sslot.in_free_vec = true; /* Other fields are garbage */
+    sslot.req_num = 0;
     sslot_free_vec.push_back(sslot_i);
   }
 }

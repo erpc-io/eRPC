@@ -78,7 +78,8 @@ struct pkthdr_t {
     return pkt_type == kPktTypeCreditReturn;
   }
 
-  inline bool is_magic_valid() const { return magic == kPktHdrMagic; }
+  /// A packet header is valid if its magic is valid
+  inline bool is_valid() const { return magic == kPktHdrMagic; }
 } __attribute__((packed));
 
 static_assert(sizeof(pkthdr_t) == 16, "");

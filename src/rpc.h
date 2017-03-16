@@ -125,9 +125,8 @@ class Rpc {
 
   /// Resize a MsgBuffer. This does not modify any headers.
   inline void resize_msg_buffer(MsgBuffer *msg_buffer, size_t new_data_size) {
-    assert(msg_buffer != nullptr);
+    assert(msg_buffer != nullptr && msg_buffer->is_valid());
     assert(new_data_size < msg_buffer->max_data_size);
-    assert(msg_buffer->check_pkthdr_0());
 
     size_t new_num_pkts;
 
@@ -144,8 +143,7 @@ class Rpc {
 
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
-    assert(msg_buffer.buf != nullptr);
-    assert(msg_buffer.check_pkthdr_0());
+    assert(msg_buffer.is_valid());
 
     huge_alloc->free_buf(msg_buffer.buffer);
   }
@@ -184,29 +182,28 @@ class Rpc {
   /// Return the number of active server or client sessions.
   size_t num_active_sessions();
 
-  // rpc_datapath.cc
+  // rpc_send_request.cc
 
   /**
    * @brief Try to enqueue a request for transmission.
    *
    * If a message slot is available for this session, the request will be
    * enqueued. In this case, a request number is assigned using the slot index,
-   * all packet headers of \p are filled in, and \p session is inserted into the
+   * all packet headers of \p are filled in, and \p session is upserted into the
    * datapath TX work queue.
+   *
+   * If this call succeeds, eRPC owns \p msg_buffer until the request completes
+   * (i.e., the response callback is invoked).
    *
    * @param session The client session to send the request on
    * @param req_type The type of the request
-   * @param msg_buffer The MsgBuffer containing the request. If this call
-   * succeeds, eRPC owns \p msg_buffer until the request completes (i.e., the
-   * callback is invoked).
+   * @param msg_buffer The user-created MsgBuffer containing the request payload
+   * but not packet headers.
    *
    * @return 0 on success, i.e., if the request was queued. An error code is
    * returned if the request cannot be queued.
    */
   int send_request(Session *session, uint8_t req_type, MsgBuffer *msg_buffer);
-
-  void send_response(Session *session, pkthdr_t *req_pkthdr,
-                     Session::sslot_t &sslot);
 
   // rpc_ev_loop.cc
 
@@ -306,8 +303,6 @@ class Rpc {
   /// Retry in-flight session management requests whose timeout has expired
   void mgmt_retry();
 
-  // rpc_ev_loop.cc
-
   /// Add \p session to the TX work queue if it's not already present
   inline void upsert_datapath_tx_work_queue(Session *session) {
     assert(session != nullptr);
@@ -316,6 +311,8 @@ class Rpc {
       datapath_tx_work_queue.push_back(session);
     }
   }
+
+  // rpc_tx.cc
 
   /// Try to transmit packets for Sessions in the \p datapath_tx_work_queue.
   /// Sessions for which all packets can be sent are removed from the queue.
@@ -344,6 +341,8 @@ class Rpc {
    */
   void process_datapath_tx_work_queue_multi_pkt_one(Session *session,
                                                     MsgBuffer *tx_msgbuf);
+
+  // rpc_rx.cc
 
   /**
    * @brief Process received packets and post RECVs. The ring buffers received
@@ -379,6 +378,17 @@ class Rpc {
    * eRPC packet header.
    */
   void process_completions_large_msg_one(Session *session, uint8_t *pkt);
+
+  // rpc_send_response.cc
+
+  /**
+   * @brief Send a response from within eRPC core
+   *
+   * @param session The session to send the response on
+   * @param sslot The session slot whose \p tx_msgbuf contains the full response
+   * payload, but not the packet headers
+   */
+  void send_response(Session *session, Session::sslot_t &sslot);
 
   // Constructor args
   Nexus *nexus;

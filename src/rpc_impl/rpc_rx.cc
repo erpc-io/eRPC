@@ -14,7 +14,7 @@ void Rpc<Transport_>::process_completions() {
     rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
 
     pkthdr_t *pkthdr = (pkthdr_t *)pkt;
-    assert(pkthdr->is_magic_valid());
+    assert(pkthdr->is_valid());
     assert(pkthdr->msg_size <= kMaxMsgSize); /* msg_size can be 0 here */
 
     uint16_t session_num = pkthdr->rem_session_num; /* Local session */
@@ -74,7 +74,7 @@ void Rpc<Transport_>::process_completions() {
 template <class Transport_>
 void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
                                                         uint8_t *pkt) {
-  pkthdr_t *pkthdr = (pkthdr_t *)pkt;
+  pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
   assert(pkthdr->pkt_num == 0);
   assert(pkthdr->msg_size > 0); /* Credit returns already handled */
 
@@ -98,22 +98,23 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
     assert(session->is_server());
     /* The sslot may or may not be in sslot_free_vec */
 
+    sslot.in_free_vec = false;
+    sslot.req_type = pkthdr->req_type;
+    sslot.req_num = pkthdr->req_num;
+
     /* Invoke the request handler */
     ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
-    send_response(session, pkthdr, sslot);
+    send_response(session, sslot);
   } else {
     // Handle a single-packet response message
     assert(pkthdr->is_resp()); /* Cannot be credit return */
     assert(session->is_client());
-
-    assert(!sslot.in_free_vec);
+    assert(sslot.is_valid());
 
     /* Sanity-check the req MsgBuffer */
     MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
-    assert(req_msgbuf != nullptr);
-    assert(req_msgbuf->buf != nullptr);
-    assert(req_msgbuf->check_pkthdr_0());
+    assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
     assert(req_msgbuf->get_pkthdr_0()->is_req());
     assert(req_msgbuf->get_pkthdr_0()->req_num == req_num);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);

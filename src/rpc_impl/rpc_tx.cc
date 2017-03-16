@@ -28,22 +28,21 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
      * credits.
      */
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
-      Session::sslot_t &sslot = session->sslot_arr[sslot_i];
+      const Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
 
-      /* Process only slots that are busy */
-      if (sslot.in_free_vec) {
+      /* Process valid slots only */
+      if (!sslot->is_valid()) {
         continue;
       }
 
       /* Process only slots that need TX */
-      MsgBuffer *tx_msgbuf = sslot.tx_msgbuf;
+      MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
       if (tx_msgbuf == nullptr ||
           tx_msgbuf->pkts_queued == tx_msgbuf->num_pkts) {
         continue;
       }
 
-      assert(tx_msgbuf->buf != nullptr);
-      assert(tx_msgbuf->check_pkthdr_0());
+      assert(tx_msgbuf->buf != nullptr && tx_msgbuf->is_valid());
       assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 
       /* If we are here, this message needs packet TX. */
@@ -93,7 +92,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_single_pkt_one(
   assert(tx_msgbuf->pkts_queued == 0);
   assert(tx_msgbuf->data_size <= Transport_::kMaxDataPerPkt);
 
-  pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0();
+  const pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0();
   bool is_unexp = (pkthdr_0->is_unexp == 1);
 
   if (is_unexp) {
