@@ -48,7 +48,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       (req_num_arr[sslot_i]++ * Session::kSessionReqWindow) + /* Shift */
       sslot_i;
 
-  /* Fill in packet 0's header */
+  // Step 1: Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
   pkthdr_0->req_type = req_type;
   pkthdr_0->msg_size = req_msgbuf->data_size;
@@ -57,8 +57,9 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   pkthdr_0->is_unexp = 1; /* Request packets are unexpected */
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = req_num;
-  /* pkthdr->magic is already filled in */
+  assert(pkthdr_0->is_valid());
 
+  // Step 2: Fill in non-zeroth packet headers, if any
   if (small_msg_likely(req_msgbuf->num_pkts == 1)) {
     /* Small messages just need pkthdr_0, so we're done */
   } else {
@@ -73,21 +74,16 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     }
   }
 
-  /*
-   * Fill in the session message slot. Record that we have a valid request
-   * for req_num, but not the response.
-   */
+  // Step 3: Fill in the slot, reset queueing progress, and upsert session
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
-  assert(sslot.in_free_vec);
+  assert(!sslot.is_valid());
   sslot.in_free_vec = false;
   sslot.req_type = req_type;
   sslot.req_num = req_num;
   sslot.tx_msgbuf = req_msgbuf;  /* Valid request */
   sslot.rx_msgbuf.buf = nullptr; /* Invalid response */
 
-  /* Reset queueing progress */
   sslot.tx_msgbuf->pkts_queued = 0;
-
   upsert_datapath_tx_work_queue(session);
   return 0;
 }

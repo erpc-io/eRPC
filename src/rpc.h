@@ -365,7 +365,7 @@ class Rpc {
    * @param pkt The received packet. The zeroth byte of this packet is the
    * eRPC packet header.
    */
-  void process_completions_small_msg_one(Session *session, uint8_t *pkt);
+  void process_completions_small_msg_one(Session *session, const uint8_t *pkt);
 
   /**
    * @brief Process a request or response packet received for a large message.
@@ -377,7 +377,7 @@ class Rpc {
    * @param pkt The received packet. The zeroth byte of this packet is the
    * eRPC packet header.
    */
-  void process_completions_large_msg_one(Session *session, uint8_t *pkt);
+  void process_completions_large_msg_one(Session *session, const uint8_t *pkt);
 
   // rpc_send_response.cc
 

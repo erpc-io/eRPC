@@ -73,7 +73,7 @@ void Rpc<Transport_>::process_completions() {
 
 template <class Transport_>
 void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
-                                                        uint8_t *pkt) {
+                                                        const uint8_t *pkt) {
   const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
   assert(pkthdr->pkt_num == 0);
   assert(pkthdr->msg_size > 0); /* Credit returns already handled */
@@ -83,7 +83,7 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
   if (unlikely(!ops.is_valid())) {
     fprintf(stderr,
             "eRPC Rpc %u: Warning: Received packet for unknown "
-            "request type %u. Dropping packet.\n",
+            "request type %lu. Dropping packet.\n",
             app_tid, (uint8_t)pkthdr->req_type);
     return;
   }
@@ -107,15 +107,15 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
 
     /* Invoke the request handler */
     ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
-    send_response(session, sslot);
+    send_response(session, sslot); /* Works for both small and large response */
   } else {
     // Handle a single-packet response message
     assert(session->is_client());
 
     /* Sanity-check the session slot */
     assert(sslot.is_valid());
-    assert(sslot.req_num == req_num);
     assert(sslot.req_type == pkthdr->req_type);
+    assert(sslot.req_num == req_num);
 
     /* Sanity-check the old req MsgBuffer */
     const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
@@ -136,7 +136,7 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
 
 template <class Transport_>
 void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
-                                                        uint8_t *pkt) {
+                                                        const uint8_t *pkt) {
   _unused(session);
   _unused(pkt);
   assert(false);

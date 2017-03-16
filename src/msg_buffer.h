@@ -100,8 +100,8 @@ class MsgBuffer {
 
   /// Construct a single-packet MsgBuffer using a received packet.
   /// \p pkt must have space for \p max_data_bytes and one packet header.
-  MsgBuffer(uint8_t *pkt, size_t max_data_size)
-      : buf(pkt + sizeof(pkthdr_t)),
+  MsgBuffer(const uint8_t *pkt, size_t max_data_size)
+      : buf((uint8_t *)pkt + sizeof(pkthdr_t)),
         buffer(Buffer::get_invalid_buffer()),
         max_data_size(max_data_size),
         data_size(max_data_size),
