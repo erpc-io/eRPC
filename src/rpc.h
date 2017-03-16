@@ -346,13 +346,36 @@ class Rpc {
    * @brief Process received packets and post RECVs. The ring buffers received
    * from `rx_burst` must not be used after new RECVs are posted.
    *
-   * Although none of the polled RX ring buffers cannot be overwritten by the
+   * Although none of the polled RX ring buffers can be overwritten by the
    * NIC until we send at least one response/CR packet back, we do not control
-   * the order or time at which these packets are sent, due to constrains like
+   * the order or time at which these packets are sent, due to constraints like
    * session credits and packet pacing.
    */
   void process_completions();
-  void process_completions_multi_pkt_one();
+
+  /**
+   * @brief Process a request or response packet received for a small message.
+   * This packet cannot be a credit return.
+   *
+   * @param session The session that the message was received on. The session
+   * is connected.
+   *
+   * @param pkt The received packet. The zeroth byte of this packet is the
+   * eRPC packet header.
+   */
+  void process_completions_small_msg_one(Session *session, uint8_t *pkt);
+
+  /**
+   * @brief Process a request or response packet received for a large message.
+   * This packet cannot be a credit return.
+   *
+   * @param session The session that the message was received on. The session
+   * is connected.
+   *
+   * @param pkt The received packet. The zeroth byte of this packet is the
+   * eRPC packet header.
+   */
+  void process_completions_large_msg_one(Session *session, uint8_t *pkt);
 
   // Constructor args
   Nexus *nexus;

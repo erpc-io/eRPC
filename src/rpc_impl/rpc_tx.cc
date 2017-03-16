@@ -76,7 +76,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     } else {
       session->in_datapath_tx_work_queue = false;
     }
-  } /* End loop over datapath work queue sessions */
+  }
 
   if (tx_batch_i > 0) {
     transport->tx_burst(tx_burst_arr, tx_batch_i);
