@@ -116,7 +116,7 @@ class HugeAllocator {
         bool success = reserve_hugepages(prev_allocation_size, numa_node);
         if (!success) {
           prev_allocation_size /= 2; /* Restore the previous allocation */
-          return Buffer::get_invalid_buffer(); /* We're out of hugepages */
+          return Buffer(nullptr, 0, 0);
         } else {
           next_class = kNumClasses - 1;
         }
@@ -135,7 +135,7 @@ class HugeAllocator {
 
     assert(false);
     exit(-1); /* We should never get here */
-    return Buffer::get_invalid_buffer();
+    return Buffer(nullptr, 0, 0);
   }
 
   /// Free a Buffer

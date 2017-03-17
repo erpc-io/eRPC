@@ -60,9 +60,7 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   assert(pkthdr_0->is_valid());
 
   // Step 2: Fill in non-zeroth packet headers, if any
-  if (small_msg_likely(req_msgbuf->num_pkts == 1)) {
-    /* Small messages just need pkthdr_0, so we're done */
-  } else {
+  if (small_msg_unlikely(req_msgbuf->num_pkts > 1)) {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and
      * changing only the required fields. All request packets are Unexpected.
@@ -74,14 +72,13 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
     }
   }
 
-  // Step 3: Fill in the slot, reset queueing progress, and upsert session
+  // Step 4: Fill in the slot, reset queueing progress, and upsert session
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
-  assert(!sslot.is_valid());
-  sslot.in_free_vec = false;
   sslot.req_type = req_type;
   sslot.req_num = req_num;
-  sslot.tx_msgbuf = req_msgbuf;  /* Valid request */
-  sslot.rx_msgbuf.buf = nullptr; /* Invalid response */
+  sslot.tx_msgbuf = req_msgbuf; /* Valid request */
+  assert(sslot.rx_msgbuf.buf == nullptr &&
+         sslot.rx_msgbuf.buffer.buf == nullptr); /* Invalid response */
 
   sslot.tx_msgbuf->pkts_queued = 0;
   upsert_datapath_tx_work_queue(session);

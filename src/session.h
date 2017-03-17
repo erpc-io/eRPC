@@ -7,6 +7,7 @@
 #include "common.h"
 #include "msg_buffer.h"
 #include "ops.h"
+#include "pkthdr.h"
 #include "session_mgmt_types.h"
 #include "util/buffer.h"
 #include "util/fixed_vector.h"
@@ -34,9 +35,6 @@ class Session {
   /**
    * @brief Session slot metadata maintained about an Rpc
    *
-   * Session slots that are in \p sslot_free_vec (i.e., \p in_free_vec is true)
-   * contain garbage.
-   *
    * This slot structure is used by both server and client sessions.
    *
    * The validity/existence of a request or response in a slot is inferred from
@@ -45,7 +43,6 @@ class Session {
    */
   struct sslot_t {
     // Fields that are meaningful for both server and client mode sessions
-    bool in_free_vec;      ///< True iff this slot is in \p sslot_free_vec
     uint8_t req_type;      ///< The eRPC request type
     size_t req_num;        ///< The eRPC request number
     MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
@@ -56,19 +53,17 @@ class Session {
     /// The application's response, containing a preallocated MsgBuffer.
     app_resp_t app_resp;
 
-    /// A session slot is valid if it's not in the free slot vector
-    bool is_valid() const { return !in_free_vec; }
-
     /// Return a string representation of this session slot, excluding
     /// \p app_resp
     std::string to_string() const {
-      if (!is_valid()) {
-        return std::string("[Invalid]");
-      }
+      std::string req_num_string =
+          req_num == kInvalidReqNum ? "Invalid" : std::to_string(req_num);
+      std::string req_type_string =
+          req_type == kInvalidReqType ? "Invalid" : std::to_string(req_type);
 
       std::ostringstream ret;
-      ret << "[req num" << std::to_string(req_num) << ", "
-          << "req type " << std::to_string(req_type) << ", "
+      ret << "[req num" << req_num_string << ", "
+          << "req type " << req_type_string << ", "
           << "rx_msgbuf " << rx_msgbuf.to_string() << ", "
           << "tx_msgbuf "
           << (tx_msgbuf == nullptr ? "0x0" : tx_msgbuf->to_string()) << "]";

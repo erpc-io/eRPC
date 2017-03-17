@@ -5,7 +5,6 @@ namespace ERpc {
 template <class Transport_>
 void Rpc<Transport_>::send_response(Session *session, Session::sslot_t &sslot) {
   assert(session != nullptr && session->is_server());
-  assert(sslot.is_valid());
 
   MsgBuffer *resp_msgbuf;
   app_resp_t &app_resp = sslot.app_resp;
@@ -35,9 +34,7 @@ void Rpc<Transport_>::send_response(Session *session, Session::sslot_t &sslot) {
   assert(pkthdr_0->is_valid());
 
   // Step 2: Fill in non-zeroth packet headers, if any
-  if (small_msg_likely(resp_msgbuf->num_pkts == 1)) {
-    /* Small messages just need pkthdr_0, so we're done */
-  } else {
+  if (small_msg_unlikely(resp_msgbuf->num_pkts > 1)) {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and
      * changing only the required fields. All non-first response packets are
@@ -52,7 +49,6 @@ void Rpc<Transport_>::send_response(Session *session, Session::sslot_t &sslot) {
   }
 
   // Step 3: Fill in the slot, reset queueing progress, and upsert session
-  assert(sslot.is_valid());
   // sslot.req_type filled earlier
   // sslot.req_num filled earlier
   sslot.tx_msgbuf = resp_msgbuf;          /* Valid response */

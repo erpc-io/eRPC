@@ -17,7 +17,7 @@ class Buffer {
   /// Since \p Buffer does not allocate its own \p buf, do nothing here.
   ~Buffer() {}
 
-  static Buffer get_invalid_buffer() { return Buffer(nullptr, 0, 0); }
+  inline bool is_valid() const { return (buf != nullptr); }
 
   /// Return a string representation of this Buffer (excluding lkey)
   std::string to_string() const {
@@ -28,9 +28,9 @@ class Buffer {
   }
 
   /// The backing memory of this Buffer. The Buffer is invalid if this is NULL.
-  uint8_t *buf = nullptr;
-  size_t class_size = 0;  ///< The class size
-  uint32_t lkey = 0;      ///< The memory registration lkey
+  uint8_t *buf;
+  size_t class_size;  ///< The class size
+  uint32_t lkey;      ///< The memory registration lkey
 };
 
 }  // End ERpc

@@ -1,5 +1,4 @@
 #include "session.h"
-#include "pkthdr.h"
 
 namespace ERpc {
 
@@ -23,9 +22,14 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
   for (size_t i = 0; i < kSessionReqWindow; i++) {
     size_t sslot_i = (kSessionReqWindow - 1 - i);
     sslot_t &sslot = sslot_arr[sslot_i];
-    sslot.in_free_vec = true; /* Other fields are garbage */
-    sslot.req_num = 0;
+    sslot.req_type = kInvalidReqType;
+    sslot.req_num = kInvalidReqNum;
+    sslot.rx_msgbuf.buffer.buf = nullptr; /* Invalidate the Buffer */
+    sslot.rx_msgbuf.buf = nullptr;        /* Invalid the MsgBuffer */
+    sslot.tx_msgbuf = nullptr;
     sslot_free_vec.push_back(sslot_i);
+
+    sslot.app_resp.resp_msgbuf = nullptr;
   }
 }
 

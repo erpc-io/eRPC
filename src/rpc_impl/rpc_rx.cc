@@ -79,7 +79,8 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
 
   const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
   assert(pkthdr->pkt_num == 0);
-  assert(pkthdr->msg_size > 0); /* Credit returns already handled */
+  assert(pkthdr->msg_size > 0 && /* Credit returns already handled */
+         pkthdr->msg_size <= Transport_::kMaxDataPerPkt);
   assert(pkthdr->is_req() || pkthdr->is_resp());
 
   const Ops &ops = ops_arr[pkthdr->req_type];
@@ -95,7 +96,93 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
   size_t req_num = pkthdr->req_num;
   size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
-  sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
+
+  if (pkthdr->is_req()) {
+    // Handle a single-packet request message
+    assert(session->is_server());
+    assert(sslot.req_num == kInvalidReqNum || sslot.req_num < req_num);
+
+    /* Free MsgBuffers from previous requests, which may have been dynamic */
+    free_sslot_msg_buffers(sslot);
+
+    /* Fill in new sslot info */
+    sslot.req_type = pkthdr->req_type;
+    sslot.req_num = req_num;
+    sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
+    sslot.rx_msgbuf.pkts_rcvd = 1;
+
+    /* Invoke the request handler */
+    ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
+    send_response(session, sslot); /* Works for both small and large response */
+  } else {
+    // Handle a single-packet response message
+    assert(session->is_client());
+
+    /* Sanity-check the session slot. It was freed earlier. */
+    assert(sslot.rx_msgbuf.buffer.buf == nullptr);
+    assert(sslot.rx_msgbuf.buf == nullptr);
+
+    assert(sslot.req_type == pkthdr->req_type);
+    assert(sslot.req_num == req_num);
+    sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
+    sslot.rx_msgbuf.pkts_rcvd = 1;
+
+    /* Sanity-check the old req MsgBuffer */
+    const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
+    _unused(req_msgbuf);
+    assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
+    assert(req_msgbuf->is_req());
+    assert(req_msgbuf->get_req_num() == req_num);
+    assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
+
+    /* Invoke the response callback */
+    ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
+
+    /* Free sslot MsgBuffers - we know they're not dynamic */
+    free_sslot_msg_buffers_no_dynamic(sslot);
+    session->sslot_free_vec.push_back(sslot_i);
+  }
+}
+
+template <class Transport_>
+void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
+                                                        const uint8_t *pkt) {
+  assert(session != nullptr && session->is_connected());
+  assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
+
+  const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
+  assert(pkthdr->msg_size > Transport_::kMaxDataPerPkt); /* Multi-packet */
+  assert(pkthdr->is_req() || pkthdr->is_resp());
+
+  const Ops &ops = ops_arr[pkthdr->req_type];
+  if (unlikely(!ops.is_valid())) {
+    fprintf(stderr,
+            "eRPC Rpc %u: Warning: Received packet for unknown "
+            "request type %lu. Dropping packet.\n",
+            app_tid, (uint8_t)pkthdr->req_type);
+    return;
+  }
+
+  size_t req_num = pkthdr->req_num;
+  size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
+  Session::sslot_t &sslot = session->sslot_arr[sslot_i];
+
+  if (sslot.req_num != req_num) {
+    /* This is the first packet of this message */
+    assert(sslot.req_num < req_num);
+
+    /* Free the previous sslot MsgBuffers, which could be dynamic */
+    free_sslot_msg_buffers(sslot);
+
+    sslot.req_type = pkthdr->req_type;
+    sslot.req_num = req_num;
+    sslot.rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
+    sslot.rx_msgbuf.pkts_rcvd = 1;
+  }
+
+  // XXX: TODO after this
+  size_t pkt_num = pkthdr->pkt_num;
+  _unused(pkt_num);
 
   if (pkthdr->is_req()) {
     // Handle single-packet request message
@@ -104,7 +191,6 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
     /* Sanity-check the session slot. It may or may not be valid */
     assert(sslot.req_num <= req_num);
 
-    sslot.in_free_vec = false;
     sslot.req_type = pkthdr->req_type;
     sslot.req_num = pkthdr->req_num;
 
@@ -116,7 +202,6 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
     assert(session->is_client());
 
     /* Sanity-check the session slot */
-    assert(sslot.is_valid());
     assert(sslot.req_type == pkthdr->req_type);
     assert(sslot.req_num == req_num);
 
@@ -132,18 +217,8 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
     ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
 
     /* Free the slot, indicating that everything in the slot is garbage */
-    sslot.in_free_vec = true;
     session->sslot_free_vec.push_back(sslot_i);
   }
-}
-
-template <class Transport_>
-void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
-                                                        const uint8_t *pkt) {
-  assert(session != nullptr && session->is_connected());
-  assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
-
-  assert(false);
 }
 
 }  // End ERpc

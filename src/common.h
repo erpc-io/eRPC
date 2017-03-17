@@ -14,11 +14,14 @@
 
 namespace ERpc {
 
-// Debug macros
-static const bool kVerbose = true;  ///< Debug printing for non-datapath stuff
-static const bool kDatapathVerbose = true;  ///< Debug printing in datapatg
-static const bool kDatapathChecks = true;   ///< Return errors on invalid args
-static const bool kDatapathStats = true;    ///< Collect stats on the datapath
+// Debug defines
+static constexpr bool kVerbose = true;  ///< Debug printing for non-datapath
+static constexpr bool kDatapathVerbose = true;  ///< Debug printing in datapath
+static constexpr bool kDatapathStats = true;  ///< Collect stats on the datapath
+
+// Perf defines
+static constexpr bool kDatapathChecks = true;  ///< Return error on invalid args
+#define small_msg_opt_level 1
 
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \
@@ -60,9 +63,20 @@ static const bool kDatapathStats = true;    ///< Collect stats on the datapath
 
 // Level of optimizations for small messages. This helps understand the overhead
 // of supporting large messages
+
+#if small_msg_opt_level == 0
+/* No optimization for small message */
+#define small_msg_likely(x) (x)
+#define small_msg_unlikely(x) (x)
+/* Small messages are very likely */
+#elif small_msg_opt_level == 1
 #define small_msg_likely(x) likely(x)
-//#define small_msg_likely(x) (x) /* No optimization */
-//#define small_msg_likely(x) (true) /* There are no large messages */
+#define small_msg_unlikely(x) unlikely(x)
+#else
+/* Small messages are the only type of messages */
+#define small_msg_likely(x) (true)
+#define small_msg_unlikely(x) (false)
+#endif
 
 #define KB(x) ((size_t)(x) << 10)
 #define KB_(x) (KB(x) - 1)

@@ -21,20 +21,18 @@ namespace ERpc {
 template <class Transport_>
 class Rpc {
  public:
-  static const size_t kMaxReqTypes = std::numeric_limits<uint8_t>::max();
-
   /// Max request or response size, excluding packet headers
-  static const size_t kMaxMsgSize = MB(8);
+  static constexpr size_t kMaxMsgSize = MB(8);
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert((1ull << kPktNumBits) * Transport_::kMaxDataPerPkt >=
                     kMaxMsgSize,
                 "");
 
   /// Initial capacity of the hugepage allocator
-  static const size_t kInitialHugeAllocSize = (128 * MB(1));
+  static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
   /// Max number of unexpected *packets* kept outstanding by this Rpc
-  static const size_t kRpcUnexpPktWindow = 20;
+  static constexpr size_t kRpcUnexpPktWindow = 20;
 
   /// Error codes returned by the Rpc datapath. 0 means no error.
   enum class RpcDatapathErrCode : int {
@@ -112,7 +110,9 @@ class Rpc {
     Buffer buffer =
         huge_alloc->alloc(max_data_size + (max_num_pkts * sizeof(pkthdr_t)));
     if (unlikely(buffer.buf == nullptr)) {
-      return MsgBuffer::get_invalid_msgbuf();
+      MsgBuffer msg_buffer;
+      msg_buffer.buf = nullptr;
+      return msg_buffer;
     }
 
     MsgBuffer msg_buffer(buffer, max_data_size, max_num_pkts);
@@ -343,6 +343,39 @@ class Rpc {
                                                     MsgBuffer *tx_msgbuf);
 
   // rpc_rx.cc
+
+  /// Free all MsgBuffers associated with a session slot
+  inline void free_sslot_msg_buffers(Session::sslot_t &sslot) {
+    /* Free the resp_msgbuf if it is dynamic */
+    if (small_msg_unlikely(sslot.app_resp.resp_msgbuf != nullptr)) {
+      assert(sslot.app_resp.resp_msgbuf->is_valid());
+      free_msg_buffer(*sslot.app_resp.resp_msgbuf);
+      sslot.app_resp.resp_msgbuf = nullptr; /* Mark invalid for future */
+    }
+
+    /* Free the rx_msgbuf if it is dynamic */
+    if (small_msg_unlikely(sslot.rx_msgbuf.buffer.is_valid())) {
+      assert(sslot.rx_msgbuf.is_valid());
+      free_msg_buffer(sslot.rx_msgbuf);
+      sslot.rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
+    }
+
+    /* Unconditional invalidations */
+    sslot.rx_msgbuf.buf = nullptr;
+    sslot.tx_msgbuf = nullptr;
+  }
+
+  /// An optimized version of \p free_sslot_msg_buffers() for cases where we
+  /// are certain that the session slot does not use any dynmically-allocated
+  /// MsgBuffers.
+  inline void free_sslot_msg_buffers_no_dynamic(Session::sslot_t &sslot) {
+    assert(sslot.app_resp.resp_msgbuf == nullptr);
+    assert(!sslot.rx_msgbuf.buffer.is_valid());
+
+    /* Unconditional invalidations */
+    sslot.rx_msgbuf.buf = nullptr;
+    sslot.tx_msgbuf = nullptr;
+  }
 
   /**
    * @brief Process received packets and post RECVs. The ring buffers received

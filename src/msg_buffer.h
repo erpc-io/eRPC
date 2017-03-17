@@ -9,6 +9,7 @@ namespace ERpc {
 
 // Forward declarations
 class IBTransport;
+class Session;
 
 template <typename T>
 class Rpc;
@@ -17,17 +18,11 @@ class Rpc;
 class MsgBuffer {
  public:
   friend class IBTransport;
+  friend class Session;
   friend class Rpc<IBTransport>;
 
   MsgBuffer() {}
   ~MsgBuffer() {}
-
-  /// Return an invalid MsgBuffer, i.e., \p buf is NULL.
-  static inline MsgBuffer get_invalid_msgbuf() {
-    MsgBuffer msg_buffer;
-    msg_buffer.buf = nullptr;
-    return msg_buffer;
-  }
 
   /// Return a pointer to the pre-appended packet header of this MsgBuffer
   inline pkthdr_t *get_pkthdr_0() const {
@@ -55,10 +50,10 @@ class MsgBuffer {
 
   /// Check if a MsgBuffer is valid
   inline bool is_valid() const {
-    if (buf == nullptr || get_pkthdr_0()->magic != kPktHdrMagic) {
-      return false;
+    if (likely(buf != nullptr && get_pkthdr_0()->magic == kPktHdrMagic)) {
+      return true;
     }
-    return true;
+    return false;
   }
 
   /// Used by applications to get the current data size of a MsgBuffer
@@ -89,8 +84,7 @@ class MsgBuffer {
         max_data_size(max_data_size),
         data_size(max_data_size),
         max_num_pkts(max_num_pkts),
-        num_pkts(max_num_pkts),
-        pkts_queued(0) {
+        num_pkts(max_num_pkts) {
     assert(buffer.buf != nullptr); /* buffer must be valid */
     /* data_size can be 0 */
     assert(max_num_pkts >= 1);
@@ -98,18 +92,18 @@ class MsgBuffer {
            max_data_size + max_num_pkts * sizeof(pkthdr_t));
   }
 
-  /// Construct a single-packet MsgBuffer using a received packet.
+  /// Construct a single-packet MsgBuffer using a received packet, setting
+  /// buffer to invalid so that we know not to free it.
   /// \p pkt must have space for \p max_data_bytes and one packet header.
   MsgBuffer(const uint8_t *pkt, size_t max_data_size)
       : buf((uint8_t *)pkt + sizeof(pkthdr_t)),
-        buffer(Buffer::get_invalid_buffer()),
         max_data_size(max_data_size),
         data_size(max_data_size),
         max_num_pkts(1),
-        num_pkts(1),
-        pkts_queued(0) {
+        num_pkts(1) {
     assert(buf != nullptr);
-    /* data_size can be zero */
+    /* max_data_size can be zero */
+    buffer.buf = nullptr;
   }
 
   /// Resize this MsgBuffer to any size smaller than its maximum allocation

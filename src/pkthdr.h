@@ -6,9 +6,12 @@
 namespace ERpc {
 
 // Packet header
-static const size_t kMsgSizeBits = 24;  ///< Bits for message size
-static const size_t kPktNumBits = 13;   ///< Bits for packet number in request
-static const size_t kReqNumBits = 44;   ///< Bits for request number
+static constexpr size_t kMaxReqTypes = std::numeric_limits<uint8_t>::max();
+static constexpr size_t kInvalidReqType = (kMaxReqTypes - 1);
+static constexpr size_t kMsgSizeBits = 24;  ///< Bits for message size
+static constexpr size_t kReqNumBits = 44;   ///< Bits for request number
+static constexpr size_t kInvalidReqNum = ((1ull << kReqNumBits) - 1);
+static constexpr size_t kPktNumBits = 13;  ///< Bits for packet number
 
 /// Debug bits for packet header. Also useful for sizing pkthdr_t to 128 bits.
 static const size_t kPktHdrMagicBits =
@@ -17,8 +20,6 @@ static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
 static_assert(kPktHdrMagicBits == 20, ""); /* Just to keep track */
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
-
-static const size_t kInvalidReqNum = ((1ull << kReqNumBits) - 1);
 
 /// These packet types are stored as bitfields in the packet header, so don't
 /// use an enum class here to avoid casting all over the place.

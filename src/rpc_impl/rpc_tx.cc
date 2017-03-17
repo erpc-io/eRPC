@@ -30,11 +30,6 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
       const Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
 
-      /* Process valid slots only */
-      if (!sslot->is_valid()) {
-        continue;
-      }
-
       /* Process only slots that need TX */
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
       if (tx_msgbuf == nullptr ||
