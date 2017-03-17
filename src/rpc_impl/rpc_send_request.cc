@@ -10,7 +10,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   if (!kDatapathChecks) {
     assert(session != nullptr && session->is_client());
     assert(session->is_connected());
-    assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
+    assert(req_msgbuf != nullptr);
+    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
     assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
     assert(req_msgbuf->num_pkts > 0);
   } else {
@@ -20,7 +21,8 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
       return static_cast<int>(RpcDatapathErrCode::kInvalidSessionArg);
     }
 
-    if (unlikely(req_msgbuf == nullptr || !req_msgbuf->is_valid())) {
+    if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
+                 !req_msgbuf->check_magic())) {
       return static_cast<int>(RpcDatapathErrCode::kInvalidMsgBufferArg);
     }
 
@@ -77,10 +79,15 @@ int Rpc<Transport_>::send_request(Session *session, uint8_t req_type,
   sslot.req_type = req_type;
   sslot.req_num = req_num;
   sslot.tx_msgbuf = req_msgbuf; /* Valid request */
-  assert(sslot.rx_msgbuf.buf == nullptr &&
-         sslot.rx_msgbuf.buffer.buf == nullptr); /* Invalid response */
-
   sslot.tx_msgbuf->pkts_queued = 0;
+
+  /*
+   * The RX MsgBuffer (i.e., the response for the previous request in this
+   * sslot) was buried after the response handler returned.
+   */
+  assert(sslot.rx_msgbuf.buf == nullptr &&
+         sslot.rx_msgbuf.buffer.buf == nullptr);
+
   upsert_datapath_tx_work_queue(session);
   return 0;
 }

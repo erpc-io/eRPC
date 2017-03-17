@@ -37,7 +37,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
         continue;
       }
 
-      assert(tx_msgbuf->buf != nullptr && tx_msgbuf->is_valid());
+      assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
       assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 
       /* If we are here, this message needs packet TX. */

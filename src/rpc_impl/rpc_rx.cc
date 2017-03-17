@@ -97,49 +97,57 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
   size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
 
+  /*
+   * The RX MsgBuffer stored previously in this slot was buried earlier. The
+   * server (client) buried it after the request (response) handler returned.
+   */
+  assert(sslot.rx_msgbuf.buffer.buf == nullptr);
+  assert(sslot.rx_msgbuf.buf == nullptr);
+
+  sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
+  sslot.rx_msgbuf.pkts_rcvd = 1;
+
   if (pkthdr->is_req()) {
     // Handle a single-packet request message
     assert(session->is_server());
     assert(sslot.req_num == kInvalidReqNum || sslot.req_num < req_num);
 
-    /* Free MsgBuffers from previous requests, which may have been dynamic */
-    free_sslot_msg_buffers(sslot);
+    /*
+     * Free the application response MsgBuffer for the previous request, as it
+     * could have been dynamic.
+     */
+    bury_sslot_dynamic_app_resp_msgbuf(sslot);
 
     /* Fill in new sslot info */
     sslot.req_type = pkthdr->req_type;
     sslot.req_num = req_num;
-    sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
-    sslot.rx_msgbuf.pkts_rcvd = 1;
 
-    /* Invoke the request handler */
+    /* Invoke the request handler, and bury the non-dynamic RX MsgBuffer */
     ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
+    sslot.rx_msgbuf.buf = nullptr;
+
     send_response(session, sslot); /* Works for both small and large response */
   } else {
     // Handle a single-packet response message
     assert(session->is_client());
 
-    /* Sanity-check the session slot. It was freed earlier. */
-    assert(sslot.rx_msgbuf.buffer.buf == nullptr);
-    assert(sslot.rx_msgbuf.buf == nullptr);
-
+    /* Sanity-check sslot */
     assert(sslot.req_type == pkthdr->req_type);
     assert(sslot.req_num == req_num);
-    sslot.rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
-    sslot.rx_msgbuf.pkts_rcvd = 1;
 
     /* Sanity-check the old req MsgBuffer */
     const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
-    assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
+    assert(req_msgbuf != nullptr);
+    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
     assert(req_msgbuf->is_req());
     assert(req_msgbuf->get_req_num() == req_num);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 
-    /* Invoke the response callback */
+    /* Invoke the response callback, and bury the non-dynamic RX MsgBuffer */
     ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
+    sslot.rx_msgbuf.buf = nullptr;
 
-    /* Free sslot MsgBuffers - we know they're not dynamic */
-    free_sslot_msg_buffers_no_dynamic(sslot);
     session->sslot_free_vec.push_back(sslot_i);
   }
 }
@@ -171,12 +179,17 @@ void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
     /* This is the first packet of this message */
     assert(sslot.req_num < req_num);
 
-    /* Free the previous sslot MsgBuffers, which could be dynamic */
-    free_sslot_msg_buffers(sslot);
+    /*
+     * The RX MsgBuffer stored previously in this slot was buried earlier. The
+     * server (client) buried it after the request (response) handler returned.
+     */
+    assert(sslot.rx_msgbuf.buffer.buf == nullptr);
+    assert(sslot.rx_msgbuf.buf == nullptr);
 
     sslot.req_type = pkthdr->req_type;
     sslot.req_num = req_num;
     sslot.rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
+    // XXX: Memcpy
     sslot.rx_msgbuf.pkts_rcvd = 1;
   }
 
@@ -185,39 +198,7 @@ void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
   _unused(pkt_num);
 
   if (pkthdr->is_req()) {
-    // Handle single-packet request message
-    assert(session->is_server());
-
-    /* Sanity-check the session slot. It may or may not be valid */
-    assert(sslot.req_num <= req_num);
-
-    sslot.req_type = pkthdr->req_type;
-    sslot.req_num = pkthdr->req_num;
-
-    /* Invoke the request handler */
-    ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
-    send_response(session, sslot); /* Works for both small and large response */
   } else {
-    // Handle a single-packet response message
-    assert(session->is_client());
-
-    /* Sanity-check the session slot */
-    assert(sslot.req_type == pkthdr->req_type);
-    assert(sslot.req_num == req_num);
-
-    /* Sanity-check the old req MsgBuffer */
-    const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
-    _unused(req_msgbuf);
-    assert(req_msgbuf != nullptr && req_msgbuf->is_valid());
-    assert(req_msgbuf->is_req());
-    assert(req_msgbuf->get_req_num() == req_num);
-    assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
-
-    /* Invoke the response callback */
-    ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
-
-    /* Free the slot, indicating that everything in the slot is garbage */
-    session->sslot_free_vec.push_back(sslot_i);
   }
 }
 

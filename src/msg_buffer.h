@@ -48,9 +48,9 @@ class MsgBuffer {
   inline uint8_t get_req_type() const { return get_pkthdr_0()->req_type; }
   ///@}
 
-  /// Check if a MsgBuffer is valid
-  inline bool is_valid() const {
-    if (likely(buf != nullptr && get_pkthdr_0()->magic == kPktHdrMagic)) {
+  /// Check if a MsgBuffer's magic is valid
+  inline bool check_magic() const {
+    if (likely(get_pkthdr_0()->magic == kPktHdrMagic)) {
       return true;
     }
     return false;

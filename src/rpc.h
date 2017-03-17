@@ -125,7 +125,8 @@ class Rpc {
 
   /// Resize a MsgBuffer. This does not modify any headers.
   inline void resize_msg_buffer(MsgBuffer *msg_buffer, size_t new_data_size) {
-    assert(msg_buffer != nullptr && msg_buffer->is_valid());
+    assert(msg_buffer != nullptr);
+    assert(msg_buffer->buf != nullptr && msg_buffer->check_magic());
     assert(new_data_size < msg_buffer->max_data_size);
 
     size_t new_num_pkts;
@@ -143,7 +144,7 @@ class Rpc {
 
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
-    assert(msg_buffer.is_valid());
+    assert(msg_buffer.buf != nullptr && msg_buffer.check_magic());
 
     huge_alloc->free_buf(msg_buffer.buffer);
   }
@@ -344,37 +345,26 @@ class Rpc {
 
   // rpc_rx.cc
 
-  /// Free all MsgBuffers associated with a session slot
-  inline void free_sslot_msg_buffers(Session::sslot_t &sslot) {
-    /* Free the resp_msgbuf if it is dynamic */
+  /// Free and NULL-ify the application response MsgBuffer if it is dynamic
+  inline void bury_sslot_dynamic_app_resp_msgbuf(Session::sslot_t &sslot) {
     if (small_msg_unlikely(sslot.app_resp.resp_msgbuf != nullptr)) {
-      assert(sslot.app_resp.resp_msgbuf->is_valid());
-      free_msg_buffer(*sslot.app_resp.resp_msgbuf);
+      assert(!sslot.app_resp.prealloc_used);
+
+      MsgBuffer *resp_msgbuf = sslot.app_resp.resp_msgbuf;
+      assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic());
+      free_msg_buffer(*resp_msgbuf);
       sslot.app_resp.resp_msgbuf = nullptr; /* Mark invalid for future */
     }
-
-    /* Free the rx_msgbuf if it is dynamic */
-    if (small_msg_unlikely(sslot.rx_msgbuf.buffer.is_valid())) {
-      assert(sslot.rx_msgbuf.is_valid());
-      free_msg_buffer(sslot.rx_msgbuf);
-      sslot.rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
-    }
-
-    /* Unconditional invalidations */
-    sslot.rx_msgbuf.buf = nullptr;
-    sslot.tx_msgbuf = nullptr;
   }
 
-  /// An optimized version of \p free_sslot_msg_buffers() for cases where we
-  /// are certain that the session slot does not use any dynmically-allocated
-  /// MsgBuffers.
-  inline void free_sslot_msg_buffers_no_dynamic(Session::sslot_t &sslot) {
-    assert(sslot.app_resp.resp_msgbuf == nullptr);
-    assert(!sslot.rx_msgbuf.buffer.is_valid());
-
-    /* Unconditional invalidations */
-    sslot.rx_msgbuf.buf = nullptr;
-    sslot.tx_msgbuf = nullptr;
+  /// Free and NULL-ify the RX MsgBuffer if it is dynamic
+  inline void bury_sslot_dynamic_rx_msgbuf(Session::sslot_t &sslot) {
+    MsgBuffer &rx_msgbuf = sslot.rx_msgbuf;
+    if (small_msg_unlikely(rx_msgbuf.buffer.buf != nullptr)) {
+      assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
+      free_msg_buffer(rx_msgbuf);
+      rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
+    }
   }
 
   /**

@@ -51,10 +51,15 @@ void Rpc<Transport_>::send_response(Session *session, Session::sslot_t &sslot) {
   // Step 3: Fill in the slot, reset queueing progress, and upsert session
   // sslot.req_type filled earlier
   // sslot.req_num filled earlier
-  sslot.tx_msgbuf = resp_msgbuf;          /* Valid response */
-  assert(sslot.rx_msgbuf.buf != nullptr); /* Valid request */
-
+  sslot.tx_msgbuf = resp_msgbuf; /* Valid response */
   sslot.tx_msgbuf->pkts_queued = 0;
+
+  /*
+   * The RX MsgBuffer (i.e., the request) was buried after the response handler
+   * that generated this response returned.
+   */
+  assert(sslot.rx_msgbuf.buf == nullptr);
+
   upsert_datapath_tx_work_queue(session);
 }
 

@@ -17,8 +17,6 @@ class Buffer {
   /// Since \p Buffer does not allocate its own \p buf, do nothing here.
   ~Buffer() {}
 
-  inline bool is_valid() const { return (buf != nullptr); }
-
   /// Return a string representation of this Buffer (excluding lkey)
   std::string to_string() const {
     std::ostringstream ret;
