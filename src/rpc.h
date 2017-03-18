@@ -66,6 +66,11 @@ class Rpc {
     return std::string("");
   }
 
+  /// Return the maximum data size that can be sent in one packet
+  static inline constexpr size_t max_data_per_pkt() {
+    return TTr::kMaxDataPerPkt;
+  }
+
   // rpc.cc
 
   /**
