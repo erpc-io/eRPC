@@ -58,7 +58,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
        * function is expensive, but it's OK because we're dealing with a
        * multi-pkt message.
        */
-      size_t pkt_num = offset_to_pkt_num(item.offset);
+      size_t pkt_num = (item.offset + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)sizeof(pkthdr_t);

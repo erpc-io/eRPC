@@ -360,9 +360,16 @@ class Rpc {
   /// Free and NULL-ify the RX MsgBuffer if it is dynamic
   inline void bury_sslot_dynamic_rx_msgbuf(Session::sslot_t &sslot) {
     MsgBuffer &rx_msgbuf = sslot.rx_msgbuf;
+
+    /*
+     * The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
+     * Its buf can be non-NULL even when dynamic allocation is not used.
+     */
     if (small_msg_unlikely(rx_msgbuf.buffer.buf != nullptr)) {
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);
+
+      rx_msgbuf.buf = nullptr;
       rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
     }
   }

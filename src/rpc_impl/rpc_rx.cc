@@ -174,31 +174,92 @@ void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
   size_t req_num = pkthdr->req_num;
   size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
+  MsgBuffer &rx_msgbuf = sslot.rx_msgbuf;
 
-  if (sslot.req_num != req_num) {
-    /* This is the first packet of this message */
-    assert(sslot.req_num < req_num);
+  /* Basic checks */
+  if (pkthdr->is_req()) {
+    assert(session->is_server());
+    assert(sslot.req_num == kInvalidReqNum || sslot.req_num <= req_num);
+  } else {
+    assert(session->is_client());
 
-    /*
-     * The RX MsgBuffer stored previously in this slot was buried earlier. The
-     * server (client) buried it after the request (response) handler returned.
-     */
-    assert(sslot.rx_msgbuf.buffer.buf == nullptr);
-    assert(sslot.rx_msgbuf.buf == nullptr);
+    /* Sanity-check sslot */
+    assert(sslot.req_type == pkthdr->req_type);
+    assert(sslot.req_num == req_num);
 
-    sslot.req_type = pkthdr->req_type;
-    sslot.req_num = req_num;
-    sslot.rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
-    // XXX: Memcpy
-    sslot.rx_msgbuf.pkts_rcvd = 1;
+    /* Sanity-check the old req MsgBuffer */
+    const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
+    _unused(req_msgbuf);
+    assert(req_msgbuf != nullptr);
+    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
+    assert(req_msgbuf->is_req());
+    assert(req_msgbuf->get_req_num() == req_num);
+    assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
   }
 
-  // XXX: TODO after this
-  size_t pkt_num = pkthdr->pkt_num;
-  _unused(pkt_num);
+  if (rx_msgbuf.buf == nullptr) {
+    /*
+     * This is the first packet of this message. The RX MsgBuffer stored
+     * previously in this slot was buried earlier. The server (client) buried
+     * it after the request (response) handler returned.
+     */
+    assert(rx_msgbuf.buffer.buf == nullptr);
 
-  if (pkthdr->is_req()) {
+    if (pkthdr->is_req()) {
+      /* Free the application response MsgBuffer for the previous request */
+      bury_sslot_dynamic_app_resp_msgbuf(sslot);
+
+      /* Fill in new sslot info */
+      sslot.req_type = pkthdr->req_type;
+      sslot.req_num = req_num;
+    }
+
+    rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
+    rx_msgbuf.pkts_rcvd = 1;
   } else {
+    /* This is a non-first packet, so we have a valid RX MsgBuffer */
+    assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
+    assert(sslot.req_type == pkthdr->req_type);
+    assert(sslot.req_num == pkthdr->req_num);
+
+    assert(rx_msgbuf.pkts_rcvd >= 1);
+    rx_msgbuf.pkts_rcvd++;
+  }
+
+  // Copy the received packet
+  size_t pkt_num = pkthdr->pkt_num;
+  size_t msg_size = pkthdr->msg_size;
+
+  size_t offset = pkt_num * Transport_::kMaxDataPerPkt; /* rx_msgbuf offset */
+
+  bool is_last = (pkt_num == (msg_size / Transport_::kMaxDataPerPkt) - 1);
+  size_t bytes_to_copy =
+      is_last ? (msg_size - offset) : Transport_::kMaxDataPerPkt;
+  assert(bytes_to_copy <= Transport_::kMaxDataPerPkt);
+
+  memcpy((char *)&rx_msgbuf.buf[offset], (char *)(pkt + sizeof(pkthdr_t)),
+         bytes_to_copy);
+
+  // Check if we need to invoke the app handler
+  size_t pkts_expected =
+      (msg_size + Transport_::kMaxDataPerPkt - 1) / Transport_::kMaxDataPerPkt;
+  if (rx_msgbuf.pkts_rcvd != pkts_expected) {
+    return;
+  }
+
+  /* If we're here, we received all packets of this message */
+  if (pkthdr->is_req()) {
+    /* Invoke the request handler, and bury the RX MsgBuffer */
+    ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
+    bury_sslot_dynamic_rx_msgbuf(sslot);
+
+    send_response(session, sslot); /* Works for both small and large response */
+  } else {
+    /* Invoke the response callback, and bury the RX MsgBuffer */
+    ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
+    bury_sslot_dynamic_rx_msgbuf(sslot);
+
+    session->sslot_free_vec.push_back(sslot_i);
   }
 }
 
