@@ -11,8 +11,8 @@ namespace ERpc {
  * We don't need to check remote arguments since the session was already
  * connected successfully.
  */
-template <class Transport_>
-void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
+template <class TTr>
+void Rpc<TTr>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectReq);
 
@@ -52,8 +52,8 @@ void Rpc<Transport_>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
   bury_session(session); /* Free session resources + NULL-ify in session_vec */
 }
 
-template <class Transport_>
-void Rpc<Transport_>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
+template <class TTr>
+void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectResp);
   assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));

@@ -2,8 +2,8 @@
 
 namespace ERpc {
 
-template <class Transport_>
-void Rpc<Transport_>::process_completions() {
+template <class TTr>
+void Rpc<TTr>::process_completions() {
   size_t num_pkts = transport->rx_burst();
   if (num_pkts == 0) {
     return;
@@ -56,7 +56,7 @@ void Rpc<Transport_>::process_completions() {
 
     assert(pkthdr->is_req() || pkthdr->is_resp());
 
-    if (small_msg_likely(pkthdr->msg_size <= Transport_::kMaxDataPerPkt)) {
+    if (small_msg_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
       /* Optimize for when the received packet is a single-packet message */
       process_completions_small_msg_one(session, pkt);
     } else {
@@ -71,16 +71,16 @@ void Rpc<Transport_>::process_completions() {
   transport->post_recvs(num_pkts);
 }
 
-template <class Transport_>
-void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
-                                                        const uint8_t *pkt) {
+template <class TTr>
+void Rpc<TTr>::process_completions_small_msg_one(Session *session,
+                                                 const uint8_t *pkt) {
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
 
   const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
   assert(pkthdr->pkt_num == 0);
   assert(pkthdr->msg_size > 0 && /* Credit returns already handled */
-         pkthdr->msg_size <= Transport_::kMaxDataPerPkt);
+         pkthdr->msg_size <= TTr::kMaxDataPerPkt);
   assert(pkthdr->is_req() || pkthdr->is_resp());
 
   const Ops &ops = ops_arr[pkthdr->req_type];
@@ -152,14 +152,14 @@ void Rpc<Transport_>::process_completions_small_msg_one(Session *session,
   }
 }
 
-template <class Transport_>
-void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
-                                                        const uint8_t *pkt) {
+template <class TTr>
+void Rpc<TTr>::process_completions_large_msg_one(Session *session,
+                                                 const uint8_t *pkt) {
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
 
-  const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
-  assert(pkthdr->msg_size > Transport_::kMaxDataPerPkt); /* Multi-packet */
+  const pkthdr_t *pkthdr = (pkthdr_t *)pkt;       /* A valid packet header */
+  assert(pkthdr->msg_size > TTr::kMaxDataPerPkt); /* Multi-packet */
   assert(pkthdr->is_req() || pkthdr->is_resp());
 
   const Ops &ops = ops_arr[pkthdr->req_type];
@@ -230,19 +230,18 @@ void Rpc<Transport_>::process_completions_large_msg_one(Session *session,
   size_t pkt_num = pkthdr->pkt_num;
   size_t msg_size = pkthdr->msg_size;
 
-  size_t offset = pkt_num * Transport_::kMaxDataPerPkt; /* rx_msgbuf offset */
+  size_t offset = pkt_num * TTr::kMaxDataPerPkt; /* rx_msgbuf offset */
 
-  bool is_last = (pkt_num == (msg_size / Transport_::kMaxDataPerPkt) - 1);
-  size_t bytes_to_copy =
-      is_last ? (msg_size - offset) : Transport_::kMaxDataPerPkt;
-  assert(bytes_to_copy <= Transport_::kMaxDataPerPkt);
+  bool is_last = (pkt_num == (msg_size / TTr::kMaxDataPerPkt) - 1);
+  size_t bytes_to_copy = is_last ? (msg_size - offset) : TTr::kMaxDataPerPkt;
+  assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
 
   memcpy((char *)&rx_msgbuf.buf[offset], (char *)(pkt + sizeof(pkthdr_t)),
          bytes_to_copy);
 
   // Check if we need to invoke the app handler
   size_t pkts_expected =
-      (msg_size + Transport_::kMaxDataPerPkt - 1) / Transport_::kMaxDataPerPkt;
+      (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
   if (rx_msgbuf.pkts_rcvd != pkts_expected) {
     return;
   }

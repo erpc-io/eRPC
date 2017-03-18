@@ -2,8 +2,8 @@
 
 namespace ERpc {
 
-template <class Transport_>
-void Rpc<Transport_>::send_response(Session *session, Session::sslot_t &sslot) {
+template <class TTr>
+void Rpc<TTr>::send_response(Session *session, Session::sslot_t &sslot) {
   assert(session != nullptr && session->is_server());
 
   MsgBuffer *resp_msgbuf;
@@ -13,7 +13,7 @@ void Rpc<Transport_>::send_response(Session *session, Session::sslot_t &sslot) {
 
   if (small_msg_likely(app_resp.prealloc_used)) {
     /* Small response to small request */
-    assert(resp_size <= Transport_::kMaxDataPerPkt);
+    assert(resp_size <= TTr::kMaxDataPerPkt);
     resp_msgbuf = &app_resp.pre_resp_msgbuf;
     resp_msgbuf->resize(resp_size, 1);
     app_resp.pre_resp_msgbuf.resize(resp_size, 1);

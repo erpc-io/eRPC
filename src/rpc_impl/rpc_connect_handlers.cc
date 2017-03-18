@@ -11,8 +11,8 @@ namespace ERpc {
  * We need to handle all types of errors in remote arguments that the client can
  * make when calling create_session(), which cannot check for such errors.
  */
-template <class Transport_>
-void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
+template <class TTr>
+void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
 
@@ -96,12 +96,12 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
    */
   RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
   erpc_dprintf("eRPC Rpc %u: Resolving client's routing info %s.\n", app_tid,
-               Transport_::routing_info_str(client_rinfo).c_str());
+               TTr::routing_info_str(client_rinfo).c_str());
 
   bool resolve_success = transport->resolve_remote_routing_info(client_rinfo);
   if (!resolve_success) {
     erpc_dprintf("%s: Unable to resolve routing info %s. Sending response.\n",
-                 issue_msg, Transport_::routing_info_str(client_rinfo).c_str());
+                 issue_msg, TTr::routing_info_str(client_rinfo).c_str());
     sm_pkt->send_resp_mut(SessionMgmtErrType::kRoutingResolutionFailure,
                           &nexus->udp_config);
     return;
@@ -115,7 +115,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
       new Session(Session::Role::kServer, SessionState::kConnected);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     MsgBuffer &msgbuf_i = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
-    msgbuf_i = alloc_msg_buffer(Transport_::kMaxDataPerPkt);
+    msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
 
     if (msgbuf_i.buf == nullptr) {
       /*
@@ -144,7 +144,7 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
   // TEMP
   fprintf(stderr, "Server routing info = %s\n",
-          Transport_::routing_info_str(&(sm_pkt->server.routing_info)).c_str());
+          TTr::routing_info_str(&(sm_pkt->server.routing_info)).c_str());
 
   /* Save endpoint metadata from pkt. This saves the resolved routing info. */
   session->server = sm_pkt->server;
@@ -159,8 +159,8 @@ void Rpc<Transport_>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   return;
 }
 
-template <class Transport_>
-void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
+template <class TTr>
+void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
   assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));
@@ -252,7 +252,7 @@ void Rpc<Transport_>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    */
   RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
   erpc_dprintf("eRPC Rpc %u: Resolving server's routing info %s.\n", app_tid,
-               Transport_::routing_info_str(srv_routing_info).c_str());
+               TTr::routing_info_str(srv_routing_info).c_str());
 
   bool resolve_success;
   if (!testing_fail_resolve_remote_rinfo_client) {

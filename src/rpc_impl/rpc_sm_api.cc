@@ -14,10 +14,9 @@ namespace ERpc {
  * This function is not on the critical path and is exposed to the user,
  * so the args checking is always enabled (i.e., no asserts).
  */
-template <class Transport_>
-Session *Rpc<Transport_>::create_session(const char *rem_hostname,
-                                         uint8_t rem_app_tid,
-                                         uint8_t rem_phy_port) {
+template <class TTr>
+Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
+                                  uint8_t rem_phy_port) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", app_tid);
@@ -73,7 +72,7 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     MsgBuffer &msgbuf_i = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
-    msgbuf_i = alloc_msg_buffer(Transport_::kMaxDataPerPkt);
+    msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
 
     if (msgbuf_i.buf == nullptr) {
       /*
@@ -127,8 +126,8 @@ Session *Rpc<Transport_>::create_session(const char *rem_hostname,
   return session;
 }
 
-template <class Transport_>
-bool Rpc<Transport_>::destroy_session(Session *session) {
+template <class TTr>
+bool Rpc<TTr>::destroy_session(Session *session) {
   if (session == nullptr || !session->is_client()) {
     erpc_dprintf("eRPC Rpc %u: destroy_session() failed. Invalid session.\n",
                  app_tid);
@@ -191,8 +190,8 @@ bool Rpc<Transport_>::destroy_session(Session *session) {
   return false;
 }
 
-template <class Transport_>
-size_t Rpc<Transport_>::num_active_sessions() {
+template <class TTr>
+size_t Rpc<TTr>::num_active_sessions() {
   size_t ret = 0;
   for (Session *session : session_vec) {
     if (session != nullptr) {

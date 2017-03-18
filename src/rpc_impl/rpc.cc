@@ -12,10 +12,10 @@
 
 namespace ERpc {
 
-template <class Transport_>
-Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
-                     session_mgmt_handler_t session_mgmt_handler,
-                     uint8_t phy_port, size_t numa_node)
+template <class TTr>
+Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
+              session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port,
+              size_t numa_node)
     : nexus(nexus),
       context(context),
       app_tid(app_tid),
@@ -53,7 +53,7 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
    * initializes the transport's memory registration functions required for
    * the hugepage allocator.
    */
-  transport = new Transport_(app_tid, phy_port);
+  transport = new TTr(app_tid, phy_port);
 
   huge_alloc =
       new HugeAllocator(kInitialHugeAllocSize, numa_node,
@@ -75,8 +75,8 @@ Rpc<Transport_>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
   erpc_dprintf("eRPC Rpc: Created with app TID = %u.\n", app_tid);
 }
 
-template <class Transport_>
-Rpc<Transport_>::~Rpc() {
+template <class TTr>
+Rpc<TTr>::~Rpc() {
   erpc_dprintf("eRPC Rpc: Destroying for app TID = %u.\n", app_tid);
 
   /*
@@ -97,8 +97,8 @@ Rpc<Transport_>::~Rpc() {
   }
 }
 
-template <class Transport_>
-void Rpc<Transport_>::bury_session(Session *session) {
+template <class TTr>
+void Rpc<TTr>::bury_session(Session *session) {
   assert(session != nullptr);
 
   /* First, free session resources */
@@ -124,8 +124,8 @@ void Rpc<Transport_>::bury_session(Session *session) {
   delete session;
 }
 
-template <class Transport_>
-void Rpc<Transport_>::handle_session_management() {
+template <class TTr>
+void Rpc<TTr>::handle_session_management() {
   assert(sm_hook.session_mgmt_ev_counter > 0);
   sm_hook.session_mgmt_mutex.lock();
 

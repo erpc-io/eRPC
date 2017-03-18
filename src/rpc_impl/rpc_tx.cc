@@ -2,8 +2,8 @@
 
 namespace ERpc {
 
-template <class Transport_>
-void Rpc<Transport_>::process_datapath_tx_work_queue() {
+template <class TTr>
+void Rpc<TTr>::process_datapath_tx_work_queue() {
   tx_batch_i = 0;
 
   /*
@@ -81,11 +81,11 @@ void Rpc<Transport_>::process_datapath_tx_work_queue() {
   datapath_tx_work_queue.resize(write_index);
 }
 
-template <class Transport_>
-void Rpc<Transport_>::process_datapath_tx_work_queue_single_pkt_one(
+template <class TTr>
+void Rpc<TTr>::process_datapath_tx_work_queue_single_pkt_one(
     Session *session, MsgBuffer *tx_msgbuf) {
   assert(tx_msgbuf->pkts_queued == 0);
-  assert(tx_msgbuf->data_size <= Transport_::kMaxDataPerPkt);
+  assert(tx_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
   const pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0();
   bool is_unexp = (pkthdr_0->is_unexp == 1);
@@ -112,7 +112,7 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_single_pkt_one(
     }
   }
 
-  assert(tx_batch_i < Transport_::kPostlist);
+  assert(tx_batch_i < TTr::kPostlist);
   tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
   item.routing_info = session->remote_routing_info;
   item.msg_buffer = tx_msgbuf;
@@ -127,15 +127,15 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_single_pkt_one(
                 app_tid, pkthdr_0->to_string().c_str(),
                 session->local_session_num);
 
-  if (tx_batch_i == Transport_::kPostlist) {
+  if (tx_batch_i == TTr::kPostlist) {
     /* This will increment tx_msgbuf's pkts_sent and data_sent */
-    transport->tx_burst(tx_burst_arr, Transport_::kPostlist);
+    transport->tx_burst(tx_burst_arr, TTr::kPostlist);
     tx_batch_i = 0;
   }
 }
 
-template <class Transport_>
-void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
+template <class TTr>
+void Rpc<TTr>::process_datapath_tx_work_queue_multi_pkt_one(
     Session *session, MsgBuffer *tx_msgbuf) {
   assert(tx_msgbuf->num_pkts > 1); /* Must be a multi-packet message */
 
@@ -190,17 +190,17 @@ void Rpc<Transport_>::process_datapath_tx_work_queue_multi_pkt_one(
     tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = session->remote_routing_info;
     item.msg_buffer = tx_msgbuf;
-    item.offset = tx_msgbuf->pkts_queued * Transport_::kMaxDataPerPkt;
-    item.data_bytes = std::min(tx_msgbuf->data_size - item.offset,
-                               Transport_::kMaxDataPerPkt);
+    item.offset = tx_msgbuf->pkts_queued * TTr::kMaxDataPerPkt;
+    item.data_bytes =
+        std::min(tx_msgbuf->data_size - item.offset, TTr::kMaxDataPerPkt);
 
     /* If we're here, we will enqueue all/part of tx_msgbuf for tx_burst */
     tx_msgbuf->pkts_queued++;
 
     tx_batch_i++;
 
-    if (tx_batch_i == Transport_::kPostlist) {
-      transport->tx_burst(tx_burst_arr, Transport_::kPostlist);
+    if (tx_batch_i == TTr::kPostlist) {
+      transport->tx_burst(tx_burst_arr, TTr::kPostlist);
       tx_batch_i = 0;
     }
   }

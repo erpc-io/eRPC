@@ -10,8 +10,8 @@
 
 namespace ERpc {
 
-template <class Transport_>
-void Rpc<Transport_>::send_connect_req_one(Session *session) {
+template <class TTr>
+void Rpc<TTr>::send_connect_req_one(Session *session) {
   assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kConnectInProgress);
 
@@ -21,8 +21,8 @@ void Rpc<Transport_>::send_connect_req_one(Session *session) {
   connect_req.send_to(session->server.hostname, &nexus->udp_config);
 }
 
-template <class Transport_>
-void Rpc<Transport_>::send_disconnect_req_one(Session *session) {
+template <class TTr>
+void Rpc<TTr>::send_disconnect_req_one(Session *session) {
   assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kDisconnectInProgress);
 
@@ -32,14 +32,14 @@ void Rpc<Transport_>::send_disconnect_req_one(Session *session) {
   connect_req.send_to(session->server.hostname, &nexus->udp_config);
 }
 
-template <class Transport_>
-bool Rpc<Transport_>::mgmt_retry_queue_contains(Session *session) {
+template <class TTr>
+bool Rpc<TTr>::mgmt_retry_queue_contains(Session *session) {
   return std::find(mgmt_retry_queue.begin(), mgmt_retry_queue.end(), session) !=
          mgmt_retry_queue.end();
 }
 
-template <class Transport_>
-void Rpc<Transport_>::mgmt_retry_queue_add(Session *session) {
+template <class TTr>
+void Rpc<TTr>::mgmt_retry_queue_add(Session *session) {
   assert(session != nullptr && session->is_client());
 
   /* Only client-mode sessions can be in the management retry queue */
@@ -52,8 +52,8 @@ void Rpc<Transport_>::mgmt_retry_queue_add(Session *session) {
   mgmt_retry_queue.push_back(session);
 }
 
-template <class Transport_>
-void Rpc<Transport_>::mgmt_retry_queue_remove(Session *session) {
+template <class TTr>
+void Rpc<TTr>::mgmt_retry_queue_remove(Session *session) {
   assert(session != nullptr && session->is_client());
   assert(mgmt_retry_queue_contains(session));
 
@@ -67,8 +67,8 @@ void Rpc<Transport_>::mgmt_retry_queue_remove(Session *session) {
   assert(mgmt_retry_queue.size() == initial_size - 1);
 }
 
-template <class Transport_>
-void Rpc<Transport_>::mgmt_retry() {
+template <class TTr>
+void Rpc<TTr>::mgmt_retry() {
   assert(mgmt_retry_queue.size() > 0);
   uint64_t cur_tsc = rdtsc();
 

@@ -17,16 +17,14 @@
 
 namespace ERpc {
 
-// Per-thread RPC object
-template <class Transport_>
+// Per-thread RPC object. TTr = Template Transport.
+template <class TTr>
 class Rpc {
  public:
   /// Max request or response size, excluding packet headers
   static constexpr size_t kMaxMsgSize = MB(8);
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
-  static_assert((1ull << kPktNumBits) * Transport_::kMaxDataPerPkt >=
-                    kMaxMsgSize,
-                "");
+  static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
@@ -99,11 +97,11 @@ class Rpc {
     size_t max_num_pkts;
 
     /* Avoid division for small packets */
-    if (small_msg_likely(max_data_size <= Transport_::kMaxDataPerPkt)) {
+    if (small_msg_likely(max_data_size <= TTr::kMaxDataPerPkt)) {
       max_num_pkts = 1;
     } else {
-      max_num_pkts = (max_data_size + (Transport_::kMaxDataPerPkt - 1)) /
-                     Transport_::kMaxDataPerPkt;
+      max_num_pkts =
+          (max_data_size + (TTr::kMaxDataPerPkt - 1)) / TTr::kMaxDataPerPkt;
     }
 
     static_assert(is_power_of_two(sizeof(pkthdr_t)), ""); /* For bit shift */
@@ -132,11 +130,11 @@ class Rpc {
     size_t new_num_pkts;
 
     /* Avoid division for small packets */
-    if (small_msg_likely(new_data_size <= Transport_::kMaxDataPerPkt)) {
+    if (small_msg_likely(new_data_size <= TTr::kMaxDataPerPkt)) {
       new_num_pkts = 1;
     } else {
-      new_num_pkts = (new_data_size + (Transport_::kMaxDataPerPkt - 1)) /
-                     Transport_::kMaxDataPerPkt;
+      new_num_pkts =
+          (new_data_size + (TTr::kMaxDataPerPkt - 1)) / TTr::kMaxDataPerPkt;
     }
 
     msg_buffer->resize(new_data_size, new_num_pkts);
@@ -429,12 +427,12 @@ class Rpc {
   size_t numa_node;
 
   // Others
-  Transport_ *transport = nullptr;      ///< The unreliable transport
+  TTr *transport = nullptr;             ///< The unreliable transport
   HugeAllocator *huge_alloc = nullptr;  ///< This thread's hugepage allocator
   size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available unexpe pkt slots
 
-  uint8_t *rx_ring[Transport_::kRecvQueueDepth];  ///< The transport's RX ring
-  size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
+  uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
+  size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
 
   Ops ops_arr[kMaxReqTypes];
 
@@ -457,11 +455,11 @@ class Rpc {
 
   /// Tx batch information for interfacing between the event loop and the
   /// transport.
-  tx_burst_item_t tx_burst_arr[Transport_::kPostlist];
+  tx_burst_item_t tx_burst_arr[TTr::kPostlist];
   size_t tx_batch_i;  ///< The batch index for \p tx_burst_arr
 
   /// Rx batch information for \p rx_burst
-  MsgBuffer rx_msg_buffer_arr[Transport_::kPostlist];
+  MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];
 
   SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
   SlowRand slow_rand;
