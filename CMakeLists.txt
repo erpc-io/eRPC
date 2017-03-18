@@ -81,6 +81,20 @@ set(SOURCES
   src/util/udp_client.cc
   src/util/udp_client.h)
 
+# The tests to run using ctest
+set(CTEST_TESTS
+  test_create_session
+  test_create_session_args
+  test_destroy_session
+  test_small_msg
+  test_large_msg)
+
+# Other tests that can be run without ctest
+set(OTHER_TESTS
+  test_huge_alloc
+  test_rand
+  test_fixed_vector)
+
 if(LTO)
   # Using a compiled eRPC library with CMake and LTO is difficult.
   # See Evernote for details.
@@ -111,28 +125,14 @@ if(LTO)
 else(LTO)
   add_library(erpc ${SOURCES})
 
-  add_executable(test_create_session tests/test_create_session.cc)
-  target_link_libraries(test_create_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_create_session COMMAND test_create_session)
+  foreach(test_name IN LISTS CTEST_TESTS)
+    add_executable(${test_name} tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    add_test(NAME ${test_name} COMMAND ${test_name})
+  endforeach()
 
-  add_executable(test_create_session_args tests/test_create_session_args.cc)
-  target_link_libraries(test_create_session_args erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_create_session_args COMMAND test_create_session_args)
-
-  add_executable(test_destroy_session tests/test_destroy_session.cc)
-  target_link_libraries(test_destroy_session erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_destroy_session COMMAND test_destroy_session)
-
-  add_executable(test_small_msg tests/test_small_msg.cc)
-  target_link_libraries(test_small_msg erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_small_msg COMMAND test_small_msg)
-
-  add_executable(test_huge_alloc tests/test_huge_alloc.cc)
-  target_link_libraries(test_huge_alloc erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-
-  add_executable(test_rand tests/test_rand.cc)
-  target_link_libraries(test_rand erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-
-  add_executable(test_fixed_vector tests/test_fixed_vector.cc)
-  target_link_libraries(test_fixed_vector ${GTEST_LIBRARIES} ${LIBRARIES})
+  foreach(test_name IN LISTS OTHER_TESTS)
+    add_executable(${test_name} tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  endforeach()
 endif(LTO)
