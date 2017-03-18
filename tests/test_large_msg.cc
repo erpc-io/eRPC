@@ -7,13 +7,14 @@
 
 using namespace ERpc;
 
-static const uint16_t kAppNexusUdpPort = 31851;
-static const double kAppNexusPktDropProb = 0.0;
-static const size_t kAppEventLoopMs = 200;
-static const uint8_t kAppClientAppTid = 100;
-static const uint8_t kAppServerAppTid = 200;
-static const uint8_t kAppReqType = 3;
-static const size_t kAppMaxMsgSize = 64;
+static constexpr uint16_t kAppNexusUdpPort = 31851;
+static constexpr double kAppNexusPktDropProb = 0.0;
+static constexpr size_t kAppEventLoopMs = 200;
+static constexpr uint8_t kAppClientAppTid = 100;
+static constexpr uint8_t kAppServerAppTid = 200;
+static constexpr uint8_t kAppReqType = 3;
+static constexpr size_t kAppMinMsgSize =
+    Rpc<IBTransport>::max_data_per_pkt() + 1; /* At least 2 packets */
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready; /* Client starts after server is ready */
@@ -42,11 +43,17 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
   auto *context = (app_context_t *)_context;
   ASSERT_FALSE(context->is_client);
 
-  test_printf("Server: Received request %s\n", req_msgbuf->buf);
+  size_t req_size = req_msgbuf->get_data_size();
+  test_printf("Server: Received request of length %zu\n", req_size);
 
-  strcpy((char *)app_resp->pre_resp_msgbuf.buf, (char *)req_msgbuf->buf);
-  app_resp->resp_size = strlen((char *)req_msgbuf->buf);
-  app_resp->prealloc_used = true;
+  app_resp->prealloc_used = false;
+  app_resp->resp_size = req_size;
+  app_resp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
+  ASSERT_NE(app_resp->dyn_resp_msgbuf.buf, nullptr);
+
+  memcpy((char *)app_resp->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
+         req_size);
+  app_resp->resp_size = req_size;
 }
 
 /// The common response handler for all subtests. This checks that the request
@@ -58,8 +65,9 @@ void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
   ASSERT_NE(resp_msgbuf, nullptr);
   ASSERT_NE(_context, nullptr);
 
-  test_printf("Client: Received response %s (request was %s)\n",
-              (char *)resp_msgbuf->buf, (char *)req_msgbuf->buf);
+  test_printf("Client: Received response of length %zu (request's was %zu)\n",
+              (char *)resp_msgbuf->get_data_size(),
+              (char *)req_msgbuf->get_data_size());
 
   ASSERT_EQ(req_msgbuf->get_data_size(), resp_msgbuf->get_data_size());
   ASSERT_STREQ((char *)req_msgbuf->buf, (char *)resp_msgbuf->buf);
@@ -128,10 +136,16 @@ void one_large_rpc(Nexus *nexus) {
   ASSERT_EQ(session->state, SessionState::kConnected);
 
   /* Send a message */
-  MsgBuffer req_msgbuf = rpc.alloc_msg_buffer(strlen("APP_MSG"));
-  strcpy((char *)req_msgbuf.buf, "APP_MSG");
+  size_t req_size = kAppMinMsgSize;
+  MsgBuffer req_msgbuf = rpc.alloc_msg_buffer(req_size);
+  ASSERT_NE(req_msgbuf.buf, nullptr);
 
-  test_printf("test: Sending request %s\n", (char *)req_msgbuf.buf);
+  for (size_t i = 0; i < req_size; i++) {
+    req_msgbuf.buf[i] = 'a';
+  }
+  req_msgbuf.buf[req_size - 1] = 0;
+
+  test_printf("test: Sending request of size %zu\n", req_size);
   int ret = rpc.send_request(session, kAppReqType, &req_msgbuf);
   if (ret != 0) {
     test_printf("test: send_request error %s\n",

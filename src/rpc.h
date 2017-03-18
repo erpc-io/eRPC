@@ -350,13 +350,13 @@ class Rpc {
 
   /// Free and NULL-ify the application response MsgBuffer if it is dynamic
   inline void bury_sslot_dynamic_app_resp_msgbuf(Session::sslot_t &sslot) {
-    if (small_msg_unlikely(sslot.app_resp.resp_msgbuf != nullptr)) {
+    MsgBuffer &dyn_resp_msgbuf = sslot.app_resp.dyn_resp_msgbuf;
+    if (small_msg_unlikely(dyn_resp_msgbuf.buf != nullptr)) {
       assert(!sslot.app_resp.prealloc_used);
 
-      MsgBuffer *resp_msgbuf = sslot.app_resp.resp_msgbuf;
-      assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic());
-      free_msg_buffer(*resp_msgbuf);
-      sslot.app_resp.resp_msgbuf = nullptr; /* Mark invalid for future */
+      assert(dyn_resp_msgbuf.check_magic());
+      free_msg_buffer(dyn_resp_msgbuf);
+      dyn_resp_msgbuf.buf = nullptr; /* Mark invalid for future */
     }
   }
 

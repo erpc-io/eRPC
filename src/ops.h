@@ -14,7 +14,7 @@ namespace ERpc {
 struct app_resp_t {
   bool prealloc_used;         ///< Did the app use pre_resp_msgbuf?
   MsgBuffer pre_resp_msgbuf;  ///< Preallocated storage for small responses
-  MsgBuffer *resp_msgbuf;     ///< Storage for large responses
+  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic storage for large responses
   size_t resp_size;  ///< The number of data bytes in the app's response
 };
 

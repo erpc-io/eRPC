@@ -20,7 +20,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(msg_buffer != nullptr);
     assert(msg_buffer->buf != nullptr && msg_buffer->check_magic());
 
-    assert(sizeof(pkthdr_t) + item.data_bytes <= kMaxDataPerPkt);
+    assert(item.data_bytes <= kMaxDataPerPkt);
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
     if (item.data_bytes == 0) {

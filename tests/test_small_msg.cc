@@ -7,13 +7,13 @@
 
 using namespace ERpc;
 
-static const uint16_t kAppNexusUdpPort = 31851;
-static const double kAppNexusPktDropProb = 0.0;
-static const size_t kAppEventLoopMs = 200;
-static const uint8_t kAppClientAppTid = 100;
-static const uint8_t kAppServerAppTid = 200;
-static const uint8_t kAppReqType = 3;
-static const size_t kAppMaxMsgSize = 64;
+static constexpr uint16_t kAppNexusUdpPort = 31851;
+static constexpr double kAppNexusPktDropProb = 0.0;
+static constexpr size_t kAppEventLoopMs = 200;
+static constexpr uint8_t kAppClientAppTid = 100;
+static constexpr uint8_t kAppServerAppTid = 200;
+static constexpr uint8_t kAppReqType = 3;
+static constexpr size_t kAppMaxMsgSize = 64;
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready; /* Client starts after server is ready */

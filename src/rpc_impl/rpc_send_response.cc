@@ -18,7 +18,7 @@ void Rpc<TTr>::send_response(Session *session, Session::sslot_t &sslot) {
     resp_msgbuf->resize(resp_size, 1);
     app_resp.pre_resp_msgbuf.resize(resp_size, 1);
   } else {
-    resp_msgbuf = app_resp.resp_msgbuf;
+    resp_msgbuf = &app_resp.dyn_resp_msgbuf;
     assert(resp_msgbuf->data_size == resp_size);
   }
 

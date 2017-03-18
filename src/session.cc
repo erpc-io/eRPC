@@ -29,7 +29,7 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
     sslot.tx_msgbuf = nullptr;
     sslot_free_vec.push_back(sslot_i);
 
-    sslot.app_resp.resp_msgbuf = nullptr;
+    sslot.app_resp.dyn_resp_msgbuf.buf = nullptr;
   }
 }
 

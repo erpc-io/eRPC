@@ -230,9 +230,11 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   size_t pkt_num = pkthdr->pkt_num;
   size_t msg_size = pkthdr->msg_size;
 
-  size_t offset = pkt_num * TTr::kMaxDataPerPkt; /* rx_msgbuf offset */
+  size_t pkts_expected =
+      (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
 
-  bool is_last = (pkt_num == (msg_size / TTr::kMaxDataPerPkt) - 1);
+  bool is_last = (pkt_num == pkts_expected - 1);
+  size_t offset = pkt_num * TTr::kMaxDataPerPkt; /* rx_msgbuf offset */
   size_t bytes_to_copy = is_last ? (msg_size - offset) : TTr::kMaxDataPerPkt;
   assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
 
@@ -240,8 +242,6 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
          bytes_to_copy);
 
   // Check if we need to invoke the app handler
-  size_t pkts_expected =
-      (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
   if (rx_msgbuf.pkts_rcvd != pkts_expected) {
     return;
   }
