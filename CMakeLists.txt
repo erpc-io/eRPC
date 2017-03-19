@@ -77,7 +77,6 @@ set(SOURCES
   src/util/buffer.h
   src/util/huge_alloc.cc
   src/util/huge_alloc.h
-  src/util/rand.cc
   src/util/rand.h
   src/util/udp_client.cc
   src/util/udp_client.h)

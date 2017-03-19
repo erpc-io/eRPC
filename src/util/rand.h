@@ -11,16 +11,27 @@ class SlowRand {
   std::uniform_int_distribution<uint64_t> dist;
 
  public:
-  SlowRand();
-  uint64_t next_u64();
+  SlowRand() : mt(rand_dev()), dist(0, UINT64_MAX) {}
+
+  inline uint64_t next_u64() {
+    return dist(mt);
+  }
 };
 
 class FastRand {
  public:
   uint64_t seed;
 
-  FastRand(uint64_t seed);
-  uint64_t next_u64();
+  /// Create a FastRand using a seed from SlowRand
+  FastRand() {
+    SlowRand slow_rand;
+    seed = slow_rand.next_u64();
+  }
+
+  inline uint32_t next_u32() {
+    seed = seed * 1103515245 + 12345;
+    return (uint32_t) (seed >> 32);
+  }
 };
 
 }  // End ERpc
