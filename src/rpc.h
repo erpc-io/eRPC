@@ -22,7 +22,9 @@ template <class TTr>
 class Rpc {
  public:
   /// Max request or response size, excluding packet headers
-  static constexpr size_t kMaxMsgSize = MB(8);
+  static constexpr size_t kMaxMsgSize =
+      HugeAllocator::kMaxClassSize -
+      ((HugeAllocator::kMaxClassSize / TTr::kMaxDataPerPkt) * sizeof(pkthdr_t));
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 

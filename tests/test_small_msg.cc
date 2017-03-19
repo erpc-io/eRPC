@@ -129,6 +129,7 @@ void one_small_rpc(Nexus *nexus) {
 
   /* Send a message */
   MsgBuffer req_msgbuf = rpc.alloc_msg_buffer(strlen("APP_MSG"));
+  ASSERT_NE(req_msgbuf.buf, nullptr);
   strcpy((char *)req_msgbuf.buf, "APP_MSG");
 
   test_printf("test: Sending request %s\n", (char *)req_msgbuf.buf);
@@ -191,6 +192,7 @@ void multi_small_rpc_one_session(Nexus *nexus) {
   MsgBuffer req_msgbuf[Session::kSessionCredits];
   for (size_t i = 0; i < Session::kSessionCredits; i++) {
     req_msgbuf[i] = rpc.alloc_msg_buffer(kAppMaxMsgSize);
+    ASSERT_NE(req_msgbuf[i].buf, nullptr);
   }
 
   size_t req_suffix = 0; /* The integer suffix after every request message */

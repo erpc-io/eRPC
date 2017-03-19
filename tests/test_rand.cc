@@ -58,7 +58,6 @@ TEST(SlowRandTest, ModHundredTest) {
   test_printf("SlowRand: min/max = %.5f (best = 1)\n", (double)min / max);
 }
 
-
 /**
  * @brief Test if FastRand is uniform-ish and covers the 64-bit range.
  */
@@ -109,7 +108,6 @@ TEST(FastRandTest, ModHundredTest) {
 
   test_printf("FastRand: min/max = %.5f (best = 1)\n", (double)min / max);
 }
-
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

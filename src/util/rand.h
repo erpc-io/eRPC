@@ -13,9 +13,7 @@ class SlowRand {
  public:
   SlowRand() : mt(rand_dev()), dist(0, UINT64_MAX) {}
 
-  inline uint64_t next_u64() {
-    return dist(mt);
-  }
+  inline uint64_t next_u64() { return dist(mt); }
 };
 
 class FastRand {
@@ -30,7 +28,7 @@ class FastRand {
 
   inline uint32_t next_u32() {
     seed = seed * 1103515245 + 12345;
-    return (uint32_t) (seed >> 32);
+    return (uint32_t)(seed >> 32);
   }
 };
 
