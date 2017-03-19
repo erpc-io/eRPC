@@ -184,7 +184,7 @@ void Rpc<TTr>::process_datapath_tx_work_queue_multi_pkt_one(
       "eRPC Rpc %u: Sending %zu of %zu remaining packets for "
       "multi-packet %s (session %u).\n",
       app_tid, now_sending, pkts_pending, pkt_type_str(pkt_type).c_str(),
-      session->client.session_num);
+      session->local_session_num);
 
   for (size_t i = 0; i < now_sending; i++) {
     tx_burst_item_t &item = tx_burst_arr[tx_batch_i];

@@ -209,7 +209,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   bool is_last = (pkt_num == pkts_expected - 1);
 
   bool send_cr =
-      (pkthdr->is_req() && !is_last) || (pkthdr->is_resp() || pkt_num != 0);
+      (pkthdr->is_req() && !is_last) || (pkthdr->is_resp() && pkt_num != 0);
   if (send_cr) {
     send_credit_return_now(session);
   }
