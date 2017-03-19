@@ -101,13 +101,11 @@ class Session {
   sslot_t sslot_arr[kSessionReqWindow];                   ///< The session slots
   FixedVector<size_t, kSessionReqWindow> sslot_free_vec;  ///< Free slots
 
-  /// Depending on this session's role, save a pointer to \p server's or
-  /// \p client's RoutingInfo for faster unconditional access
+  ///@{ Info saved for faster unconditional access
   RoutingInfo *remote_routing_info;
-
-  /// Depending on this session's role, save the local endpoint's session number
-  /// for faster unconditional access
   uint16_t local_session_num;
+  uint16_t remote_session_num;
+  ///@}
 
   struct {
     size_t remote_credits_exhaused = 0;

@@ -26,7 +26,7 @@ void Rpc<TTr>::send_response(Session *session, Session::sslot_t &sslot) {
   pkthdr_t *pkthdr_0 = resp_msgbuf->get_pkthdr_0();
   pkthdr_0->req_type = sslot.req_type;
   pkthdr_0->msg_size = resp_msgbuf->data_size;
-  pkthdr_0->rem_session_num = session->client.session_num;
+  pkthdr_0->rem_session_num = session->remote_session_num;
   pkthdr_0->pkt_type = kPktTypeResp;
   pkthdr_0->is_unexp = 0; /* First response packet is unexpected */
   pkthdr_0->pkt_num = 0;

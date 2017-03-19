@@ -54,7 +54,7 @@ int Rpc<TTr>::send_request(Session *session, uint8_t req_type,
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
   pkthdr_0->req_type = req_type;
   pkthdr_0->msg_size = req_msgbuf->data_size;
-  pkthdr_0->rem_session_num = session->server.session_num;
+  pkthdr_0->rem_session_num = session->remote_session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->is_unexp = 1; /* Request packets are unexpected */
   pkthdr_0->pkt_num = 0;

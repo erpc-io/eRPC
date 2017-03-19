@@ -151,6 +151,7 @@ void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   session->client = sm_pkt->client;
 
   session->local_session_num = sm_pkt->server.session_num;
+  session->remote_session_num = sm_pkt->client.session_num;
 
   session_vec.push_back(session); /* Add to list of all sessions */
 
@@ -285,6 +286,7 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
 
   /* Save server endpoint metadata. This saves the resolved routing info. */
   session->server = sm_pkt->server;
+  session->remote_session_num = session->server.session_num;
   session->state = SessionState::kConnected;
 
   erpc_dprintf("%s: None. Session connected.\n", issue_msg);

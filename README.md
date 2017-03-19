@@ -23,7 +23,7 @@
 ## API notes
 
 ## Short-term TODOs
- * Increments to `pkts_rcvd`?
+ * Rename `send_request` and related functions to `enque_*`.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
@@ -32,7 +32,12 @@
  * Optimize `pkthdr_0` filling using preconstructed headers.
  * The first packet size limit should be much smaller than MTU to improve RTT
    measurement accuracy (e.g., it could be around 256 bytes). This will need
-   many changes, including `offset_to_pkt_num`.
+   many changes, mostly to code that uses TTr::kMaxDataPerPkt.
+   * We must ensure that a small response message packet or a credit return
+     packet is never delayed by TX queueing (even by congestion control--related
+     TX queueing) or we'll mess up RTT measurement.
+
+## Longer-term TODOs
  * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,
    function pointers, and unused opcodes/QP types/cases. If inline size is
    fixed at 60 bytes, optimized that. Add fast RECV posting.
@@ -59,14 +64,3 @@
  * Flags that control performance:
    * kDataPathChecks
    * `small_msg_likely`
-
-
-
-    /* Avoid division for small packets */
-    if (small_msg_likely(data_size <= Transport_::kMaxDataPerPkt)) {
-      num_pkts = 1;
-    } else {
-      num_pkts = (data_size + (Transport_::kMaxDataPerPkt - 1)) /
-                 Transport_::kMaxDataPerPkt;
-    }
-

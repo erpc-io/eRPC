@@ -415,13 +415,16 @@ class Rpc {
   // rpc_send_response.cc
 
   /**
-   * @brief Send a response from within eRPC core
+   * @brief Try to enqueue a response from within eRPC core
    *
    * @param session The session to send the response on
    * @param sslot The session slot whose \p tx_msgbuf contains the full response
    * payload, but not the packet headers
    */
   void send_response(Session *session, Session::sslot_t &sslot);
+
+  /// Send a credit return for this session now. This must now be rescheduled.
+  void send_credit_return_now(Session *session);
 
   // Constructor args
   Nexus *nexus;

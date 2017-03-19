@@ -112,6 +112,9 @@ void Rpc<TTr>::process_datapath_tx_work_queue_single_pkt_one(
     }
   }
 
+  /* If we're here, we're going to enqueue this message for tx_burst */
+  tx_msgbuf->pkts_queued = 1;
+
   assert(tx_batch_i < TTr::kPostlist);
   tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
   item.routing_info = session->remote_routing_info;
@@ -119,9 +122,6 @@ void Rpc<TTr>::process_datapath_tx_work_queue_single_pkt_one(
   item.offset = 0;
   item.data_bytes = tx_msgbuf->data_size;
   tx_batch_i++;
-
-  /* If we're here, we're going to enqueue this message for tx_burst */
-  tx_msgbuf->pkts_queued = 1;
 
   dpath_dprintf("eRPC Rpc %u: Sending single-packet message %s (session %u)\n",
                 app_tid, pkthdr_0->to_string().c_str(),

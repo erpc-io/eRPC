@@ -56,6 +56,7 @@ set(SOURCES
   src/pkthdr.h
   src/rpc.h
   src/rpc_impl/rpc.cc
+  src/rpc_impl/rpc_send_cr.cc
   src/rpc_impl/rpc_send_request.cc
   src/rpc_impl/rpc_send_response.cc
   src/rpc_impl/rpc_rx.cc

@@ -98,7 +98,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
 
   /*
-   * The RX MsgBuffer stored previously in this slot was buried earlier. The
+   * The RX MsgBuffer stored previously in this slot was buried earlier: The
    * server (client) buried it after the request (response) handler returned.
    */
   assert(sslot.rx_msgbuf.buffer.buf == nullptr);
@@ -160,7 +160,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
 
   const pkthdr_t *pkthdr = (pkthdr_t *)pkt;       /* A valid packet header */
   assert(pkthdr->msg_size > TTr::kMaxDataPerPkt); /* Multi-packet */
-  assert(pkthdr->is_req() || pkthdr->is_resp());
+  assert(pkthdr->is_req() || pkthdr->is_resp());  /* Credit returns are small */
 
   const Ops &ops = ops_arr[pkthdr->req_type];
   if (unlikely(!ops.is_valid())) {
@@ -197,11 +197,30 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
   }
 
+  /*
+   * Credit returns are sent for non-last request packets and non-first
+   * response packets. The first/last decision is made based on packet number,
+   * irrespective of the order in which we receive the packets.
+   */
+  size_t pkt_num = pkthdr->pkt_num;
+  size_t msg_size = pkthdr->msg_size;
+  size_t pkts_expected =
+      (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
+  bool is_last = (pkt_num == pkts_expected - 1);
+
+  bool send_cr =
+      (pkthdr->is_req() && !is_last) || (pkthdr->is_resp() || pkt_num != 0);
+  if (send_cr) {
+    send_credit_return_now(session);
+  }
+
   if (rx_msgbuf.buf == nullptr) {
     /*
-     * This is the first packet of this message. The RX MsgBuffer stored
-     * previously in this slot was buried earlier. The server (client) buried
-     * it after the request (response) handler returned.
+     * This is the first time that we have received a message for this packet.
+     * (This may not be the zeroth packet of the message due to reordering.)
+     *
+     * The RX MsgBuffer stored previously in this slot was buried earlier: The
+     * server (client) buried it after the request (response) handler returned.
      */
     assert(rx_msgbuf.buffer.buf == nullptr);
 
@@ -227,13 +246,6 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   }
 
   // Copy the received packet
-  size_t pkt_num = pkthdr->pkt_num;
-  size_t msg_size = pkthdr->msg_size;
-
-  size_t pkts_expected =
-      (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
-
-  bool is_last = (pkt_num == pkts_expected - 1);
   size_t offset = pkt_num * TTr::kMaxDataPerPkt; /* rx_msgbuf offset */
   size_t bytes_to_copy = is_last ? (msg_size - offset) : TTr::kMaxDataPerPkt;
   assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
