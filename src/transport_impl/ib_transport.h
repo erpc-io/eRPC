@@ -96,7 +96,6 @@ class IBTransport : public Transport {
   void post_recvs(size_t num_recvs);
 
   /// Get the current signaling flag, and poll the send CQ if we need to.
-  /// Poll the send CQ if we need to.
   inline int get_signaled_flag() {
     int flag = (nb_pending == 0) ? IBV_SEND_SIGNALED : 0;
     if (nb_pending == kUnsigBatch - 1) {
@@ -112,7 +111,7 @@ class IBTransport : public Transport {
       }
       nb_pending = 0;
     } else {
-      nb_pending = 0;
+      nb_pending++;
     }
 
     return flag;

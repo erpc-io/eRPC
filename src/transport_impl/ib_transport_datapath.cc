@@ -83,7 +83,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
   /* Handle failure. XXX: Don't exit. */
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
-  if (ret != 0) {
+  if (unlikely(ret != 0)) {
     fprintf(stderr, "ibv_post_send failed. ret = %d\n", ret);
     exit(-1);
   }

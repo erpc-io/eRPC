@@ -11,6 +11,7 @@ using namespace ERpc;
 static constexpr uint16_t kAppNexusUdpPort = 31851;
 static constexpr double kAppNexusPktDropProb = 0.0;
 static constexpr size_t kAppEventLoopMs = 200;
+static constexpr size_t kAppEventLoopMsVerbose = 7000; /* 7 seconds */
 static constexpr uint8_t kAppClientAppTid = 100;
 static constexpr uint8_t kAppServerAppTid = 200;
 static constexpr uint8_t kAppReqType = 3;
@@ -249,7 +250,12 @@ void multi_small_rpc_one_session(Nexus *nexus) {
     int ret = rpc.send_request(session, kAppReqType, &req_msgbuf[0]);
     ASSERT_NE(ret, 0);
 
-    rpc.run_event_loop_timeout(kAppEventLoopMs);
+    if (kDatapathVerbose) {
+      /* If the datapath is verbose, receiving resps takes a long time */
+      rpc.run_event_loop_timeout(kAppEventLoopMsVerbose); /* 7 seconds */
+    } else {
+      rpc.run_event_loop_timeout(kAppEventLoopMs);
+    }
 
     ASSERT_EQ(context.num_rpc_resps, Session::kSessionCredits);
   }
