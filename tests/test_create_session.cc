@@ -4,7 +4,7 @@
 #include <thread>
 
 #include "rpc.h"
-#include "test_printf.h"
+#include "util/test_printf.h"
 
 using namespace ERpc;
 

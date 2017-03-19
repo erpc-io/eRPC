@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <limits.h>
 
-#include "test_printf.h"
 #include "util/fixed_vector.h"
+#include "util/test_printf.h"
 
 TEST(FixedVectorTest, FixedVectorTest) {
   ERpc::FixedVector<size_t, 4> fv;

@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <limits.h>
 
-#include "test_printf.h"
 #include "util/rand.h"
+#include "util/test_printf.h"
 
 // These tests are basic correctness tests and are not supposed to have any
 // statistical meaning.

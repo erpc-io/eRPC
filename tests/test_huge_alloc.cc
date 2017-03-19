@@ -2,8 +2,8 @@
 #include <time.h>
 #include <algorithm>
 #include <vector>
-#include "test_printf.h"
 #include "util/huge_alloc.h"
+#include "util/test_printf.h"
 
 #define SYSTEM_HUGEPAGES (512) /* The number of hugepages available */
 #define SYSTEM_4K_PAGES (SYSTEM_HUGEPAGES * 512) /* Number of 4K pages*/
