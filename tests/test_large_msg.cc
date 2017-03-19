@@ -11,7 +11,7 @@ using namespace ERpc;
 static constexpr uint16_t kAppNexusUdpPort = 31851;
 static constexpr double kAppNexusPktDropProb = 0.0;
 static constexpr size_t kAppEventLoopMs = 200;
-static constexpr size_t kAppEventLoopMsVerbose = 7000; /* 7 seconds */
+static constexpr size_t kAppMaxEventLoopMs = 10000; /* 10 seconds */
 static constexpr uint8_t kAppClientAppTid = 100;
 static constexpr uint8_t kAppServerAppTid = 200;
 static constexpr uint8_t kAppReqType = 3;
@@ -169,7 +169,17 @@ void one_large_rpc(Nexus *nexus) {
   }
   ASSERT_EQ(ret, 0);
 
-  rpc.run_event_loop_timeout(kAppEventLoopMs);
+  /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
+  uint64_t cycles_start = rdtsc();
+  while (context.num_rpc_resps != 1) {
+    rpc.run_event_loop_timeout(kAppEventLoopMs);
+
+    double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
+    if (ms_elapsed > kAppMaxEventLoopMs) {
+      break;
+    }
+  }
+
   ASSERT_EQ(context.num_rpc_resps, 1);
 
   rpc.free_msg_buffer(req_msgbuf);
@@ -250,11 +260,15 @@ void multi_small_rpc_one_session(Nexus *nexus) {
     int ret = rpc.send_request(session, kAppReqType, &req_msgbuf[0]);
     ASSERT_NE(ret, 0);
 
-    if (kDatapathVerbose) {
-      /* If the datapath is verbose, receiving resps takes a long time */
-      rpc.run_event_loop_timeout(kAppEventLoopMsVerbose); /* 7 seconds */
-    } else {
+    /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
+    uint64_t cycles_start = rdtsc();
+    while (context.num_rpc_resps != Session::kSessionCredits) {
       rpc.run_event_loop_timeout(kAppEventLoopMs);
+
+      double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
+      if (ms_elapsed > kAppMaxEventLoopMs) {
+        break;
+      }
     }
 
     ASSERT_EQ(context.num_rpc_resps, Session::kSessionCredits);
