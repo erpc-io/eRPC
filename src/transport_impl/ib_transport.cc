@@ -23,7 +23,7 @@ IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port)
                app_tid, ib_ctx->device->name, dev_port_id);
 }
 
-void IBTransport::init_hugepage_structures(HugeAllocator *huge_alloc,
+void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
                                            uint8_t **rx_ring) {
   assert(huge_alloc != nullptr);
   assert(rx_ring != nullptr);

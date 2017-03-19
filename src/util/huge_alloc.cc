@@ -3,9 +3,8 @@
 
 namespace ERpc {
 
-HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
-                             reg_mr_func_t reg_mr_func,
-                             dereg_mr_func_t dereg_mr_func)
+HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
+                     reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func)
     : numa_node(numa_node),
       reg_mr_func(reg_mr_func),
       dereg_mr_func(dereg_mr_func),
@@ -24,7 +23,7 @@ HugeAllocator::HugeAllocator(size_t initial_size, size_t numa_node,
   reserve_hugepages(initial_size, numa_node);
 }
 
-HugeAllocator::~HugeAllocator() {
+HugeAlloc::~HugeAlloc() {
   /* Deregister and delete the created SHM regions */
   for (shm_region_t &shm_region : shm_list) {
     dereg_mr_func(shm_region.mem_reg_info);
@@ -36,7 +35,7 @@ HugeAllocator::~HugeAllocator() {
  * To create a cache of Buffers, we first allocate the required number of
  * Buffers and then free them.
  */
-bool HugeAllocator::create_cache(size_t size, size_t num_buffers) {
+bool HugeAlloc::create_cache(size_t size, size_t num_buffers) {
   size_t size_class = get_class(size);
   size_t reqd_buffers = num_buffers - freelist[size_class].size();
   if (reqd_buffers <= 0) {
@@ -61,8 +60,8 @@ bool HugeAllocator::create_cache(size_t size, size_t num_buffers) {
   return true;
 }
 
-void HugeAllocator::print_stats() {
-  fprintf(stderr, "eRPC HugeAllocator stats:\n");
+void HugeAlloc::print_stats() {
+  fprintf(stderr, "eRPC HugeAlloc stats:\n");
   fprintf(stderr, "Total reserved memory = %zu bytes (%.2f MB)\n",
           stat_memory_reserved, (double)stat_memory_reserved / MB(1));
 
@@ -89,7 +88,7 @@ void HugeAllocator::print_stats() {
   }
 }
 
-bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
+bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   assert(size >= kMaxClassSize); /* We need at least one max-sized buffer */
 
   std::ostringstream xmsg; /* The exception message */
@@ -114,12 +113,12 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
           break;
 
         case EACCES:
-          xmsg << "eRPC HugeAllocator: SHM allocation error. "
+          xmsg << "eRPC HugeAlloc: SHM allocation error. "
                << "Insufficient permissions.";
           throw std::runtime_error(xmsg.str());
 
         case EINVAL:
-          xmsg << "eRPC HugeAllocator: SHM allocation error: SHMMAX/SHMIN "
+          xmsg << "eRPC HugeAlloc: SHM allocation error: SHMMAX/SHMIN "
                << "mismatch. size = " << std::to_string(size) << " ("
                << std::to_string(size / MB(1)) << " MB)";
           throw std::runtime_error(xmsg.str());
@@ -127,12 +126,12 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
         case ENOMEM:
           /* Out of memory - this is OK */
           erpc_dprintf(
-              "eRPC HugeAllocator: Insufficient memory. Can't reserve %lu MB\n",
+              "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB\n",
               size / MB(1));
           return false;
 
         default:
-          xmsg << "eRPC HugeAllocator: Unexpected SHM malloc error "
+          xmsg << "eRPC HugeAlloc: Unexpected SHM malloc error "
                << strerror(errno);
           throw std::runtime_error(xmsg.str());
       }
@@ -144,7 +143,7 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
 
   uint8_t *shm_buf = (uint8_t *)shmat(shm_id, nullptr, 0);
   if (shm_buf == nullptr) {
-    xmsg << "eRPC HugeAllocator: SHM malloc error: shmat() failed for key "
+    xmsg << "eRPC HugeAlloc: SHM malloc error: shmat() failed for key "
          << std::to_string(shm_key);
     throw std::runtime_error(xmsg.str());
   }
@@ -153,7 +152,7 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   const unsigned long nodemask = (1ul << (unsigned long)numa_node);
   long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
   if (ret != 0) {
-    xmsg << "eRPC HugeAllocator: SHM malloc error. mbind() failed for key "
+    xmsg << "eRPC HugeAlloc: SHM malloc error. mbind() failed for key "
          << shm_key;
     throw std::runtime_error(xmsg.str());
   }
@@ -180,25 +179,25 @@ bool HugeAllocator::reserve_hugepages(size_t size, size_t numa_node) {
   return true;
 }
 
-void HugeAllocator::delete_shm(int shm_key, const uint8_t *shm_buf) {
+void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
   int shmid = shmget(shm_key, 0, 0);
   if (shmid == -1) {
     switch (errno) {
       case EACCES:
         fprintf(stderr,
-                "eRPC HugeAllocator: SHM free error: "
+                "eRPC HugeAlloc: SHM free error: "
                 "Insufficient permissions. SHM key = %d.\n",
                 shm_key);
         break;
       case ENOENT:
         fprintf(stderr,
-                "eRPC HugeAllocator: SHM free error: No such SHM key."
+                "eRPC HugeAlloc: SHM free error: No such SHM key."
                 "SHM key = %d.\n",
                 shm_key);
         break;
       default:
         fprintf(stderr,
-                "eRPC HugeAllocator: SHM free error: A wild SHM error: "
+                "eRPC HugeAlloc: SHM free error: A wild SHM error: "
                 "%s\n",
                 strerror(errno));
         break;
@@ -209,13 +208,13 @@ void HugeAllocator::delete_shm(int shm_key, const uint8_t *shm_buf) {
 
   int ret = shmctl(shmid, IPC_RMID, nullptr); /* Please don't fail */
   if (ret != 0) {
-    fprintf(stderr, "eRPC HugeAllocator: Error freeing SHM ID %d\n", shmid);
+    fprintf(stderr, "eRPC HugeAlloc: Error freeing SHM ID %d\n", shmid);
     exit(-1);
   }
 
   ret = shmdt((void *)shm_buf);
   if (ret != 0) {
-    fprintf(stderr, "HugeAllocator: Error freeing SHM buf %p. (SHM key = %d)\n",
+    fprintf(stderr, "HugeAlloc: Error freeing SHM buf %p. (SHM key = %d)\n",
             shm_buf, shm_key);
     exit(-1);
   }

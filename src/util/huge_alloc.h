@@ -48,7 +48,7 @@ struct shm_region_t {
  * The allocator uses randomly generated positive SHM keys, and deallocates the
  * SHM regions it creates when deleted.
  */
-class HugeAllocator {
+class HugeAlloc {
  public:
   static const size_t kMinClassSize = 64;     ///< Min allocation size
   static const size_t kMinClassBitShift = 6;  ///< For division by kMinClassSize
@@ -69,9 +69,9 @@ class HugeAllocator {
    * @brief Construct the hugepage allocator
    * @throw runtime_error if construction fails
    */
-  HugeAllocator(size_t initial_size, size_t numa_node,
-                reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func);
-  ~HugeAllocator();
+  HugeAlloc(size_t initial_size, size_t numa_node, reg_mr_func_t reg_mr_func,
+            dereg_mr_func_t dereg_mr_func);
+  ~HugeAlloc();
 
   /**
    * @brief Allocate a Buffer
@@ -87,7 +87,7 @@ class HugeAllocator {
    */
   inline Buffer alloc(size_t size) {
     if (unlikely(size > kMaxClassSize)) {
-      throw std::runtime_error("eRPC HugeAllocator: Allocation size too large");
+      throw std::runtime_error("eRPC HugeAlloc: Allocation size too large");
     }
 
     size_t size_class = get_class(size);

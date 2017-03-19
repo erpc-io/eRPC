@@ -44,7 +44,7 @@ class Transport {
    * @throw runtime_error if initialization fails. This exception is caught
    * in the parent Rpc, which then deletes \p huge_alloc so we don't need to.
    */
-  void init_hugepage_structures(HugeAllocator* huge_alloc, uint8_t** rx_ring);
+  void init_hugepage_structures(HugeAlloc* huge_alloc, uint8_t** rx_ring);
 
   /// Initialize the memory registration and deregistratin functions
   void init_mem_reg_funcs();
@@ -104,8 +104,8 @@ class Transport {
   dereg_mr_func_t dereg_mr_func;  ///< The memory deregistration function
 
   // Members initialized after the hugepage allocator is provided
-  HugeAllocator* huge_alloc;  ///< The parent Rpc's hugepage allocator
-  size_t numa_node;           ///< Derived from \p huge_alloc
+  HugeAlloc* huge_alloc;  ///< The parent Rpc's hugepage allocator
+  size_t numa_node;       ///< Derived from \p huge_alloc
 };
 
 }  // End ERpc

@@ -55,9 +55,8 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
    */
   transport = new TTr(app_tid, phy_port);
 
-  huge_alloc =
-      new HugeAllocator(kInitialHugeAllocSize, numa_node,
-                        transport->reg_mr_func, transport->dereg_mr_func);
+  huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
+                             transport->reg_mr_func, transport->dereg_mr_func);
 
   try {
     /* Complete transport initialization using the hugepage allocator */

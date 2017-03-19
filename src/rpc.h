@@ -23,8 +23,8 @@ class Rpc {
  public:
   /// Max request or response size, excluding packet headers
   static constexpr size_t kMaxMsgSize =
-      HugeAllocator::kMaxClassSize -
-      ((HugeAllocator::kMaxClassSize / TTr::kMaxDataPerPkt) * sizeof(pkthdr_t));
+      HugeAlloc::kMaxClassSize -
+      ((HugeAlloc::kMaxClassSize / TTr::kMaxDataPerPkt) * sizeof(pkthdr_t));
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 
@@ -437,8 +437,8 @@ class Rpc {
   size_t numa_node;
 
   // Others
-  TTr *transport = nullptr;             ///< The unreliable transport
-  HugeAllocator *huge_alloc = nullptr;  ///< This thread's hugepage allocator
+  TTr *transport = nullptr;         ///< The unreliable transport
+  HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
   size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available unexpe pkt slots
 
   uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
