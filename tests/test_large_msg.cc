@@ -202,9 +202,8 @@ TEST(OneLargeRpc, OneLargeRpc) {
   client_thread.join();
 }
 
-/// Test: Repeat: Multiple large Rpcs on one session, each of a different
-/// size.
-void multi_small_rpc_one_session(Nexus *nexus) {
+/// Test: Repeat: Multiple large Rpcs on one session, with random size
+void multi_large_rpc_one_session(Nexus *nexus) {
   while (!server_ready) { /* Wait for server */
     usleep(1);
   }
@@ -286,14 +285,143 @@ void multi_small_rpc_one_session(Nexus *nexus) {
   client_done = true;
 }
 
-TEST(MultiSmallRpcOneSession, MultiSmallRpcOneSession) {
+TEST(MultiLargeRpcOneSession, MultiLargeRpcOneSession) {
   Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
   server_ready = false;
   client_done = false;
 
   std::thread server_thread(server_thread_func, &nexus, kAppServerAppTid);
-  std::thread client_thread(multi_small_rpc_one_session, &nexus);
+  std::thread client_thread(multi_large_rpc_one_session, &nexus);
   server_thread.join();
+  client_thread.join();
+}
+
+/// Test: Repeat: Multiple large Rpcs on multiple sessions
+void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
+  while (!server_ready) { /* Wait for server */
+    usleep(1);
+  }
+
+  volatile app_context_t context;
+  context.is_client = true;
+
+  Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_hander,
+                       phy_port, numa_node);
+  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
+  context.rpc = &rpc;
+
+  /* Connect the sessions */
+  Session *session[num_sessions];
+  for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
+    session[sess_i] = rpc.create_session(
+        local_hostname, kAppServerAppTid + (uint8_t)sess_i, phy_port);
+  }
+
+  while (context.num_sm_connect_resps < num_sessions) {
+    rpc.run_event_loop_one();
+  }
+  ASSERT_EQ(context.num_sm_connect_resps, num_sessions);
+
+  for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
+    ASSERT_EQ(session[sess_i]->state, SessionState::kConnected);
+  }
+
+  /* Pre-create MsgBuffers so we can test reuse and resizing */
+  size_t tot_reqs_per_iter = num_sessions * Session::kSessionCredits;
+  MsgBuffer req_msgbuf[tot_reqs_per_iter];
+  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
+    req_msgbuf[req_i] = rpc.alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+    ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
+  }
+
+  for (size_t iter = 0; iter < 5; iter++) {
+    context.num_rpc_resps = 0;
+
+    for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
+      /* Enqueue as many requests as this session allows */
+      for (size_t crd_i = 0; crd_i < Session::kSessionCredits; crd_i++) {
+        size_t req_i = (sess_i * Session::kSessionCredits) + crd_i;
+        assert(req_i < tot_reqs_per_iter);
+
+        size_t req_len = pick_large_msg_size((app_context_t *)&context);
+        rpc.resize_msg_buffer(&req_msgbuf[req_i], req_len);
+
+        for (size_t j = 0; j < req_len; j++) {
+          req_msgbuf[req_i].buf[j] = 'a' + ((req_i + j) % 26);
+        }
+        req_msgbuf[req_i].buf[req_len - 1] = 0;
+
+        test_printf("test: Sending request of length = %zu\n", req_len);
+
+        int ret =
+            rpc.send_request(session[sess_i], kAppReqType, &req_msgbuf[req_i]);
+        if (ret != 0) {
+          test_printf("test: send_request error %s\n",
+                      rpc.rpc_datapath_err_code_str(ret).c_str());
+        }
+        ASSERT_EQ(ret, 0);
+      }
+
+      /* Try to enqueue one more request - this should fail */
+      int ret = rpc.send_request(session[sess_i], kAppReqType, &req_msgbuf[0]);
+      ASSERT_NE(ret, 0);
+    }
+
+    /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
+    uint64_t cycles_start = rdtsc();
+    while (context.num_rpc_resps != tot_reqs_per_iter) {
+      rpc.run_event_loop_timeout(kAppEventLoopMs);
+
+      double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
+      if (ms_elapsed > kAppMaxEventLoopMs) {
+        break;
+      }
+    }
+    ASSERT_EQ(context.num_rpc_resps, tot_reqs_per_iter);
+  }
+
+  /* Free the request MsgBuffers */
+  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
+    rpc.free_msg_buffer(req_msgbuf[req_i]);
+  }
+
+  /* Disconnect the sessions */
+  for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
+    rpc.destroy_session(session[sess_i]);
+  }
+
+  rpc.run_event_loop_timeout(kAppEventLoopMs);
+
+  client_done = true;
+}
+
+TEST(MultiLargeRpcMultiSession, MultiLargeRpcMultiSession) {
+  Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
+  server_ready = false;
+  client_done = false;
+
+  /* Use enough sessions to exceed the Rpc's unexpected window */
+  size_t num_sessions =
+      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
+
+  test_printf("test: Using %zu sessions\n", num_sessions);
+
+  std::thread server_thread[num_sessions];
+
+  /* Launch one server Rpc thread for each client session */
+  for (size_t i = 0; i < num_sessions; i++) {
+    server_thread[i] =
+        std::thread(server_thread_func, &nexus, kAppServerAppTid + i);
+  }
+
+  std::thread client_thread(multi_large_rpc_multi_session, &nexus,
+                            num_sessions);
+
+  for (size_t i = 0; i < num_sessions; i++) {
+    server_thread[i].join();
+  }
+
   client_thread.join();
 }
 
