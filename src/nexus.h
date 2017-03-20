@@ -31,14 +31,13 @@ class Nexus {
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
  public:
   /**
-   * @brief Nexus creation API for UDP packet loss testing. Creates the
-   * one-per-process Nexus object.
+   * @brief Create the one-per-process Nexus object.
    *
    * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
-   * listen for session management packets.
+   * listen for session management packets
    *
    * @param num_bg_threads The number of background RPC request processing
-   * threads to launch.
+   * threads to launch
    *
    * @param udp_drop_prob The probability that a session management packet
    * will be dropped. This is useful for testing session management packet

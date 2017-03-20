@@ -49,7 +49,13 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
 
 Nexus::~Nexus() {
   erpc_dprintf_noargs("eRPC Nexus: Destroying Nexus.\n");
-  close(sm_sock_fd);
+
+  /* Close the socket file descriptor */
+  int ret = close(sm_sock_fd);
+  if (ret != 0) {
+    erpc_dprintf_noargs(
+        "eRPC Nexus: Failed to close session management socket. Ignoring.\n");
+  }
 }
 
 bool Nexus::app_tid_exists(uint8_t app_tid) {
