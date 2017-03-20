@@ -76,7 +76,7 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
 }
 
 TEST(test_build, test_build) {
-  Nexus nexus(NEXUS_UDP_PORT);
+  Nexus nexus(NEXUS_UDP_PORT, 0, 0.0); /* 0 background threads */
 
   /* Launch the server thread */
   std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);

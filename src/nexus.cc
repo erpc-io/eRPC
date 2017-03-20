@@ -14,13 +14,13 @@
 
 namespace ERpc {
 
-Nexus::Nexus(uint16_t mgmt_udp_port) : Nexus(mgmt_udp_port, 0.0) {}
-
-Nexus::Nexus(uint16_t mgmt_udp_port, double udp_drop_prob)
+Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
+             double udp_drop_prob)
     : udp_config(mgmt_udp_port, udp_drop_prob),
       freq_ghz(get_freq_ghz()),
-      hostname(get_hostname()) {
-  /* Print configuration messages if verbose printing or checking is enabled */
+      hostname(get_hostname()),
+      num_bg_threads(num_bg_threads) {
+  // Print warning messages if low-performance debug settings are enabled
   if (kDatapathVerbose) {
     fprintf(stderr,
             "eRPC Nexus: Datapath verbose enabled. Performance will be low.\n");
@@ -29,6 +29,14 @@ Nexus::Nexus(uint16_t mgmt_udp_port, double udp_drop_prob)
   if (kDatapathChecks) {
     fprintf(stderr,
             "eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
+  }
+
+  if (num_bg_threads > kMaxBgThreads) {
+    throw std::runtime_error("eRPC Nexus: Too many background threads.");
+  }
+
+  if (udp_drop_prob > kMaxUdpDropProb) {
+    throw std::runtime_error("eRPC Nexus: UDP drop probability too high.");
   }
 
   nexus_object = this;

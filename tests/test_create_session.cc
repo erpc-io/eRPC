@@ -84,7 +84,7 @@ void simple_connect(Nexus *nexus) {
 }
 
 TEST(SuccessfulConnect, SuccessfulConnect) {
-  Nexus nexus(NEXUS_UDP_PORT, .8);
+  Nexus nexus(NEXUS_UDP_PORT, 0, 0.0); /* 0 background threads */
   server_count = 0;
 
   std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
@@ -117,7 +117,7 @@ void invalid_remote_port(Nexus *nexus) {
 }
 
 TEST(InvalidRemotePort, InvalidRemotePort) {
-  Nexus nexus(NEXUS_UDP_PORT, .8);
+  Nexus nexus(NEXUS_UDP_PORT, 0, .8); /* 0 background threads */
   server_count = 0;
 
   std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);

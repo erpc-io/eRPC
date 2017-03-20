@@ -99,7 +99,7 @@ void simple_disconnect(Nexus *nexus) {
 }
 
 TEST(SimpleDisconnect, SimpleDisconnect) {
-  Nexus nexus(NEXUS_UDP_PORT, .8);
+  Nexus nexus(NEXUS_UDP_PORT, 0, 0.8); /* 0 background threads */
   server_ready = false;
   client_done = false;
 
@@ -147,7 +147,7 @@ void disconnect_multi(Nexus *nexus) {
 }
 
 TEST(DisconnectMulti, DisconnectMulti) {
-  Nexus nexus(NEXUS_UDP_PORT, .8);
+  Nexus nexus(NEXUS_UDP_PORT, 0, .8); /* 0 background threads */
   server_ready = false;
   client_done = false;
 
@@ -191,7 +191,7 @@ void disconnect_remote_error(Nexus *nexus) {
 }
 
 TEST(DisconnectRemoteError, DisconnectRemoteError) {
-  Nexus nexus(NEXUS_UDP_PORT, .8);
+  Nexus nexus(NEXUS_UDP_PORT, 0, .8); /* 0 background threads */
   server_ready = false;
   client_done = false;
 
@@ -238,7 +238,7 @@ void disconnect_local_error(Nexus *nexus) {
 }
 
 TEST(DisconnectLocalError, DisconnectLocalError) {
-  Nexus nexus(NEXUS_UDP_PORT, .8);
+  Nexus nexus(NEXUS_UDP_PORT, 0, 0.8); /* 0 background threads */
   server_ready = false;
   client_done = false;
 

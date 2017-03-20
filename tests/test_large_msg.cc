@@ -139,7 +139,7 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
 void launch_server_and_client_threads(size_t num_sessions,
                                       void (*client_thread_func)(Nexus *,
                                                                  size_t)) {
-  Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
+  Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
   server_ready = false;
   client_done = false;
 

@@ -153,7 +153,7 @@ void one_small_rpc(Nexus *nexus) {
 }
 
 TEST(OneSmallRpc, OneSmallRpc) {
-  Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
+  Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
   server_ready = false;
   client_done = false;
 
@@ -239,7 +239,7 @@ void multi_small_rpc_one_session(Nexus *nexus) {
 }
 
 TEST(MultiSmallRpcOneSession, MultiSmallRpcOneSession) {
-  Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
+  Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
   server_ready = false;
   client_done = false;
 
@@ -343,7 +343,7 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 }
 
 TEST(MultiSmallRpcMultiSession, MultiSmallRpcMultiSession) {
-  Nexus nexus(kAppNexusUdpPort, kAppNexusPktDropProb);
+  Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
   server_ready = false;
   client_done = false;
 

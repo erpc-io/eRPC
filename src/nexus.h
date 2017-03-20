@@ -27,18 +27,9 @@ struct nexus_hook_t {
 };
 
 class Nexus {
+  static constexpr size_t kMaxBgThreads = 8;  ///< Maximum background threads
+  static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
  public:
-  /**
-   * @brief The Nexus creation API exposed to the user. Creates the
-   * one-per-process Nexus object. This sets @udp_drop_prob = 0.0.
-   *
-   * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
-   * listen for session management packets.
-   *
-   * @throw runtime_error if Nexus creation fails.
-   */
-  Nexus(uint16_t mgmt_udp_port);
-
   /**
    * @brief Nexus creation API for UDP packet loss testing. Creates the
    * one-per-process Nexus object.
@@ -46,13 +37,17 @@ class Nexus {
    * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
    * listen for session management packets.
    *
+   * @param num_bg_threads The number of background RPC request processing
+   * threads to launch.
+   *
    * @param udp_drop_prob The probability that a session management packet
    * will be dropped. This is useful for testing session management packet
    * retransmission.
    *
    * @throw runtime_error if Nexus creation fails.
    */
-  Nexus(uint16_t mgmt_udp_port, double udp_drop_prob);
+  Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads = 0,
+        double udp_drop_prob = 0.0);
 
   ~Nexus();
 
