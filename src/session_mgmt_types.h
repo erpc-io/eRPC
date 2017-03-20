@@ -300,18 +300,6 @@ class SessionMgmtPkt {
 static_assert(sizeof(SessionMgmtPkt) < 1400,
               "Session management packet too large for UDP");
 
-/// A hook created by the per-thread Rpc, and shared with the per-process Nexus.
-/// All accesses must be done with @session_mgmt_mutex locked.
-class SessionMgmtHook {
- public:
-  uint8_t app_tid; /* App-level thread ID of the RPC that created this hook */
-  std::mutex session_mgmt_mutex;
-  volatile size_t session_mgmt_ev_counter; /* Number of session mgmt events */
-  std::vector<SessionMgmtPkt *> session_mgmt_pkt_list;
-
-  SessionMgmtHook() : session_mgmt_ev_counter(0) {}
-};
-
 }  // End ERpc
 
 #endif  // ERPC_SESSION_MGMT_PKT_TYPE_H

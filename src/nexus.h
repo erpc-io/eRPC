@@ -9,9 +9,22 @@
 
 #include "common.h"
 #include "session.h"
+#include "session_mgmt_types.h"
 using namespace std;
 
 namespace ERpc {
+
+/// A hook created by the per-thread Rpc, and shared with the per-process Nexus.
+/// All accesses to this hook must be done with @session_mgmt_mutex locked.
+struct nexus_hook_t {
+  uint8_t app_tid;  ///< App TID of the RPC that created this hook
+  std::mutex _lock;
+  volatile size_t session_mgmt_pkt_counter;  ///< Number of session mgmt events
+  std::vector<SessionMgmtPkt *> session_mgmt_pkt_list;  ///< List of mgmt pkts
+
+  void lock() { _lock.lock(); }
+  void unlock() { _lock.unlock(); }
+};
 
 class Nexus {
  public:
@@ -44,19 +57,16 @@ class Nexus {
   ~Nexus();
 
   /**
-   * @brief Check if a hook with app TID = \p app_tid exists in this Nexus.
-   * If \p app_tid is derived from a hook, this function also checks if that
-   * hook is already registered.
-   *
-   * The caller must not hold the Nexus lock before calling this.
+   * @brief Check if a hook with app TID = \p app_tid exists in this Nexus. The
+   * caller must not hold the Nexus lock before calling this.
    */
   bool app_tid_exists(uint8_t app_tid);
 
-  /// Register a previously unregistered hook.
-  void register_hook(SessionMgmtHook *hook);
+  /// Register a previously unregistered session management hook
+  void register_hook(nexus_hook_t *hook);
 
-  /// Unregister a previously registered hook.
-  void unregister_hook(SessionMgmtHook *hook);
+  /// Unregister a previously registered session management hook
+  void unregister_hook(nexus_hook_t *hook);
 
   void install_sigio_handler();
   void session_mgnt_handler();
@@ -77,16 +87,15 @@ class Nexus {
   // The Nexus object is shared among all Rpc objects, so we need to avoid
   // false sharing. Read-only members go first; other members come after
   // a cache line padding.
-  char hostname[kMaxHostnameLen]; /* The local host's network hostname */
-  double freq_ghz;
+  char hostname[kMaxHostnameLen];  ///< The local host's network hostname
+  double freq_ghz;                 ///< Rdtsc frequncy
   const udp_config_t udp_config;
-  int nexus_sock_fd; /* The file descriptor of the UDP socket */
+  int nexus_sock_fd;  ///< File descriptor of the UDP socket
 
   uint8_t pad[64];
-  std::mutex nexus_lock; /* Held by Rpc threads to access Nexus */
+  std::mutex nexus_lock;  ///< Lock for concurrently access to r/w Nexus members
 
-  /* Hooks into session management objects registered by RPC objects */
-  std::vector<SessionMgmtHook *> reg_hooks;
+  std::vector<nexus_hook_t *> reg_hooks;  ///< Hooks registered by Rpcs
 
  private:
   /// Compute the frequency of rdtsc and set @freq_ghz

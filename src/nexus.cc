@@ -56,7 +56,7 @@ bool Nexus::app_tid_exists(uint8_t app_tid) {
   nexus_lock.lock();
   bool found = false;
 
-  for (SessionMgmtHook *reg_hook : reg_hooks) {
+  for (nexus_hook_t *reg_hook : reg_hooks) {
     if (reg_hook->app_tid == app_tid) {
       found = true;
     }
@@ -66,18 +66,16 @@ bool Nexus::app_tid_exists(uint8_t app_tid) {
   return found;
 }
 
-void Nexus::register_hook(SessionMgmtHook *hook) {
+void Nexus::register_hook(nexus_hook_t *hook) {
   assert(hook != nullptr);
   assert(!app_tid_exists(hook->app_tid));
 
   nexus_lock.lock();
-
   reg_hooks.push_back(hook);
-
   nexus_lock.unlock();
 }
 
-void Nexus::unregister_hook(SessionMgmtHook *hook) {
+void Nexus::unregister_hook(nexus_hook_t *hook) {
   assert(hook != nullptr);
   assert(app_tid_exists(hook->app_tid));
 
@@ -201,8 +199,8 @@ void Nexus::session_mgnt_handler() {
   }
 
   /* Find the registered Rpc that has this TID */
-  SessionMgmtHook *target_hook = nullptr;
-  for (SessionMgmtHook *hook : reg_hooks) {
+  nexus_hook_t *target_hook = nullptr;
+  for (nexus_hook_t *hook : reg_hooks) {
     if (hook->app_tid == target_app_tid) {
       target_hook = hook;
     }
@@ -233,13 +231,13 @@ void Nexus::session_mgnt_handler() {
   }
 
   /* Add the packet to the target Rpc's session management packet list */
-  target_hook->session_mgmt_mutex.lock();
+  target_hook->lock();
 
   target_hook->session_mgmt_pkt_list.push_back(sm_pkt);
   ERpc::memory_barrier();
-  target_hook->session_mgmt_ev_counter++;
+  target_hook->session_mgmt_pkt_counter++;
 
-  target_hook->session_mgmt_mutex.unlock();
+  target_hook->unlock();
   nexus_lock.unlock();
 }
 

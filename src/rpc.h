@@ -219,7 +219,7 @@ class Rpc {
     dpath_stat_inc(&dpath_stats.ev_loop_calls);
 
     /* Handle session management events, if any */
-    if (unlikely(sm_hook.session_mgmt_ev_counter > 0)) {
+    if (unlikely(nexus_hook.session_mgmt_pkt_counter > 0)) {
       handle_session_management(); /* Callee grabs the hook lock */
     }
 
@@ -473,7 +473,7 @@ class Rpc {
   /// Rx batch information for \p rx_burst
   MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];
 
-  SessionMgmtHook sm_hook; /* Shared with Nexus for session management */
+  nexus_hook_t nexus_hook; /* A hook shared with the Nexus */
   SlowRand slow_rand;
 
   // Stats
