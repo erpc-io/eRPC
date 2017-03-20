@@ -8,19 +8,15 @@ void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot) {
 
   MsgBuffer *resp_msgbuf;
   app_resp_t &app_resp = sslot.app_resp;
-  size_t resp_size = app_resp.resp_size;
-  assert(resp_size > 0);
 
   if (small_msg_likely(app_resp.prealloc_used)) {
-    /* Small response to small request */
-    assert(resp_size <= TTr::kMaxDataPerPkt);
     resp_msgbuf = &app_resp.pre_resp_msgbuf;
-    resp_msgbuf->resize(resp_size, 1);
-    app_resp.pre_resp_msgbuf.resize(resp_size, 1);
   } else {
     resp_msgbuf = &app_resp.dyn_resp_msgbuf;
-    assert(resp_msgbuf->data_size == resp_size);
   }
+
+  size_t resp_size = resp_msgbuf->data_size;
+  assert(resp_size > 0);
 
   // Step 1: Fill in packet 0's header
   pkthdr_t *pkthdr_0 = resp_msgbuf->get_pkthdr_0();

@@ -44,8 +44,9 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
 
   test_printf("Server: Received request %s\n", req_msgbuf->buf);
 
+  size_t resp_size = strlen((char *)req_msgbuf->buf);
+  Rpc<IBTransport>::resize_msg_buffer(&app_resp->pre_resp_msgbuf, resp_size);
   strcpy((char *)app_resp->pre_resp_msgbuf.buf, (char *)req_msgbuf->buf);
-  app_resp->resp_size = strlen((char *)req_msgbuf->buf);
   app_resp->prealloc_used = true;
 }
 

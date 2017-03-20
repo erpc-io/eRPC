@@ -129,7 +129,8 @@ class Rpc {
   }
 
   /// Resize a MsgBuffer. This does not modify any headers.
-  inline void resize_msg_buffer(MsgBuffer *msg_buffer, size_t new_data_size) {
+  static inline void resize_msg_buffer(MsgBuffer *msg_buffer,
+                                       size_t new_data_size) {
     assert(msg_buffer != nullptr);
     assert(msg_buffer->buf != nullptr && msg_buffer->check_magic());
     assert(new_data_size < msg_buffer->max_data_size);

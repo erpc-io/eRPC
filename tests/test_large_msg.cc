@@ -65,13 +65,11 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
   test_printf("Server: Received request of length %zu\n", req_size);
 
   app_resp->prealloc_used = false;
-  app_resp->resp_size = req_size;
   app_resp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
   ASSERT_NE(app_resp->dyn_resp_msgbuf.buf, nullptr);
 
   memcpy((char *)app_resp->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
          req_size);
-  app_resp->resp_size = req_size;
 }
 
 /// The common response handler for all subtests. This checks that the request

@@ -43,8 +43,18 @@ class Session {
    */
   struct sslot_t {
     // Fields that are meaningful for both server and client mode sessions
-    uint8_t req_type;      ///< The eRPC request type
-    size_t req_num;        ///< The eRPC request number
+
+    /*
+     * It might be possible to figure out req_type and req_num using either of
+     * rx_msgbuf or tx_msgbuf, but it gets pretty complex.
+     *
+     * Also, keeping req_type and req_num separately allows cleaner separation.
+     * Example: enqueue_request() and enqueue_response() need not examine
+     * rx_msgbuf.
+     */
+    uint8_t req_type;  ///< The eRPC request type
+    size_t req_num;    ///< The eRPC request number
+
     MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
     MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
 
