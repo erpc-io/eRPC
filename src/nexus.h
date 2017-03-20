@@ -84,22 +84,29 @@ class Nexus {
     return ret;
   }
 
-  // The Nexus object is shared among all Rpc objects, so we need to avoid
-  // false sharing. Read-only members go first; other members come after
-  // a cache line padding.
-  char hostname[kMaxHostnameLen];  ///< The local host's network hostname
-  double freq_ghz;                 ///< Rdtsc frequncy
-  const udp_config_t udp_config;
-  int nexus_sock_fd;  ///< File descriptor of the UDP socket
+  /// Read-mostly members exposed to Rpc threads
+  const udp_config_t udp_config;  ///< UDP port and packet drop probability
+  const double freq_ghz;          ///< Rdtsc frequncy
+  const std::string hostname;     ///< The local host
 
-  uint8_t pad[64];
-  std::mutex nexus_lock;  ///< Lock for concurrently access to r/w Nexus members
+  /// Number of background threads that process RPC requests. This can only
+  /// increase over time.
+  volatile size_t num_bg_threads;
 
+  const uint8_t pad[64] = {0};
+
+  /// Read-write members exposed to Rpc threads
+  std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
   std::vector<nexus_hook_t *> reg_hooks;  ///< Hooks registered by Rpcs
 
  private:
-  /// Compute the frequency of rdtsc and set @freq_ghz
-  void compute_freq_ghz();
+  int sm_sock_fd;  ///< File descriptor of the session management UDP socket
+
+  /// Return the frequency of rdtsc in GHz
+  static double get_freq_ghz();
+
+  /// Return the hostname of this machine
+  static std::string get_hostname();
 };
 
 static Nexus *nexus_object; /* The one per-process Nexus object */

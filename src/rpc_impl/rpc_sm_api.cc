@@ -35,7 +35,8 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
   }
 
   /* Creating a session to one's own Rpc as the client is not allowed */
-  if (strcmp(rem_hostname, nexus->hostname) == 0 && rem_app_tid == app_tid) {
+  if (strcmp(rem_hostname, nexus->hostname.c_str()) == 0 &&
+      rem_app_tid == app_tid) {
     erpc_dprintf("%s: Remote Rpc is same as local.\n", issue_msg);
     return nullptr;
   }
@@ -97,7 +98,7 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
   SessionEndpoint &client_endpoint = session->client;
 
   client_endpoint.transport_type = transport->transport_type;
-  strcpy((char *)client_endpoint.hostname, nexus->hostname);
+  strcpy((char *)client_endpoint.hostname, nexus->hostname.c_str());
   client_endpoint.phy_port = phy_port;
   client_endpoint.app_tid = app_tid;
   client_endpoint.session_num = session_vec.size();

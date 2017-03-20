@@ -18,7 +18,7 @@ void Rpc<TTr>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
 
   /* Ensure that server fields known by the client were filled correctly */
   assert(sm_pkt->server.app_tid == app_tid);
-  assert(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0);
+  assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
 
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];

@@ -17,7 +17,9 @@ namespace ERpc {
 Nexus::Nexus(uint16_t mgmt_udp_port) : Nexus(mgmt_udp_port, 0.0) {}
 
 Nexus::Nexus(uint16_t mgmt_udp_port, double udp_drop_prob)
-    : udp_config(mgmt_udp_port, udp_drop_prob) {
+    : udp_config(mgmt_udp_port, udp_drop_prob),
+      freq_ghz(get_freq_ghz()),
+      hostname(get_hostname()) {
   /* Print configuration messages if verbose printing or checking is enabled */
   if (kDatapathVerbose) {
     fprintf(stderr,
@@ -29,27 +31,17 @@ Nexus::Nexus(uint16_t mgmt_udp_port, double udp_drop_prob)
             "eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
   }
 
-  /* Get the local hostname */
-  int ret = get_hostname(hostname);
-  if (ret == -1) {
-    erpc_dprintf("eRPC Nexus: gethostname failed. Error = %s.\n",
-                 strerror(errno));
-    throw std::runtime_error("eRPC Nexus: gethostname failed");
-    return;
-  }
-
   nexus_object = this;
 
-  compute_freq_ghz();
   install_sigio_handler();
 
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
-               mgmt_udp_port, hostname);
+               mgmt_udp_port, hostname.c_str());
 }
 
 Nexus::~Nexus() {
   erpc_dprintf_noargs("eRPC Nexus: Destroying Nexus.\n");
-  close(nexus_sock_fd);
+  close(sm_sock_fd);
 }
 
 bool Nexus::app_tid_exists(uint8_t app_tid) {
@@ -96,10 +88,10 @@ void Nexus::install_sigio_handler() {
    * AF_INET = IPv4, SOCK_DGRAM = datagrams, IPPROTO_UDP = datagrams over UDP.
    * Returns a file descriptor.
    */
-  nexus_sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if (nexus_sock_fd < 0) {
-    perror("Error opening datagram socket");
-    exit(1);
+  sm_sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (sm_sock_fd < 0) {
+    erpc_dprintf_noargs("eRPC Nexus: FATAL. Error opening datagram socket.\n");
+    throw std::runtime_error("eRPC Nexus: Error opening datagram socket.");
   }
 
   /*
@@ -112,16 +104,16 @@ void Nexus::install_sigio_handler() {
   server.sin_addr.s_addr = INADDR_ANY;
   server.sin_port = htons((uint16_t)udp_config.mgmt_udp_port);
 
-  if (bind(nexus_sock_fd, (struct sockaddr *)&server,
-           sizeof(struct sockaddr_in)) < 0) {
-    perror("Error binding datagram socket");
-    exit(1);
+  if (bind(sm_sock_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in)) <
+      0) {
+    erpc_dprintf_noargs("eRPC Nexus: FATAL. Error binding datagram socket.\n");
+    throw std::runtime_error("eRPC Nexus: Error binding datagram socket.");
   }
 
   /* Set file flags. Allow receipt of asynchronous I/O signals */
-  if (fcntl(nexus_sock_fd, F_SETFL, O_ASYNC | O_NONBLOCK) < 0) {
-    perror("Error: fcntl F_SETFL, FASYNC");
-    exit(1);
+  if (fcntl(sm_sock_fd, F_SETFL, O_ASYNC | O_NONBLOCK) < 0) {
+    erpc_dprintf_noargs("eRPC Nexus: FATAL. Ascync fnctl() failed.\n");
+    throw std::runtime_error("eRPC Nexus: Async fnctl() failed.");
   }
 
   /* Ensure that only the thread that creates the Nexus receives SIGIO */
@@ -129,9 +121,9 @@ void Nexus::install_sigio_handler() {
   owner_thread.type = F_OWNER_TID;
   owner_thread.pid = (int)syscall(SYS_gettid);
 
-  if (fcntl(nexus_sock_fd, F_SETOWN_EX, &owner_thread) < 0) {
-    perror("Error: fcntl F_SETOWN_EX");
-    exit(1);
+  if (fcntl(sm_sock_fd, F_SETOWN_EX, &owner_thread) < 0) {
+    erpc_dprintf_noargs("eRPC Nexus: FATAL. Setown fnctl() failed.\n");
+    throw std::runtime_error("eRPC Nexus: Setown fnctl() failed.");
   }
 
   /*
@@ -145,8 +137,8 @@ void Nexus::install_sigio_handler() {
   memset((void *)&act, 0, sizeof(act));
   act.sa_handler = &sigio_handler;
   if (sigaction(SIGIO, &act, nullptr) < 0) { /* Old signal handler is NULL */
-    perror("sigaction");
-    exit(-1);
+    erpc_dprintf_noargs("eRPC Nexus: FATAL. sigaction() failed.\n");
+    throw std::runtime_error("eRPC Nexus: sigaction() failed.");
   }
 }
 
@@ -161,7 +153,7 @@ void Nexus::session_mgnt_handler() {
 
   /* Receive a packet from the socket. We're guaranteed to get exactly one. */
   ssize_t recv_bytes =
-      recvfrom(nexus_sock_fd, (void *)sm_pkt, sizeof(*sm_pkt), flags,
+      recvfrom(sm_sock_fd, (void *)sm_pkt, sizeof(*sm_pkt), flags,
                (struct sockaddr *)&their_addr, &addr_len);
   if (recv_bytes != (ssize_t)sizeof(*sm_pkt)) {
     erpc_dprintf(
@@ -241,7 +233,7 @@ void Nexus::session_mgnt_handler() {
   nexus_lock.unlock();
 }
 
-void Nexus::compute_freq_ghz() {
+double Nexus::get_freq_ghz() {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
   uint64_t rdtsc_start = rdtsc();
@@ -266,14 +258,30 @@ void Nexus::compute_freq_ghz() {
                       (uint64_t)(end.tv_nsec - start.tv_nsec);
   uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
 
-  freq_ghz = rdtsc_cycles / clock_ns;
+  double _freq_ghz = rdtsc_cycles / clock_ns;
 
-  if (freq_ghz < 1.0 || freq_ghz > 4.0) {
+  /* Less than 500 MHz and greater than 5.0 GHz is abnormal */
+  if (_freq_ghz < 0.5 || _freq_ghz > 5.0) {
     erpc_dprintf("eRPC Nexus: FATAL. Abnormal CPU frequency %.4f GHz\n",
-                 freq_ghz);
-    assert(false);
-    exit(-1);
+                 _freq_ghz);
+    throw std::runtime_error("eRPC Nexus: get_freq_ghz() failed.");
   }
+
+  return _freq_ghz;
+}
+
+std::string Nexus::get_hostname() {
+  char _hostname[kMaxHostnameLen];
+
+  /* Get the local hostname */
+  int ret = get_hostname(_hostname);
+  if (ret == -1) {
+    erpc_dprintf("eRPC Nexus: FATAL. gethostname failed. Error = %s.\n",
+                 strerror(errno));
+    throw std::runtime_error("eRPC Nexus: get_hostname() failed.");
+  }
+
+  return std::string(_hostname);
 }
 
 }  // End ERpc

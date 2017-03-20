@@ -132,10 +132,10 @@ void Rpc<TTr>::handle_session_management() {
   for (SessionMgmtPkt *sm_pkt : nexus_hook.session_mgmt_pkt_list) {
     /* The sender of a packet cannot be this Rpc */
     if (session_mgmt_pkt_type_is_req(sm_pkt->pkt_type)) {
-      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname) == 0 &&
+      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname.c_str()) == 0 &&
                sm_pkt->client.app_tid == app_tid));
     } else {
-      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0 &&
+      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0 &&
                sm_pkt->server.app_tid == app_tid));
     }
 

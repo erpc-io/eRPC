@@ -17,7 +17,7 @@ void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
 
   /* Ensure that server fields known by the client were filled correctly */
-  assert(strcmp(sm_pkt->server.hostname, nexus->hostname) == 0);
+  assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
   assert(sm_pkt->server.app_tid == app_tid);
   assert(sm_pkt->server.secret == sm_pkt->client.secret);
 
