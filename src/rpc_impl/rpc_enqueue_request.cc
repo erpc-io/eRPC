@@ -5,8 +5,8 @@
 namespace ERpc {
 
 template <class TTr>
-int Rpc<TTr>::send_request(Session *session, uint8_t req_type,
-                           MsgBuffer *req_msgbuf) {
+int Rpc<TTr>::enqueue_request(Session *session, uint8_t req_type,
+                              MsgBuffer *req_msgbuf) {
   if (!kDatapathChecks) {
     assert(session != nullptr && session->is_client());
     assert(session->is_connected());

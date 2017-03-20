@@ -36,6 +36,8 @@
    * We must ensure that a small response message packet or a credit return
      packet is never delayed by TX queueing (even by congestion control--related
      TX queueing) or we'll mess up RTT measurement.
+   * Credit return packets will need the packet number field so that the
+     receiver can match RTT.
 
 ## Longer-term TODOs
  * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,

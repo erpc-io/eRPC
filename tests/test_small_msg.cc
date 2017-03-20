@@ -133,9 +133,9 @@ void one_small_rpc(Nexus *nexus) {
   strcpy((char *)req_msgbuf.buf, "APP_MSG");
 
   test_printf("test: Sending request %s\n", (char *)req_msgbuf.buf);
-  int ret = rpc.send_request(session, kAppReqType, &req_msgbuf);
+  int ret = rpc.enqueue_request(session, kAppReqType, &req_msgbuf);
   if (ret != 0) {
-    test_printf("test: send_request error %s\n",
+    test_printf("test: enqueue_request error %s\n",
                 rpc.rpc_datapath_err_code_str(ret).c_str());
   }
   ASSERT_EQ(ret, 0);
@@ -209,16 +209,16 @@ void multi_small_rpc_one_session(Nexus *nexus) {
       strcpy((char *)req_msgbuf[i].buf, req_msg.c_str());
 
       test_printf("test: Sending request %s\n", (char *)req_msgbuf[i].buf);
-      int ret = rpc.send_request(session, kAppReqType, &req_msgbuf[i]);
+      int ret = rpc.enqueue_request(session, kAppReqType, &req_msgbuf[i]);
       if (ret != 0) {
-        test_printf("test: send_request error %s\n",
+        test_printf("test: enqueue_request error %s\n",
                     rpc.rpc_datapath_err_code_str(ret).c_str());
       }
       ASSERT_EQ(ret, 0);
     }
 
     /* Try to enqueue one more request - this should fail */
-    int ret = rpc.send_request(session, kAppReqType, &req_msgbuf[0]);
+    int ret = rpc.enqueue_request(session, kAppReqType, &req_msgbuf[0]);
     ASSERT_NE(ret, 0);
 
     rpc.run_event_loop_timeout(kAppEventLoopMs);
@@ -307,17 +307,18 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
         test_printf("test: Sending request %s\n",
                     (char *)req_msgbuf[req_i].buf);
 
-        int ret =
-            rpc.send_request(session[sess_i], kAppReqType, &req_msgbuf[req_i]);
+        int ret = rpc.enqueue_request(session[sess_i], kAppReqType,
+                                      &req_msgbuf[req_i]);
         if (ret != 0) {
-          test_printf("test: send_request error %s\n",
+          test_printf("test: enqueue_request error %s\n",
                       rpc.rpc_datapath_err_code_str(ret).c_str());
         }
         ASSERT_EQ(ret, 0);
       }
 
       /* Try to enqueue one more request - this should fail */
-      int ret = rpc.send_request(session[sess_i], kAppReqType, &req_msgbuf[0]);
+      int ret =
+          rpc.enqueue_request(session[sess_i], kAppReqType, &req_msgbuf[0]);
       ASSERT_NE(ret, 0);
     }
 

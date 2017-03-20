@@ -235,9 +235,9 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   req_msgbuf.buf[req_size - 1] = 0;
 
   test_printf("test: Sending request of size %zu\n", req_size);
-  int ret = rpc->send_request(session, kAppReqType, &req_msgbuf);
+  int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf);
   if (ret != 0) {
-    test_printf("test: send_request error %s\n",
+    test_printf("test: enqueue_request error %s\n",
                 rpc->rpc_datapath_err_code_str(ret).c_str());
   }
   ASSERT_EQ(ret, 0);
@@ -292,16 +292,16 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
       req_msgbuf[i].buf[req_len - 1] = 0;
 
       test_printf("test: Sending request of length = %zu\n", req_len);
-      int ret = rpc->send_request(session, kAppReqType, &req_msgbuf[i]);
+      int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[i]);
       if (ret != 0) {
-        test_printf("test: send_request error %s\n",
+        test_printf("test: enqueue_request error %s\n",
                     rpc->rpc_datapath_err_code_str(ret).c_str());
       }
       ASSERT_EQ(ret, 0);
     }
 
     /* Try to enqueue one more request - this should fail */
-    int ret = rpc->send_request(session, kAppReqType, &req_msgbuf[0]);
+    int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[0]);
     ASSERT_NE(ret, 0);
 
     client_wait_for_rpc_resps_or_timeout(nexus, context,
@@ -366,10 +366,10 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
         test_printf("test: Sending request of length = %zu\n", req_len);
 
-        int ret = rpc->send_request(session_arr[sess_i], kAppReqType,
-                                    &req_msgbuf[req_i]);
+        int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
+                                       &req_msgbuf[req_i]);
         if (ret != 0) {
-          test_printf("test: send_request error %s\n",
+          test_printf("test: enqueue_request error %s\n",
                       rpc->rpc_datapath_err_code_str(ret).c_str());
         }
         ASSERT_EQ(ret, 0);
@@ -448,10 +448,10 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
 
         test_printf("test: Sending request of length = %zu\n", req_len);
 
-        int ret = rpc->send_request(session_arr[sess_i], kAppReqType,
-                                    &req_msgbuf[req_i]);
+        int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
+                                       &req_msgbuf[req_i]);
         if (ret != 0) {
-          test_printf("test: send_request error %s\n",
+          test_printf("test: enqueue_request error %s\n",
                       rpc->rpc_datapath_err_code_str(ret).c_str());
         }
         ASSERT_EQ(ret, 0);

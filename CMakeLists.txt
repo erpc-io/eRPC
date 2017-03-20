@@ -57,8 +57,8 @@ set(SOURCES
   src/rpc.h
   src/rpc_impl/rpc.cc
   src/rpc_impl/rpc_send_cr.cc
-  src/rpc_impl/rpc_send_request.cc
-  src/rpc_impl/rpc_send_response.cc
+  src/rpc_impl/rpc_enqueue_request.cc
+  src/rpc_impl/rpc_enqueue_response.cc
   src/rpc_impl/rpc_rx.cc
   src/rpc_impl/rpc_tx.cc
   src/rpc_impl/rpc_connect_handlers.cc

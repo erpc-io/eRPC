@@ -3,7 +3,7 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::send_response(Session *session, Session::sslot_t &sslot) {
+void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot) {
   assert(session != nullptr && session->is_server());
 
   MsgBuffer *resp_msgbuf;

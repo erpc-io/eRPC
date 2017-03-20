@@ -206,10 +206,11 @@ class Rpc {
    * @param msg_buffer The user-created MsgBuffer containing the request payload
    * but not packet headers.
    *
-   * @return 0 on success, i.e., if the request was queued. An error code is
+   * @return 0 on success (i.e., if the request was queued). An error code is
    * returned if the request cannot be queued.
    */
-  int send_request(Session *session, uint8_t req_type, MsgBuffer *msg_buffer);
+  int enqueue_request(Session *session, uint8_t req_type,
+                      MsgBuffer *msg_buffer);
 
   // rpc_ev_loop.cc
 
@@ -423,9 +424,10 @@ class Rpc {
    * @param sslot The session slot whose \p tx_msgbuf contains the full response
    * payload, but not the packet headers
    */
-  void send_response(Session *session, Session::sslot_t &sslot);
+  void enqueue_response(Session *session, Session::sslot_t &sslot);
 
-  /// Send a credit return for this session now. This must now be rescheduled.
+  /// Send a credit return for this session immediately, i.e., this must not be
+  /// rescheduled.
   void send_credit_return_now(Session *session);
 
   // Constructor args

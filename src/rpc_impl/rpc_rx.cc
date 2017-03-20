@@ -126,7 +126,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
     ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
     sslot.rx_msgbuf.buf = nullptr;
 
-    send_response(session, sslot); /* Works for both small and large response */
+    enqueue_response(session, sslot); /* Works for small and large responses */
   } else {
     // Handle a single-packet response message
     assert(session->is_client());
@@ -211,6 +211,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   bool send_cr =
       (pkthdr->is_req() && !is_last) || (pkthdr->is_resp() && pkt_num != 0);
   if (send_cr) {
+    assert(tx_batch_i == 0); /* tx_batch_i is 0 outside rpc_tx.cc */
     send_credit_return_now(session);
   }
 
@@ -264,7 +265,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
     ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
     bury_sslot_dynamic_rx_msgbuf(sslot);
 
-    send_response(session, sslot); /* Works for both small and large response */
+    enqueue_response(session, sslot); /* Works for small and large responses */
   } else {
     /* Invoke the response callback, and bury the RX MsgBuffer */
     ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
