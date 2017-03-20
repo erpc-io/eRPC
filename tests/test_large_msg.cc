@@ -268,6 +268,7 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   app_context_t context;
   client_connect_sessions(nexus, context, num_sessions);
+
   Rpc<IBTransport> *rpc = context.rpc;
   Session *session = context.session_arr[0];
 
@@ -334,6 +335,7 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
   app_context_t context;
   client_connect_sessions(nexus, context, num_sessions);
+
   Rpc<IBTransport> *rpc = context.rpc;
   Session **session_arr = context.session_arr;
 
@@ -372,11 +374,6 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
         }
         ASSERT_EQ(ret, 0);
       }
-
-      /* Try to enqueue one more request - this should fail */
-      int ret =
-          rpc->send_request(session_arr[sess_i], kAppReqType, &req_msgbuf[0]);
-      ASSERT_NE(ret, 0);
     }
 
     client_wait_for_rpc_resps_or_timeout(nexus, context, tot_reqs_per_iter);
@@ -417,22 +414,22 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
   app_context_t context;
   client_connect_sessions(nexus, context, num_sessions);
+
   Rpc<IBTransport> *rpc = context.rpc;
   Session **session_arr = context.session_arr;
 
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
+  /* Run many iterations to stress memory leaks */
+  for (size_t iter = 0; iter < 50; iter++) {
+    test_printf("test: Iteration %zu\n", iter);
 
-  /* Pre-create MsgBuffers so we can test reuse and resizing */
-  size_t tot_reqs_per_iter = num_sessions * Session::kSessionCredits;
-  MsgBuffer req_msgbuf[tot_reqs_per_iter];
-  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    req_msgbuf[req_i] = rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
-    ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
-  }
+    /* Create new MsgBuffers in each iteration to stress leaks */
+    size_t tot_reqs_per_iter = num_sessions * Session::kSessionCredits;
+    MsgBuffer req_msgbuf[tot_reqs_per_iter];
+    for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
+      req_msgbuf[req_i] = rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+      ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
+    }
 
-  for (size_t iter = 0; iter < 5; iter++) {
     context.num_rpc_resps = 0;
 
     for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
@@ -459,21 +456,16 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
         }
         ASSERT_EQ(ret, 0);
       }
-
-      /* Try to enqueue one more request - this should fail */
-      int ret =
-          rpc->send_request(session_arr[sess_i], kAppReqType, &req_msgbuf[0]);
-      ASSERT_NE(ret, 0);
     }
 
     /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
     client_wait_for_rpc_resps_or_timeout(nexus, context, tot_reqs_per_iter);
     ASSERT_EQ(context.num_rpc_resps, tot_reqs_per_iter);
-  }
 
-  /* Free the request MsgBuffers */
-  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    rpc->free_msg_buffer(req_msgbuf[req_i]);
+    /* Free the request MsgBuffers */
+    for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
+      rpc->free_msg_buffer(req_msgbuf[req_i]);
+    }
   }
 
   /* Disconnect the sessions */
@@ -489,12 +481,12 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
   client_done = true;
 }
 
-TEST(MemoryLeak, MemoryLeak) {
+TEST(DISABLED_MemoryLeak, DISABLED_MemoryLeak) {
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
 
-  launch_server_and_client_threads(num_sessions, multi_large_rpc_multi_session);
+  launch_server_and_client_threads(num_sessions, memory_leak);
 }
 
 int main(int argc, char **argv) {
