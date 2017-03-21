@@ -21,6 +21,10 @@
    confusion.
 
 ## API notes
+ * MsgBuffer ownership:
+   * Request MsgBuffers are owned/allocated by apps and are never freed by eRPC.
+   * Response MsgBuffers allocated by apps, and are freed by eRPC as soon as
+     they are no longer needed for retransmission.
 
 ## Short-term TODOs
  * Ensure that credit returns can be sent inline in any transport: We don't

@@ -113,7 +113,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
 
     /*
      * Bury the possibly-dynamic response MsgBuffer (tx_msgbuf) for the
-     * previous request
+     * previous request.
      */
     bury_sslot_tx_msgbuf(sslot);
 
