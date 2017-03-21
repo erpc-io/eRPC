@@ -216,7 +216,7 @@ class Rpc {
     dpath_stat_inc(&dpath_stats.ev_loop_calls);
 
     /* Handle session management events, if any */
-    if (unlikely(nexus_hook.sm_pkt_counter > 0)) {
+    if (unlikely(nexus_hook.sm_pkt_list.size > 0)) {
       handle_session_management(); /* Callee grabs the hook lock */
     }
 

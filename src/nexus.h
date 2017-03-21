@@ -3,9 +3,6 @@
 
 #include <signal.h>
 #include <unistd.h>
-#include <mutex>
-#include <queue>
-#include <vector>
 
 #include "common.h"
 #include "session.h"
@@ -25,24 +22,17 @@ struct bg_work_item_t {
 /// All accesses to this hook must be done with @session_mgmt_mutex locked.
 class NexusHook {
  public:
-  NexusHook(uint8_t app_tid) : app_tid(app_tid) {
-    sm_pkt_counter = 0;
-    bg_resp_counter = 0;
-  }
+  NexusHook(uint8_t app_tid) : app_tid(app_tid) {}
 
   const uint8_t app_tid;  ///< App TID of the RPC that created this hook
 
-  ///@{ Session management packet list
-  std::mutex sm_pkt_list_lock;
-  volatile size_t sm_pkt_counter;
-  std::vector<SessionMgmtPkt *> sm_pkt_list;
-  ///@}
+  MtList<SessionMgmtPkt *> sm_pkt_list;   ///< Session management packet list
+  MtList<bg_work_item_t *> bg_resp_list;  ///< Background thread response list
+};
 
-  ///@{ Background thread response list
-  std::mutex bg_resp_list_lock;
-  volatile size_t bg_resp_counter;
-  std::vector<bg_work_item_t *> bg_resp_list;
-  ///@}
+/// Background thread context
+class BgThreadCtx {
+  MtList<bg_work_item_t *> bg_req_list;
 };
 
 class Nexus {
@@ -84,6 +74,10 @@ class Nexus {
   void install_sigio_handler();
   void session_mgnt_handler();
 
+  /// The function executed by background RPC-processing threads
+  static void bg_thread_func(std::vector<bg_work_item_t> &req_list,
+                             NexusHook *reg_hooks_arr);
+
   /**
    * @brief Copy the hostname of this machine to \p hostname. \p hostname must
    * have space for kMaxHostnameLen characters.
@@ -111,6 +105,7 @@ class Nexus {
 
  private:
   int sm_sock_fd;  ///< File descriptor of the session management UDP socket
+  std::thread bg_thread_arr[kMaxBgThreads];
 
   /// Return the frequency of rdtsc in GHz
   static double get_freq_ghz();

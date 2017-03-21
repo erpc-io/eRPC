@@ -127,11 +127,11 @@ void Rpc<TTr>::bury_session(Session *session) {
 
 template <class TTr>
 void Rpc<TTr>::handle_session_management() {
-  assert(nexus_hook.sm_pkt_counter > 0);
-  nexus_hook.sm_pkt_list_lock.lock();
+  assert(nexus_hook.sm_pkt_list.size > 0);
+  nexus_hook.sm_pkt_list.lock();
 
   /* Handle all session management requests */
-  for (SessionMgmtPkt *sm_pkt : nexus_hook.sm_pkt_list) {
+  for (SessionMgmtPkt *sm_pkt : nexus_hook.sm_pkt_list.list) {
     /* The sender of a packet cannot be this Rpc */
     if (session_mgmt_pkt_type_is_req(sm_pkt->pkt_type)) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname.c_str()) == 0 &&
@@ -164,9 +164,9 @@ void Rpc<TTr>::handle_session_management() {
   }
 
   /* Clear the session management packet list */
-  nexus_hook.sm_pkt_counter = 0;
-  nexus_hook.sm_pkt_list.clear();
-  nexus_hook.sm_pkt_list_lock.unlock();
+  nexus_hook.sm_pkt_list.size = 0;
+  nexus_hook.sm_pkt_list.list.clear();
+  nexus_hook.sm_pkt_list.unlock();
 }
 
 }  // End ERpc

@@ -225,13 +225,13 @@ void Nexus::session_mgnt_handler() {
   }
 
   /* Add the packet to the target Rpc's session management packet list */
-  target_hook->sm_pkt_list_lock.lock();
+  target_hook->sm_pkt_list.lock();
 
-  target_hook->sm_pkt_list.push_back(sm_pkt);
+  target_hook->sm_pkt_list.list.push_back(sm_pkt);
   ERpc::memory_barrier();
-  target_hook->sm_pkt_counter++;
+  target_hook->sm_pkt_list.size++;
 
-  target_hook->sm_pkt_list_lock.unlock();
+  target_hook->sm_pkt_list.unlock();
   nexus_lock.unlock();
 }
 
