@@ -131,12 +131,20 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
  * @param num_sessions The number of sessions needed by the client thread,
  * equal to the number of server threads launched
  *
+ * @param num_bg_threads The number of background threads in the Nexus. If
+ * this is non-zero, the request handler is executed in a background thread.
+ *
  * @param client_thread_func The function executed by the client threads
  */
 void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
                                   void (*client_thread_func)(Nexus *, size_t)) {
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
-  nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
+  if (num_bg_threads == 0) {
+    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+  } else {
+    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler, true));
+  }
 
   server_ready = false;
   client_done = false;
