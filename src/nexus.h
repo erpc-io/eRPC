@@ -28,15 +28,23 @@ class NexusHook {
 
   MtList<SessionMgmtPkt *> sm_pkt_list;   ///< Session management packet list
   MtList<bg_work_item_t *> bg_resp_list;  ///< Background thread response list
+
+  /// List of background thread request submission list, filled in by the Nexus
+  MtList<bg_work_item_t *> *bg_req_list_arr[kMaxBgThreads];
 };
 
 /// Background thread context
 class BgThreadCtx {
-  MtList<bg_work_item_t *> bg_req_list;
+ public:
+  /// A switch used by the Nexus to turn off background threads
+  volatile bool *bg_kill_switch;
+
+  size_t bg_thread_id;                   ///< ID of the background thread
+  MtList<bg_work_item_t *> bg_req_list;  ///< The list to submit requests to
+  NexusHook **reg_hooks_arr;
 };
 
 class Nexus {
-  static constexpr size_t kMaxBgThreads = 8;  ///< Maximum background threads
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
  public:
   /**
@@ -75,8 +83,12 @@ class Nexus {
   void session_mgnt_handler();
 
   /// The function executed by background RPC-processing threads
-  static void bg_thread_func(std::vector<bg_work_item_t> &req_list,
-                             NexusHook *reg_hooks_arr);
+  static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
+    volatile bool *bg_kill_switch = bg_thread_ctx->bg_kill_switch;
+    while (*bg_kill_switch != true) {
+      usleep(200000);
+    }
+  }
 
   /**
    * @brief Copy the hostname of this machine to \p hostname. \p hostname must
@@ -105,7 +117,11 @@ class Nexus {
 
  private:
   int sm_sock_fd;  ///< File descriptor of the session management UDP socket
-  std::thread bg_thread_arr[kMaxBgThreads];
+
+  // Background threads
+  volatile bool bg_kill_switch;  ///< A switch to turn off background threads
+  std::thread bg_thread_arr[kMaxBgThreads];      ///< The background threads
+  BgThreadCtx bg_thread_ctx_arr[kMaxBgThreads];  ///< Background thread context
 
   /// Return the frequency of rdtsc in GHz
   static double get_freq_ghz();

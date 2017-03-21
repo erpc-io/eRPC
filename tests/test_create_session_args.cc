@@ -18,6 +18,7 @@ const uint8_t phy_port = 0;
 const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
+/// The session managament handler that is never invoked
 void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
                     SessionMgmtErrType sm_err_type, void *_context) {
   _unused(session);
@@ -28,7 +29,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
 /* The client thread */
 void client_thread_func(Nexus *nexus) {
-  /* Start the tests only after all servers are ready */
+  /* Start the tests only after the server is ready */
   while (!server_ready) {
     usleep(1);
   }
@@ -75,7 +76,8 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
 }
 
-TEST(test_build, test_build) {
+/// Test: Check if passing invalid arguments to create_session gives an error
+TEST(TestBuild, TestBuild) {
   Nexus nexus(NEXUS_UDP_PORT, 0, 0.0); /* 0 background threads */
 
   /* Launch the server thread */

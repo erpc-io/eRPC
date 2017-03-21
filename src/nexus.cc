@@ -41,6 +41,17 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
 
   nexus_object = this;
 
+  // Launch background threads
+  bg_kill_switch = false;
+  for (size_t i = 0; i < num_bg_threads; i++) {
+    erpc_dprintf("eRPC Nexus: Launching background thread %zu.\n", i);
+    bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
+    bg_thread_ctx_arr[i].bg_thread_id = i;
+    bg_thread_ctx_arr[i].reg_hooks_arr = reg_hooks_arr;
+
+    bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
+  }
+
   install_sigio_handler();
 
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
@@ -55,6 +66,13 @@ Nexus::~Nexus() {
   if (ret != 0) {
     erpc_dprintf_noargs(
         "eRPC Nexus: Failed to close session management socket. Ignoring.\n");
+  }
+
+  /* Kill background threads */
+  bg_kill_switch = true;
+  for (size_t i = 0; i < num_bg_threads; i++) {
+    erpc_dprintf("eRPC Nexus: Background thread %zu exited.\n", i);
+    bg_thread_arr[i].join();
   }
 }
 
