@@ -508,7 +508,7 @@ class Rpc {
   /// Rx batch information for \p rx_burst
   MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];
 
-  nexus_hook_t nexus_hook; /* A hook shared with the Nexus */
+  NexusHook nexus_hook; /* A hook shared with the Nexus */
   SlowRand slow_rand;
 
   // Stats

@@ -65,7 +65,7 @@ bool Nexus::app_tid_exists(uint8_t app_tid) {
   return ret;
 }
 
-void Nexus::register_hook(nexus_hook_t *hook) {
+void Nexus::register_hook(NexusHook *hook) {
   assert(hook != nullptr);
 
   uint8_t app_tid = hook->app_tid;
@@ -77,7 +77,7 @@ void Nexus::register_hook(nexus_hook_t *hook) {
   nexus_lock.unlock();
 }
 
-void Nexus::unregister_hook(nexus_hook_t *hook) {
+void Nexus::unregister_hook(NexusHook *hook) {
   assert(hook != nullptr);
 
   uint8_t app_tid = hook->app_tid;
@@ -198,7 +198,7 @@ void Nexus::session_mgnt_handler() {
   }
 
   /* Find the registered Rpc that has this TID */
-  nexus_hook_t *target_hook = reg_hooks_arr[target_app_tid];
+  NexusHook *target_hook = reg_hooks_arr[target_app_tid];
 
   if (target_hook == nullptr) {
     /* We don't have an Rpc object for @target_app_tid  */

@@ -23,8 +23,14 @@ struct bg_work_item_t {
 
 /// A hook created by the per-thread Rpc, and shared with the per-process Nexus.
 /// All accesses to this hook must be done with @session_mgmt_mutex locked.
-struct nexus_hook_t {
-  uint8_t app_tid;  ///< App TID of the RPC that created this hook
+class NexusHook {
+ public:
+  NexusHook(uint8_t app_tid) : app_tid(app_tid) {
+    sm_pkt_counter = 0;
+    bg_resp_counter = 0;
+  }
+
+  const uint8_t app_tid;  ///< App TID of the RPC that created this hook
 
   ///@{ Session management packet list
   std::mutex sm_pkt_list_lock;
@@ -70,10 +76,10 @@ class Nexus {
   bool app_tid_exists(uint8_t app_tid);
 
   /// Register a previously unregistered session management hook
-  void register_hook(nexus_hook_t *hook);
+  void register_hook(NexusHook *hook);
 
   /// Unregister a previously registered session management hook
-  void unregister_hook(nexus_hook_t *hook);
+  void unregister_hook(NexusHook *hook);
 
   void install_sigio_handler();
   void session_mgnt_handler();
@@ -101,7 +107,7 @@ class Nexus {
 
   /// Read-write members exposed to Rpc threads
   std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
-  nexus_hook_t *reg_hooks_arr[kMaxAppTid + 1] = {nullptr};  ///< Rpc hooks
+  NexusHook *reg_hooks_arr[kMaxAppTid + 1] = {nullptr};  ///< Rpc-Nexus hooks
 
  private:
   int sm_sock_fd;  ///< File descriptor of the session management UDP socket

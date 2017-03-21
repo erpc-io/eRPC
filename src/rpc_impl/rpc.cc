@@ -21,7 +21,8 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       app_tid(app_tid),
       session_mgmt_handler(session_mgmt_handler),
       phy_port(phy_port),
-      numa_node(numa_node) {
+      numa_node(numa_node),
+      nexus_hook(app_tid) {
   /* Ensure that we're running as root */
   if (getuid()) {
     throw std::runtime_error("eRPC Rpc: You need to be root to use eRPC");
@@ -67,8 +68,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
     throw e;
   }
 
-  /* Register a hook with the Nexus */
-  nexus_hook.app_tid = app_tid;
+  /* Register the hook with the Nexus */
   nexus->register_hook(&nexus_hook);
 
   erpc_dprintf("eRPC Rpc: Created with app TID = %u.\n", app_tid);
