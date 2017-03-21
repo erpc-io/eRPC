@@ -40,21 +40,12 @@ class Session {
    * The validity/existence of a request or response in a slot is inferred from
    * \p rx_msgbuf or \p tx_msgbuf. Doing so avoids maintaining additional
    * boolean fields (such as \em is_req_received and \em is_resp_generated).
+   *
+   * If either \p rx_msgbuf or \p tx_msgbuf is valid outside a function,
+   * its packet header must contain the request type and number.
    */
   struct sslot_t {
     // Fields that are meaningful for both server and client mode sessions
-
-    /*
-     * It might be possible to figure out req_type and req_num using either of
-     * rx_msgbuf or tx_msgbuf, but it gets pretty complex.
-     *
-     * Also, keeping req_type and req_num separately allows cleaner separation.
-     * Example: enqueue_request() and enqueue_response() need not examine
-     * rx_msgbuf.
-     */
-    uint8_t req_type;  ///< The eRPC request type
-    size_t req_num;    ///< The eRPC request number
-
     MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
     MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
 
@@ -66,10 +57,30 @@ class Session {
     /// Return a string representation of this session slot, excluding
     /// \p app_resp
     std::string to_string() const {
-      std::string req_num_string =
-          req_num == kInvalidReqNum ? "Invalid" : std::to_string(req_num);
-      std::string req_type_string =
-          req_type == kInvalidReqType ? "Invalid" : std::to_string(req_type);
+      if (rx_msgbuf.buf == nullptr && tx_msgbuf == nullptr) {
+        return "[Invalid]";
+      }
+
+      /*
+       * Sanity check: If the RX and TX MsgBuffers are both valid, they should
+       * contain identical request number and type.
+       */
+      if (rx_msgbuf.buf != nullptr && tx_msgbuf != nullptr) {
+        assert(rx_msgbuf.get_req_num() == tx_msgbuf->get_req_num());
+        assert(rx_msgbuf.get_req_type() == tx_msgbuf->get_req_type());
+      }
+
+      /* Extract the request number and type from either RX or TX MsgBuffer */
+      std::string req_num_string, req_type_string;
+      if (rx_msgbuf.buf != nullptr) {
+        req_num_string = std::to_string(rx_msgbuf.get_req_num());
+        req_type_string = std::to_string(rx_msgbuf.get_req_type());
+      }
+
+      if (tx_msgbuf != nullptr && rx_msgbuf.buf == nullptr) {
+        req_num_string = std::to_string(tx_msgbuf->get_req_num());
+        req_type_string = std::to_string(tx_msgbuf->get_req_type());
+      }
 
       std::ostringstream ret;
       ret << "[req num" << req_num_string << ", "

@@ -22,11 +22,9 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
   for (size_t i = 0; i < kSessionReqWindow; i++) {
     size_t sslot_i = (kSessionReqWindow - 1 - i);
     sslot_t &sslot = sslot_arr[sslot_i];
-    sslot.req_type = kInvalidReqType;
-    sslot.req_num = kInvalidReqNum;
-    sslot.rx_msgbuf.buffer.buf = nullptr; /* Invalidate the Buffer */
-    sslot.rx_msgbuf.buf = nullptr;        /* Invalid the MsgBuffer */
-    sslot.tx_msgbuf = nullptr;
+    sslot.rx_msgbuf.buffer.buf = nullptr; /* Bury rx_msgbuf */
+    sslot.rx_msgbuf.buf = nullptr;        /* Bury rx_msgbuf */
+    sslot.tx_msgbuf = nullptr;            /* Bury tx_msgbuf */
     sslot_free_vec.push_back(sslot_i);
 
     sslot.app_resp.dyn_resp_msgbuf.buf = nullptr;

@@ -14,7 +14,7 @@ class Session;
 template <typename T>
 class Rpc;
 
-/// A message buffer with headers at the beginning and end
+/// A message buffer with magic-ful headers at the beginning and end
 class MsgBuffer {
  public:
   friend class IBTransport;
@@ -90,6 +90,9 @@ class MsgBuffer {
     assert(max_num_pkts >= 1);
     assert(buffer.class_size >=
            max_data_size + max_num_pkts * sizeof(pkthdr_t));
+
+    pkthdr_t *pkthdr_0 = (pkthdr_t *)buffer.buf;
+    pkthdr_0->magic = kPktHdrMagic;
   }
 
   /// Construct a single-packet MsgBuffer using a received packet, setting
@@ -104,6 +107,9 @@ class MsgBuffer {
     assert(buf != nullptr);
     /* max_data_size can be zero */
     buffer.buf = nullptr;
+
+    pkthdr_t *pkthdr_0 = (pkthdr_t *)pkt;
+    pkthdr_0->magic = kPktHdrMagic;
   }
 
   /// Resize this MsgBuffer to any size smaller than its maximum allocation

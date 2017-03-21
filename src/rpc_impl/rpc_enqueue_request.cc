@@ -76,17 +76,18 @@ int Rpc<TTr>::enqueue_request(Session *session, uint8_t req_type,
 
   // Step 4: Fill in the slot, reset queueing progress, and upsert session
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
-  sslot.req_type = req_type;
-  sslot.req_num = req_num;
-  sslot.tx_msgbuf = req_msgbuf; /* Valid request */
-  sslot.tx_msgbuf->pkts_queued = 0;
 
   /*
-   * The RX MsgBuffer (i.e., the response for the previous request in this
-   * sslot) was buried after the response handler returned.
+   * The tx_msgbuf and rx_msgbuf (i.e., the request and response for the
+   * previous request in this sslot) were buried after the response handler
+   * returned.
    */
+  assert(sslot.tx_msgbuf == nullptr);
   assert(sslot.rx_msgbuf.buf == nullptr &&
          sslot.rx_msgbuf.buffer.buf == nullptr);
+
+  sslot.tx_msgbuf = req_msgbuf; /* Valid request */
+  sslot.tx_msgbuf->pkts_queued = 0;
 
   upsert_datapath_tx_work_queue(session);
   return 0;

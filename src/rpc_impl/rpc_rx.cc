@@ -110,32 +110,23 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
   if (pkthdr->is_req()) {
     // Handle a single-packet request message
     assert(session->is_server());
-    assert(sslot.req_num == kInvalidReqNum || sslot.req_num < req_num);
 
     /*
-     * Free the application response MsgBuffer for the previous request, as it
-     * could have been dynamic.
+     * Bury the possibly-dynamic response MsgBuffer (tx_msgbuf) for the
+     * previous request
      */
-    bury_sslot_dynamic_app_resp_msgbuf(sslot);
+    bury_sslot_tx_msgbuf(sslot);
 
-    /* Fill in new sslot info */
-    sslot.req_type = pkthdr->req_type;
-    sslot.req_num = req_num;
-
-    /* Invoke the request handler, and bury the non-dynamic RX MsgBuffer */
     ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
-    sslot.rx_msgbuf.buf = nullptr;
+    enqueue_response(session, sslot); /* Requires valid rx_msgbuf */
 
-    enqueue_response(session, sslot); /* Works for small and large responses */
+    /* Bury the non-dynamic request MsgBuffer (rx_msgbuf) created above */
+    bury_sslot_rx_msgbuf_nofree(sslot);
   } else {
     // Handle a single-packet response message
     assert(session->is_client());
 
-    /* Sanity-check sslot */
-    assert(sslot.req_type == pkthdr->req_type);
-    assert(sslot.req_num == req_num);
-
-    /* Sanity-check the old req MsgBuffer */
+    /* Sanity-check the user's request MsgBuffer. This always has a Buffer. */
     const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
     assert(req_msgbuf != nullptr);
@@ -144,9 +135,16 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
     assert(req_msgbuf->get_req_num() == req_num);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 
-    /* Invoke the response callback, and bury the non-dynamic RX MsgBuffer */
     ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
-    sslot.rx_msgbuf.buf = nullptr;
+
+    /*
+     * Bury the request MsgBuffer (tx_msgbuf) without freeing the underlying
+     * Buffer, which belongs to the user.
+     */
+    bury_sslot_tx_msgbuf_nofree(sslot);
+
+    /* Bury the non-dynamic response MsgBuffer (rx_msgbuf) created above */
+    bury_sslot_rx_msgbuf_nofree(sslot);
 
     session->sslot_free_vec.push_back(sslot_i);
   }
@@ -162,12 +160,13 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   assert(pkthdr->msg_size > TTr::kMaxDataPerPkt); /* Multi-packet */
   assert(pkthdr->is_req() || pkthdr->is_resp());  /* Credit returns are small */
 
-  const Ops &ops = ops_arr[pkthdr->req_type];
+  uint64_t req_type = pkthdr->req_type;
+  const Ops &ops = ops_arr[req_type];
   if (unlikely(!ops.is_valid())) {
     fprintf(stderr,
             "eRPC Rpc %u: Warning: Received packet for unknown "
-            "request type %lu. Dropping packet.\n",
-            app_tid, (uint8_t)pkthdr->req_type);
+            "request type %u. Dropping packet.\n",
+            app_tid, (uint8_t)req_type);
     return;
   }
 
@@ -179,21 +178,17 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   /* Basic checks */
   if (pkthdr->is_req()) {
     assert(session->is_server());
-    assert(sslot.req_num == kInvalidReqNum || sslot.req_num <= req_num);
   } else {
     assert(session->is_client());
 
-    /* Sanity-check sslot */
-    assert(sslot.req_type == pkthdr->req_type);
-    assert(sslot.req_num == req_num);
-
-    /* Sanity-check the old req MsgBuffer */
+    /* Sanity-check the user's request MsgBuffer. This always has a Buffer. */
     const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
     assert(req_msgbuf != nullptr);
     assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
     assert(req_msgbuf->is_req());
     assert(req_msgbuf->get_req_num() == req_num);
+    assert(req_msgbuf->get_req_type() == req_type);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
   }
 
@@ -226,27 +221,30 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
     assert(rx_msgbuf.buffer.buf == nullptr);
 
     if (pkthdr->is_req()) {
-      /* Free the application response MsgBuffer for the previous request */
-      bury_sslot_dynamic_app_resp_msgbuf(sslot);
-
-      /* Fill in new sslot info */
-      sslot.req_type = pkthdr->req_type;
-      sslot.req_num = req_num;
+      /*
+       * Bury the possibly-dynamic response MsgBuffer (tx_msgbuf) for the
+       * previous request
+       */
+      bury_sslot_tx_msgbuf(sslot);
     }
 
     rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     rx_msgbuf.pkts_rcvd = 1;
+
+    /* Store the request type and number in the zeroth packet header */
+    rx_msgbuf.get_pkthdr_0()->req_type = req_type;
+    rx_msgbuf.get_pkthdr_0()->req_num = req_num;
   } else {
     /* This is a non-first packet, so we have a valid RX MsgBuffer */
     assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
-    assert(sslot.req_type == pkthdr->req_type);
-    assert(sslot.req_num == pkthdr->req_num);
+    assert(rx_msgbuf.get_req_type() == req_type);
+    assert(rx_msgbuf.get_req_num() == req_num);
 
     assert(rx_msgbuf.pkts_rcvd >= 1);
     rx_msgbuf.pkts_rcvd++;
   }
 
-  // Copy the received packet
+  // Copy the received packet's data only
   size_t offset = pkt_num * TTr::kMaxDataPerPkt; /* rx_msgbuf offset */
   size_t bytes_to_copy = is_last ? (msg_size - offset) : TTr::kMaxDataPerPkt;
   assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
@@ -261,15 +259,22 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
 
   /* If we're here, we received all packets of this message */
   if (pkthdr->is_req()) {
-    /* Invoke the request handler, and bury the RX MsgBuffer */
     ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
-    bury_sslot_dynamic_rx_msgbuf(sslot);
+    enqueue_response(session, sslot); /* Requires valid rx_msgbuf */
 
-    enqueue_response(session, sslot); /* Works for small and large responses */
+    /* Bury the dynamic request MsgBuffer (rx_msgbuf) */
+    bury_sslot_rx_msgbuf(sslot);
   } else {
-    /* Invoke the response callback, and bury the RX MsgBuffer */
     ops.resp_handler(sslot.tx_msgbuf, &sslot.rx_msgbuf, context);
-    bury_sslot_dynamic_rx_msgbuf(sslot);
+
+    /*
+     * Bury the request MsgBuffer (tx_msgbuf) without freeing the underlying
+     * Buffer, which belongs to the user.
+     */
+    bury_sslot_tx_msgbuf_nofree(sslot);
+
+    /* Bury the dynamic response MsgBuffer (rx_msgbuf) */
+    bury_sslot_rx_msgbuf(sslot);
 
     session->sslot_free_vec.push_back(sslot_i);
   }
