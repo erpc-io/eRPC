@@ -114,7 +114,6 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
 
   Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, phy_port,
                        numa_node);
-  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
   context.rpc = &rpc;
   server_ready = true;
 
@@ -137,6 +136,8 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
 void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
                                   void (*client_thread_func)(Nexus *, size_t)) {
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
+  nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
   server_ready = false;
   client_done = false;
 
@@ -172,8 +173,6 @@ void client_connect_sessions(Nexus *nexus, app_context_t &context,
   context.is_client = true;
   context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
                                      &sm_hander, phy_port, numa_node);
-
-  context.rpc->register_ops(kAppReqType, Ops(req_handler, resp_handler));
 
   /* Connect the sessions */
   context.session_arr = new Session *[num_sessions];

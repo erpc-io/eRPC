@@ -90,7 +90,6 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
 
   Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, phy_port,
                        numa_node);
-  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
   context.rpc = &rpc;
   server_ready = true;
 
@@ -114,7 +113,6 @@ void one_small_rpc(Nexus *nexus) {
 
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_hander,
                        phy_port, numa_node);
-  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
 
   context.rpc = &rpc;
 
@@ -155,6 +153,8 @@ void one_small_rpc(Nexus *nexus) {
 
 TEST(OneSmallRpc, OneSmallRpc) {
   Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
+  nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
   server_ready = false;
   client_done = false;
 
@@ -175,7 +175,6 @@ void multi_small_rpc_one_session(Nexus *nexus) {
 
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_hander,
                        phy_port, numa_node);
-  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
 
   context.rpc = &rpc;
 
@@ -241,6 +240,8 @@ void multi_small_rpc_one_session(Nexus *nexus) {
 
 TEST(MultiSmallRpcOneSession, MultiSmallRpcOneSession) {
   Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
+  nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
   server_ready = false;
   client_done = false;
 
@@ -261,7 +262,6 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_hander,
                        phy_port, numa_node);
-  rpc.register_ops(kAppReqType, Ops(req_handler, resp_handler));
 
   context.rpc = &rpc;
 
@@ -345,6 +345,8 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
 TEST(MultiSmallRpcMultiSession, MultiSmallRpcMultiSession) {
   Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
+  nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+
   server_ready = false;
   client_done = false;
 

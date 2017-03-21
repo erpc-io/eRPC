@@ -92,6 +92,7 @@ void Nexus::register_hook(NexusHook *hook) {
 
   nexus_lock.lock();
   reg_hooks_arr[app_tid] = hook;
+  ops_registration_allowed = false;
   nexus_lock.unlock();
 }
 

@@ -250,24 +250,6 @@ class Rpc {
     }
   }
 
-  /// Register application-defined operations for a request type
-  int register_ops(uint8_t req_type, Ops app_ops) {
-    Ops &arr_ops = ops_arr[req_type];
-
-    /* Check if this request type is already registered */
-    if (arr_ops.is_valid()) {
-      return static_cast<int>(RpcDatapathErrCode::kInvalidReqTypeArg);
-    }
-
-    /* Check if the application's Ops is valid */
-    if (!app_ops.is_valid()) {
-      return static_cast<int>(RpcDatapathErrCode::kInvalidOpsArg);
-    }
-
-    arr_ops = app_ops;
-    return 0;
-  }
-
  private:
   // rpc.cc
 
@@ -481,7 +463,9 @@ class Rpc {
   uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
 
-  Ops ops_arr[kMaxReqTypes];
+  /// A copy of the request/response handlers from the Nexus. We could use
+  /// a pointer instead, but an array is faster.
+  const std::array<Ops, kMaxReqTypes> ops_arr;
 
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};

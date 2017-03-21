@@ -82,6 +82,29 @@ class Nexus {
   void install_sigio_handler();
   void session_mgnt_handler();
 
+  /// Register application-defined operations for a request type
+  int register_ops(uint8_t req_type, Ops app_ops) {
+    /* If any Rpc is already registered, the user cannot register new Ops */
+    if (!ops_registration_allowed) {
+      return EPERM;
+    }
+
+    Ops &arr_ops = ops_arr[req_type];
+
+    /* Check if this request type is already registered */
+    if (ops_arr[req_type].is_valid()) {
+      return EEXIST;
+    }
+
+    /* Check if the application's Ops is valid */
+    if (!app_ops.is_valid()) {
+      return EINVAL;
+    }
+
+    arr_ops = app_ops;
+    return 0;
+  }
+
   /// The function executed by background RPC-processing threads
   static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     volatile bool *bg_kill_switch = bg_thread_ctx->bg_kill_switch;
@@ -110,6 +133,13 @@ class Nexus {
   const size_t num_bg_threads;    ///< Background threads to process Rpc reqs
 
   const uint8_t pad[64] = {0};
+
+  /// The ground truth for registered Ops
+  std::array<Ops, kMaxReqTypes> ops_arr;
+
+  /// Ops registration is disallowed after any Rpc registers and gets a copy
+  /// of ops_arr
+  bool ops_registration_allowed = true;
 
   /// Read-write members exposed to Rpc threads
   std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
