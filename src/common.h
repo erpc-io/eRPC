@@ -97,13 +97,16 @@ struct udp_config_t {
 };
 
 // General constants
-static const size_t kMaxNumaNodes = 8; /* Maximum number of NUMA nodes */
-static const size_t kPageSize = 4096;  /* Page size in bytes */
-static const size_t kHugepageSize = (2 * 1024 * 1024); /* Hugepage size */
-static const size_t kMaxPhyPorts = 4; /* Max fabric device ports */
-static const size_t kMaxHostnameLen = 128;
-static const size_t kMaxIssueMsgLen = /* Debug issue messages */
-    (240 + kMaxHostnameLen * 2);      /* Three lines and two hostnames */
+
+/// The max application TID. uint8_t::max() is invalid.
+static constexpr size_t kMaxAppTid = std::numeric_limits<uint8_t>::max() - 1;
+static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
+static constexpr size_t kPageSize = 4096;   ///< Page size in bytes
+static constexpr size_t kHugepageSize = (2 * 1024 * 1024);  ///< Hugepage size
+static constexpr size_t kMaxPhyPorts = 16;      ///< Max fabric device ports
+static constexpr size_t kMaxHostnameLen = 128;  ///< Max hostname length
+static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
+    (240 + kMaxHostnameLen * 2);           /* Three lines and two hostnames */
 
 // Simple methods
 

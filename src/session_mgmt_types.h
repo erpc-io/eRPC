@@ -22,8 +22,8 @@ static const size_t kSessionMgmtRetransMs = 10;   ///< Timeout for mgmt reqs
 static const size_t kSessionMgmtTimeoutMs = 200;  ///< Max time for mgmt reqs
 
 /* Invalid metadata values for session endpoint initialization */
-static const uint8_t kInvalidPhyPort = std::numeric_limits<uint8_t>::max();
-static const uint8_t kInvalidAppTid = std::numeric_limits<uint8_t>::max();
+static const uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
+static const uint8_t kInvalidAppTid = kMaxAppTid + 1;
 static const uint16_t kInvalidSessionNum = std::numeric_limits<uint16_t>::max();
 static const uint32_t kInvalidSecret = 0;
 

@@ -60,39 +60,32 @@ Nexus::~Nexus() {
 
 bool Nexus::app_tid_exists(uint8_t app_tid) {
   nexus_lock.lock();
-  bool found = false;
-
-  for (nexus_hook_t *reg_hook : reg_hooks) {
-    if (reg_hook->app_tid == app_tid) {
-      found = true;
-    }
-  }
-
+  bool ret = (reg_hooks_arr[app_tid] != nullptr);
   nexus_lock.unlock();
-  return found;
+  return ret;
 }
 
 void Nexus::register_hook(nexus_hook_t *hook) {
   assert(hook != nullptr);
-  assert(!app_tid_exists(hook->app_tid));
+
+  uint8_t app_tid = hook->app_tid;
+  assert(app_tid <= kMaxAppTid);
+  assert(reg_hooks_arr[app_tid] == nullptr);
 
   nexus_lock.lock();
-  reg_hooks.push_back(hook);
+  reg_hooks_arr[app_tid] = hook;
   nexus_lock.unlock();
 }
 
 void Nexus::unregister_hook(nexus_hook_t *hook) {
   assert(hook != nullptr);
-  assert(app_tid_exists(hook->app_tid));
+
+  uint8_t app_tid = hook->app_tid;
+  assert(app_tid <= kMaxAppTid);
+  assert(reg_hooks_arr[app_tid] == hook);
 
   nexus_lock.lock();
-
-  size_t initial_size = reg_hooks.size(); /* Debug-only */
-  _unused(initial_size);
-  reg_hooks.erase(std::remove(reg_hooks.begin(), reg_hooks.end(), hook),
-                  reg_hooks.end());
-  assert(reg_hooks.size() == initial_size - 1);
-
+  reg_hooks_arr[app_tid] = nullptr;
   nexus_lock.unlock();
 }
 
@@ -205,12 +198,7 @@ void Nexus::session_mgnt_handler() {
   }
 
   /* Find the registered Rpc that has this TID */
-  nexus_hook_t *target_hook = nullptr;
-  for (nexus_hook_t *hook : reg_hooks) {
-    if (hook->app_tid == target_app_tid) {
-      target_hook = hook;
-    }
-  }
+  nexus_hook_t *target_hook = reg_hooks_arr[target_app_tid];
 
   if (target_hook == nullptr) {
     /* We don't have an Rpc object for @target_app_tid  */
@@ -237,13 +225,13 @@ void Nexus::session_mgnt_handler() {
   }
 
   /* Add the packet to the target Rpc's session management packet list */
-  target_hook->lock();
+  target_hook->sm_pkt_list_lock.lock();
 
-  target_hook->session_mgmt_pkt_list.push_back(sm_pkt);
+  target_hook->sm_pkt_list.push_back(sm_pkt);
   ERpc::memory_barrier();
-  target_hook->session_mgmt_pkt_counter++;
+  target_hook->sm_pkt_counter++;
 
-  target_hook->unlock();
+  target_hook->sm_pkt_list_lock.unlock();
   nexus_lock.unlock();
 }
 

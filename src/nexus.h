@@ -14,16 +14,29 @@ using namespace std;
 
 namespace ERpc {
 
+/// A work item submitted to a background thread. Also a work completion.
+struct bg_work_item_t {
+  uint8_t app_tid;  ///< TID of the Rpc that submitted this request
+  Session *session;
+  Session::sslot_t *sslot;
+};
+
 /// A hook created by the per-thread Rpc, and shared with the per-process Nexus.
 /// All accesses to this hook must be done with @session_mgmt_mutex locked.
 struct nexus_hook_t {
   uint8_t app_tid;  ///< App TID of the RPC that created this hook
-  std::mutex _lock;
-  volatile size_t session_mgmt_pkt_counter;  ///< Number of session mgmt events
-  std::vector<SessionMgmtPkt *> session_mgmt_pkt_list;  ///< List of mgmt pkts
 
-  void lock() { _lock.lock(); }
-  void unlock() { _lock.unlock(); }
+  ///@{ Session management packet list
+  std::mutex sm_pkt_list_lock;
+  volatile size_t sm_pkt_counter;
+  std::vector<SessionMgmtPkt *> sm_pkt_list;
+  ///@}
+
+  ///@{ Background thread response list
+  std::mutex bg_resp_list_lock;
+  volatile size_t bg_resp_counter;
+  std::vector<bg_work_item_t *> bg_resp_list;
+  ///@}
 };
 
 class Nexus {
@@ -82,16 +95,13 @@ class Nexus {
   const udp_config_t udp_config;  ///< UDP port and packet drop probability
   const double freq_ghz;          ///< Rdtsc frequncy
   const std::string hostname;     ///< The local host
-
-  /// Number of background threads that process RPC requests. This can only
-  /// increase over time.
-  volatile size_t num_bg_threads;
+  const size_t num_bg_threads;    ///< Background threads to process Rpc reqs
 
   const uint8_t pad[64] = {0};
 
   /// Read-write members exposed to Rpc threads
   std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
-  std::vector<nexus_hook_t *> reg_hooks;  ///< Hooks registered by Rpcs
+  nexus_hook_t *reg_hooks_arr[kMaxAppTid + 1] = {nullptr};  ///< Rpc hooks
 
  private:
   int sm_sock_fd;  ///< File descriptor of the session management UDP socket

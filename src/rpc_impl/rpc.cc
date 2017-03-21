@@ -69,13 +69,20 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
   /* Register a hook with the Nexus */
   nexus_hook.app_tid = app_tid;
-  nexus->register_hook((nexus_hook_t *)&nexus_hook);
+  nexus->register_hook(&nexus_hook);
 
   erpc_dprintf("eRPC Rpc: Created with app TID = %u.\n", app_tid);
 }
 
 template <class TTr>
 Rpc<TTr>::~Rpc() {
+  /* XXX: Check if all sessions are disconnected */
+  for (Session *session : session_vec) {
+    if (session != nullptr) {
+      _unused(session);
+    }
+  }
+
   erpc_dprintf("eRPC Rpc: Destroying for app TID = %u.\n", app_tid);
 
   /*
@@ -88,12 +95,7 @@ Rpc<TTr>::~Rpc() {
   /* Allow \p transport to clean up non-hugepage structures */
   delete transport;
 
-  for (Session *session : session_vec) {
-    if (session != nullptr) {
-      /* Free this session */
-      _unused(session);
-    }
-  }
+  nexus->unregister_hook(&nexus_hook);
 }
 
 template <class TTr>
@@ -125,11 +127,11 @@ void Rpc<TTr>::bury_session(Session *session) {
 
 template <class TTr>
 void Rpc<TTr>::handle_session_management() {
-  assert(nexus_hook.session_mgmt_pkt_counter > 0);
-  nexus_hook.lock();
+  assert(nexus_hook.sm_pkt_counter > 0);
+  nexus_hook.sm_pkt_list_lock.lock();
 
   /* Handle all session management requests */
-  for (SessionMgmtPkt *sm_pkt : nexus_hook.session_mgmt_pkt_list) {
+  for (SessionMgmtPkt *sm_pkt : nexus_hook.sm_pkt_list) {
     /* The sender of a packet cannot be this Rpc */
     if (session_mgmt_pkt_type_is_req(sm_pkt->pkt_type)) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname.c_str()) == 0 &&
@@ -157,13 +159,14 @@ void Rpc<TTr>::handle_session_management() {
         break;
     }
 
-    /* Free memory that was allocated by the Nexus */
+    /* Free packet memory that was allocated by the Nexus */
     free(sm_pkt);
   }
 
-  nexus_hook.session_mgmt_pkt_list.clear();
-  nexus_hook.session_mgmt_pkt_counter = 0;
-  nexus_hook.unlock();
+  /* Clear the session management packet list */
+  nexus_hook.sm_pkt_counter = 0;
+  nexus_hook.sm_pkt_list.clear();
+  nexus_hook.sm_pkt_list_lock.unlock();
 }
 
 }  // End ERpc
