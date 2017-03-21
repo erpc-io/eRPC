@@ -82,36 +82,13 @@ class Nexus {
   void install_sigio_handler();
   void session_mgnt_handler();
 
-  /// Register application-defined operations for a request type
-  int register_ops(uint8_t req_type, Ops app_ops) {
-    /* If any Rpc is already registered, the user cannot register new Ops */
-    if (!ops_registration_allowed) {
-      return EPERM;
-    }
-
-    Ops &arr_ops = ops_arr[req_type];
-
-    /* Check if this request type is already registered */
-    if (ops_arr[req_type].is_valid()) {
-      return EEXIST;
-    }
-
-    /* Check if the application's Ops is valid */
-    if (!app_ops.is_valid()) {
-      return EINVAL;
-    }
-
-    arr_ops = app_ops;
-    return 0;
-  }
-
-  /// The function executed by background RPC-processing threads
-  static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
-    volatile bool *bg_kill_switch = bg_thread_ctx->bg_kill_switch;
-    while (*bg_kill_switch != true) {
-      usleep(200000);
-    }
-  }
+  /**
+   * @brief Register application-defined operations for a request type. This
+   * must be done before any Rpc registers a hook with the Nexus.
+   *
+   * @return 0 on success, errno on failure.
+   */
+  int register_ops(uint8_t req_type, Ops app_ops);
 
   /**
    * @brief Copy the hostname of this machine to \p hostname. \p hostname must
@@ -124,6 +101,14 @@ class Nexus {
 
     int ret = gethostname(_hostname, kMaxHostnameLen);
     return ret;
+  }
+
+  /// The function executed by background RPC-processing threads
+  static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
+    volatile bool *bg_kill_switch = bg_thread_ctx->bg_kill_switch;
+    while (*bg_kill_switch != true) {
+      usleep(200000);
+    }
   }
 
   /// Read-mostly members exposed to Rpc threads

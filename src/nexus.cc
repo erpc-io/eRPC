@@ -254,6 +254,44 @@ void Nexus::session_mgnt_handler() {
   nexus_lock.unlock();
 }
 
+int Nexus::register_ops(uint8_t req_type, Ops app_ops) {
+  /* Create the basic issue message */
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg,
+          "eRPC Nexus: Failed to register handlers for request type %u. Issue",
+          req_type);
+
+  /* If any Rpc is already registered, the user cannot register new Ops */
+  if (!ops_registration_allowed) {
+    erpc_dprintf("%s: Registration not allowed anymore.\n", issue_msg);
+    return EPERM;
+  }
+
+  Ops &arr_ops = ops_arr[req_type];
+
+  /* Check if this request type is already registered */
+  if (ops_arr[req_type].is_valid()) {
+    erpc_dprintf("%s: A handler for this request type already exists.\n",
+                 issue_msg);
+    return EEXIST;
+  }
+
+  /* Check if the application's Ops is valid */
+  if (!app_ops.is_valid()) {
+    erpc_dprintf("%s: Invalid handler.\n", issue_msg);
+    return EINVAL;
+  }
+
+  /* If the request handler runs in the background, we must have bg threads */
+  if (app_ops.run_in_background && num_bg_threads == 0) {
+    erpc_dprintf("%s: Background threads not available.\n", issue_msg);
+    return EPERM;
+  }
+
+  arr_ops = app_ops;
+  return 0;
+}
+
 double Nexus::get_freq_ghz() {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
