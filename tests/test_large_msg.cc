@@ -134,10 +134,9 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
  *
  * @param client_thread_func The function executed by the client threads
  */
-void launch_server_and_client_threads(size_t num_sessions,
-                                      void (*client_thread_func)(Nexus *,
-                                                                 size_t)) {
-  Nexus nexus(kAppNexusUdpPort, 0, kAppNexusPktDropProb); /* 0 bg threads */
+void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
+                                  void (*client_thread_func)(Nexus *, size_t)) {
+  Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
   server_ready = false;
   client_done = false;
 
@@ -196,7 +195,8 @@ void client_connect_sessions(Nexus *nexus, app_context_t &context,
 
 /// Run the event loop until we get \p num_resps RPC responses, or until
 /// kAppMaxEventLoopMs are elapsed.
-void client_wait_for_rpc_resps_or_timeout(Nexus *nexus, app_context_t &context,
+void client_wait_for_rpc_resps_or_timeout(const Nexus *nexus,
+                                          app_context_t &context,
                                           size_t num_resps) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
   uint64_t cycles_start = rdtsc();
@@ -256,7 +256,13 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(OneLargeRpc, OneLargeRpc) {
-  launch_server_and_client_threads(1, one_large_rpc);
+  /* 1 client session, 0 bg threads */
+  launch_server_client_threads(1, 0, one_large_rpc);
+}
+
+TEST(OneLargeRpcBg, OneLargeRpcBg) {
+  /* 1 client session, 1 bg thread */
+  launch_server_client_threads(1, 1, one_large_rpc);
 }
 
 ///
@@ -323,7 +329,8 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(MultiLargeRpcOneSession, MultiLargeRpcOneSession) {
-  launch_server_and_client_threads(1, multi_large_rpc_one_session);
+  /* 1 client session, 0 bg threads */
+  launch_server_client_threads(1, 0, multi_large_rpc_one_session);
 }
 
 ///
@@ -401,7 +408,8 @@ TEST(MultiLargeRpcMultiSession, MultiLargeRpcMultiSession) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
 
-  launch_server_and_client_threads(num_sessions, multi_large_rpc_multi_session);
+  /* num_sessions client session, 0 bg threads */
+  launch_server_client_threads(num_sessions, 0, multi_large_rpc_multi_session);
 }
 
 ///
@@ -484,7 +492,8 @@ TEST(DISABLED_MemoryLeak, DISABLED_MemoryLeak) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
 
-  launch_server_and_client_threads(num_sessions, memory_leak);
+  /* num_sessions client sessions, 0 background threads */
+  launch_server_client_threads(num_sessions, 0, memory_leak);
 }
 
 int main(int argc, char **argv) {
