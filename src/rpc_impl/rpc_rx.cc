@@ -254,15 +254,29 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
       bury_sslot_tx_msgbuf(sslot);
     }
 
+    if (unlikely(pkt_num != 0)) {
+      erpc_dprintf(
+          "eRPC Rpc %u: Received out-of-order packet on session %u. "
+          "Expected packet number = 0, received = %zu.\n",
+          app_tid, session->local_session_num, pkt_num);
+    }
+
     rx_msgbuf = alloc_msg_buffer(msg_size);
     rx_msgbuf.pkts_rcvd = 1;
 
-    /* Store the request type and number in the zeroth packet header */
-    rx_msgbuf.get_pkthdr_0()->req_type = req_type;
-    rx_msgbuf.get_pkthdr_0()->req_num = req_num;
+    /*
+     * Store the received packet header into the zeroth rx_msgbuf packet header.
+     * It's possible to copy fewer fields, but copying pkthdr_t is cheap.
+     */
+    *(rx_msgbuf.get_pkthdr_0()) = *pkthdr;
+    rx_msgbuf.get_pkthdr_0()->pkt_num = 0;
   } else {
-    /* This is a non-first packet, so we have a valid RX MsgBuffer */
-    assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
+    /*
+     * This is not the 1st packet received for this message, so we have a valid,
+     * dynamically-allocated RX MsgBuffer.
+     */
+    assert(rx_msgbuf.buf != nullptr);
+    assert(rx_msgbuf.is_dynamic() && rx_msgbuf.check_magic());
     assert(rx_msgbuf.get_req_type() == req_type);
     assert(rx_msgbuf.get_req_num() == req_num);
 
@@ -271,8 +285,8 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   }
 
   /*
-   * Copy the received packet's data only. The required packet header fields
-   * (req_num and req_type) were copied to rx_msgbuf.pkthdr_0 earlier.
+   * Copy the received packet's data only. The message's common packet header
+   * was copied to rx_msgbuf.pkthdr_0 earlier.
    */
   size_t offset = pkt_num * TTr::kMaxDataPerPkt; /* rx_msgbuf offset */
   size_t bytes_to_copy = is_last ? (msg_size - offset) : TTr::kMaxDataPerPkt;

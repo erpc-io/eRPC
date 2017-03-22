@@ -262,13 +262,12 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   client_done = true;
 }
 
-TEST(OneLargeRpc, OneLargeRpc) {
-  /* 1 client session, 0 bg threads */
+TEST(OneLargeRpc, Foreground) {
   launch_server_client_threads(1, 0, one_large_rpc);
 }
 
-TEST(OneLargeRpcBg, OneLargeRpcBg) {
-  /* 1 client session, 1 bg thread */
+TEST(OneLargeRpc, Background) {
+  /* 1 background thread */
   launch_server_client_threads(1, 1, one_large_rpc);
 }
 
@@ -335,9 +334,13 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   client_done = true;
 }
 
-TEST(MultiLargeRpcOneSession, MultiLargeRpcOneSession) {
-  /* 1 client session, 0 bg threads */
+TEST(MultiLargeRpcOneSession, Foreground) {
   launch_server_client_threads(1, 0, multi_large_rpc_one_session);
+}
+
+TEST(MultiLargeRpcOneSession, Background) {
+  /* 2 background threads */
+  launch_server_client_threads(1, 2, multi_large_rpc_one_session);
 }
 
 ///
@@ -410,18 +413,24 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
   client_done = true;
 }
 
-TEST(MultiLargeRpcMultiSession, MultiLargeRpcMultiSession) {
+TEST(MultiLargeRpcMultiSession, Foreground) {
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
-
-  /* num_sessions client session, 0 bg threads */
   launch_server_client_threads(num_sessions, 0, multi_large_rpc_multi_session);
+}
+
+TEST(MultiLargeRpcMultiSession, Background) {
+  /* Use enough sessions to exceed the Rpc's unexpected window */
+  size_t num_sessions =
+      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
+  /* 2 background threads */
+  launch_server_client_threads(num_sessions, 2, multi_large_rpc_multi_session);
 }
 
 ///
 /// Test: Repeat: Multiple large Rpcs on multiple sessions, trying to force
-/// a memory leak.
+/// a memory leak. This test takes a long time so it's disabled by default.
 ///
 void memory_leak(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
@@ -494,13 +503,19 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
   client_done = true;
 }
 
-TEST(DISABLED_MemoryLeak, DISABLED_MemoryLeak) {
+TEST(DISABLED_MemoryLeak, Foreground) {
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
-
-  /* num_sessions client sessions, 0 background threads */
   launch_server_client_threads(num_sessions, 0, memory_leak);
+}
+
+TEST(DISABLED_MemoryLeak, Background) {
+  /* Use enough sessions to exceed the Rpc's unexpected window */
+  size_t num_sessions =
+      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
+  /* 2 background threads */
+  launch_server_client_threads(num_sessions, 2, memory_leak);
 }
 
 int main(int argc, char **argv) {
