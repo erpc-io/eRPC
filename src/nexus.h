@@ -143,7 +143,7 @@ class Nexus {
 
         dpath_dprintf(
             "eRPC Nexus: Background thread %zu running request "
-            "handler for app TID %u, session %u.\n",
+            "handler for Rpc %u, session %u.\n",
             bg_thread_id, app_tid, session->local_session_num);
 
         /* Sanity-check rx_msgbuf. It must use dynamic memory allocation. */

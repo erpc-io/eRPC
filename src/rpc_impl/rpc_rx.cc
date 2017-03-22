@@ -356,12 +356,6 @@ void Rpc<TTr>::handle_bg_responses() {
     assert(sslot->rx_msgbuf.buffer.buf != nullptr);
     assert(sslot->rx_msgbuf.is_req());
 
-    uint8_t req_type = sslot->rx_msgbuf.get_req_type();
-    const Ops &ops = ops_arr[req_type];
-    assert(ops.is_valid()); /* Checked during submit_bg */
-
-    ops.req_handler(&sslot->rx_msgbuf, &sslot->app_resp, context);
-
     /* This uses sslot.rx_msgbuf for pkt header, so delay burying rx_msgbuf */
     enqueue_response(session, *sslot);
     assert(sslot->tx_msgbuf != nullptr); /* Installed by enqueue_response */
