@@ -121,7 +121,7 @@ class Nexus {
     volatile bool *bg_kill_switch = bg_thread_ctx->bg_kill_switch;
     size_t bg_thread_id = bg_thread_ctx->bg_thread_id;
 
-    while (*bg_kill_switch != true) {
+    while (*bg_kill_switch == false) {
       MtList<BgWorkItem> &req_list = bg_thread_ctx->bg_req_list;
 
       if (req_list.size == 0) {
@@ -169,6 +169,8 @@ class Nexus {
       req_list.locked_clear();
       req_list.unlock();
     }
+
+    erpc_dprintf("eRPC Nexus: Background thread %zu exiting.\n", bg_thread_id);
     return;
   }
 

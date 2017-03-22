@@ -368,7 +368,6 @@ void Rpc<TTr>::handle_bg_responses() {
 
     /* Bury the dynamic request MsgBuffer (rx_msgbuf) */
     bury_sslot_rx_msgbuf(*sslot);
-    return;
   }
 
   resp_list.locked_clear(); /* Empty the response list */

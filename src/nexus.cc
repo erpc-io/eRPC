@@ -69,10 +69,8 @@ Nexus::~Nexus() {
         "eRPC Nexus: Failed to close session management socket. Ignoring.\n");
   }
 
-  /* Kill background threads */
-  bg_kill_switch = true;
+  bg_kill_switch = true; /* Indicate background threads to kill themselves */
   for (size_t i = 0; i < num_bg_threads; i++) {
-    erpc_dprintf("eRPC Nexus: Background thread %zu exited.\n", i);
     bg_thread_arr[i].join();
   }
 }
