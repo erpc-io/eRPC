@@ -75,10 +75,10 @@ class MsgBuffer {
   }
 
   /// Check if this Buffer uses dynamic memory allocation
-  bool is_dynamic() const { return buffer.buf != nullptr; }
+  inline bool is_dynamic() const { return buffer.buf != nullptr; }
 
  private:
-  /// Construct a MsgBuffer with a valid Buffer allocated by eRPC.
+  /// Construct a MsgBuffer with a dynamic Buffer allocated by eRPC.
   /// The zeroth packet header is stored at \p buffer.buf. \p buffer must have
   /// space for at least \p max_data_bytes, and \p max_num_pkts packet headers.
   MsgBuffer(Buffer buffer, size_t max_data_size, size_t max_num_pkts)
@@ -109,7 +109,7 @@ class MsgBuffer {
         num_pkts(1) {
     assert(buf != nullptr);
     /* max_data_size can be zero */
-    buffer.buf = nullptr;
+    buffer.buf = nullptr; /* This is a static-allocation MsgBuffer */
 
     pkthdr_t *pkthdr_0 = (pkthdr_t *)pkt;
     pkthdr_0->magic = kPktHdrMagic;

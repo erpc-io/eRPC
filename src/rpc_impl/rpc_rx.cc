@@ -105,8 +105,8 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
    * The RX MsgBuffer stored previously in this slot was buried earlier: The
    * server (client) buried it after the request (response) handler returned.
    */
-  assert(sslot.rx_msgbuf.buffer.buf == nullptr);
   assert(sslot.rx_msgbuf.buf == nullptr);
+  assert(sslot.rx_msgbuf.buffer.buf == nullptr);
 
   if (pkthdr->is_req()) {
     // Handle a single-packet request message
@@ -116,7 +116,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
     bury_sslot_tx_msgbuf(sslot);
 
     if (small_msg_likely(!ops.run_in_background)) {
-      /* Create a "fake" MsgBuffer for the foreground request handler */
+      /* Create a "fake" static MsgBuffer for the foreground request handler */
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
       sslot.rx_msgbuf.pkts_rcvd = 1;
 
@@ -156,7 +156,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
     assert(req_msgbuf->get_req_num() == req_num);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 
-    /* Create a "fake" MsgBuffer for the foreground response handler */
+    /* Create a "fake" static MsgBuffer for the foreground response handler */
     sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
     sslot.rx_msgbuf.pkts_rcvd = 1;
 
@@ -353,7 +353,7 @@ void Rpc<TTr>::handle_bg_responses() {
 
     /* Sanity-check rx_msgbuf. It must be dynamic. */
     assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
-    assert(sslot->rx_msgbuf.buffer.buf != nullptr);
+    assert(sslot->rx_msgbuf.is_dynamic());
     assert(sslot->rx_msgbuf.is_req());
 
     /* This uses sslot.rx_msgbuf for pkt header, so delay burying rx_msgbuf */

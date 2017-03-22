@@ -147,8 +147,7 @@ class Rpc {
 
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
-    assert(msg_buffer.buf != nullptr && msg_buffer.check_magic());
-
+    assert(msg_buffer.is_dynamic() && msg_buffer.check_magic());
     huge_alloc->free_buf(msg_buffer.buffer);
   }
 
@@ -346,8 +345,7 @@ class Rpc {
      * The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
      * Its buf can be non-NULL even when dynamic allocation is not used.
      */
-    if (small_msg_unlikely(tx_msgbuf != nullptr &&
-                           tx_msgbuf->buffer.buf != nullptr)) {
+    if (small_msg_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
       /* This check is OK, since this sslot must be initialized */
       assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
       free_msg_buffer(*tx_msgbuf);
@@ -381,7 +379,7 @@ class Rpc {
      * The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
      * Its buf can be non-NULL even when dynamic allocation is not used.
      */
-    if (small_msg_unlikely(rx_msgbuf.buffer.buf != nullptr)) {
+    if (small_msg_unlikely(rx_msgbuf.is_dynamic())) {
       /* This check is OK, since this sslot must be initialized */
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);
