@@ -25,6 +25,8 @@
    * Request MsgBuffers are owned/allocated by apps and are never freed by eRPC.
    * Response MsgBuffers allocated by apps, and are freed by eRPC as soon as
      they are no longer needed for retransmission.
+ * Thread safety:
+   * RPC request handlers must be thread-safe if background threads are used.
 
 ## Short-term TODOs
  * If we refactor background threads out of Nexus, remove Nexus as a friend

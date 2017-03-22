@@ -27,18 +27,20 @@ const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 /// Per-thread application context
-struct app_context_t {
+class AppContext {
+ public:
   bool is_client;
   Rpc<IBTransport> *rpc;
   Session **session_arr;
-  FastRand fastrand; /* Used for picking large message size */
+  FastRand fastrand; ///< Used for picking large message sizes
+  std::mutex lock;   ///< Lock for thread-safe request handler
 
   size_t num_sm_connect_resps = 0; /* Client-only */
   size_t num_rpc_resps = 0;        /* Client-only */
 };
 
 /// Pick a random message size with at least two packets
-size_t pick_large_msg_size(app_context_t *app_context) {
+size_t pick_large_msg_size(AppContext *app_context) {
   assert(app_context != nullptr);
   uint32_t sample = app_context->fastrand.next_u32();
   uint32_t msg_size =
@@ -58,15 +60,19 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
   ASSERT_NE(app_resp, nullptr);
   ASSERT_NE(_context, nullptr);
 
-  auto *context = (app_context_t *)_context;
+  auto *context = (AppContext *)_context;
   ASSERT_FALSE(context->is_client);
 
   size_t req_size = req_msgbuf->get_data_size();
   test_printf("Server: Received request of length %zu\n", req_size);
 
   app_resp->prealloc_used = false;
+
+  /* Only the MsgBuffer allocation needs to be thread safe */
+  context->lock.lock();
   app_resp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
   ASSERT_NE(app_resp->dyn_resp_msgbuf.buf, nullptr);
+  context->lock.unlock();
 
   memcpy((char *)app_resp->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
          req_size);
@@ -88,7 +94,7 @@ void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
   ASSERT_EQ(req_msgbuf->get_data_size(), resp_msgbuf->get_data_size());
   ASSERT_STREQ((char *)req_msgbuf->buf, (char *)resp_msgbuf->buf);
 
-  auto *context = (app_context_t *)_context;
+  auto *context = (AppContext *)_context;
   ASSERT_TRUE(context->is_client);
   context->num_rpc_resps++;
 }
@@ -98,7 +104,7 @@ void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
                SessionMgmtErrType sm_err_type, void *_context) {
   _unused(session);
 
-  auto *context = (app_context_t *)_context;
+  auto *context = (AppContext *)_context;
   ASSERT_TRUE(context->is_client);
   context->num_sm_connect_resps++;
 
@@ -109,7 +115,7 @@ void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
 /// The server thread used for all subtests
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  app_context_t context;
+  AppContext context;
   context.is_client = false;
 
   Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, phy_port,
@@ -169,7 +175,7 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
 }
 
 /// Initialize client context and connect sessions
-void client_connect_sessions(Nexus *nexus, app_context_t &context,
+void client_connect_sessions(Nexus *nexus, AppContext &context,
                              size_t num_sessions) {
   assert(nexus != nullptr);
   assert(num_sessions >= 1);
@@ -203,7 +209,7 @@ void client_connect_sessions(Nexus *nexus, app_context_t &context,
 /// Run the event loop until we get \p num_resps RPC responses, or until
 /// kAppMaxEventLoopMs are elapsed.
 void client_wait_for_rpc_resps_or_timeout(const Nexus *nexus,
-                                          app_context_t &context,
+                                          AppContext &context,
                                           size_t num_resps) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
   uint64_t cycles_start = rdtsc();
@@ -223,7 +229,7 @@ void client_wait_for_rpc_resps_or_timeout(const Nexus *nexus,
 ///
 void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
-  app_context_t context;
+  AppContext context;
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
@@ -276,7 +282,7 @@ TEST(OneLargeRpc, Background) {
 ///
 void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
-  app_context_t context;
+  AppContext context;
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
@@ -294,7 +300,7 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
 
     /* Enqueue as many requests as one session allows */
     for (size_t i = 0; i < Session::kSessionCredits; i++) {
-      size_t req_len = pick_large_msg_size((app_context_t *)&context);
+      size_t req_len = pick_large_msg_size((AppContext *)&context);
       rpc->resize_msg_buffer(&req_msgbuf[i], req_len);
 
       for (size_t j = 0; j < req_len; j++) {
@@ -349,7 +355,7 @@ TEST(MultiLargeRpcOneSession, Background) {
 ///
 void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
-  app_context_t context;
+  AppContext context;
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
@@ -372,7 +378,7 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
         size_t req_i = (sess_i * Session::kSessionCredits) + crd_i;
         assert(req_i < tot_reqs_per_iter);
 
-        size_t req_len = pick_large_msg_size((app_context_t *)&context);
+        size_t req_len = pick_large_msg_size((AppContext *)&context);
         rpc->resize_msg_buffer(&req_msgbuf[req_i], req_len);
 
         for (size_t j = 0; j < req_len; j++) {
@@ -435,14 +441,14 @@ TEST(MultiLargeRpcMultiSession, Background) {
 ///
 void memory_leak(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
-  app_context_t context;
+  AppContext context;
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
   Session **session_arr = context.session_arr;
 
   /* Run many iterations to stress memory leaks */
-  for (size_t iter = 0; iter < 50; iter++) {
+  for (size_t iter = 0; iter < 500; iter++) {
     test_printf("test: Iteration %zu\n", iter);
 
     /* Create new MsgBuffers in each iteration to stress leaks */
@@ -461,7 +467,7 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
         size_t req_i = (sess_i * Session::kSessionCredits) + crd_i;
         assert(req_i < tot_reqs_per_iter);
 
-        size_t req_len = pick_large_msg_size((app_context_t *)&context);
+        size_t req_len = pick_large_msg_size((AppContext *)&context);
         rpc->resize_msg_buffer(&req_msgbuf[req_i], req_len);
 
         for (size_t j = 0; j < req_len; j++) {
@@ -469,7 +475,8 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
         }
         req_msgbuf[req_i].buf[req_len - 1] = 0;
 
-        test_printf("test: Sending request of length = %zu\n", req_len);
+        test_printf("test: Iter %zu: Sending request of length = %zu\n",
+                    iter, req_len);
 
         int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
                                        &req_msgbuf[req_i]);
