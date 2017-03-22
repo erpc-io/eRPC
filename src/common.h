@@ -87,21 +87,6 @@ static constexpr bool kDatapathChecks = true;  ///< Return error on invalid args
 #define MB(x) ((size_t)(x) << 20)
 #define MB_(x) (MB(x) - 1)
 
-/// A simple multi-threaded list
-template <class T>
-class MtList {
- public:
-  MtList() : size(0) {}
-  volatile size_t size;
-  std::vector<T> list;
-
-  void lock() { return _lock.lock(); }
-  void unlock() { return _lock.unlock(); }
-
- private:
-  std::mutex _lock;
-};
-
 /// UDP config used throughout eRPC
 struct udp_config_t {
   /*

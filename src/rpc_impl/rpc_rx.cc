@@ -334,19 +334,19 @@ void Rpc<TTr>::submit_bg(Session *session, Session::sslot_t *sslot) {
   size_t bg_thread_id = fast_rand.next_u32() % nexus->num_bg_threads;
   MtList<BgWorkItem> *req_list = nexus_hook.bg_req_list_arr[bg_thread_id];
 
-  req_list->lock();
-  req_list->list.push_back(BgWorkItem(app_tid, session, sslot));
-  req_list->unlock();
+  /* Thread-safe */
+  req_list->unlocked_push_back(BgWorkItem(app_tid, context, session, sslot));
 }
 
 template <class TTr>
 void Rpc<TTr>::handle_bg_responses() {
-  assert(nexus_hook.bg_resp_list.size > 0);
+  MtList<BgWorkItem> &resp_list = nexus_hook.bg_resp_list;
+  assert(resp_list.size > 0);
 
   // Process all responses in the response list
-  nexus_hook.bg_resp_list.lock();
+  resp_list.lock();
 
-  for (BgWorkItem bg_work_item : nexus_hook.bg_resp_list.list) {
+  for (BgWorkItem bg_work_item : resp_list.list) {
     assert(bg_work_item.app_tid == app_tid);
     Session *session = bg_work_item.session;
     Session::sslot_t *sslot = bg_work_item.sslot;
@@ -356,9 +356,7 @@ void Rpc<TTr>::handle_bg_responses() {
     assert(sslot->rx_msgbuf.buffer.buf != nullptr);
     assert(sslot->rx_msgbuf.is_req());
 
-    const pkthdr_t *pkthdr = sslot->rx_msgbuf.get_pkthdr_0();
-    uint8_t req_type = pkthdr->req_type;
-
+    uint8_t req_type = sslot->rx_msgbuf.get_req_type();
     const Ops &ops = ops_arr[req_type];
     assert(ops.is_valid()); /* Checked during submit_bg */
 
@@ -373,7 +371,8 @@ void Rpc<TTr>::handle_bg_responses() {
     return;
   }
 
-  nexus_hook.bg_resp_list.unlock();
+  resp_list.locked_clear(); /* Empty the response list */
+  resp_list.unlock();
 }
 
 }  // End ERpc

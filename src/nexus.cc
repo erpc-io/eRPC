@@ -45,6 +45,8 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
   bg_kill_switch = false;
   for (size_t i = 0; i < num_bg_threads; i++) {
     erpc_dprintf("eRPC Nexus: Launching background thread %zu.\n", i);
+
+    bg_thread_ctx_arr[i].nexus = this;
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
     bg_thread_ctx_arr[i].bg_thread_id = i;
 

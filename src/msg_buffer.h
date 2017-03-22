@@ -20,6 +20,7 @@ class MsgBuffer {
   friend class IBTransport;
   friend class Session;
   friend class Rpc<IBTransport>;
+  friend class Nexus;
 
   MsgBuffer() {}
   ~MsgBuffer() {}

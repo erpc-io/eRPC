@@ -13,6 +13,7 @@
 #include "transport_impl/ib_transport.h"
 #include "util/buffer.h"
 #include "util/huge_alloc.h"
+#include "util/mt_list.h"
 #include "util/rand.h"
 
 namespace ERpc {

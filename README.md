@@ -27,6 +27,8 @@
      they are no longer needed for retransmission.
 
 ## Short-term TODOs
+ * If we refactor background threads out of Nexus, remove Nexus as a friend
+   class of MsgBuffer.
  * Ensure that credit returns can be sent inline in any transport: We don't
    create them in DMA buffers.
  * Move all max limits to an `erpc_limits.h` file.
