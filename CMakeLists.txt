@@ -48,6 +48,7 @@ else(LTO)
 endif(LTO)
 
 set(SOURCES
+  src/bg_thread.h
   src/common.h
   src/nexus.cc
   src/nexus.h

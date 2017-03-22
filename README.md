@@ -31,6 +31,7 @@
    class of MsgBuffer.
  * Ensure that credit returns can be sent inline in any transport: We don't
    create them in DMA buffers.
+ * Reduce time taken by `test_destroy_session`.
  * Move all max limits to an `erpc_limits.h` file.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.

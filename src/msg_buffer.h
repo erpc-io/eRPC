@@ -20,7 +20,6 @@ class MsgBuffer {
   friend class IBTransport;
   friend class Session;
   friend class Rpc<IBTransport>;
-  friend class Nexus;
 
   MsgBuffer() {}
   ~MsgBuffer() {}
@@ -74,6 +73,9 @@ class MsgBuffer {
         << "pkts queued/rcvd " << pkts_queued << "]";
     return ret.str();
   }
+
+  /// Check if this Buffer uses dynamic memory allocation
+  bool is_dynamic() const { return buffer.buf != nullptr; }
 
  private:
   /// Construct a MsgBuffer with a valid Buffer allocated by eRPC.
