@@ -241,6 +241,11 @@ TEST(OneSmallRpc, Foreground) {
   launch_server_client_threads(1, 0, one_small_rpc);
 }
 
+TEST(OneSmallRpc, Background) {
+  /* One background thread */
+  launch_server_client_threads(1, 1, one_small_rpc);
+}
+
 ///
 /// Test: Repeat: Multiple small Rpcs on one session
 ///
@@ -307,6 +312,11 @@ void multi_small_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
 
 TEST(MultiSmallRpcOneSession, Foreground) {
   launch_server_client_threads(1, 0, multi_small_rpc_one_session);
+}
+
+TEST(MultiSmallRpcOneSession, Background) {
+  /* 2 background threads */
+  launch_server_client_threads(1, 2, multi_small_rpc_one_session);
 }
 
 ///
@@ -384,6 +394,14 @@ TEST(MultiSmallRpcMultiSession, Foreground) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session);
+}
+
+TEST(MultiSmallRpcMultiSession, Background) {
+  /* Use enough sessions to exceed the Rpc's unexpected window */
+  size_t num_sessions =
+      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
+  /* 3 background threads */
+  launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session);
 }
 
 int main(int argc, char **argv) {
