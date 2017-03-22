@@ -168,8 +168,7 @@ void Rpc<TTr>::handle_session_management() {
   }
 
   /* Clear the session management packet list */
-  nexus_hook.sm_pkt_list.size = 0;
-  nexus_hook.sm_pkt_list.list.clear();
+  nexus_hook.sm_pkt_list.locked_clear();
   nexus_hook.sm_pkt_list.unlock();
 }
 
