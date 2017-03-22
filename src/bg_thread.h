@@ -60,8 +60,8 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     assert(req_list.size > 0);
 
     for (BgWorkItem bg_work_item : req_list.list) {
-      uint8_t app_tid = bg_work_item.app_tid; /* Debug-only */
-      void *context = bg_work_item.context;
+      uint8_t app_tid = bg_work_item.app_tid;  /* Debug-only */
+      void *context = bg_work_item.context;    /* The app's context */
       Session *session = bg_work_item.session; /* Debug-only */
       Session::sslot_t *sslot = bg_work_item.sslot;
       _unused(app_tid);

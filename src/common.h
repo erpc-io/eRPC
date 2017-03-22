@@ -25,7 +25,13 @@ static constexpr bool kDatapathStats = true;  ///< Collect stats on the datapath
 
 // Perf defines
 static constexpr bool kDatapathChecks = true;  ///< Return error on invalid args
+
+/// This controls how much the code is optimized at compile time for the special
+/// case of small messages and foreground request handlers.
+/// This helps understand the overhead of supporting large messages and
+/// background request handlers.
 #define small_msg_opt_level 1
+static_assert(small_msg_opt_level >= 0 && small_msg_opt_level <= 2, "");
 
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \
@@ -65,22 +71,34 @@ static constexpr bool kDatapathChecks = true;  ///< Return error on invalid args
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-// Level of optimizations for small messages. This helps understand the overhead
-// of supporting large messages
-
 #if small_msg_opt_level == 0
 /* No optimization for small message */
 #define small_msg_likely(x) (x)
 #define small_msg_unlikely(x) (x)
-/* Small messages are very likely */
 #elif small_msg_opt_level == 1
+/* Small messages are very likely */
 #define small_msg_likely(x) likely(x)
 #define small_msg_unlikely(x) unlikely(x)
-#else
+#elif small_msg_opt_level == 2
 /* Small messages are the only type of messages */
-#define small_msg_likely(x) (true)
-#define small_msg_unlikely(x) (false)
+static constexpr bool small_msg_likely(x) {
+  assert(x);
+  return true;
+}
+static constexpr bool small_msg_unlikely(x) {
+  assert(!x);
+  return false;
+}
 #endif
+
+/// Collect datapath stats if datapath stats are enabled
+static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
+  if (!kDatapathStats) {
+    return;
+  } else {
+    *stat += val;
+  }
+}
 
 #define KB(x) ((size_t)(x) << 10)
 #define KB_(x) (KB(x) - 1)
@@ -115,34 +133,6 @@ static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
 
 // Simple methods
 
-/// Return the TSC
-static inline uint64_t rdtsc() {
-  uint64_t rax;
-  uint64_t rdx;
-  asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
-  return (rdx << 32) | rax;
-}
-
-/// Convert cycles measured by rdtsc with frequence \p freq_ghz to seconds
-static double to_sec(uint64_t cycles, double freq_ghz) {
-  return (cycles / (freq_ghz * 1000000000));
-}
-
-/// Convert cycles measured by rdtsc with frequence \p freq_ghz to msec
-static double to_msec(uint64_t cycles, double freq_ghz) {
-  return (cycles / (freq_ghz * 1000000));
-}
-
-/// Convert cycles measured by rdtsc with frequence \p freq_ghz to usec
-static double to_usec(uint64_t cycles, double freq_ghz) {
-  return (cycles / (freq_ghz * 1000));
-}
-
-/// Convert cycles measured by rdtsc with frequence \p freq_ghz to nsec
-static double to_nsec(uint64_t cycles, double freq_ghz) {
-  return (cycles / freq_ghz);
-}
-
 /// Emulab hostnames are very long, so trim it to just the node name.
 static std::string trim_hostname(std::string hostname) {
   if (hostname.find("emulab.net") != std::string::npos) {
@@ -150,49 +140,6 @@ static std::string trim_hostname(std::string hostname) {
     return trimmed_hostname;
   } else {
     return hostname;
-  }
-}
-
-/// Optimized (x + 1) % N
-template <size_t N>
-static constexpr size_t mod_add_one(size_t x) {
-  return (x + 1) == N ? 0 : x + 1;
-}
-
-template <typename T>
-static constexpr inline bool is_power_of_two(T x) {
-  return x && ((x & T(x - 1)) == 0);
-}
-
-template <uint64_t power_of_two_number, typename T>
-static constexpr inline T round_up(T x) {
-  static_assert(is_power_of_two(power_of_two_number),
-                "PowerOfTwoNumber must be a power of 2");
-  return ((x) + T(power_of_two_number - 1)) & (~T(power_of_two_number - 1));
-}
-
-/// Return the index of the least significant bit of x. The index of the 2^0
-/// bit is 1. (x = 0 returns 0, x = 1 returns 1.)
-static inline size_t lsb_index(int x) {
-  assert(x != 0);
-  return static_cast<size_t>(__builtin_ffs(x));
-}
-
-/// Return the index of the most significant bit of x. The index of the 2^0
-/// bit is 1. (x = 0 returns 0, x = 1 returns 1.)
-static inline size_t msb_index(int x) {
-  assert(x < std::numeric_limits<int>::max() / 2);
-  int index;
-  asm("bsrl %1, %0" : "=r"(index) : "r"(x << 1));
-  return static_cast<size_t>(index);
-}
-
-/// Collect datapath stats if datapath stats are enabled
-static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
-  if (!kDatapathStats) {
-    return;
-  } else {
-    *stat += val;
   }
 }
 

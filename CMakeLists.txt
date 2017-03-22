@@ -79,7 +79,9 @@ set(SOURCES
   src/util/huge_alloc.cc
   src/util/huge_alloc.h
   src/util/mt_list.h
+  src/util/math_utils.h
   src/util/rand.h
+  src/util/tsc.h
   src/util/udp_client.cc
   src/util/udp_client.h)
 

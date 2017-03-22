@@ -4,6 +4,7 @@
 #include "common.h"
 #include "pkthdr.h"
 #include "util/buffer.h"
+#include "util/math_utils.h"
 
 namespace ERpc {
 
