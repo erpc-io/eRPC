@@ -47,7 +47,6 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
     erpc_dprintf("eRPC Nexus: Launching background thread %zu.\n", i);
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
     bg_thread_ctx_arr[i].bg_thread_id = i;
-    bg_thread_ctx_arr[i].reg_hooks_arr = reg_hooks_arr;
 
     bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
   }
@@ -91,8 +90,19 @@ void Nexus::register_hook(NexusHook *hook) {
   assert(reg_hooks_arr[app_tid] == nullptr);
 
   nexus_lock.lock();
+
+  ops_registration_allowed = false; /* Disable future Ops registration */
   reg_hooks_arr[app_tid] = hook;
-  ops_registration_allowed = false;
+
+  /* Install background request and response submission lists */
+  for (size_t i = 0; i < num_bg_threads; i++) {
+    BgThreadCtx &bg_ctx = bg_thread_ctx_arr[i];
+    assert(bg_ctx.bg_thread_id == i);
+
+    hook->bg_req_list_arr[i] = &bg_ctx.bg_req_list; /* Request */
+    bg_ctx.bg_resp_list_arr[app_tid] = &hook->bg_resp_list;
+  }
+
   nexus_lock.unlock();
 }
 

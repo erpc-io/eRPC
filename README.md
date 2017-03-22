@@ -35,6 +35,7 @@
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
 
 ## Long-term TODOs
+ * Optimize mem-copies using `rte_memcpy`.
  * Optimize `pkthdr_0` filling using preconstructed headers.
  * The first packet size limit should be much smaller than MTU to improve RTT
    measurement accuracy (e.g., it could be around 256 bytes). This will need

@@ -69,8 +69,11 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
     throw e;
   }
 
-  /* Register the hook with the Nexus */
+  /* Register the hook with the Nexus + sanity-check background request lists */
   nexus->register_hook(&nexus_hook);
+  for (size_t i = 0; i < nexus->num_bg_threads; i++) {
+    assert(nexus_hook.bg_req_list_arr[i] != nullptr);
+  }
 
   erpc_dprintf("eRPC Rpc: Created with app TID = %u.\n", app_tid);
 }

@@ -225,6 +225,11 @@ class Rpc {
       mgmt_retry();
     }
 
+    /* Check if we have new responses from background threads */
+    if (small_msg_unlikely(nexus_hook.bg_resp_list.size > 0)) {
+      handle_bg_responses();
+    }
+
     process_completions();            /* RX */
     process_datapath_tx_work_queue(); /* TX */
   }
@@ -431,6 +436,12 @@ class Rpc {
    */
   void process_completions_large_msg_one(Session *session, const uint8_t *pkt);
 
+  /// Submit a work item for background processing
+  void submit_bg(Session *session, Session::sslot_t *sslot);
+
+  /// Handle responses from background threads
+  void handle_bg_responses();
+
   // rpc_send_response.cc
 
   /**
@@ -494,6 +505,7 @@ class Rpc {
 
   NexusHook nexus_hook; /* A hook shared with the Nexus */
   SlowRand slow_rand;
+  FastRand fast_rand;
 
   // Stats
   struct {

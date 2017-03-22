@@ -16,8 +16,9 @@ void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot) {
     resp_msgbuf = &app_resp.dyn_resp_msgbuf;
   }
 
-  size_t resp_size = resp_msgbuf->data_size;
-  assert(resp_size > 0);
+  /* Sanity-check resp_msgbuf */
+  assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic());
+  assert(resp_msgbuf->data_size > 0);
 
   // Step 1: Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();

@@ -11,9 +11,14 @@ using namespace std;
 
 namespace ERpc {
 
-/// A work item submitted to a background thread. Also a work completion.
-struct bg_work_item_t {
-  uint8_t app_tid;  ///< TID of the Rpc that submitted this request
+/// A work item submitted to a background thread.
+/// Also acts as the background work completion.
+class BgWorkItem {
+ public:
+  BgWorkItem(uint8_t app_tid, Session *session, Session::sslot_t *sslot)
+      : app_tid(app_tid), session(session), sslot(sslot) {}
+
+  const uint8_t app_tid;  ///< TID of the Rpc that submitted this request
   Session *session;
   Session::sslot_t *sslot;
 };
@@ -26,11 +31,11 @@ class NexusHook {
 
   const uint8_t app_tid;  ///< App TID of the RPC that created this hook
 
-  MtList<SessionMgmtPkt *> sm_pkt_list;   ///< Session management packet list
-  MtList<bg_work_item_t *> bg_resp_list;  ///< Background thread response list
+  MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
+  MtList<BgWorkItem> bg_resp_list;       ///< Background thread response list
 
-  /// List of background thread request submission list, filled in by the Nexus
-  MtList<bg_work_item_t *> *bg_req_list_arr[kMaxBgThreads];
+  /// Background thread request lists
+  MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
 };
 
 /// Background thread context
@@ -38,10 +43,11 @@ class BgThreadCtx {
  public:
   /// A switch used by the Nexus to turn off background threads
   volatile bool *bg_kill_switch;
+  size_t bg_thread_id;             ///< ID of the background thread
+  MtList<BgWorkItem> bg_req_list;  ///< Background thread request list
 
-  size_t bg_thread_id;                   ///< ID of the background thread
-  MtList<bg_work_item_t *> bg_req_list;  ///< The list to submit requests to
-  NexusHook **reg_hooks_arr;
+  /// Lists for submitting responses to Rpc threads
+  MtList<BgWorkItem> *bg_resp_list_arr[kMaxAppTid + 1] = {nullptr};
 };
 
 class Nexus {
