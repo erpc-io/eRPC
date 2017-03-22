@@ -31,7 +31,7 @@ struct app_context_t {
   bool is_client;
   Rpc<IBTransport> *rpc;
   Session **session_arr;
-  FastRand fastrand;
+  FastRand fastrand; /* Used for picking large message size */
 
   size_t num_sm_connect_resps = 0; /* Client-only */
   size_t num_rpc_resps = 0;        /* Client-only */
@@ -286,6 +286,7 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   MsgBuffer req_msgbuf[Session::kSessionCredits];
   for (size_t i = 0; i < Session::kSessionCredits; i++) {
     req_msgbuf[i] = rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+    ASSERT_NE(req_msgbuf[i].buf, nullptr);
   }
 
   for (size_t iter = 0; iter < 2; iter++) {
@@ -424,8 +425,8 @@ TEST(MultiLargeRpcMultiSession, Background) {
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
-  /* 2 background threads */
-  launch_server_client_threads(num_sessions, 2, multi_large_rpc_multi_session);
+  /* 3 background threads */
+  launch_server_client_threads(num_sessions, 3, multi_large_rpc_multi_session);
 }
 
 ///
