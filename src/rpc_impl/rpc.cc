@@ -107,27 +107,24 @@ template <class TTr>
 void Rpc<TTr>::bury_session(Session *session) {
   assert(session != nullptr);
 
-  /* First, free session resources */
+  if (session->is_client()) {
+    /* Server-mode sessions can never be in the retry queue */
+    assert(!mgmt_retry_queue_contains(session));
+  }
+
+  // Free session resources
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     /* Free the preallocated MsgBuffer */
     MsgBuffer &msg_buf = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
     free_msg_buffer(msg_buf);
 
-    /* XXX: Who frees the other message buffers in the slot? */
+    /* XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
+     * guaranteed to have been freed at this point? */
   }
 
-  /* Second, mark the session as NULL in the session vector */
-  uint16_t session_num;
-  if (session->is_client()) {
-    assert(!mgmt_retry_queue_contains(session));
-    session_num = session->client.session_num;
-  } else {
-    /* Server-mode sessions can never be in the retry queue */
-    session_num = session->server.session_num;
-  }
+  session_vec.at(session->local_session_num) = nullptr;
 
-  session_vec.at(session_num) = nullptr;
-  delete session;
+  delete session; /* This does nothing */
 }
 
 template <class TTr>

@@ -232,16 +232,16 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
 
   /*
    * If the connect response has an error, the server has not allocated a
-   * Session. Move the session to an error state and invoke the callback.
+   * Session. Mark the session as disconnected and invoke callback.
    */
   if (sm_pkt->err_type != SessionMgmtErrType::kNoError) {
     erpc_dprintf("%s: Error %s.\n", issue_msg,
                  session_mgmt_err_type_str(sm_pkt->err_type).c_str());
 
-    session->state = SessionState::kErrorServerEndpointAbsent;
+    session->state = SessionState::kDisconnected;
     session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
                          sm_pkt->err_type, context);
-
+    bury_session(session);
     return;
   }
 
@@ -267,20 +267,33 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
                  issue_msg);
 
     /*
-     * The server's response didn't have an error, and the server has allocated
-     * a Session. We'll try to free server resources when the client calls
-     * destroy_session().
+     * The server has allocated a Session, so we'll try to free server
+     * resources by disconnecting. The user will only get the kConnectFailed
+     * callback, i.e., no callback will be invoked when we get the disconnect
+     * response.
      *
      * We need to save the server's endpoint metadata from the packet so we
      * can send it in the subsequent disconnect request.
      */
     session->server = sm_pkt->server;
-    session->state = SessionState::kErrorServerEndpointExists;
 
-    /* This is a local error (i.e., sm_pkt did not have an error) */
+    /* This ensures that we don't invoke the disconnect callback later */
+    session->client_info.sm_callbacks_disabled = true;
+
+    /* Do what destroy_session() does with a kConnected session */
+    session->state = SessionState::kDisconnectInProgress;
+    mgmt_retry_queue_add(session); /* Checks that session is not in flight */
+
+    erpc_dprintf(
+        "eRPC Rpc %u: Sending first (callback-less) disconnect request for "
+        "session %u, and invoking kConnectFailed callback\n",
+        app_tid, session->local_session_num);
+    send_disconnect_req_one(session);
+
     session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
                          SessionMgmtErrType::kRoutingResolutionFailure,
                          context);
+
     return;
   }
 

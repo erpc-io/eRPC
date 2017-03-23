@@ -299,7 +299,9 @@ class Rpc {
   /// packets.
   void handle_session_management();
 
-  /// Free session resources and mark it as NULL in the session vector
+  /// Free a session's resources and mark it as NULL in the session vector.
+  /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
+  /// responsible for freeing user-allocated MsgBuffers.
   void bury_session(Session *session);
 
   // rpc_connect_handlers.cc

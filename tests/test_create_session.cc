@@ -22,7 +22,9 @@ char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
   size_t nb_sm_events;
+
   SessionMgmtErrType exp_err;
+  SessionState exp_state;
 
   client_context_t() { nb_sm_events = 0; }
 };
@@ -36,13 +38,12 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
   /* Check that the error type matches the expected value */
   ASSERT_EQ(sm_err_type, context->exp_err);
+  ASSERT_EQ(session->state, context->exp_state);
 
   /* If the error type is really an error, the event should be connect failed */
   if (sm_err_type == SessionMgmtErrType::kNoError) {
-    ASSERT_EQ(session->state, SessionState::kConnected);
     ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnected);
   } else {
-    ASSERT_EQ(session->state, SessionState::kErrorServerEndpointAbsent);
     ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnectFailed);
   }
 }
@@ -70,6 +71,7 @@ void simple_connect(Nexus *nexus) {
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
+  client_context->exp_state = SessionState::kConnected;
   Session *session =
       rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
   ASSERT_TRUE(session != nullptr);
@@ -108,6 +110,7 @@ void invalid_remote_port(Nexus *nexus) {
 
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
+  client_context->exp_state = SessionState::kDisconnected;
   Session *session =
       rpc.create_session(local_hostname, SERVER_APP_TID, phy_port + 1);
   ASSERT_TRUE(session != nullptr);

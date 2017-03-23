@@ -149,13 +149,12 @@ bool Rpc<TTr>::destroy_session(Session *session) {
       return false;
 
     case SessionState::kConnected:
-    case SessionState::kErrorServerEndpointExists:
       session->state = SessionState::kDisconnectInProgress;
       mgmt_retry_queue_add(session); /* Checks that session is not in flight */
 
       erpc_dprintf(
           "eRPC Rpc %u: Sending first session disconnect req for session %u.\n",
-          app_tid, session->client.session_num);
+          app_tid, session->local_session_num);
       send_disconnect_req_one(session);
       return true;
 
@@ -170,22 +169,6 @@ bool Rpc<TTr>::destroy_session(Session *session) {
           "eRPC Rpc: destroy_session() failed. Issue: "
           "Session already destroyed.\n");
       return false;
-
-    case SessionState::kErrorServerEndpointAbsent:
-      /*
-       * This happens when either we get a connect response containing an error,
-       * or when the connect request times out. In either case, we don't send a
-       * disconnect request. In case of a timeout, we leak memory at the server.
-       */
-      assert(!mgmt_retry_queue_contains(session));
-      erpc_dprintf(
-          "eRPC Rpc %u: destroy_session() succeeded for error-ed session %u.\n",
-          app_tid, session_num);
-
-      session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
-                           SessionMgmtErrType::kNoError, context);
-      bury_session(session);
-      return true;
   }
   exit(-1);
   return false;

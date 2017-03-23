@@ -27,8 +27,18 @@ class AppContext {
   Rpc<IBTransport> *rpc;
   SessionMgmtEventType exp_event;
   SessionMgmtErrType exp_err;
+  SessionState exp_state;
 
   size_t num_sm_events = 0;
+
+  /// Fill in the values expected in the next session management callback
+  void arm(SessionMgmtEventType exp_event, SessionMgmtErrType exp_err,
+           SessionState exp_state) {
+    num_sm_events = 0; /* Reset */
+    this->exp_event = exp_event;
+    this->exp_err = exp_err;
+    this->exp_state = exp_state;
+  }
 };
 
 /// The common session management handler for all subtests
@@ -43,6 +53,7 @@ void sm_handler(Session *session, SessionMgmtEventType sm_event_type,
   /* Check that the event and error types matche their expected values */
   ASSERT_EQ(sm_event_type, context->exp_event);
   ASSERT_EQ(sm_err_type, context->exp_err);
+  ASSERT_EQ(session->state, context->exp_state);
 }
 
 /// The server thread used for all subtests
@@ -71,6 +82,12 @@ void launch_server_client_threads(void (*client_thread_func)(Nexus *)) {
 
   std::thread server_thread =
       std::thread(server_thread_func, &nexus, kAppServerAppTid);
+
+  /* Wait for server before launching clients */
+  while (!server_ready) {
+    usleep(1);
+  }
+
   std::thread client_thread(client_thread_func, &nexus);
 
   server_thread.join();
@@ -100,35 +117,27 @@ void client_wait_for_sm_resps_or_timeout(const Nexus *nexus,
 
 /// Simple successful disconnection of one session, and other simple tests
 void simple_disconnect(Nexus *nexus) {
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
+  assert(server_ready);
   AppContext context;
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_handler,
                        phy_port, numa_node);
   context.rpc = &rpc;
 
   /* Connect the session */
-  context.num_sm_events = 0;
-  context.exp_event = SessionMgmtEventType::kConnected;
-  context.exp_err = SessionMgmtErrType::kNoError;
+  context.arm(SessionMgmtEventType::kConnected, SessionMgmtErrType::kNoError,
+              SessionState::kConnected);
   Session *session =
       rpc.create_session(local_hostname, kAppServerAppTid, phy_port);
 
   /* Try to disconnect the session before it is connected. This should fail. */
   ASSERT_EQ(rpc.destroy_session(session), false);
 
-  /* Connect the session */
   client_wait_for_sm_resps_or_timeout(nexus, context, 1);
-
   ASSERT_EQ(context.num_sm_events, 1); /* The connect event */
-  ASSERT_EQ(session->state, SessionState::kConnected);
 
   /* Disconnect the session */
-  context.num_sm_events = 0;
-  context.exp_event = SessionMgmtEventType::kDisconnected;
-  context.exp_err = SessionMgmtErrType::kNoError;
+  context.arm(SessionMgmtEventType::kDisconnected, SessionMgmtErrType::kNoError,
+              SessionState::kDisconnected);
   rpc.destroy_session(session);
   client_wait_for_sm_resps_or_timeout(nexus, context, 1);
 
@@ -152,9 +161,7 @@ TEST(SimpleDisconnect, SimpleDisconnect) {
 
 /// Repeat: Create a session to the server and disconnect it.
 void disconnect_multi(Nexus *nexus) {
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
+  assert(server_ready);
 
   AppContext context;
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_handler,
@@ -162,26 +169,21 @@ void disconnect_multi(Nexus *nexus) {
   context.rpc = &rpc;
 
   for (size_t i = 0; i < 3; i++) {
-    context.num_sm_events = 0;
-    context.exp_event = SessionMgmtEventType::kConnected;
-    context.exp_err = SessionMgmtErrType::kNoError;
-
     /* Connect the session */
+    context.arm(SessionMgmtEventType::kConnected, SessionMgmtErrType::kNoError,
+                SessionState::kConnected);
     Session *session =
         rpc.create_session(local_hostname, kAppServerAppTid, phy_port);
     client_wait_for_sm_resps_or_timeout(nexus, context, 1);
-
     ASSERT_EQ(context.num_sm_events, 1); /* The connect event */
-    ASSERT_EQ(session->state, SessionState::kConnected);
 
     /* Disconnect the session */
-    context.num_sm_events = 0;
-    context.exp_event = SessionMgmtEventType::kDisconnected;
-    context.exp_err = SessionMgmtErrType::kNoError;
+    context.arm(SessionMgmtEventType::kDisconnected,
+                SessionMgmtErrType::kNoError, SessionState::kDisconnected);
     rpc.destroy_session(session);
     client_wait_for_sm_resps_or_timeout(nexus, context, 1);
-
     ASSERT_EQ(context.num_sm_events, 1); /* The disconnect event */
+
     ASSERT_EQ(rpc.num_active_sessions(), 0);
   }
 
@@ -194,9 +196,7 @@ TEST(DisconnectMulti, DisconnectMulti) {
 
 /// Disconnect a session that encountered a remote error. This should succeed.
 void disconnect_remote_error(Nexus *nexus) {
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
+  assert(server_ready);
 
   AppContext context;
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_handler,
@@ -204,26 +204,19 @@ void disconnect_remote_error(Nexus *nexus) {
   context.rpc = &rpc;
 
   /* Try to create a session that uses an invalid remote port */
-  context.num_sm_events = 0;
-  context.exp_event = SessionMgmtEventType::kConnectFailed;
-  context.exp_err = SessionMgmtErrType::kInvalidRemotePort;
+  context.arm(SessionMgmtEventType::kConnectFailed,
+              SessionMgmtErrType::kInvalidRemotePort,
+              SessionState::kDisconnected);
   Session *session =
       rpc.create_session(local_hostname, kAppServerAppTid, phy_port + 1);
-
+  _unused(session);
   client_wait_for_sm_resps_or_timeout(nexus, context, 1);
-
   ASSERT_EQ(context.num_sm_events, 1); /* The connect failed event */
-  ASSERT_EQ(session->state, SessionState::kErrorServerEndpointAbsent);
 
-  /* Disconnect the session */
-  context.num_sm_events = 0;
-  context.exp_event = SessionMgmtEventType::kDisconnected;
-  context.exp_err = SessionMgmtErrType::kNoError;
-  rpc.destroy_session(session);
-
-  client_wait_for_sm_resps_or_timeout(nexus, context, 1);
-
-  ASSERT_EQ(context.num_sm_events, 1); /* The disconnect event */
+  /*
+   * After invoking the kConnectFailed callback, the Rpc event loop immediately
+   * buries the session since there are no server resources to free.
+   */
   ASSERT_EQ(rpc.num_active_sessions(), 0);
 
   client_done = true;
@@ -236,9 +229,7 @@ TEST(DisconnectRemoteError, DisconnectRemoteError) {
 /// Create a session for which the client fails to resolve the server's routing
 /// info while processing the connect response.
 void disconnect_local_error(Nexus *nexus) {
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
+  assert(server_ready);
 
   AppContext context;
   Rpc<IBTransport> rpc(nexus, (void *)&context, kAppClientAppTid, &sm_handler,
@@ -248,26 +239,21 @@ void disconnect_local_error(Nexus *nexus) {
   /* Force Rpc to fail remote routing info resolution at client */
   rpc.testing_fail_resolve_remote_rinfo_client = true;
 
-  context.num_sm_events = 0;
-  context.exp_event = SessionMgmtEventType::kConnectFailed;
-  context.exp_err = SessionMgmtErrType::kRoutingResolutionFailure;
+  context.arm(SessionMgmtEventType::kConnectFailed,
+              SessionMgmtErrType::kRoutingResolutionFailure,
+              SessionState::kDisconnectInProgress);
   Session *session =
       rpc.create_session(local_hostname, kAppServerAppTid, phy_port);
-
+  _unused(session);
   client_wait_for_sm_resps_or_timeout(nexus, context, 1);
-
   ASSERT_EQ(context.num_sm_events, 1); /* The connect failed event */
-  ASSERT_EQ(session->state, SessionState::kErrorServerEndpointExists);
 
-  /* Disconnect the session */
-  context.num_sm_events = 0;
-  context.exp_event = SessionMgmtEventType::kDisconnected;
-  context.exp_err = SessionMgmtErrType::kNoError;
-  rpc.destroy_session(session);
-
-  client_wait_for_sm_resps_or_timeout(nexus, context, 1);
-
-  ASSERT_EQ(context.num_sm_events, 1); /* The disconnect event */
+  /*
+   * After invoking the kConnectFailed callback, the Rpc event loop tries to
+   * free resources at the server. This won't invoke a callback, so just wait
+   * for it.
+   */
+  rpc.run_event_loop_timeout(kAppEventLoopMs);
   ASSERT_EQ(rpc.num_active_sessions(), 0);
 
   client_done = true;

@@ -30,14 +30,12 @@ static const uint32_t kInvalidSecret = 0;
 /// Session state that can only go forward.
 enum class SessionState {
   kConnectInProgress,
-  kConnected,                  ///< The only state for server-side sessions
-  kErrorServerEndpointExists,  ///< Only for client-side sessions
+  kConnected,  ///< The only state for server-side sessions
   kDisconnectInProgress,
   kDisconnected,  ///< Temporary state just for the disconnected callback
-  kErrorServerEndpointAbsent  ///< Only for client-side sessions
 };
 
-/// High-level types of packets used for session management
+/// Packet types used for session management
 enum class SessionMgmtPktType : int {
   kConnectReq,
   kConnectResp,
@@ -70,14 +68,10 @@ static std::string session_state_str(SessionState state) {
       return std::string("[Connect in progress]");
     case SessionState::kConnected:
       return std::string("[Connected]");
-    case SessionState::kErrorServerEndpointExists:
-      return std::string("[Error (but server endpoint exists)");
     case SessionState::kDisconnectInProgress:
       return std::string("[Disconnect in progress]");
     case SessionState::kDisconnected:
       return std::string("[Disconnected]");
-    case SessionState::kErrorServerEndpointAbsent:
-      return std::string("[Error (and server endpoint is absent)]");
   }
   return std::string("[Invalid state]");
 }
@@ -264,9 +258,9 @@ class SessionEndpoint {
 class SessionMgmtPkt {
  public:
   SessionMgmtPktType pkt_type;
-  SessionMgmtErrType err_type; /* For responses only */
+  SessionMgmtErrType err_type;  ///< Error type, for responses only
 
-  SessionEndpoint client, server; /* Filled in by client and server Rpc */
+  SessionEndpoint client, server;  ///< Endpoint metadata
 
   SessionMgmtPkt() {}
   SessionMgmtPkt(SessionMgmtPktType pkt_type) : pkt_type(pkt_type) {}

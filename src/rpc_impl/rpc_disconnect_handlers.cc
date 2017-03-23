@@ -82,11 +82,12 @@ void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   }
 
   /*
-   * If we are here, this is the first disconnect response, so we must be in
-   * the kDisconnectInProgress state, and the disconnect request should be in
-   * flight. It's not possible to also have a connect request in flight, since
+   * If we are here, this is the first disconnect response, so we must be in the
+   * kDisconnectInProgress state, and the disconnect req should be in flight.
+   *
+   * It's not possible to also have a connect request in flight, since
    * the disconnect must wait for the first connect response, at which point
-   * the connect response is removed from the in-flight list.
+   * the connect request is removed from the in-flight list.
    */
   assert(session->state == SessionState::kDisconnectInProgress);
   assert(mgmt_retry_queue_contains(session));
@@ -103,9 +104,17 @@ void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->err_type == SessionMgmtErrType::kNoError);
 
   session->state = SessionState::kDisconnected; /* Mark session connected */
-  erpc_dprintf("%s: None. Session disconnected.\n", issue_msg);
-  session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
-                       SessionMgmtErrType::kNoError, context);
+
+  if (!session->client_info.sm_callbacks_disabled) {
+    erpc_dprintf("%s: None. Session disconnected.\n", issue_msg);
+    session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
+                         SessionMgmtErrType::kNoError, context);
+  } else {
+    erpc_dprintf(
+        "%s: None. Session disconnected. Not invoking disconnect "
+        "callback because session was never connected successfully.",
+        issue_msg);
+  }
 
   bury_session(session); /* Free session resources + NULL-ify in session_vec */
 }

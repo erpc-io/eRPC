@@ -115,11 +115,11 @@ class Session {
 
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
-  SessionEndpoint client, server;           ///< Read-only endpoint metadata
+  SessionEndpoint client, server;  ///< Read-only endpoint metadata
+
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
   bool in_datapath_tx_work_queue = false;   ///< Is session in tx work queue?
-
-  sslot_t sslot_arr[kSessionReqWindow];                   ///< The session slots
+  sslot_t sslot_arr[kSessionReqWindow];     ///< The session slots
   FixedVector<size_t, kSessionReqWindow> sslot_free_vec;  ///< Free slots
 
   ///@{ Info saved for faster unconditional access
@@ -134,6 +134,10 @@ class Session {
 
   /// Information that is required only at the client endpoint
   struct {
+    /// We disable the disconnect callback if session connection fails despite
+    /// getting an error-free connect response
+    bool sm_callbacks_disabled = false;
+
     uint64_t mgmt_req_tsc;  ///< Timestamp of the last management request
     bool is_cc = false;     ///< True if this session is congestion controlled
   } client_info;
