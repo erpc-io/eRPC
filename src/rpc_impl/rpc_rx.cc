@@ -56,7 +56,7 @@ void Rpc<TTr>::process_completions() {
 
     assert(pkthdr->is_req() || pkthdr->is_resp());
 
-    if (small_msg_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
+    if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
       /* Optimize for when the received packet is a single-packet message */
       process_completions_small_msg_one(session, pkt);
     } else {
@@ -115,7 +115,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
     /* Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf) */
     bury_sslot_tx_msgbuf(sslot);
 
-    if (small_msg_likely(!ops.run_in_background)) {
+    if (small_rpc_likely(!ops.run_in_background)) {
       /* Create a "fake" static MsgBuffer for the foreground request handler */
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
       sslot.rx_msgbuf.pkts_rcvd = 1;
@@ -211,7 +211,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   } else {
     assert(session->is_client());
 
-    /* Sanity-check the user's request MsgBuffer. This always has a Buffer. */
+    /* Sanity-check the request MsgBuffer, which may be statically allocated */
     const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
     assert(req_msgbuf != nullptr);
@@ -301,7 +301,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
 
   /* If we're here, we received all packets of this message */
   if (pkthdr->is_req()) {
-    if (small_msg_likely(!ops.run_in_background)) {
+    if (small_rpc_likely(!ops.run_in_background)) {
       ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
 
       /* This uses sslot.rx_msgbuf for pkt header, so delay burying rx_msgbuf */

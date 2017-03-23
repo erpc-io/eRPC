@@ -26,13 +26,6 @@ static constexpr bool kDatapathStats = true;  ///< Collect stats on the datapath
 // Perf defines
 static constexpr bool kDatapathChecks = true;  ///< Return error on invalid args
 
-/// This controls how much the code is optimized at compile time for the special
-/// case of small messages and foreground request handlers.
-/// This helps understand the overhead of supporting large messages and
-/// background request handlers.
-#define small_msg_opt_level 1
-static_assert(small_msg_opt_level >= 0 && small_msg_opt_level <= 2, "");
-
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \
   do {                                   \
@@ -70,26 +63,6 @@ static_assert(small_msg_opt_level >= 0 && small_msg_opt_level <= 2, "");
 #define _unused(x) ((void)(x)) /* Make production build happy */
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
-
-#if small_msg_opt_level == 0
-/* No optimization for small message */
-#define small_msg_likely(x) (x)
-#define small_msg_unlikely(x) (x)
-#elif small_msg_opt_level == 1
-/* Small messages are very likely */
-#define small_msg_likely(x) likely(x)
-#define small_msg_unlikely(x) unlikely(x)
-#elif small_msg_opt_level == 2
-/* Small messages are the only type of messages */
-static constexpr bool small_msg_likely(x) {
-  assert(x);
-  return true;
-}
-static constexpr bool small_msg_unlikely(x) {
-  assert(!x);
-  return false;
-}
-#endif
 
 /// Collect datapath stats if datapath stats are enabled
 static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {

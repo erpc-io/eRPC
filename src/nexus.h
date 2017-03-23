@@ -8,6 +8,7 @@
 #include "common.h"
 #include "session.h"
 #include "session_mgmt_types.h"
+#include "small_rpc_optlevel.h"
 #include "util/mt_list.h"
 
 namespace ERpc {

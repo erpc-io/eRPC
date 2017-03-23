@@ -32,8 +32,8 @@ class AppContext {
   bool is_client;
   Rpc<IBTransport> *rpc;
   Session **session_arr;
-  FastRand fastrand; ///< Used for picking large message sizes
-  std::mutex lock;   ///< Lock for thread-safe request handler
+  FastRand fastrand;  ///< Used for picking large message sizes
+  std::mutex lock;    ///< Lock for thread-safe request handler
 
   size_t num_sm_connect_resps = 0; /* Client-only */
   size_t num_rpc_resps = 0;        /* Client-only */
@@ -64,18 +64,25 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
   ASSERT_FALSE(context->is_client);
 
   size_t req_size = req_msgbuf->get_data_size();
-  test_printf("Server: Received request of length %zu\n", req_size);
 
   app_resp->prealloc_used = false;
 
   /* Only the MsgBuffer allocation needs to be thread safe */
   context->lock.lock();
+
   app_resp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
   ASSERT_NE(app_resp->dyn_resp_msgbuf.buf, nullptr);
+  size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
+
   context->lock.unlock();
 
   memcpy((char *)app_resp->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
          req_size);
+
+  test_printf(
+      "Server: Received request of length %zu. "
+      "Rpc memory used = %zu bytes (%.3f MB)\n",
+      req_size, user_alloc_tot, (double)user_alloc_tot / MB(1));
 }
 
 /// The common response handler for all subtests. This checks that the request
@@ -475,8 +482,8 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
         }
         req_msgbuf[req_i].buf[req_len - 1] = 0;
 
-        test_printf("test: Iter %zu: Sending request of length = %zu\n",
-                    iter, req_len);
+        test_printf("test: Iter %zu: Sending request of length = %zu\n", iter,
+                    req_len);
 
         int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
                                        &req_msgbuf[req_i]);

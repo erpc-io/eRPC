@@ -10,7 +10,7 @@ void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot) {
   MsgBuffer *resp_msgbuf;
   app_resp_t &app_resp = sslot.app_resp;
 
-  if (small_msg_likely(app_resp.prealloc_used)) {
+  if (small_rpc_likely(app_resp.prealloc_used)) {
     resp_msgbuf = &app_resp.pre_resp_msgbuf;
   } else {
     resp_msgbuf = &app_resp.dyn_resp_msgbuf;
@@ -32,7 +32,7 @@ void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot) {
   assert(resp_pkthdr_0->is_valid());
 
   // Step 2: Fill in non-zeroth packet headers, if any
-  if (small_msg_unlikely(resp_msgbuf->num_pkts > 1)) {
+  if (small_rpc_unlikely(resp_msgbuf->num_pkts > 1)) {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and
      * changing only the required fields. All non-first response packets are

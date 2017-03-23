@@ -62,7 +62,7 @@ int Rpc<TTr>::enqueue_request(Session *session, uint8_t req_type,
   assert(pkthdr_0->is_valid());
 
   // Step 2: Fill in non-zeroth packet headers, if any
-  if (small_msg_unlikely(req_msgbuf->num_pkts > 1)) {
+  if (small_rpc_unlikely(req_msgbuf->num_pkts > 1)) {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and
      * changing only the required fields. All request packets are Unexpected.

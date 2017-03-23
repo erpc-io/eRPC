@@ -74,13 +74,15 @@ class HugeAlloc {
   ~HugeAlloc();
 
   /**
-   * @brief Allocate a Buffer
+   * @brief Allocate a Buffer. The actual allocation is done in
+   * \p alloc_from_class.
    *
    * @param size The minimum size of the allocated Buffer. \p size need not
    * equal a class size.
    *
    * @return The allocated buffer. The buffer is invalid if we ran out of
-   * memory.
+   * memory. The \p class_size of the allocated Buffer is equal to a
+   * HugeAlloc class size.
    *
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic
@@ -141,17 +143,26 @@ class HugeAlloc {
   /// Free a Buffer
   inline void free_buf(Buffer buffer) {
     assert(buffer.buf != nullptr);
+
     size_t size_class = get_class(buffer.class_size);
     assert(class_max_size(size_class) == buffer.class_size);
+
     freelist[size_class].push_back(buffer);
+    stats.user_alloc_tot -= buffer.class_size;
   }
 
   inline size_t get_numa_node() { return numa_node; }
 
-  /// Return the total amount of memory reserved as hugepages.
-  inline size_t get_reserved_memory() {
-    assert(stat_memory_reserved % kHugepageSize == 0);
-    return stat_memory_reserved;
+  /// Return the total amount of memory reserved as hugepages
+  inline size_t get_stat_shm_reserved() const {
+    assert(stats.shm_reserved % kHugepageSize == 0);
+    return stats.shm_reserved;
+  }
+
+  /// Return the total amoung of memory allocated to the user
+  inline size_t get_stat_user_alloc_tot() const {
+    assert(stats.user_alloc_tot % kMinClassSize == 0);
+    return stats.user_alloc_tot;
   }
 
   /// Create a cache of at lease \p num_buffers Buffers of size at least
@@ -217,6 +228,8 @@ class HugeAlloc {
     assert(buffer.class_size = class_max_size(size_class));
     freelist[size_class].pop_back();
 
+    stats.user_alloc_tot += buffer.class_size;
+
     return buffer;
   }
 
@@ -245,8 +258,14 @@ class HugeAlloc {
   dereg_mr_func_t dereg_mr_func;
 
   size_t prev_allocation_size;  ///< Size of previous hugepage reservation
-  size_t stat_memory_reserved;  ///< Total hugepage memory reserved by allocator
+
+  // Stats
+  struct {
+    size_t shm_reserved = 0;    ///< Total hugepage memory reserved by allocator
+    size_t user_alloc_tot = 0;  ///< Total memory allocated to user
+  } stats;
 };
+
 }  // End ERpc
 
 #endif  // ERPC_HUGE_ALLOC_H

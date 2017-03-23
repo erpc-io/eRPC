@@ -87,6 +87,8 @@ class Rpc {
 
   ~Rpc();
 
+  // Allocator functions
+
   /**
    * @brief Create a hugepage-backed MsgBuffer for the eRPC user.
    * The returned MsgBuffer's \p buf is surrounded by packet headers that the
@@ -106,7 +108,7 @@ class Rpc {
     size_t max_num_pkts;
 
     /* Avoid division for small packets */
-    if (small_msg_likely(max_data_size <= TTr::kMaxDataPerPkt)) {
+    if (small_rpc_likely(max_data_size <= TTr::kMaxDataPerPkt)) {
       max_num_pkts = 1;
     } else {
       max_num_pkts =
@@ -136,7 +138,7 @@ class Rpc {
     size_t new_num_pkts;
 
     /* Avoid division for small packets */
-    if (small_msg_likely(new_data_size <= TTr::kMaxDataPerPkt)) {
+    if (small_rpc_likely(new_data_size <= TTr::kMaxDataPerPkt)) {
       new_num_pkts = 1;
     } else {
       new_num_pkts =
@@ -150,6 +152,11 @@ class Rpc {
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     assert(msg_buffer.is_dynamic() && msg_buffer.check_magic());
     huge_alloc->free_buf(msg_buffer.buffer);
+  }
+
+  /// Return the total amount of memory allocated to the user
+  inline size_t get_stat_user_alloc_tot() {
+    return huge_alloc->get_stat_user_alloc_tot();
   }
 
   // rpc_sm_api.cc
@@ -227,7 +234,7 @@ class Rpc {
     }
 
     /* Check if we have new responses from background threads */
-    if (small_msg_unlikely(nexus_hook.bg_resp_list.size > 0)) {
+    if (small_rpc_unlikely(nexus_hook.bg_resp_list.size > 0)) {
       handle_bg_responses();
     }
 
@@ -346,7 +353,7 @@ class Rpc {
      * The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
      * Its buf can be non-NULL even when dynamic allocation is not used.
      */
-    if (small_msg_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
+    if (small_rpc_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
       /* This check is OK, since this sslot must be initialized */
       assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
       free_msg_buffer(*tx_msgbuf);
@@ -380,7 +387,7 @@ class Rpc {
      * The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
      * Its buf can be non-NULL even when dynamic allocation is not used.
      */
-    if (small_msg_unlikely(rx_msgbuf.is_dynamic())) {
+    if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
       /* This check is OK, since this sslot must be initialized */
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);

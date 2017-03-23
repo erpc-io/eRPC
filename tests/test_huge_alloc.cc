@@ -161,13 +161,13 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
         test_printf(
             "Fraction of system memory reserved by alloc at "
             "failure = %.2f (best = 1.0)\n",
-            (double)alloc->get_reserved_memory() /
+            (double)alloc->get_stat_shm_reserved() /
                 (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
 
         test_printf(
             "Fraction of memory reserved allocated to user = %.2f "
             "(best = 1.0)\n",
-            (double)app_memory / alloc->get_reserved_memory());
+            (double)app_memory / alloc->get_stat_shm_reserved());
 
         break;
       } else {
@@ -216,11 +216,11 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
       test_printf(
           "Fraction of system memory reserved by alloc at "
           "failure = %.2f\n",
-          (double)alloc->get_reserved_memory() /
+          (double)alloc->get_stat_shm_reserved() /
               (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
 
       test_printf("Fraction of memory reserved allocated to user = %.2f\n",
-                  ((double)app_memory / alloc->get_reserved_memory()));
+                  ((double)app_memory / alloc->get_stat_shm_reserved()));
       break;
     } else {
       EXPECT_EQ(buffer.lkey, DUMMY_LKEY);

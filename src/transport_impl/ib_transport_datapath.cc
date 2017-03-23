@@ -39,7 +39,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     /* Set signaling flag. The work request is non-inline by default. */
     wr.send_flags = get_signaled_flag();
 
-    if (small_msg_likely(item.offset == 0)) {
+    if (small_rpc_likely(item.offset == 0)) {
       /*
        * This is the first packet, so we need only 1 SGE. This can be a credit
        * return packet.

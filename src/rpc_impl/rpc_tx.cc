@@ -50,7 +50,7 @@ void Rpc<TTr>::process_datapath_tx_work_queue() {
         assert(pkthdr_0->is_resp() || pkthdr_0->is_credit_return());
       }
 
-      if (small_msg_likely(tx_msgbuf->num_pkts == 1)) {
+      if (small_rpc_likely(tx_msgbuf->num_pkts == 1)) {
         /* Optimize for small/credit-return messages that fit in one packet */
         process_datapath_tx_work_queue_single_pkt_one(session, tx_msgbuf);
       } else {

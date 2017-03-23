@@ -7,8 +7,7 @@ HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
                      reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func)
     : numa_node(numa_node),
       reg_mr_func(reg_mr_func),
-      dereg_mr_func(dereg_mr_func),
-      stat_memory_reserved(0) {
+      dereg_mr_func(dereg_mr_func) {
   assert(numa_node <= kMaxNumaNodes);
 
   if (initial_size < kMaxClassSize) {
@@ -62,8 +61,10 @@ bool HugeAlloc::create_cache(size_t size, size_t num_buffers) {
 
 void HugeAlloc::print_stats() {
   fprintf(stderr, "eRPC HugeAlloc stats:\n");
-  fprintf(stderr, "Total reserved memory = %zu bytes (%.2f MB)\n",
-          stat_memory_reserved, (double)stat_memory_reserved / MB(1));
+  fprintf(stderr, "Total reserved SHM = %zu bytes (%.2f MB)\n",
+          stats.shm_reserved, (double)stats.shm_reserved / MB(1));
+  fprintf(stderr, "Total memory allocated to user = %zu bytes (%.2f MB)\n",
+          stats.user_alloc_tot, (double)stats.user_alloc_tot / MB(1));
 
   fprintf(stderr, "%zu SHM regions\n", shm_list.size());
   size_t shm_region_index = 0;
@@ -164,7 +165,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   MemRegInfo reg_info = reg_mr_func(shm_buf, size);
 
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size, reg_info));
-  stat_memory_reserved += size;
+  stats.shm_reserved += size;
 
   /* Add Buffers to the largest class */
   size_t num_buffers = size / kMaxClassSize;

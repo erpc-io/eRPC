@@ -66,6 +66,7 @@ set(SOURCES
   src/rpc_impl/rpc_disconnect_handlers.cc
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_retry.cc
+  src/small_rpc_optlevel.h
   src/session.cc
   src/session.h
   src/transport.cc
