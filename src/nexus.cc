@@ -39,6 +39,14 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
     throw std::runtime_error("eRPC Nexus: UDP drop probability too high.");
   }
 
+#if (small_rpc_optlevel == small_rpc_optlevel_extreme)
+  if (num_bg_threads > 0) {
+    throw std::runtime_error(
+        "eRPC Nexus: Background threads not supported with "
+        "small_rpc_optlevel_extreme.");
+  }
+#endif
+
   nexus_object = this;
 
   // Launch background threads

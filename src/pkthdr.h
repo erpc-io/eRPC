@@ -88,8 +88,10 @@ struct pkthdr_t {
   inline bool is_valid() const { return magic == kPktHdrMagic; }
 } __attribute__((packed));
 
+/* pkthdr_t should be a power of 2 for cheap multiplication */
 static_assert(sizeof(pkthdr_t) == 16, "");
-/* Cover all the bitfields to make copying cheaper */
+
+/* Cover all the bits to make copying cheaper */
 static_assert(8 + kMsgSizeBits + 16 + 2 + 1 + kPktNumBits + kReqNumBits +
                       kPktHdrMagicBits ==
                   128,

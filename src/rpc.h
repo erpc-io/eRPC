@@ -89,8 +89,27 @@ class Rpc {
 
   // Allocator functions
 
+  /// Lock the hugepage allocator if locking is needed, i.e., background
+  /// threads are enabled
+  inline void do_huge_alloc_lock_cond() {
+    if (small_rpc_unlikely(need_alloc_lock)) {
+      huge_alloc_lock.lock();
+    }
+  }
+
+  /// Unlock the hugepage allocator if locking is needed, i.e., background
+  /// threads are enabled
+  inline void do_huge_alloc_unlock_cond() {
+    if (small_rpc_unlikely(need_alloc_lock)) {
+      huge_alloc_lock.unlock();
+    }
+  }
+
   /**
-   * @brief Create a hugepage-backed MsgBuffer for the eRPC user.
+   * @brief Create a hugepage-backed MsgBuffer for the eRPC user. This
+   * function is thread-safe if the small RPC optimization level is not
+   * set to extreme.
+   *
    * The returned MsgBuffer's \p buf is surrounded by packet headers that the
    * user must not modify. This function does not fill in these message headers,
    * though it sets the magic field in the zeroth header.
@@ -115,9 +134,11 @@ class Rpc {
           (max_data_size + (TTr::kMaxDataPerPkt - 1)) / TTr::kMaxDataPerPkt;
     }
 
-    static_assert(is_power_of_two(sizeof(pkthdr_t)), ""); /* For bit shift */
+    do_huge_alloc_lock_cond();
     Buffer buffer =
         huge_alloc->alloc(max_data_size + (max_num_pkts * sizeof(pkthdr_t)));
+    do_huge_alloc_unlock_cond();
+
     if (unlikely(buffer.buf == nullptr)) {
       MsgBuffer msg_buffer;
       msg_buffer.buf = nullptr;
@@ -128,7 +149,8 @@ class Rpc {
     return msg_buffer;
   }
 
-  /// Resize a MsgBuffer. This does not modify any headers.
+  /// Resize a MsgBuffer to a smaller size than its max allocation.
+  /// This does not modify the MsgBuffer's packet headers.
   static inline void resize_msg_buffer(MsgBuffer *msg_buffer,
                                        size_t new_data_size) {
     assert(msg_buffer != nullptr);
@@ -151,12 +173,18 @@ class Rpc {
   /// Free a MsgBuffer allocated using alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     assert(msg_buffer.is_dynamic() && msg_buffer.check_magic());
+
+    do_huge_alloc_lock_cond();
     huge_alloc->free_buf(msg_buffer.buffer);
+    do_huge_alloc_unlock_cond();
   }
 
   /// Return the total amount of memory allocated to the user
   inline size_t get_stat_user_alloc_tot() {
-    return huge_alloc->get_stat_user_alloc_tot();
+    do_huge_alloc_lock_cond();
+    size_t ret = huge_alloc->get_stat_user_alloc_tot();
+    do_huge_alloc_unlock_cond();
+    return ret;
   }
 
   // rpc_sm_api.cc
@@ -474,12 +502,18 @@ class Rpc {
   size_t numa_node;
 
   // Others
-  TTr *transport = nullptr;         ///< The unreliable transport
+  TTr *transport = nullptr;  ///< The unreliable transport
+
+  /// A lock to guard the allocator, used iff background threads are enabled
+  std::mutex huge_alloc_lock;
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
-  size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available unexpe pkt slots
+  /// We need the allocator lock iff the Nexus has background threads
+  const bool need_alloc_lock;
 
   uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
+
+  size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available Unexp pkt slots
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.

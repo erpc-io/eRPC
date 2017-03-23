@@ -33,7 +33,6 @@ class AppContext {
   Rpc<IBTransport> *rpc;
   Session **session_arr;
   FastRand fastrand;  ///< Used for picking large message sizes
-  std::mutex lock;    ///< Lock for thread-safe request handler
 
   size_t num_sm_connect_resps = 0; /* Client-only */
   size_t num_rpc_resps = 0;        /* Client-only */
@@ -67,14 +66,10 @@ void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
 
   app_resp->prealloc_used = false;
 
-  /* Only the MsgBuffer allocation needs to be thread safe */
-  context->lock.lock();
-
+  /* MsgBuffer allocation is thread safe */
   app_resp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
   ASSERT_NE(app_resp->dyn_resp_msgbuf.buf, nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
-
-  context->lock.unlock();
 
   memcpy((char *)app_resp->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
          req_size);

@@ -40,7 +40,8 @@ class Nexus {
    * listen for session management packets
    *
    * @param num_bg_threads The number of background RPC request processing
-   * threads to launch
+   * threads to launch. This requires small_rpc_optlevel to not be
+   * small_rpc_optlevel_extreme, which does not support background threads.
    *
    * @param udp_drop_prob The probability that a session management packet
    * will be dropped. This is useful for testing session management packet
