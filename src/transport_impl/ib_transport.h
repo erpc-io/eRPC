@@ -21,6 +21,7 @@ class IBTransport : public Transport {
 
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, ""); /* Capacity check */
   static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
+  static_assert(kMaxInline >= kMinInline, ""); /* For inline credit returns */
 
   // Derived constants
 

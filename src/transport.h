@@ -19,8 +19,12 @@ namespace ERpc {
 class Transport {
  public:
   // Queue depths
-  static const size_t kRecvQueueDepth = 2048;  ///< RECV queue size
-  static const size_t kSendQueueDepth = 128;   ///< SEND queue size
+  static constexpr size_t kRecvQueueDepth = 2048;  ///< RECV queue size
+  static constexpr size_t kSendQueueDepth = 128;   ///< SEND queue size
+
+  /// The transport must allow inline posting of the packet header, as we
+  /// don't maintain DMA-able MsgBuffers for credit returns.
+  static constexpr size_t kMinInline = sizeof(pkthdr_t);
 
   static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
   static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");

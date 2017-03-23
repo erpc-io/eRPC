@@ -29,10 +29,6 @@
    * RPC request handlers must be thread-safe if background threads are used.
 
 ## Short-term TODOs
- * If we refactor background threads out of Nexus, remove Nexus as a friend
-   class of MsgBuffer.
- * Ensure that credit returns can be sent inline in any transport: We don't
-   create them in DMA buffers.
  * Reduce time taken by `test_destroy_session`.
  * Move all max limits to an `erpc_limits.h` file.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving

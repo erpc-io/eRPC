@@ -17,6 +17,7 @@ void Rpc<TTr>::send_credit_return_now(Session *session) {
   cr_pkthdr.req_num = kInvalidReqNum;
   cr_pkthdr.magic = kPktHdrMagic;
 
+  // Step 2: Create a "fake" static MsgBuffer for inline tx_burst
   MsgBuffer cr_msgbuf = MsgBuffer((uint8_t *)&cr_pkthdr, 0);
   cr_msgbuf.pkts_queued = 1;
 

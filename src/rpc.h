@@ -490,7 +490,7 @@ class Rpc {
   void enqueue_response(Session *session, Session::sslot_t &sslot);
 
   /// Send a credit return for this session immediately, i.e., this must not be
-  /// rescheduled.
+  /// rescheduled
   void send_credit_return_now(Session *session);
 
   // Constructor args
