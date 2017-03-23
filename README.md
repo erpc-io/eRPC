@@ -17,7 +17,7 @@
  * Do not append integers directly to string streams. If the integer is
    `uint8_t`, it will get interpreted as a character.
  * Do not initialize struct/class members in the struct/class definition
-   (except maybe in major classes like Rpc/Nexus/Session). This just causes
+   (except maybe in major classes like Rpc/Nexus/Session). This only causes
    confusion.
 
 ## API notes
@@ -29,8 +29,8 @@
    * RPC request handlers must be thread-safe if background threads are used.
 
 ## Short-term TODOs
- * Reduce time taken by `test_destroy_session`.
- * Move all max limits to an `erpc_limits.h` file.
+ * If the sm connect callback is kConnectFailed, then user should not have
+   to invoke destroy-session().
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
