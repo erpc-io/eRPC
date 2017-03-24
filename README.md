@@ -29,8 +29,6 @@
    * RPC request handlers must be thread-safe if background threads are used.
 
 ## Short-term TODOs
- * If the sm connect callback is kConnectFailed, then user should not have
-   to invoke destroy-session().
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?

@@ -121,9 +121,11 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
 
   if (num_bg_threads == 0) {
-    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler,
+                                        ReqHandlerType::kForeground));
   } else {
-    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler, true));
+    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler,
+                                        ReqHandlerType::kBackground));
   }
 
   server_ready = false;

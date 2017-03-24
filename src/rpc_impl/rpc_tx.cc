@@ -84,7 +84,7 @@ void Rpc<TTr>::process_datapath_tx_work_queue() {
 template <class TTr>
 void Rpc<TTr>::process_datapath_tx_work_queue_single_pkt_one(
     Session *session, MsgBuffer *tx_msgbuf) {
-  assert(tx_msgbuf->pkts_queued == 0);
+  assert(tx_msgbuf->num_pkts == 1 && tx_msgbuf->pkts_queued == 0);
   assert(tx_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
   const pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0();
@@ -137,36 +137,54 @@ void Rpc<TTr>::process_datapath_tx_work_queue_single_pkt_one(
 template <class TTr>
 void Rpc<TTr>::process_datapath_tx_work_queue_multi_pkt_one(
     Session *session, MsgBuffer *tx_msgbuf) {
-  assert(tx_msgbuf->num_pkts > 1); /* Must be a multi-packet message */
+  assert(tx_msgbuf->num_pkts > 1 &&
+         tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 
   /* A multi-packet message cannot be a credit return */
   uint64_t pkt_type = tx_msgbuf->get_pkt_type();
   assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeResp);
 
   size_t pkts_pending = tx_msgbuf->num_pkts - tx_msgbuf->pkts_queued; /* >= 1 */
-  size_t min_of_credits = std::min(session->remote_credits, unexp_credits);
+  const size_t min_of_credits =
+      std::min(session->remote_credits, unexp_credits);
 
-  size_t now_sending;
+  /* The number of packets (Expected or Unexpected) that we will send */
+  size_t now_sending = 0;
+  size_t available_credits = min_of_credits;
 
-  if (pkt_type == kPktTypeReq || tx_msgbuf->pkts_queued >= 1) {
-    /* All request packets, and non-first response packets are Unexpected */
-    now_sending = std::min(pkts_pending, min_of_credits);
-    unexp_credits -= now_sending;
-    session->remote_credits -= now_sending;
-  } else {
-    /*
-     * This is a response message for which no packet has been sent. We're going
-     * to send at least the first (Expected) packet, as it does not require
-     * credits.
-     */
-    now_sending = 1 + std::min(pkts_pending - 1, min_of_credits);
+  /*
+   * It's possible to compute now_sending in O(1), but it's more complicated.
+   * This is O(1) per packet sent, and uses header info filled in by
+   * enqueue_request() or enqueue_response().
+   */
+  for (size_t i = tx_msgbuf->pkts_queued; i < tx_msgbuf->num_pkts; i++) {
+    pkthdr_t *pkthdr_i =
+        i == 0 ? tx_msgbuf->get_pkthdr_0() : tx_msgbuf->get_pkthdr_n(i);
 
-    /* Response packets except the first use Unexpected credits */
-    unexp_credits -= (now_sending - 1);
-    session->remote_credits -= (now_sending - 1);
+    if (pkthdr_i->is_unexp == 0) {
+      /* Expected packets don't need credits */
+      now_sending++;
+    } else {
+      if (available_credits > 0) {
+        now_sending++;
+        available_credits--;
+
+        /* Update credits tracking */
+        session->remote_credits--;
+        unexp_credits--;
+      } else {
+        /*
+         * We cannot send this packet, so we're done. There are no more
+         * Expected packets in this message. (Even if there were Expected
+         * packets, we wouldn't send them out of order.)
+         */
+        break;
+      }
+    }
   }
 
   if (now_sending == 0) {
+    /* This can happen too frequently, so don't print a message here */
     assert(min_of_credits == 0);
 
     if (session->remote_credits == 0) {

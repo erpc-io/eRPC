@@ -26,31 +26,43 @@ typedef void (*erpc_resp_handler_t)(const MsgBuffer *req_msgbuf,
                                     const MsgBuffer *resp_msgbuf,
                                     void *context);
 
+/// The foreground or background type of the request handler. Response handlers
+/// always run in the foreground.
+enum class ReqHandlerType : bool { kForeground, kBackground };
+
 /// The application-specified eRPC request and response handlers. An \p Ops
 /// object is invalid if either of the two function pointers are NULL.
 class Ops {
  public:
   erpc_req_handler_t req_handler;
   erpc_resp_handler_t resp_handler;
-  bool run_in_background;  ///< Should request handler run in the background?
+  ReqHandlerType req_handler_type;  ///< Foreground/background type
+
+  inline bool is_req_handler_foreground() const {
+    return req_handler_type == ReqHandlerType::kForeground;
+  }
+
+  inline bool is_req_handler_background() const {
+    return req_handler_type == ReqHandlerType::kBackground;
+  }
 
   Ops() {
-    run_in_background = false;
     req_handler = nullptr;
     resp_handler = nullptr;
   }
 
   Ops(erpc_req_handler_t req_handler, erpc_resp_handler_t resp_handler,
-      bool run_in_background = false)
+      ReqHandlerType req_handler_type)
       : req_handler(req_handler),
         resp_handler(resp_handler),
-        run_in_background(run_in_background) {
+        req_handler_type(req_handler_type) {
     if (req_handler == nullptr || resp_handler == nullptr) {
       throw std::runtime_error("Invalid Ops with NULL handler function");
     }
   }
 
-  inline bool is_valid() const {
+  /// Check if handlers have been registered for this Ops
+  inline bool is_registered() const {
     return req_handler != nullptr; /* Checking one is good enough */
   }
 };

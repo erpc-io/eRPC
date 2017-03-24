@@ -13,12 +13,13 @@ static constexpr size_t kReqNumBits = 44;   ///< Bits for request number
 static constexpr size_t kInvalidReqNum = ((1ull << kReqNumBits) - 1);
 static constexpr size_t kPktNumBits = 13;  ///< Bits for packet number
 
-/// Debug bits for packet header. Also useful for sizing pkthdr_t to 128 bits.
+/// Debug bits for packet header. Also useful for making the total size of all
+/// pkthdr_t bitfields equal to 128 bits, which makes copying faster.
 static const size_t kPktHdrMagicBits =
-    128 - (8 + kMsgSizeBits + 16 + 2 + 1 + kPktNumBits + kReqNumBits);
+    128 - (8 + kMsgSizeBits + 16 + 2 + 1 + 1 + kPktNumBits + kReqNumBits);
 static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
-static_assert(kPktHdrMagicBits == 20, ""); /* Just to keep track */
+static_assert(kPktHdrMagicBits == 19, ""); /* Just to keep track */
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 
 /// These packet types are stored as bitfields in the packet header, so don't
@@ -53,30 +54,30 @@ struct pkthdr_t {
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t rem_session_num : 16;     ///< Session number of the remote session
   uint64_t pkt_type : 2;             ///< The packet type
-  /// 1 if this packet is unexpected. This can be computed using the packet type
-  /// and pkt_num, but it's useful to have it separately.
+  /// 1 if this packet is unexpected. This can be computed using other fields,
+  /// but it's useful to have it separately.
   uint64_t is_unexp : 1;
+  /// 1 if this packet is a response, and the request handler ran in background
+  uint64_t bg_resp : 1;
   uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
   uint64_t req_num : kReqNumBits;     ///< Request number of this packet
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
 
-  /// Return a string representation of a packet header. Credit return packets
-  /// are marked with an asterisk.
+  /// Return a string representation of a packet header. Implicit and explicit
+  /// credit returns are marked with a + sign.
   std::string to_string() const {
     std::ostringstream ret;
 
-    if (pkt_type == kPktTypeCreditReturn) {
-      /* Other fields don't make sense for credit returns */
-      ret << "[type " << pkt_type_str(kPktTypeCreditReturn) << "]*";
-    } else {
-      ret << "[type " << pkt_type_str(pkt_type) << ", "
-          << "req " << req_num << ", "
-          << "pkt " << pkt_num << ", "
-          << "msg size " << msg_size << "]" << (is_unexp == 0 ? "*" : "");
-    }
+    ret << "[type " << pkt_type_str(pkt_type) << ", "
+        << "req " << req_num << ", "
+        << "pkt " << pkt_num << ", "
+        << "bg resp " << ((bg_resp == 0) ? "no, " : "yes, ") << "msg size "
+        << msg_size << "]" << (is_unexp == 0 ? "+" : "");
+
     return ret.str();
   }
 
+  inline bool check_magic() const { return magic == kPktHdrMagic; }
   inline bool is_req() const { return pkt_type == kPktTypeReq; }
   inline bool is_resp() const { return pkt_type == kPktTypeResp; }
 
@@ -84,18 +85,10 @@ struct pkthdr_t {
     return pkt_type == kPktTypeCreditReturn;
   }
 
-  /// A packet header is valid if its magic is valid
-  inline bool is_valid() const { return magic == kPktHdrMagic; }
 } __attribute__((packed));
 
 /* pkthdr_t should be a power of 2 for cheap multiplication */
 static_assert(sizeof(pkthdr_t) == 16, "");
-
-/* Cover all the bits to make copying cheaper */
-static_assert(8 + kMsgSizeBits + 16 + 2 + 1 + kPktNumBits + kReqNumBits +
-                      kPktHdrMagicBits ==
-                  128,
-              "");
 }
 
 #endif  // ERPC_PKTHDR_H

@@ -11,7 +11,7 @@ using namespace ERpc;
 static constexpr uint16_t kAppNexusUdpPort = 31851;
 static constexpr double kAppNexusPktDropProb = 0.0;
 static constexpr size_t kAppEventLoopMs = 200;
-static constexpr size_t kAppMaxEventLoopMs = 10000; /* 10 seconds */
+static constexpr size_t kAppMaxEventLoopMs = 20000; /* 20 seconds */
 static constexpr uint8_t kAppClientAppTid = 100;
 static constexpr uint8_t kAppServerAppTid = 200;
 static constexpr uint8_t kAppReqType = 3;
@@ -149,9 +149,11 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
 
   if (num_bg_threads == 0) {
-    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler));
+    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler,
+                                        ReqHandlerType::kForeground));
   } else {
-    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler, true));
+    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler,
+                                        ReqHandlerType::kBackground));
   }
 
   server_ready = false;
@@ -423,6 +425,7 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 }
 
 TEST(MultiLargeRpcMultiSession, Foreground) {
+  assert(!kDatapathVerbose);
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
@@ -430,6 +433,7 @@ TEST(MultiLargeRpcMultiSession, Foreground) {
 }
 
 TEST(MultiLargeRpcMultiSession, Background) {
+  assert(!kDatapathVerbose);
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
@@ -514,6 +518,7 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
 }
 
 TEST(DISABLED_MemoryLeak, Foreground) {
+  assert(!kDatapathVerbose);
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
@@ -521,6 +526,7 @@ TEST(DISABLED_MemoryLeak, Foreground) {
 }
 
 TEST(DISABLED_MemoryLeak, Background) {
+  assert(!kDatapathVerbose);
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;

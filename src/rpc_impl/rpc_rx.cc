@@ -14,7 +14,7 @@ void Rpc<TTr>::process_completions() {
     rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
 
     const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
-    assert(pkthdr->is_valid());
+    assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize); /* msg_size can be 0 here */
 
     uint16_t session_num = pkthdr->rem_session_num; /* Local session */
@@ -48,7 +48,7 @@ void Rpc<TTr>::process_completions() {
       unexp_credits++;
       session->remote_credits++;
 
-      /* Nothing more to do for credit returns */
+      /* Nothing more to do for credit returns - process other packets */
       if (pkthdr->is_credit_return()) {
         continue;
       }
@@ -75,7 +75,7 @@ template <class TTr>
 void Rpc<TTr>::process_completions_small_msg_one(Session *session,
                                                  const uint8_t *pkt) {
   assert(session != nullptr && session->is_connected());
-  assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
+  assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
 
   const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
   assert(pkthdr->pkt_num == 0);
@@ -87,14 +87,27 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
   uint8_t req_type = pkthdr->req_type;
   size_t req_num = pkthdr->req_num;
   size_t msg_size = pkthdr->msg_size;
+  bool is_req = pkthdr->is_req();
 
   const Ops &ops = ops_arr[req_type];
-  if (unlikely(!ops.is_valid())) {
+  if (unlikely(!ops.is_registered())) {
     erpc_dprintf(
         "eRPC Rpc %u: Warning: Received packet for unknown request type %u. "
         "Dropping packet.\n",
         app_tid, req_type);
     return;
+  }
+
+  /*
+   * Send a credit return if needed.
+   *
+   * For small messages, explicit credit return packets are sent only if the
+   * request handler runs in the background.
+   */
+  bool is_req_handler_bg = (is_req && ops.is_req_handler_background()) ||
+                           (!is_req && pkthdr->bg_resp == 1);
+  if (small_rpc_unlikely(is_req_handler_bg)) {
+    send_credit_return_now(session, pkthdr);
   }
 
   /* Create the RX MsgBuffer in the message's session slot */
@@ -115,7 +128,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
     /* Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf) */
     bury_sslot_tx_msgbuf(sslot);
 
-    if (small_rpc_likely(!ops.run_in_background)) {
+    if (small_rpc_likely(ops.is_req_handler_foreground())) {
       /* Create a "fake" static MsgBuffer for the foreground request handler */
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
       sslot.rx_msgbuf.pkts_rcvd = 1;
@@ -123,7 +136,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
       ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
 
       /* This uses sslot.rx_msgbuf for pkt header, so delay burying rx_msgbuf */
-      enqueue_response(session, sslot);
+      enqueue_response(session, sslot, ReqHandlerType::kForeground);
       assert(sslot.tx_msgbuf != nullptr); /* Installed by enqueue_response */
 
       /* Bury the non-dynamic request MsgBuffer (rx_msgbuf) created above */
@@ -176,11 +189,12 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
   }
 }
 
+/* This function is for large messages, so don't use small_rpc_likely() */
 template <class TTr>
 void Rpc<TTr>::process_completions_large_msg_one(Session *session,
                                                  const uint8_t *pkt) {
   assert(session != nullptr && session->is_connected());
-  assert(pkt != nullptr && ((pkthdr_t *)pkt)->is_valid());
+  assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
 
   const pkthdr_t *pkthdr = (pkthdr_t *)pkt;       /* A valid packet header */
   assert(pkthdr->msg_size > TTr::kMaxDataPerPkt); /* Multi-packet */
@@ -191,9 +205,10 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
   size_t req_num = pkthdr->req_num;
   size_t msg_size = pkthdr->msg_size;
   size_t pkt_num = pkthdr->pkt_num;
+  bool is_req = pkthdr->is_req();
 
   const Ops &ops = ops_arr[req_type];
-  if (unlikely(!ops.is_valid())) {
+  if (unlikely(!ops.is_registered())) {
     fprintf(stderr,
             "eRPC Rpc %u: Warning: Received packet for unknown "
             "request type %u. Dropping packet.\n",
@@ -201,12 +216,34 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
     return;
   }
 
+  /*
+   * Send a credit return if needed. For large messages, explicit credit return
+   * packets for are sent in the following cases:
+   *
+   * 1. Background request handler: All packets
+   * 2. Foreground request handler:
+   *   1a. Non-last request packets
+   *   1b. Non-first response packets
+   */
+  bool is_req_handler_bg = (is_req && ops.is_req_handler_background()) ||
+                           (!is_req && pkthdr->bg_resp == 1);
+
+  size_t pkts_expected =
+      (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
+  bool is_last = (pkt_num == pkts_expected - 1);
+
+  if (is_req_handler_bg || (pkthdr->is_req() && !is_last) ||
+      (pkthdr->is_resp() && pkt_num != 0)) {
+    send_credit_return_now(session, pkthdr);
+    /* Continue processing */
+  }
+
   size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
   Session::sslot_t &sslot = session->sslot_arr[sslot_i];
   MsgBuffer &rx_msgbuf = sslot.rx_msgbuf;
 
   /* Basic checks */
-  if (pkthdr->is_req()) {
+  if (is_req) {
     assert(session->is_server());
   } else {
     assert(session->is_client());
@@ -220,23 +257,6 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
     assert(req_msgbuf->get_req_num() == req_num);
     assert(req_msgbuf->get_req_type() == req_type);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
-  }
-
-  /*
-   * Credit returns are sent for non-last request packets and non-first
-   * response packets. The first/last decision is made based on packet number,
-   * irrespective of the order in which we receive the packets.
-   */
-  size_t pkts_expected =
-      (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
-  bool is_last = (pkt_num == pkts_expected - 1);
-
-  bool send_cr =
-      (pkthdr->is_req() && !is_last) || (pkthdr->is_resp() && pkt_num != 0);
-  if (send_cr) {
-    assert(tx_batch_i == 0); /* tx_batch_i is 0 outside rpc_tx.cc */
-    send_credit_return_now(session);
-    /* Continue processing */
   }
 
   if (rx_msgbuf.buf == nullptr) {
@@ -301,11 +321,11 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
 
   /* If we're here, we received all packets of this message */
   if (pkthdr->is_req()) {
-    if (small_rpc_likely(!ops.run_in_background)) {
+    if (ops.is_req_handler_foreground()) {
       ops.req_handler(&sslot.rx_msgbuf, &sslot.app_resp, context);
 
       /* This uses sslot.rx_msgbuf for pkt header, so delay burying rx_msgbuf */
-      enqueue_response(session, sslot);
+      enqueue_response(session, sslot, ReqHandlerType::kForeground);
       assert(sslot.tx_msgbuf != nullptr); /* Installed by enqueue_response */
 
       /* Bury the dynamic request MsgBuffer (rx_msgbuf) */
@@ -371,7 +391,7 @@ void Rpc<TTr>::handle_bg_responses() {
     assert(sslot->rx_msgbuf.is_req());
 
     /* This uses sslot.rx_msgbuf for pkt header, so delay burying rx_msgbuf */
-    enqueue_response(session, *sslot);
+    enqueue_response(session, *sslot, ReqHandlerType::kBackground);
     assert(sslot->tx_msgbuf != nullptr); /* Installed by enqueue_response */
 
     /* Bury the dynamic request MsgBuffer (rx_msgbuf) */

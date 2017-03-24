@@ -79,7 +79,7 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
 
       uint8_t req_type = sslot->rx_msgbuf.get_req_type();
       const Ops &ops = bg_thread_ctx->ops_arr->at(req_type);
-      assert(ops.is_valid()); /* Checked during submit_bg */
+      assert(ops.is_registered()); /* Checked during submit_bg */
 
       ops.req_handler(&sslot->rx_msgbuf, &sslot->app_resp, context);
 

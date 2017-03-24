@@ -282,20 +282,20 @@ int Nexus::register_ops(uint8_t req_type, Ops app_ops) {
   Ops &arr_ops = ops_arr[req_type];
 
   /* Check if this request type is already registered */
-  if (ops_arr[req_type].is_valid()) {
+  if (ops_arr[req_type].is_registered()) {
     erpc_dprintf("%s: A handler for this request type already exists.\n",
                  issue_msg);
     return EEXIST;
   }
 
   /* Check if the application's Ops is valid */
-  if (!app_ops.is_valid()) {
+  if (app_ops.req_handler == nullptr || app_ops.resp_handler == nullptr) {
     erpc_dprintf("%s: Invalid handler.\n", issue_msg);
     return EINVAL;
   }
 
   /* If the request handler runs in the background, we must have bg threads */
-  if (app_ops.run_in_background && num_bg_threads == 0) {
+  if (app_ops.is_req_handler_background() && num_bg_threads == 0) {
     erpc_dprintf("%s: Background threads not available.\n", issue_msg);
     return EPERM;
   }

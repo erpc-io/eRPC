@@ -57,9 +57,10 @@ int Rpc<TTr>::enqueue_request(Session *session, uint8_t req_type,
   pkthdr_0->rem_session_num = session->remote_session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->is_unexp = 1; /* Request packets are unexpected */
+  pkthdr_0->bg_resp = 0;  /* A request is not a response */
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = req_num;
-  assert(pkthdr_0->is_valid());
+  assert(pkthdr_0->check_magic());
 
   // Step 2: Fill in non-zeroth packet headers, if any
   if (small_rpc_unlikely(req_msgbuf->num_pkts > 1)) {

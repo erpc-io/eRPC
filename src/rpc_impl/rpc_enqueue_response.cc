@@ -3,7 +3,8 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot) {
+void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot,
+                                ReqHandlerType req_handler_type) {
   assert(session != nullptr && session->is_server());
   assert(sslot.rx_msgbuf.buf != nullptr); /* rx_msgbuf must be valid */
 
@@ -26,17 +27,29 @@ void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot) {
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
   resp_pkthdr_0->rem_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
-  resp_pkthdr_0->is_unexp = 0; /* First response packet is unexpected */
+
+  if (small_rpc_likely(req_handler_type == ReqHandlerType::kForeground)) {
+    /* Foreground req handler: 1st resp packet is Expected */
+    resp_pkthdr_0->is_unexp = 0;
+    resp_pkthdr_0->bg_resp = 0;
+  } else {
+    /* Background request handler: all resp packets are Unexpected */
+    resp_pkthdr_0->is_unexp = 1;
+    resp_pkthdr_0->bg_resp = 1;
+  }
+
   resp_pkthdr_0->pkt_num = 0;
   resp_pkthdr_0->req_num = sslot.rx_msgbuf.get_req_num();
-  assert(resp_pkthdr_0->is_valid());
+  assert(resp_pkthdr_0->check_magic());
 
   // Step 2: Fill in non-zeroth packet headers, if any
   if (small_rpc_unlikely(resp_msgbuf->num_pkts > 1)) {
     /*
      * Headers for non-zeroth packets are created by copying the 0th header, and
-     * changing only the required fields. All non-first response packets are
-     * Unexpected.
+     * changing only the required fields.
+     *
+     * All non-first response packets are Unexpected, for both foreground and
+     * background request handlers.
      */
     for (size_t i = 1; i < resp_msgbuf->num_pkts; i++) {
       pkthdr_t *resp_pkthdr_i = resp_msgbuf->get_pkthdr_n(i);
