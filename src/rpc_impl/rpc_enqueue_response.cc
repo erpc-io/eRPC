@@ -3,18 +3,18 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot,
-                                ReqHandlerType req_handler_type) {
-  assert(session != nullptr && session->is_server());
-  assert(sslot.rx_msgbuf.buf != nullptr); /* rx_msgbuf must be valid */
+void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
+  assert(req_handle != nullptr);
+
+  SSlot *sslot = (SSlot *)req_handle;
+  assert(sslot->session->is_server());
+  assert(sslot->rx_msgbuf.buf != nullptr); /* Must be valid for pkthdr fields */
 
   MsgBuffer *resp_msgbuf;
-  app_resp_t &app_resp = sslot.app_resp;
-
-  if (small_rpc_likely(app_resp.prealloc_used)) {
-    resp_msgbuf = &app_resp.pre_resp_msgbuf;
+  if (small_rpc_likely(sslot->prealloc_used)) {
+    resp_msgbuf = &sslot->pre_resp_msgbuf;
   } else {
-    resp_msgbuf = &app_resp.dyn_resp_msgbuf;
+    resp_msgbuf = &sslot->dyn_resp_msgbuf;
   }
 
   /* Sanity-check resp_msgbuf */
@@ -23,23 +23,24 @@ void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot,
 
   // Step 1: Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
-  resp_pkthdr_0->req_type = sslot.rx_msgbuf.get_req_type();
+  resp_pkthdr_0->req_type = sslot->rx_msgbuf.get_req_type();
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
-  resp_pkthdr_0->rem_session_num = session->remote_session_num;
+  resp_pkthdr_0->rem_session_num = sslot->session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
 
-  if (small_rpc_likely(req_handler_type == ReqHandlerType::kForeground)) {
-    /* Foreground req handler: 1st resp packet is Expected */
+  if (small_rpc_likely(sslot->req_func_type ==
+                       ReqFuncType::kForegroundTerminal)) {
+    /* Foreground terminal req function: 1st resp packet is Expected */
     resp_pkthdr_0->is_unexp = 0;
-    resp_pkthdr_0->bg_resp = 0;
+    resp_pkthdr_0->fgt_resp = 1;
   } else {
-    /* Background request handler: all resp packets are Unexpected */
+    /* Non-foreground-terminal: all resp packets are Unexpected */
     resp_pkthdr_0->is_unexp = 1;
-    resp_pkthdr_0->bg_resp = 1;
+    resp_pkthdr_0->fgt_resp = 0;
   }
 
   resp_pkthdr_0->pkt_num = 0;
-  resp_pkthdr_0->req_num = sslot.rx_msgbuf.get_req_num();
+  resp_pkthdr_0->req_num = sslot->rx_msgbuf.get_req_num();
   assert(resp_pkthdr_0->check_magic());
 
   // Step 2: Fill in non-zeroth packet headers, if any
@@ -60,12 +61,13 @@ void Rpc<TTr>::enqueue_response(Session *session, Session::sslot_t &sslot,
   }
 
   // Step 3: Fill in the slot, reset queueing progress, and upsert session
-  // sslot.req_type filled earlier
-  // sslot.req_num filled earlier
-  sslot.tx_msgbuf = resp_msgbuf; /* Valid response */
-  sslot.tx_msgbuf->pkts_queued = 0;
+  sslot->tx_msgbuf = resp_msgbuf; /* Valid response */
+  sslot->tx_msgbuf->pkts_queued = 0;
 
-  upsert_datapath_tx_work_queue(session);
+  upsert_datapath_tx_work_queue(sslot->session);
+
+  /* Bury the request MsgBuffer (rx_msgbuf), which may be dynamic */
+  bury_sslot_rx_msgbuf(sslot);
 }
 
 }  // End ERpc

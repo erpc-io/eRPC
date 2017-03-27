@@ -42,7 +42,7 @@ class Rpc {
     kInvalidMsgBufferArg,
     kInvalidMsgSizeArg,
     kInvalidReqTypeArg,
-    kInvalidOpsArg,
+    kInvalidReqFuncArg,
     kNoSessionMsgSlots
   };
 
@@ -59,8 +59,8 @@ class Rpc {
         return std::string("[Invalid message size argument]");
       case RpcDatapathErrCode::kInvalidReqTypeArg:
         return std::string("[Invalid request type argument]");
-      case RpcDatapathErrCode::kInvalidOpsArg:
-        return std::string("[Invalid Ops argument]");
+      case RpcDatapathErrCode::kInvalidReqFuncArg:
+        return std::string("[Invalid request function argument]");
       case RpcDatapathErrCode::kNoSessionMsgSlots:
         return std::string("[No session message slots]");
     };
@@ -237,13 +237,40 @@ class Rpc {
    * @param session The client session to send the request on
    * @param req_type The type of the request
    * @param msg_buffer The user-created MsgBuffer containing the request payload
-   * but not packet headers.
+   * but not packet headers
+   * @param cont_func The continuation function for this request
+   * @tag The tag for this request
    *
    * @return 0 on success (i.e., if the request was queued). An error code is
    * returned if the request cannot be queued.
    */
-  int enqueue_request(Session *session, uint8_t req_type,
-                      MsgBuffer *msg_buffer);
+  int enqueue_request(Session *session, uint8_t req_type, MsgBuffer *msg_buffer,
+                      erpc_cont_func_t cont_func, size_t tag);
+
+  // rpc_enqueue_response.cc
+
+  /**
+   * @brief Try to enqueue a response for transmission. This requires the
+   * session slot's RX MsgBuffer to be valid.
+   */
+  void enqueue_response(ReqHandle *req_handle);
+
+  /// Release a response received at a client
+  inline void release_respone(RespHandle *resp_handle) {
+    assert(resp_handle != nullptr);
+    SSlot *sslot = (SSlot *)resp_handle;
+
+    assert(sslot->session->is_client());
+    assert(sslot->tx_msgbuf == nullptr); /* Freed before calling continuation */
+
+    /*
+     * Bury the possibly-dynamic response MsgBuffer (rx_msgbuf). If we used
+     * pre_resp_msgbuf in the continuation, this is still OK.
+     */
+    bury_sslot_rx_msgbuf(sslot);
+
+    sslot->session->sslot_free_vec.push_back(sslot->index);
+  }
 
   // rpc_ev_loop.cc
 
@@ -259,11 +286,6 @@ class Rpc {
     /* Check if we need to retransmit any session management requests */
     if (unlikely(mgmt_retry_queue.size() > 0)) {
       mgmt_retry();
-    }
-
-    /* Check if we have new responses from background threads */
-    if (small_rpc_unlikely(nexus_hook.bg_resp_list.size > 0)) {
-      handle_bg_responses();
     }
 
     process_completions();            /* RX */
@@ -376,24 +398,25 @@ class Rpc {
   /// Free the session slot's TX MsgBuffer if it is dynamic, and NULL-ify it
   /// in any case. This does not fully validate the MsgBuffer, since we don't
   /// want to conditinally bury only initialized sslots.
-  inline void bury_sslot_tx_msgbuf(Session::sslot_t &sslot) {
-    MsgBuffer *tx_msgbuf = sslot.tx_msgbuf;
+  inline void bury_sslot_tx_msgbuf(SSlot *sslot) {
+    assert(sslot != nullptr);
 
     /*
      * The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
      * Its buf can be non-NULL even when dynamic allocation is not used.
      */
+    MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
     if (small_rpc_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
       /* This check is OK, since this sslot must be initialized */
       assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
       free_msg_buffer(*tx_msgbuf);
       /*
        * No need to NULL-ify tx_msgbuf->buffer.buf; we'll just NULL-ify
-       * sslot.tx_msgbuf.
+       * sslot->tx_msgbuf.
        */
     }
 
-    sslot.tx_msgbuf = nullptr;
+    sslot->tx_msgbuf = nullptr;
   }
 
   /**
@@ -403,20 +426,22 @@ class Rpc {
    * This is used for burying the TX MsgBuffer used for requests, since the
    * application will free the associated dynamic memory.
    */
-  static inline void bury_sslot_tx_msgbuf_nofree(Session::sslot_t &sslot) {
-    sslot.tx_msgbuf = nullptr;
+  static inline void bury_sslot_tx_msgbuf_nofree(SSlot *sslot) {
+    assert(sslot != nullptr);
+    sslot->tx_msgbuf = nullptr;
   }
 
   /// Free the session slot's RX MsgBuffer if it is dynamic, and NULL-ify it
   /// in any case. This does not fully validate the MsgBuffer, since we don't
   /// want to conditinally bury only initialized sslots.
-  inline void bury_sslot_rx_msgbuf(Session::sslot_t &sslot) {
-    MsgBuffer &rx_msgbuf = sslot.rx_msgbuf;
+  inline void bury_sslot_rx_msgbuf(SSlot *sslot) {
+    assert(sslot != nullptr);
 
     /*
      * The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
      * Its buf can be non-NULL even when dynamic allocation is not used.
      */
+    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
     if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
       /* This check is OK, since this sslot must be initialized */
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
@@ -433,9 +458,10 @@ class Rpc {
    *
    * This is used for freeing non-dynamic request and response MsgBuffers.
    */
-  static inline void bury_sslot_rx_msgbuf_nofree(Session::sslot_t &sslot) {
-    assert(sslot.rx_msgbuf.buffer.buf == nullptr);
-    sslot.rx_msgbuf.buf = nullptr;
+  static inline void bury_sslot_rx_msgbuf_nofree(SSlot *sslot) {
+    assert(sslot != nullptr);
+    assert(sslot->rx_msgbuf.buffer.buf == nullptr);
+    sslot->rx_msgbuf.buf = nullptr;
   }
 
   /**
@@ -474,29 +500,7 @@ class Rpc {
   void process_completions_large_msg_one(Session *session, const uint8_t *pkt);
 
   /// Submit a work item for background processing
-  void submit_bg(Session *session, Session::sslot_t *sslot);
-
-  /// Handle responses from background threads
-  void handle_bg_responses();
-
-  // rpc_enqueue_response.cc
-
-  /**
-   * @brief Try to enqueue a response from within eRPC core. This requires the
-   * session slot's RX MsgBuffer to be valid.
-   *
-   * @param session The session to send the response on
-   * @param sslot The session slot whose \p tx_msgbuf contains the full response
-   * payload, but not the packet headers
-   *
-   * @param req_handler_type The type (foreground or background) of the request
-   * handler that generated this response
-   *
-   * @param bg_resp True iff this response was generated by a background
-   * request handler
-   */
-  void enqueue_response(Session *session, Session::sslot_t &sslot,
-                        ReqHandlerType req_handler_type);
+  void submit_bg(SSlot *sslot);
 
   /**
    * @brief Send a credit return for this session immediately, i.e., the
@@ -532,7 +536,7 @@ class Rpc {
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.
-  const std::array<Ops, kMaxReqTypes> ops_arr;
+  const std::array<ReqFunc, kMaxReqTypes> req_func_arr;
 
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};

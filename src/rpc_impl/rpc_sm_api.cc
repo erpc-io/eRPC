@@ -71,19 +71,21 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
   /* Create a new session and fill prealloc MsgBuffers. XXX: Use pool? */
   Session *session =
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    MsgBuffer &msgbuf_i = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
-    msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
 
-    if (msgbuf_i.buf == nullptr) {
+  /* Fill prealloc response MsgBuffers for the client session */
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    MsgBuffer &resp_msgbuf_i = session->sslot_arr[i].pre_resp_msgbuf;
+    resp_msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
+
+    if (resp_msgbuf_i.buf == nullptr) {
       /*
        * We haven't assigned a session number or allocated non-prealloc
        * MsgBuffers yet, so just free prealloc MsgBuffers 0 -- (i - 1).
        */
       for (size_t j = 0; j < i; j++) {
-        MsgBuffer &msgbuf_j = session->sslot_arr[j].app_resp.pre_resp_msgbuf;
-        assert(msgbuf_j.buf != nullptr);
-        free_msg_buffer(msgbuf_j);
+        MsgBuffer &resp_msgbuf_j = session->sslot_arr[j].pre_resp_msgbuf;
+        assert(resp_msgbuf_j.buf != nullptr);
+        free_msg_buffer(resp_msgbuf_j);
       }
 
       erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);

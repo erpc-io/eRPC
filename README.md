@@ -1,4 +1,4 @@
-## Code notes
+EA Code notes
  * An important simplifying insight is that all functions invoked by the event
    loop run to completion, i.e., we cannot be preempted. So we don't need to
    worry about cases such as one where the request number and response buffer
@@ -29,6 +29,14 @@
    * RPC request handlers must be thread-safe if background threads are used.
 
 ## Short-term TODOs
+ * Application request handlers now need to call `enqueue_resp` and
+   `release_response`.
+ * Locking for `enqueue_req` and `enqueue_resp`? How much locking can we avoid?
+   (e.g., we need lock in `upsert_datapath_tx_work_queue`.)
+ * Which fields of SSlot need to be public?
+ * Do we need free_vec of SSlot indices, or can we just have pointers?
+ * Should `datapath_tx_work_queue` contain sslots instead of sessions?
+ * Do we need `no_free` versions of sslot burying functions?
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?

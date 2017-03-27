@@ -6,7 +6,8 @@ namespace ERpc {
 
 template <class TTr>
 int Rpc<TTr>::enqueue_request(Session *session, uint8_t req_type,
-                              MsgBuffer *req_msgbuf) {
+                              MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
+                              size_t tag) {
   if (!kDatapathChecks) {
     assert(session != nullptr && session->is_client());
     assert(session->is_connected());
@@ -57,7 +58,7 @@ int Rpc<TTr>::enqueue_request(Session *session, uint8_t req_type,
   pkthdr_0->rem_session_num = session->remote_session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->is_unexp = 1; /* Request packets are unexpected */
-  pkthdr_0->bg_resp = 0;  /* A request is not a response */
+  pkthdr_0->fgt_resp = 0; /* A request is not a response */
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = req_num;
   assert(pkthdr_0->check_magic());
@@ -76,7 +77,9 @@ int Rpc<TTr>::enqueue_request(Session *session, uint8_t req_type,
   }
 
   // Step 4: Fill in the slot, reset queueing progress, and upsert session
-  Session::sslot_t &sslot = session->sslot_arr[sslot_i];
+  SSlot &sslot = session->sslot_arr[sslot_i];
+  sslot.cont_func = cont_func;
+  sslot.tag = tag;
 
   /*
    * The tx_msgbuf and rx_msgbuf (i.e., the request and response for the

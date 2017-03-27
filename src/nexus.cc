@@ -54,7 +54,7 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
   for (size_t i = 0; i < num_bg_threads; i++) {
     erpc_dprintf("eRPC Nexus: Launching background thread %zu.\n", i);
 
-    bg_thread_ctx_arr[i].ops_arr = &ops_arr;
+    bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
     bg_thread_ctx_arr[i].bg_thread_id = i;
 
@@ -99,7 +99,7 @@ void Nexus::register_hook(NexusHook *hook) {
 
   nexus_lock.lock();
 
-  ops_registration_allowed = false; /* Disable future Ops registration */
+  req_func_registration_allowed = false; /* Disable future Ops registration */
   reg_hooks_arr[app_tid] = hook;
 
   /* Install background request and response submission lists */
@@ -108,7 +108,6 @@ void Nexus::register_hook(NexusHook *hook) {
     assert(bg_ctx.bg_thread_id == i);
 
     hook->bg_req_list_arr[i] = &bg_ctx.bg_req_list; /* Request */
-    bg_ctx.bg_resp_list_arr[app_tid] = &hook->bg_resp_list;
   }
 
   nexus_lock.unlock();
@@ -266,7 +265,7 @@ void Nexus::session_mgnt_handler() {
   nexus_lock.unlock();
 }
 
-int Nexus::register_ops(uint8_t req_type, Ops app_ops) {
+int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
@@ -274,33 +273,33 @@ int Nexus::register_ops(uint8_t req_type, Ops app_ops) {
           req_type);
 
   /* If any Rpc is already registered, the user cannot register new Ops */
-  if (!ops_registration_allowed) {
+  if (!req_func_registration_allowed) {
     erpc_dprintf("%s: Registration not allowed anymore.\n", issue_msg);
     return EPERM;
   }
 
-  Ops &arr_ops = ops_arr[req_type];
+  ReqFunc &arr_req_func = req_func_arr[req_type];
 
   /* Check if this request type is already registered */
-  if (ops_arr[req_type].is_registered()) {
+  if (req_func_arr[req_type].is_registered()) {
     erpc_dprintf("%s: A handler for this request type already exists.\n",
                  issue_msg);
     return EEXIST;
   }
 
   /* Check if the application's Ops is valid */
-  if (app_ops.req_handler == nullptr || app_ops.resp_handler == nullptr) {
+  if (app_req_func.req_func == nullptr) {
     erpc_dprintf("%s: Invalid handler.\n", issue_msg);
     return EINVAL;
   }
 
   /* If the request handler runs in the background, we must have bg threads */
-  if (app_ops.is_req_handler_background() && num_bg_threads == 0) {
+  if (app_req_func.is_background() && num_bg_threads == 0) {
     erpc_dprintf("%s: Background threads not available.\n", issue_msg);
     return EPERM;
   }
 
-  arr_ops = app_ops;
+  arr_req_func = app_req_func;
   return 0;
 }
 

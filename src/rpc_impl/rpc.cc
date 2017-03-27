@@ -23,7 +23,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       phy_port(phy_port),
       numa_node(numa_node),
       need_alloc_lock(nexus->num_bg_threads > 0),
-      ops_arr(nexus->ops_arr),
+      req_func_arr(nexus->req_func_arr),
       nexus_hook(app_tid) {
   /* Ensure that we're running as root */
   if (getuid()) {
@@ -115,7 +115,7 @@ void Rpc<TTr>::bury_session(Session *session) {
   // Free session resources
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     /* Free the preallocated MsgBuffer */
-    MsgBuffer &msg_buf = session->sslot_arr[i].app_resp.pre_resp_msgbuf;
+    MsgBuffer &msg_buf = session->sslot_arr[i].pre_resp_msgbuf;
     free_msg_buffer(msg_buf);
 
     /* XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are

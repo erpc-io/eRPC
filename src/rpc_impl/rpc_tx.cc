@@ -28,7 +28,7 @@ void Rpc<TTr>::process_datapath_tx_work_queue() {
      * credits.
      */
     for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
-      const Session::sslot_t *sslot = &session->sslot_arr[sslot_i];
+      const SSlot *sslot = &session->sslot_arr[sslot_i];
 
       /* Process only slots that need TX */
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;

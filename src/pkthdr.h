@@ -57,8 +57,8 @@ struct pkthdr_t {
   /// 1 if this packet is unexpected. This can be computed using other fields,
   /// but it's useful to have it separately.
   uint64_t is_unexp : 1;
-  /// 1 if this packet is a response, and the request handler ran in background
-  uint64_t bg_resp : 1;
+  /// 1 if this packet is a response, and the req func was foreground terminal
+  uint64_t fgt_resp : 1;
   uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
   uint64_t req_num : kReqNumBits;     ///< Request number of this packet
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
@@ -69,10 +69,11 @@ struct pkthdr_t {
     std::ostringstream ret;
 
     ret << "[type " << pkt_type_str(pkt_type) << ", "
+        << "rem session " << rem_session_num << ", "
         << "req " << req_num << ", "
         << "pkt " << pkt_num << ", "
-        << "bg resp " << ((bg_resp == 0) ? "no, " : "yes, ") << "msg size "
-        << msg_size << "]" << (is_unexp == 0 ? "+" : "");
+        << "fgt_resp " << fgt_resp << ", "
+        << "msg size " << msg_size << "]" << (is_unexp == 0 ? "+" : "");
 
     return ret.str();
   }

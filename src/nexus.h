@@ -22,7 +22,6 @@ class NexusHook {
   const uint8_t app_tid;  ///< App TID of the RPC that created this hook
 
   MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
-  MtList<BgWorkItem> bg_resp_list;       ///< Background thread response list
 
   /// Background thread request lists
   MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
@@ -70,12 +69,12 @@ class Nexus {
   void session_mgnt_handler();
 
   /**
-   * @brief Register application-defined operations for a request type. This
+   * @brief Register application-defined request handler function. This
    * must be done before any Rpc registers a hook with the Nexus.
    *
    * @return 0 on success, errno on failure.
    */
-  int register_ops(uint8_t req_type, Ops app_ops);
+  int register_req_func(uint8_t req_type, ReqFunc req_func);
 
   /**
    * @brief Copy the hostname of this machine to \p hostname. \p hostname must
@@ -97,12 +96,12 @@ class Nexus {
 
   const uint8_t pad[64] = {0};
 
-  /// The ground truth for registered Ops
-  std::array<Ops, kMaxReqTypes> ops_arr;
+  /// The ground truth for registered request functions
+  std::array<ReqFunc, kMaxReqTypes> req_func_arr;
 
-  /// Ops registration is disallowed after any Rpc registers and gets a copy
-  /// of ops_arr
-  bool ops_registration_allowed = true;
+  /// Request function registration is disallowed after any Rpc registers with
+  /// the Nexus gets a copy of req_func_arr
+  bool req_func_registration_allowed = true;
 
   /// Read-write members exposed to Rpc threads
   std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus

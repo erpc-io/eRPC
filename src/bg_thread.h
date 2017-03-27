@@ -14,14 +14,12 @@ namespace ERpc {
 /// Also acts as the background work completion.
 class BgWorkItem {
  public:
-  BgWorkItem(uint8_t app_tid, void *context, Session *session,
-             Session::sslot_t *sslot)
-      : app_tid(app_tid), context(context), session(session), sslot(sslot) {}
+  BgWorkItem(uint8_t app_tid, void *context, SSlot *sslot)
+      : app_tid(app_tid), context(context), sslot(sslot) {}
 
   const uint8_t app_tid;  ///< TID of the Rpc that submitted this request
   void *context;          ///< The context to use for request handler
-  Session *session;
-  Session::sslot_t *sslot;
+  SSlot *sslot;
 };
 
 /// Background thread context
@@ -30,16 +28,14 @@ class BgThreadCtx {
   /// A switch used by the Nexus to turn off background threads
   volatile bool *bg_kill_switch;
 
-  /// A pointer to the Rpc's Ops. Unlike Rpc threads which create a copy of the
-  /// Nexus's Ops, background threads have a pointer. This is because background
-  /// threads are launched before any Ops are registered.
-  std::array<Ops, kMaxReqTypes> *ops_arr;
+  /// A pointer to the Nexus's request functions. Unlike Rpc threads that create
+  /// a copy of the Nexus's request functions, background threads have a
+  /// pointer. This is because background threads are launched before any
+  /// request functions are registered.
+  std::array<ReqFunc, kMaxReqTypes> *req_func_arr;
 
   size_t bg_thread_id;             ///< ID of the background thread
   MtList<BgWorkItem> bg_req_list;  ///< Background thread request list
-
-  /// Lists for submitting responses to Rpc threads
-  MtList<BgWorkItem> *bg_resp_list_arr[kMaxAppTid + 1] = {nullptr};
 };
 
 /// The function executed by background RPC-processing threads
@@ -60,10 +56,10 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     assert(req_list.size > 0);
 
     for (BgWorkItem bg_work_item : req_list.list) {
-      uint8_t app_tid = bg_work_item.app_tid;  /* Debug-only */
-      void *context = bg_work_item.context;    /* The app's context */
-      Session *session = bg_work_item.session; /* Debug-only */
-      Session::sslot_t *sslot = bg_work_item.sslot;
+      uint8_t app_tid = bg_work_item.app_tid; /* Debug-only */
+      void *context = bg_work_item.context;   /* The app's context */
+      SSlot *sslot = bg_work_item.sslot;
+      Session *session = sslot->session; /* Debug-only */
       _unused(app_tid);
       _unused(session);
 
@@ -78,16 +74,10 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
       assert(sslot->rx_msgbuf.is_req());
 
       uint8_t req_type = sslot->rx_msgbuf.get_req_type();
-      const Ops &ops = bg_thread_ctx->ops_arr->at(req_type);
-      assert(ops.is_registered()); /* Checked during submit_bg */
+      const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);
+      assert(req_func.is_registered()); /* Checked during submit_bg */
 
-      ops.req_handler(&sslot->rx_msgbuf, &sslot->app_resp, context);
-
-      /* Submit the response */
-      MtList<BgWorkItem> *resp_list = bg_thread_ctx->bg_resp_list_arr[app_tid];
-      assert(resp_list != nullptr);
-
-      resp_list->unlocked_push_back(bg_work_item); /* Thread-safe */
+      req_func.req_func((ReqHandle *)sslot, &sslot->rx_msgbuf, context);
     }
 
     req_list.locked_clear();

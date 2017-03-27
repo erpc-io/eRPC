@@ -21,13 +21,15 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
   /* Arrange the free slot vector so that slots are popped in order */
   for (size_t i = 0; i < kSessionReqWindow; i++) {
     size_t sslot_i = (kSessionReqWindow - 1 - i);
-    sslot_t &sslot = sslot_arr[sslot_i];
+    SSlot &sslot = sslot_arr[sslot_i];
+
+    sslot.session = this;
+    sslot.index = sslot_i;
     sslot.rx_msgbuf.buffer.buf = nullptr; /* Bury rx_msgbuf */
     sslot.rx_msgbuf.buf = nullptr;        /* Bury rx_msgbuf */
     sslot.tx_msgbuf = nullptr;            /* Bury tx_msgbuf */
-    sslot_free_vec.push_back(sslot_i);
 
-    sslot.app_resp.dyn_resp_msgbuf.buf = nullptr;
+    sslot_free_vec.push_back(sslot_i);
   }
 }
 
