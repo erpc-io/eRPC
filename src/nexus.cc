@@ -3,7 +3,6 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <sys/socket.h>
-#include <sys/syscall.h>
 #include <sys/types.h>
 #include <algorithm>
 
@@ -11,6 +10,7 @@
 #include "nexus.h"
 #include "rpc.h"
 #include "util/barrier.h"
+#include "util/gettid.h"
 
 namespace ERpc {
 
@@ -162,7 +162,7 @@ void Nexus::install_sigio_handler() {
   /* Ensure that only the thread that creates the Nexus receives SIGIO */
   struct f_owner_ex owner_thread;
   owner_thread.type = F_OWNER_TID;
-  owner_thread.pid = (int)syscall(SYS_gettid);
+  owner_thread.pid = gettid();
 
   if (fcntl(sm_sock_fd, F_SETOWN_EX, &owner_thread) < 0) {
     erpc_dprintf_noargs("eRPC Nexus: FATAL. Setown fnctl() failed.\n");

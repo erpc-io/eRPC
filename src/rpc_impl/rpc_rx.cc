@@ -4,6 +4,7 @@ namespace ERpc {
 
 template <class TTr>
 void Rpc<TTr>::process_completions() {
+  assert(in_creator()); /* Only creator runs event loop */
   size_t num_pkts = transport->rx_burst();
   if (num_pkts == 0) {
     return;
@@ -74,6 +75,7 @@ void Rpc<TTr>::process_completions() {
 template <class TTr>
 void Rpc<TTr>::process_completions_small_msg_one(Session *session,
                                                  const uint8_t *pkt) {
+  assert(in_creator()); /* Only creator runs event loop */
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
 
@@ -190,6 +192,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
 template <class TTr>
 void Rpc<TTr>::process_completions_large_msg_one(Session *session,
                                                  const uint8_t *pkt) {
+  assert(in_creator()); /* Only creator runs event loop */
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
 

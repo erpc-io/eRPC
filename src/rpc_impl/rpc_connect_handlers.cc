@@ -13,6 +13,7 @@ namespace ERpc {
  */
 template <class TTr>
 void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
 
@@ -162,6 +163,7 @@ void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
 template <class TTr>
 void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
   assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));

@@ -4,6 +4,7 @@ namespace ERpc {
 
 template <class TTr>
 void Rpc<TTr>::process_datapath_tx_work_queue() {
+  assert(in_creator()); /* Only creator runs event loop */
   tx_batch_i = 0;
 
   /*
@@ -84,6 +85,7 @@ void Rpc<TTr>::process_datapath_tx_work_queue() {
 template <class TTr>
 void Rpc<TTr>::process_datapath_tx_work_queue_single_pkt_one(
     Session *session, MsgBuffer *tx_msgbuf) {
+  assert(in_creator()); /* Only creator runs event loop */
   assert(tx_msgbuf->num_pkts == 1 && tx_msgbuf->pkts_queued == 0);
   assert(tx_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
@@ -137,6 +139,7 @@ void Rpc<TTr>::process_datapath_tx_work_queue_single_pkt_one(
 template <class TTr>
 void Rpc<TTr>::process_datapath_tx_work_queue_multi_pkt_one(
     Session *session, MsgBuffer *tx_msgbuf) {
+  assert(in_creator()); /* Only creator runs event loop */
   assert(tx_msgbuf->num_pkts > 1 &&
          tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 

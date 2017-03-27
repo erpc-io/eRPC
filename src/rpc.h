@@ -12,6 +12,7 @@
 #include "transport.h"
 #include "transport_impl/ib_transport.h"
 #include "util/buffer.h"
+#include "util/gettid.h"
 #include "util/huge_alloc.h"
 #include "util/mt_list.h"
 #include "util/rand.h"
@@ -19,7 +20,15 @@
 
 namespace ERpc {
 
-// Per-thread RPC object. TTr = Template Transport.
+/**
+ * @brief Rpc object created by foreground threads, and possibly shared with
+ * background threads.
+ *
+ * Non-const functions that are not thread-safe should be marked in the
+ * documentation.
+ *
+ * @tparam TTr The unreliable transport
+ */
 template <class TTr>
 class Rpc {
  public:
@@ -75,32 +84,65 @@ class Rpc {
     return TTr::kMaxDataPerPkt;
   }
 
+  /// Return true iff we're currently running in this Rpc's creator.
+  /// This is pretty fast as we cache the OS thread ID in \p gettid().
+  inline bool in_creator() { return gettid() == creator_os_tid; }
+
   // rpc.cc
 
   /**
-   * @brief Construct the Rpc object
+   * @brief Construct the Rpc object from a foreground thread
    * @throw runtime_error if construction fails
    */
   Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port = 0,
       size_t numa_node = 0);
 
+  /// Destroy the Rpc from a foreground thread
   ~Rpc();
+
+  /// Lock the Rpc if it is accessible from multiple threads
+  inline void rpc_lock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
+      rpc_lock.lock();
+    }
+  }
+
+  /// Unlock the Rpc if it is accessible from multiple threads
+  inline void rpc_unlock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
+      rpc_lock.unlock();
+    }
+  }
+
+  /// Lock this session if it is accessible from multiple threads
+  inline void session_lock_cond(Session *session) {
+    assert(session != nullptr);
+    if (small_rpc_unlikely(multi_threaded)) {
+      session->lock.lock();
+    }
+  }
+
+  /// Unlock this session if it is accessible from multiple threads
+  inline void session_unlock_cond(Session *session) {
+    assert(session != nullptr);
+    if (small_rpc_unlikely(multi_threaded)) {
+      session->lock.unlock();
+    }
+  }
 
   // Allocator functions
 
-  /// Lock the hugepage allocator if locking is needed, i.e., background
-  /// threads are enabled
-  inline void do_huge_alloc_lock_cond() {
-    if (small_rpc_unlikely(need_alloc_lock)) {
+  /// Lock the huge allocator if if it is accessible from multiple threads
+  inline void huge_alloc_lock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
       huge_alloc_lock.lock();
     }
   }
 
-  /// Unlock the hugepage allocator if locking is needed, i.e., background
-  /// threads are enabled
-  inline void do_huge_alloc_unlock_cond() {
-    if (small_rpc_unlikely(need_alloc_lock)) {
+  /// Unlock the huge allocator if if it is accessible from multiple threads
+  inline void huge_alloc_unlock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
       huge_alloc_lock.unlock();
     }
   }
@@ -134,10 +176,10 @@ class Rpc {
           (max_data_size + (TTr::kMaxDataPerPkt - 1)) / TTr::kMaxDataPerPkt;
     }
 
-    do_huge_alloc_lock_cond();
+    huge_alloc_lock_cond();
     Buffer buffer =
         huge_alloc->alloc(max_data_size + (max_num_pkts * sizeof(pkthdr_t)));
-    do_huge_alloc_unlock_cond();
+    huge_alloc_unlock_cond();
 
     if (unlikely(buffer.buf == nullptr)) {
       MsgBuffer msg_buffer;
@@ -174,23 +216,24 @@ class Rpc {
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     assert(msg_buffer.is_dynamic() && msg_buffer.check_magic());
 
-    do_huge_alloc_lock_cond();
+    huge_alloc_lock_cond();
     huge_alloc->free_buf(msg_buffer.buffer);
-    do_huge_alloc_unlock_cond();
+    huge_alloc_unlock_cond();
   }
 
   /// Return the total amount of memory allocated to the user
   inline size_t get_stat_user_alloc_tot() {
-    do_huge_alloc_lock_cond();
+    huge_alloc_lock_cond();
     size_t ret = huge_alloc->get_stat_user_alloc_tot();
-    do_huge_alloc_unlock_cond();
+    huge_alloc_unlock_cond();
     return ret;
   }
 
   // rpc_sm_api.cc
 
   /**
-   * @brief Create a Session and initiate session connection.
+   * @brief Create a Session and initiate session connection. This function can
+   * be called only from the creator thread.
    *
    * @return A pointer to the created session if creation succeeds and the
    * connect request is sent, NULL otherwise.
@@ -203,7 +246,8 @@ class Rpc {
 
   /**
    * @brief Disconnect and destroy a client session. \p session should not
-   * be used by the application after this function is called.
+   * be used by the application after this function is called. This function
+   * can be called only from the creator thread.
    *
    * @param session A session that was returned by create_session().
    *
@@ -218,8 +262,20 @@ class Rpc {
    */
   bool destroy_session(Session *session);
 
-  /// Return the number of active server or client sessions.
-  size_t num_active_sessions();
+  /// Return the number of active server or client sessions. This function
+  /// can be called only from the creator thread.
+  inline size_t num_active_sessions() {
+    assert(in_creator());
+
+    size_t ret = 0;
+    for (Session *session : session_vec) {
+      if (session != nullptr) {
+        ret++;
+      }
+    }
+
+    return ret;
+  }
 
   // rpc_enqueue_request.cc
 
@@ -258,24 +314,29 @@ class Rpc {
   /// Release a response received at a client
   inline void release_respone(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
-    SSlot *sslot = (SSlot *)resp_handle;
 
-    assert(sslot->session->is_client());
+    SSlot *sslot = (SSlot *)resp_handle;
     assert(sslot->tx_msgbuf == nullptr); /* Freed before calling continuation */
 
     /*
      * Bury the possibly-dynamic response MsgBuffer (rx_msgbuf). If we used
-     * pre_resp_msgbuf in the continuation, this is still OK.
+     * pre_resp_msgbuf in the continuation, this is still OK and sufficient.
      */
     bury_sslot_rx_msgbuf(sslot);
 
-    sslot->session->sslot_free_vec.push_back(sslot->index);
+    Session *session = sslot->session;
+    assert(session->is_client());
+
+    session_lock_cond(session);
+    session->sslot_free_vec.push_back(sslot->index);
+    session_unlock_cond(session);
   }
 
   // rpc_ev_loop.cc
 
   /// Run one iteration of the event loop
   void run_event_loop_one() {
+    assert(in_creator());
     dpath_stat_inc(&dpath_stats.ev_loop_calls);
 
     /* Handle session management events, if any */
@@ -294,6 +355,7 @@ class Rpc {
 
   /// Run the event loop forever
   inline void run_event_loop() {
+    assert(in_creator());
     while (true) {
       run_event_loop_one();
     }
@@ -301,8 +363,9 @@ class Rpc {
 
   /// Run the event loop for \p timeout_ms milliseconds
   inline void run_event_loop_timeout(size_t timeout_ms) {
-    uint64_t start_tsc = rdtsc();
+    assert(in_creator());
 
+    uint64_t start_tsc = rdtsc();
     while (true) {
       run_event_loop_one();
 
@@ -395,9 +458,13 @@ class Rpc {
 
   // rpc_rx.cc
 
-  /// Free the session slot's TX MsgBuffer if it is dynamic, and NULL-ify it
-  /// in any case. This does not fully validate the MsgBuffer, since we don't
-  /// want to conditinally bury only initialized sslots.
+  /**
+   * @brief Free the session slot's TX MsgBuffer if it is dynamic, and NULL-ify
+   * it in any case. This does not fully validate the MsgBuffer, since we don't
+   * want to conditionally bury only initialized sslots.
+   *
+   * This is thread-safe, as \p free_msg_buffer() is thread-safe.
+   */
   inline void bury_sslot_tx_msgbuf(SSlot *sslot) {
     assert(sslot != nullptr);
 
@@ -410,10 +477,7 @@ class Rpc {
       /* This check is OK, since this sslot must be initialized */
       assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
       free_msg_buffer(*tx_msgbuf);
-      /*
-       * No need to NULL-ify tx_msgbuf->buffer.buf; we'll just NULL-ify
-       * sslot->tx_msgbuf.
-       */
+      /* Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf */
     }
 
     sslot->tx_msgbuf = nullptr;
@@ -431,9 +495,13 @@ class Rpc {
     sslot->tx_msgbuf = nullptr;
   }
 
-  /// Free the session slot's RX MsgBuffer if it is dynamic, and NULL-ify it
-  /// in any case. This does not fully validate the MsgBuffer, since we don't
-  /// want to conditinally bury only initialized sslots.
+  /**
+   * @brief Free the session slot's RX MsgBuffer if it is dynamic, and NULL-ify
+   * it in any case. This does not fully validate the MsgBuffer, since we don't
+   * want to conditinally bury only initialized sslots.
+   *
+   * This is thread-safe, as \p free_msg_buffer() is thread-safe.
+   */
   inline void bury_sslot_rx_msgbuf(SSlot *sslot) {
     assert(sslot != nullptr);
 
@@ -450,18 +518,6 @@ class Rpc {
     }
 
     rx_msgbuf.buf = nullptr;
-  }
-
-  /**
-   * @brief Bury a session slot's RX MsgBuffer that did not use dynamically
-   * allocated memory.
-   *
-   * This is used for freeing non-dynamic request and response MsgBuffers.
-   */
-  static inline void bury_sslot_rx_msgbuf_nofree(SSlot *sslot) {
-    assert(sslot != nullptr);
-    assert(sslot->rx_msgbuf.buffer.buf == nullptr);
-    sslot->rx_msgbuf.buf = nullptr;
   }
 
   /**
@@ -521,13 +577,13 @@ class Rpc {
   size_t numa_node;
 
   // Others
-  TTr *transport = nullptr;  ///< The unreliable transport
+  const int creator_os_tid;    ///< OS thread ID of the creator thread
+  const bool multi_threaded;   ///< True iff there are background threads
+  std::mutex rpc_lock;         ///< A lock to guard the Rpc object
+  std::mutex huge_alloc_lock;  ///< A lock to guard the huge allocator
 
-  /// A lock to guard the allocator, used iff background threads are enabled
-  std::mutex huge_alloc_lock;
+  TTr *transport = nullptr;         ///< The unreliable transport
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
-  /// We need the allocator lock iff the Nexus has background threads
-  const bool need_alloc_lock;
 
   uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer

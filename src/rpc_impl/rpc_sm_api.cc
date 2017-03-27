@@ -21,9 +21,15 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", app_tid);
 
+  /* Check that the caller is the creator thread */
+  if (!in_creator()) {
+    erpc_dprintf("%s: Caller thread is not the creator thread.\n", issue_msg);
+    return nullptr;
+  }
+
   /* Check remote fabric port */
   if (rem_phy_port >= kMaxPhyPorts) {
-    erpc_dprintf("%s: Invalid remote fabric port %u\n", issue_msg,
+    erpc_dprintf("%s: Invalid remote fabric port %u.\n", issue_msg,
                  rem_phy_port);
     return nullptr;
   }
@@ -131,8 +137,16 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
 
 template <class TTr>
 bool Rpc<TTr>::destroy_session(Session *session) {
+  /* Check that the caller is the creator thread */
+  if (!in_creator()) {
+    erpc_dprintf(
+        "eRPC Rpc %u: destroy_session() failed: Caller thread is not creator\n",
+        app_tid);
+    return false;
+  }
+
   if (session == nullptr || !session->is_client()) {
-    erpc_dprintf("eRPC Rpc %u: destroy_session() failed. Invalid session.\n",
+    erpc_dprintf("eRPC Rpc %u: destroy_session() failed: Invalid session.\n",
                  app_tid);
     return false;
   }
@@ -174,18 +188,6 @@ bool Rpc<TTr>::destroy_session(Session *session) {
   }
   exit(-1);
   return false;
-}
-
-template <class TTr>
-size_t Rpc<TTr>::num_active_sessions() {
-  size_t ret = 0;
-  for (Session *session : session_vec) {
-    if (session != nullptr) {
-      ret++;
-    }
-  }
-
-  return ret;
 }
 
 }  // End ERpc

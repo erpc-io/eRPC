@@ -12,6 +12,7 @@ namespace ERpc {
 
 template <class TTr>
 void Rpc<TTr>::send_connect_req_one(Session *session) {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kConnectInProgress);
 
@@ -23,6 +24,7 @@ void Rpc<TTr>::send_connect_req_one(Session *session) {
 
 template <class TTr>
 void Rpc<TTr>::send_disconnect_req_one(Session *session) {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kDisconnectInProgress);
 
@@ -34,12 +36,14 @@ void Rpc<TTr>::send_disconnect_req_one(Session *session) {
 
 template <class TTr>
 bool Rpc<TTr>::mgmt_retry_queue_contains(Session *session) {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   return std::find(mgmt_retry_queue.begin(), mgmt_retry_queue.end(), session) !=
          mgmt_retry_queue.end();
 }
 
 template <class TTr>
 void Rpc<TTr>::mgmt_retry_queue_add(Session *session) {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
 
   /* Only client-mode sessions can be in the management retry queue */
@@ -54,6 +58,7 @@ void Rpc<TTr>::mgmt_retry_queue_add(Session *session) {
 
 template <class TTr>
 void Rpc<TTr>::mgmt_retry_queue_remove(Session *session) {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
   assert(mgmt_retry_queue_contains(session));
 
@@ -69,6 +74,7 @@ void Rpc<TTr>::mgmt_retry_queue_remove(Session *session) {
 
 template <class TTr>
 void Rpc<TTr>::mgmt_retry() {
+  assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(mgmt_retry_queue.size() > 0);
   uint64_t cur_tsc = rdtsc();
 

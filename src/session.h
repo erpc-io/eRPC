@@ -2,6 +2,7 @@
 #define ERPC_SESSION_H
 
 #include <limits>
+#include <mutex>
 #include <queue>
 
 #include "common.h"
@@ -54,6 +55,7 @@ class Session {
   inline bool is_server() const { return role == Role::kServer; }
   inline bool is_connected() const { return state == SessionState::kConnected; }
 
+  std::mutex lock;     ///< A lock for protecting this session
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
