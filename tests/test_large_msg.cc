@@ -53,52 +53,58 @@ size_t pick_large_msg_size(AppContext *app_context) {
 
 /// The common request handler for all subtests. Copies the request string to
 /// the response.
-void req_handler(const MsgBuffer *req_msgbuf, app_resp_t *app_resp,
+void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
                  void *_context) {
-  ASSERT_NE(req_msgbuf, nullptr);
-  ASSERT_NE(app_resp, nullptr);
-  ASSERT_NE(_context, nullptr);
+  assert(req_handle != nullptr);
+  assert(req_msgbuf != nullptr);
+  assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   ASSERT_FALSE(context->is_client);
 
   size_t req_size = req_msgbuf->get_data_size();
 
-  app_resp->prealloc_used = false;
+  req_handle->prealloc_used = false;
 
   /* MsgBuffer allocation is thread safe */
-  app_resp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
-  ASSERT_NE(app_resp->dyn_resp_msgbuf.buf, nullptr);
+  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
+  ASSERT_NE(req_handle->dyn_resp_msgbuf.buf, nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
 
-  memcpy((char *)app_resp->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
+  memcpy((char *)req_handle->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
          req_size);
 
   test_printf(
       "Server: Received request of length %zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
       req_size, user_alloc_tot, (double)user_alloc_tot / MB(1));
+
+  context->rpc->enqueue_response(req_handle);
 }
 
-/// The common response handler for all subtests. This checks that the request
-/// buffer is identical to the response buffer, and increments the number of
-/// responses in the context.
-void resp_handler(const MsgBuffer *req_msgbuf, const MsgBuffer *resp_msgbuf,
-                  void *_context) {
-  ASSERT_NE(req_msgbuf, nullptr);
-  ASSERT_NE(resp_msgbuf, nullptr);
-  ASSERT_NE(_context, nullptr);
+/// The common continuation function for all subtests. This checks that the
+/// request buffer is identical to the response buffer, and increments the
+/// number of responses in the context.
+void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
+               void *_context, size_t tag) {
+  assert(resp_handle != nullptr);
+  assert(resp_msgbuf != nullptr);
+  assert(_context != nullptr);
+  _unused(tag);
 
-  test_printf("Client: Received response of length %zu (request's was %zu)\n",
-              (char *)resp_msgbuf->get_data_size(),
-              (char *)req_msgbuf->get_data_size());
+  test_printf("Client: Received response of length %zu.\n",
+              (char *)resp_msgbuf->get_data_size());
 
+  /*
   ASSERT_EQ(req_msgbuf->get_data_size(), resp_msgbuf->get_data_size());
   ASSERT_STREQ((char *)req_msgbuf->buf, (char *)resp_msgbuf->buf);
+  */
 
   auto *context = (AppContext *)_context;
   ASSERT_TRUE(context->is_client);
   context->num_rpc_resps++;
+
+  context->rpc->release_respone(resp_handle);
 }
 
 /// The common session management handler for all subtests
@@ -149,11 +155,11 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
 
   if (num_bg_threads == 0) {
-    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler,
-                                        ReqHandlerType::kForeground));
+    nexus.register_req_func(
+        kAppReqType, ReqFunc(req_handler, ReqFuncType::kForegroundTerminal));
   } else {
-    nexus.register_ops(kAppReqType, Ops(req_handler, resp_handler,
-                                        ReqHandlerType::kBackground));
+    nexus.register_req_func(kAppReqType,
+                            ReqFunc(req_handler, ReqFuncType::kBackground));
   }
 
   server_ready = false;
@@ -250,7 +256,8 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   req_msgbuf.buf[req_size - 1] = 0;
 
   test_printf("test: Sending request of size %zu\n", req_size);
-  int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf);
+  int ret =
+      rpc->enqueue_request(session, kAppReqType, &req_msgbuf, cont_func, 0);
   if (ret != 0) {
     test_printf("test: enqueue_request error %s\n",
                 rpc->rpc_datapath_err_code_str(ret).c_str());
@@ -277,7 +284,7 @@ TEST(OneLargeRpc, Foreground) {
 }
 
 TEST(OneLargeRpc, Background) {
-  /* 1 background thread */
+  /* One background thread */
   launch_server_client_threads(1, 1, one_large_rpc);
 }
 
@@ -313,7 +320,8 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
       req_msgbuf[i].buf[req_len - 1] = 0;
 
       test_printf("test: Sending request of length = %zu\n", req_len);
-      int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[i]);
+      int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[i],
+                                     cont_func, 0);
       if (ret != 0) {
         test_printf("test: enqueue_request error %s\n",
                     rpc->rpc_datapath_err_code_str(ret).c_str());
@@ -322,7 +330,8 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
     }
 
     /* Try to enqueue one more request - this should fail */
-    int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[0]);
+    int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[0],
+                                   cont_func, 0);
     ASSERT_NE(ret, 0);
 
     client_wait_for_rpc_resps_or_timeout(nexus, context,
@@ -393,7 +402,7 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
         test_printf("test: Sending request of length = %zu\n", req_len);
 
         int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
-                                       &req_msgbuf[req_i]);
+                                       &req_msgbuf[req_i], cont_func, 0);
         if (ret != 0) {
           test_printf("test: enqueue_request error %s\n",
                       rpc->rpc_datapath_err_code_str(ret).c_str());
@@ -485,7 +494,7 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
                     req_len);
 
         int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
-                                       &req_msgbuf[req_i]);
+                                       &req_msgbuf[req_i], cont_func, 0);
         if (ret != 0) {
           test_printf("test: enqueue_request error %s\n",
                       rpc->rpc_datapath_err_code_str(ret).c_str());

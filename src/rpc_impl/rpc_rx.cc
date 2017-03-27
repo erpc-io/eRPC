@@ -172,21 +172,16 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
     assert(req_msgbuf->get_req_num() == req_num);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 
-    /*
-     * Bury the request MsgBuffer (tx_msgbuf) without freeing the underlying
-     * Buffer, which belongs to the user.
-     */
-    bury_sslot_tx_msgbuf_nofree(&sslot);
-
     /* Use pre_resp_msgbuf as the response MsgBuffer */
     sslot.pre_resp_msgbuf.resize(msg_size, 1);
     memcpy((char *)sslot.pre_resp_msgbuf.get_pkthdr_0(), pkt,
            msg_size + sizeof(pkthdr_t));
     sslot.pre_resp_msgbuf.pkts_rcvd = 1;
 
+    /* Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory */
+    bury_sslot_tx_msgbuf_nofree(&sslot);
     sslot.cont_func((RespHandle *)&sslot, &sslot.pre_resp_msgbuf, context,
                     sslot.tag);
-
     return;
   }
 }
@@ -335,6 +330,8 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
       return;
     }
   } else {
+    /* Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory */
+    bury_sslot_tx_msgbuf_nofree(&sslot);
     sslot.cont_func((RespHandle *)&sslot, &sslot.rx_msgbuf, context, sslot.tag);
     return;
   }
