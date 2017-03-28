@@ -275,7 +275,7 @@ int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   /* If any Rpc is already registered, the user cannot register new Ops */
   if (!req_func_registration_allowed) {
     erpc_dprintf("%s: Registration not allowed anymore.\n", issue_msg);
-    return EPERM;
+    return -EPERM;
   }
 
   ReqFunc &arr_req_func = req_func_arr[req_type];
@@ -284,19 +284,19 @@ int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   if (req_func_arr[req_type].is_registered()) {
     erpc_dprintf("%s: A handler for this request type already exists.\n",
                  issue_msg);
-    return EEXIST;
+    return -EEXIST;
   }
 
   /* Check if the application's Ops is valid */
   if (app_req_func.req_func == nullptr) {
     erpc_dprintf("%s: Invalid handler.\n", issue_msg);
-    return EINVAL;
+    return -EINVAL;
   }
 
   /* If the request handler runs in the background, we must have bg threads */
   if (app_req_func.is_background() && num_bg_threads == 0) {
     erpc_dprintf("%s: Background threads not available.\n", issue_msg);
-    return EPERM;
+    return -EPERM;
   }
 
   arr_req_func = app_req_func;

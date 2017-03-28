@@ -22,6 +22,7 @@ char local_hostname[kMaxHostnameLen];
 
 struct client_context_t {
   size_t nb_sm_events;
+  int session_num;
 
   SessionMgmtErrType exp_err;
   SessionState exp_state;
@@ -30,7 +31,7 @@ struct client_context_t {
 };
 
 /* Only invoked for clients */
-void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
+void test_sm_hander(int session_num, SessionMgmtEventType sm_event_type,
                     SessionMgmtErrType sm_err_type, void *_context) {
   ASSERT_TRUE(_context != nullptr);
   client_context_t *context = (client_context_t *)_context;
@@ -38,7 +39,7 @@ void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
 
   /* Check that the error type matches the expected value */
   ASSERT_EQ(sm_err_type, context->exp_err);
-  ASSERT_EQ(session->state, context->exp_state);
+  ASSERT_EQ(session_num, context->session_num);
 
   /* If the error type is really an error, the event should be connect failed */
   if (sm_err_type == SessionMgmtErrType::kNoError) {
@@ -72,17 +73,12 @@ void simple_connect(Nexus *nexus) {
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
   client_context->exp_state = SessionState::kConnected;
-  Session *session =
+  client_context->session_num = 
       rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
-  ASSERT_TRUE(session != nullptr);
+  ASSERT_GE(client_context->session_num, 0);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
   ASSERT_EQ(client_context->nb_sm_events, 1);
-
-  test_printf(
-      "simple_connect: Routing info: client %s, server %s.\n",
-      IBTransport::routing_info_str(&session->client.routing_info).c_str(),
-      IBTransport::routing_info_str(&session->server.routing_info).c_str());
 }
 
 TEST(SuccessfulConnect, SuccessfulConnect) {
@@ -111,9 +107,9 @@ void invalid_remote_port(Nexus *nexus) {
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kInvalidRemotePort;
   client_context->exp_state = SessionState::kDisconnected;
-  Session *session =
+  client_context->session_num =
       rpc.create_session(local_hostname, SERVER_APP_TID, phy_port + 1);
-  ASSERT_TRUE(session != nullptr);
+  ASSERT_GE(client_context->session_num, 0);
 
   rpc.run_event_loop_timeout(EVENT_LOOP_MS);
   ASSERT_EQ(client_context->nb_sm_events, 1);

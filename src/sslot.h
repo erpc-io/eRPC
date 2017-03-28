@@ -24,6 +24,7 @@ class Session; /* Forward declaration */
 class SSlot {
  public:
   // Members that are valid for both server and client
+  uint8_t pad[64];  ///< Padding to prevent false sharing
   Session *session;  ///< Pointer to the session that this sslot belongs to
   size_t index; ///< Index of this sslot in the session's sslot_arr
   MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL

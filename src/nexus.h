@@ -72,7 +72,7 @@ class Nexus {
    * @brief Register application-defined request handler function. This
    * must be done before any Rpc registers a hook with the Nexus.
    *
-   * @return 0 on success, errno on failure.
+   * @return 0 on success, negative errno on failure.
    */
   int register_req_func(uint8_t req_type, ReqFunc req_func);
 
