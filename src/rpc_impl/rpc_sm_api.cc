@@ -12,11 +12,11 @@ namespace ERpc {
 
 /*
  * This function is not on the critical path and is exposed to the user,
- * so the args checking is always enabled (i.e., no asserts).
+ * so the args checking is always enabled.
  */
 template <class TTr>
-int Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
-                             uint8_t rem_phy_port) {
+int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
+                                uint8_t rem_phy_port) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", app_tid);
@@ -139,7 +139,7 @@ int Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
 }
 
 template <class TTr>
-int Rpc<TTr>::destroy_session(int session_num) {
+int Rpc<TTr>::destroy_session_st(int session_num) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
@@ -219,6 +219,20 @@ int Rpc<TTr>::destroy_session(int session_num) {
   }
   exit(-1);
   return false;
+}
+
+template <class TTr>
+size_t Rpc<TTr>::num_active_sessions_st() {
+  assert(in_creator());
+
+  size_t ret = 0;
+  for (Session *session : session_vec) {
+    if (session != nullptr) {
+      ret++;
+    }
+  }
+
+  return ret;
 }
 
 }  // End ERpc

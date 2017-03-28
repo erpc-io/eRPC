@@ -50,15 +50,6 @@ class Rpc {
     return TTr::kMaxDataPerPkt;
   }
 
-  /// Return true iff we're currently running in this Rpc's creator.
-  /// This is pretty fast as we cache the OS thread ID in \p gettid().
-  inline bool in_creator() { return gettid() == creator_os_tid; }
-
-  /// Return true iff a user-provide session number is in the session vector
-  inline bool is_usr_session_num_in_range(int session_num) {
-    return session_num >= 0 && (size_t)session_num < session_vec.size();
-  }
-
   // rpc.cc
 
   /**
@@ -72,51 +63,7 @@ class Rpc {
   /// Destroy the Rpc from a foreground thread
   ~Rpc();
 
-  /// Lock the Rpc if it is accessible from multiple threads
-  inline void rpc_lock_cond() {
-    if (small_rpc_unlikely(multi_threaded)) {
-      rpc_lock.lock();
-    }
-  }
-
-  /// Unlock the Rpc if it is accessible from multiple threads
-  inline void rpc_unlock_cond() {
-    if (small_rpc_unlikely(multi_threaded)) {
-      rpc_lock.unlock();
-    }
-  }
-
-  /// Lock this session if it is accessible from multiple threads
-  inline void session_lock_cond(Session *session) {
-    assert(session != nullptr);
-    if (small_rpc_unlikely(multi_threaded)) {
-      session->lock.lock();
-    }
-  }
-
-  /// Unlock this session if it is accessible from multiple threads
-  inline void session_unlock_cond(Session *session) {
-    assert(session != nullptr);
-    if (small_rpc_unlikely(multi_threaded)) {
-      session->lock.unlock();
-    }
-  }
-
   // Allocator functions
-
-  /// Lock the huge allocator if if it is accessible from multiple threads
-  inline void huge_alloc_lock_cond() {
-    if (small_rpc_unlikely(multi_threaded)) {
-      huge_alloc_lock.lock();
-    }
-  }
-
-  /// Unlock the huge allocator if if it is accessible from multiple threads
-  inline void huge_alloc_unlock_cond() {
-    if (small_rpc_unlikely(multi_threaded)) {
-      huge_alloc_lock.unlock();
-    }
-  }
 
   /**
    * @brief Create a hugepage-backed MsgBuffer for the eRPC user.
@@ -200,9 +147,10 @@ class Rpc {
 
   // rpc_sm_api.cc
 
+ public:
   /**
-   * @brief Create a Session and initiate session connection. This function can
-   * be called only from the creator thread.
+   * @brief Create a session and initiate session connection. This function
+   * can only be called from the creator thread.
    *
    * @return The local session number (>= 0) of the session if creation succeeds
    * and the connect request is sent, negative errno otherwise.
@@ -211,12 +159,14 @@ class Rpc {
    * this call is successful.
    */
   int create_session(const char *_rem_hostname, uint8_t rem_app_tid,
-                     uint8_t rem_phy_port = 0);
+                     uint8_t rem_phy_port = 0) {
+    return create_session_st(_rem_hostname, rem_app_tid, rem_phy_port);
+  }
 
   /**
    * @brief Disconnect and destroy a client session. The session should not
-   * be used by the application after this function is called. This function
-   * can be called only from the creator thread.
+   * be used by the application after this function is called. This functio
+   * can only be called from the creator thread.
    *
    * @param session_num A session number returned from a successful
    * create_session()
@@ -225,24 +175,19 @@ class Rpc {
    * callback will be invoked later. Negative errno if the session cannot be
    * disconnected.
    */
-  int destroy_session(int session_num);
+  int destroy_session(int session_num) {
+    return destroy_session_st(session_num);
+  }
 
   /// Return the number of active server or client sessions. This function
   /// can be called only from the creator thread.
-  inline size_t num_active_sessions() {
-    assert(in_creator());
+  size_t num_active_sessions() { return num_active_sessions_st(); }
 
-    size_t ret = 0;
-    for (Session *session : session_vec) {
-      if (session != nullptr) {
-        ret++;
-      }
-    }
-
-    return ret;
-  }
-
-  // rpc_enqueue_request.cc
+ private:
+  int create_session_st(const char *_rem_hostname, uint8_t rem_app_tid,
+                        uint8_t rem_phy_port = 0);
+  int destroy_session_st(int session_num);
+  size_t num_active_sessions_st();
 
   /**
    * @brief Try to enqueue a request for transmission.
@@ -268,8 +213,6 @@ class Rpc {
   int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *msg_buffer,
                       erpc_cont_func_t cont_func, size_t tag);
 
-  // rpc_enqueue_response.cc
-
   /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
@@ -294,10 +237,21 @@ class Rpc {
     session_unlock_cond(session);
   }
 
-  // rpc_ev_loop.cc
-
+  // Event loop
+ public:
   /// Run one iteration of the event loop
-  void run_event_loop_one() {
+  inline void run_event_loop_one() { run_event_loop_one_st(); }
+
+  /// Run the event loop forever
+  inline void run_event_loop() { run_event_loop_st(); }
+
+  /// Run the event loop for \p timeout_ms milliseconds
+  inline void run_event_loop_timeout(size_t timeout_ms) {
+    run_event_loop_timeout_st(timeout_ms);
+  }
+
+ private:
+  inline void run_event_loop_one_st() {
     assert(in_creator());
     dpath_stat_inc(&dpath_stats.ev_loop_calls);
 
@@ -315,16 +269,14 @@ class Rpc {
     process_datapath_tx_work_queue(); /* TX */
   }
 
-  /// Run the event loop forever
-  inline void run_event_loop() {
+  inline void run_event_loop_st() {
     assert(in_creator());
     while (true) {
       run_event_loop_one();
     }
   }
 
-  /// Run the event loop for \p timeout_ms milliseconds
-  inline void run_event_loop_timeout(size_t timeout_ms) {
+  inline void run_event_loop_timeout_st(size_t timeout_ms) {
     assert(in_creator());
 
     uint64_t start_tsc = rdtsc();
@@ -339,6 +291,59 @@ class Rpc {
   }
 
  private:
+  /// Return true iff we're currently running in this Rpc's creator.
+  /// This is pretty fast as we cache the OS thread ID in \p gettid().
+  inline bool in_creator() { return gettid() == creator_os_tid; }
+
+  /// Return true iff a user-provide session number is in the session vector
+  inline bool is_usr_session_num_in_range(int session_num) {
+    return session_num >= 0 && (size_t)session_num < session_vec.size();
+  }
+
+  /// Lock the Rpc if it is accessible from multiple threads
+  inline void rpc_lock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
+      rpc_lock.lock();
+    }
+  }
+
+  /// Unlock the Rpc if it is accessible from multiple threads
+  inline void rpc_unlock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
+      rpc_lock.unlock();
+    }
+  }
+
+  /// Lock this session if it is accessible from multiple threads
+  inline void session_lock_cond(Session *session) {
+    assert(session != nullptr);
+    if (small_rpc_unlikely(multi_threaded)) {
+      session->lock.lock();
+    }
+  }
+
+  /// Unlock this session if it is accessible from multiple threads
+  inline void session_unlock_cond(Session *session) {
+    assert(session != nullptr);
+    if (small_rpc_unlikely(multi_threaded)) {
+      session->lock.unlock();
+    }
+  }
+
+  /// Lock the huge allocator if if it is accessible from multiple threads
+  inline void huge_alloc_lock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
+      huge_alloc_lock.lock();
+    }
+  }
+
+  /// Unlock the huge allocator if if it is accessible from multiple threads
+  inline void huge_alloc_unlock_cond() {
+    if (small_rpc_unlikely(multi_threaded)) {
+      huge_alloc_lock.unlock();
+    }
+  }
+
   // rpc.cc
 
   /// Process all session management events in the queue and free them.
