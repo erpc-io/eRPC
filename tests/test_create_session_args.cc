@@ -19,9 +19,9 @@ const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 /// The session managament handler that is never invoked
-void test_sm_hander(Session *session, SessionMgmtEventType sm_event_type,
+void test_sm_hander(int session_num, SessionMgmtEventType sm_event_type,
                     SessionMgmtErrType sm_err_type, void *_context) {
-  _unused(session);
+  _unused(session_num);
   _unused(sm_event_type);
   _unused(sm_err_type);
   _unused(_context);
@@ -40,30 +40,30 @@ void client_thread_func(Nexus *nexus) {
 
   {
     /* Test: Correct args */
-    Session *session =
+    int session_num =
         rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
-    ASSERT_TRUE(session != nullptr);
+    ASSERT_GE(session_num, 0);
   }
 
   {
     /* Test: Invalid remote port, which can be detected locally */
-    Session *session =
+    int session_num =
         rpc.create_session(local_hostname, SERVER_APP_TID, kMaxPhyPorts);
-    ASSERT_TRUE(session == nullptr);
+    ASSERT_LT(session_num, 0);
   }
 
   {
     /* Test: Try to create session to self */
-    Session *session =
+    int session_num =
         rpc.create_session(local_hostname, CLIENT_APP_TID, phy_port);
-    ASSERT_TRUE(session == nullptr);
+    ASSERT_LT(session_num, 0);
   }
 
   {
     /* Test: Try to create another session to the same remote Rpc. */
-    Session *session =
+    int session_num =
         rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
-    ASSERT_TRUE(session == nullptr);
+    ASSERT_LT(session_num, 0);
   }
 }
 
