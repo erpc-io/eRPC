@@ -29,6 +29,7 @@ EA Code notes
    * RPC request handlers must be thread-safe if background threads are used.
 
 ## Short-term TODOs
+ * Rename `sm_hander` to `sm_handler`.
  * Locking for `enqueue_req` and `enqueue_resp`? How much locking can we avoid?
    (e.g., we need lock in `upsert_datapath_tx_work_queue`.)
  * Which fields of SSlot need to be public?

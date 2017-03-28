@@ -50,7 +50,9 @@ class Rpc {
     return TTr::kMaxDataPerPkt;
   }
 
-  // rpc.cc
+  //
+  // Constructor/destructor (rpc.cc)
+  //
 
   /**
    * @brief Construct the Rpc object from a foreground thread
@@ -63,7 +65,9 @@ class Rpc {
   /// Destroy the Rpc from a foreground thread
   ~Rpc();
 
-  // Allocator functions
+  //
+  // MsgBuffer allocation
+  //
 
   /**
    * @brief Create a hugepage-backed MsgBuffer for the eRPC user.
@@ -145,7 +149,9 @@ class Rpc {
     return ret;
   }
 
-  // rpc_sm_api.cc
+  //
+  // Session management API (rpc_sm_api.cc)
+  //
 
  public:
   /**
@@ -189,6 +195,11 @@ class Rpc {
   int destroy_session_st(int session_num);
   size_t num_active_sessions_st();
 
+  //
+  // Rpc datapath (rpc_enqueue_request.cc and rpc_enqueue_response.cc)
+  //
+
+ public:
   /**
    * @brief Try to enqueue a request for transmission.
    *
@@ -237,7 +248,9 @@ class Rpc {
     session_unlock_cond(session);
   }
 
+  //
   // Event loop
+  //
  public:
   /// Run one iteration of the event loop
   inline void run_event_loop_one() { run_event_loop_one_st(); }
@@ -289,6 +302,10 @@ class Rpc {
       }
     }
   }
+
+  //
+  // Misc private functions
+  //
 
  private:
   /// Return true iff we're currently running in this Rpc's creator.

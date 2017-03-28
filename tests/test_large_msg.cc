@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <string.h>
 #include <atomic>
+#include <cstring>
 #include <thread>
 #include "rpc.h"
 #include "util/rand.h"
@@ -31,7 +32,7 @@ class AppContext {
  public:
   bool is_client;
   Rpc<IBTransport> *rpc;
-  Session **session_arr;
+  int *session_num_arr;
   FastRand fastrand;  ///< Used for picking large message sizes
 
   size_t num_sm_connect_resps = 0; /* Client-only */
@@ -108,9 +109,9 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
 }
 
 /// The common session management handler for all subtests
-void sm_hander(Session *session, SessionMgmtEventType sm_event_type,
+void sm_hander(int session_num, SessionMgmtEventType sm_event_type,
                SessionMgmtErrType sm_err_type, void *_context) {
-  _unused(session);
+  _unused(session_num);
 
   auto *context = (AppContext *)_context;
   ASSERT_TRUE(context->is_client);
@@ -199,21 +200,18 @@ void client_connect_sessions(Nexus *nexus, AppContext &context,
                                      &sm_hander, phy_port, numa_node);
 
   /* Connect the sessions */
-  context.session_arr = new Session *[num_sessions];
-  for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
-    context.session_arr[sess_i] = context.rpc->create_session(
-        local_hostname, kAppServerAppTid + (uint8_t)sess_i, phy_port);
+  context.session_num_arr = new int[num_sessions];
+  for (size_t i = 0; i < num_sessions; i++) {
+    context.session_num_arr[i] = context.rpc->create_session(
+        local_hostname, kAppServerAppTid + (uint8_t)i, phy_port);
   }
 
   while (context.num_sm_connect_resps < num_sessions) {
     context.rpc->run_event_loop_one();
   }
 
+  /* sm handler checks that the callbacks have no errors */
   ASSERT_EQ(context.num_sm_connect_resps, num_sessions);
-
-  for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
-    ASSERT_EQ(context.session_arr[sess_i]->state, SessionState::kConnected);
-  }
 }
 
 /// Run the event loop until we get \p num_resps RPC responses, or until
@@ -243,7 +241,7 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
-  Session *session = context.session_arr[0];
+  int session_num = context.session_num_arr[0];
 
   /* Send a message */
   size_t req_size = kAppMinMsgSize;
@@ -257,10 +255,9 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
 
   test_printf("test: Sending request of size %zu\n", req_size);
   int ret =
-      rpc->enqueue_request(session, kAppReqType, &req_msgbuf, cont_func, 0);
+      rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
   if (ret != 0) {
-    test_printf("test: enqueue_request error %s\n",
-                rpc->rpc_datapath_err_code_str(ret).c_str());
+    test_printf("test: enqueue_request error %s\n", std::strerror(ret));
   }
   ASSERT_EQ(ret, 0);
 
@@ -270,7 +267,7 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   rpc->free_msg_buffer(req_msgbuf);
 
   /* Disconnect the session */
-  rpc->destroy_session(session);
+  rpc->destroy_session(session_num);
   rpc->run_event_loop_timeout(kAppEventLoopMs);
 
   /* Free resources */
@@ -297,7 +294,7 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
-  Session *session = context.session_arr[0];
+  int session_num = context.session_num_arr[0];
 
   /* Pre-create MsgBuffers so we can test reuse and resizing */
   MsgBuffer req_msgbuf[Session::kSessionCredits];
@@ -320,17 +317,16 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
       req_msgbuf[i].buf[req_len - 1] = 0;
 
       test_printf("test: Sending request of length = %zu\n", req_len);
-      int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[i],
+      int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[i],
                                      cont_func, 0);
       if (ret != 0) {
-        test_printf("test: enqueue_request error %s\n",
-                    rpc->rpc_datapath_err_code_str(ret).c_str());
+        test_printf("test: enqueue_request error %s\n", std::strerror(ret));
       }
       ASSERT_EQ(ret, 0);
     }
 
     /* Try to enqueue one more request - this should fail */
-    int ret = rpc->enqueue_request(session, kAppReqType, &req_msgbuf[0],
+    int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[0],
                                    cont_func, 0);
     ASSERT_NE(ret, 0);
 
@@ -345,7 +341,7 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   }
 
   /* Disconnect the session */
-  rpc->destroy_session(session);
+  rpc->destroy_session(session_num);
   rpc->run_event_loop_timeout(kAppEventLoopMs);
 
   /* Free resources */
@@ -372,7 +368,7 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
-  Session **session_arr = context.session_arr;
+  int *session_num_arr = context.session_num_arr;
 
   /* Pre-create MsgBuffers so we can test reuse and resizing */
   size_t tot_reqs_per_iter = num_sessions * Session::kSessionCredits;
@@ -401,11 +397,10 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
         test_printf("test: Sending request of length = %zu\n", req_len);
 
-        int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
+        int ret = rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
                                        &req_msgbuf[req_i], cont_func, 0);
         if (ret != 0) {
-          test_printf("test: enqueue_request error %s\n",
-                      rpc->rpc_datapath_err_code_str(ret).c_str());
+          test_printf("test: enqueue_request error %s\n", std::strerror(ret));
         }
         ASSERT_EQ(ret, 0);
       }
@@ -422,7 +417,7 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
   /* Disconnect the sessions */
   for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
-    rpc->destroy_session(session_arr[sess_i]);
+    rpc->destroy_session(session_num_arr[sess_i]);
   }
 
   rpc->run_event_loop_timeout(kAppEventLoopMs);
@@ -460,7 +455,7 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
   client_connect_sessions(nexus, context, num_sessions);
 
   Rpc<IBTransport> *rpc = context.rpc;
-  Session **session_arr = context.session_arr;
+  int *session_num_arr = context.session_num_arr;
 
   /* Run many iterations to stress memory leaks */
   for (size_t iter = 0; iter < 500; iter++) {
@@ -493,11 +488,10 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
         test_printf("test: Iter %zu: Sending request of length = %zu\n", iter,
                     req_len);
 
-        int ret = rpc->enqueue_request(session_arr[sess_i], kAppReqType,
+        int ret = rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
                                        &req_msgbuf[req_i], cont_func, 0);
         if (ret != 0) {
-          test_printf("test: enqueue_request error %s\n",
-                      rpc->rpc_datapath_err_code_str(ret).c_str());
+          test_printf("test: enqueue_request error %s\n", std::strerror(ret));
         }
         ASSERT_EQ(ret, 0);
       }
@@ -515,7 +509,7 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
 
   /* Disconnect the sessions */
   for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
-    rpc->destroy_session(session_arr[sess_i]);
+    rpc->destroy_session(session_num_arr[sess_i]);
   }
 
   rpc->run_event_loop_timeout(kAppEventLoopMs);
