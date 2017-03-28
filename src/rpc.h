@@ -45,40 +45,6 @@ class Rpc {
   /// Max number of unexpected *packets* kept outstanding by this Rpc
   static constexpr size_t kRpcUnexpPktWindow = 20;
 
-  /// Error codes returned by the Rpc datapath. 0 means no error.
-  enum class RpcDatapathErrCode : int {
-    kInvalidSessionArg = 1,
-    kInvalidMsgBufferArg,
-    kInvalidMsgSizeArg,
-    kInvalidReqTypeArg,
-    kInvalidReqFuncArg,
-    kNoSessionMsgSlots
-  };
-
-  /// Return a string representation of a datapath error code
-  static std::string rpc_datapath_err_code_str(int datapath_err_code) {
-    auto e = static_cast<RpcDatapathErrCode>(datapath_err_code);
-
-    switch (e) {
-      case RpcDatapathErrCode::kInvalidSessionArg:
-        return std::string("[Invalid session argument]");
-      case RpcDatapathErrCode::kInvalidMsgBufferArg:
-        return std::string("[Invalid MsgBuffer argument]");
-      case RpcDatapathErrCode::kInvalidMsgSizeArg:
-        return std::string("[Invalid message size argument]");
-      case RpcDatapathErrCode::kInvalidReqTypeArg:
-        return std::string("[Invalid request type argument]");
-      case RpcDatapathErrCode::kInvalidReqFuncArg:
-        return std::string("[Invalid request function argument]");
-      case RpcDatapathErrCode::kNoSessionMsgSlots:
-        return std::string("[No session message slots]");
-    };
-
-    assert(false);
-    exit(-1);
-    return std::string("");
-  }
-
   /// Return the maximum data size that can be sent in one packet
   static inline constexpr size_t max_data_per_pkt() {
     return TTr::kMaxDataPerPkt;
@@ -87,6 +53,11 @@ class Rpc {
   /// Return true iff we're currently running in this Rpc's creator.
   /// This is pretty fast as we cache the OS thread ID in \p gettid().
   inline bool in_creator() { return gettid() == creator_os_tid; }
+
+  /// Return true iff a user-provide session number is in the session vector
+  inline bool is_usr_session_num_in_range(int session_num) {
+    return session_num >= 0 && (size_t)session_num < session_vec.size();
+  }
 
   // rpc.cc
 
@@ -148,9 +119,7 @@ class Rpc {
   }
 
   /**
-   * @brief Create a hugepage-backed MsgBuffer for the eRPC user. This
-   * function is thread-safe if the small RPC optimization level is not
-   * set to extreme.
+   * @brief Create a hugepage-backed MsgBuffer for the eRPC user.
    *
    * The returned MsgBuffer's \p buf is surrounded by packet headers that the
    * user must not modify. This function does not fill in these message headers,
@@ -212,7 +181,7 @@ class Rpc {
     msg_buffer->resize(new_data_size, new_num_pkts);
   }
 
-  /// Free a MsgBuffer allocated using alloc_msg_buffer()
+  /// Free a MsgBuffer created by \p alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     assert(msg_buffer.is_dynamic() && msg_buffer.check_magic());
 
@@ -235,32 +204,28 @@ class Rpc {
    * @brief Create a Session and initiate session connection. This function can
    * be called only from the creator thread.
    *
-   * @return A pointer to the created session if creation succeeds and the
-   * connect request is sent, NULL otherwise.
+   * @return The local session number (>= 0) of the session if creation succeeds
+   * and the connect request is sent, negative errno otherwise.
    *
    * A callback of type \p kConnected or \p kConnectFailed will be invoked if
    * this call is successful.
    */
-  Session *create_session(const char *_rem_hostname, uint8_t rem_app_tid,
-                          uint8_t rem_phy_port = 0);
+  int create_session(const char *_rem_hostname, uint8_t rem_app_tid,
+                     uint8_t rem_phy_port = 0);
 
   /**
-   * @brief Disconnect and destroy a client session. \p session should not
+   * @brief Disconnect and destroy a client session. The session should not
    * be used by the application after this function is called. This function
    * can be called only from the creator thread.
    *
-   * @param session A session that was returned by create_session().
+   * @param session_num A session number returned from a successful
+   * create_session()
    *
-   * @return True if (a) the session disconnect packet was sent, and the
-   * disconnect callback will be invoked later, or if (b) there was no need for
-   * a disconnect packet since the session is in an error state. In the latter
-   * case, the callback is invoked before this function returns.
-   * The possible callback types are \p kDisconnected and \p kDisconnectFailed.
-   *
-   * False if the session cannot be disconnected right now since connection
-   * establishment is in progress , or if the \p session argument is invalid.
+   * @return 0 if (a) the session disconnect packet was sent, and the disconnect
+   * callback will be invoked later. Negative errno if the session cannot be
+   * disconnected.
    */
-  bool destroy_session(Session *session);
+  int destroy_session(int session_num);
 
   /// Return the number of active server or client sessions. This function
   /// can be called only from the creator thread.
@@ -290,7 +255,7 @@ class Rpc {
    * If this call succeeds, eRPC owns \p msg_buffer until the request completes
    * (i.e., the response callback is invoked).
    *
-   * @param session The client session to send the request on
+   * @param session_num The session number to send the request on
    * @param req_type The type of the request
    * @param msg_buffer The user-created MsgBuffer containing the request payload
    * but not packet headers
@@ -300,15 +265,12 @@ class Rpc {
    * @return 0 on success (i.e., if the request was queued). An error code is
    * returned if the request cannot be queued.
    */
-  int enqueue_request(Session *session, uint8_t req_type, MsgBuffer *msg_buffer,
+  int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *msg_buffer,
                       erpc_cont_func_t cont_func, size_t tag);
 
   // rpc_enqueue_response.cc
 
-  /**
-   * @brief Try to enqueue a response for transmission. This requires the
-   * session slot's RX MsgBuffer to be valid.
-   */
+  /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
   /// Release a response received at a client
@@ -405,25 +367,24 @@ class Rpc {
   /// Send a (possibly retried) disconnect request for this session
   void send_disconnect_req_one(Session *session);
 
-  /// Add this session to the session managment retry queue
+  ///@{
+  /// Management retry queue functions. These can only be executed by the Rpc
+  /// creator thread.
   void mgmt_retry_queue_add(Session *session);
-
-  /// Remove this session from the session managment retry queue
   void mgmt_retry_queue_remove(Session *session);
-
-  /// Check if the session managment retry queue contains this session
   bool mgmt_retry_queue_contains(Session *session);
-
-  /// Retry in-flight session management requests whose timeout has expired
   void mgmt_retry();
+  ///@}
 
   /// Add \p session to the TX work queue if it's not already present
   inline void upsert_datapath_tx_work_queue(Session *session) {
+    rpc_lock_cond();
     assert(session != nullptr);
     if (!session->in_datapath_tx_work_queue) {
       session->in_datapath_tx_work_queue = true;
       datapath_tx_work_queue.push_back(session);
     }
+    rpc_unlock_cond();
   }
 
   // rpc_tx.cc
@@ -474,7 +435,7 @@ class Rpc {
      */
     MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
     if (small_rpc_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
-      /* This check is OK, since this sslot must be initialized */
+      /* This check is OK, as dynamic sslots must be initialized */
       assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
       free_msg_buffer(*tx_msgbuf);
       /* Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf */
@@ -511,7 +472,7 @@ class Rpc {
      */
     MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
     if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
-      /* This check is OK, since this sslot must be initialized */
+      /* This check is OK, as dynamic sslots must be initialized */
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);
       rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
@@ -602,8 +563,8 @@ class Rpc {
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
 
-  /// Sessions for which a management request is in flight. This can be a vector
-  /// because session management is not performance-critical.
+  /// Sessions for which a management request is in flight. This is only
+  /// accessed by the creator thread, so we don't need a lock.
   std::vector<Session *> mgmt_retry_queue;
 
   /// Sessions that need TX. We don't need a std::list to support efficient

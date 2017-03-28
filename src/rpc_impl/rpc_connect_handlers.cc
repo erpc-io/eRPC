@@ -13,7 +13,7 @@ namespace ERpc {
  */
 template <class TTr>
 void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
-  assert(in_creator()); /* Only Rpc creator runs event loop */
+  assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
 
@@ -163,7 +163,7 @@ void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 
 template <class TTr>
 void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
-  assert(in_creator()); /* Only Rpc creator runs event loop */
+  assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
   assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));
@@ -241,8 +241,9 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
                  session_mgmt_err_type_str(sm_pkt->err_type).c_str());
 
     session->state = SessionState::kDisconnected;
-    session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
-                         sm_pkt->err_type, context);
+    session_mgmt_handler(session->local_session_num,
+                         SessionMgmtEventType::kConnectFailed, sm_pkt->err_type,
+                         context);
     bury_session(session);
     return;
   }
@@ -292,9 +293,9 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
         app_tid, session->local_session_num);
     send_disconnect_req_one(session);
 
-    session_mgmt_handler(session, SessionMgmtEventType::kConnectFailed,
-                         SessionMgmtErrType::kRoutingResolutionFailure,
-                         context);
+    session_mgmt_handler(
+        session->local_session_num, SessionMgmtEventType::kConnectFailed,
+        SessionMgmtErrType::kRoutingResolutionFailure, context);
 
     return;
   }
@@ -305,7 +306,8 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
   session->state = SessionState::kConnected;
 
   erpc_dprintf("%s: None. Session connected.\n", issue_msg);
-  session_mgmt_handler(session, SessionMgmtEventType::kConnected,
+  session_mgmt_handler(session->local_session_num,
+                       SessionMgmtEventType::kConnected,
                        SessionMgmtErrType::kNoError, context);
 }
 

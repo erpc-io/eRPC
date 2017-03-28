@@ -5,10 +5,13 @@ namespace ERpc {
 template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
-
   SSlot *sslot = (SSlot *)req_handle;
-  assert(sslot->session->is_server());
   assert(sslot->rx_msgbuf.buf != nullptr); /* Must be valid for pkthdr fields */
+
+  Session *session = sslot->session;
+  assert(session->is_server());
+  /* Client has a pending request, so session can't be disconnected */
+  assert(session->is_connected());
 
   MsgBuffer *resp_msgbuf;
   if (small_rpc_likely(sslot->prealloc_used)) {
@@ -25,7 +28,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
   resp_pkthdr_0->req_type = sslot->rx_msgbuf.get_req_type();
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
-  resp_pkthdr_0->rem_session_num = sslot->session->remote_session_num;
+  resp_pkthdr_0->rem_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
 
   if (small_rpc_likely(sslot->req_func_type ==
@@ -64,7 +67,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   sslot->tx_msgbuf = resp_msgbuf; /* Valid response */
   sslot->tx_msgbuf->pkts_queued = 0;
 
-  upsert_datapath_tx_work_queue(sslot->session);
+  upsert_datapath_tx_work_queue(session); /* Thread-safe */
 
   /* Bury the request MsgBuffer (rx_msgbuf), which may be dynamic */
   bury_sslot_rx_msgbuf(sslot);

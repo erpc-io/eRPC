@@ -82,6 +82,8 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
 
 template <class TTr>
 Rpc<TTr>::~Rpc() {
+  assert(in_creator());
+
   /* XXX: Check if all sessions are disconnected */
   for (Session *session : session_vec) {
     if (session != nullptr) {
@@ -106,10 +108,11 @@ Rpc<TTr>::~Rpc() {
 
 template <class TTr>
 void Rpc<TTr>::bury_session(Session *session) {
+  assert(in_creator());
   assert(session != nullptr);
 
+  /* Server-mode sessions are never in the retry queue, so check only clients */
   if (session->is_client()) {
-    /* Server-mode sessions can never be in the retry queue */
     assert(!mgmt_retry_queue_contains(session));
   }
 
@@ -119,17 +122,20 @@ void Rpc<TTr>::bury_session(Session *session) {
     MsgBuffer &msg_buf = session->sslot_arr[i].pre_resp_msgbuf;
     free_msg_buffer(msg_buf);
 
-    /* XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
-     * guaranteed to have been freed at this point? */
+    /*
+     * XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
+     * guaranteed to have been freed at this point?
+     */
   }
 
+  /* No need to lock the session to nullify it */
   session_vec.at(session->local_session_num) = nullptr;
-
   delete session; /* This does nothing */
 }
 
 template <class TTr>
 void Rpc<TTr>::handle_session_management() {
+  assert(in_creator());
   assert(nexus_hook.sm_pkt_list.size > 0);
   nexus_hook.sm_pkt_list.lock();
 

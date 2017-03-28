@@ -4,7 +4,6 @@
 #include "msg_buffer.h"
 #include "ops.h"
 
-
 namespace ERpc {
 
 class Session; /* Forward declaration */
@@ -24,21 +23,21 @@ class Session; /* Forward declaration */
 class SSlot {
  public:
   // Members that are valid for both server and client
-  uint8_t pad[64];  ///< Padding to prevent false sharing
-  Session *session;  ///< Pointer to the session that this sslot belongs to
-  size_t index; ///< Index of this sslot in the session's sslot_arr
+  uint8_t pad[64];       ///< Padding to prevent false sharing
+  Session *session;      ///< Pointer to the session that this sslot belongs to
+  size_t index;          ///< Index of this sslot in the session's sslot_arr
   MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
   MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
 
   // Client-only
-  erpc_cont_func_t cont_func; ///< Continuation function for the request
-  size_t tag;  ///< Tag of the request
+  erpc_cont_func_t cont_func;  ///< Continuation function for the request
+  size_t tag;                  ///< Tag of the request
 
   // Server-only
   ReqFuncType req_func_type;  ///< The type of the request function
-  MsgBuffer pre_resp_msgbuf; ///< Prealloc MsgBuffer to store app response
-  MsgBuffer dyn_resp_msgbuf; ///< Dynamic MsgBuffer to store app response
-  bool prealloc_used;  ///< Did the app use \p pre_resp_msgbuf
+  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
+  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
+  bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
 
   /// Return a string representation of this session slot
   std::string to_string() const {
@@ -76,7 +75,6 @@ class SSlot {
     return ret.str();
   }
 };
-
 }
 
 #endif  // ERPC_SSLOT_H

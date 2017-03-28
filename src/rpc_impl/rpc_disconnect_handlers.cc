@@ -10,14 +10,17 @@ namespace ERpc {
 /*
  * We don't need to check remote arguments since the session was already
  * connected successfully.
+ *
+ * We don't need to lock the session since it is idle, i.e., the session client
+ * has received responses for all outstanding requests.
  */
 template <class TTr>
 void Rpc<TTr>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
-  assert(in_creator()); /* Only Rpc creator runs event loop */
+  assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectReq);
 
-  /* Ensure that server fields known by the client were filled correctly */
+  /* Check that the server fields known by the client were filled correctly */
   assert(sm_pkt->server.app_tid == app_tid);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
 
@@ -47,15 +50,30 @@ void Rpc<TTr>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
   assert(session->server == sm_pkt->server);
   assert(session->client == sm_pkt->client);
 
+  /* Check that responses for all sslots have been sent */
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    SSlot &sslot = session->sslot_arr[i];
+    assert(sslot.rx_msgbuf.buf == nullptr &&
+           sslot.rx_msgbuf.buffer.buf == nullptr);
+
+    if (sslot.tx_msgbuf != nullptr) {
+      assert(sslot.tx_msgbuf->pkts_queued == sslot.tx_msgbuf->num_pkts);
+    }
+  }
+
   erpc_dprintf("%s. None. Sending response.\n", issue_msg);
   sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
 
   bury_session(session); /* Free session resources + NULL-ify in session_vec */
 }
 
+/*
+ * We don't need to acquire the session lock because this session has been
+ * idle since the disconnect request was sent.
+ */
 template <class TTr>
 void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
-  assert(in_creator()); /* Only Rpc creator runs event loop */
+  assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectResp);
   assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));
@@ -109,7 +127,8 @@ void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
 
   if (!session->client_info.sm_callbacks_disabled) {
     erpc_dprintf("%s: None. Session disconnected.\n", issue_msg);
-    session_mgmt_handler(session, SessionMgmtEventType::kDisconnected,
+    session_mgmt_handler(session->local_session_num,
+                         SessionMgmtEventType::kDisconnected,
                          SessionMgmtErrType::kNoError, context);
   } else {
     erpc_dprintf(

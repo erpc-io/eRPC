@@ -86,9 +86,6 @@ class Session {
   } client_info;
 };
 
-typedef void (*session_mgmt_handler_t)(Session *, SessionMgmtEventType,
-                                       SessionMgmtErrType, void *);
-
 }  // End ERpc
 
 #endif  // ERPC_SESSION_H

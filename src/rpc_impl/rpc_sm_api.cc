@@ -15,8 +15,8 @@ namespace ERpc {
  * so the args checking is always enabled (i.e., no asserts).
  */
 template <class TTr>
-Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
-                                  uint8_t rem_phy_port) {
+int Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
+                             uint8_t rem_phy_port) {
   /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", app_tid);
@@ -24,27 +24,27 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
   /* Check that the caller is the creator thread */
   if (!in_creator()) {
     erpc_dprintf("%s: Caller thread is not the creator thread.\n", issue_msg);
-    return nullptr;
+    return -EPERM;
   }
 
   /* Check remote fabric port */
   if (rem_phy_port >= kMaxPhyPorts) {
     erpc_dprintf("%s: Invalid remote fabric port %u.\n", issue_msg,
                  rem_phy_port);
-    return nullptr;
+    return -EINVAL;
   }
 
   /* Check remote hostname */
   if (rem_hostname == nullptr || strlen(rem_hostname) > kMaxHostnameLen) {
     erpc_dprintf("%s: Invalid remote hostname.\n", issue_msg);
-    return nullptr;
+    return -EINVAL;
   }
 
   /* Creating a session to one's own Rpc as the client is not allowed */
   if (strcmp(rem_hostname, nexus->hostname.c_str()) == 0 &&
       rem_app_tid == app_tid) {
     erpc_dprintf("%s: Remote Rpc is same as local.\n", issue_msg);
-    return nullptr;
+    return -EINVAL;
   }
 
   /* Creating two sessions as client to the same remote Rpc is not allowed */
@@ -63,7 +63,7 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
       assert(existing_session->is_client());
       erpc_dprintf("%s: Session to %s already exists.\n", issue_msg,
                    existing_session->server.rpc_name().c_str());
-      return nullptr;
+      return -EEXIST;
     }
   }
 
@@ -71,10 +71,13 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
   if (session_vec.size() >= kMaxSessionsPerThread) {
     erpc_dprintf("%s: Session limit (%zu) reached.\n", issue_msg,
                  kMaxSessionsPerThread);
-    return nullptr;
+    return -ENOMEM;
   }
 
-  /* Create a new session and fill prealloc MsgBuffers. XXX: Use pool? */
+  /*
+   * Create a new session and fill prealloc MsgBuffers. No need to lock the
+   * session since we haven't given the session number to the user.
+   */
   Session *session =
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
 
@@ -95,7 +98,7 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
       }
 
       erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
-      return nullptr;
+      return -ENOMEM;
     }
   }
 
@@ -132,37 +135,64 @@ Session *Rpc<TTr>::create_session(const char *rem_hostname, uint8_t rem_app_tid,
       app_tid, client_endpoint.session_num, rem_hostname);
   send_connect_req_one(session);
 
-  return session;
+  return client_endpoint.session_num;
 }
 
 template <class TTr>
-bool Rpc<TTr>::destroy_session(Session *session) {
-  /* Check that the caller is the creator thread */
-  if (!in_creator()) {
-    erpc_dprintf(
-        "eRPC Rpc %u: destroy_session() failed: Caller thread is not creator\n",
-        app_tid);
-    return false;
-  }
-
-  if (session == nullptr || !session->is_client()) {
-    erpc_dprintf("eRPC Rpc %u: destroy_session() failed: Invalid session.\n",
-                 app_tid);
-    return false;
-  }
-
-  uint16_t session_num = session->client.session_num;
+int Rpc<TTr>::destroy_session(int session_num) {
+  /* Create the basic issue message */
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: destroy_session() failed for session %u. Issue",
+          "eRPC Rpc %u: destroy_session() failed for session %d. Issue",
           app_tid, session_num);
+
+  /* Check that the caller is the creator thread */
+  if (!in_creator()) {
+    erpc_dprintf("%s: Caller thread is not creator.\n", issue_msg);
+    return -EPERM;
+  }
+
+  if (!is_usr_session_num_in_range(session_num)) {
+    erpc_dprintf("%s: Invalid session number.\n", issue_msg);
+    return -EINVAL;
+  }
+
+  Session *session = session_vec[(size_t)session_num];
+  if (session == nullptr) {
+    erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
+    return -EPERM;
+  }
+
+  /* Lock the session to prevent concurrent request submission */
+  session_lock_cond(session);
+
+  if (!session->is_client()) {
+    erpc_dprintf("%s: User cannot destroy server session.\n", issue_msg);
+    session_unlock_cond(session);
+    return -EINVAL;
+  }
+
+  /* A session can be destroyed only when all its sslots are free */
+  if (session->sslot_free_vec.size() != Session::kSessionReqWindow) {
+    erpc_dprintf("%s: Session has pending requests.\n", issue_msg);
+    session_unlock_cond(session);
+    return -EBUSY;
+  }
+
+  /* If we're here, RX and TX MsgBuffers in all sslots should be buried */
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    SSlot &sslot = session->sslot_arr[i];
+    assert(sslot.rx_msgbuf.buf == nullptr);
+    assert(sslot.tx_msgbuf == nullptr);
+  }
 
   switch (session->state) {
     case SessionState::kConnectInProgress:
       /* Can't disconnect right now. User needs to wait. */
       assert(mgmt_retry_queue_contains(session));
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
-      return false;
+      session_unlock_cond(session);
+      return -EPERM;
 
     case SessionState::kConnected:
       session->state = SessionState::kDisconnectInProgress;
@@ -172,19 +202,20 @@ bool Rpc<TTr>::destroy_session(Session *session) {
           "eRPC Rpc %u: Sending first session disconnect req for session %u.\n",
           app_tid, session->local_session_num);
       send_disconnect_req_one(session);
-      return true;
+      session_unlock_cond(session);
+      return 0;
 
     case SessionState::kDisconnectInProgress:
       assert(mgmt_retry_queue_contains(session));
       erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
-      return false;
+      session_unlock_cond(session);
+      return -EALREADY;
 
     case SessionState::kDisconnected:
       assert(!mgmt_retry_queue_contains(session));
-      erpc_dprintf_noargs(
-          "eRPC Rpc: destroy_session() failed. Issue: "
-          "Session already destroyed.\n");
-      return false;
+      erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
+      session_unlock_cond(session);
+      return -ESHUTDOWN;
   }
   exit(-1);
   return false;

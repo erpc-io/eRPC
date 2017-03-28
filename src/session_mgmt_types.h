@@ -62,6 +62,9 @@ enum class SessionMgmtEventType {
   kDisconnectFailed
 };
 
+typedef void (*session_mgmt_handler_t)(int, SessionMgmtEventType,
+                                       SessionMgmtErrType, void *);
+
 static std::string session_state_str(SessionState state) {
   switch (state) {
     case SessionState::kConnectInProgress:

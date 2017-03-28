@@ -73,7 +73,7 @@ void simple_connect(Nexus *nexus) {
   /* Connect the session */
   client_context->exp_err = SessionMgmtErrType::kNoError;
   client_context->exp_state = SessionState::kConnected;
-  client_context->session_num = 
+  client_context->session_num =
       rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
   ASSERT_GE(client_context->session_num, 0);
 
