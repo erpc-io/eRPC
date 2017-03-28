@@ -107,13 +107,13 @@ Rpc<TTr>::~Rpc() {
 }
 
 template <class TTr>
-void Rpc<TTr>::bury_session(Session *session) {
+void Rpc<TTr>::bury_session_st(Session *session) {
   assert(in_creator());
   assert(session != nullptr);
 
   /* Server-mode sessions are never in the retry queue, so check only clients */
   if (session->is_client()) {
-    assert(!mgmt_retry_queue_contains(session));
+    assert(!mgmt_retryq_contains_st(session));
   }
 
   // Free session resources
@@ -134,7 +134,7 @@ void Rpc<TTr>::bury_session(Session *session) {
 }
 
 template <class TTr>
-void Rpc<TTr>::handle_session_management() {
+void Rpc<TTr>::handle_session_management_st() {
   assert(in_creator());
   assert(nexus_hook.sm_pkt_list.size > 0);
   nexus_hook.sm_pkt_list.lock();
@@ -152,16 +152,16 @@ void Rpc<TTr>::handle_session_management() {
 
     switch (sm_pkt->pkt_type) {
       case SessionMgmtPktType::kConnectReq:
-        handle_session_connect_req(sm_pkt);
+        handle_connect_req_st(sm_pkt);
         break;
       case SessionMgmtPktType::kConnectResp:
-        handle_session_connect_resp(sm_pkt);
+        handle_connect_resp_st(sm_pkt);
         break;
       case SessionMgmtPktType::kDisconnectReq:
-        handle_session_disconnect_req(sm_pkt);
+        handle_disconnect_req_st(sm_pkt);
         break;
       case SessionMgmtPktType::kDisconnectResp:
-        handle_session_disconnect_resp(sm_pkt);
+        handle_disconnect_resp_st(sm_pkt);
         break;
       default:
         assert(false);

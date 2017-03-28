@@ -257,7 +257,7 @@ class Rpc {
 
     /* Handle session management events, if any */
     if (unlikely(nexus_hook.sm_pkt_list.size > 0)) {
-      handle_session_management(); /* Callee grabs the hook lock */
+      handle_session_management_st(); /* Callee grabs the hook lock */
     }
 
     /* Check if we need to retransmit any session management requests */
@@ -265,8 +265,8 @@ class Rpc {
       mgmt_retry();
     }
 
-    process_completions();            /* RX */
-    process_datapath_tx_work_queue(); /* TX */
+    process_comps_st();       /* RX */
+    process_datapath_tx_st(); /* TX */
   }
 
   inline void run_event_loop_st() {
@@ -349,35 +349,35 @@ class Rpc {
   /// Process all session management events in the queue and free them.
   /// The handlers for individual request/response types should not free
   /// packets.
-  void handle_session_management();
+  void handle_session_management_st();
 
   /// Free a session's resources and mark it as NULL in the session vector.
   /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
   /// responsible for freeing user-allocated MsgBuffers.
-  void bury_session(Session *session);
+  void bury_session_st(Session *session);
 
   // rpc_connect_handlers.cc
-  void handle_session_connect_req(SessionMgmtPkt *pkt);
-  void handle_session_connect_resp(SessionMgmtPkt *pkt);
+  void handle_connect_req_st(SessionMgmtPkt *pkt);
+  void handle_connect_resp_st(SessionMgmtPkt *pkt);
 
   // rpc_disconnect_handlers.cc
-  void handle_session_disconnect_req(SessionMgmtPkt *pkt);
-  void handle_session_disconnect_resp(SessionMgmtPkt *pkt);
+  void handle_disconnect_req_st(SessionMgmtPkt *pkt);
+  void handle_disconnect_resp_st(SessionMgmtPkt *pkt);
 
   // rpc_sm_retry.cc
 
   /// Send a (possibly retried) connect request for this session
-  void send_connect_req_one(Session *session);
+  void send_connect_req_one_st(Session *session);
 
   /// Send a (possibly retried) disconnect request for this session
-  void send_disconnect_req_one(Session *session);
+  void send_disconnect_req_one_st(Session *session);
 
   ///@{
   /// Management retry queue functions. These can only be executed by the Rpc
   /// creator thread.
-  void mgmt_retry_queue_add(Session *session);
-  void mgmt_retry_queue_remove(Session *session);
-  bool mgmt_retry_queue_contains(Session *session);
+  void mgmt_retryq_add_st(Session *session);
+  void mgmt_retryq_remove_st(Session *session);
+  bool mgmt_retryq_contains_st(Session *session);
   void mgmt_retry();
   ///@}
 
@@ -396,7 +396,7 @@ class Rpc {
 
   /// Try to transmit packets for Sessions in the \p datapath_tx_work_queue.
   /// Sessions for which all packets can be sent are removed from the queue.
-  void process_datapath_tx_work_queue();
+  void process_datapath_tx_st();
 
   /**
    * @brief Try to enqueue a single-packet message
@@ -407,8 +407,8 @@ class Rpc {
    * @param tx_msgbuf A valid single-packet MsgBuffer that needs one packet to
    * be queued
    */
-  void process_datapath_tx_work_queue_single_pkt_one(Session *session,
-                                                     MsgBuffer *tx_msgbuf);
+  void process_datapath_tx_small_msg_one_st(Session *session,
+                                            MsgBuffer *tx_msgbuf);
 
   /**
    * @brief Try to enqueue a multi-packet message
@@ -419,10 +419,61 @@ class Rpc {
    * @param tx_msgbuf A valid multi-packet MsgBuffer that needs one or more
    * packets to be queued
    */
-  void process_datapath_tx_work_queue_multi_pkt_one(Session *session,
-                                                    MsgBuffer *tx_msgbuf);
+  void process_datapath_tx_large_msg_one_st(Session *session,
+                                            MsgBuffer *tx_msgbuf);
 
   // rpc_rx.cc
+
+  /**
+   * @brief Process received packets and post RECVs. The ring buffers received
+   * from `rx_burst` must not be used after new RECVs are posted.
+   *
+   * Although none of the polled RX ring buffers can be overwritten by the
+   * NIC until we send at least one response/CR packet back, we do not control
+   * the order or time at which these packets are sent, due to constraints like
+   * session credits and packet pacing.
+   */
+  void process_comps_st();
+
+  /**
+   * @brief Process a request or response packet received for a small message.
+   * This packet cannot be a credit return.
+   *
+   * @param session The session that the message was received on. The session
+   * is connected.
+   *
+   * @param pkt The received packet. The zeroth byte of this packet is the
+   * eRPC packet header.
+   */
+  void process_comps_small_msg_one_st(Session *session, const uint8_t *pkt);
+
+  /**
+   * @brief Process a request or response packet received for a large message.
+   * This packet cannot be a credit return.
+   *
+   * @param session The session that the message was received on. The session
+   * is connected.
+   *
+   * @param pkt The received packet. The zeroth byte of this packet is the
+   * eRPC packet header.
+   */
+  void process_comps_large_msg_one_st(Session *session, const uint8_t *pkt);
+
+  /// Submit a work item for background processing
+  void submit_background_st(SSlot *sslot);
+
+  // rpc_send_cr.cc
+
+  /**
+   * @brief Send a credit return for this session immediately, i.e., the
+   * transmission of the packet must not be rescheduled
+   *
+   * @param session The session to send the credit return for
+   * @param unexp_pkthdr The packet header of the Unexpected packet that
+   * triggered this credit return
+   */
+  void send_credit_return_now_st(Session *session,
+                                 const pkthdr_t *unexp_pkthdr);
 
   /**
    * @brief Free the session slot's TX MsgBuffer if it is dynamic, and NULL-ify
@@ -485,54 +536,6 @@ class Rpc {
 
     rx_msgbuf.buf = nullptr;
   }
-
-  /**
-   * @brief Process received packets and post RECVs. The ring buffers received
-   * from `rx_burst` must not be used after new RECVs are posted.
-   *
-   * Although none of the polled RX ring buffers can be overwritten by the
-   * NIC until we send at least one response/CR packet back, we do not control
-   * the order or time at which these packets are sent, due to constraints like
-   * session credits and packet pacing.
-   */
-  void process_completions();
-
-  /**
-   * @brief Process a request or response packet received for a small message.
-   * This packet cannot be a credit return.
-   *
-   * @param session The session that the message was received on. The session
-   * is connected.
-   *
-   * @param pkt The received packet. The zeroth byte of this packet is the
-   * eRPC packet header.
-   */
-  void process_completions_small_msg_one(Session *session, const uint8_t *pkt);
-
-  /**
-   * @brief Process a request or response packet received for a large message.
-   * This packet cannot be a credit return.
-   *
-   * @param session The session that the message was received on. The session
-   * is connected.
-   *
-   * @param pkt The received packet. The zeroth byte of this packet is the
-   * eRPC packet header.
-   */
-  void process_completions_large_msg_one(Session *session, const uint8_t *pkt);
-
-  /// Submit a work item for background processing
-  void submit_bg(SSlot *sslot);
-
-  /**
-   * @brief Send a credit return for this session immediately, i.e., the
-   * transmission of the packet must not be rescheduled
-   *
-   * @param session The session to send the credit return for
-   * @param unexp_pkthdr The packet header of the Unexpected packet that
-   * triggered this credit return
-   */
-  void send_credit_return_now(Session *session, const pkthdr_t *unexp_pkthdr);
 
   // Constructor args
   Nexus *nexus;

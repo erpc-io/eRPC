@@ -15,7 +15,7 @@ namespace ERpc {
  * has received responses for all outstanding requests.
  */
 template <class TTr>
-void Rpc<TTr>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
+void Rpc<TTr>::handle_disconnect_req_st(SessionMgmtPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectReq);
@@ -64,7 +64,7 @@ void Rpc<TTr>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
   erpc_dprintf("%s. None. Sending response.\n", issue_msg);
   sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
 
-  bury_session(session); /* Free session resources + NULL-ify in session_vec */
+  bury_session_st(session); /* Free session resources + NULL in session_vec */
 }
 
 /*
@@ -72,7 +72,7 @@ void Rpc<TTr>::handle_session_disconnect_req(SessionMgmtPkt *sm_pkt) {
  * idle since the disconnect request was sent.
  */
 template <class TTr>
-void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
+void Rpc<TTr>::handle_disconnect_resp_st(SessionMgmtPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectResp);
@@ -96,7 +96,7 @@ void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
    * we get a duplicate disconnect response. If so, the callback is not invoked.
    */
   if (session == nullptr) {
-    assert(!mgmt_retry_queue_contains(session));
+    assert(!mgmt_retryq_contains_st(session));
     erpc_dprintf("%s: Client session is already disconnected.\n", issue_msg);
     return;
   }
@@ -110,8 +110,8 @@ void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
    * the connect request is removed from the in-flight list.
    */
   assert(session->state == SessionState::kDisconnectInProgress);
-  assert(mgmt_retry_queue_contains(session));
-  mgmt_retry_queue_remove(session);
+  assert(mgmt_retryq_contains_st(session));
+  mgmt_retryq_remove_st(session);
 
   /*
    * If the session was not already disconnected, the session endpoints
@@ -137,7 +137,7 @@ void Rpc<TTr>::handle_session_disconnect_resp(SessionMgmtPkt *sm_pkt) {
         issue_msg);
   }
 
-  bury_session(session); /* Free session resources + NULL-ify in session_vec */
+  bury_session_st(session); /* Free session resources + NULL in session_vec */
 }
 
 }  // End ERpc

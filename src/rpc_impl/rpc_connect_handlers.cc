@@ -12,7 +12,7 @@ namespace ERpc {
  * make when calling create_session(), which cannot check for such errors.
  */
 template <class TTr>
-void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
+void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
@@ -162,7 +162,7 @@ void Rpc<TTr>::handle_session_connect_req(SessionMgmtPkt *sm_pkt) {
 }
 
 template <class TTr>
-void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
+void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != NULL);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
@@ -202,7 +202,7 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    */
   if (session->state > SessionState::kConnectInProgress) {
     /* We may have a disconnect request outstanding */
-    if (mgmt_retry_queue_contains(session)) {
+    if (mgmt_retryq_contains_st(session)) {
       assert(session->state == SessionState::kDisconnectInProgress);
     }
 
@@ -216,8 +216,8 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
    * should be in flight. It's not possible to also have a disconnect request in
    * flight, since disconnect must wait for the first connect response.
    */
-  assert(mgmt_retry_queue_contains(session));
-  mgmt_retry_queue_remove(session);
+  assert(mgmt_retryq_contains_st(session));
+  mgmt_retryq_remove_st(session);
 
   /*
    * If the session was not already disconnected, the session endpoint metadata
@@ -244,7 +244,7 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
     session_mgmt_handler(session->local_session_num,
                          SessionMgmtEventType::kConnectFailed, sm_pkt->err_type,
                          context);
-    bury_session(session);
+    bury_session_st(session);
     return;
   }
 
@@ -285,13 +285,13 @@ void Rpc<TTr>::handle_session_connect_resp(SessionMgmtPkt *sm_pkt) {
 
     /* Do what destroy_session() does with a kConnected session */
     session->state = SessionState::kDisconnectInProgress;
-    mgmt_retry_queue_add(session); /* Checks that session is not in flight */
+    mgmt_retryq_add_st(session); /* Checks that session is not in flight */
 
     erpc_dprintf(
         "eRPC Rpc %u: Sending first (callback-less) disconnect request for "
         "session %u, and invoking kConnectFailed callback\n",
         app_tid, session->local_session_num);
-    send_disconnect_req_one(session);
+    send_disconnect_req_one_st(session);
 
     session_mgmt_handler(
         session->local_session_num, SessionMgmtEventType::kConnectFailed,

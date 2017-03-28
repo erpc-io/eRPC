@@ -3,8 +3,8 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::send_credit_return_now(Session *session,
-                                      const pkthdr_t *unexp_pkthdr) {
+void Rpc<TTr>::send_credit_return_now_st(Session *session,
+                                         const pkthdr_t *unexp_pkthdr) {
   assert(session != nullptr);
   assert(unexp_pkthdr != nullptr && unexp_pkthdr->check_magic());
   assert(unexp_pkthdr->is_req() || unexp_pkthdr->is_resp());

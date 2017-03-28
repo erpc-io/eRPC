@@ -128,12 +128,12 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
   session->local_session_num = client_endpoint.session_num;
 
   session_vec.push_back(session); /* Add to list of all sessions */
-  mgmt_retry_queue_add(session);  /* Record management request for retry */
+  mgmt_retryq_add_st(session);    /* Record management request for retry */
 
   erpc_dprintf(
       "eRPC Rpc %u: Sending first session connect req for session %u to %s.\n",
       app_tid, client_endpoint.session_num, rem_hostname);
-  send_connect_req_one(session);
+  send_connect_req_one_st(session);
 
   return client_endpoint.session_num;
 }
@@ -189,30 +189,30 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   switch (session->state) {
     case SessionState::kConnectInProgress:
       /* Can't disconnect right now. User needs to wait. */
-      assert(mgmt_retry_queue_contains(session));
+      assert(mgmt_retryq_contains_st(session));
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
       session_unlock_cond(session);
       return -EPERM;
 
     case SessionState::kConnected:
       session->state = SessionState::kDisconnectInProgress;
-      mgmt_retry_queue_add(session); /* Checks that session is not in flight */
+      mgmt_retryq_add_st(session); /* Checks that session is not in flight */
 
       erpc_dprintf(
           "eRPC Rpc %u: Sending first session disconnect req for session %u.\n",
           app_tid, session->local_session_num);
-      send_disconnect_req_one(session);
+      send_disconnect_req_one_st(session);
       session_unlock_cond(session);
       return 0;
 
     case SessionState::kDisconnectInProgress:
-      assert(mgmt_retry_queue_contains(session));
+      assert(mgmt_retryq_contains_st(session));
       erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
       session_unlock_cond(session);
       return -EALREADY;
 
     case SessionState::kDisconnected:
-      assert(!mgmt_retry_queue_contains(session));
+      assert(!mgmt_retryq_contains_st(session));
       erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
       session_unlock_cond(session);
       return -ESHUTDOWN;

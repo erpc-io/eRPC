@@ -11,7 +11,7 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::send_connect_req_one(Session *session) {
+void Rpc<TTr>::send_connect_req_one_st(Session *session) {
   assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kConnectInProgress);
@@ -23,7 +23,7 @@ void Rpc<TTr>::send_connect_req_one(Session *session) {
 }
 
 template <class TTr>
-void Rpc<TTr>::send_disconnect_req_one(Session *session) {
+void Rpc<TTr>::send_disconnect_req_one_st(Session *session) {
   assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kDisconnectInProgress);
@@ -35,14 +35,14 @@ void Rpc<TTr>::send_disconnect_req_one(Session *session) {
 }
 
 template <class TTr>
-bool Rpc<TTr>::mgmt_retry_queue_contains(Session *session) {
+bool Rpc<TTr>::mgmt_retryq_contains_st(Session *session) {
   assert(in_creator()); /* Only Rpc creator runs event loop */
   return std::find(mgmt_retry_queue.begin(), mgmt_retry_queue.end(), session) !=
          mgmt_retry_queue.end();
 }
 
 template <class TTr>
-void Rpc<TTr>::mgmt_retry_queue_add(Session *session) {
+void Rpc<TTr>::mgmt_retryq_add_st(Session *session) {
   assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
 
@@ -50,17 +50,17 @@ void Rpc<TTr>::mgmt_retry_queue_add(Session *session) {
   assert(session->is_client());
 
   /* Ensure that we don't have an in-flight management req for this session */
-  assert(!mgmt_retry_queue_contains(session));
+  assert(!mgmt_retryq_contains_st(session));
 
   session->client_info.mgmt_req_tsc = rdtsc(); /* Save tsc for retry */
   mgmt_retry_queue.push_back(session);
 }
 
 template <class TTr>
-void Rpc<TTr>::mgmt_retry_queue_remove(Session *session) {
+void Rpc<TTr>::mgmt_retryq_remove_st(Session *session) {
   assert(in_creator()); /* Only Rpc creator runs event loop */
   assert(session != nullptr && session->is_client());
-  assert(mgmt_retry_queue_contains(session));
+  assert(mgmt_retryq_contains_st(session));
 
   size_t initial_size = mgmt_retry_queue.size(); /* Debug-only */
   _unused(initial_size);
@@ -96,14 +96,14 @@ void Rpc<TTr>::mgmt_retry() {
               "eRPC Rpc %u: Retrying session connect req for session %u.\n",
               app_tid, session->client.session_num);
 
-          send_connect_req_one(session);
+          send_connect_req_one_st(session);
           break; /* Process other in-flight requests */
         case SessionState::kDisconnectInProgress:
           erpc_dprintf(
               "eRPC Rpc %u: Retrying session disconnect req for session %u.\n",
               app_tid, session->client.session_num);
 
-          send_disconnect_req_one(session);
+          send_disconnect_req_one_st(session);
           break; /* Process other in-flight requests */
         default:
           assert(false);

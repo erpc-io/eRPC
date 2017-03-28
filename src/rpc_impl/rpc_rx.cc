@@ -3,8 +3,8 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::process_completions() {
-  assert(in_creator()); /* Only creator runs event loop */
+void Rpc<TTr>::process_comps_st() {
+  assert(in_creator());
   size_t num_pkts = transport->rx_burst();
   if (num_pkts == 0) {
     return;
@@ -59,9 +59,9 @@ void Rpc<TTr>::process_completions() {
 
     if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
       /* Optimize for when the received packet is a single-packet message */
-      process_completions_small_msg_one(session, pkt);
+      process_comps_small_msg_one_st(session, pkt);
     } else {
-      process_completions_large_msg_one(session, pkt);
+      process_comps_large_msg_one_st(session, pkt);
     }
   }
 
@@ -73,8 +73,8 @@ void Rpc<TTr>::process_completions() {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_completions_small_msg_one(Session *session,
-                                                 const uint8_t *pkt) {
+void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
+                                              const uint8_t *pkt) {
   assert(in_creator()); /* Only creator runs event loop */
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
@@ -108,7 +108,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
    */
   if (small_rpc_unlikely((is_req && !req_func.is_fg_terminal()) ||
                          (!is_req && pkthdr->fgt_resp == 0))) {
-    send_credit_return_now(session, pkthdr);
+    send_credit_return_now_st(session, pkthdr);
   }
 
   /* Create the RX MsgBuffer in the message's session slot */
@@ -156,7 +156,7 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
       if (!req_func.is_background()) {
         req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
       } else {
-        submit_bg(&sslot);
+        submit_background_st(&sslot);
       }
 
       return;
@@ -190,8 +190,8 @@ void Rpc<TTr>::process_completions_small_msg_one(Session *session,
 
 /* This function is for large messages, so don't use small_rpc_likely() */
 template <class TTr>
-void Rpc<TTr>::process_completions_large_msg_one(Session *session,
-                                                 const uint8_t *pkt) {
+void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
+                                              const uint8_t *pkt) {
   assert(in_creator()); /* Only creator runs event loop */
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
@@ -234,7 +234,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
 
   if (is_req_handler_bg || (pkthdr->is_req() && !is_last) ||
       (pkthdr->is_resp() && pkt_num != 0)) {
-    send_credit_return_now(session, pkthdr);
+    send_credit_return_now_st(session, pkthdr);
     /* Continue processing */
   }
 
@@ -329,7 +329,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
       return;
     } else {
       /* We don't depend on any RX ring, so don't create a new MsgBuffer*/
-      submit_bg(&sslot);
+      submit_background_st(&sslot);
       return;
     }
   } else {
@@ -341,7 +341,7 @@ void Rpc<TTr>::process_completions_large_msg_one(Session *session,
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_bg(SSlot *sslot) {
+void Rpc<TTr>::submit_background_st(SSlot *sslot) {
   assert(sslot != nullptr);
   assert(sslot->session != nullptr && sslot->session->is_server());
 
