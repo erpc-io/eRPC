@@ -166,7 +166,7 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
   server_ready = false;
   client_done = false;
 
-  test_printf("test: Using %zu sessions\n", num_sessions);
+  test_printf("Client: Using %zu sessions\n", num_sessions);
 
   std::thread server_thread[num_sessions];
 
@@ -253,11 +253,11 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   }
   req_msgbuf.buf[req_size - 1] = 0;
 
-  test_printf("test: Sending request of size %zu\n", req_size);
+  test_printf("Client: Sending request of size %zu\n", req_size);
   int ret =
       rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
   if (ret != 0) {
-    test_printf("test: enqueue_request error %s\n", std::strerror(ret));
+    test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
   }
   ASSERT_EQ(ret, 0);
 
@@ -316,11 +316,11 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
       }
       req_msgbuf[i].buf[req_len - 1] = 0;
 
-      test_printf("test: Sending request of length = %zu\n", req_len);
+      test_printf("Client: Sending request of length = %zu\n", req_len);
       int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[i],
                                      cont_func, 0);
       if (ret != 0) {
-        test_printf("test: enqueue_request error %s\n", std::strerror(ret));
+        test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
       }
       ASSERT_EQ(ret, 0);
     }
@@ -395,12 +395,12 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
         }
         req_msgbuf[req_i].buf[req_len - 1] = 0;
 
-        test_printf("test: Sending request of length = %zu\n", req_len);
+        test_printf("Client: Sending request of length = %zu\n", req_len);
 
         int ret = rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
                                        &req_msgbuf[req_i], cont_func, 0);
         if (ret != 0) {
-          test_printf("test: enqueue_request error %s\n", std::strerror(ret));
+          test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
         }
         ASSERT_EQ(ret, 0);
       }
@@ -459,7 +459,7 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
 
   /* Run many iterations to stress memory leaks */
   for (size_t iter = 0; iter < 500; iter++) {
-    test_printf("test: Iteration %zu\n", iter);
+    test_printf("Client: Iteration %zu\n", iter);
 
     /* Create new MsgBuffers in each iteration to stress leaks */
     size_t tot_reqs_per_iter = num_sessions * Session::kSessionCredits;
@@ -485,13 +485,13 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
         }
         req_msgbuf[req_i].buf[req_len - 1] = 0;
 
-        test_printf("test: Iter %zu: Sending request of length = %zu\n", iter,
+        test_printf("Client: Iter %zu: Sending request of length = %zu\n", iter,
                     req_len);
 
         int ret = rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
                                        &req_msgbuf[req_i], cont_func, 0);
         if (ret != 0) {
-          test_printf("test: enqueue_request error %s\n", std::strerror(ret));
+          test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
         }
         ASSERT_EQ(ret, 0);
       }

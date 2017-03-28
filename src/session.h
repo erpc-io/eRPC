@@ -25,8 +25,8 @@ class Session {
     kClient = 95
   };
 
-  static const size_t kSessionReqWindow = 8;  ///< *Request* window size
-  static const size_t kSessionCredits = 8;    ///< *Packet* credits per endpoint
+  static constexpr size_t kSessionReqWindow = 8;  ///< *Request* window size
+  static constexpr size_t kSessionCredits = 8;    ///< *Packet* credits
 
   /*
    * Required for fast multiplication and modulo calculation during request
