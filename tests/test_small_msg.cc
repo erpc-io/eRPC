@@ -137,7 +137,7 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
   server_ready = false;
   client_done = false;
 
-  test_printf("test: Using %zu sessions\n", num_sessions);
+  test_printf("Client: Using %zu sessions\n", num_sessions);
 
   std::thread server_thread[num_sessions];
 
