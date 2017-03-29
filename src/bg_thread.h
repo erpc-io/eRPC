@@ -63,15 +63,18 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
       _unused(app_tid);
       _unused(session);
 
-      dpath_dprintf(
-          "eRPC Nexus: Background thread %zu running request "
-          "handler for Rpc %u, session %u.\n",
-          bg_thread_id, app_tid, session->local_session_num);
-
       /* Sanity-check rx_msgbuf. It must use dynamic memory allocation. */
       assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
       assert(sslot->rx_msgbuf.is_dynamic());
       assert(sslot->rx_msgbuf.is_req());
+
+      assert(sslot->tx_msgbuf == nullptr); /* Sanity-check tx_msgbuf */
+
+      dpath_dprintf(
+          "eRPC Background: Background thread %zu running request "
+          "handler for Rpc %u, session %u. Request number = %zu.\n",
+          bg_thread_id, app_tid, session->local_session_num,
+          sslot->rx_msgbuf.get_req_num());
 
       uint8_t req_type = sslot->rx_msgbuf.get_req_type();
       const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);

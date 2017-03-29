@@ -65,9 +65,9 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
   assert(resp_handle != nullptr);
   assert(resp_msgbuf != nullptr);
   assert(_context != nullptr);
-  _unused(tag);
 
-  test_printf("Client: Received response %s\n", (char *)resp_msgbuf->buf);
+  test_printf("Client: Received response %s, tag = %zu\n",
+              (char *)resp_msgbuf->buf, tag);
 
   /*
   ASSERT_EQ(req_msgbuf->get_data_size(), resp_msgbuf->get_data_size());
@@ -217,7 +217,7 @@ void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
   int session_num = context.session_num_arr[0];
 
   /* Send a message */
-  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG"));
+  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG") + 1);
   ASSERT_NE(req_msgbuf.buf, nullptr);
   strcpy((char *)req_msgbuf.buf, "APP_MSG");
 
@@ -279,18 +279,20 @@ void multi_small_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
     /* Enqueue as many requests as one session allows */
     for (size_t i = 0; i < Session::kSessionCredits; i++) {
       std::string req_msg =
-          std::string("APP_MSG-") + std::to_string(req_suffix++);
-      rpc->resize_msg_buffer(&req_msgbuf[i], req_msg.length());
+          std::string("APP_MSG-") + std::to_string(req_suffix);
+      rpc->resize_msg_buffer(&req_msgbuf[i], req_msg.length() + 1);
 
       strcpy((char *)req_msgbuf[i].buf, req_msg.c_str());
 
       test_printf("test: Sending request %s\n", (char *)req_msgbuf[i].buf);
       int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[i],
-                                     cont_func, 0);
+                                     cont_func, req_suffix);
       if (ret != 0) {
         test_printf("test: enqueue_request error %s\n", std::strerror(ret));
       }
       ASSERT_EQ(ret, 0);
+
+      req_suffix++;
     }
 
     /* Try to enqueue one more request - this should fail */
@@ -350,6 +352,8 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
   for (size_t iter = 0; iter < 5; iter++) {
     context.num_rpc_resps = 0;
 
+    test_printf("Client: Iteration %zu.\n", iter);
+
     for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
       /* Enqueue as many requests as this session allows */
       for (size_t crd_i = 0; crd_i < Session::kSessionCredits; crd_i++) {
@@ -357,20 +361,23 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
         assert(req_i < tot_reqs_per_iter);
 
         std::string req_msg =
-            std::string("APP_MSG-") + std::to_string(req_suffix++);
-        rpc->resize_msg_buffer(&(req_msgbuf[req_i]), req_msg.length());
+            std::string("APP_MSG-") + std::to_string(req_suffix);
+        rpc->resize_msg_buffer(&req_msgbuf[req_i], req_msg.length() + 1);
 
         strcpy((char *)req_msgbuf[req_i].buf, req_msg.c_str());
 
         test_printf("test: Sending request %s\n",
                     (char *)req_msgbuf[req_i].buf);
 
-        int ret = rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
-                                       &req_msgbuf[req_i], cont_func, 0);
+        int ret =
+            rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
+                                 &req_msgbuf[req_i], cont_func, req_suffix);
         if (ret != 0) {
-          test_printf("test: enqueue_request error %s\n", std::strerror(ret));
+          test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
         }
         ASSERT_EQ(ret, 0);
+
+        req_suffix++;
       }
     }
 
