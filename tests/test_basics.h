@@ -36,8 +36,8 @@ class BasicAppContext {
 };
 
 /// A basic session management handler that expects successful responses
-void basic_sm_hander(int session_num, SessionMgmtEventType sm_event_type,
-                     SessionMgmtErrType sm_err_type, void *_context) {
+void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
+                      SessionMgmtErrType sm_err_type, void *_context) {
   _unused(session_num);
 
   auto *context = (BasicAppContext *)_context;
@@ -50,11 +50,12 @@ void basic_sm_hander(int session_num, SessionMgmtEventType sm_event_type,
 }
 
 /// A basic server thread that just runs the event loop
-void basic_server_thread_func(Nexus *nexus, uint8_t app_tid) {
+void basic_server_thread_func(Nexus *nexus, uint8_t app_tid,
+                              session_mgmt_handler_t sm_handler) {
   BasicAppContext context;
   context.is_client = false;
 
-  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &basic_sm_hander,
+  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, sm_handler,
                        kAppPhyPort, kAppNumaNode);
   context.rpc = &rpc;
   server_ready = true;
@@ -76,10 +77,16 @@ void basic_server_thread_func(Nexus *nexus, uint8_t app_tid) {
  * @param num_bg_threads The number of background threads in the Nexus. If
  * this is non-zero, the request handler is executed in a background thread.
  *
- * @param client_thread_func The function executed by the client threads
+ * @param client_thread_func The function executed by the client threads.
+ * Server threads execute \p basic_server_thread_func()
+ *
+ * @param sm_handler The session management handler used by server threads
+ *
+ * @param req_func The request function that handlers kAppReqType
  */
 void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
                                   void (*client_thread_func)(Nexus *, size_t),
+                                  session_mgmt_handler_t sm_handler,
                                   erpc_req_func_t req_func) {
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
 
@@ -100,8 +107,8 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
 
   /* Launch one server Rpc thread for each client session */
   for (size_t i = 0; i < num_sessions; i++) {
-    server_thread[i] =
-        std::thread(basic_server_thread_func, &nexus, kAppServerAppTid + i);
+    server_thread[i] = std::thread(basic_server_thread_func, &nexus,
+                                   kAppServerAppTid + i, sm_handler);
   }
 
   std::thread client_thread(client_thread_func, &nexus, num_sessions);
@@ -115,7 +122,8 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
 
 /// Initialize client context and connect sessions
 void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
-                             size_t num_sessions) {
+                             size_t num_sessions,
+                             session_mgmt_handler_t sm_handler) {
   assert(nexus != nullptr);
   assert(num_sessions >= 1);
 
@@ -124,9 +132,8 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
   }
 
   context.is_client = true;
-  context.rpc =
-      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
-                           &basic_sm_hander, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+                                     sm_handler, kAppPhyPort, kAppNumaNode);
 
   /* Connect the sessions */
   context.session_num_arr = new int[num_sessions];

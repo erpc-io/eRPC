@@ -55,7 +55,7 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
 void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions);
+  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
@@ -89,12 +89,14 @@ void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(OneSmallRpc, Foreground) {
-  launch_server_client_threads(1, 0, one_small_rpc, req_handler);
+  launch_server_client_threads(1, 0, one_small_rpc, basic_sm_handler,
+                               req_handler);
 }
 
 TEST(OneSmallRpc, Background) {
   /* One background thread */
-  launch_server_client_threads(1, 1, one_small_rpc, req_handler);
+  launch_server_client_threads(1, 1, one_small_rpc, basic_sm_handler,
+                               req_handler);
 }
 
 ///
@@ -103,7 +105,7 @@ TEST(OneSmallRpc, Background) {
 void multi_small_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions);
+  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
@@ -165,12 +167,14 @@ void multi_small_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(MultiSmallRpcOneSession, Foreground) {
-  launch_server_client_threads(1, 0, multi_small_rpc_one_session, req_handler);
+  launch_server_client_threads(1, 0, multi_small_rpc_one_session,
+                               basic_sm_handler, req_handler);
 }
 
 TEST(MultiSmallRpcOneSession, Background) {
   /* 2 background threads */
-  launch_server_client_threads(1, 2, multi_small_rpc_one_session, req_handler);
+  launch_server_client_threads(1, 2, multi_small_rpc_one_session,
+                               basic_sm_handler, req_handler);
 }
 
 ///
@@ -179,7 +183,7 @@ TEST(MultiSmallRpcOneSession, Background) {
 void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions);
+  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int *session_num_arr = context.session_num_arr;
@@ -252,7 +256,7 @@ TEST(MultiSmallRpcMultiSession, Foreground) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session,
-                               req_handler);
+                               basic_sm_handler, req_handler);
 }
 
 TEST(MultiSmallRpcMultiSession, Background) {
@@ -261,7 +265,7 @@ TEST(MultiSmallRpcMultiSession, Background) {
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   /* 3 background threads */
   launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session,
-                               req_handler);
+                               basic_sm_handler, req_handler);
 }
 
 int main(int argc, char **argv) {

@@ -85,7 +85,7 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
 void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions);
+  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
@@ -124,12 +124,14 @@ void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(OneLargeRpc, Foreground) {
-  launch_server_client_threads(1, 0, one_large_rpc, req_handler);
+  launch_server_client_threads(1, 0, one_large_rpc, basic_sm_handler,
+                               req_handler);
 }
 
 TEST(OneLargeRpc, Background) {
   /* One background thread */
-  launch_server_client_threads(1, 1, one_large_rpc, req_handler);
+  launch_server_client_threads(1, 1, one_large_rpc, basic_sm_handler,
+                               req_handler);
 }
 
 ///
@@ -138,7 +140,7 @@ TEST(OneLargeRpc, Background) {
 void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions);
+  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
@@ -198,12 +200,14 @@ void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(MultiLargeRpcOneSession, Foreground) {
-  launch_server_client_threads(1, 0, multi_large_rpc_one_session, req_handler);
+  launch_server_client_threads(1, 0, multi_large_rpc_one_session,
+                               basic_sm_handler, req_handler);
 }
 
 TEST(MultiLargeRpcOneSession, Background) {
   /* 2 background threads */
-  launch_server_client_threads(1, 2, multi_large_rpc_one_session, req_handler);
+  launch_server_client_threads(1, 2, multi_large_rpc_one_session,
+                               basic_sm_handler, req_handler);
 }
 
 ///
@@ -212,7 +216,7 @@ TEST(MultiLargeRpcOneSession, Background) {
 void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions);
+  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int *session_num_arr = context.session_num_arr;
@@ -281,7 +285,7 @@ TEST(MultiLargeRpcMultiSession, Foreground) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   launch_server_client_threads(num_sessions, 0, multi_large_rpc_multi_session,
-                               req_handler);
+                               basic_sm_handler, req_handler);
 }
 
 TEST(MultiLargeRpcMultiSession, Background) {
@@ -291,7 +295,7 @@ TEST(MultiLargeRpcMultiSession, Background) {
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   /* 3 background threads */
   launch_server_client_threads(num_sessions, 3, multi_large_rpc_multi_session,
-                               req_handler);
+                               basic_sm_handler, req_handler);
 }
 
 ///
@@ -301,7 +305,7 @@ TEST(MultiLargeRpcMultiSession, Background) {
 void memory_leak(Nexus *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions);
+  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int *session_num_arr = context.session_num_arr;
@@ -374,7 +378,8 @@ TEST(DISABLED_MemoryLeak, Foreground) {
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
-  launch_server_client_threads(num_sessions, 0, memory_leak, req_handler);
+  launch_server_client_threads(num_sessions, 0, memory_leak, basic_sm_handler,
+                               req_handler);
 }
 
 TEST(DISABLED_MemoryLeak, Background) {
@@ -383,7 +388,8 @@ TEST(DISABLED_MemoryLeak, Background) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   /* 2 background threads */
-  launch_server_client_threads(num_sessions, 2, memory_leak, req_handler);
+  launch_server_client_threads(num_sessions, 2, memory_leak, basic_sm_handler,
+                               req_handler);
 }
 
 int main(int argc, char **argv) {
