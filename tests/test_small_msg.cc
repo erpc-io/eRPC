@@ -69,10 +69,8 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
   test_printf("Client: Received response %s, tag = %zu\n",
               (char *)resp_msgbuf->buf, tag);
 
-  /*
-  ASSERT_EQ(req_msgbuf->get_data_size(), resp_msgbuf->get_data_size());
-  ASSERT_STREQ((char *)req_msgbuf->buf, (char *)resp_msgbuf->buf);
-  */
+  std::string exp_resp = std::string("APP_MSG-") + std::to_string(tag);
+  ASSERT_STREQ((char *)resp_msgbuf->buf, exp_resp.c_str());
 
   auto *context = (AppContext *)_context;
   ASSERT_TRUE(context->is_client);
@@ -217,9 +215,9 @@ void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
   int session_num = context.session_num_arr[0];
 
   /* Send a message */
-  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG") + 1);
+  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG-0") + 1);
   ASSERT_NE(req_msgbuf.buf, nullptr);
-  strcpy((char *)req_msgbuf.buf, "APP_MSG");
+  strcpy((char *)req_msgbuf.buf, "APP_MSG-0");
 
   test_printf("test: Sending request %s\n", (char *)req_msgbuf.buf);
   int ret =

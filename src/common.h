@@ -20,7 +20,7 @@ namespace ERpc {
 
 // Debug defines
 static constexpr bool kVerbose = true;  ///< Debug printing for non-datapath
-static constexpr bool kDatapathVerbose = true;  ///< Debug printing in datapath
+static constexpr bool kDatapathVerbose = false;  ///< Debug printing in datapath
 static constexpr bool kDatapathStats = true;  ///< Collect stats on the datapath
 
 // Perf defines
