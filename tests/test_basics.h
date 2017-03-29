@@ -19,3 +19,143 @@ static constexpr uint8_t kAppReqType = 3;
 static constexpr uint8_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 
+/* Shared between client and server thread */
+std::atomic<bool> server_ready; /* Clients starts after server is ready */
+std::atomic<bool> client_done;  /* Server ends after clients are done */
+char local_hostname[kMaxHostnameLen];
+
+/// Basic context to derive from
+class BasicAppContext {
+ public:
+  bool is_client;
+  Rpc<IBTransport> *rpc;
+  int *session_num_arr;
+
+  size_t num_sm_resps = 0;   ///< Number of SM responses
+  size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+};
+
+/// A basic session management handler that expects successful responses
+void basic_sm_hander(int session_num, SessionMgmtEventType sm_event_type,
+                     SessionMgmtErrType sm_err_type, void *_context) {
+  _unused(session_num);
+
+  auto *context = (BasicAppContext *)_context;
+  ASSERT_TRUE(context->is_client);
+  context->num_sm_resps++;
+
+  ASSERT_EQ(sm_err_type, SessionMgmtErrType::kNoError);
+  ASSERT_TRUE(sm_event_type == SessionMgmtEventType::kConnected ||
+              sm_event_type == SessionMgmtEventType::kDisconnected);
+}
+
+/// A basic server thread that just runs the event loop
+void basic_server_thread_func(Nexus *nexus, uint8_t app_tid) {
+  BasicAppContext context;
+  context.is_client = false;
+
+  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &basic_sm_hander,
+                       kAppPhyPort, kAppNumaNode);
+  context.rpc = &rpc;
+  server_ready = true;
+
+  while (!client_done) { /* Wait for all clients */
+    rpc.run_event_loop_timeout(kAppEventLoopMs);
+  }
+
+  /* The client is done after disconnecting */
+  ASSERT_EQ(rpc.num_active_sessions(), 0);
+}
+
+/**
+ * @brief Launch (possibly) multiple server threads and one client thread
+ *
+ * @param num_sessions The number of sessions needed by the client thread,
+ * equal to the number of server threads launched
+ *
+ * @param num_bg_threads The number of background threads in the Nexus. If
+ * this is non-zero, the request handler is executed in a background thread.
+ *
+ * @param client_thread_func The function executed by the client threads
+ */
+void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
+                                  void (*client_thread_func)(Nexus *, size_t),
+                                  erpc_req_func_t req_func) {
+  Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
+
+  if (num_bg_threads == 0) {
+    nexus.register_req_func(
+        kAppReqType, ReqFunc(req_func, ReqFuncType::kForegroundTerminal));
+  } else {
+    nexus.register_req_func(kAppReqType,
+                            ReqFunc(req_func, ReqFuncType::kBackground));
+  }
+
+  server_ready = false;
+  client_done = false;
+
+  test_printf("Client: Using %zu sessions\n", num_sessions);
+
+  std::thread server_thread[num_sessions];
+
+  /* Launch one server Rpc thread for each client session */
+  for (size_t i = 0; i < num_sessions; i++) {
+    server_thread[i] =
+        std::thread(basic_server_thread_func, &nexus, kAppServerAppTid + i);
+  }
+
+  std::thread client_thread(client_thread_func, &nexus, num_sessions);
+
+  for (size_t i = 0; i < num_sessions; i++) {
+    server_thread[i].join();
+  }
+
+  client_thread.join();
+}
+
+/// Initialize client context and connect sessions
+void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
+                             size_t num_sessions) {
+  assert(nexus != nullptr);
+  assert(num_sessions >= 1);
+
+  while (!server_ready) { /* Wait for server */
+    usleep(1);
+  }
+
+  context.is_client = true;
+  context.rpc =
+      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+                           &basic_sm_hander, kAppPhyPort, kAppNumaNode);
+
+  /* Connect the sessions */
+  context.session_num_arr = new int[num_sessions];
+  for (size_t i = 0; i < num_sessions; i++) {
+    context.session_num_arr[i] = context.rpc->create_session(
+        local_hostname, kAppServerAppTid + (uint8_t)i, kAppPhyPort);
+  }
+
+  while (context.num_sm_resps < num_sessions) {
+    context.rpc->run_event_loop_one();
+  }
+
+  /* basic_sm_handler checks that the callbacks have no errors */
+  ASSERT_EQ(context.num_sm_resps, num_sessions);
+}
+
+/// Run the event loop until we get \p num_resps RPC responses, or until
+/// kAppMaxEventLoopMs are elapsed.
+void client_wait_for_rpc_resps_or_timeout(const Nexus *nexus,
+                                          BasicAppContext &context,
+                                          size_t num_resps) {
+  /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
+  uint64_t cycles_start = rdtsc();
+  while (context.num_rpc_resps != num_resps) {
+    context.rpc->run_event_loop_timeout(kAppEventLoopMs);
+
+    double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
+    if (ms_elapsed > kAppMaxEventLoopMs) {
+      break;
+    }
+  }
+}

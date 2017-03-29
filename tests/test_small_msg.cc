@@ -2,21 +2,8 @@
 
 static constexpr size_t kAppMaxMsgSize = 64;
 
-/* Shared between client and server thread */
-std::atomic<bool> server_ready; /* Client starts after server is ready */
-std::atomic<bool> client_done;  /* Server ends after client is done */
-char local_hostname[kMaxHostnameLen];
-
 /// Per-thread application context
-class AppContext {
- public:
-  bool is_client;
-  Rpc<IBTransport> *rpc;
-  int *session_num_arr;
-
-  size_t num_sm_connect_resps = 0; /* Client-only */
-  size_t num_rpc_resps = 0;        /* Client-only */
-};
+class AppContext : public BasicAppContext {};
 
 /// The common request handler for all subtests. Copies the request string to
 /// the response.
@@ -61,129 +48,6 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
   context->rpc->release_respone(resp_handle);
 }
 
-/// The common session management handler for all subtests
-void sm_hander(int session_num, SessionMgmtEventType sm_event_type,
-               SessionMgmtErrType sm_err_type, void *_context) {
-  _unused(session_num);
-
-  auto *context = (AppContext *)_context;
-  ASSERT_TRUE(context->is_client);
-  context->num_sm_connect_resps++;
-
-  ASSERT_EQ(sm_err_type, SessionMgmtErrType::kNoError);
-  ASSERT_TRUE(sm_event_type == SessionMgmtEventType::kConnected ||
-              sm_event_type == SessionMgmtEventType::kDisconnected);
-}
-
-/// The server thread used for all subtests
-void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  AppContext context;
-  context.is_client = false;
-
-  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, kAppPhyPort,
-                       kAppNumaNode);
-  context.rpc = &rpc;
-  server_ready = true;
-
-  while (!client_done) { /* Wait for the client */
-    rpc.run_event_loop_timeout(kAppEventLoopMs);
-  }
-
-  /* The client is done after disconnecting */
-  ASSERT_EQ(rpc.num_active_sessions(), 0);
-}
-
-/**
- * @brief Launch (possibly) multiple server threads and one client thread
- *
- * @param num_sessions The number of sessions needed by the client thread,
- * equal to the number of server threads launched
- *
- * @param num_bg_threads The number of background threads in the Nexus. If
- * this is non-zero, the request handler is executed in a background thread.
- *
- * @param client_thread_func The function executed by the client threads
- */
-void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
-                                  void (*client_thread_func)(Nexus *, size_t)) {
-  Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
-
-  if (num_bg_threads == 0) {
-    nexus.register_req_func(
-        kAppReqType, ReqFunc(req_handler, ReqFuncType::kForegroundTerminal));
-  } else {
-    nexus.register_req_func(kAppReqType,
-                            ReqFunc(req_handler, ReqFuncType::kBackground));
-  }
-
-  server_ready = false;
-  client_done = false;
-
-  test_printf("Client: Using %zu sessions\n", num_sessions);
-
-  std::thread server_thread[num_sessions];
-
-  /* Launch one server Rpc thread for each client session */
-  for (size_t i = 0; i < num_sessions; i++) {
-    server_thread[i] =
-        std::thread(server_thread_func, &nexus, kAppServerAppTid + i);
-  }
-
-  std::thread client_thread(client_thread_func, &nexus, num_sessions);
-
-  for (size_t i = 0; i < num_sessions; i++) {
-    server_thread[i].join();
-  }
-
-  client_thread.join();
-}
-
-/// Initialize client context and connect sessions
-void client_connect_sessions(Nexus *nexus, AppContext &context,
-                             size_t num_sessions) {
-  assert(nexus != nullptr);
-  assert(num_sessions >= 1);
-
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
-  context.is_client = true;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
-                                     &sm_hander, kAppPhyPort, kAppNumaNode);
-
-  /* Connect the sessions */
-  context.session_num_arr = new int[num_sessions];
-  for (size_t i = 0; i < num_sessions; i++) {
-    context.session_num_arr[i] = context.rpc->create_session(
-        local_hostname, kAppServerAppTid + (uint8_t)i, kAppPhyPort);
-  }
-
-  while (context.num_sm_connect_resps < num_sessions) {
-    context.rpc->run_event_loop_one();
-  }
-
-  /* sm handler checks that the callbacks have no errors */
-  ASSERT_EQ(context.num_sm_connect_resps, num_sessions);
-}
-
-/// Run the event loop until we get \p num_resps RPC responses, or until
-/// kAppMaxEventLoopMs are elapsed.
-void client_wait_for_rpc_resps_or_timeout(const Nexus *nexus,
-                                          AppContext &context,
-                                          size_t num_resps) {
-  /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
-  uint64_t cycles_start = rdtsc();
-  while (context.num_rpc_resps != num_resps) {
-    context.rpc->run_event_loop_timeout(kAppEventLoopMs);
-
-    double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
-    if (ms_elapsed > kAppMaxEventLoopMs) {
-      break;
-    }
-  }
-}
-
 ///
 /// Test: Send one small request packet and check that we receive the
 /// correct response
@@ -225,12 +89,12 @@ void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(OneSmallRpc, Foreground) {
-  launch_server_client_threads(1, 0, one_small_rpc);
+  launch_server_client_threads(1, 0, one_small_rpc, req_handler);
 }
 
 TEST(OneSmallRpc, Background) {
   /* One background thread */
-  launch_server_client_threads(1, 1, one_small_rpc);
+  launch_server_client_threads(1, 1, one_small_rpc, req_handler);
 }
 
 ///
@@ -301,12 +165,12 @@ void multi_small_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
 }
 
 TEST(MultiSmallRpcOneSession, Foreground) {
-  launch_server_client_threads(1, 0, multi_small_rpc_one_session);
+  launch_server_client_threads(1, 0, multi_small_rpc_one_session, req_handler);
 }
 
 TEST(MultiSmallRpcOneSession, Background) {
   /* 2 background threads */
-  launch_server_client_threads(1, 2, multi_small_rpc_one_session);
+  launch_server_client_threads(1, 2, multi_small_rpc_one_session, req_handler);
 }
 
 ///
@@ -387,7 +251,8 @@ TEST(MultiSmallRpcMultiSession, Foreground) {
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
-  launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session);
+  launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session,
+                               req_handler);
 }
 
 TEST(MultiSmallRpcMultiSession, Background) {
@@ -395,7 +260,8 @@ TEST(MultiSmallRpcMultiSession, Background) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   /* 3 background threads */
-  launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session);
+  launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session,
+                               req_handler);
 }
 
 int main(int argc, char **argv) {
