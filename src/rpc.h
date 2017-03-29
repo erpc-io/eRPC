@@ -245,6 +245,9 @@ class Rpc {
     unlock_cond(&session->lock);
   }
 
+  /// Return true iff the caller is running in a background thread
+  inline bool in_background() { return !in_creator(); }
+
   //
   // Event loop
   //

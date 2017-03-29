@@ -91,6 +91,7 @@ set(CTEST_TESTS
   test_create_session
   test_create_session_args
   test_destroy_session
+  test_bg_restrictions
   test_small_msg
   test_large_msg)
 
