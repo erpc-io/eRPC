@@ -1,28 +1,10 @@
-#include <gtest/gtest.h>
-#include <string.h>
-#include <atomic>
-#include <cstring>
-#include <thread>
-#include "rpc.h"
-#include "util/test_printf.h"
+#include "test_basics.h"
 
-using namespace ERpc;
-
-static constexpr uint16_t kAppNexusUdpPort = 31851;
-static constexpr double kAppNexusPktDropProb = 0.0;
-static constexpr size_t kAppEventLoopMs = 200;
-static constexpr size_t kAppMaxEventLoopMs = 20000; /* 20 seconds */
-static constexpr uint8_t kAppClientAppTid = 100;
-static constexpr uint8_t kAppServerAppTid = 200;
-static constexpr uint8_t kAppReqType = 3;
 static constexpr size_t kAppMaxMsgSize = 64;
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready; /* Client starts after server is ready */
 std::atomic<bool> client_done;  /* Server ends after client is done */
-
-const uint8_t phy_port = 0;
-const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 /// Per-thread application context
@@ -98,8 +80,8 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
   AppContext context;
   context.is_client = false;
 
-  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, phy_port,
-                       numa_node);
+  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, &sm_hander, kAppPhyPort,
+                       kAppNumaNode);
   context.rpc = &rpc;
   server_ready = true;
 
@@ -168,13 +150,13 @@ void client_connect_sessions(Nexus *nexus, AppContext &context,
 
   context.is_client = true;
   context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
-                                     &sm_hander, phy_port, numa_node);
+                                     &sm_hander, kAppPhyPort, kAppNumaNode);
 
   /* Connect the sessions */
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
-        local_hostname, kAppServerAppTid + (uint8_t)i, phy_port);
+        local_hostname, kAppServerAppTid + (uint8_t)i, kAppPhyPort);
   }
 
   while (context.num_sm_connect_resps < num_sessions) {

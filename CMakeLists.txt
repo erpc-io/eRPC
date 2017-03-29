@@ -84,7 +84,8 @@ set(SOURCES
   src/util/rand.h
   src/util/tsc.h
   src/util/udp_client.cc
-  src/util/udp_client.h)
+  src/util/udp_client.h
+  tests/test_basics.h)
 
 # The tests to run using ctest
 set(CTEST_TESTS
