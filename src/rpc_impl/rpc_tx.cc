@@ -3,88 +3,61 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::process_datapath_tx_st() {
+void Rpc<TTr>::process_dpath_txq_st() {
   assert(in_creator());
+  size_t write_index = 0; /* Re-add incomplete sslots at this index */
   tx_batch_i = 0;
 
-  /*
-   * If we're unable to complete TX for *any* slot of a session, the session is
-   * re-added into the TX work queue at this index.
-   */
-  size_t write_index = 0;
+  /* Prevent background threads from enqueueing while processing the queue */
+  lock_cond(&dpath_txq_lock);
 
-  for (size_t i = 0; i < datapath_tx_work_queue.size(); i++) {
-    Session *session = datapath_tx_work_queue[i];
-    assert(session->in_datapath_tx_work_queue);
+  for (size_t i = 0; i < dpath_txq.size(); i++) {
+    SSlot *sslot = dpath_txq[i];
+    assert(sslot != nullptr);
 
-    /* The session cannot be disconnected if it's in TX work queue */
+    Session *session = sslot->session;
     assert(session->is_connected());
 
-    /* Does this session need more TX after the loop over slots below? */
-    bool session_needs_more_tx = false;
+    MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
+    assert(tx_msgbuf != nullptr);
+    assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
+    assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 
-    /*
-     * We need to process all slots even if we run out of credits (session or
-     * Unexpected window) midway. This is because Expected pkts don't need
-     * credits.
-     */
-    for (size_t sslot_i = 0; sslot_i < Session::kSessionReqWindow; sslot_i++) {
-      const SSlot *sslot = &session->sslot_arr[sslot_i];
+    pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0(); /* Debug-only */
+    _unused(pkthdr_0);
 
-      /* Process only slots that need TX */
-      MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
-      if (tx_msgbuf == nullptr ||
-          tx_msgbuf->pkts_queued == tx_msgbuf->num_pkts) {
-        continue;
-      }
-
-      assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
-      assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
-
-      /* If we are here, this message needs packet TX. */
-      pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0(); /* Debug-only */
-      _unused(pkthdr_0);
-
-      if (session->is_client()) {
-        assert(pkthdr_0->is_req() || pkthdr_0->is_credit_return());
-      } else {
-        assert(pkthdr_0->is_resp() || pkthdr_0->is_credit_return());
-      }
-
-      if (small_rpc_likely(tx_msgbuf->num_pkts == 1)) {
-        /* Optimize for small/credit-return messages that fit in one packet */
-        process_datapath_tx_small_msg_one_st(session, tx_msgbuf);
-      } else {
-        process_datapath_tx_large_msg_one_st(session, tx_msgbuf);
-      }
-
-      /* If sslot still needs TX, the session needs to stay in the work queue */
-      if (tx_msgbuf->pkts_queued != tx_msgbuf->num_pkts) {
-        session_needs_more_tx = true;
-      }
-    } /* End loop over messages of a session */
-
-    if (session_needs_more_tx) {
-      assert(session->in_datapath_tx_work_queue);
-      assert(write_index < datapath_tx_work_queue.size());
-      datapath_tx_work_queue[write_index++] = session;
+    if (session->is_client()) {
+      assert(pkthdr_0->is_req() || pkthdr_0->is_credit_return());
     } else {
-      session->in_datapath_tx_work_queue = false;
+      assert(pkthdr_0->is_resp() || pkthdr_0->is_credit_return());
+    }
+
+    if (small_rpc_likely(tx_msgbuf->num_pkts == 1)) {
+      /* Optimize for small/credit-return messages that fit in one packet */
+      process_dpath_txq_small_msg_one_st(session, tx_msgbuf);
+    } else {
+      process_dpath_txq_large_msg_one_st(session, tx_msgbuf);
+    }
+
+    /* Sslots that still need TX stay in the queue */
+    if (tx_msgbuf->pkts_queued != tx_msgbuf->num_pkts) {
+      assert(write_index < dpath_txq.size());
+      dpath_txq[write_index++] = sslot;
     }
   }
+
+  dpath_txq.resize(write_index); /* Number of sslots left = write_index */
+  unlock_cond(&dpath_txq_lock);  /* Re-allow bg threads to enqueue sslots */
 
   if (tx_batch_i > 0) {
     transport->tx_burst(tx_burst_arr, tx_batch_i);
     tx_batch_i = 0;
   }
-
-  /* Number of sessions left in the datapath work queue = write_index */
-  datapath_tx_work_queue.resize(write_index);
 }
 
 template <class TTr>
-void Rpc<TTr>::process_datapath_tx_small_msg_one_st(Session *session,
-                                                    MsgBuffer *tx_msgbuf) {
+void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
+                                                  MsgBuffer *tx_msgbuf) {
   assert(in_creator()); /* Only creator runs event loop */
   assert(tx_msgbuf->num_pkts == 1 && tx_msgbuf->pkts_queued == 0);
   assert(tx_msgbuf->data_size <= TTr::kMaxDataPerPkt);
@@ -137,8 +110,8 @@ void Rpc<TTr>::process_datapath_tx_small_msg_one_st(Session *session,
 }
 
 template <class TTr>
-void Rpc<TTr>::process_datapath_tx_large_msg_one_st(Session *session,
-                                                    MsgBuffer *tx_msgbuf) {
+void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
+                                                  MsgBuffer *tx_msgbuf) {
   assert(in_creator());
   assert(tx_msgbuf->num_pkts > 1 &&
          tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);

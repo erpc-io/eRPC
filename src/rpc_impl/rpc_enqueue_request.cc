@@ -19,8 +19,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  /* Prevent the creator thread from disconnecting this session */
-  session_lock_cond(session);
+  /* Prevent concurrent datapath/management operations on this session */
+  lock_cond(&session->lock);
 
   if (!kDatapathChecks) {
     assert(session->is_client());
@@ -32,25 +32,25 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   } else {
     /* If datapath checks are enabled, return meaningful error codes */
     if (unlikely(!session->is_client())) {
-      session_unlock_cond(session);
+      unlock_cond(&session->lock);
       return -EPERM;
     }
 
     if (unlikely(!session->is_connected())) {
-      session_unlock_cond(session);
+      unlock_cond(&session->lock);
       return -ESHUTDOWN;
     }
 
     if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
                  !req_msgbuf->check_magic())) {
-      session_unlock_cond(session);
+      unlock_cond(&session->lock);
       return -EINVAL;
     }
 
     if (unlikely(req_msgbuf->data_size == 0 ||
                  req_msgbuf->data_size > kMaxMsgSize ||
                  req_msgbuf->num_pkts == 0)) {
-      session_unlock_cond(session);
+      unlock_cond(&session->lock);
       return -EINVAL;
     }
   }
@@ -60,7 +60,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
      * No free message slots left in session, so we can't queue this request.
      * This needs to be done even when kDatapathChecks is disabled.
      */
-    session_unlock_cond(session);
+    unlock_cond(&session->lock);
     return -ENOMEM;
   }
 
@@ -68,15 +68,18 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   size_t sslot_i = session->sslot_free_vec.pop_back();
   assert(sslot_i < Session::kSessionReqWindow);
 
-  /* We have an exclusive sslot, so creator thread can't disconnect now */
-  session_unlock_cond(session);
+  /*
+   * We have an exclusive sslot, so the creator thread can't disconnect now,
+   * and other enqueueing threads can't grab this sslot.
+   */
+  unlock_cond(&session->lock);
 
   /* Generate req num. All sessions share req_num_arr, so we need to lock. */
-  rpc_lock_cond();
+  lock_cond(&req_num_arr_lock);
   size_t req_num =
       (req_num_arr[sslot_i]++ * Session::kSessionReqWindow) + /* Shift */
       sslot_i;
-  rpc_unlock_cond(); /* Avoid holding the lock for header-filling */
+  unlock_cond(&req_num_arr_lock); /* Avoid holding lock for header-filling */
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
@@ -120,7 +123,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   sslot.tx_msgbuf = req_msgbuf; /* Valid request */
   sslot.tx_msgbuf->pkts_queued = 0;
 
-  upsert_datapath_tx_work_queue(session); /* Thread-safe */
+  dpath_txq_push_back(&sslot); /* Thread-safe */
   return 0;
 }
 

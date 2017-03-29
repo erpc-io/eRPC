@@ -61,7 +61,6 @@ class Session {
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
-  bool in_datapath_tx_work_queue = false;   ///< Is session in tx work queue?
   SSlot sslot_arr[kSessionReqWindow];       ///< The session slots
   FixedVector<size_t, kSessionReqWindow> sslot_free_vec;  ///< Free slots
 

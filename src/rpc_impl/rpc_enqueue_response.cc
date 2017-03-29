@@ -6,12 +6,17 @@ template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
   SSlot *sslot = (SSlot *)req_handle;
-  assert(sslot->rx_msgbuf.buf != nullptr); /* Must be valid for pkthdr fields */
 
   Session *session = sslot->session;
   assert(session->is_server());
-  /* Client has a pending request, so session can't be disconnected */
+  /* The client has a pending request, so the session can't be disconnected */
   assert(session->is_connected());
+
+  /* Extract required fields from the request MsgBuffer, and then bury it */
+  assert(sslot->rx_msgbuf.buf != nullptr); /* Must be valid for pkthdr fields */
+  uint8_t req_type = sslot->rx_msgbuf.get_req_type();
+  uint64_t req_num = sslot->rx_msgbuf.get_req_num();
+  bury_sslot_rx_msgbuf(sslot); /* Could be dynamic */
 
   MsgBuffer *resp_msgbuf;
   if (small_rpc_likely(sslot->prealloc_used)) {
@@ -26,7 +31,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // Step 1: Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
-  resp_pkthdr_0->req_type = sslot->rx_msgbuf.get_req_type();
+  resp_pkthdr_0->req_type = req_type;
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
   resp_pkthdr_0->rem_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
@@ -43,7 +48,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   }
 
   resp_pkthdr_0->pkt_num = 0;
-  resp_pkthdr_0->req_num = sslot->rx_msgbuf.get_req_num();
+  resp_pkthdr_0->req_num = req_num;
   assert(resp_pkthdr_0->check_magic());
 
   // Step 2: Fill in non-zeroth packet headers, if any
@@ -67,10 +72,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   sslot->tx_msgbuf = resp_msgbuf; /* Valid response */
   sslot->tx_msgbuf->pkts_queued = 0;
 
-  upsert_datapath_tx_work_queue(session); /* Thread-safe */
-
-  /* Bury the request MsgBuffer (rx_msgbuf), which may be dynamic */
-  bury_sslot_rx_msgbuf(sslot);
+  dpath_txq_push_back(sslot); /* Thread-safe */
 }
 
 }  // End ERpc

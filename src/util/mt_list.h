@@ -6,7 +6,8 @@
 
 namespace ERpc {
 
-/// A simple multi-threaded list
+/// A simple multi-threaded list, without performance optimizations for the
+/// the single-threaded case
 template <class T>
 class MtList {
  public:

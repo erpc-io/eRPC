@@ -1,6 +1,7 @@
 #ifndef ERPC_RPC_H
 #define ERPC_RPC_H
 
+#include <algorithm>
 #include <random>
 #include <vector>
 #include "common.h"
@@ -96,10 +97,10 @@ class Rpc {
           (max_data_size + (TTr::kMaxDataPerPkt - 1)) / TTr::kMaxDataPerPkt;
     }
 
-    huge_alloc_lock_cond();
+    lock_cond(&huge_alloc_lock);
     Buffer buffer =
         huge_alloc->alloc(max_data_size + (max_num_pkts * sizeof(pkthdr_t)));
-    huge_alloc_unlock_cond();
+    unlock_cond(&huge_alloc_lock);
 
     if (unlikely(buffer.buf == nullptr)) {
       MsgBuffer msg_buffer;
@@ -136,16 +137,16 @@ class Rpc {
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     assert(msg_buffer.is_dynamic() && msg_buffer.check_magic());
 
-    huge_alloc_lock_cond();
+    lock_cond(&huge_alloc_lock);
     huge_alloc->free_buf(msg_buffer.buffer);
-    huge_alloc_unlock_cond();
+    unlock_cond(&huge_alloc_lock);
   }
 
   /// Return the total amount of memory allocated to the user
   inline size_t get_stat_user_alloc_tot() {
-    huge_alloc_lock_cond();
+    lock_cond(&huge_alloc_lock);
     size_t ret = huge_alloc->get_stat_user_alloc_tot();
-    huge_alloc_unlock_cond();
+    unlock_cond(&huge_alloc_lock);
     return ret;
   }
 
@@ -204,12 +205,8 @@ class Rpc {
    * @brief Try to enqueue a request for transmission.
    *
    * If a message slot is available for this session, the request will be
-   * enqueued. In this case, a request number is assigned using the slot index,
-   * all packet headers of \p are filled in, and \p session is upserted into the
-   * datapath TX work queue.
-   *
-   * If this call succeeds, eRPC owns \p msg_buffer until the request completes
-   * (i.e., the response callback is invoked).
+   * enqueued. If this call succeeds, eRPC owns \p msg_buffer until the request
+   * completes (i.e., the continuation is invoked).
    *
    * @param session_num The session number to send the request on
    * @param req_type The type of the request
@@ -218,8 +215,8 @@ class Rpc {
    * @param cont_func The continuation function for this request
    * @tag The tag for this request
    *
-   * @return 0 on success (i.e., if the request was queued). An error code is
-   * returned if the request cannot be queued.
+   * @return 0 on success (i.e., if the request was queued). Negative errno is
+   * returned if the request was not queued.
    */
   int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *msg_buffer,
                       erpc_cont_func_t cont_func, size_t tag);
@@ -243,9 +240,9 @@ class Rpc {
     Session *session = sslot->session;
     assert(session->is_client());
 
-    session_lock_cond(session);
+    lock_cond(&session->lock);
     session->sslot_free_vec.push_back(sslot->index);
-    session_unlock_cond(session);
+    unlock_cond(&session->lock);
   }
 
   //
@@ -278,8 +275,8 @@ class Rpc {
       mgmt_retry();
     }
 
-    process_comps_st();       /* RX */
-    process_datapath_tx_st(); /* TX */
+    process_comps_st();     /* RX */
+    process_dpath_txq_st(); /* TX */
   }
 
   inline void run_event_loop_st() {
@@ -317,47 +314,17 @@ class Rpc {
     return session_num >= 0 && (size_t)session_num < session_vec.size();
   }
 
-  /// Lock the Rpc if it is accessible from multiple threads
-  inline void rpc_lock_cond() {
+  /// Lock the mutex if the Rpc is accessible from multiple threads
+  inline void lock_cond(std::mutex *mutex) {
     if (small_rpc_unlikely(multi_threaded)) {
-      rpc_lock.lock();
+      mutex->lock();
     }
   }
 
-  /// Unlock the Rpc if it is accessible from multiple threads
-  inline void rpc_unlock_cond() {
+  /// Unlock the mutex if the Rpc is accessible from multiple threads
+  inline void unlock_cond(std::mutex *mutex) {
     if (small_rpc_unlikely(multi_threaded)) {
-      rpc_lock.unlock();
-    }
-  }
-
-  /// Lock this session if it is accessible from multiple threads
-  inline void session_lock_cond(Session *session) {
-    assert(session != nullptr);
-    if (small_rpc_unlikely(multi_threaded)) {
-      session->lock.lock();
-    }
-  }
-
-  /// Unlock this session if it is accessible from multiple threads
-  inline void session_unlock_cond(Session *session) {
-    assert(session != nullptr);
-    if (small_rpc_unlikely(multi_threaded)) {
-      session->lock.unlock();
-    }
-  }
-
-  /// Lock the huge allocator if if it is accessible from multiple threads
-  inline void huge_alloc_lock_cond() {
-    if (small_rpc_unlikely(multi_threaded)) {
-      huge_alloc_lock.lock();
-    }
-  }
-
-  /// Unlock the huge allocator if if it is accessible from multiple threads
-  inline void huge_alloc_unlock_cond() {
-    if (small_rpc_unlikely(multi_threaded)) {
-      huge_alloc_lock.unlock();
+      mutex->unlock();
     }
   }
 
@@ -398,46 +365,45 @@ class Rpc {
   void mgmt_retry();
   ///@}
 
-  /// Add \p session to the TX work queue if it's not already present
-  inline void upsert_datapath_tx_work_queue(Session *session) {
-    rpc_lock_cond();
-    assert(session != nullptr);
-    if (!session->in_datapath_tx_work_queue) {
-      session->in_datapath_tx_work_queue = true;
-      datapath_tx_work_queue.push_back(session);
-    }
-    rpc_unlock_cond();
+  /// Add \p sslot to the datapath TX queue
+  inline void dpath_txq_push_back(SSlot *sslot) {
+    lock_cond(&dpath_txq_lock);
+    assert(sslot != nullptr);
+    assert(std::find(dpath_txq.begin(), dpath_txq.end(), sslot) ==
+           dpath_txq.end());
+    dpath_txq.push_back(sslot);
+    unlock_cond(&dpath_txq_lock);
   }
 
   // rpc_tx.cc
 
-  /// Try to transmit packets for Sessions in the \p datapath_tx_work_queue.
-  /// Sessions for which all packets can be sent are removed from the queue.
-  void process_datapath_tx_st();
+  /// Try to transmit packets for sslots in the datapath TX queue. SSlots for
+  /// which all packets can be sent are removed from the queue.
+  void process_dpath_txq_st();
 
   /**
    * @brief Try to enqueue a single-packet message
    *
-   * @param session The session to send the message on. This session is in
-   * the datapath TX work queue and it is connected.
+   * @param session The session to send the message on. This session must be
+   * connected.
    *
    * @param tx_msgbuf A valid single-packet MsgBuffer that needs one packet to
    * be queued
    */
-  void process_datapath_tx_small_msg_one_st(Session *session,
-                                            MsgBuffer *tx_msgbuf);
+  void process_dpath_txq_small_msg_one_st(Session *session,
+                                          MsgBuffer *tx_msgbuf);
 
   /**
    * @brief Try to enqueue a multi-packet message
    *
-   * @param session The session to send the message on. This session is in
-   * the datapath TX work queue and it is connected.
+   * @param session The session to send the message on. This seession must be
+   * connected.
    *
    * @param tx_msgbuf A valid multi-packet MsgBuffer that needs one or more
    * packets to be queued
    */
-  void process_datapath_tx_large_msg_one_st(Session *session,
-                                            MsgBuffer *tx_msgbuf);
+  void process_dpath_txq_large_msg_one_st(Session *session,
+                                          MsgBuffer *tx_msgbuf);
 
   // rpc_rx.cc
 
@@ -563,13 +529,13 @@ class Rpc {
   size_t numa_node;
 
   // Others
-  const int creator_os_tid;    ///< OS thread ID of the creator thread
-  const bool multi_threaded;   ///< True iff there are background threads
-  std::mutex rpc_lock;         ///< A lock to guard the Rpc object
-  std::mutex huge_alloc_lock;  ///< A lock to guard the huge allocator
+  const int creator_os_tid;   ///< OS thread ID of the creator thread
+  const bool multi_threaded;  ///< True iff there are background threads
 
-  TTr *transport = nullptr;         ///< The unreliable transport
+  TTr *transport = nullptr;  ///< The unreliable transport
+
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
+  std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
 
   uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
@@ -582,6 +548,7 @@ class Rpc {
 
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};
+  std::mutex req_num_arr_lock;
 
   /// The append-only list of session pointers, indexed by session number.
   /// Disconnected sessions are denoted by null pointers. This grows as sessions
@@ -592,10 +559,11 @@ class Rpc {
   /// accessed by the creator thread, so we don't need a lock.
   std::vector<Session *> mgmt_retry_queue;
 
-  /// Sessions that need TX. We don't need a std::list to support efficient
-  /// deletes because sessions are implicitly deleted while processing the
+  /// SSlots that need TX. We don't need a std::list to support efficient
+  /// deletes because sslots are implicitly deleted while processing the
   /// work queue.
-  std::vector<Session *> datapath_tx_work_queue;
+  std::vector<SSlot *> dpath_txq;
+  std::mutex dpath_txq_lock;
 
   /// Tx batch information for interfacing between the event loop and the
   /// transport.
