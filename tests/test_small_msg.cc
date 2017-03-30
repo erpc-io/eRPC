@@ -84,19 +84,16 @@ void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
 
   /* Free resources */
   delete rpc;
-
   client_done = true;
 }
 
 TEST(OneSmallRpc, Foreground) {
-  launch_server_client_threads(1, 0, one_small_rpc, basic_sm_handler,
-                               req_handler);
+  launch_server_client_threads(1, 0, one_small_rpc, req_handler);
 }
 
 TEST(OneSmallRpc, Background) {
   /* One background thread */
-  launch_server_client_threads(1, 1, one_small_rpc, basic_sm_handler,
-                               req_handler);
+  launch_server_client_threads(1, 1, one_small_rpc, req_handler);
 }
 
 ///
@@ -162,19 +159,16 @@ void multi_small_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
 
   /* Free resources */
   delete rpc;
-
   client_done = true;
 }
 
 TEST(MultiSmallRpcOneSession, Foreground) {
-  launch_server_client_threads(1, 0, multi_small_rpc_one_session,
-                               basic_sm_handler, req_handler);
+  launch_server_client_threads(1, 0, multi_small_rpc_one_session, req_handler);
 }
 
 TEST(MultiSmallRpcOneSession, Background) {
   /* 2 background threads */
-  launch_server_client_threads(1, 2, multi_small_rpc_one_session,
-                               basic_sm_handler, req_handler);
+  launch_server_client_threads(1, 2, multi_small_rpc_one_session, req_handler);
 }
 
 ///
@@ -247,7 +241,6 @@ void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
   /* Free resources */
   delete rpc;
-
   client_done = true;
 }
 
@@ -256,7 +249,7 @@ TEST(MultiSmallRpcMultiSession, Foreground) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session,
-                               basic_sm_handler, req_handler);
+                               req_handler);
 }
 
 TEST(MultiSmallRpcMultiSession, Background) {
@@ -265,7 +258,7 @@ TEST(MultiSmallRpcMultiSession, Background) {
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionCredits) + 2;
   /* 3 background threads */
   launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session,
-                               basic_sm_handler, req_handler);
+                               req_handler);
 }
 
 int main(int argc, char **argv) {

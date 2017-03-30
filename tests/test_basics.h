@@ -49,7 +49,21 @@ void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
               sm_event_type == SessionMgmtEventType::kDisconnected);
 }
 
-/// A basic server thread that just runs the event loop
+/// A basic empty session management handler that should never be iinvoked.
+void basic_empty_sm_handler(int, SessionMgmtEventType, SessionMgmtErrType,
+                            void *) {
+  assert(false);
+  exit(-1);
+}
+
+/// A basic request handler that should never be invoked
+void basic_empty_req_handler(ReqHandle *, const MsgBuffer *, void *) {
+  assert(false);
+  exit(-1);
+}
+
+/// A basic server thread that just runs the event loop, and expects the
+/// client to disconnect before finishing.
 void basic_server_thread_func(Nexus *nexus, uint8_t app_tid,
                               session_mgmt_handler_t sm_handler) {
   BasicAppContext context;
@@ -64,7 +78,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t app_tid,
     rpc.run_event_loop_timeout(kAppEventLoopMs);
   }
 
-  /* The client is done after disconnecting */
+  /* The client is done only after disconnecting */
   ASSERT_EQ(rpc.num_active_sessions(), 0);
 }
 
@@ -80,13 +94,10 @@ void basic_server_thread_func(Nexus *nexus, uint8_t app_tid,
  * @param client_thread_func The function executed by the client threads.
  * Server threads execute \p basic_server_thread_func()
  *
- * @param sm_handler The session management handler used by server threads
- *
  * @param req_func The request function that handlers kAppReqType
  */
 void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
                                   void (*client_thread_func)(Nexus *, size_t),
-                                  session_mgmt_handler_t sm_handler,
                                   erpc_req_func_t req_func) {
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
 
@@ -107,8 +118,9 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
 
   /* Launch one server Rpc thread for each client session */
   for (size_t i = 0; i < num_sessions; i++) {
-    server_thread[i] = std::thread(basic_server_thread_func, &nexus,
-                                   kAppServerAppTid + i, sm_handler);
+    server_thread[i] =
+        std::thread(basic_server_thread_func, &nexus, kAppServerAppTid + i,
+                    basic_empty_sm_handler);
   }
 
   std::thread client_thread(client_thread_func, &nexus, num_sessions);
