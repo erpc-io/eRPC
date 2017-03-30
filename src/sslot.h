@@ -39,6 +39,14 @@ class SSlot {
   MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
   bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
 
+  /// Request metadata saved by the server before calling the request handler.
+  /// These fields are needed in enqueue_response(), and the request's rx_msgbuf
+  /// may not be valid when enqueue_response() is called.
+  struct {
+    uint8_t req_type;
+    uint64_t req_num;
+  } rx_msgbuf_saved;
+
   /// Return a string representation of this session slot
   std::string to_string() const {
     if (rx_msgbuf.buf == nullptr && tx_msgbuf == nullptr) {

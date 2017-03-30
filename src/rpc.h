@@ -455,8 +455,8 @@ class Rpc {
    * @brief Bury a session slot's TX MsgBuffer without freeing possibly
    * dynamically allocated memory.
    *
-   * This is used for burying the TX MsgBuffer used for requests, since the
-   * application will free the associated dynamic memory.
+   * This is used for burying the TX MsgBuffer used for holding requests at
+   * the client.
    */
   static inline void bury_sslot_tx_msgbuf_nofree(SSlot *sslot) {
     assert(sslot != nullptr);
@@ -486,6 +486,19 @@ class Rpc {
     }
 
     rx_msgbuf.buf = nullptr;
+  }
+
+  /**
+   * @brief Bury a session slot's RX MsgBuffer without freeing possibly
+   * dynamically allocated memory.
+   *
+   * This is used for burying the fake RX MsgBuffer used for holding requests
+   * at the server for foreground handlers.
+   */
+  static inline void bury_sslot_rx_msgbuf_nofree(SSlot *sslot) {
+    assert(sslot != nullptr);
+    assert(!sslot->rx_msgbuf.is_dynamic()); /* It's fake */
+    sslot->rx_msgbuf.buf = nullptr;
   }
 
   // Constructor args

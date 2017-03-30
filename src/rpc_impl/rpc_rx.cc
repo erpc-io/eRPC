@@ -129,21 +129,28 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     /* Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf) */
     bury_sslot_tx_msgbuf(&sslot);
 
-    /* Remember the request function type for enqueue_response() */
+    /* Remember request metadata for enqueue_response() */
     sslot.req_func_type = req_func.req_func_type;
+    sslot.rx_msgbuf_saved.req_type = req_type;
+    sslot.rx_msgbuf_saved.req_num = req_num;
 
-    if (small_rpc_likely(req_func.is_fg_terminal())) {
-      /*
-       * Create a "fake" static MsgBuffer for the foreground terminal
-       * request handler
-       */
+    if (small_rpc_likely(!req_func.is_background())) {
+      /* Create a "fake" static MsgBuffer for the foreground handler */
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
+
+      /* If req_func is fg terminal, it must have called enqueue_response() */
+      if (req_func.req_func_type == ReqFuncType::kForegroundTerminal) {
+        assert(sslot.tx_msgbuf != nullptr);
+      }
+
+      /* If the user needs rx_msgbuf, they should have created a copy */
+      bury_sslot_rx_msgbuf_nofree(&sslot);
       return;
     } else {
       /*
-       * For foreground non-terminal and background request handlers, make a
-       * copy of the request, including pkthdr (needed for enqueue_response).
+       * For background request handlers, copy the request MsgBuffer. rx_msgbuf
+       * will be freed on enqueue_response().
        */
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
       memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
@@ -154,12 +161,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       assert(sslot.rx_msgbuf.get_req_type() == req_type);
       assert(sslot.rx_msgbuf.get_req_num() == req_num);
 
-      if (!req_func.is_background()) {
-        req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
-      } else {
-        submit_background_st(&sslot);
-      }
-
+      submit_background_st(&sslot);
       return;
     }
   } else {
@@ -323,13 +325,25 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
   /* If we're here, we received all packets of this message */
   if (pkthdr->is_req()) {
     sslot.req_func_type = req_func.req_func_type;
+    sslot.rx_msgbuf_saved.req_type = req_type;
+    sslot.rx_msgbuf_saved.req_num = req_num;
 
     if (!req_func.is_background()) {
-      /* Works for both terminal and non-terminal request functions */
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
+
+      /* If req_func is fg terminal, it must have called enqueue_response() */
+      if (req_func.req_func_type == ReqFuncType::kForegroundTerminal) {
+        assert(sslot.tx_msgbuf != nullptr);
+      }
+
+      /* If the user needs rx_msgbuf, they should have created a copy */
+      bury_sslot_rx_msgbuf(&sslot);
       return;
     } else {
-      /* We don't depend on any RX ring, so don't create a new MsgBuffer*/
+      /*
+       * rx_msgbuf is not backed by RX ring buffers, so don't create a new
+       * MsgBuffer. rx_msgbuf will be freed on enqueue_response().
+       */
       submit_background_st(&sslot);
       return;
     }

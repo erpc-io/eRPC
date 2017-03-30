@@ -110,7 +110,7 @@ class MsgBuffer {
         num_pkts(1) {
     assert(buf != nullptr);
     /* max_data_size can be zero */
-    buffer.buf = nullptr; /* This is a static-allocation MsgBuffer */
+    buffer.buf = nullptr; /* This is a non-dynamic ("fake") MsgBuffer */
 
     pkthdr_t *pkthdr_0 = (pkthdr_t *)pkt;
     pkthdr_0->magic = kPktHdrMagic;

@@ -12,11 +12,34 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   /* The client has a pending request, so the session can't be disconnected */
   assert(session->is_connected());
 
-  /* Extract required fields from the request MsgBuffer, and then bury it */
-  assert(sslot->rx_msgbuf.buf != nullptr); /* Must be valid for pkthdr fields */
-  uint8_t req_type = sslot->rx_msgbuf.get_req_type();
-  uint64_t req_num = sslot->rx_msgbuf.get_req_num();
-  bury_sslot_rx_msgbuf(sslot); /* Could be dynamic */
+  /* Sanity-check the request MsgBuffer. The switch below gets optimized out. */
+  MsgBuffer *rx_msgbuf = &sslot->rx_msgbuf;
+  _unused(rx_msgbuf);
+  switch (sslot->req_func_type) {
+    case ReqFuncType::kForegroundTerminal:
+      /*
+       * Response enqueued before the request handler returns, and the event
+       * loop will bury rx_msgbuf after the handler returns.
+       */
+      assert(rx_msgbuf->buf != nullptr && rx_msgbuf->check_magic());
+      break;
+    case ReqFuncType::kForegroundNonterminal:
+      /*
+       * Response enqueued before or after the request handler returns, and the
+       * event loop will bury or has buried the rx_msgbuf.
+       */
+      break;
+    case ReqFuncType::kBackground:
+      /* We allocated a dynamic rx_msgbuf. We'll free it below. */
+      assert(rx_msgbuf->buf != nullptr && rx_msgbuf->is_dynamic() &&
+             rx_msgbuf->check_magic());
+      break;
+  }
+
+  if (small_rpc_unlikely(sslot->req_func_type == ReqFuncType::kBackground)) {
+    /* Event loop frees rx_msgbuf in other cases */
+    bury_sslot_rx_msgbuf(sslot);
+  }
 
   MsgBuffer *resp_msgbuf;
   if (small_rpc_likely(sslot->prealloc_used)) {
@@ -31,7 +54,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // Step 1: Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
-  resp_pkthdr_0->req_type = req_type;
+  resp_pkthdr_0->req_type = sslot->rx_msgbuf_saved.req_type;
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
   resp_pkthdr_0->rem_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
@@ -48,7 +71,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   }
 
   resp_pkthdr_0->pkt_num = 0;
-  resp_pkthdr_0->req_num = req_num;
+  resp_pkthdr_0->req_num = sslot->rx_msgbuf_saved.req_num;
   assert(resp_pkthdr_0->check_magic());
 
   // Step 2: Fill in non-zeroth packet headers, if any
