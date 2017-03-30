@@ -29,10 +29,7 @@ void test_sm_hander(int session_num, SessionMgmtEventType sm_event_type,
 // Test: Successful connection establishment
 //
 void simple_connect(Nexus *nexus, size_t) {
-  /*
-   * We need our own session connection function logic to inject session_num,
-   * i.e., we can't use client_connect_sessions.
-   */
+  /* We're testing session connection, so can't use client_connect_sessions */
   while (!server_ready) { /* Wait for server */
     usleep(1);
   }
@@ -65,10 +62,7 @@ TEST(SuccessfulConnect, SuccessfulConnect) {
 // reply with the error code
 //
 void invalid_remote_port(Nexus *nexus, size_t) {
-  /*
-   * We need our own session connection function logic to inject the invalid
-   * remote port, i.e., we can't use client_connect_sessions.
-   */
+  /* We're testing session connection, so can't use client_connect_sessions */
   while (!server_ready) { /* Wait for server */
     usleep(1);
   }
@@ -98,6 +92,9 @@ TEST(InvalidRemotePort, InvalidRemotePort) {
 }
 
 int main(int argc, char **argv) {
+  /* We don't have disconnection logic here */
+  server_check_all_disconnected = false;
+
   Nexus::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

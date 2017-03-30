@@ -24,6 +24,13 @@ std::atomic<bool> server_ready; /* Clients starts after server is ready */
 std::atomic<bool> client_done;  /* Server ends after clients are done */
 char local_hostname[kMaxHostnameLen];
 
+/*
+ * Hack: The server threads check that their Rpcs have zero active sessions
+ * after the client exits. This needs to be disabled for test_create_session,
+ * which does not use disconnection.
+ */
+bool server_check_all_disconnected = true;
+
 /// Basic context to derive from
 class BasicAppContext {
  public:
@@ -78,8 +85,10 @@ void basic_server_thread_func(Nexus *nexus, uint8_t app_tid,
     rpc.run_event_loop_timeout(kAppEventLoopMs);
   }
 
-  /* The client is done only after disconnecting */
-  ASSERT_EQ(rpc.num_active_sessions(), 0);
+  if (server_check_all_disconnected) {
+    /* The client is done only after disconnecting */
+    ASSERT_EQ(rpc.num_active_sessions(), 0);
+  }
 }
 
 /**
@@ -160,6 +169,23 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
 
   /* basic_sm_handler checks that the callbacks have no errors */
   ASSERT_EQ(context.num_sm_resps, num_sessions);
+}
+
+/// Run the event loop until we get \p num_resps session management responses,
+/// or until kAppMaxEventLoopMs are elapsed.
+void client_wait_for_sm_resps_or_timeout(const Nexus *nexus,
+                                         BasicAppContext &context,
+                                         size_t num_resps) {
+  /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
+  uint64_t cycles_start = rdtsc();
+  while (context.num_sm_resps != num_resps) {
+    context.rpc->run_event_loop_timeout(kAppEventLoopMs);
+
+    double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
+    if (ms_elapsed > kAppMaxEventLoopMs) {
+      break;
+    }
+  }
 }
 
 /// Run the event loop until we get \p num_resps RPC responses, or until
