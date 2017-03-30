@@ -264,44 +264,9 @@ class Rpc {
   }
 
  private:
-  inline void run_event_loop_one_st() {
-    assert(in_creator());
-    dpath_stat_inc(&dpath_stats.ev_loop_calls);
-
-    /* Handle session management events, if any */
-    if (unlikely(nexus_hook.sm_pkt_list.size > 0)) {
-      handle_session_management_st(); /* Callee grabs the hook lock */
-    }
-
-    /* Check if we need to retransmit any session management requests */
-    if (unlikely(mgmt_retry_queue.size() > 0)) {
-      mgmt_retry();
-    }
-
-    process_comps_st();     /* RX */
-    process_dpath_txq_st(); /* TX */
-  }
-
-  inline void run_event_loop_st() {
-    assert(in_creator());
-    while (true) {
-      run_event_loop_one();
-    }
-  }
-
-  inline void run_event_loop_timeout_st(size_t timeout_ms) {
-    assert(in_creator());
-
-    uint64_t start_tsc = rdtsc();
-    while (true) {
-      run_event_loop_one();
-
-      double elapsed_ms = to_sec(rdtsc() - start_tsc, nexus->freq_ghz) * 1000;
-      if (elapsed_ms > timeout_ms) {
-        return;
-      }
-    }
-  }
+  void run_event_loop_one_st();
+  void run_event_loop_st();
+  void run_event_loop_timeout_st(size_t timeout_ms);
 
   //
   // Misc private functions
@@ -534,6 +499,7 @@ class Rpc {
   // Others
   const int creator_os_tid;   ///< OS thread ID of the creator thread
   const bool multi_threaded;  ///< True iff there are background threads
+  bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
 
   TTr *transport = nullptr;  ///< The unreliable transport
 

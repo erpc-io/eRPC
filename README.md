@@ -1,8 +1,6 @@
 EA Code notes
  * An important simplifying insight is that all functions invoked by the event
-   loop run to completion, i.e., we cannot be preempted. So we don't need to
-   worry about cases such as one where the request number and response buffer
-   in a session slot do not correspond.
+   loop run to completion, i.e., we cannot be preempted.
  * Major types
    * Request type: `uint8_t`. 256 request types should be enough.
    * App TIDs: `uint8_t`. We need one per thread, so 256 is enough.

@@ -24,6 +24,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t app_tid,
       numa_node(numa_node),
       creator_os_tid(gettid()),
       multi_threaded(nexus->num_bg_threads > 0),
+      in_event_loop(false),
       req_func_arr(nexus->req_func_arr),
       nexus_hook(app_tid) {
   /* Ensure that we're running as root */
