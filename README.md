@@ -18,13 +18,16 @@ EA Code notes
    (except maybe in major classes like Rpc/Nexus/Session). This only causes
    confusion.
 
-## API notes
- * MsgBuffer ownership:
+## MsgBuffer ownership notes
+ * The correctness of this reasoning depends on restrictions on the request
+   handler and continuation functions. These functions can only enqueue requests
+   and responses, but cannot invoke the event loop. The event loop can modify
+   RX ring memory, which is unsafe if the buffer ownership has been passed to
+   the application.
+ * At client:
    * Request MsgBuffers are owned/allocated by apps and are never freed by eRPC.
-   * Response MsgBuffers allocated by apps, and are freed by eRPC as soon as
-     they are no longer needed for retransmission.
- * Thread safety:
-   * RPC request handlers must be thread-safe if background threads are used.
+   * Response MsgBuffers are allocated by eRPC, and are freed by eRPC when the
+     continuation ends.
 
 ## Short-term TODOs
  * Rename `sm_hander` to `sm_handler`.

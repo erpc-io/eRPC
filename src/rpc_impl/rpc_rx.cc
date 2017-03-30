@@ -129,7 +129,8 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     /* Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf) */
     bury_sslot_tx_msgbuf(&sslot);
 
-    sslot.req_func_type = req_func.req_func_type; /* Set the req func type */
+    /* Remember the request function type for enqueue_response() */
+    sslot.req_func_type = req_func.req_func_type;
 
     if (small_rpc_likely(req_func.is_fg_terminal())) {
       /*
