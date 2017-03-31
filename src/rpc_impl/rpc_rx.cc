@@ -173,8 +173,10 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     // Create a "fake" static MsgBuffer for the foreground continuation
     sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
     sslot.cont_func((RespHandle *)&sslot, &sslot.rx_msgbuf, context, sslot.tag);
-    bury_sslot_rx_msgbuf_nofree(&sslot);
 
+    // The continuation must release the response (rx_msgbuf). It may enqueue
+    // a new request that uses sslot, but that won't use rx_msgbuf.
+    assert(sslot.rx_msgbuf.buf == nullptr);
     return;
   }
 }
@@ -325,7 +327,10 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
     sslot.cont_func((RespHandle *)&sslot, &sslot.rx_msgbuf, context, sslot.tag);
-    bury_sslot_rx_msgbuf(&sslot);  // Free the dynamic response MsgBuffer
+
+    // The continuation must release the response (rx_msgbuf). It may enqueue
+    // a new request that uses sslot, but that won't use rx_msgbuf.
+    assert(sslot.rx_msgbuf.buf == nullptr);
     return;
   }
 }

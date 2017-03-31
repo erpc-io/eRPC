@@ -224,13 +224,18 @@ class Rpc {
   /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
-  /// Release a response received at a client
+  /// Bury the response MsgBuffer and free up the sslot
   inline void release_respone(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
     SSlot *sslot = (SSlot *)resp_handle;
 
-    // tx_msgbuf was freed before calling the continuation
+    // The request MsgBuffer (tx_msgbuf) was buried before calling continuation
     assert(sslot->tx_msgbuf == nullptr);
+
+    // Bury the response, which may be dynamic
+    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
+    assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
+    bury_sslot_rx_msgbuf(sslot);
 
     Session *session = sslot->session;
     assert(session->is_client());

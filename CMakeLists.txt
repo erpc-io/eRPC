@@ -95,7 +95,8 @@ set(CTEST_TESTS
   test_destroy_session
   test_bg_restrictions
   test_small_msg
-  test_large_msg)
+  test_large_msg
+  test_req_in_cont)
 
 # Other tests that can be run without ctest
 set(OTHER_TESTS
