@@ -137,15 +137,14 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     if (small_rpc_likely(!req_func.is_background())) {
       /* Create a "fake" static MsgBuffer for the foreground handler */
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
+
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
+      bury_sslot_rx_msgbuf_nofree(&sslot);
 
       /* If req_func is fg terminal, it must have called enqueue_response() */
-      if (req_func.req_func_type == ReqFuncType::kForegroundTerminal) {
+      if (req_func.req_func_type == ReqFuncType::kFgTerminal) {
         assert(sslot.tx_msgbuf != nullptr);
       }
-
-      /* If the user needs rx_msgbuf, they should have created a copy */
-      bury_sslot_rx_msgbuf_nofree(&sslot);
       return;
     } else {
       /*
@@ -330,14 +329,13 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
 
     if (!req_func.is_background()) {
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
+      bury_sslot_rx_msgbuf(&sslot);
 
       /* If req_func is fg terminal, it must have called enqueue_response() */
-      if (req_func.req_func_type == ReqFuncType::kForegroundTerminal) {
+      if (req_func.req_func_type == ReqFuncType::kFgTerminal) {
         assert(sslot.tx_msgbuf != nullptr);
       }
 
-      /* If the user needs rx_msgbuf, they should have created a copy */
-      bury_sslot_rx_msgbuf(&sslot);
       return;
     } else {
       /*

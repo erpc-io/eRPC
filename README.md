@@ -36,6 +36,11 @@ EA Code notes
  * At server:
    * The request handler permanently loses ownership of the request MsgBuffer
      when it returns, at which point eRPC may free it.
+    * For foreground handlers, eRPC frees the request MsgBuffer when the handler
+      returns.
+    * For background handlers, the buffer is freed when the user calls
+      `enqueue_response()`. This is because the background threads don't have
+      access to the Rpc's MsgBuffer burying functions. 
    * The request handler permanently loses ownership of the response MsgBuffer
      when it calls `enqueue_response()`. eRPC will free it when the response
      is no longer needed for retransmission.

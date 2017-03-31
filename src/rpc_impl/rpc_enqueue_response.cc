@@ -16,14 +16,14 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   MsgBuffer *rx_msgbuf = &sslot->rx_msgbuf;
   _unused(rx_msgbuf);
   switch (sslot->req_func_type) {
-    case ReqFuncType::kForegroundTerminal:
+    case ReqFuncType::kFgTerminal:
       /*
        * Response enqueued before the request handler returns, and the event
        * loop will bury rx_msgbuf after the handler returns.
        */
       assert(rx_msgbuf->buf != nullptr && rx_msgbuf->check_magic());
       break;
-    case ReqFuncType::kForegroundNonterminal:
+    case ReqFuncType::kFgNonterminal:
       /*
        * Response enqueued before or after the request handler returns, and the
        * event loop will bury or has buried the rx_msgbuf.
@@ -59,9 +59,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   resp_pkthdr_0->rem_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
 
-  if (small_rpc_likely(sslot->req_func_type ==
-                       ReqFuncType::kForegroundTerminal)) {
-    /* Foreground terminal req function: 1st resp packet is Expected */
+  if (small_rpc_likely(sslot->req_func_type == ReqFuncType::kFgTerminal)) {
+    /* Fg terminal req function: 1st resp packet is Expected */
     resp_pkthdr_0->is_unexp = 0;
     resp_pkthdr_0->fgt_resp = 1;
   } else {

@@ -23,11 +23,7 @@ typedef void (*erpc_cont_func_t)(RespHandle *resp_handle,
                                  const MsgBuffer *resp_msgbuf, void *context,
                                  size_t tag);
 
-enum class ReqFuncType : uint8_t {
-  kForegroundTerminal,
-  kForegroundNonterminal,
-  kBackground
-};
+enum class ReqFuncType : uint8_t { kFgTerminal, kFgNonterminal, kBackground };
 
 /// The application-specified eRPC request and response handlers. An \p Ops
 /// object is invalid if either of the two function pointers are NULL.
@@ -37,7 +33,7 @@ class ReqFunc {
   ReqFuncType req_func_type;
 
   inline bool is_fg_terminal() const {
-    return req_func_type == ReqFuncType::kForegroundTerminal;
+    return req_func_type == ReqFuncType::kFgTerminal;
   }
 
   inline bool is_background() const {

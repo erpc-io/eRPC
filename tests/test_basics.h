@@ -111,8 +111,8 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
   Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
 
   if (num_bg_threads == 0) {
-    nexus.register_req_func(
-        kAppReqType, ReqFunc(req_func, ReqFuncType::kForegroundTerminal));
+    nexus.register_req_func(kAppReqType,
+                            ReqFunc(req_func, ReqFuncType::kFgTerminal));
   } else {
     nexus.register_req_func(kAppReqType,
                             ReqFunc(req_func, ReqFuncType::kBackground));

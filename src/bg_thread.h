@@ -10,8 +10,7 @@
 
 namespace ERpc {
 
-/// A work item submitted to a background thread.
-/// Also acts as the background work completion.
+/// A work item submitted to a background thread
 class BgWorkItem {
  public:
   BgWorkItem(uint8_t app_tid, void *context, SSlot *sslot)
@@ -80,6 +79,7 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
       const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);
       assert(req_func.is_registered()); /* Checked during submit_bg */
 
+      /* rx_msgbuf will be buried when the user calls enqueue_response() */
       req_func.req_func((ReqHandle *)sslot, &sslot->rx_msgbuf, context);
     }
 
