@@ -7,11 +7,20 @@
 static constexpr size_t kNumReqs = 100;
 static_assert(kNumReqs > Session::kSessionReqWindow, "");
 
+union tag_t {
+  struct {
+    uint32_t size;
+    uint32_t msgbuf_i;
+  };
+  size_t _tag;
+};
+
 /// Per-thread application context
 class AppContext : public BasicAppContext {
  public:
   FastRand fast_rand;
-  MsgBuffer *req_msgbuf;
+  MsgBuffer req_msgbuf[Session::kSessionReqWindow];
+  size_t num_reqs_sent = 0;
 };
 
 /// Pick a random message size (>= 1 byte)
@@ -39,7 +48,7 @@ void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
 
   req_handle->prealloc_used = false;
 
-  /* MsgBuffer allocation is thread safe */
+  // eRPC will free the MsgBuffer
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
   ASSERT_NE(req_handle->dyn_resp_msgbuf.buf, nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
@@ -58,13 +67,18 @@ void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
 void cont_func(RespHandle *, const MsgBuffer *, void *, size_t);  // Fwd decl
 void enqueue_requests_helper(AppContext *context, size_t num_reqs) {
   for (size_t i = 0; i < num_reqs; i++) {
-    size_t req_size = get_rand_msg_size(context);
-    test_printf("Client: Sending request of size %zu\n", req_size);
+    size_t msgbuf_i = context->num_reqs_sent % Session::kSessionReqWindow;
 
-    context->rpc->resize_msg_buffer(context->req_msgbuf, req_size);
-    int ret =
-        context->rpc->enqueue_request(context->session_num_arr[0], kAppReqType,
-                                      context->req_msgbuf, cont_func, req_size);
+    size_t req_size = get_rand_msg_size(context);
+    test_printf("Client: Sending request %zu of size %zu\n",
+                context->num_reqs_sent, req_size);
+
+    context->rpc->resize_msg_buffer(&context->req_msgbuf[msgbuf_i], req_size);
+    int ret = context->rpc->enqueue_request(
+        context->session_num_arr[0], kAppReqType,
+        &context->req_msgbuf[msgbuf_i], cont_func, req_size);
+
+    context->num_reqs_sent++;
     ASSERT_EQ(ret, 0);
   }
 }
@@ -87,7 +101,9 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
   context->num_rpc_resps++;
   context->rpc->release_respone(resp_handle);
 
-  enqueue_requests_helper(context, 1);
+  if (context->num_rpc_resps < kNumReqs) {
+    enqueue_requests_helper(context, 1);
+  }
 }
 
 void client_thread(Nexus *nexus, size_t num_sessions = 1) {
@@ -97,23 +113,21 @@ void client_thread(Nexus *nexus, size_t num_sessions = 1) {
 
   Rpc<IBTransport> *rpc = context.rpc;
 
-  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
-  ASSERT_NE(req_msgbuf.buf, nullptr);
-  context.req_msgbuf = &req_msgbuf;
-
-  size_t req_size = get_rand_msg_size(&context);
-  rpc->resize_msg_buffer(&req_msgbuf, req_size);
-  for (size_t i = 0; i < req_size; i++) {
-    req_msgbuf.buf[i] = (uint8_t)req_size;
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    context.req_msgbuf[i] =
+        rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+    ASSERT_NE(context.req_msgbuf[i].buf, nullptr);
   }
 
   // Start by filling the request window
   enqueue_requests_helper(&context, Session::kSessionReqWindow);
 
   client_wait_for_rpc_resps_or_timeout(nexus, context, kNumReqs);
-  ASSERT_EQ(context.num_rpc_resps, kNumReqs);
+  ASSERT_GE(context.num_rpc_resps, kNumReqs);  // We can overshoot a bit
 
-  rpc->free_msg_buffer(req_msgbuf);
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    rpc->free_msg_buffer(context.req_msgbuf[i]);
+  }
 
   // Disconnect the session
   rpc->destroy_session(context.session_num_arr[0]);

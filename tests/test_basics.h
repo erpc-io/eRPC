@@ -171,14 +171,14 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
   ASSERT_EQ(context.num_sm_resps, num_sessions);
 }
 
-/// Run the event loop until we get \p num_resps session management responses,
-/// or until kAppMaxEventLoopMs are elapsed.
+/// Run the event loop until we get at least \p num_resps session management
+/// responses, or until kAppMaxEventLoopMs are elapsed.
 void client_wait_for_sm_resps_or_timeout(const Nexus *nexus,
                                          BasicAppContext &context,
                                          size_t num_resps) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
   uint64_t cycles_start = rdtsc();
-  while (context.num_sm_resps != num_resps) {
+  while (context.num_sm_resps < num_resps) {
     context.rpc->run_event_loop_timeout(kAppEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
@@ -188,14 +188,14 @@ void client_wait_for_sm_resps_or_timeout(const Nexus *nexus,
   }
 }
 
-/// Run the event loop until we get \p num_resps RPC responses, or until
-/// kAppMaxEventLoopMs are elapsed.
+/// Run the event loop until we get at least \p num_resps RPC responses, or
+/// until kAppMaxEventLoopMs are elapsed.
 void client_wait_for_rpc_resps_or_timeout(const Nexus *nexus,
                                           BasicAppContext &context,
                                           size_t num_resps) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
   uint64_t cycles_start = rdtsc();
-  while (context.num_rpc_resps != num_resps) {
+  while (context.num_rpc_resps < num_resps) {
     context.rpc->run_event_loop_timeout(kAppEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
