@@ -8,20 +8,18 @@
 
 namespace ERpc {
 
-/*
- * Maximum number of sessions (both as client and server) that can be created
- * by an Rpc through its lifetime. Increase this for more sessions.
- */
+/// Maximum number of sessions (both as client and server) that can be created
+/// by an Rpc through its lifetime. Increase this for more sessions.
 static const size_t kMaxSessionsPerThread = 1024;
 static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(), "");
 
 static const size_t kSecretBits = 32;  ///< Session secret for security
-static_assert(kSecretBits <= 32, "");  /* Secret must fit in 32 bits */
+static_assert(kSecretBits <= 32, "");  // Secret must fit in 32 bits
 
 static const size_t kSessionMgmtRetransMs = 10;   ///< Timeout for mgmt reqs
 static const size_t kSessionMgmtTimeoutMs = 200;  ///< Max time for mgmt reqs
 
-/* Invalid metadata values for session endpoint initialization */
+// Invalid metadata values for session endpoint initialization
 static const uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
 static const uint8_t kInvalidAppTid = kMaxAppTid + 1;
 static const uint16_t kInvalidSessionNum = std::numeric_limits<uint16_t>::max();
@@ -213,7 +211,7 @@ class SessionEndpoint {
   uint32_t secret : kSecretBits;  ///< Secret for both session endpoints
   RoutingInfo routing_info;       ///< Generic routing info for this endpoint
 
-  /* Fill invalid metadata to aid debugging */
+  // Fill invalid metadata to aid debugging
   SessionEndpoint() {
     transport_type = TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));

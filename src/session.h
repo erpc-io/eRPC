@@ -20,7 +20,7 @@ namespace ERpc {
 class Session {
  public:
   enum class Role : int {
-    /* Weird numbers to help detect use of freed session pointers */
+    // Weird numbers to help detect use of freed session pointers
     kServer = 37,
     kClient = 95
   };
@@ -28,10 +28,8 @@ class Session {
   static constexpr size_t kSessionReqWindow = 8;  ///< *Request* window size
   static constexpr size_t kSessionCredits = 8;    ///< *Packet* credits
 
-  /*
-   * Required for fast multiplication and modulo calculation during request
-   * number assignment and slot number decoding, respectively.
-   */
+  // Required for fast multiplication and modulo calculation during request
+  // number assignment and slot number decoding, respectively.
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
   Session(Role role, SessionState state);

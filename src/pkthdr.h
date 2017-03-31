@@ -19,7 +19,7 @@ static const size_t kPktHdrMagicBits =
     128 - (8 + kMsgSizeBits + 16 + 2 + 1 + 1 + kPktNumBits + kReqNumBits);
 static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
-static_assert(kPktHdrMagicBits == 19, ""); /* Just to keep track */
+static_assert(kPktHdrMagicBits == 19, "");  // Just to keep track
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 
 /// These packet types are stored as bitfields in the packet header, so don't
@@ -88,7 +88,7 @@ struct pkthdr_t {
 
 } __attribute__((packed));
 
-/* pkthdr_t should be a power of 2 for cheap multiplication */
+// pkthdr_t size should be a power of 2 for cheap multiplication
 static_assert(sizeof(pkthdr_t) == 16, "");
 }
 

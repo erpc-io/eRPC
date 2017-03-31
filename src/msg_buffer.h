@@ -89,8 +89,8 @@ class MsgBuffer {
         data_size(max_data_size),
         max_num_pkts(max_num_pkts),
         num_pkts(max_num_pkts) {
-    assert(buffer.buf != nullptr); /* buffer must be valid */
-    /* data_size can be 0 */
+    assert(buffer.buf != nullptr);  // buffer must be valid
+    // data_size can be 0
     assert(max_num_pkts >= 1);
     assert(buffer.class_size >=
            max_data_size + max_num_pkts * sizeof(pkthdr_t));
@@ -109,8 +109,8 @@ class MsgBuffer {
         max_num_pkts(1),
         num_pkts(1) {
     assert(buf != nullptr);
-    /* max_data_size can be zero */
-    buffer.buf = nullptr; /* This is a non-dynamic ("fake") MsgBuffer */
+    // max_data_size can be zero
+    buffer.buf = nullptr;  // This is a non-dynamic ("fake") MsgBuffer
 
     pkthdr_t *pkthdr_0 = (pkthdr_t *)pkt;
     pkthdr_0->magic = kPktHdrMagic;

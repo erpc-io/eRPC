@@ -27,7 +27,7 @@ class NexusHook {
   MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
 };
 
-class Nexus; /* Forward declaration */
+class Nexus;  // Forward declaration
 
 class Nexus {
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
@@ -122,7 +122,7 @@ class Nexus {
   static std::string get_hostname();
 };
 
-static Nexus *nexus_object; /* The one per-process Nexus object */
+static Nexus *nexus_object;  // The one per-process Nexus object
 
 /**
  * @brief The static signal handler, which executes the actual signal handler

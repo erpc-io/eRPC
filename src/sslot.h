@@ -6,7 +6,7 @@
 
 namespace ERpc {
 
-class Session; /* Forward declaration */
+class Session;  // Forward declaration
 
 /**
  * @brief Session slot metadata maintained about an Rpc
@@ -53,16 +53,14 @@ class SSlot {
       return "[Invalid]";
     }
 
-    /*
-     * Sanity check: If the RX and TX MsgBuffers are both valid, they should
-     * contain identical request number and type.
-     */
+    // Sanity check: If the RX and TX MsgBuffers are both valid, they should
+    // contain identical request number and type.
     if (rx_msgbuf.buf != nullptr && tx_msgbuf != nullptr) {
       assert(rx_msgbuf.get_req_num() == tx_msgbuf->get_req_num());
       assert(rx_msgbuf.get_req_type() == tx_msgbuf->get_req_type());
     }
 
-    /* Extract the request number and type from either RX or TX MsgBuffer */
+    // Extract the request number and type from either RX or TX MsgBuffer
     std::string req_num_string, req_type_string;
     if (rx_msgbuf.buf != nullptr) {
       req_num_string = std::to_string(rx_msgbuf.get_req_num());

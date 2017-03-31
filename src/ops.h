@@ -2,7 +2,6 @@
  * @file ops.h
  * @brief User-defined eRPC request and response handler types
  */
-
 #ifndef ERPC_OPS_H
 #define ERPC_OPS_H
 
@@ -10,7 +9,7 @@
 
 namespace ERpc {
 
-class SSlot; /* Forward declaration */
+class SSlot;  // Forward declaration
 typedef SSlot ReqHandle;
 typedef SSlot RespHandle;
 
