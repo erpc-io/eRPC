@@ -2,11 +2,9 @@
 
 namespace ERpc {
 
-/*
- * Packets that are the first packet in their MsgBuffer use one DMA, and may
- * be inlined. Packets that are not the first packet use two DMAs, and are never
- * inlined for simplicity.
- */
+// Packets that are the first packet in their MsgBuffer use one DMA, and may
+// be inlined. Packets that are not the first packet use two DMAs, and are never
+// inlined for simplicity.
 void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
                            size_t num_pkts) {
   assert(tx_burst_arr != nullptr);
@@ -27,37 +25,33 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       assert(msg_buffer->is_credit_return());
     }
 
-    /* Verify constant fields of work request */
+    // Verify constant fields of work request
     struct ibv_send_wr& wr = send_wr[i];
     struct ibv_sge* sgl = send_sgl[i];
 
-    assert(wr.next == &send_wr[i + 1]); /* +1 is valid */
+    assert(wr.next == &send_wr[i + 1]);  // +1 is valid
     assert(wr.wr.ud.remote_qkey == kQKey);
     assert(wr.opcode == IBV_WR_SEND_WITH_IMM);
     assert(wr.sg_list == sgl);
 
-    /* Set signaling flag. The work request is non-inline by default. */
+    // Set signaling flag. The work request is non-inline by default.
     wr.send_flags = get_signaled_flag();
 
     if (small_rpc_likely(item.offset == 0)) {
-      /*
-       * This is the first packet, so we need only 1 SGE. This can be a credit
-       * return packet.
-       */
+      // This is the first packet, so we need only 1 SGE. This can be a credit
+      // return packet.
       pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = (uint64_t)pkthdr;
       sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + item.data_bytes);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      /* Only single-SGE work requests are inlined */
+      // Only single-SGE work requests are inlined
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
       wr.num_sge = 1;
     } else {
-      /*
-       * This is not the first packet, so we need 2 SGEs. The offset_to_pkt_num
-       * function is expensive, but it's OK because we're dealing with a
-       * multi-pkt message.
-       */
+      // This is not the first packet, so we need 2 SGEs. The offset_to_pkt_num
+      // function is expensive, but it's OK because we're dealing with a
+      // multi-pkt message.
       size_t pkt_num = (item.offset + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
       sgl[0].addr = (uint64_t)pkthdr;
@@ -77,23 +71,23 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     wr.wr.ud.ah = ib_routing_info->ah;
   }
 
-  send_wr[num_pkts - 1].next = nullptr; /* Breaker of chains */
+  send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains
 
   struct ibv_send_wr* bad_wr;
 
-  /* Handle failure. XXX: Don't exit. */
+  // Handle failure. XXX: Don't exit.
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
   if (unlikely(ret != 0)) {
     fprintf(stderr, "ibv_post_send failed. ret = %d\n", ret);
     exit(-1);
   }
 
-  send_wr[num_pkts - 1].next = &send_wr[num_pkts]; /* Restore chain; safe */
+  send_wr[num_pkts - 1].next = &send_wr[num_pkts];  // Restore chain; safe
 }
 
 size_t IBTransport::rx_burst() {
   int new_comps = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
-  assert(new_comps >= 0); /* When can this fail? */
+  assert(new_comps >= 0);  // When can this fail?
 
   if (kDatapathChecks) {
     for (int i = 0; i < new_comps; i++) {
@@ -108,8 +102,8 @@ size_t IBTransport::rx_burst() {
 }
 
 void IBTransport::post_recvs(size_t num_recvs) {
-  assert(!fast_recv_used);              /* Not supported yet */
-  assert(num_recvs <= kRecvQueueDepth); /* num_recvs can be 0 */
+  assert(!fast_recv_used);               // Not supported yet
+  assert(num_recvs <= kRecvQueueDepth);  // num_recvs can be 0
   assert(recvs_to_post < kRecvSlack);
 
   recvs_to_post += num_recvs;
@@ -117,7 +111,7 @@ void IBTransport::post_recvs(size_t num_recvs) {
     return;
   }
 
-  /* The recvs posted are @first_wr through @last_wr, inclusive */
+  // The recvs posted are @first_wr through @last_wr, inclusive
   struct ibv_recv_wr *first_wr, *last_wr, *temp_wr, *bad_wr;
 
   int ret;
@@ -131,7 +125,7 @@ void IBTransport::post_recvs(size_t num_recvs) {
   last_wr = &recv_wr[last_wr_i];
   temp_wr = last_wr->next;
 
-  last_wr->next = nullptr; /* Breaker of chains */
+  last_wr->next = nullptr;  // Breaker of chains
 
   ret = ibv_post_recv(qp, first_wr, &bad_wr);
   if (ret != 0) {
@@ -139,13 +133,13 @@ void IBTransport::post_recvs(size_t num_recvs) {
     exit(-1);
   }
 
-  last_wr->next = temp_wr; /* Restore circularity */
+  last_wr->next = temp_wr;  // Restore circularity
 
-  /* Update RECV head: go to the last wr posted and take 1 more step */
+  // Update RECV head: go to the last wr posted and take 1 more step
   recv_head = last_wr_i;
   recv_head = mod_add_one<kRecvQueueDepth>(recv_head);
 
-  /* Reset slack counter */
+  // Reset slack counter
   recvs_to_post = 0;
 }
 

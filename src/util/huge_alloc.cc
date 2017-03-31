@@ -15,25 +15,21 @@ HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
   }
   prev_allocation_size = initial_size;
 
-  /*
-   * Reserve initial hugepages. \p reserve_hugepages will throw runtime_error
-   * if reservation fails.
-   */
+  // Reserve initial hugepages. \p reserve_hugepages will throw runtime_error
+  // if reservation fails.
   reserve_hugepages(initial_size, numa_node);
 }
 
 HugeAlloc::~HugeAlloc() {
-  /* Deregister and delete the created SHM regions */
+  // Deregister and delete the created SHM regions
   for (shm_region_t &shm_region : shm_list) {
     dereg_mr_func(shm_region.mem_reg_info);
     delete_shm(shm_region.shm_key, shm_region.buf);
   }
 }
 
-/*
- * To create a cache of Buffers, we first allocate the required number of
- * Buffers and then free them.
- */
+// To create a cache of Buffers, we first allocate the required number of
+// Buffers and then free them.
 bool HugeAlloc::create_cache(size_t size, size_t num_buffers) {
   size_t size_class = get_class(size);
   size_t reqd_buffers = num_buffers - freelist[size_class].size();
@@ -90,27 +86,25 @@ void HugeAlloc::print_stats() {
 }
 
 bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
-  assert(size >= kMaxClassSize); /* We need at least one max-sized buffer */
+  assert(size >= kMaxClassSize);  // We need at least one max-sized buffer
 
-  std::ostringstream xmsg; /* The exception message */
+  std::ostringstream xmsg;  // The exception message
   size = round_up<kHugepageSize>(size);
   int shm_key, shm_id;
 
   while (true) {
-    /*
-     * Choose a positive SHM key. Negative is fine but it looks scary in the
-     * error message.
-     */
+    // Choose a positive SHM key. Negative is fine but it looks scary in the
+    // error message.
     shm_key = static_cast<int>(slow_rand.next_u64());
     shm_key = std::abs(shm_key);
 
-    /* Try to get an SHM region */
+    // Try to get an SHM region
     shm_id = shmget(shm_key, size, IPC_CREAT | IPC_EXCL | 0666 | SHM_HUGETLB);
 
     if (shm_id == -1) {
       switch (errno) {
         case EEXIST:
-          /* \p shm_key already exists. Try again. */
+          // \p shm_key already exists. Try again.
           break;
 
         case EACCES:
@@ -125,7 +119,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
           throw std::runtime_error(xmsg.str());
 
         case ENOMEM:
-          /* Out of memory - this is OK */
+          // Out of memory - this is OK
           erpc_dprintf(
               "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB\n",
               size / MB(1));
@@ -137,7 +131,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
           throw std::runtime_error(xmsg.str());
       }
     } else {
-      /* \p shm_key worked. Break out of the while loop */
+      // \p shm_key worked. Break out of the while loop
       break;
     }
   }
@@ -149,7 +143,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
     throw std::runtime_error(xmsg.str());
   }
 
-  /* Bind the buffer to the NUMA node */
+  // Bind the buffer to the NUMA node
   const unsigned long nodemask = (1ul << (unsigned long)numa_node);
   long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
   if (ret != 0) {
@@ -158,16 +152,16 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
     throw std::runtime_error(xmsg.str());
   }
 
-  /* If we are here, the allocation succeeded. */
+  // If we are here, the allocation succeeded.
   memset(shm_buf, 0, size);
 
-  /* Register the allocated buffer. This may throw, which is OK. */
+  // Register the allocated buffer. This may throw, which is OK.
   MemRegInfo reg_info = reg_mr_func(shm_buf, size);
 
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size, reg_info));
   stats.shm_reserved += size;
 
-  /* Add Buffers to the largest class */
+  // Add Buffers to the largest class
   size_t num_buffers = size / kMaxClassSize;
   assert(num_buffers >= 1);
   for (size_t i = 0; i < num_buffers; i++) {
@@ -207,7 +201,7 @@ void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
     exit(-1);
   }
 
-  int ret = shmctl(shmid, IPC_RMID, nullptr); /* Please don't fail */
+  int ret = shmctl(shmid, IPC_RMID, nullptr);  // Please don't fail
   if (ret != 0) {
     fprintf(stderr, "eRPC HugeAlloc: Error freeing SHM ID %d\n", shmid);
     exit(-1);

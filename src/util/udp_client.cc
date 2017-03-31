@@ -47,11 +47,11 @@ ssize_t UDPClient::send(const char *msg, size_t size) {
   uint64_t rand = slow_rand.next_u64();
 
   if (rand % 100 >= drop_prob * 100) {
-    /* Actually send the packet */
+    // Actually send the packet
     return sendto(sock_fd, msg, size, 0, remote_addrinfo->ai_addr,
                   remote_addrinfo->ai_addrlen);
   } else {
-    /* Pretend as if we sent the packet. This simulates a network drop. */
+    // Pretend as if we sent the packet. This simulates a network drop.
     return static_cast<ssize_t>(size);
   }
 }

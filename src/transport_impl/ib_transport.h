@@ -19,9 +19,9 @@ class IBTransport : public Transport {
   static const uint32_t kQKey = 0xffffffff;  ///< Secure key for all eRPC nodes
   static const size_t kGRHBytes = 40;
 
-  static_assert(kSendQueueDepth >= 2 * kUnsigBatch, ""); /* Capacity check */
-  static_assert(kPostlist <= kUnsigBatch, "");           /* Postlist check */
-  static_assert(kMaxInline >= kMinInline, ""); /* For inline credit returns */
+  static_assert(kSendQueueDepth >= 2 * kUnsigBatch, "");  // Capacity check
+  static_assert(kPostlist <= kUnsigBatch, "");            // Postlist check
+  static_assert(kMaxInline >= kMinInline, "");  // For inline credit returns
 
   // Derived constants
 
@@ -103,10 +103,10 @@ class IBTransport : public Transport {
     if (nb_pending == kUnsigBatch - 1) {
       struct ibv_wc wc;
       while (ibv_poll_cq(send_cq, 1, &wc) != 1) {
-        /* Do nothing */
+        // Do nothing
       }
 
-      /* XXX: Don't exit! */
+      // XXX: Don't exit!
       if (wc.status != 0) {
         fprintf(stderr, "Bad SEND wc status %d\n", wc.status);
         exit(-1);
@@ -201,9 +201,9 @@ class IBTransport : public Transport {
   Buffer recv_extent;
 
   // SEND
-  size_t nb_pending = 0;                     /* For selective signalling */
-  struct ibv_send_wr send_wr[kPostlist + 1]; /* +1 for blind ->next */
-  struct ibv_sge send_sgl[kPostlist][2];     /* 2 SGE/wr for header & payload */
+  size_t nb_pending = 0;                      ///< For selective signalling
+  struct ibv_send_wr send_wr[kPostlist + 1];  // +1 for blind ->next */
+  struct ibv_sge send_sgl[kPostlist][2];      // 2 SGE/wr for header & payload
 
   // RECV
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
@@ -213,7 +213,7 @@ class IBTransport : public Transport {
   struct ibv_sge recv_sgl[kRecvQueueDepth];
   struct ibv_wc recv_wc[kRecvQueueDepth];
 
-  /* Once post_recvs_fast() is used, regular post_recv() must not be used */
+  // Once post_recvs_fast() is used, regular post_recv() must not be used
   bool fast_recv_used = false;
 };
 

@@ -98,10 +98,8 @@ class HugeAlloc {
     if (!freelist[size_class].empty()) {
       return alloc_from_class(size_class);
     } else {
-      /*
-       * There is no free Buffer in this class. Find the first larger class with
-       * free Buffers.
-       */
+      // There is no free Buffer in this class. Find the first larger class with
+      // free Buffers.
       size_t next_class = size_class + 1;
       for (; next_class < kNumClasses; next_class++) {
         if (!freelist[next_class].empty()) {
@@ -110,21 +108,19 @@ class HugeAlloc {
       }
 
       if (next_class == kNumClasses) {
-        /*
-         * There's no larger size class with free pages, we we need to allocate
-         * more hugepages. This adds some Buffers to the largest class.
-         */
+        // There's no larger size class with free pages, we we need to allocate
+        // more hugepages. This adds some Buffers to the largest class.
         prev_allocation_size *= 2;
         bool success = reserve_hugepages(prev_allocation_size, numa_node);
         if (!success) {
-          prev_allocation_size /= 2; /* Restore the previous allocation */
+          prev_allocation_size /= 2;  // Restore the previous allocation
           return Buffer(nullptr, 0, 0);
         } else {
           next_class = kNumClasses - 1;
         }
       }
 
-      /* If we're here, \p next_class has free Buffers */
+      // If we're here, \p next_class has free Buffers
       assert(next_class < kNumClasses);
       while (next_class != size_class) {
         split(next_class);
@@ -136,7 +132,7 @@ class HugeAlloc {
     }
 
     assert(false);
-    exit(-1); /* We should never get here */
+    exit(-1);  // We should never get here
     return Buffer(nullptr, 0, 0);
   }
 
@@ -179,7 +175,7 @@ class HugeAlloc {
    */
   inline size_t get_class(size_t size) {
     assert(size >= 1 && size <= kMaxClassSize);
-    /* Use bit shift instead of division to make debug-mode code a faster */
+    // Use bit shift instead of division to make debug-mode code a faster
     return msb_index((int)((size - 1) >> kMinClassBitShift));
   }
 
@@ -187,8 +183,8 @@ class HugeAlloc {
   inline size_t get_class_slow(size_t size) {
     assert(size >= 1 && size <= kMaxClassSize);
 
-    size_t size_class = 0;            /* The size class for \p size */
-    size_t class_lim = kMinClassSize; /* The max size for \p size_class */
+    size_t size_class = 0;             // The size class for \p size
+    size_t class_lim = kMinClassSize;  // The max size for \p size_class
     while (size > class_lim) {
       size_class++;
       class_lim *= 2;
@@ -223,7 +219,7 @@ class HugeAlloc {
   inline Buffer alloc_from_class(size_t size_class) {
     assert(size_class < kNumClasses);
 
-    /* Use the Buffers at the back to improve locality */
+    // Use the Buffers at the back to improve locality
     Buffer buffer = freelist[size_class].back();
     assert(buffer.class_size = class_max_size(size_class));
     freelist[size_class].pop_back();
