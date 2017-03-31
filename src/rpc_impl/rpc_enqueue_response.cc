@@ -25,12 +25,12 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
       break;
     case ReqFuncType::kFgNonterminal:
       /*
-       * Response enqueued before or after the request handler returns, and the
-       * event loop will bury or has buried the rx_msgbuf.
+       * Response enqueued before (or after) the request handler returns, and
+       * the event loop will bury or (has buried) rx_msgbuf.
        */
       break;
     case ReqFuncType::kBackground:
-      /* We allocated a dynamic rx_msgbuf. We'll free it below. */
+      /* Background threads can't bury, so we'll bury rx_msgbuf below. */
       assert(rx_msgbuf->buf != nullptr && rx_msgbuf->is_dynamic() &&
              rx_msgbuf->check_magic());
       break;
