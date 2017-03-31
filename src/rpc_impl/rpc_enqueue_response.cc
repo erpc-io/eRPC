@@ -56,7 +56,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
   resp_pkthdr_0->req_type = sslot->rx_msgbuf_saved.req_type;
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
-  resp_pkthdr_0->rem_session_num = session->remote_session_num;
+  resp_pkthdr_0->dest_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
 
   if (small_rpc_likely(sslot->req_func_type == ReqFuncType::kFgTerminal)) {

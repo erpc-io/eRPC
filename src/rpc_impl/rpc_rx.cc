@@ -18,7 +18,7 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize); /* msg_size can be 0 here */
 
-    uint16_t session_num = pkthdr->rem_session_num; /* Local session */
+    uint16_t session_num = pkthdr->dest_session_num; /* The local session */
     assert(session_num < session_vec.size());
 
     Session *session = session_vec[session_num];

@@ -52,7 +52,7 @@ static std::string pkt_type_str(uint64_t pkt_type) {
 struct pkthdr_t {
   uint64_t req_type : 8;             ///< RPC request type
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
-  uint64_t rem_session_num : 16;     ///< Session number of the remote session
+  uint64_t dest_session_num : 16;    ///< Session number of the destination
   uint64_t pkt_type : 2;             ///< The packet type
   /// 1 if this packet is unexpected. This can be computed using other fields,
   /// but it's useful to have it separately.
@@ -69,7 +69,7 @@ struct pkthdr_t {
     std::ostringstream ret;
 
     ret << "[type " << pkt_type_str(pkt_type) << ", "
-        << "rem session " << rem_session_num << ", "
+        << "dest session " << dest_session_num << ", "
         << "req " << req_num << ", "
         << "pkt " << pkt_num << ", "
         << "fgt_resp " << fgt_resp << ", "

@@ -16,7 +16,7 @@ void Rpc<TTr>::send_credit_return_now_st(Session *session,
   pkthdr_t cr_pkthdr = *unexp_pkthdr;
   // cr_pkthdr.req_type = pkthdr->req_type;
   cr_pkthdr.msg_size = 0;
-  cr_pkthdr.rem_session_num = session->remote_session_num;
+  cr_pkthdr.dest_session_num = session->remote_session_num;
   cr_pkthdr.pkt_type = kPktTypeCreditReturn;
   cr_pkthdr.is_unexp = 0; /* All credit returns are Expected */
   cr_pkthdr.fgt_resp = 0; /* A credit return is not a response */
