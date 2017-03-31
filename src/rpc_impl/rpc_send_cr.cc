@@ -18,8 +18,8 @@ void Rpc<TTr>::send_credit_return_now_st(Session *session,
   cr_pkthdr.msg_size = 0;
   cr_pkthdr.dest_session_num = session->remote_session_num;
   cr_pkthdr.pkt_type = kPktTypeCreditReturn;
-  cr_pkthdr.is_unexp = 0; /* All credit returns are Expected */
-  cr_pkthdr.fgt_resp = 0; /* A credit return is not a response */
+  cr_pkthdr.is_unexp = 0;  // All credit returns are Expected
+  cr_pkthdr.fgt_resp = 0;  // A credit return is not a response
 
   // cr_pkthdr.pkt_num = pkthdr->pkt_num;
   // cr_pkthdr.req_num = pkthdr->req_num;
@@ -29,7 +29,7 @@ void Rpc<TTr>::send_credit_return_now_st(Session *session,
   MsgBuffer cr_msgbuf = MsgBuffer((uint8_t *)&cr_pkthdr, 0);
   cr_msgbuf.pkts_queued = 1;
 
-  assert(tx_batch_i == 0); /* tx_batch_i is 0 outside rpx_tx.cc */
+  assert(tx_batch_i == 0);  // tx_batch_i is 0 outside rpx_tx.cc
   tx_burst_item_t &item = tx_burst_arr[0];
   item.routing_info = session->remote_routing_info;
   item.msg_buffer = &cr_msgbuf;

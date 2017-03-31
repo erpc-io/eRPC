@@ -5,10 +5,10 @@ namespace ERpc {
 template <class TTr>
 void Rpc<TTr>::process_dpath_txq_st() {
   assert(in_creator());
-  size_t write_index = 0; /* Re-add incomplete sslots at this index */
+  size_t write_index = 0;  // Re-add incomplete sslots at this index
   tx_batch_i = 0;
 
-  /* Prevent background threads from enqueueing while processing the queue */
+  // Prevent background threads from enqueueing while processing the queue
   lock_cond(&dpath_txq_lock);
 
   for (size_t i = 0; i < dpath_txq.size(); i++) {
@@ -23,7 +23,7 @@ void Rpc<TTr>::process_dpath_txq_st() {
     assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
     assert(tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 
-    pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0(); /* Debug-only */
+    pkthdr_t *pkthdr_0 = tx_msgbuf->get_pkthdr_0();  // Debug-only
     _unused(pkthdr_0);
 
     if (session->is_client()) {
@@ -33,21 +33,21 @@ void Rpc<TTr>::process_dpath_txq_st() {
     }
 
     if (small_rpc_likely(tx_msgbuf->num_pkts == 1)) {
-      /* Optimize for small/credit-return messages that fit in one packet */
+      // Optimize for small/credit-return messages that fit in one packet
       process_dpath_txq_small_msg_one_st(session, tx_msgbuf);
     } else {
       process_dpath_txq_large_msg_one_st(session, tx_msgbuf);
     }
 
-    /* Sslots that still need TX stay in the queue */
+    // Sslots that still need TX stay in the queue
     if (tx_msgbuf->pkts_queued != tx_msgbuf->num_pkts) {
       assert(write_index < dpath_txq.size());
       dpath_txq[write_index++] = sslot;
     }
   }
 
-  dpath_txq.resize(write_index); /* Number of sslots left = write_index */
-  unlock_cond(&dpath_txq_lock);  /* Re-allow bg threads to enqueue sslots */
+  dpath_txq.resize(write_index);  // Number of sslots left = write_index
+  unlock_cond(&dpath_txq_lock);   // Re-allow bg threads to enqueue sslots
 
   if (tx_batch_i > 0) {
     transport->tx_burst(tx_burst_arr, tx_batch_i);
@@ -58,7 +58,7 @@ void Rpc<TTr>::process_dpath_txq_st() {
 template <class TTr>
 void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
                                                   MsgBuffer *tx_msgbuf) {
-  assert(in_creator()); /* Only creator runs event loop */
+  assert(in_creator());  // Only creator runs event loop
   assert(tx_msgbuf->num_pkts == 1 && tx_msgbuf->pkts_queued == 0);
   assert(tx_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
@@ -66,16 +66,14 @@ void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
   bool is_unexp = (pkthdr_0->is_unexp == 1);
 
   if (is_unexp) {
-    /* Well-structured app code should avoid exhausting credits */
+    // Well-structured app code should avoid exhausting credits
     if (likely(session->remote_credits > 0 && unexp_credits > 0)) {
       session->remote_credits--;
       unexp_credits--;
     } else {
-      /*
-       * We cannot make progress if the packet is Unexpected and we're out of
-       * either session or Unexpected window credits. In this case, caller will
-       * upsert session to the TX work queue.
-       */
+      // We cannot make progress if the packet is Unexpected and we're out of
+      // either session or Unexpected window credits. In this case, caller will
+      // re-insert the sslot to the TX queue.
       if (session->remote_credits == 0) {
         dpath_stat_inc(&session->dpath_stats.remote_credits_exhaused);
       }
@@ -87,7 +85,7 @@ void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
     }
   }
 
-  /* If we're here, we're going to enqueue this message for tx_burst */
+  // If we're here, we're going to enqueue this message for tx_burst
   tx_msgbuf->pkts_queued = 1;
 
   assert(tx_batch_i < TTr::kPostlist);
@@ -103,7 +101,7 @@ void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
                 session->local_session_num);
 
   if (tx_batch_i == TTr::kPostlist) {
-    /* This will increment tx_msgbuf's pkts_sent and data_sent */
+    // This will increment tx_msgbuf's pkts_sent and data_sent
     transport->tx_burst(tx_burst_arr, TTr::kPostlist);
     tx_batch_i = 0;
   }
@@ -116,51 +114,47 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
   assert(tx_msgbuf->num_pkts > 1 &&
          tx_msgbuf->pkts_queued < tx_msgbuf->num_pkts);
 
-  /* A multi-packet message cannot be a credit return */
+  // A multi-packet message cannot be a credit return
   uint64_t pkt_type = tx_msgbuf->get_pkt_type();
   assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeResp);
 
-  size_t pkts_pending = tx_msgbuf->num_pkts - tx_msgbuf->pkts_queued; /* >= 1 */
+  size_t pkts_pending = tx_msgbuf->num_pkts - tx_msgbuf->pkts_queued;  // >= 1
   const size_t min_of_credits =
       std::min(session->remote_credits, unexp_credits);
 
-  /* The number of packets (Expected or Unexpected) that we will send */
+  // The number of packets (Expected or Unexpected) that we will send
   size_t now_sending = 0;
   size_t available_credits = min_of_credits;
 
-  /*
-   * It's possible to compute now_sending in O(1), but it's more complicated.
-   * This is O(1) per packet sent, and uses header info filled in by
-   * enqueue_request() or enqueue_response().
-   */
+  // It's possible to compute now_sending in O(1), but it's more complicated.
+  // This is O(1) per packet sent, and uses header info filled in by
+  // enqueue_request() or enqueue_response().
   for (size_t i = tx_msgbuf->pkts_queued; i < tx_msgbuf->num_pkts; i++) {
     pkthdr_t *pkthdr_i =
         i == 0 ? tx_msgbuf->get_pkthdr_0() : tx_msgbuf->get_pkthdr_n(i);
 
     if (pkthdr_i->is_unexp == 0) {
-      /* Expected packets don't need credits */
+      // Expected packets don't need credits
       now_sending++;
     } else {
       if (available_credits > 0) {
         now_sending++;
         available_credits--;
 
-        /* Update credits tracking */
+        // Update credits tracking
         session->remote_credits--;
         unexp_credits--;
       } else {
-        /*
-         * We cannot send this packet, so we're done. There are no more
-         * Expected packets in this message. (Even if there were Expected
-         * packets, we wouldn't send them out of order.)
-         */
+        // We cannot send this packet, so we're done. There are no more
+        // expected packets in this message. (Even if there were more Expected
+        // packets, we wouldn't send them out of order.)
         break;
       }
     }
   }
 
   if (now_sending == 0) {
-    /* This can happen too frequently, so don't print a message here */
+    // This can happen too frequently, so don't print a message here
     assert(min_of_credits == 0);
 
     if (session->remote_credits == 0) {
@@ -188,7 +182,7 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
     item.data_bytes =
         std::min(tx_msgbuf->data_size - item.offset, TTr::kMaxDataPerPkt);
 
-    /* If we're here, we will enqueue all/part of tx_msgbuf for tx_burst */
+    // If we're here, we will enqueue all/part of tx_msgbuf for tx_burst
     tx_msgbuf->pkts_queued++;
 
     tx_batch_i++;
