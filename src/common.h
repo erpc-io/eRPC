@@ -62,7 +62,7 @@ static constexpr bool kDatapathChecks = true;
     }                             \
   } while (0)
 
-#define _unused(x) ((void)(x)) /* Make production build happy */
+#define _unused(x) ((void)(x))  // Make production build happy
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
@@ -82,12 +82,10 @@ static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
 
 /// UDP config used throughout eRPC
 struct udp_config_t {
-  /*
-   * The UDP port used by all Nexus-es in the cluster to listen on for
-   * session management
-   */
+  //  The UDP port used by all Nexus-es in the cluster to listen on for
+  // session management
   uint16_t mgmt_udp_port;
-  double drop_prob; /* Used to add packet loss to UDP traffic */
+  double drop_prob;  // Used to add packet loss to UDP traffic
 
   udp_config_t(uint16_t mgmt_udp_port, double drop_prob)
       : mgmt_udp_port(mgmt_udp_port), drop_prob(drop_prob) {}
@@ -104,7 +102,7 @@ static constexpr size_t kHugepageSize = (2 * 1024 * 1024);  ///< Hugepage size
 static constexpr size_t kMaxPhyPorts = 16;      ///< Max fabric device ports
 static constexpr size_t kMaxHostnameLen = 128;  ///< Max hostname length
 static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
-    (240 + kMaxHostnameLen * 2);           /* Three lines and two hostnames */
+    (240 + kMaxHostnameLen * 2);           // Three lines and two hostnames
 
 // Simple methods
 

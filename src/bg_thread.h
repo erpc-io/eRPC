@@ -18,7 +18,7 @@ class BgWorkItem {
 
   /// App TID of the Rpc that submitted this request. Debug-only.
   const uint8_t app_tid;
-  void *context;          ///< The context to use for request handler
+  void *context;  ///< The context to use for request handler
   SSlot *sslot;
 };
 
@@ -47,7 +47,7 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     MtList<BgWorkItem> &req_list = bg_thread_ctx->bg_req_list;
 
     if (req_list.size == 0) {
-      /* Try again later */
+      // Try again later
       usleep(1);
       continue;
     }
@@ -56,19 +56,19 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     assert(req_list.size > 0);
 
     for (BgWorkItem bg_work_item : req_list.list) {
-      uint8_t app_tid = bg_work_item.app_tid; /* Debug-only */
-      void *context = bg_work_item.context;   /* The app's context */
+      uint8_t app_tid = bg_work_item.app_tid;  // Debug-only
+      void *context = bg_work_item.context;    // The app's context
       SSlot *sslot = bg_work_item.sslot;
-      Session *session = sslot->session; /* Debug-only */
+      Session *session = sslot->session;  // Debug-only
       _unused(app_tid);
       _unused(session);
 
-      /* Sanity-check rx_msgbuf. It must use dynamic memory allocation. */
+      // Sanity-check rx_msgbuf. It must use dynamic memory allocation.
       assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
       assert(sslot->rx_msgbuf.is_dynamic());
       assert(sslot->rx_msgbuf.is_req());
 
-      assert(sslot->tx_msgbuf == nullptr); /* Sanity-check tx_msgbuf */
+      assert(sslot->tx_msgbuf == nullptr);  // Sanity-check tx_msgbuf
 
       dpath_dprintf(
           "eRPC Background: Background thread %zu running request "
@@ -78,13 +78,11 @@ static void bg_thread_func(BgThreadCtx *bg_thread_ctx) {
 
       uint8_t req_type = sslot->rx_msgbuf.get_req_type();
       const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);
-      assert(req_func.is_registered()); /* Checked during submit_bg */
+      assert(req_func.is_registered());  // Checked during submit_bg
 
-      /*
-       * We don't have access to the Rpc object: it's templated and we don't
-       * want a templated Nexus. So, rx_msgbuf will be buried when the user
-       * calls enqueue_response().
-       */
+      // We don't have access to the Rpc object: it's templated and we don't
+      // want a templated Nexus. So, rx_msgbuf will be buried when the user
+      // calls enqueue_response().
       req_func.req_func((ReqHandle *)sslot, &sslot->rx_msgbuf, context);
     }
 
