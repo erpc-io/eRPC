@@ -27,7 +27,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     assert(session->is_client());
     assert(session->is_connected());
     assert(req_msgbuf != nullptr);
-    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
+    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic() &&
+           req_msgbuf->is_dynamic());
     assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
     assert(req_msgbuf->num_pkts > 0);
   } else {
@@ -42,7 +43,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
 
     if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
-                 !req_msgbuf->check_magic())) {
+                 !req_msgbuf->check_magic() || !req_msgbuf->is_dynamic())) {
       unlock_cond(&session->lock);
       return -EINVAL;
     }

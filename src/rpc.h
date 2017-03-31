@@ -89,7 +89,7 @@ class Rpc {
   inline MsgBuffer alloc_msg_buffer(size_t max_data_size) {
     size_t max_num_pkts;
 
-    /* Avoid division for small packets */
+    // Avoid division for small packets
     if (small_rpc_likely(max_data_size <= TTr::kMaxDataPerPkt)) {
       max_num_pkts = 1;
     } else {
@@ -122,7 +122,7 @@ class Rpc {
 
     size_t new_num_pkts;
 
-    /* Avoid division for small packets */
+    // Avoid division for small packets
     if (small_rpc_likely(new_data_size <= TTr::kMaxDataPerPkt)) {
       new_num_pkts = 1;
     } else {
@@ -227,15 +227,10 @@ class Rpc {
   /// Release a response received at a client
   inline void release_respone(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
-
     SSlot *sslot = (SSlot *)resp_handle;
-    assert(sslot->tx_msgbuf == nullptr); /* Freed before calling continuation */
 
-    /*
-     * Bury the possibly-dynamic response MsgBuffer (rx_msgbuf). If we used
-     * pre_resp_msgbuf in the continuation, this is still OK and sufficient.
-     */
-    bury_sslot_rx_msgbuf(sslot);
+    // tx_msgbuf was freed before calling the continuation
+    assert(sslot->tx_msgbuf == nullptr);
 
     Session *session = sslot->session;
     assert(session->is_client());
@@ -436,16 +431,14 @@ class Rpc {
   inline void bury_sslot_tx_msgbuf(SSlot *sslot) {
     assert(sslot != nullptr);
 
-    /*
-     * The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
-     * Its buf can be non-NULL even when dynamic allocation is not used.
-     */
+    // The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
+    // Its buf can be non-NULL even when dynamic allocation is not used.
     MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
     if (small_rpc_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
-      /* This check is OK, as dynamic sslots must be initialized */
+      // This check is OK, as dynamic sslots must be initialized
       assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
       free_msg_buffer(*tx_msgbuf);
-      /* Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf */
+      // Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf
     }
 
     sslot->tx_msgbuf = nullptr;
@@ -473,13 +466,11 @@ class Rpc {
   inline void bury_sslot_rx_msgbuf(SSlot *sslot) {
     assert(sslot != nullptr);
 
-    /*
-     * The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
-     * Its buf can be non-NULL even when dynamic allocation is not used.
-     */
+    // The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
+    // Its buf can be non-NULL even when dynamic allocation is not used.
     MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
     if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
-      /* This check is OK, as dynamic sslots must be initialized */
+      // This check is OK, as dynamic sslots must be initialized
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);
       rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
@@ -490,14 +481,11 @@ class Rpc {
 
   /**
    * @brief Bury a session slot's RX MsgBuffer without freeing possibly
-   * dynamically allocated memory.
-   *
-   * This is used for burying the fake RX MsgBuffer used for holding requests
-   * at the server for foreground handlers.
+   * dynamically allocated memory. This is used for burying fake RX MsgBuffers.
    */
   static inline void bury_sslot_rx_msgbuf_nofree(SSlot *sslot) {
     assert(sslot != nullptr);
-    assert(!sslot->rx_msgbuf.is_dynamic()); /* It's fake */
+    assert(!sslot->rx_msgbuf.is_dynamic());  // It's fake
     sslot->rx_msgbuf.buf = nullptr;
   }
 
@@ -574,7 +562,7 @@ class Rpc {
   bool testing_fail_resolve_remote_rinfo_client = false;
 };
 
-/* Instantiate required Rpc classes so they get compiled for the linker */
+// Instantiate required Rpc classes so they get compiled for the linker
 template class Rpc<IBTransport>;
 
 }  // End ERpc

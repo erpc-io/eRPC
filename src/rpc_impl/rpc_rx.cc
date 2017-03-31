@@ -16,9 +16,9 @@ void Rpc<TTr>::process_comps_st() {
 
     const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
     assert(pkthdr->check_magic());
-    assert(pkthdr->msg_size <= kMaxMsgSize); /* msg_size can be 0 here */
+    assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
-    uint16_t session_num = pkthdr->dest_session_num; /* The local session */
+    uint16_t session_num = pkthdr->dest_session_num;  // The local session
     assert(session_num < session_vec.size());
 
     Session *session = session_vec[session_num];
@@ -38,18 +38,18 @@ void Rpc<TTr>::process_comps_st() {
       continue;
     }
 
-    /* If we are here, we have a valid packet for a connected session */
+    // If we are here, we have a valid packet for a connected session
     dpath_dprintf("eRPC Rpc %u: Received packet %s.\n", app_tid,
                   pkthdr->to_string().c_str());
 
-    /* All Expected packets are session/window credit returns, and vice versa */
+    // All Expected packets are session/window credit returns, and vice versa
     if (pkthdr->is_unexp == 0) {
       assert(unexp_credits < kRpcUnexpPktWindow);
       assert(session->remote_credits < Session::kSessionCredits);
       unexp_credits++;
       session->remote_credits++;
 
-      /* Nothing more to do for credit returns - process other packets */
+      // Nothing more to do for credit returns - process other packets
       if (pkthdr->is_credit_return()) {
         continue;
       }
@@ -58,34 +58,32 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->is_req() || pkthdr->is_resp());
 
     if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
-      /* Optimize for when the received packet is a single-packet message */
+      // Optimize for when the received packet is a single-packet message
       process_comps_small_msg_one_st(session, pkt);
     } else {
       process_comps_large_msg_one_st(session, pkt);
     }
   }
 
-  /*
-   * Technically, these RECVs can be posted immediately after rx_burst(), or
-   * even in the rx_burst() code.
-   */
+  // Technically, these RECVs can be posted immediately after rx_burst(), or
+  // even in the rx_burst() code.
   transport->post_recvs(num_pkts);
 }
 
 template <class TTr>
 void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
                                               const uint8_t *pkt) {
-  assert(in_creator()); /* Only creator runs event loop */
+  assert(in_creator());
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
 
-  const pkthdr_t *pkthdr = (pkthdr_t *)pkt; /* A valid packet header */
+  const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
   assert(pkthdr->pkt_num == 0);
-  assert(pkthdr->msg_size > 0 && /* Credit returns already handled */
+  assert(pkthdr->msg_size > 0 &&  // Credit returns already handled
          pkthdr->msg_size <= TTr::kMaxDataPerPkt);
   assert(pkthdr->is_req() || pkthdr->is_resp());
 
-  /* Extract packet header fields */
+  // Extract packet header fields
   uint8_t req_type = pkthdr->req_type;
   size_t req_num = pkthdr->req_num;
   size_t msg_size = pkthdr->msg_size;
@@ -100,25 +98,19 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     return;
   }
 
-  /*
-   * Send a credit return if needed.
-   *
-   * For small messages, explicit credit return packets are sent if the
-   * request handler is not foreground-terminal.
-   */
+  // Send a credit return if needed.
+  // For small messages, explicit credit return packets are sent if the
+  // request handler is not foreground-terminal.
   if (small_rpc_unlikely((is_req && !req_func.is_fg_terminal()) ||
                          (!is_req && pkthdr->fgt_resp == 0))) {
     send_credit_return_now_st(session, pkthdr);
   }
 
-  /* Create the RX MsgBuffer in the message's session slot */
-  size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
+  // Create the RX MsgBuffer in the message's session slot
+  size_t sslot_i = req_num % Session::kSessionReqWindow;  // Bit shift
   SSlot &sslot = session->sslot_arr[sslot_i];
 
-  /*
-   * The RX MsgBuffer stored previously in this slot was buried earlier: The
-   * server (client) buried it after the request (response) handler returned.
-   */
+  // The RX MsgBuffer stored previously in this slot was buried earlier
   assert(sslot.rx_msgbuf.buf == nullptr);
   assert(sslot.rx_msgbuf.buffer.buf == nullptr);
 
@@ -126,36 +118,34 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     // Handle a single-packet request message
     assert(session->is_server());
 
-    /* Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf) */
+    // Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf)
     bury_sslot_tx_msgbuf(&sslot);
 
-    /* Remember request metadata for enqueue_response() */
+    // Remember request metadata for enqueue_response()
     sslot.req_func_type = req_func.req_func_type;
     sslot.rx_msgbuf_saved.req_type = req_type;
     sslot.rx_msgbuf_saved.req_num = req_num;
 
     if (small_rpc_likely(!req_func.is_background())) {
-      /* Create a "fake" static MsgBuffer for the foreground handler */
+      // Create a "fake" static MsgBuffer for the foreground handler
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
 
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
       bury_sslot_rx_msgbuf_nofree(&sslot);
 
-      /* If req_func is fg terminal, it must have called enqueue_response() */
+      // If req_func is fg terminal, it must have called enqueue_response()
       if (req_func.req_func_type == ReqFuncType::kFgTerminal) {
         assert(sslot.tx_msgbuf != nullptr);
       }
       return;
     } else {
-      /*
-       * For background request handlers, copy the request MsgBuffer. rx_msgbuf
-       * will be freed on enqueue_response().
-       */
+      // For background request handlers, copy the request MsgBuffer. rx_msgbuf
+      // will be freed on enqueue_response().
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
       memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
              msg_size + sizeof(pkthdr_t));
 
-      /* Check the copy */
+      // Check the copy
       assert(sslot.rx_msgbuf.is_req());
       assert(sslot.rx_msgbuf.get_req_type() == req_type);
       assert(sslot.rx_msgbuf.get_req_num() == req_num);
@@ -167,42 +157,41 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     // Handle a single-packet response message
     assert(session->is_client());
 
-    /* Sanity-check the user's request MsgBuffer. This always has a Buffer. */
+    // Sanity-check the user's request MsgBuffer. This is always dynamic.
     const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
     assert(req_msgbuf != nullptr);
-    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
+    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic() &&
+           req_msgbuf->is_dynamic());
     assert(req_msgbuf->is_req());
     assert(req_msgbuf->get_req_num() == req_num);
     assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 
-    /* Use pre_resp_msgbuf as the response MsgBuffer */
-    sslot.pre_resp_msgbuf.resize(msg_size, 1);
-    memcpy((char *)sslot.pre_resp_msgbuf.get_pkthdr_0(), pkt,
-           msg_size + sizeof(pkthdr_t));
-    sslot.pre_resp_msgbuf.pkts_rcvd = 1;
-
-    /* Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory */
+    // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
-    sslot.cont_func((RespHandle *)&sslot, &sslot.pre_resp_msgbuf, context,
-                    sslot.tag);
+
+    // Create a "fake" static MsgBuffer for the foreground continuation
+    sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
+    sslot.cont_func((RespHandle *)&sslot, &sslot.rx_msgbuf, context, sslot.tag);
+    bury_sslot_rx_msgbuf_nofree(&sslot);
+
     return;
   }
 }
 
-/* This function is for large messages, so don't use small_rpc_likely() */
+// This function is for large messages, so don't use small_rpc_likely()
 template <class TTr>
 void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
                                               const uint8_t *pkt) {
-  assert(in_creator()); /* Only creator runs event loop */
+  assert(in_creator());
   assert(session != nullptr && session->is_connected());
   assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
 
-  const pkthdr_t *pkthdr = (pkthdr_t *)pkt;       /* A valid packet header */
-  assert(pkthdr->msg_size > TTr::kMaxDataPerPkt); /* Multi-packet */
-  assert(pkthdr->is_req() || pkthdr->is_resp());  /* Credit returns are small */
+  const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
+  assert(pkthdr->msg_size > TTr::kMaxDataPerPkt);  // Multi-packet
+  assert(pkthdr->is_req() || pkthdr->is_resp());   // Credit returns are small
 
-  /* Extract packet header fields */
+  // Extract packet header fields
   uint8_t req_type = pkthdr->req_type;
   size_t req_num = pkthdr->req_num;
   size_t msg_size = pkthdr->msg_size;
@@ -218,15 +207,13 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     return;
   }
 
-  /*
-   * Send a credit return if needed. For large messages, explicit credit return
-   * packets for are sent in the following cases:
-   *
-   * 1. Background request handler: All packets
-   * 2. Foreground request handler:
-   *   1a. Non-last request packets
-   *   1b. Non-first response packets
-   */
+  // Send a credit return if needed. For large messages, explicit credit return
+  // packets for are sent in the following cases:
+  //
+  // 1. Background request handler: All packets
+  // 2. Foreground request handler:
+  //   1a. Non-last request packets
+  //   1b. Non-first response packets
   bool is_req_handler_bg = (is_req && req_func.is_background()) ||
                            (!is_req && pkthdr->fgt_resp == 0);
 
@@ -237,20 +224,20 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
   if (is_req_handler_bg || (pkthdr->is_req() && !is_last) ||
       (pkthdr->is_resp() && pkt_num != 0)) {
     send_credit_return_now_st(session, pkthdr);
-    /* Continue processing */
+    // Continue processing
   }
 
-  size_t sslot_i = req_num % Session::kSessionReqWindow; /* Bit shift */
+  size_t sslot_i = req_num % Session::kSessionReqWindow;  // Bit shift
   SSlot &sslot = session->sslot_arr[sslot_i];
   MsgBuffer &rx_msgbuf = sslot.rx_msgbuf;
 
-  /* Basic checks */
+  // Basic checks
   if (is_req) {
     assert(session->is_server());
   } else {
     assert(session->is_client());
 
-    /* Sanity-check the request MsgBuffer, which may be statically allocated */
+    // Sanity-check the request MsgBuffer, which may be statically allocated
     const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
     _unused(req_msgbuf);
     assert(req_msgbuf != nullptr);
@@ -262,17 +249,14 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
   }
 
   if (rx_msgbuf.buf == nullptr) {
-    /*
-     * This is the first time that we have received a message for this packet.
-     * (This may not be the zeroth packet of the message due to reordering.)
-     *
-     * The RX MsgBuffer stored previously in this slot was buried earlier: The
-     * server (client) buried it after the request (response) handler returned.
-     */
+    // This is the first time that we have received a packet for this message.
+    // (This may not be the zeroth packet of the message due to reordering.)
+    //
+    // The RX MsgBuffer stored previously in this slot was buried earlier.
     assert(rx_msgbuf.buffer.buf == nullptr);
 
     if (pkthdr->is_req()) {
-      /* Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf) */
+      // Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf)
       bury_sslot_tx_msgbuf(&sslot);
     }
 
@@ -286,17 +270,13 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     rx_msgbuf = alloc_msg_buffer(msg_size);
     rx_msgbuf.pkts_rcvd = 1;
 
-    /*
-     * Store the received packet header into the zeroth rx_msgbuf packet header.
-     * It's possible to copy fewer fields, but copying pkthdr_t is cheap.
-     */
+    // Store the received packet header into the zeroth rx_msgbuf packet header.
+    // It's possible to copy fewer fields, but copying pkthdr_t is cheap.
     *(rx_msgbuf.get_pkthdr_0()) = *pkthdr;
     rx_msgbuf.get_pkthdr_0()->pkt_num = 0;
   } else {
-    /*
-     * This is not the 1st packet received for this message, so we have a valid,
-     * dynamically-allocated RX MsgBuffer.
-     */
+    // This is not the 1st packet received for this message, so we have a valid,
+    // dynamically-allocated RX MsgBuffer.
     assert(rx_msgbuf.buf != nullptr);
     assert(rx_msgbuf.is_dynamic() && rx_msgbuf.check_magic());
     assert(rx_msgbuf.get_req_type() == req_type);
@@ -306,22 +286,20 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     rx_msgbuf.pkts_rcvd++;
   }
 
-  /*
-   * Copy the received packet's data only. The message's common packet header
-   * was copied to rx_msgbuf.pkthdr_0 earlier.
-   */
-  size_t offset = pkt_num * TTr::kMaxDataPerPkt; /* rx_msgbuf offset */
+  // Copy the received packet's data only. The message's common packet header
+  // was copied to rx_msgbuf.pkthdr_0 earlier.
+  size_t offset = pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
   size_t bytes_to_copy = is_last ? (msg_size - offset) : TTr::kMaxDataPerPkt;
   assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
   memcpy((char *)&rx_msgbuf.buf[offset], (char *)(pkt + sizeof(pkthdr_t)),
          bytes_to_copy);
 
-  /* Check if we need to invoke the app handler */
+  // Check if we need to invoke the app handler
   if (rx_msgbuf.pkts_rcvd != pkts_expected) {
     return;
   }
 
-  /* If we're here, we received all packets of this message */
+  // If we're here, we received all packets of this message
   if (pkthdr->is_req()) {
     sslot.req_func_type = req_func.req_func_type;
     sslot.rx_msgbuf_saved.req_type = req_type;
@@ -331,24 +309,23 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
       bury_sslot_rx_msgbuf(&sslot);
 
-      /* If req_func is fg terminal, it must have called enqueue_response() */
+      // If req_func is fg terminal, it must have called enqueue_response()
       if (req_func.req_func_type == ReqFuncType::kFgTerminal) {
         assert(sslot.tx_msgbuf != nullptr);
       }
 
       return;
     } else {
-      /*
-       * rx_msgbuf is not backed by RX ring buffers, so don't create a new
-       * MsgBuffer. rx_msgbuf will be freed on enqueue_response().
-       */
+      // rx_msgbuf here is not backed by RX ring buffers, so don't create a new
+      // MsgBuffer. rx_msgbuf will be freed on enqueue_response().
       submit_background_st(&sslot);
       return;
     }
   } else {
-    /* Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory */
+    // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
     sslot.cont_func((RespHandle *)&sslot, &sslot.rx_msgbuf, context, sslot.tag);
+    bury_sslot_rx_msgbuf(&sslot);  // Free the dynamic response MsgBuffer
     return;
   }
 }
@@ -358,17 +335,17 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot) {
   assert(sslot != nullptr);
   assert(sslot->session != nullptr && sslot->session->is_server());
 
-  /* rx_msgbuf (request) must be valid, and tx_msgbuf (response) invalid */
+  // rx_msgbuf (request) must be valid, and tx_msgbuf (response) invalid
   assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
   assert(sslot->tx_msgbuf == nullptr);
 
   assert(nexus->num_bg_threads > 0);
 
-  /* Choose a background thread at random */
+  // Choose a background thread at random
   size_t bg_thread_id = fast_rand.next_u32() % nexus->num_bg_threads;
   MtList<BgWorkItem> *req_list = nexus_hook.bg_req_list_arr[bg_thread_id];
 
-  /* Thread-safe */
+  // Thread-safe
   req_list->unlocked_push_back(BgWorkItem(app_tid, context, sslot));
 }
 
