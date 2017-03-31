@@ -16,7 +16,8 @@ class BgWorkItem {
   BgWorkItem(uint8_t app_tid, void *context, SSlot *sslot)
       : app_tid(app_tid), context(context), sslot(sslot) {}
 
-  const uint8_t app_tid;  ///< TID of the Rpc that submitted this request
+  /// App TID of the Rpc that submitted this request. Debug-only.
+  const uint8_t app_tid;
   void *context;          ///< The context to use for request handler
   SSlot *sslot;
 };
