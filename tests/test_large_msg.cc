@@ -228,8 +228,8 @@ void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
 
     for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
       /* Enqueue as many requests as this session allows */
-      for (size_t crd_i = 0; crd_i < Session::kSessionReqWindow; crd_i++) {
-        size_t req_i = (sess_i * Session::kSessionReqWindow) + crd_i;
+      for (size_t w_i = 0; w_i < Session::kSessionReqWindow; w_i++) {
+        size_t req_i = (sess_i * Session::kSessionReqWindow) + w_i;
         assert(req_i < tot_reqs_per_iter);
 
         size_t req_len = pick_large_msg_size((AppContext *)&context);
@@ -319,8 +319,8 @@ void memory_leak(Nexus *nexus, size_t num_sessions) {
 
     for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
       /* Enqueue as many requests as this session allows */
-      for (size_t crd_i = 0; crd_i < Session::kSessionReqWindow; crd_i++) {
-        size_t req_i = (sess_i * Session::kSessionReqWindow) + crd_i;
+      for (size_t w_i = 0; w_i < Session::kSessionReqWindow; w_i++) {
+        size_t req_i = (sess_i * Session::kSessionReqWindow) + w_i;
         assert(req_i < tot_reqs_per_iter);
 
         size_t req_len = pick_large_msg_size((AppContext *)&context);
