@@ -4,16 +4,20 @@
  */
 #include "test_basics.h"
 
-static constexpr size_t kNumReqs = 100;
-static_assert(kNumReqs > Session::kSessionReqWindow, "");
+static constexpr size_t kAppNumReqs = 10000;
+static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
 union tag_t {
   struct {
-    uint32_t size;
+    uint32_t req_size;
     uint32_t msgbuf_i;
   };
-  size_t _tag;
+  size_t tag;
+  tag_t(uint32_t req_size, uint32_t msgbuf_i)
+      : req_size(req_size), msgbuf_i(msgbuf_i) {}
+  tag_t(size_t tag) : tag(tag) {}
 };
+static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
 /// Per-thread application context
 class AppContext : public BasicAppContext {
@@ -65,22 +69,25 @@ void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
 }
 
 void cont_func(RespHandle *, const MsgBuffer *, void *, size_t);  // Fwd decl
-void enqueue_requests_helper(AppContext *context, size_t num_reqs) {
-  for (size_t i = 0; i < num_reqs; i++) {
-    size_t msgbuf_i = context->num_reqs_sent % Session::kSessionReqWindow;
 
-    size_t req_size = get_rand_msg_size(context);
-    test_printf("Client: Sending request %zu of size %zu\n",
-                context->num_reqs_sent, req_size);
+/// Enqueue a request using the request MsgBuffer with index = msgbuf_i
+void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
+  assert(context != nullptr && msgbuf_i < Session::kSessionReqWindow);
 
-    context->rpc->resize_msg_buffer(&context->req_msgbuf[msgbuf_i], req_size);
-    int ret = context->rpc->enqueue_request(
-        context->session_num_arr[0], kAppReqType,
-        &context->req_msgbuf[msgbuf_i], cont_func, req_size);
+  size_t req_size = get_rand_msg_size(context);
+  context->rpc->resize_msg_buffer(&context->req_msgbuf[msgbuf_i], req_size);
 
-    context->num_reqs_sent++;
-    ASSERT_EQ(ret, 0);
-  }
+  tag_t tag((uint32_t)req_size, (uint32_t)msgbuf_i);  // Construct tag
+
+  test_printf("Client: Sending request %zu of size %zu\n",
+              context->num_reqs_sent, req_size);
+
+  int ret = context->rpc->enqueue_request(
+      context->session_num_arr[0], kAppReqType, &context->req_msgbuf[msgbuf_i],
+      cont_func, tag.tag);
+
+  context->num_reqs_sent++;
+  ASSERT_EQ(ret, 0);
 }
 
 void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
@@ -96,13 +103,13 @@ void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
   test_printf("Client: Received response %zu of length %zu.\n",
               context->num_rpc_resps, (char *)resp_msgbuf->get_data_size());
 
-  ASSERT_EQ(resp_msgbuf->get_data_size(), tag);
+  ASSERT_EQ(resp_msgbuf->get_data_size(), ((tag_t)tag).req_size);
 
   context->num_rpc_resps++;
   context->rpc->release_respone(resp_handle);
 
-  if (context->num_rpc_resps < kNumReqs) {
-    enqueue_requests_helper(context, 1);
+  if (context->num_rpc_resps < kAppNumReqs) {
+    enqueue_request_helper(context, ((tag_t)tag).msgbuf_i);
   }
 }
 
@@ -113,17 +120,16 @@ void client_thread(Nexus *nexus, size_t num_sessions = 1) {
 
   Rpc<IBTransport> *rpc = context.rpc;
 
+  // Start by filling the request window
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     context.req_msgbuf[i] =
         rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
     ASSERT_NE(context.req_msgbuf[i].buf, nullptr);
+    enqueue_request_helper(&context, i);
   }
 
-  // Start by filling the request window
-  enqueue_requests_helper(&context, Session::kSessionReqWindow);
-
-  client_wait_for_rpc_resps_or_timeout(nexus, context, kNumReqs);
-  ASSERT_GE(context.num_rpc_resps, kNumReqs);  // We can overshoot a bit
+  client_wait_for_rpc_resps_or_timeout(nexus, context, kAppNumReqs);
+  ASSERT_GE(context.num_rpc_resps, kAppNumReqs);  // We can overshoot a bit
 
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
