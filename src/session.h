@@ -60,7 +60,10 @@ class Session {
 
   size_t remote_credits = kSessionCredits;  ///< This session's current credits
   SSlot sslot_arr[kSessionReqWindow];       ///< The session slots
-  FixedVector<size_t, kSessionReqWindow> sslot_free_vec;  ///< Free slots
+
+  /// Free session slots. We could use a vector of pointers, but indices are
+  /// useful in \p req_num calculation.
+  FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
   ///@{ Info saved for faster unconditional access
   RoutingInfo *remote_routing_info;
