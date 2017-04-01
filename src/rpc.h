@@ -413,6 +413,11 @@ class Rpc {
   /// Submit a work item for background processing
   void submit_background_st(SSlot *sslot);
 
+  /// Sanity-check a slot's request MsgBuffer on receiving a response packet.
+  /// Debug-only.
+  void check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
+                                uint8_t req_type);
+
   // rpc_send_cr.cc
 
   /**

@@ -132,11 +132,6 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
 
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
       bury_sslot_rx_msgbuf_nofree(&sslot);
-
-      // If req_func is fg terminal, it must have called enqueue_response()
-      if (req_func.req_func_type == ReqFuncType::kFgTerminal) {
-        assert(sslot.tx_msgbuf != nullptr);
-      }
       return;
     } else {
       // For background request handlers, copy the request MsgBuffer. rx_msgbuf
@@ -144,28 +139,13 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
       memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
              msg_size + sizeof(pkthdr_t));
-
-      // Check the copy
-      assert(sslot.rx_msgbuf.is_req());
-      assert(sslot.rx_msgbuf.get_req_type() == req_type);
-      assert(sslot.rx_msgbuf.get_req_num() == req_num);
-
       submit_background_st(&sslot);
       return;
     }
   } else {
     // Handle a single-packet response message
     assert(session->is_client());
-
-    // Sanity-check the user's request MsgBuffer. This is always dynamic.
-    const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
-    _unused(req_msgbuf);
-    assert(req_msgbuf != nullptr);
-    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic() &&
-           req_msgbuf->is_dynamic());
-    assert(req_msgbuf->is_req());
-    assert(req_msgbuf->get_req_num() == req_num);
-    assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
+    check_req_msgbuf_on_resp(&sslot, req_num, req_type);
 
     // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
@@ -238,16 +218,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     assert(session->is_server());
   } else {
     assert(session->is_client());
-
-    // Sanity-check the request MsgBuffer, which may be statically allocated
-    const MsgBuffer *req_msgbuf = sslot.tx_msgbuf;
-    _unused(req_msgbuf);
-    assert(req_msgbuf != nullptr);
-    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
-    assert(req_msgbuf->is_req());
-    assert(req_msgbuf->get_req_num() == req_num);
-    assert(req_msgbuf->get_req_type() == req_type);
-    assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
+    check_req_msgbuf_on_resp(&sslot, req_num, req_type);
   }
 
   if (rx_msgbuf.buf == nullptr) {
@@ -310,16 +281,9 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     if (!req_func.is_background()) {
       req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
       bury_sslot_rx_msgbuf(&sslot);
-
-      // If req_func is fg terminal, it must have called enqueue_response()
-      if (req_func.req_func_type == ReqFuncType::kFgTerminal) {
-        assert(sslot.tx_msgbuf != nullptr);
-      }
-
       return;
     } else {
-      // rx_msgbuf here is not backed by RX ring buffers, so don't create a new
-      // MsgBuffer. rx_msgbuf will be freed on enqueue_response().
+      // rx_msgbuf here is not backed by RX ring buffers
       submit_background_st(&sslot);
       return;
     }
@@ -352,6 +316,23 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot) {
 
   // Thread-safe
   req_list->unlocked_push_back(BgWorkItem(app_tid, context, sslot));
+}
+
+template <class TTr>
+void Rpc<TTr>::check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
+                                        uint8_t req_type) {
+  // This is an sslot that has just received a response packet. The request
+  // MsgBuffer of this sslot must be a dynamic MsgBuffer.
+  assert(sslot != nullptr);
+  const MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
+  _unused(req_msgbuf);
+
+  assert(req_msgbuf != nullptr && req_msgbuf->buf != nullptr &&
+         req_msgbuf->check_magic() && req_msgbuf->is_dynamic());
+  assert(req_msgbuf->is_req());
+  assert(req_msgbuf->get_req_num() == req_num);
+  assert(req_msgbuf->get_req_type() == req_type);
+  assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 }
 
 }  // End ERpc
