@@ -5,16 +5,15 @@ class AppContext : public BasicAppContext {};
 
 /// The common request handler for all subtests. Copies the request string to
 /// the response.
-void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
-                 void *_context) {
+void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
-  assert(req_msgbuf != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   ASSERT_FALSE(context->is_client);
   ASSERT_TRUE(context->rpc->in_background());
 
+  const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   test_printf("Server: Received request %s\n", req_msgbuf->buf);
 
   /* Try to create a session */
@@ -44,12 +43,11 @@ void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
 /// The common continuation function for all subtests. This checks that the
 /// request buffer is identical to the response buffer, and increments the
 /// number of responses in the context.
-void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
-               void *_context, size_t tag) {
+void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
   assert(resp_handle != nullptr);
-  assert(resp_msgbuf != nullptr);
   assert(_context != nullptr);
 
+  const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response %s, tag = %zu\n",
               (char *)resp_msgbuf->buf, tag);
 

@@ -17,11 +17,11 @@ class Rpc;
 
 /// A message buffer with magic-ful headers at the beginning and end
 class MsgBuffer {
- public:
   friend class IBTransport;
   friend class Session;
   friend class Rpc<IBTransport>;
 
+ public:
   MsgBuffer() {}
   ~MsgBuffer() {}
 

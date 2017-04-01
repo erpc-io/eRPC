@@ -130,7 +130,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       // Create a "fake" static MsgBuffer for the foreground handler
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
 
-      req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
+      req_func.req_func((ReqHandle *)&sslot, context);
       bury_sslot_rx_msgbuf_nofree(&sslot);
       return;
     } else {
@@ -152,7 +152,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
 
     // Create a "fake" static MsgBuffer for the foreground continuation
     sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
-    sslot.cont_func((RespHandle *)&sslot, &sslot.rx_msgbuf, context, sslot.tag);
+    sslot.cont_func((RespHandle *)&sslot, context, sslot.tag);
 
     // The continuation must release the response (rx_msgbuf). It may enqueue
     // a new request that uses sslot, but that won't use rx_msgbuf.
@@ -279,7 +279,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     sslot.rx_msgbuf_saved.req_num = req_num;
 
     if (!req_func.is_background()) {
-      req_func.req_func((ReqHandle *)&sslot, &sslot.rx_msgbuf, context);
+      req_func.req_func((ReqHandle *)&sslot, context);
       bury_sslot_rx_msgbuf(&sslot);
       return;
     } else {
@@ -290,7 +290,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
   } else {
     // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
-    sslot.cont_func((RespHandle *)&sslot, &sslot.rx_msgbuf, context, sslot.tag);
+    sslot.cont_func((RespHandle *)&sslot, context, sslot.tag);
 
     // The continuation must release the response (rx_msgbuf). It may enqueue
     // a new request that uses sslot, but that won't use rx_msgbuf.

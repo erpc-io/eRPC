@@ -24,15 +24,14 @@ size_t pick_large_msg_size(AppContext *app_context) {
 
 /// The common request handler for all subtests. Copies the request string to
 /// the response.
-void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
-                 void *_context) {
+void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
-  assert(req_msgbuf != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   ASSERT_FALSE(context->is_client);
 
+  const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf->get_data_size();
 
   req_handle->prealloc_used = false;
@@ -56,13 +55,12 @@ void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
 /// The common continuation function for all subtests. This checks that the
 /// request buffer is identical to the response buffer, and increments the
 /// number of responses in the context.
-void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
-               void *_context, size_t tag) {
+void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
   assert(resp_handle != nullptr);
-  assert(resp_msgbuf != nullptr);
   assert(_context != nullptr);
   _unused(tag);
 
+  const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response of length %zu.\n",
               (char *)resp_msgbuf->get_data_size());
 

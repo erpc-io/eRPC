@@ -4,7 +4,7 @@
  */
 #include "test_basics.h"
 
-static constexpr size_t kAppNumReqs = 10000;
+static constexpr size_t kAppNumReqs = 1000;
 static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
 union tag_t {
@@ -39,15 +39,14 @@ size_t get_rand_msg_size(AppContext *app_context) {
   return (size_t)msg_size;
 }
 
-void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
-                 void *_context) {
+void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
-  assert(req_msgbuf != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   ASSERT_FALSE(context->is_client);
 
+  const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf->get_data_size();
 
   req_handle->prealloc_used = false;
@@ -68,7 +67,7 @@ void req_handler(ReqHandle *req_handle, const MsgBuffer *req_msgbuf,
   context->rpc->enqueue_response(req_handle);
 }
 
-void cont_func(RespHandle *, const MsgBuffer *, void *, size_t);  // Fwd decl
+void cont_func(RespHandle *, void *, size_t);  // Forward declaration
 
 /// Enqueue a request using the request MsgBuffer with index = msgbuf_i
 void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
@@ -90,16 +89,15 @@ void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
   ASSERT_EQ(ret, 0);
 }
 
-void cont_func(RespHandle *resp_handle, const MsgBuffer *resp_msgbuf,
-               void *_context, size_t tag) {
+void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
   assert(resp_handle != nullptr);
-  assert(resp_msgbuf != nullptr);
   assert(_context != nullptr);
   _unused(tag);
 
   auto *context = (AppContext *)_context;
   ASSERT_TRUE(context->is_client);
 
+  const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response %zu of length %zu.\n",
               context->num_rpc_resps, (char *)resp_msgbuf->get_data_size());
 

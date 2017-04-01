@@ -9,17 +9,16 @@
 
 namespace ERpc {
 
-class SSlot;  // Forward declaration
-typedef SSlot ReqHandle;
-typedef SSlot RespHandle;
+// Forward declarations
+class SSlot;
+class ReqHandle;
+class RespHandle;
 
 /// The application-defined request handler
-typedef void (*erpc_req_func_t)(ReqHandle *req_handle,
-                                const MsgBuffer *req_msgbuf, void *context);
+typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
 
 /// The continuation function
-typedef void (*erpc_cont_func_t)(RespHandle *resp_handle,
-                                 const MsgBuffer *resp_msgbuf, void *context,
+typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
                                  size_t tag);
 
 enum class ReqFuncType : uint8_t { kFgTerminal, kFgNonterminal, kBackground };

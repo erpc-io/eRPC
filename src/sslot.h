@@ -6,7 +6,13 @@
 
 namespace ERpc {
 
-class Session;  // Forward declaration
+// Forward declarations
+class IBTransport;
+class Session;
+class BgThread;
+
+template <typename T>
+class Rpc;
 
 /**
  * @brief Session slot metadata maintained about an Rpc
@@ -21,23 +27,33 @@ class Session;  // Forward declaration
  * its packet header must contain the request type and number.
  */
 class SSlot {
- public:
+  friend class IBTransport;
+  friend class Session;
+  friend class BgThread;
+  friend class Rpc<IBTransport>;
+  friend class ReqHandle;
+  friend class RespHandle;
+
+ private:
   // Members that are valid for both server and client
   uint8_t pad[64];       ///< Padding to prevent false sharing
   Session *session;      ///< Pointer to the session that this sslot belongs to
   size_t index;          ///< Index of this sslot in the session's sslot_arr
-  MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
   MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
+  MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
+
+ public:
+  // Server-only
+  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
+  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
+  bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
+
+ private:
+  ReqFuncType req_func_type;  ///< The type of the request function
 
   // Client-only
   erpc_cont_func_t cont_func;  ///< Continuation function for the request
   size_t tag;                  ///< Tag of the request
-
-  // Server-only
-  ReqFuncType req_func_type;  ///< The type of the request function
-  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
-  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
-  bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
 
   /// Request metadata saved by the server before calling the request handler.
   /// These fields are needed in enqueue_response(), and the request's rx_msgbuf
@@ -80,6 +96,16 @@ class SSlot {
         << (tx_msgbuf == nullptr ? "0x0" : tx_msgbuf->to_string()) << "]";
     return ret.str();
   }
+};
+
+class ReqHandle : public SSlot {
+ public:
+  inline const MsgBuffer *get_req_msgbuf() const { return &rx_msgbuf; }
+};
+
+class RespHandle : public SSlot {
+ public:
+  inline const MsgBuffer *get_resp_msgbuf() const { return &rx_msgbuf; }
 };
 }
 

@@ -64,7 +64,7 @@ void basic_empty_sm_handler(int, SessionMgmtEventType, SessionMgmtErrType,
 }
 
 /// A basic request handler that should never be invoked
-void basic_empty_req_handler(ReqHandle *, const MsgBuffer *, void *) {
+void basic_empty_req_handler(ReqHandle *, void *) {
   assert(false);
   exit(-1);
 }

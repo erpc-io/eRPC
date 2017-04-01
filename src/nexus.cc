@@ -58,7 +58,8 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
     bg_thread_ctx_arr[i].bg_thread_id = i;
 
-    bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
+    bg_thread_arr[i] =
+        std::thread(BgThread::bg_thread_func, &bg_thread_ctx_arr[i]);
   }
 
   install_sigio_handler();
