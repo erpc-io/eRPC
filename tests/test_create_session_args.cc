@@ -19,8 +19,8 @@ const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 /// The session managament handler that is never invoked
-void test_sm_hander(int session_num, SessionMgmtEventType sm_event_type,
-                    SessionMgmtErrType sm_err_type, void *_context) {
+void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
+                     SessionMgmtErrType sm_err_type, void *_context) {
   _unused(session_num);
   _unused(sm_event_type);
   _unused(sm_err_type);
@@ -35,7 +35,7 @@ void client_thread_func(Nexus *nexus) {
   }
 
   /* Create the Rpc */
-  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID, &test_sm_hander,
+  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID, &test_sm_handler,
                        phy_port, numa_node);
 
   {
@@ -69,7 +69,7 @@ void client_thread_func(Nexus *nexus) {
 
 /* The server thread */
 void server_thread_func(Nexus *nexus, uint8_t app_tid) {
-  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_hander, phy_port,
+  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_handler, phy_port,
                        numa_node);
 
   server_ready = true;
