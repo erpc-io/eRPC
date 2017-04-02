@@ -127,9 +127,8 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     sslot.rx_msgbuf_saved.req_num = req_num;
 
     if (small_rpc_likely(!req_func.is_background())) {
-      // Create a "fake" static MsgBuffer for the foreground handler
+      // Create a "fake" static MsgBuffer for the foreground request handler
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
-
       req_func.req_func((ReqHandle *)&sslot, context);
       bury_sslot_rx_msgbuf_nofree(&sslot);
       return;
@@ -267,7 +266,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
   memcpy((char *)&rx_msgbuf.buf[offset], (char *)(pkt + sizeof(pkthdr_t)),
          bytes_to_copy);
 
-  // Check if we need to invoke the app handler
+  // Check if we need to invoke the app handler/continuation
   if (rx_msgbuf.pkts_rcvd != pkts_expected) {
     return;
   }

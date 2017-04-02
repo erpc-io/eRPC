@@ -3,18 +3,18 @@
 
 namespace ERpc {
 
-/// No optimization for small messages and foreground handlers
+/// No optimization for small messages and foreground request handlers
 #define small_rpc_optlevel_none (0)
 
-/// Small messages and foreground handlers are very likely
+/// Small messages and foreground request handlers are very likely
 #define small_rpc_optlevel_likely (1)
 
-/// Large messages and background handlers are not supported
+/// Large messages and background request handlers are not supported
 #define small_rpc_optlevel_extreme (2)
 
 /// This controls how much the code is optimized at compile time for the common
-/// case of small messages and foreground handlers. This helps understand the
-/// overhead of supporting large messages and background threads.
+/// case of small messages and foreground request handlers. This helps
+/// understand the overhead of supporting large messages and background threads.
 #define small_rpc_optlevel (small_rpc_optlevel_likely)
 
 #if small_rpc_optlevel == small_rpc_optlevel_none

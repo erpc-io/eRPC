@@ -1,6 +1,6 @@
 /**
  * @file ops.h
- * @brief User-defined eRPC request and response handler types
+ * @brief User-defined eRPC request handler and continuation types
  */
 #ifndef ERPC_OPS_H
 #define ERPC_OPS_H
@@ -21,10 +21,10 @@ typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
 typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
                                  size_t tag);
 
+/// The request handler types
 enum class ReqFuncType : uint8_t { kFgTerminal, kFgNonterminal, kBackground };
 
-/// The application-specified eRPC request and response handlers. An \p Ops
-/// object is invalid if either of the two function pointers are NULL.
+/// The application-specified eRPC request handler
 class ReqFunc {
  public:
   erpc_req_func_t req_func;
@@ -47,7 +47,7 @@ class ReqFunc {
     }
   }
 
-  /// Check if handlers have been registered for this Ops
+  /// Check if this request handler is registered
   inline bool is_registered() const { return req_func != nullptr; }
 };
 }

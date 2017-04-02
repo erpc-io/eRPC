@@ -17,16 +17,17 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   _unused(rx_msgbuf);
   switch (sslot->req_func_type) {
     case ReqFuncType::kFgTerminal:
-      // Response enqueued before the request handler returns, and the event
+      // Response is enqueued before the request handler returns, and the event
       // loop will bury rx_msgbuf after the handler returns.
       assert(rx_msgbuf->buf != nullptr && rx_msgbuf->check_magic());
       break;
     case ReqFuncType::kFgNonterminal:
-      // Response enqueued before (or after) the request handler returns, and
-      // the event loop will bury or (has buried) rx_msgbuf.
+      // Response is enqueued before (or after) the request handler returns, and
+      // the event loop will bury or (has buried) rx_msgbuf after the handler
+      // returns
       break;
     case ReqFuncType::kBackground:
-      // Background threads can't bury, so we'll bury rx_msgbuf below.
+      // Background threads can't bury MsgBuffers, so we'll bury rx_msgbuf below
       assert(rx_msgbuf->buf != nullptr && rx_msgbuf->is_dynamic() &&
              rx_msgbuf->check_magic());
       break;

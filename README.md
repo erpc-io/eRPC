@@ -29,8 +29,9 @@ EA Code notes
      The client temporarily loses ownership of the request MsgBuffer until the
      continuation for the request is invoked. During this time, the client may
      not modify the request MsgBuffer.
-   * A continuation must invoke `release_response()` before returning, which
-     buries the response MsgBuffer.
+   * Response MsgBuffers are buried when the continuation invokes
+     `release_response()`. A continuation must invoke `release_response()`
+     before returning.
  * At server:
    * The request handler permanently loses ownership of the request MsgBuffer
      when it returns, at which point eRPC may free it.
