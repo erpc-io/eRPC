@@ -71,7 +71,7 @@ void basic_empty_req_handler(ReqHandle *, void *) {
 
 /// A basic server thread that just runs the event loop, and expects the
 /// client to disconnect before finishing.
-void basic_server_thread_func(Nexus *nexus, uint8_t app_tid,
+void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
                               session_mgmt_handler_t sm_handler) {
   BasicAppContext context;
   context.is_client = false;
@@ -105,10 +105,12 @@ void basic_server_thread_func(Nexus *nexus, uint8_t app_tid,
  *
  * @param req_func The request function that handlers kAppReqType
  */
-void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
-                                  void (*client_thread_func)(Nexus *, size_t),
-                                  erpc_req_func_t req_func) {
-  Nexus nexus(kAppNexusUdpPort, num_bg_threads, kAppNexusPktDropProb);
+void launch_server_client_threads(
+    size_t num_sessions, size_t num_bg_threads,
+    void (*client_thread_func)(Nexus<IBTransport> *, size_t),
+    erpc_req_func_t req_func) {
+  Nexus<IBTransport> nexus(kAppNexusUdpPort, num_bg_threads,
+                           kAppNexusPktDropProb);
 
   if (num_bg_threads == 0) {
     nexus.register_req_func(kAppReqType,
@@ -121,7 +123,7 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
   server_ready = false;
   client_done = false;
 
-  test_printf("Client: Using %zu sessions\n", num_sessions);
+  test_printf("test: Using %zu sessions\n", num_sessions);
 
   std::thread server_thread[num_sessions];
 
@@ -142,8 +144,8 @@ void launch_server_client_threads(size_t num_sessions, size_t num_bg_threads,
 }
 
 /// Initialize client context and connect sessions
-void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
-                             size_t num_sessions,
+void client_connect_sessions(Nexus<IBTransport> *nexus,
+                             BasicAppContext &context, size_t num_sessions,
                              session_mgmt_handler_t sm_handler) {
   assert(nexus != nullptr);
   assert(num_sessions >= 1);
@@ -173,7 +175,7 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
 
 /// Run the event loop until we get at least \p num_resps session management
 /// responses, or until kAppMaxEventLoopMs are elapsed.
-void client_wait_for_sm_resps_or_timeout(const Nexus *nexus,
+void client_wait_for_sm_resps_or_timeout(const Nexus<IBTransport> *nexus,
                                          BasicAppContext &context,
                                          size_t num_resps) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
@@ -190,7 +192,7 @@ void client_wait_for_sm_resps_or_timeout(const Nexus *nexus,
 
 /// Run the event loop until we get at least \p num_resps RPC responses, or
 /// until kAppMaxEventLoopMs are elapsed.
-void client_wait_for_rpc_resps_or_timeout(const Nexus *nexus,
+void client_wait_for_rpc_resps_or_timeout(const Nexus<IBTransport> *nexus,
                                           BasicAppContext &context,
                                           size_t num_resps) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */

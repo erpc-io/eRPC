@@ -33,7 +33,7 @@ void sm_handler(int session_num, SessionMgmtEventType sm_event_type,
 }
 
 /// Simple successful disconnection of one session, and other simple tests
-void simple_disconnect(Nexus *nexus, size_t) {
+void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
   /* We're testing session connection, so can't use client_connect_sessions */
   while (!server_ready) { /* Wait for server */
     usleep(1);
@@ -82,7 +82,7 @@ TEST(SimpleDisconnect, SimpleDisconnect) {
 }
 
 /// Repeat: Create a session to the server and disconnect it.
-void disconnect_multi(Nexus *nexus, size_t) {
+void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
   /* We're testing session connection, so can't use client_connect_sessions */
   while (!server_ready) { /* Wait for server */
     usleep(1);
@@ -123,7 +123,7 @@ TEST(DisconnectMulti, DisconnectMulti) {
 }
 
 /// Disconnect a session that encountered a remote error. This should succeed.
-void disconnect_remote_error(Nexus *nexus, size_t) {
+void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
   /* We're testing session connection, so can't use client_connect_sessions */
   while (!server_ready) { /* Wait for server */
     usleep(1);
@@ -160,7 +160,7 @@ TEST(DisconnectRemoteError, DisconnectRemoteError) {
 
 /// Create a session for which the client fails to resolve the server's routing
 /// info while processing the connect response.
-void disconnect_local_error(Nexus *nexus, size_t) {
+void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   /* We're testing session connection, so can't use client_connect_sessions */
   while (!server_ready) { /* Wait for server */
     usleep(1);
@@ -199,7 +199,7 @@ TEST(DisconnectLocalError, DisconnectLocalError) {
 }
 
 int main(int argc, char **argv) {
-  Nexus::get_hostname(local_hostname);
+  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

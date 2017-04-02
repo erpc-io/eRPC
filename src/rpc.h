@@ -59,7 +59,7 @@ class Rpc {
    * @brief Construct the Rpc object from a foreground thread
    * @throw runtime_error if construction fails
    */
-  Rpc(Nexus *nexus, void *context, uint8_t app_tid,
+  Rpc(Nexus<TTr> *nexus, void *context, uint8_t app_tid,
       session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port = 0,
       size_t numa_node = 0);
 
@@ -500,7 +500,7 @@ class Rpc {
   }
 
   // Constructor args
-  Nexus *nexus;
+  Nexus<TTr> *nexus;
   void *context;  ///< The application context
   uint8_t app_tid;
   session_mgmt_handler_t session_mgmt_handler;

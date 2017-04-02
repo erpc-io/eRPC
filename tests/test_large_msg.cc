@@ -80,7 +80,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 /// Test: Send one large request message and check that we receive the
 /// correct response
 ///
-void one_large_rpc(Nexus *nexus, size_t num_sessions = 1) {
+void one_large_rpc(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -132,7 +132,8 @@ TEST(OneLargeRpc, Background) {
 ///
 /// Test: Repeat: Multiple large Rpcs on one session, with random size
 ///
-void multi_large_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
+void multi_large_rpc_one_session(Nexus<IBTransport> *nexus,
+                                 size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -205,7 +206,8 @@ TEST(MultiLargeRpcOneSession, Background) {
 ///
 /// Test: Repeat: Multiple large Rpcs on multiple sessions
 ///
-void multi_large_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
+void multi_large_rpc_multi_session(Nexus<IBTransport> *nexus,
+                                   size_t num_sessions) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -293,7 +295,7 @@ TEST(MultiLargeRpcMultiSession, Background) {
 /// Test: Repeat: Multiple large Rpcs on multiple sessions, trying to force
 /// a memory leak. This test takes a long time so it's disabled by default.
 ///
-void memory_leak(Nexus *nexus, size_t num_sessions) {
+void memory_leak(Nexus<IBTransport> *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -381,7 +383,7 @@ TEST(DISABLED_MemoryLeak, Background) {
 }
 
 int main(int argc, char **argv) {
-  Nexus::get_hostname(local_hostname);
+  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

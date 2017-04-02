@@ -28,7 +28,7 @@ void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
 }
 
 /* The client thread */
-void client_thread_func(Nexus *nexus) {
+void client_thread_func(Nexus<IBTransport> *nexus) {
   /* Start the tests only after the server is ready */
   while (!server_ready) {
     usleep(1);
@@ -68,7 +68,7 @@ void client_thread_func(Nexus *nexus) {
 }
 
 /* The server thread */
-void server_thread_func(Nexus *nexus, uint8_t app_tid) {
+void server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid) {
   Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_handler, phy_port,
                        numa_node);
 
@@ -78,7 +78,7 @@ void server_thread_func(Nexus *nexus, uint8_t app_tid) {
 
 /// Test: Check if passing invalid arguments to create_session gives an error
 TEST(TestBuild, TestBuild) {
-  Nexus nexus(NEXUS_UDP_PORT, 0, 0.0); /* 0 background threads */
+  Nexus<IBTransport> nexus(NEXUS_UDP_PORT, 0, 0.0); /* 0 background threads */
 
   /* Launch the server thread */
   std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
@@ -91,7 +91,7 @@ TEST(TestBuild, TestBuild) {
 }
 
 int main(int argc, char **argv) {
-  Nexus::get_hostname(local_hostname);
+  Nexus<IBTransport>::get_hostname(local_hostname);
   server_ready = false;
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

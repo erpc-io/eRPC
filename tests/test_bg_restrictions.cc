@@ -64,7 +64,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 ///
 /// Test: Send one small request packet to the invalid request handler
 ///
-void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
+void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -105,7 +105,7 @@ TEST(BgRestrictions, All) {
 }
 
 int main(int argc, char **argv) {
-  Nexus::get_hostname(local_hostname);
+  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

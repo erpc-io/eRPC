@@ -50,7 +50,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 /// Test: Send one small request packet and check that we receive the
 /// correct response
 ///
-void one_small_rpc(Nexus *nexus, size_t num_sessions = 1) {
+void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -97,7 +97,8 @@ TEST(OneSmallRpc, Background) {
 ///
 /// Test: Repeat: Multiple small Rpcs on one session
 ///
-void multi_small_rpc_one_session(Nexus *nexus, size_t num_sessions = 1) {
+void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
+                                 size_t num_sessions = 1) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -172,7 +173,8 @@ TEST(MultiSmallRpcOneSession, Background) {
 ///
 /// Test: Repeat: Multiple small Rpcs on multiple sessions
 ///
-void multi_small_rpc_multi_session(Nexus *nexus, size_t num_sessions) {
+void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
+                                   size_t num_sessions) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -260,7 +262,7 @@ TEST(MultiSmallRpcMultiSession, Background) {
 }
 
 int main(int argc, char **argv) {
-  Nexus::get_hostname(local_hostname);
+  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

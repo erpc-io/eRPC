@@ -9,6 +9,7 @@
 #include "session.h"
 #include "session_mgmt_types.h"
 #include "small_rpc_optlevel.h"
+#include "transport_impl/ib_transport.h"
 #include "util/mt_list.h"
 
 namespace ERpc {
@@ -24,9 +25,11 @@ class NexusHook {
   MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
 };
 
+template <class TTr>
 class Nexus {
-  static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
  public:
+  static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
+
   /**
    * @brief Create the one-per-process Nexus object.
    *
@@ -117,7 +120,10 @@ class Nexus {
   static std::string get_hostname();
 };
 
-static Nexus *nexus_object;  // The one per-process Nexus object
+/// The per-process Nexus object and its transport type
+static void *nexus_object;
+static Transport::TransportType nexus_object_transport_type =
+    Transport::TransportType::kInvalidTransport;
 
 /**
  * @brief The static signal handler, which executes the actual signal handler
@@ -126,8 +132,23 @@ static Nexus *nexus_object;  // The one per-process Nexus object
 static void sigio_handler(int sig_num) {
   assert(sig_num == SIGIO);
   _unused(sig_num);
-  nexus_object->session_mgnt_handler();
+  assert(nexus_object != nullptr);
+
+  switch (nexus_object_transport_type) {
+    case Transport::TransportType::kInfiniBand:
+      static_cast<Nexus<IBTransport> *>(nexus_object)->session_mgnt_handler();
+      break;
+    case Transport::TransportType::kRoCE:
+    case Transport::TransportType::kOmniPath:
+    case Transport::TransportType::kInvalidTransport:
+      /* Unsupported transports */
+      assert(false);
+      exit(-1);
+  }
 }
+
+// Instantiate required Nexus classes so they get compiled for the linker
+template class Nexus<IBTransport>;
 
 }  // End ERpc
 

@@ -14,8 +14,9 @@
 
 namespace ERpc {
 
-Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
-             double udp_drop_prob)
+template <class TTr>
+Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
+                  double udp_drop_prob)
     : udp_config(mgmt_udp_port, udp_drop_prob),
       freq_ghz(get_freq_ghz()),
       hostname(get_hostname()),
@@ -48,6 +49,7 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
 #endif
 
   nexus_object = this;
+  nexus_object_transport_type = TTr::kTransportType;
 
   // Launch background threads
   bg_kill_switch = false;
@@ -68,7 +70,8 @@ Nexus::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
                mgmt_udp_port, hostname.c_str());
 }
 
-Nexus::~Nexus() {
+template <class TTr>
+Nexus<TTr>::~Nexus() {
   erpc_dprintf_noargs("eRPC Nexus: Destroying Nexus.\n");
 
   // Close the socket file descriptor
@@ -84,14 +87,16 @@ Nexus::~Nexus() {
   }
 }
 
-bool Nexus::app_tid_exists(uint8_t app_tid) {
+template <class TTr>
+bool Nexus<TTr>::app_tid_exists(uint8_t app_tid) {
   nexus_lock.lock();
   bool ret = (reg_hooks_arr[app_tid] != nullptr);
   nexus_lock.unlock();
   return ret;
 }
 
-void Nexus::register_hook(NexusHook *hook) {
+template <class TTr>
+void Nexus<TTr>::register_hook(NexusHook *hook) {
   assert(hook != nullptr);
 
   uint8_t app_tid = hook->app_tid;
@@ -114,7 +119,8 @@ void Nexus::register_hook(NexusHook *hook) {
   nexus_lock.unlock();
 }
 
-void Nexus::unregister_hook(NexusHook *hook) {
+template <class TTr>
+void Nexus<TTr>::unregister_hook(NexusHook *hook) {
   assert(hook != nullptr);
 
   uint8_t app_tid = hook->app_tid;
@@ -126,7 +132,8 @@ void Nexus::unregister_hook(NexusHook *hook) {
   nexus_lock.unlock();
 }
 
-void Nexus::install_sigio_handler() {
+template <class TTr>
+void Nexus<TTr>::install_sigio_handler() {
   // Create a UDP socket.
   // AF_INET = IPv4, SOCK_DGRAM = datagrams, IPPROTO_UDP = datagrams over UDP.
   // Returns a file descriptor.
@@ -180,7 +187,8 @@ void Nexus::install_sigio_handler() {
   }
 }
 
-void Nexus::session_mgnt_handler() {
+template <class TTr>
+void Nexus<TTr>::session_mgnt_handler() {
   nexus_lock.lock();
 
   uint32_t addr_len = sizeof(struct sockaddr_in);  // value-result
@@ -259,7 +267,8 @@ void Nexus::session_mgnt_handler() {
   nexus_lock.unlock();
 }
 
-int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
+template <class TTr>
+int Nexus<TTr>::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   // Create the basic issue message
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
@@ -297,7 +306,8 @@ int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   return 0;
 }
 
-double Nexus::get_freq_ghz() {
+template <class TTr>
+double Nexus<TTr>::get_freq_ghz() {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
   uint64_t rdtsc_start = rdtsc();
@@ -332,7 +342,8 @@ double Nexus::get_freq_ghz() {
   return _freq_ghz;
 }
 
-std::string Nexus::get_hostname() {
+template <class TTr>
+std::string Nexus<TTr>::get_hostname() {
   char _hostname[kMaxHostnameLen];
 
   // Get the local hostname
