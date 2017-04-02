@@ -11,22 +11,27 @@
 #define DUMMY_MR_PTR ((void *)0x3185)
 #define DUMMY_LKEY (3186)
 
+using namespace ERpc;
+
 // Dummy registration and deregistration functions
-ERpc::MemRegInfo reg_mr_wrapper(void *buf, size_t size) {
+Transport::MemRegInfo reg_mr_wrapper(void *buf, size_t size) {
   _unused(buf);
   _unused(size);
-  return ERpc::MemRegInfo(DUMMY_MR_PTR, DUMMY_LKEY); /* *transport_mr, lkey */
+  return Transport::MemRegInfo(DUMMY_MR_PTR,
+                               DUMMY_LKEY); /* *transport_mr, lkey */
 }
 
-void dereg_mr_wrapper(ERpc::MemRegInfo mr) {
+void dereg_mr_wrapper(Transport::MemRegInfo mr) {
   _unused(mr);
   assert(mr.lkey == DUMMY_LKEY);
   assert(mr.transport_mr == DUMMY_MR_PTR);
 }
 
 using namespace std::placeholders;
-typename ERpc::reg_mr_func_t reg_mr_func = std::bind(reg_mr_wrapper, _1, _2);
-typename ERpc::dereg_mr_func_t dereg_mr_func = std::bind(dereg_mr_wrapper, _1);
+typename Transport::reg_mr_func_t reg_mr_func =
+    std::bind(reg_mr_wrapper, _1, _2);
+typename Transport::dereg_mr_func_t dereg_mr_func =
+    std::bind(dereg_mr_wrapper, _1);
 
 /// Measure performance of 4k-page allocation where all pages are allocated
 /// without first creating a page cache.

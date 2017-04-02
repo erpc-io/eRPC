@@ -26,9 +26,10 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
           app_tid, sm_pkt->client.name().c_str());
 
   // Check that the transport matches
-  if (sm_pkt->server.transport_type != transport->transport_type) {
+  Transport::TransportType pkt_tr_type = sm_pkt->server.transport_type;
+  if (pkt_tr_type != transport->transport_type) {
     erpc_dprintf("%s: Invalid transport %s. Sending response.\n", issue_msg,
-                 get_transport_name(sm_pkt->server.transport_type).c_str());
+                 Transport::get_transport_name(pkt_tr_type).c_str());
 
     sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidTransport,
                           &nexus->udp_config);
@@ -87,7 +88,7 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
 
   // Try to resolve the client's routing info into the packet. If session
   // creation succeeds, we'll copy it to the server's session endpoint.
-  RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
+  Transport::RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
   erpc_dprintf("eRPC Rpc %u: Resolving client's routing info %s.\n", app_tid,
                TTr::routing_info_str(client_rinfo).c_str());
 
@@ -224,7 +225,7 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   //
   // Try to resolve the server's routing information into the packet. If this
   // fails, invoke kConnectFailed callback.
-  RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
+  Transport::RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
   erpc_dprintf("eRPC Rpc %u: Resolving server's routing info %s.\n", app_tid,
                TTr::routing_info_str(srv_routing_info).c_str());
 

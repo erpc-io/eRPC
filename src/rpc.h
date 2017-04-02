@@ -545,9 +545,8 @@ class Rpc {
   std::vector<SSlot *> dpath_txq;
   std::mutex dpath_txq_lock;
 
-  /// Tx batch information for interfacing between the event loop and the
-  /// transport.
-  tx_burst_item_t tx_burst_arr[TTr::kPostlist];
+  /// Tx batch info for interfacing between the event loop and the transport
+  Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];
   size_t tx_batch_i;  ///< The batch index for \p tx_burst_arr
 
   /// Rx batch information for \p rx_burst

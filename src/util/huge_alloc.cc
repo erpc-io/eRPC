@@ -4,7 +4,8 @@
 namespace ERpc {
 
 HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
-                     reg_mr_func_t reg_mr_func, dereg_mr_func_t dereg_mr_func)
+                     Transport::reg_mr_func_t reg_mr_func,
+                     Transport::dereg_mr_func_t dereg_mr_func)
     : numa_node(numa_node),
       reg_mr_func(reg_mr_func),
       dereg_mr_func(dereg_mr_func) {
@@ -156,7 +157,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   memset(shm_buf, 0, size);
 
   // Register the allocated buffer. This may throw, which is OK.
-  MemRegInfo reg_info = reg_mr_func(shm_buf, size);
+  Transport::MemRegInfo reg_info = reg_mr_func(shm_buf, size);
 
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size, reg_info));
   stats.shm_reserved += size;

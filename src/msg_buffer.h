@@ -8,7 +8,7 @@
 
 namespace ERpc {
 
-// Forward declarations
+// Forward declarations for friendship
 class IBTransport;
 class Session;
 

@@ -3,7 +3,7 @@
 
 #include <mutex>
 #include "common.h"
-#include "transport_types.h"
+#include "transport.h"
 #include "util/udp_client.h"
 
 namespace ERpc {
@@ -203,17 +203,17 @@ static std::string session_mgmt_event_type_str(
 /// Basic metadata about a session end point filled when the session is created
 class SessionEndpoint {
  public:
-  TransportType transport_type;
+  Transport::TransportType transport_type;
   char hostname[kMaxHostnameLen];  ///< Hostname of this endpoint
   uint8_t phy_port;                ///< Fabric port used by this endpoint
   uint8_t app_tid;       ///< TID of the Rpc that created this endpoint
   uint16_t session_num;  ///< The session number of this endpoint in its Rpc
-  uint32_t secret : kSecretBits;  ///< Secret for both session endpoints
-  RoutingInfo routing_info;       ///< Generic routing info for this endpoint
+  uint32_t secret : kSecretBits;        ///< Secret for both session endpoints
+  Transport::RoutingInfo routing_info;  ///< Endpoint's routing info
 
   // Fill invalid metadata to aid debugging
   SessionEndpoint() {
-    transport_type = TransportType::kInvalidTransport;
+    transport_type = Transport::TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));
     phy_port = kInvalidPhyPort;
     app_tid = kInvalidAppTid;

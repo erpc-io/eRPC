@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "common.h"
-#include "transport_types.h"
+#include "transport.h"
 #include "util/buffer.h"
 #include "util/rand.h"
 
@@ -24,10 +24,13 @@ struct shm_region_t {
   const size_t size;   ///< The size in bytes of the allocated SHM buffer
 
   // Filled in by Rpc when this region is registered
-  bool registered;          ///< Is this SHM region registered with the NIC?
-  MemRegInfo mem_reg_info;  ///< The transport-specific memory registration info
+  bool registered;  ///< Is this SHM region registered with the NIC?
 
-  shm_region_t(int shm_key, uint8_t *buf, size_t size, MemRegInfo mem_reg_info)
+  /// The transport-specific memory registration info
+  Transport::MemRegInfo mem_reg_info;
+
+  shm_region_t(int shm_key, uint8_t *buf, size_t size,
+               Transport::MemRegInfo mem_reg_info)
       : shm_key(shm_key), buf(buf), size(size), mem_reg_info(mem_reg_info) {
     assert(size % kHugepageSize == 0);
   }
@@ -69,8 +72,9 @@ class HugeAlloc {
    * @brief Construct the hugepage allocator
    * @throw runtime_error if construction fails
    */
-  HugeAlloc(size_t initial_size, size_t numa_node, reg_mr_func_t reg_mr_func,
-            dereg_mr_func_t dereg_mr_func);
+  HugeAlloc(size_t initial_size, size_t numa_node,
+            Transport::reg_mr_func_t reg_mr_func,
+            Transport::dereg_mr_func_t dereg_mr_func);
   ~HugeAlloc();
 
   /**
@@ -250,8 +254,8 @@ class HugeAlloc {
   SlowRand slow_rand;  ///< RNG to generate SHM keys
   size_t numa_node;    ///< NUMA node on which all memory is allocated
 
-  reg_mr_func_t reg_mr_func;
-  dereg_mr_func_t dereg_mr_func;
+  Transport::reg_mr_func_t reg_mr_func;
+  Transport::dereg_mr_func_t dereg_mr_func;
 
   size_t prev_allocation_size;  ///< Size of previous hugepage reservation
 

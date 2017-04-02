@@ -66,7 +66,7 @@ class Session {
   FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
   ///@{ Info saved for faster unconditional access
-  RoutingInfo *remote_routing_info;
+  Transport::RoutingInfo *remote_routing_info;
   uint16_t local_session_num;
   uint16_t remote_session_num;
   ///@}

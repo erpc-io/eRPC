@@ -30,7 +30,7 @@ void Rpc<TTr>::send_credit_return_now_st(Session *session,
   cr_msgbuf.pkts_queued = 1;
 
   assert(tx_batch_i == 0);  // tx_batch_i is 0 outside rpx_tx.cc
-  tx_burst_item_t &item = tx_burst_arr[0];
+  Transport::tx_burst_item_t &item = tx_burst_arr[0];
   item.routing_info = session->remote_routing_info;
   item.msg_buffer = &cr_msgbuf;
   item.offset = 0;

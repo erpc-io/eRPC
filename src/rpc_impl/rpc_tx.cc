@@ -89,7 +89,7 @@ void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
   tx_msgbuf->pkts_queued = 1;
 
   assert(tx_batch_i < TTr::kPostlist);
-  tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
+  Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
   item.routing_info = session->remote_routing_info;
   item.msg_buffer = tx_msgbuf;
   item.offset = 0;
@@ -175,7 +175,7 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
       session->local_session_num);
 
   for (size_t i = 0; i < now_sending; i++) {
-    tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
+    Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = session->remote_routing_info;
     item.msg_buffer = tx_msgbuf;
     item.offset = tx_msgbuf->pkts_queued * TTr::kMaxDataPerPkt;

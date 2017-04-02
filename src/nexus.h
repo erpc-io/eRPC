@@ -18,16 +18,11 @@ namespace ERpc {
 class NexusHook {
  public:
   NexusHook(uint8_t app_tid) : app_tid(app_tid) {}
-
   const uint8_t app_tid;  ///< App TID of the RPC that created this hook
-
   MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
-
   /// Background thread request lists
   MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
 };
-
-class Nexus;  // Forward declaration
 
 class Nexus {
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob

@@ -8,16 +8,65 @@
 #include "common.h"
 #include "msg_buffer.h"
 #include "pkthdr.h"
-#include "session.h"
-#include "transport_types.h"
 #include "util/buffer.h"
-#include "util/huge_alloc.h"
+#include "util/math_utils.h"
 
 namespace ERpc {
+
+class HugeAlloc;  // Forward declaration: HugeAlloc needs MemRegInfo
 
 /// Generic mostly-reliable transport
 class Transport {
  public:
+  static const size_t kMaxRoutingInfoSize = 32;  ///< Space for routing info
+  static const size_t kMaxMemRegInfoSize = 64;   ///< Space for memory reg info
+
+  /**
+   * @brief Generic struct to store routing info for any transport.
+   *
+   * This can contain both cluster-wide valid members (e.g., LID, QPN), and
+   * members that are only locally valid (e.g., a pointer to \p ibv_ah).
+   */
+  struct RoutingInfo {
+    uint8_t buf[kMaxRoutingInfoSize];
+  };
+
+  /// Generic struct to store memory registration info for any transport.
+  struct MemRegInfo {
+    void*transport_mr;  ///< The transport-specific memory region (eg, ibv_mr)
+    uint32_t lkey;     ///< The lkey of the memory region
+
+    MemRegInfo(void* transport_mr, uint32_t lkey)
+        : transport_mr(transport_mr), lkey(lkey) {}
+  };
+
+  /// Info about a packet that needs TX
+  struct tx_burst_item_t {
+    RoutingInfo* routing_info;  ///< Routing info for this packet
+    MsgBuffer* msg_buffer;      ///< The MsgBuffer for this packet
+    size_t offset;              ///< The offset for this packet in the MsgBuffer
+    size_t data_bytes;  ///< The number of data bytes to TX from \p offset
+  };
+
+  /// Generic types for memory registration and deregistration functions.
+  typedef std::function<MemRegInfo(void*, size_t)> reg_mr_func_t;
+  typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
+
+  enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
+
+  static std::string get_transport_name(TransportType transport_type) {
+    switch (transport_type) {
+      case TransportType::kInfiniBand:
+        return std::string("[InfiniBand]");
+      case TransportType::kRoCE:
+        return std::string("[RoCE]");
+      case TransportType::kOmniPath:
+        return std::string("[OmniPath]");
+      default:
+        return std::string("[Invalid transport]");
+    }
+  }
+
   // Queue depths
   static constexpr size_t kRecvQueueDepth = 2048;  ///< RECV queue size
   static constexpr size_t kSendQueueDepth = 128;   ///< SEND queue size
