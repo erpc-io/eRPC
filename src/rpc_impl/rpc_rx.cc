@@ -153,8 +153,9 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
     sslot.cont_func((RespHandle *)&sslot, context, sslot.tag);
 
-    // The continuation must release the response (rx_msgbuf). It may enqueue
-    // a new request that uses sslot, but that won't use rx_msgbuf.
+    // The continuation must release the response (rx_msgbuf). The continuation
+    // or a background thread may enqueue a new request that uses this sslot,
+    // but that won't affect rx_msgbuf: only the event loop can do that.
     assert(sslot.rx_msgbuf.buf == nullptr);
     return;
   }
@@ -291,8 +292,9 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     bury_sslot_tx_msgbuf_nofree(&sslot);
     sslot.cont_func((RespHandle *)&sslot, context, sslot.tag);
 
-    // The continuation must release the response (rx_msgbuf). It may enqueue
-    // a new request that uses sslot, but that won't use rx_msgbuf.
+    // The continuation must release the response (rx_msgbuf). The continuation
+    // or a background thread may enqueue a new request that uses this sslot,
+    // but that won't affect rx_msgbuf: only the event loop can do that.
     assert(sslot.rx_msgbuf.buf == nullptr);
     return;
   }
