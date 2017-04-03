@@ -103,6 +103,12 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
 
   // Connect to all other server threads if needed
   if (connect_servers == ConnectServers::kTrue) {
+    if (num_srv_threads <= 1) {
+      throw std::runtime_error(
+          "basic_server_thread_func: At least 2 server "
+          "threads needed to connect servers.");
+    }
+
     test_printf("test: Server %u connecting to %zu other server threads.\n",
                 app_tid, num_srv_threads - 1);
 
