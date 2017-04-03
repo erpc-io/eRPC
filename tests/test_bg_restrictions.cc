@@ -101,7 +101,8 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
 
 TEST(BgRestrictions, All) {
   /* One background thread */
-  launch_server_client_threads(1, 1, one_small_rpc, req_handler);
+  launch_server_client_threads(1, 1, one_small_rpc, req_handler,
+                               ConnectServers::kFalse);
 }
 
 int main(int argc, char **argv) {

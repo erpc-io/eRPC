@@ -32,13 +32,11 @@ void sm_handler(int session_num, SessionMgmtEventType sm_event_type,
   ASSERT_EQ(session_num, context->exp_session_num);
 }
 
+///
 /// Simple successful disconnection of one session, and other simple tests
+///
 void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
-  /* We're testing session connection, so can't use client_connect_sessions */
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
+  // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
@@ -77,17 +75,15 @@ void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
 }
 
 TEST(SimpleDisconnect, SimpleDisconnect) {
-  launch_server_client_threads(1, 0, simple_disconnect,
-                               basic_empty_req_handler);
+  launch_server_client_threads(1, 0, simple_disconnect, basic_empty_req_handler,
+                               ConnectServers::kFalse);
 }
 
+///
 /// Repeat: Create a session to the server and disconnect it.
+///
 void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
-  /* We're testing session connection, so can't use client_connect_sessions */
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
+  // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
@@ -119,16 +115,15 @@ void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
 }
 
 TEST(DisconnectMulti, DisconnectMulti) {
-  launch_server_client_threads(1, 0, disconnect_multi, basic_empty_req_handler);
+  launch_server_client_threads(1, 0, disconnect_multi, basic_empty_req_handler,
+                               ConnectServers::kFalse);
 }
 
+///
 /// Disconnect a session that encountered a remote error. This should succeed.
+///
 void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
-  /* We're testing session connection, so can't use client_connect_sessions */
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
+  // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
@@ -155,17 +150,15 @@ void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(DisconnectRemoteError, DisconnectRemoteError) {
   launch_server_client_threads(1, 0, disconnect_remote_error,
-                               basic_empty_req_handler);
+                               basic_empty_req_handler, ConnectServers::kFalse);
 }
 
+///
 /// Create a session for which the client fails to resolve the server's routing
 /// info while processing the connect response.
+///
 void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
-  /* We're testing session connection, so can't use client_connect_sessions */
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
+  // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
@@ -195,7 +188,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(DisconnectLocalError, DisconnectLocalError) {
   launch_server_client_threads(1, 0, disconnect_local_error,
-                               basic_empty_req_handler);
+                               basic_empty_req_handler, ConnectServers::kFalse);
 }
 
 int main(int argc, char **argv) {

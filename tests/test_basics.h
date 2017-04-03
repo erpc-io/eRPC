@@ -19,28 +19,33 @@ static constexpr uint8_t kAppReqType = 3;
 static constexpr uint8_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 
-/* Shared between client and server thread */
-std::atomic<bool> server_ready; /* Clients starts after server is ready */
-std::atomic<bool> client_done;  /* Server ends after clients are done */
+// Shared between client and server thread
+std::atomic<size_t> num_servers_ready;  ///< Number of ready servers
+std::atomic<bool> all_servers_ready;  ///< True iff all server threads are ready
+std::atomic<bool> client_done;        ///< True when the client has disconnected
 char local_hostname[kMaxHostnameLen];
 
-/*
- * Hack: The server threads check that their Rpcs have zero active sessions
- * after the client exits. This needs to be disabled for test_create_session,
- * which does not use disconnection.
- */
+// Hack: The server threads check that their Rpcs have zero active sessions
+// after the client exits. This needs to be disabled for test_create_session,
+// which does not use disconnection.
 bool server_check_all_disconnected = true;
 
 /// Basic context to derive from
 class BasicAppContext {
  public:
   bool is_client;
-  Rpc<IBTransport> *rpc;
-  int *session_num_arr;
+  Rpc<IBTransport> *rpc = nullptr;
+  int *session_num_arr = nullptr;
 
   volatile size_t num_sm_resps = 0;   ///< Number of SM responses
   volatile size_t num_rpc_resps = 0;  ///< Number of Rpc responses
 };
+
+enum class ConnectServers : bool { kTrue, kFalse };
+
+// Forward declaration
+void wait_for_sm_resps_or_timeout(BasicAppContext &, const size_t,
+                                  const double);
 
 /// A basic session management handler that expects successful responses
 void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
@@ -69,9 +74,18 @@ void basic_empty_req_handler(ReqHandle *, void *) {
   exit(-1);
 }
 
-/// A basic server thread that just runs the event loop, and expects the
-/// client to disconnect before finishing.
+/**
+ * @brief The basic server thread function
+ *
+ * @param nexus The process's Nexus
+ * @param app_tid The app TID for the Rpc created by this server thread
+ * @param num_srv_threads The number of server Rpc (foreground) threads
+ * @param connect_servers True if the server threads should be connected
+ * @param sm_handler The SM handler for this server thread
+ */
 void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
+                              size_t num_srv_threads,
+                              ConnectServers connect_servers,
                               session_mgmt_handler_t sm_handler) {
   BasicAppContext context;
   context.is_client = false;
@@ -79,10 +93,61 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
   Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, sm_handler,
                        kAppPhyPort, kAppNumaNode);
   context.rpc = &rpc;
-  server_ready = true;
+  num_servers_ready++;
+
+  // Wait for all servers to come up
+  while (num_servers_ready < num_srv_threads) {
+    usleep(1);
+  }
+  all_servers_ready = true;
+
+  // Connect to all other server threads if needed
+  if (connect_servers == ConnectServers::kTrue) {
+    test_printf("test: Server %u connecting to %zu other server threads.\n",
+                app_tid, num_srv_threads - 1);
+
+    // Session number for server (kAppServerAppTid + x) is session_num_arr[x]
+    context.session_num_arr = new int[num_srv_threads];
+
+    // Create the sessions
+    for (size_t i = 0; i < num_srv_threads; i++) {
+      uint8_t other_app_tid = (uint8_t)(kAppServerAppTid + i);
+      if (other_app_tid == app_tid) {
+        continue;
+      }
+
+      context.session_num_arr[i] = context.rpc->create_session(
+          local_hostname, kAppServerAppTid + (uint8_t)i, kAppPhyPort);
+      ASSERT_GE(context.session_num_arr[i], 0);
+    }
+
+    // Wait for the sessions to connect
+    wait_for_sm_resps_or_timeout(context, num_srv_threads - 1, nexus->freq_ghz);
+  } else {
+    test_printf("test: Server %u not connecting to other server threads.\n",
+                app_tid);
+  }
 
   while (!client_done) { /* Wait for all clients */
     rpc.run_event_loop_timeout(kAppEventLoopMs);
+  }
+
+  // Disconnect sessions created to other server threads if needed
+  if (connect_servers == ConnectServers::kTrue) {
+    test_printf("test: Server %u disconnecting from %zu other server threads\n",
+                app_tid, num_srv_threads - 1);
+
+    for (size_t i = 0; i < num_srv_threads; i++) {
+      uint8_t other_app_tid = (uint8_t)(kAppServerAppTid + i);
+      if (other_app_tid == app_tid) {
+        continue;
+      }
+
+      context.rpc->destroy_session(context.session_num_arr[i]);
+    }
+
+    context.num_sm_resps = 0;
+    wait_for_sm_resps_or_timeout(context, num_srv_threads - 1, nexus->freq_ghz);
   }
 
   if (server_check_all_disconnected) {
@@ -103,12 +168,13 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
  * @param client_thread_func The function executed by the client threads.
  * Server threads execute \p basic_server_thread_func()
  *
- * @param req_func The request function that handlers kAppReqType
+ * @param req_func The request handler for kAppReqType
+ * @param connect_servers True if the created server threads should be connected
  */
 void launch_server_client_threads(
     size_t num_sessions, size_t num_bg_threads,
     void (*client_thread_func)(Nexus<IBTransport> *, size_t),
-    erpc_req_func_t req_func) {
+    erpc_req_func_t req_func, ConnectServers connect_servers) {
   Nexus<IBTransport> nexus(kAppNexusUdpPort, num_bg_threads,
                            kAppNexusPktDropProb);
 
@@ -120,18 +186,24 @@ void launch_server_client_threads(
                             ReqFunc(req_func, ReqFuncType::kBackground));
   }
 
-  server_ready = false;
+  num_servers_ready = 0;
+  all_servers_ready = false;
   client_done = false;
 
   test_printf("test: Using %zu sessions\n", num_sessions);
 
   std::thread server_thread[num_sessions];
 
-  /* Launch one server Rpc thread for each client session */
+  // Launch one server Rpc thread for each client session
   for (size_t i = 0; i < num_sessions; i++) {
     server_thread[i] =
         std::thread(basic_server_thread_func, &nexus, kAppServerAppTid + i,
-                    basic_empty_sm_handler);
+                    num_sessions, connect_servers, basic_empty_sm_handler);
+  }
+
+  // Wait for all servers to be ready before launching client thread
+  while (!all_servers_ready) {
+    usleep(1);
   }
 
   std::thread client_thread(client_thread_func, &nexus, num_sessions);
@@ -159,7 +231,7 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
   assert(nexus != nullptr);
   assert(num_sessions >= 1);
 
-  while (!server_ready) { /* Wait for server */
+  while (!all_servers_ready) {  // Wait for all server threads to start
     usleep(1);
   }
 

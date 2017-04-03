@@ -29,11 +29,7 @@ void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
 // Test: Successful connection establishment
 //
 void simple_connect(Nexus<IBTransport> *nexus, size_t) {
-  /* We're testing session connection, so can't use client_connect_sessions */
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
+  // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc =
       new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
@@ -54,7 +50,8 @@ void simple_connect(Nexus<IBTransport> *nexus, size_t) {
 }
 
 TEST(SuccessfulConnect, SuccessfulConnect) {
-  launch_server_client_threads(1, 0, simple_connect, basic_empty_req_handler);
+  launch_server_client_threads(1, 0, simple_connect, basic_empty_req_handler,
+                               ConnectServers::kFalse);
 }
 
 //
@@ -62,11 +59,7 @@ TEST(SuccessfulConnect, SuccessfulConnect) {
 // reply with the error code
 //
 void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
-  /* We're testing session connection, so can't use client_connect_sessions */
-  while (!server_ready) { /* Wait for server */
-    usleep(1);
-  }
-
+  // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc =
       new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
@@ -88,7 +81,7 @@ void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(InvalidRemotePort, InvalidRemotePort) {
   launch_server_client_threads(1, 0, invalid_remote_port,
-                               basic_empty_req_handler);
+                               basic_empty_req_handler, ConnectServers::kFalse);
 }
 
 int main(int argc, char **argv) {

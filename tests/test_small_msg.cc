@@ -86,12 +86,14 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
 }
 
 TEST(OneSmallRpc, Foreground) {
-  launch_server_client_threads(1, 0, one_small_rpc, req_handler);
+  launch_server_client_threads(1, 0, one_small_rpc, req_handler,
+                               ConnectServers::kFalse);
 }
 
 TEST(OneSmallRpc, Background) {
   /* One background thread */
-  launch_server_client_threads(1, 1, one_small_rpc, req_handler);
+  launch_server_client_threads(1, 1, one_small_rpc, req_handler,
+                               ConnectServers::kFalse);
 }
 
 ///
@@ -162,12 +164,14 @@ void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
 }
 
 TEST(MultiSmallRpcOneSession, Foreground) {
-  launch_server_client_threads(1, 0, multi_small_rpc_one_session, req_handler);
+  launch_server_client_threads(1, 0, multi_small_rpc_one_session, req_handler,
+                               ConnectServers::kFalse);
 }
 
 TEST(MultiSmallRpcOneSession, Background) {
   /* 2 background threads */
-  launch_server_client_threads(1, 2, multi_small_rpc_one_session, req_handler);
+  launch_server_client_threads(1, 2, multi_small_rpc_one_session, req_handler,
+                               ConnectServers::kFalse);
 }
 
 ///
@@ -249,7 +253,7 @@ TEST(MultiSmallRpcMultiSession, Foreground) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
   launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session,
-                               req_handler);
+                               req_handler, ConnectServers::kFalse);
 }
 
 TEST(MultiSmallRpcMultiSession, Background) {
@@ -258,7 +262,7 @@ TEST(MultiSmallRpcMultiSession, Background) {
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
   /* 3 background threads */
   launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session,
-                               req_handler);
+                               req_handler, ConnectServers::kFalse);
 }
 
 int main(int argc, char **argv) {
