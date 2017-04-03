@@ -85,7 +85,7 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
   }
   ASSERT_EQ(ret, 0);
 
-  client_wait_for_rpc_resps_or_timeout(nexus, context, 1);
+  wait_for_rpc_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_rpc_resps, 1);
 
   rpc->free_msg_buffer(req_msgbuf);

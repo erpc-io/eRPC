@@ -38,8 +38,8 @@ class BasicAppContext {
   Rpc<IBTransport> *rpc;
   int *session_num_arr;
 
-  size_t num_sm_resps = 0;   ///< Number of SM responses
-  size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+  volatile size_t num_sm_resps = 0;   ///< Number of SM responses
+  volatile size_t num_rpc_resps = 0;  ///< Number of Rpc responses
 };
 
 /// A basic session management handler that expects successful responses
@@ -143,7 +143,16 @@ void launch_server_client_threads(
   client_thread.join();
 }
 
-/// Initialize client context and connect sessions
+/**
+ * @brief Initialize client context and create sessions to server Rpcs running
+ * on localhost
+ *
+ * @param nexus The process's Nexus
+ * @param context The uninitialized client context
+ * @param num_sessions The number of sessions to create for the client. Session
+ * \p i is created to Rpc \p {kAppServerAppTid + i} at localhost
+ * @param sm_handler The client's sm handler
+ */
 void client_connect_sessions(Nexus<IBTransport> *nexus,
                              BasicAppContext &context, size_t num_sessions,
                              session_mgmt_handler_t sm_handler) {
@@ -173,34 +182,47 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
   ASSERT_EQ(context.num_sm_resps, num_sessions);
 }
 
-/// Run the event loop until we get at least \p num_resps session management
-/// responses, or until kAppMaxEventLoopMs are elapsed.
-void client_wait_for_sm_resps_or_timeout(const Nexus<IBTransport> *nexus,
-                                         BasicAppContext &context,
-                                         size_t num_resps) {
+/**
+ * @brief Run the event loop on \p context's Rpc until we get at least
+ * \p num_resps session management responses, or until \p kAppMaxEventLoopMs
+ * are elapsed
+ *
+ * @param context The server or client context containing the Rpc
+ * @param num_resps The number of SM responses to wait for
+ * @param freq_ghz rdtsc frequency in GHz
+ */
+void wait_for_sm_resps_or_timeout(BasicAppContext &context,
+                                  const size_t num_resps,
+                                  const double freq_ghz) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
   uint64_t cycles_start = rdtsc();
   while (context.num_sm_resps < num_resps) {
     context.rpc->run_event_loop_timeout(kAppEventLoopMs);
 
-    double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
+    double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
     if (ms_elapsed > kAppMaxEventLoopMs) {
       break;
     }
   }
 }
 
-/// Run the event loop until we get at least \p num_resps RPC responses, or
-/// until kAppMaxEventLoopMs are elapsed.
-void client_wait_for_rpc_resps_or_timeout(const Nexus<IBTransport> *nexus,
-                                          BasicAppContext &context,
-                                          size_t num_resps) {
+/**
+ * @brief Run the event loop on \p context's Rpc until we get at least
+ * \p num_resps RPC responses, or until \p kAppMaxEventLoopMs are elapsed
+ *
+ * @param context The server or client context containing the Rpc
+ * @param num_resps The number of RPC responses to wait for
+ * @param freq_ghz rdtsc frequency in GHz
+ */
+void wait_for_rpc_resps_or_timeout(BasicAppContext &context,
+                                   const size_t num_resps,
+                                   const double freq_ghz) {
   /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
   uint64_t cycles_start = rdtsc();
   while (context.num_rpc_resps < num_resps) {
     context.rpc->run_event_loop_timeout(kAppEventLoopMs);
 
-    double ms_elapsed = to_msec(rdtsc() - cycles_start, nexus->freq_ghz);
+    double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
     if (ms_elapsed > kAppMaxEventLoopMs) {
       break;
     }

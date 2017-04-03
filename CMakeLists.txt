@@ -95,7 +95,8 @@ set(CTEST_TESTS
   test_bg_restrictions
   test_small_msg
   test_large_msg
-  test_req_in_cont)
+  test_req_in_cont_func
+  test_req_in_req_func)
 
 # Other tests that can be run without ctest
 set(OTHER_TESTS

@@ -71,7 +71,7 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
   }
   ASSERT_EQ(ret, 0);
 
-  client_wait_for_rpc_resps_or_timeout(nexus, context, 1);
+  wait_for_rpc_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_rpc_resps, 1);
 
   rpc->free_msg_buffer(req_msgbuf);
@@ -142,8 +142,8 @@ void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
                                    cont_func, 0);
     ASSERT_NE(ret, 0);
 
-    client_wait_for_rpc_resps_or_timeout(nexus, context,
-                                         Session::kSessionReqWindow);
+    wait_for_rpc_resps_or_timeout(context, Session::kSessionReqWindow,
+                                  nexus->freq_ghz);
     ASSERT_EQ(context.num_rpc_resps, Session::kSessionReqWindow);
   }
 
@@ -223,7 +223,7 @@ void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
       }
     }
 
-    client_wait_for_rpc_resps_or_timeout(nexus, context, tot_reqs_per_iter);
+    wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter, nexus->freq_ghz);
     ASSERT_EQ(context.num_rpc_resps, tot_reqs_per_iter);
   }
 

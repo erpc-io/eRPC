@@ -53,14 +53,14 @@ void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
   /* Connect the session */
   context.arm(SessionMgmtEventType::kConnected, SessionMgmtErrType::kNoError,
               session_num);
-  client_wait_for_sm_resps_or_timeout(nexus, context, 1);
+  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_sm_resps, 1); /* The connect event */
 
   /* Disconnect the session */
   context.arm(SessionMgmtEventType::kDisconnected, SessionMgmtErrType::kNoError,
               session_num);
   rpc->destroy_session(session_num);
-  client_wait_for_sm_resps_or_timeout(nexus, context, 1);
+  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_sm_resps, 1); /* The disconnect event */
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
@@ -101,14 +101,14 @@ void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
     /* Connect the session */
     context.arm(SessionMgmtEventType::kConnected, SessionMgmtErrType::kNoError,
                 session_num);
-    client_wait_for_sm_resps_or_timeout(nexus, context, 1);
+    wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
     ASSERT_EQ(context.num_sm_resps, 1); /* The connect event */
 
     /* Disconnect the session */
     context.arm(SessionMgmtEventType::kDisconnected,
                 SessionMgmtErrType::kNoError, session_num);
     rpc->destroy_session(session_num);
-    client_wait_for_sm_resps_or_timeout(nexus, context, 1);
+    wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
     ASSERT_EQ(context.num_sm_resps, 1); /* The disconnect event */
 
     ASSERT_EQ(rpc->num_active_sessions(), 0);
@@ -140,7 +140,7 @@ void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
   ASSERT_GE(session_num, 0);
   context.arm(SessionMgmtEventType::kConnectFailed,
               SessionMgmtErrType::kInvalidRemotePort, session_num);
-  client_wait_for_sm_resps_or_timeout(nexus, context, 1);
+  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_sm_resps, 1); /* The connect failed event */
 
   /*
@@ -178,7 +178,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
       rpc->create_session(local_hostname, kAppServerAppTid, kAppPhyPort);
   context.arm(SessionMgmtEventType::kConnectFailed,
               SessionMgmtErrType::kRoutingResolutionFailure, session_num);
-  client_wait_for_sm_resps_or_timeout(nexus, context, 1);
+  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_sm_resps, 1); /* The connect failed event */
 
   /*

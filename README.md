@@ -45,9 +45,6 @@ EA Code notes
      is no longer needed for retransmission.
 
 ## Short-term TODOs
- * Locking for `enqueue_req` and `enqueue_resp`? How much locking can we avoid?
-   (e.g., we need lock in `upsert_datapath_tx_work_queue`.)
- * Which fields of SSlot need to be public?
  * Need background flag for continuations.
  * Should `datapath_tx_work_queue` contain sslots instead of sessions?
  * Do we need `no_free` versions of sslot burying functions?

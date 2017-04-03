@@ -126,7 +126,7 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions = 1) {
     enqueue_request_helper(&context, i);
   }
 
-  client_wait_for_rpc_resps_or_timeout(nexus, context, kAppNumReqs);
+  wait_for_rpc_resps_or_timeout(context, kAppNumReqs, nexus->freq_ghz);
   ASSERT_GE(context.num_rpc_resps, kAppNumReqs);  // We can overshoot a bit
 
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
