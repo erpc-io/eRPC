@@ -12,30 +12,19 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   // The client has a pending request, so the session can't be disconnected
   assert(session->is_connected());
 
-  // Sanity-check the request MsgBuffer. The switch below gets optimized out.
+  // Foreground request handlers must call enqueue_response() *before* returning
+  // to the event loop, which frees the request MsgBuffer. For these handlers,
+  // rx_msgbuf must be valid for now (but not for other handlers).
   MsgBuffer *rx_msgbuf = &sslot->rx_msgbuf;
   _unused(rx_msgbuf);
   switch (sslot->req_func_type) {
     case ReqFuncType::kFgTerminal:
-      // Response is enqueued before the request handler returns, and the event
-      // loop will bury rx_msgbuf after the handler returns.
+      // rx_msgbuf could be fake
       assert(rx_msgbuf->buf != nullptr && rx_msgbuf->check_magic());
       break;
-    case ReqFuncType::kFgNonterminal:
-      // Response is enqueued before (or after) the request handler returns, and
-      // the event loop will bury or (has buried) rx_msgbuf after the handler
-      // returns
+    default:
+      // We can't assert anything for other request handler types
       break;
-    case ReqFuncType::kBackground:
-      // Background threads can't bury MsgBuffers, so we'll bury rx_msgbuf below
-      assert(rx_msgbuf->buf != nullptr && rx_msgbuf->is_dynamic() &&
-             rx_msgbuf->check_magic());
-      break;
-  }
-
-  if (small_rpc_unlikely(sslot->req_func_type == ReqFuncType::kBackground)) {
-    // Event loop frees rx_msgbuf in other cases
-    bury_sslot_rx_msgbuf(sslot);
   }
 
   MsgBuffer *resp_msgbuf;

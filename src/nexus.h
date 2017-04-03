@@ -25,13 +25,12 @@ class Nexus {
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(uint8_t app_tid, const Rpc<TTr> *rpc, void *context,
-               SSlot *sslot)
+    BgWorkItem(uint8_t app_tid, Rpc<TTr> *rpc, void *context, SSlot *sslot)
         : app_tid(app_tid), rpc(rpc), context(context), sslot(sslot) {}
 
     /// App TID of the Rpc that submitted this request. Debug-only.
     const uint8_t app_tid;
-    const Rpc<TTr> *rpc;
+    Rpc<TTr> *rpc;
     void *context;  ///< The context to use for request handler
     SSlot *sslot;
   };

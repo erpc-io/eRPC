@@ -67,7 +67,7 @@ class Rpc {
   ~Rpc();
 
   //
-  // MsgBuffer allocation
+  // MsgBuffer management
   //
 
   /**
@@ -148,6 +148,74 @@ class Rpc {
     size_t ret = huge_alloc->get_stat_user_alloc_tot();
     unlock_cond(&huge_alloc_lock);
     return ret;
+  }
+
+  /**
+   * @brief Free the session slot's TX MsgBuffer if it is dynamic, and NULL-ify
+   * it in any case. This does not fully validate the MsgBuffer, since we don't
+   * want to conditionally bury only initialized sslots.
+   *
+   * This is thread-safe, as \p free_msg_buffer() is thread-safe.
+   */
+  inline void bury_sslot_tx_msgbuf(SSlot *sslot) {
+    assert(sslot != nullptr);
+
+    // The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
+    // Its buf can be non-NULL even when dynamic allocation is not used.
+    MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
+    if (small_rpc_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
+      // This check is OK, as dynamic sslots must be initialized
+      assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
+      free_msg_buffer(*tx_msgbuf);
+      // Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf
+    }
+
+    sslot->tx_msgbuf = nullptr;
+  }
+
+  /**
+   * @brief Bury a session slot's TX MsgBuffer without freeing possibly
+   * dynamically allocated memory.
+   *
+   * This is used for burying the TX MsgBuffer used for holding requests at
+   * the client.
+   */
+  static inline void bury_sslot_tx_msgbuf_nofree(SSlot *sslot) {
+    assert(sslot != nullptr);
+    sslot->tx_msgbuf = nullptr;
+  }
+
+  /**
+   * @brief Free the session slot's RX MsgBuffer if it is dynamic, and NULL-ify
+   * it in any case. This does not fully validate the MsgBuffer, since we don't
+   * want to conditinally bury only initialized sslots.
+   *
+   * This is thread-safe, as \p free_msg_buffer() is thread-safe.
+   */
+  inline void bury_sslot_rx_msgbuf(SSlot *sslot) {
+    assert(sslot != nullptr);
+
+    // The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
+    // Its buf can be non-NULL even when dynamic allocation is not used.
+    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
+    if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
+      // This check is OK, as dynamic sslots must be initialized
+      assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
+      free_msg_buffer(rx_msgbuf);
+      rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
+    }
+
+    rx_msgbuf.buf = nullptr;
+  }
+
+  /**
+   * @brief Bury a session slot's RX MsgBuffer without freeing possibly
+   * dynamically allocated memory. This is used for burying fake RX MsgBuffers.
+   */
+  static inline void bury_sslot_rx_msgbuf_nofree(SSlot *sslot) {
+    assert(sslot != nullptr);
+    assert(!sslot->rx_msgbuf.is_dynamic());  // It's fake
+    sslot->rx_msgbuf.buf = nullptr;
   }
 
   //
@@ -430,74 +498,6 @@ class Rpc {
    */
   void send_credit_return_now_st(Session *session,
                                  const pkthdr_t *unexp_pkthdr);
-
-  /**
-   * @brief Free the session slot's TX MsgBuffer if it is dynamic, and NULL-ify
-   * it in any case. This does not fully validate the MsgBuffer, since we don't
-   * want to conditionally bury only initialized sslots.
-   *
-   * This is thread-safe, as \p free_msg_buffer() is thread-safe.
-   */
-  inline void bury_sslot_tx_msgbuf(SSlot *sslot) {
-    assert(sslot != nullptr);
-
-    // The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
-    // Its buf can be non-NULL even when dynamic allocation is not used.
-    MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
-    if (small_rpc_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
-      // This check is OK, as dynamic sslots must be initialized
-      assert(tx_msgbuf->buf != nullptr && tx_msgbuf->check_magic());
-      free_msg_buffer(*tx_msgbuf);
-      // Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf
-    }
-
-    sslot->tx_msgbuf = nullptr;
-  }
-
-  /**
-   * @brief Bury a session slot's TX MsgBuffer without freeing possibly
-   * dynamically allocated memory.
-   *
-   * This is used for burying the TX MsgBuffer used for holding requests at
-   * the client.
-   */
-  static inline void bury_sslot_tx_msgbuf_nofree(SSlot *sslot) {
-    assert(sslot != nullptr);
-    sslot->tx_msgbuf = nullptr;
-  }
-
-  /**
-   * @brief Free the session slot's RX MsgBuffer if it is dynamic, and NULL-ify
-   * it in any case. This does not fully validate the MsgBuffer, since we don't
-   * want to conditinally bury only initialized sslots.
-   *
-   * This is thread-safe, as \p free_msg_buffer() is thread-safe.
-   */
-  inline void bury_sslot_rx_msgbuf(SSlot *sslot) {
-    assert(sslot != nullptr);
-
-    // The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
-    // Its buf can be non-NULL even when dynamic allocation is not used.
-    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
-    if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
-      // This check is OK, as dynamic sslots must be initialized
-      assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
-      free_msg_buffer(rx_msgbuf);
-      rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
-    }
-
-    rx_msgbuf.buf = nullptr;
-  }
-
-  /**
-   * @brief Bury a session slot's RX MsgBuffer without freeing possibly
-   * dynamically allocated memory. This is used for burying fake RX MsgBuffers.
-   */
-  static inline void bury_sslot_rx_msgbuf_nofree(SSlot *sslot) {
-    assert(sslot != nullptr);
-    assert(!sslot->rx_msgbuf.is_dynamic());  // It's fake
-    sslot->rx_msgbuf.buf = nullptr;
-  }
 
   // Constructor args
   Nexus<TTr> *nexus;

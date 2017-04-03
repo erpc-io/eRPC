@@ -1,6 +1,7 @@
 #include "nexus.h"
 #include "common.h"
 #include "ops.h"
+#include "rpc.h"
 #include "session.h"
 #include "util/mt_list.h"
 
@@ -48,10 +49,8 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
       const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);
       assert(req_func.is_registered());  // Checked during submit_bg
 
-      // We don't have access to the Rpc object: it's templated and we don't
-      // want a templated Nexus. So, rx_msgbuf will be buried when the user
-      // calls enqueue_response().
       req_func.req_func((ReqHandle *)sslot, context);
+      bg_work_item.rpc->bury_sslot_rx_msgbuf(sslot);
     }
 
     req_list.locked_clear();
