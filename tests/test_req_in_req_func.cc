@@ -5,8 +5,12 @@
 #include "test_basics.h"
 
 static constexpr size_t kAppNumReqs = 1000;
-static constexpr uint8_t kAppReqTypeCS = 1;  /// Client to server 0
-static constexpr uint8_t kAppReqTypeSS = 2;  /// Server 0 to server 1
+
+/// Request type used for client to server 0
+static constexpr uint8_t kAppReqTypeCS = kAppReqType + 1;
+
+/// Request type used for server 0 to server 1
+static constexpr uint8_t kAppReqTypeSS = kAppReqType + 2;
 
 static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
@@ -99,7 +103,7 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
   tag_t tag((void *)srv_req_info);
 
   int ret = context->rpc->enqueue_request(
-      context->session_num_arr[0], kAppReqTypeSS, &srv_req_info->req_msgbuf_ss,
+      context->session_num_arr[1], kAppReqTypeSS, &srv_req_info->req_msgbuf_ss,
       server_cont_func, tag.tag);
   ASSERT_EQ(ret, 0);
 }
@@ -203,7 +207,7 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
               context->num_reqs_sent, req_size);
 
   int ret =
-      context->rpc->enqueue_request(context->session_num_arr[0], kAppReqType,
+      context->rpc->enqueue_request(context->session_num_arr[0], kAppReqTypeCS,
                                     &req_msgbuf, client_cont_func, tag.tag);
 
   context->num_reqs_sent++;

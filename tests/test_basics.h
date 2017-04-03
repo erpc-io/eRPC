@@ -65,7 +65,6 @@ void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
   _unused(session_num);
 
   auto *context = (BasicAppContext *)_context;
-  ASSERT_TRUE(context->is_client);
   context->num_sm_resps++;
 
   ASSERT_EQ(sm_err_type, SessionMgmtErrType::kNoError);
@@ -73,7 +72,7 @@ void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
               sm_event_type == SessionMgmtEventType::kDisconnected);
 }
 
-/// A basic empty session management handler that should never be iinvoked.
+/// A basic empty session management handler that should never be invoked.
 void basic_empty_sm_handler(int, SessionMgmtEventType, SessionMgmtErrType,
                             void *) {
   assert(false);
@@ -213,9 +212,14 @@ void launch_server_client_threads(
 
   // Launch one server Rpc thread for each client session
   for (size_t i = 0; i < num_sessions; i++) {
+    // Server threads need an SM handler iff we're connecting servers together
+    session_mgmt_handler_t _sm_handler =
+        connect_servers == ConnectServers::kFalse ? basic_empty_sm_handler
+                                                  : basic_sm_handler;
+
     server_thread[i] =
         std::thread(basic_server_thread_func, &nexus, kAppServerAppTid + i,
-                    num_sessions, connect_servers, basic_empty_sm_handler);
+                    num_sessions, connect_servers, _sm_handler);
   }
 
   // Wait for all servers to be ready before launching client thread
