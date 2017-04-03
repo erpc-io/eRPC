@@ -313,10 +313,11 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot) {
 
   // Choose a background thread at random
   size_t bg_thread_id = fast_rand.next_u32() % nexus->num_bg_threads;
-  MtList<BgWorkItem> *req_list = nexus_hook.bg_req_list_arr[bg_thread_id];
+  auto *req_list = nexus_hook.bg_req_list_arr[bg_thread_id];
 
   // Thread-safe
-  req_list->unlocked_push_back(BgWorkItem(app_tid, context, sslot));
+  req_list->unlocked_push_back(
+      typename Nexus<TTr>::BgWorkItem(app_tid, this, context, sslot));
 }
 
 template <class TTr>

@@ -60,8 +60,7 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
     bg_thread_ctx_arr[i].bg_thread_id = i;
 
-    bg_thread_arr[i] =
-        std::thread(BgThread::bg_thread_func, &bg_thread_ctx_arr[i]);
+    bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
   }
 
   install_sigio_handler();
@@ -96,7 +95,7 @@ bool Nexus<TTr>::app_tid_exists(uint8_t app_tid) {
 }
 
 template <class TTr>
-void Nexus<TTr>::register_hook(NexusHook *hook) {
+void Nexus<TTr>::register_hook(Hook *hook) {
   assert(hook != nullptr);
 
   uint8_t app_tid = hook->app_tid;
@@ -120,7 +119,7 @@ void Nexus<TTr>::register_hook(NexusHook *hook) {
 }
 
 template <class TTr>
-void Nexus<TTr>::unregister_hook(NexusHook *hook) {
+void Nexus<TTr>::unregister_hook(Hook *hook) {
   assert(hook != nullptr);
 
   uint8_t app_tid = hook->app_tid;
@@ -237,7 +236,7 @@ void Nexus<TTr>::session_mgnt_handler() {
   }
 
   // Find the registered Rpc that has this TID
-  NexusHook *target_hook = reg_hooks_arr[target_app_tid];
+  Hook *target_hook = reg_hooks_arr[target_app_tid];
 
   if (target_hook == nullptr) {
     // We don't have an Rpc object for target_app_tid

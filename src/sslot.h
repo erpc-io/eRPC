@@ -9,7 +9,9 @@ namespace ERpc {
 // Forward declarations for friendship
 class IBTransport;
 class Session;
-class BgThread;
+
+template <typename T>
+class Nexus;
 
 template <typename T>
 class Rpc;
@@ -27,9 +29,8 @@ class Rpc;
  * its packet header must contain the request type and number.
  */
 class SSlot {
-  friend class IBTransport;
   friend class Session;
-  friend class BgThread;
+  friend class Nexus<IBTransport>;
   friend class Rpc<IBTransport>;
   friend class ReqHandle;
   friend class RespHandle;

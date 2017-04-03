@@ -4,7 +4,6 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "bg_thread.h"
 #include "common.h"
 #include "session.h"
 #include "session_mgmt_types.h"
@@ -14,21 +13,56 @@
 
 namespace ERpc {
 
-/// A hook created by the per-thread Rpc, and shared with the per-process Nexus.
-/// All accesses to this hook must be done with @session_mgmt_mutex locked.
-class NexusHook {
- public:
-  NexusHook(uint8_t app_tid) : app_tid(app_tid) {}
-  const uint8_t app_tid;  ///< App TID of the RPC that created this hook
-  MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
-  /// Background thread request lists
-  MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
-};
+// Forward declaration
+template <typename T>
+class Rpc;
 
 template <class TTr>
 class Nexus {
  public:
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
+
+  /// A work item submitted to a background thread
+  class BgWorkItem {
+   public:
+    BgWorkItem(uint8_t app_tid, const Rpc<TTr> *rpc, void *context,
+               SSlot *sslot)
+        : app_tid(app_tid), rpc(rpc), context(context), sslot(sslot) {}
+
+    /// App TID of the Rpc that submitted this request. Debug-only.
+    const uint8_t app_tid;
+    const Rpc<TTr> *rpc;
+    void *context;  ///< The context to use for request handler
+    SSlot *sslot;
+  };
+
+  /// Background thread context
+  class BgThreadCtx {
+   public:
+    /// A switch used by the Nexus to turn off background threads
+    volatile bool *bg_kill_switch;
+
+    /// A pointer to the Nexus's request functions. Unlike Rpc threads that
+    /// create a copy of the Nexus's request functions, background threads have
+    /// a pointer. This is because background threads are launched before any
+    /// request functions are registered.
+    std::array<ReqFunc, kMaxReqTypes> *req_func_arr;
+
+    size_t bg_thread_id;             ///< ID of the background thread
+    MtList<BgWorkItem> bg_req_list;  ///< Background thread request list
+  };
+
+  /// A hook created by the per-thread Rpc, and shared with the per-process
+  /// Nexus. All accesses to this hook must be done with @session_mgmt_mutex
+  /// locked.
+  class Hook {
+   public:
+    Hook(uint8_t app_tid) : app_tid(app_tid) {}
+    const uint8_t app_tid;  ///< App TID of the RPC that created this hook
+    MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
+    /// Background thread request lists
+    MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
+  };
 
   /**
    * @brief Create the one-per-process Nexus object.
@@ -51,6 +85,9 @@ class Nexus {
 
   ~Nexus();
 
+  /// The function executed by background threads
+  static void bg_thread_func(BgThreadCtx *bg_thread_ctx);
+
   /**
    * @brief Check if a hook with app TID = \p app_tid exists in this Nexus. The
    * caller must not hold the Nexus lock before calling this.
@@ -58,10 +95,10 @@ class Nexus {
   bool app_tid_exists(uint8_t app_tid);
 
   /// Register a previously unregistered session management hook
-  void register_hook(NexusHook *hook);
+  void register_hook(Hook *hook);
 
   /// Unregister a previously registered session management hook
-  void unregister_hook(NexusHook *hook);
+  void unregister_hook(Hook *hook);
 
   void install_sigio_handler();
   void session_mgnt_handler();
@@ -103,7 +140,7 @@ class Nexus {
 
   /// Read-write members exposed to Rpc threads
   std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
-  NexusHook *reg_hooks_arr[kMaxAppTid + 1] = {nullptr};  ///< Rpc-Nexus hooks
+  Hook *reg_hooks_arr[kMaxAppTid + 1] = {nullptr};  ///< Rpc-Nexus hooks
 
  private:
   int sm_sock_fd;  ///< File descriptor of the session management UDP socket
