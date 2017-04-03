@@ -66,6 +66,9 @@ class Rpc {
   /// Destroy the Rpc from a foreground thread
   ~Rpc();
 
+  /// Return the application TID of this Rpc object
+  uint8_t get_app_tid() const { return app_tid; }
+
   //
   // MsgBuffer management
   //

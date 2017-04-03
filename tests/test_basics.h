@@ -35,10 +35,22 @@ class BasicAppContext {
  public:
   bool is_client;
   Rpc<IBTransport> *rpc = nullptr;
-  int *session_num_arr = nullptr;
+  int *session_num_arr = nullptr;  ///< Sessions created as client
 
   volatile size_t num_sm_resps = 0;   ///< Number of SM responses
   volatile size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+};
+
+/// Info required to register a request handler function
+class ReqFuncRegInfo {
+ public:
+  const uint8_t req_type;
+  const erpc_req_func_t req_func;
+  const ReqFuncType req_func_type;
+
+  ReqFuncRegInfo(uint8_t req_type, erpc_req_func_t req_func,
+                 ReqFuncType req_func_type)
+      : req_type(req_type), req_func(req_func), req_func_type(req_func_type) {}
 };
 
 enum class ConnectServers : bool { kTrue, kFalse };
@@ -174,22 +186,21 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
  * @param client_thread_func The function executed by the client threads.
  * Server threads execute \p basic_server_thread_func()
  *
- * @param req_func The request handler for kAppReqType
+ * @param req_func_vec The request handlers to register
  * @param connect_servers True if the created server threads should be connected
  */
 void launch_server_client_threads(
     size_t num_sessions, size_t num_bg_threads,
     void (*client_thread_func)(Nexus<IBTransport> *, size_t),
-    erpc_req_func_t req_func, ConnectServers connect_servers) {
+    std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
+    ConnectServers connect_servers) {
   Nexus<IBTransport> nexus(kAppNexusUdpPort, num_bg_threads,
                            kAppNexusPktDropProb);
 
-  if (num_bg_threads == 0) {
-    nexus.register_req_func(kAppReqType,
-                            ReqFunc(req_func, ReqFuncType::kFgTerminal));
-  } else {
-    nexus.register_req_func(kAppReqType,
-                            ReqFunc(req_func, ReqFuncType::kBackground));
+  // Register the request handler functions
+  for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
+    nexus.register_req_func(info.req_type,
+                            ReqFunc(info.req_func, info.req_func_type));
   }
 
   num_servers_ready = 0;

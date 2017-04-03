@@ -142,7 +142,7 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
   client_done = true;
 }
 
-TEST(SendReqInCont, Foreground) {
+TEST(SendReqInContFunc, Foreground) {
   launch_server_client_threads(1, 0, client_thread, req_handler,
                                ConnectServers::kFalse);
 }
