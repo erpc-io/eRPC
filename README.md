@@ -1,6 +1,7 @@
-EA Code notes
+## Code notes
  * An important simplifying insight is that all functions invoked by the event
-   loop run to completion, i.e., we cannot be preempted.
+   loop run to completion, i.e., we cannot be preempted, leaving objects in
+   an invalid state.
  * Major types
    * Request type: `uint8_t`. 256 request types should be enough.
    * App TIDs: `uint8_t`. We need one per thread, so 256 is enough.
@@ -17,6 +18,12 @@ EA Code notes
  * Do not initialize struct/class members in the struct/class definition
    (except maybe in major classes like Rpc/Nexus/Session). This only causes
    confusion.
+
+## Object lifetime notes
+ * The Rpc object cannot be destroyed by a background thread or while the
+   foreground thread is in the event loop (i.e., by the request handler or
+   continuation user code). This means that an initially valid Rpc object will
+   stay valid for an interation of the event loop.
 
 ## MsgBuffer ownership notes
  * The correctness of this reasoning depends on restrictions on the request

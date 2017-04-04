@@ -1,70 +1,93 @@
+/**
+ * @file test_api_restrictions.cc
+ * @brief Test the restrictions on the eRPC API.
+ */
+
 #include "test_basics.h"
+
+static constexpr size_t kAppReqSize = 32;  ///< Request size for this test
 
 /// Per-thread application context
 class AppContext : public BasicAppContext {};
 
-/// The common request handler for all subtests. Copies the request string to
-/// the response.
+enum class AppDeathMode {
+  kReqHandlerRunsEventLoop,
+  kReqHandlerDeletesRpc,
+  kContFuncRunsEventLoop,
+  kContFuncDeletesRpc
+};
+
+/// Used to configure the cause of death of the req handler or continuation
+std::atomic<AppDeathMode> app_death_mode;
+
+void req_handler(ReqHandle *, void *);  // Forward declaration
+auto reg_info_vec = {
+    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kBackground)};
+
+/// A request handler with a configurable death mode
 void req_handler(ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
+  assert(req_handle != nullptr && _context != nullptr);
 
   auto *context = (AppContext *)_context;
-  ASSERT_FALSE(context->is_client);
-  ASSERT_TRUE(context->rpc->in_background());
+  assert(!context->is_client);
+  assert(context->rpc->in_background());
 
-  const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  test_printf("Server: Received request %s\n", req_msgbuf->buf);
-
-  /* Try to create a session */
+  // Try to create a session
   int session_num = context->rpc->create_session(local_hostname,
                                                  kAppServerAppTid, kAppPhyPort);
   ASSERT_EQ(session_num, -EPERM);
 
-  /* Try to destroy a valid session number */
+  // Try to destroy a valid session number
   int ret = context->rpc->destroy_session(0);
   ASSERT_EQ(ret, -EPERM);
 
-  /*
-   * Try to run the event loop. This may not cause a crash if asserts are
-   * disabled.
-   */
-  ASSERT_DEATH(context->rpc->run_event_loop_one(), ".*");
-  ASSERT_DEATH(assert(false), ".*");
+  if (app_death_mode == AppDeathMode::kReqHandlerRunsEventLoop) {
+    // Try to run the event loop. This crashes only in kDatapathChecks mode
+    if (kDatapathChecks) {
+      test_printf("test: Trying to run event loop in req handler.\n");
+      ASSERT_DEATH(context->rpc->run_event_loop_one(), ".*");
+    }
+  }
 
-  size_t resp_size = strlen((char *)req_msgbuf->buf);
-  Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
-  strcpy((char *)req_handle->pre_resp_msgbuf.buf, (char *)req_msgbuf->buf);
+  if (app_death_mode == AppDeathMode::kReqHandlerDeletesRpc) {
+    // Try to delete the Rpc. This crashes even without kDatapathChecks.
+    test_printf("test: Trying to delete Rpc in req handler.\n");
+    ASSERT_DEATH(delete context->rpc, ".*");
+  }
+
+  Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                      kAppReqSize);
   req_handle->prealloc_used = true;
-
   context->rpc->enqueue_response(req_handle);
 }
 
-/// The common continuation function for all subtests. This checks that the
-/// request buffer is identical to the response buffer, and increments the
-/// number of responses in the context.
-void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
-  assert(resp_handle != nullptr);
-  assert(_context != nullptr);
-
-  const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  test_printf("Client: Received response %s, tag = %zu\n",
-              (char *)resp_msgbuf->buf, tag);
-
-  std::string exp_resp = std::string("APP_MSG-") + std::to_string(tag);
-  ASSERT_STREQ((char *)resp_msgbuf->buf, exp_resp.c_str());
-
+/// A continuation function with a configurable death mode
+void cont_func(RespHandle *resp_handle, void *_context, size_t) {
+  assert(resp_handle != nullptr && _context != nullptr);
   auto *context = (AppContext *)_context;
+
+  if (app_death_mode == AppDeathMode::kContFuncRunsEventLoop) {
+    // Try to run the event loop. This crashes only in kDatapathChecks mode
+    if (kDatapathChecks) {
+      test_printf("test: Trying to run event loop in cont func.\n");
+      ASSERT_DEATH(context->rpc->run_event_loop_one(), ".*");
+    }
+  }
+
+  if (app_death_mode == AppDeathMode::kContFuncDeletesRpc) {
+    // Try to delete the Rpc. This crashes even without kDatapathChecks.
+    test_printf("test: Trying to delete Rpc in cont func.\n");
+    ASSERT_DEATH(delete context->rpc, ".*");
+  }
+
   ASSERT_TRUE(context->is_client);
   context->num_rpc_resps++;
 
   context->rpc->release_respone(resp_handle);
 }
 
-///
-/// Test: Send one small request packet to the invalid request handler
-///
-void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
+/// The test function
+void test_func(Nexus<IBTransport> *nexus, size_t num_sessions) {
   /* Create the Rpc and connect the session */
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
@@ -73,20 +96,15 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
   int session_num = context.session_num_arr[0];
 
   /* Send a message */
-  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG-0") + 1);
-  ASSERT_NE(req_msgbuf.buf, nullptr);
-  strcpy((char *)req_msgbuf.buf, "APP_MSG-0");
+  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(kAppReqSize);
+  assert(req_msgbuf.buf != nullptr);
 
-  test_printf("test: Sending request %s\n", (char *)req_msgbuf.buf);
   int ret =
       rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
-  if (ret != 0) {
-    test_printf("test: enqueue_request error %s\n", std::strerror(ret));
-  }
-  ASSERT_EQ(ret, 0);
+  assert(ret == 0);
 
   wait_for_rpc_resps_or_timeout(context, 1, nexus->freq_ghz);
-  ASSERT_EQ(context.num_rpc_resps, 1);
+  assert(context.num_rpc_resps == 1);
 
   rpc->free_msg_buffer(req_msgbuf);
 
@@ -99,13 +117,32 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
   client_done = true;
 }
 
-TEST(BgRestrictions, All) {
-  auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kBackground)};
-
-  // One background thread
-  launch_server_client_threads(1, 1, one_small_rpc, reg_info_vec,
+/// A helper function to run the tests below. GTest's death test seems to
+/// keep running a copy of the program after the crash, which cleans up
+/// hugepages.
+void TEST_HELPER() {
+  launch_server_client_threads(1, 1, test_func, reg_info_vec,
                                ConnectServers::kFalse);
+}
+
+TEST(Restrictions, ReqHandlerRunsEventLoop) {
+  app_death_mode = AppDeathMode::kReqHandlerRunsEventLoop;
+  TEST_HELPER();
+}
+
+TEST(Restrictions, ReqHandlerDeletesRpc) {
+  app_death_mode = AppDeathMode::kReqHandlerDeletesRpc;
+  TEST_HELPER();
+}
+
+TEST(Restrictions, ContFuncRunsEventLoop) {
+  app_death_mode = AppDeathMode::kContFuncRunsEventLoop;
+  TEST_HELPER();
+}
+
+TEST(Restrictions, ContFuncDeletesRpc) {
+  app_death_mode = AppDeathMode::kContFuncDeletesRpc;
+  TEST_HELPER();
 }
 
 int main(int argc, char **argv) {

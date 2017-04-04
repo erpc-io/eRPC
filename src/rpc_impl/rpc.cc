@@ -80,7 +80,21 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t app_tid,
 
 template <class TTr>
 Rpc<TTr>::~Rpc() {
-  assert(in_creator());
+  // Rpc can only be destroyed from the creator thread
+  if (unlikely(!in_creator())) {
+    erpc_dprintf("eRPC Rpc %u: Error. Cannot destroy from background thread.\n",
+                 app_tid);
+    exit(-1);
+  }
+
+  // Rpc cannot be destroyed from within the event loop (e.g., in a request
+  // handler). However, event loop entrance tracking is enabled only in
+  // kDatapathChecks mode
+  if (kDatapathChecks && in_event_loop) {
+    erpc_dprintf("eRPC Rpc %u: Error. Cannot destroy when inside event loop.\n",
+                 app_tid);
+    exit(-1);
+  }
 
   // XXX: Check if all sessions are disconnected
   for (Session *session : session_vec) {

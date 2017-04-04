@@ -2,28 +2,33 @@
 
 namespace ERpc {
 
+// The Rpc object stays valid for this iteration of the event loop, i.e., it
+// cannot be destroyed
 template <class TTr>
 inline void Rpc<TTr>::run_event_loop_one_st() {
   dpath_stat_inc(&dpath_stats.ev_loop_calls);
 
+  // In kDatapathChecks mode, alert user if background thread calls event loop
   if (kDatapathChecks) {
-    if (!in_creator()) {
+    if (unlikely(!in_creator())) {
       erpc_dprintf(
           "eRPC Rpc %u: Error. Event loop invoked from a background thread.\n",
           app_tid);
       exit(-1);
     }
+  } else {
+    assert(in_creator());
+  }
 
-    if (in_event_loop) {
+  // In kDatapathChecks mode, track event loop reentrance
+  if (kDatapathChecks) {
+    if (unlikely(in_event_loop)) {
       erpc_dprintf("eRPC Rpc %u: Error. Re-entering event loop not allowed.\n",
                    app_tid);
       exit(-1);
     }
 
     in_event_loop = true;
-  } else {
-    assert(in_creator());
-    // Event loop re-entrance tracking is disabled
   }
 
   // Handle session management events, if any
@@ -58,7 +63,7 @@ inline void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
 
   uint64_t start_tsc = rdtsc();
   while (true) {
-    run_event_loop_one();
+    run_event_loop_one();  // Run at least once even if timeout_ms is 0
 
     double elapsed_ms = to_sec(rdtsc() - start_tsc, nexus->freq_ghz) * 1000;
     if (elapsed_ms > timeout_ms) {
