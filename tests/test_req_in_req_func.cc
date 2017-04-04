@@ -55,6 +55,9 @@ class AppContext : public BasicAppContext {
 
 /// Pick a random message size (>= 1 byte)
 size_t get_rand_msg_size(AppContext *app_context) {
+  _unused(app_context);
+  return 32;
+  /*
   assert(app_context != nullptr);
   uint32_t sample = app_context->fast_rand.next_u32();
   uint32_t msg_size = sample % Rpc<IBTransport>::kMaxMsgSize;
@@ -63,6 +66,7 @@ size_t get_rand_msg_size(AppContext *app_context) {
   }
 
   return (size_t)msg_size;
+  */
 }
 
 ///
@@ -79,7 +83,7 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
-  ASSERT_FALSE(context->is_client);
+  assert(!context->is_client);
 
   const MsgBuffer *req_msgbuf_cs = req_handle_cs->get_req_msgbuf();
   size_t req_size_cs = req_msgbuf_cs->get_data_size();
@@ -92,7 +96,7 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
 
   MsgBuffer &req_msgbuf_ss = srv_req_info->req_msgbuf_ss;
   req_msgbuf_ss = context->rpc->alloc_msg_buffer(req_size_cs);
-  ASSERT_NE(req_msgbuf_ss.buf, nullptr);
+  assert(req_msgbuf_ss.buf != nullptr);
 
   // Request to server #1 = client-to-server request + 1
   for (size_t i = 0; i < req_size_cs; i++) {
@@ -105,7 +109,7 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
   int ret = context->rpc->enqueue_request(
       context->session_num_arr[1], kAppReqTypeSS, &srv_req_info->req_msgbuf_ss,
       server_cont_func, tag.tag);
-  ASSERT_EQ(ret, 0);
+  assert(ret == 0);
 }
 
 /// Request handler for server to server requests. Echoes the received request
@@ -115,7 +119,7 @@ void req_handler_ss(ReqHandle *req_handle, void *_context) {
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
-  ASSERT_FALSE(context->is_client);
+  assert(!context->is_client);
 
   const MsgBuffer *req_msgbuf_ss = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf_ss->get_data_size();
@@ -125,11 +129,11 @@ void req_handler_ss(ReqHandle *req_handle, void *_context) {
 
   // eRPC will free dyn_resp_msgbuf
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
-  ASSERT_NE(req_handle->dyn_resp_msgbuf.buf, nullptr);
+  assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
 
   // Response to server #0 = server-to-server request + 1
   for (size_t i = 0; i < req_size; i++) {
-    req_handle->dyn_resp_msgbuf.buf[i] = req_msgbuf_ss->buf[i];
+    req_handle->dyn_resp_msgbuf.buf[i] = req_msgbuf_ss->buf[i] + 1;
   }
 
   req_handle->prealloc_used = false;
@@ -142,10 +146,10 @@ void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
-  ASSERT_TRUE(context->is_client);
+  assert(!context->is_client);
 
   const MsgBuffer *resp_msgbuf_ss = resp_handle_ss->get_resp_msgbuf();
-  test_printf("Server: Received server-serve response %zu of length %zu.\n",
+  test_printf("Server: Received server-server response %zu of length %zu.\n",
               context->num_rpc_resps, (char *)resp_msgbuf_ss->get_data_size());
 
   // Extract the request info
@@ -155,11 +159,11 @@ void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
   ReqHandle *req_handle_cs = srv_req_info->req_handle_cs;
   MsgBuffer &req_msgbuf_ss = srv_req_info->req_msgbuf_ss;
 
-  ASSERT_EQ(resp_msgbuf_ss->get_data_size(), req_size_cs);
+  assert(resp_msgbuf_ss->get_data_size() == req_size_cs);
 
   // Check the response from server #1
   for (size_t i = 0; i < req_size_cs; i++) {
-    ASSERT_EQ(req_msgbuf_ss.buf[i] + 1, resp_msgbuf_ss->buf[i]);
+    assert(req_msgbuf_ss.buf[i] + 1 == resp_msgbuf_ss->buf[i]);
   }
 
   // eRPC will free dyn_resp_msgbuf
@@ -209,9 +213,9 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
   int ret =
       context->rpc->enqueue_request(context->session_num_arr[0], kAppReqTypeCS,
                                     &req_msgbuf, client_cont_func, tag.tag);
+  assert(ret == 0);
 
   context->num_reqs_sent++;
-  ASSERT_EQ(ret, 0);
 }
 
 void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
@@ -219,7 +223,7 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
-  ASSERT_TRUE(context->is_client);
+  assert(context->is_client);
 
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response %zu of length %zu.\n",
@@ -255,12 +259,12 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     context.req_msgbuf[i] =
         rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
-    ASSERT_NE(context.req_msgbuf[i].buf, nullptr);
+    assert(context.req_msgbuf[i].buf != nullptr);
     client_request_helper(&context, i);
   }
 
   wait_for_rpc_resps_or_timeout(context, kAppNumReqs, nexus->freq_ghz);
-  ASSERT_GE(context.num_rpc_resps, kAppNumReqs);  // We can overshoot a bit
+  assert(context.num_rpc_resps >= kAppNumReqs);  // We can overshoot a bit
 
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);

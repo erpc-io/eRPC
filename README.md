@@ -45,6 +45,7 @@ EA Code notes
      is no longer needed for retransmission.
 
 ## Short-term TODOs
+ * Re-enable large messages for `test_req_in_req_func`
  * Need background flag for continuations.
  * Should `datapath_tx_work_queue` contain sslots instead of sessions?
  * Do we need `no_free` versions of sslot burying functions?
