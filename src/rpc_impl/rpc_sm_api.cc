@@ -120,8 +120,9 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
   mgmt_retryq_add_st(session);     // Record management request for retry
 
   erpc_dprintf(
-      "eRPC Rpc %u: Sending first session connect req for session %u to %s.\n",
-      app_tid, client_endpoint.session_num, rem_hostname);
+      "eRPC Rpc %u: Sending first connect req for session %u "
+      "to [%s, %u].\n",
+      app_tid, client_endpoint.session_num, rem_hostname, rem_app_tid);
   send_connect_req_one_st(session);
 
   return client_endpoint.session_num;
@@ -188,8 +189,10 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       mgmt_retryq_add_st(session);  // Checks that session is not in flight
 
       erpc_dprintf(
-          "eRPC Rpc %u: Sending first session disconnect req for session %u.\n",
-          app_tid, session->local_session_num);
+          "eRPC Rpc %u: Sending first disconnect req for session %u "
+          "to [%s, %u].\n",
+          app_tid, session->local_session_num, session->server.hostname,
+          session->server.app_tid);
       send_disconnect_req_one_st(session);
       unlock_cond(&session->lock);
       return 0;

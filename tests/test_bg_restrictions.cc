@@ -100,8 +100,11 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
 }
 
 TEST(BgRestrictions, All) {
-  /* One background thread */
-  launch_server_client_threads(1, 1, one_small_rpc, req_handler,
+  auto reg_info_vec = {
+      ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kBackground)};
+
+  // One background thread
+  launch_server_client_threads(1, 1, one_small_rpc, reg_info_vec,
                                ConnectServers::kFalse);
 }
 

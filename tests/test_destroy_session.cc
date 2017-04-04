@@ -1,5 +1,9 @@
 #include "test_basics.h"
 
+/// This test uses a request handler that is never invoked
+auto reg_info_vec = {ReqFuncRegInfo(kAppReqType, basic_empty_req_handler,
+                                    ReqFuncType::kFgTerminal)};
+
 /// Per-thread application context
 class AppContext : public BasicAppContext {
  public:
@@ -75,7 +79,7 @@ void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
 }
 
 TEST(SimpleDisconnect, SimpleDisconnect) {
-  launch_server_client_threads(1, 0, simple_disconnect, basic_empty_req_handler,
+  launch_server_client_threads(1, 0, simple_disconnect, reg_info_vec,
                                ConnectServers::kFalse);
 }
 
@@ -115,7 +119,7 @@ void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
 }
 
 TEST(DisconnectMulti, DisconnectMulti) {
-  launch_server_client_threads(1, 0, disconnect_multi, basic_empty_req_handler,
+  launch_server_client_threads(1, 0, disconnect_multi, reg_info_vec,
                                ConnectServers::kFalse);
 }
 
@@ -149,8 +153,8 @@ void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
 }
 
 TEST(DisconnectRemoteError, DisconnectRemoteError) {
-  launch_server_client_threads(1, 0, disconnect_remote_error,
-                               basic_empty_req_handler, ConnectServers::kFalse);
+  launch_server_client_threads(1, 0, disconnect_remote_error, reg_info_vec,
+                               ConnectServers::kFalse);
 }
 
 ///
@@ -187,8 +191,8 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
 }
 
 TEST(DisconnectLocalError, DisconnectLocalError) {
-  launch_server_client_threads(1, 0, disconnect_local_error,
-                               basic_empty_req_handler, ConnectServers::kFalse);
+  launch_server_client_threads(1, 0, disconnect_local_error, reg_info_vec,
+                               ConnectServers::kFalse);
 }
 
 int main(int argc, char **argv) {

@@ -4,7 +4,7 @@
  */
 #include "test_basics.h"
 
-static constexpr size_t kAppNumReqs = 1000;
+static constexpr size_t kAppNumReqs = 9;
 
 /// Request type used for client to server 0
 static constexpr uint8_t kAppReqTypeCS = kAppReqType + 1;
@@ -270,9 +270,12 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
   }
 
-  // Disconnect the session
-  rpc->destroy_session(context.session_num_arr[0]);
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
+  // Disconnect the sessions
+  context.num_sm_resps = 0;
+  for (size_t i = 0; i < num_sessions; i++) {
+    rpc->destroy_session(context.session_num_arr[i]);
+  }
+  wait_for_sm_resps_or_timeout(context, num_sessions, nexus->freq_ghz);
 
   // Free resources
   delete rpc;

@@ -133,9 +133,12 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
   }
 
-  // Disconnect the session
-  rpc->destroy_session(context.session_num_arr[0]);
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
+  // Disconnect the sessions
+  context.num_sm_resps = 0;
+  for (size_t i = 0; i < num_sessions; i++) {
+    rpc->destroy_session(context.session_num_arr[0]);
+  }
+  wait_for_sm_resps_or_timeout(context, num_sessions, nexus->freq_ghz);
 
   // Free resources
   delete rpc;
@@ -143,7 +146,9 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
 }
 
 TEST(SendReqInContFunc, Foreground) {
-  launch_server_client_threads(1, 0, client_thread, req_handler,
+  auto reg_info_vec = {
+      ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kFgTerminal)};
+  launch_server_client_threads(1, 0, client_thread, reg_info_vec,
                                ConnectServers::kFalse);
 }
 

@@ -93,15 +93,18 @@ void Rpc<TTr>::mgmt_retry() {
       switch (state) {
         case SessionState::kConnectInProgress:
           erpc_dprintf(
-              "eRPC Rpc %u: Retrying session connect req for session %u.\n",
-              app_tid, session->client.session_num);
+              "eRPC Rpc %u: Retrying connect req for session %u to [%s, %u].\n",
+              app_tid, session->client.session_num, session->server.hostname,
+              session->server.app_tid);
 
           send_connect_req_one_st(session);
           break; /* Process other in-flight requests */
         case SessionState::kDisconnectInProgress:
           erpc_dprintf(
-              "eRPC Rpc %u: Retrying session disconnect req for session %u.\n",
-              app_tid, session->client.session_num);
+              "eRPC Rpc %u: Retrying disconnect req for session %u to "
+              "[%s, %u].\n",
+              app_tid, session->client.session_num, session->server.hostname,
+              session->server.app_tid);
 
           send_disconnect_req_one_st(session);
           break; /* Process other in-flight requests */

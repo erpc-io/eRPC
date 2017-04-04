@@ -3,6 +3,16 @@
 static constexpr size_t kAppMinMsgSize =
     Rpc<IBTransport>::max_data_per_pkt() + 1; /* At least 2 packets */
 
+void req_handler(ReqHandle *, void *);  // Forward declaration
+
+/// Request handler for foreground testing
+auto reg_info_vec_fg = {
+    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kFgTerminal)};
+
+/// Request handler for background testing
+auto reg_info_vec_bg = {
+    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kBackground)};
+
 /// Per-thread application context
 class AppContext : public BasicAppContext {
  public:
@@ -121,13 +131,13 @@ void one_large_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
 }
 
 TEST(OneLargeRpc, Foreground) {
-  launch_server_client_threads(1, 0, one_large_rpc, req_handler,
+  launch_server_client_threads(1, 0, one_large_rpc, reg_info_vec_fg,
                                ConnectServers::kFalse);
 }
 
 TEST(OneLargeRpc, Background) {
   /* One background thread */
-  launch_server_client_threads(1, 1, one_large_rpc, req_handler,
+  launch_server_client_threads(1, 1, one_large_rpc, reg_info_vec_bg,
                                ConnectServers::kFalse);
 }
 
@@ -197,14 +207,14 @@ void multi_large_rpc_one_session(Nexus<IBTransport> *nexus,
 }
 
 TEST(MultiLargeRpcOneSession, Foreground) {
-  launch_server_client_threads(1, 0, multi_large_rpc_one_session, req_handler,
-                               ConnectServers::kFalse);
+  launch_server_client_threads(1, 0, multi_large_rpc_one_session,
+                               reg_info_vec_fg, ConnectServers::kFalse);
 }
 
 TEST(MultiLargeRpcOneSession, Background) {
   /* 2 background threads */
-  launch_server_client_threads(1, 2, multi_large_rpc_one_session, req_handler,
-                               ConnectServers::kFalse);
+  launch_server_client_threads(1, 2, multi_large_rpc_one_session,
+                               reg_info_vec_bg, ConnectServers::kFalse);
 }
 
 ///
@@ -282,7 +292,7 @@ TEST(MultiLargeRpcMultiSession, Foreground) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
   launch_server_client_threads(num_sessions, 0, multi_large_rpc_multi_session,
-                               req_handler, ConnectServers::kFalse);
+                               reg_info_vec_fg, ConnectServers::kFalse);
 }
 
 TEST(MultiLargeRpcMultiSession, Background) {
@@ -292,7 +302,7 @@ TEST(MultiLargeRpcMultiSession, Background) {
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
   /* 3 background threads */
   launch_server_client_threads(num_sessions, 3, multi_large_rpc_multi_session,
-                               req_handler, ConnectServers::kFalse);
+                               reg_info_vec_bg, ConnectServers::kFalse);
 }
 
 ///
@@ -374,7 +384,7 @@ TEST(DISABLED_MemoryLeak, Foreground) {
   /* Use enough sessions to exceed the Rpc's unexpected window */
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-  launch_server_client_threads(num_sessions, 0, memory_leak, req_handler,
+  launch_server_client_threads(num_sessions, 0, memory_leak, reg_info_vec_fg,
                                ConnectServers::kFalse);
 }
 
@@ -384,7 +394,7 @@ TEST(DISABLED_MemoryLeak, Background) {
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
   /* 2 background threads */
-  launch_server_client_threads(num_sessions, 2, memory_leak, req_handler,
+  launch_server_client_threads(num_sessions, 2, memory_leak, reg_info_vec_bg,
                                ConnectServers::kFalse);
 }
 

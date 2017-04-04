@@ -50,7 +50,8 @@ endif(LTO)
 set(SOURCES
   src/common.h
   src/nexus_impl/nexus.cc
-  src/nexus_impl/nexus_bg.cc
+  src/nexus_impl/nexus_bg_thread.cc
+  src/nexus_impl/nexus_sm_thread.cc
   src/nexus.h
   src/msg_buffer.h
   src/ops.h

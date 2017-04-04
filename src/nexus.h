@@ -1,9 +1,7 @@
 #ifndef ERPC_NEXUS_H
 #define ERPC_NEXUS_H
 
-#include <signal.h>
 #include <unistd.h>
-
 #include "common.h"
 #include "session.h"
 #include "session_mgmt_types.h"
@@ -87,6 +85,12 @@ class Nexus {
   /// The function executed by background threads
   static void bg_thread_func(BgThreadCtx *bg_thread_ctx);
 
+  /// The function executed by the session management thread
+  static void sm_thread_func(volatile bool *sm_kill_switch,
+                             volatile Hook **reg_hooks_arr,
+                             std::mutex *nexus_lock,
+                             const udp_config_t *udp_config);
+
   /**
    * @brief Check if a hook with app TID = \p app_tid exists in this Nexus. The
    * caller must not hold the Nexus lock before calling this.
@@ -99,8 +103,7 @@ class Nexus {
   /// Unregister a previously registered session management hook
   void unregister_hook(Hook *hook);
 
-  void install_sigio_handler();
-  void session_mgnt_handler();
+  void session_mgmt_handler();
 
   /**
    * @brief Register application-defined request handler function. This
@@ -142,7 +145,9 @@ class Nexus {
   Hook *reg_hooks_arr[kMaxAppTid + 1] = {nullptr};  ///< Rpc-Nexus hooks
 
  private:
-  int sm_sock_fd;  ///< File descriptor of the session management UDP socket
+  // Session management thread
+  volatile bool sm_kill_switch;  ///< A switch to turn off the SM thread
+  std::thread sm_thread;         ///< The session management thread
 
   // Background threads
   volatile bool bg_kill_switch;  ///< A switch to turn off background threads
@@ -155,33 +160,6 @@ class Nexus {
   /// Return the hostname of this machine
   static std::string get_hostname();
 };
-
-/// The per-process Nexus object and its transport type
-static void *nexus_object;
-static Transport::TransportType nexus_object_transport_type =
-    Transport::TransportType::kInvalidTransport;
-
-/**
- * @brief The static signal handler, which executes the actual signal handler
- * with the one Nexus object.
- */
-static void sigio_handler(int sig_num) {
-  assert(sig_num == SIGIO);
-  _unused(sig_num);
-  assert(nexus_object != nullptr);
-
-  switch (nexus_object_transport_type) {
-    case Transport::TransportType::kInfiniBand:
-      static_cast<Nexus<IBTransport> *>(nexus_object)->session_mgnt_handler();
-      break;
-    case Transport::TransportType::kRoCE:
-    case Transport::TransportType::kOmniPath:
-    case Transport::TransportType::kInvalidTransport:
-      /* Unsupported transports */
-      assert(false);
-      exit(-1);
-  }
-}
 
 // Instantiate required Nexus classes so they get compiled for the linker
 template class Nexus<IBTransport>;

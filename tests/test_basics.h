@@ -67,9 +67,9 @@ void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
   auto *context = (BasicAppContext *)_context;
   context->num_sm_resps++;
 
-  ASSERT_EQ(sm_err_type, SessionMgmtErrType::kNoError);
-  ASSERT_TRUE(sm_event_type == SessionMgmtEventType::kConnected ||
-              sm_event_type == SessionMgmtEventType::kDisconnected);
+  assert(sm_err_type == SessionMgmtErrType::kNoError);
+  assert(sm_event_type == SessionMgmtEventType::kConnected ||
+         sm_event_type == SessionMgmtEventType::kDisconnected);
 }
 
 /// A basic empty session management handler that should never be invoked.
@@ -135,7 +135,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
 
       context.session_num_arr[i] = context.rpc->create_session(
           local_hostname, kAppServerAppTid + (uint8_t)i, kAppPhyPort);
-      ASSERT_GE(context.session_num_arr[i], 0);
+      assert(context.session_num_arr[i] >= 0);
     }
 
     // Wait for the sessions to connect
@@ -169,7 +169,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
 
   if (server_check_all_disconnected) {
     /* The client is done only after disconnecting */
-    ASSERT_EQ(rpc.num_active_sessions(), 0);
+    assert(rpc.num_active_sessions() == 0);
   }
 }
 
@@ -272,7 +272,7 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
   }
 
   /* basic_sm_handler checks that the callbacks have no errors */
-  ASSERT_EQ(context.num_sm_resps, num_sessions);
+  assert(context.num_sm_resps == num_sessions);
 }
 
 /**
