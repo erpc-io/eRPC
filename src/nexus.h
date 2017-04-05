@@ -56,7 +56,7 @@ class Nexus {
     std::array<ReqFunc, kMaxReqTypes> *req_func_arr;
 
     TlsRegistry *tls_registry;       ///< The Nexus's thread-local registry
-    size_t bg_thread_id;             ///< ID of the background thread
+    size_t bg_thread_index;          ///< Index of this background thread
     MtList<BgWorkItem> bg_req_list;  ///< Background thread request list
   };
 
@@ -67,7 +67,7 @@ class Nexus {
    public:
     uint8_t rpc_id;  ///< ID of the Rpc that created this hook
     MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
-    /// Background thread request lists
+    /// Background thread request lists, populated by the Nexus
     MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
   };
 

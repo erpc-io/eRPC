@@ -10,13 +10,17 @@ namespace ERpc {
 template <class TTr>
 void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
   volatile bool *bg_kill_switch = bg_thread_ctx->bg_kill_switch;
-  size_t bg_thread_id = bg_thread_ctx->bg_thread_id;
+  size_t bg_thread_index = bg_thread_ctx->bg_thread_index;
   TlsRegistry *tls_registry = bg_thread_ctx->tls_registry;
 
   tls_registry->init();  // Initialize thread-local variables for this thread
 
+  // The BgWorkItem request list can be indexed using the background thread's
+  // index in the Nexus, or its tiny TID.
+  assert(bg_thread_index == tls_registry->get_tls_tiny_tid());
+
   erpc_dprintf("eRPC Nexus: Background thread %zu running. Tiny TID = %zu.\n",
-               bg_thread_id, tls_registry->get_tls_tiny_tid());
+               bg_thread_index, tls_registry->get_tls_tiny_tid());
 
   while (*bg_kill_switch == false) {
     MtList<BgWorkItem> &req_list = bg_thread_ctx->bg_req_list;
@@ -45,7 +49,7 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
       dpath_dprintf(
           "eRPC Background: Background thread %zu running request "
           "handler for Rpc %u, session %u. Request number = %zu.\n",
-          bg_thread_id, rpc_id, session->local_session_num,
+          bg_thread_index, rpc_id, session->local_session_num,
           sslot->rx_msgbuf.get_req_num());
 
       uint8_t req_type = sslot->rx_msgbuf.get_req_type();
@@ -60,7 +64,7 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     req_list.unlock();
   }
 
-  erpc_dprintf("eRPC Nexus: Background thread %zu exiting.\n", bg_thread_id);
+  erpc_dprintf("eRPC Nexus: Background thread %zu exiting.\n", bg_thread_index);
   return;
 }
 

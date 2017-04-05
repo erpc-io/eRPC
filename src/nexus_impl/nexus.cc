@@ -53,7 +53,7 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
     bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
     bg_thread_ctx_arr[i].tls_registry = &tls_registry;
-    bg_thread_ctx_arr[i].bg_thread_id = i;
+    bg_thread_ctx_arr[i].bg_thread_index = i;
 
     bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
   }
@@ -98,10 +98,10 @@ void Nexus<TTr>::register_hook(Hook *hook) {
   req_func_registration_allowed = false;  // Disable future Ops registration
   reg_hooks_arr[rpc_id] = hook;
 
-  // Install background request and response submission lists
+  // Install background request submission lists
   for (size_t i = 0; i < num_bg_threads; i++) {
     BgThreadCtx &bg_ctx = bg_thread_ctx_arr[i];
-    assert(bg_ctx.bg_thread_id == i);
+    assert(bg_ctx.bg_thread_index == i);
 
     hook->bg_req_list_arr[i] = &bg_ctx.bg_req_list;  // Request
   }
