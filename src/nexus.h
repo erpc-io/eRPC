@@ -20,11 +20,20 @@ class Nexus {
  public:
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
 
+  enum class BgWorkItemType : bool { kReq, kResp };
+
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(uint8_t app_tid, Rpc<TTr> *rpc, void *context, SSlot *sslot)
-        : app_tid(app_tid), rpc(rpc), context(context), sslot(sslot) {}
+    BgWorkItem(BgWorkItemType wi_type, uint8_t app_tid, Rpc<TTr> *rpc,
+               void *context, SSlot *sslot)
+        : wi_type(wi_type),
+          app_tid(app_tid),
+          rpc(rpc),
+          context(context),
+          sslot(sslot) {}
+
+    const BgWorkItemType wi_type;
 
     /// App TID of the Rpc that submitted this request. Debug-only.
     const uint8_t app_tid;

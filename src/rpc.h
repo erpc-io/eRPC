@@ -340,6 +340,24 @@ class Rpc {
   void run_event_loop_timeout_st(size_t timeout_ms);
 
   //
+  // Misc public functions
+  //
+
+ public:
+  // rpc_rx.cc
+
+  /// Sanity-check a slot's request MsgBuffer on receiving a response packet.
+  /// It should be valid, dynamic, and the request number/type should match.
+  static void debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
+                                             uint8_t req_type);
+
+  /// Check an RX MsgBuffer submitted to a background thread. It should be
+  /// valid, dynamic, and the \p is_req field should match. This holds for
+  /// both background request handlers and continuations.
+  static void debug_check_bg_rx_msgbuf(
+      SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type);
+
+  //
   // Misc private functions
   //
 
@@ -481,13 +499,9 @@ class Rpc {
    */
   void process_comps_large_msg_one_st(Session *session, const uint8_t *pkt);
 
-  /// Submit a work item for background processing
-  void submit_background_st(SSlot *sslot);
-
-  /// Sanity-check a slot's request MsgBuffer on receiving a response packet.
-  /// Debug-only.
-  void check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
-                                uint8_t req_type);
+  /// Submit a work item to a background thread
+  void submit_background_st(SSlot *sslot,
+                            typename Nexus<TTr>::BgWorkItemType wi_type);
 
   // rpc_send_cr.cc
 

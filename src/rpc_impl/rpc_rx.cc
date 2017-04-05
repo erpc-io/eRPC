@@ -136,15 +136,16 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       // For background request handlers, copy the request MsgBuffer. rx_msgbuf
       // will be freed on enqueue_response().
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
+      assert(sslot.rx_msgbuf.buf != nullptr);
       memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
              msg_size + sizeof(pkthdr_t));
-      submit_background_st(&sslot);
+      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kReq);
       return;
     }
   } else {
     // Handle a single-packet response message
     assert(session->is_client());
-    check_req_msgbuf_on_resp(&sslot, req_num, req_type);
+    debug_check_req_msgbuf_on_resp(&sslot, req_num, req_type);
 
     // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
@@ -218,7 +219,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     assert(session->is_server());
   } else {
     assert(session->is_client());
-    check_req_msgbuf_on_resp(&sslot, req_num, req_type);
+    debug_check_req_msgbuf_on_resp(&sslot, req_num, req_type);
   }
 
   if (rx_msgbuf.buf == nullptr) {
@@ -241,6 +242,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     }
 
     rx_msgbuf = alloc_msg_buffer(msg_size);
+    assert(sslot.rx_msgbuf.buf != nullptr);
     rx_msgbuf.pkts_rcvd = 1;
 
     // Store the received packet header into the zeroth rx_msgbuf packet header.
@@ -283,8 +285,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
       bury_sslot_rx_msgbuf(&sslot);
       return;
     } else {
-      // rx_msgbuf here is not backed by RX ring buffers
-      submit_background_st(&sslot);
+      // rx_msgbuf here is independent of RX ring, so we don't need to copy
+      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kReq);
       return;
     }
   } else {
@@ -301,15 +303,21 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_background_st(SSlot *sslot) {
-  assert(sslot != nullptr);
-  assert(sslot->session != nullptr && sslot->session->is_server());
-
-  // rx_msgbuf (request) must be valid, and tx_msgbuf (response) invalid
-  assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
-  assert(sslot->tx_msgbuf == nullptr);
-
+void Rpc<TTr>::submit_background_st(
+    SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type) {
+  assert(in_creator());
   assert(nexus->num_bg_threads > 0);
+  assert(sslot != nullptr);
+
+  if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
+    assert(sslot->session != nullptr && sslot->session->is_server());
+  } else {
+    assert(sslot->session != nullptr && sslot->session->is_client());
+  }
+
+  // Sanity-check RX and TX MsgBuffers
+  debug_check_bg_rx_msgbuf(sslot, wi_type);
+  assert(sslot->tx_msgbuf == nullptr);
 
   // Choose a background thread at random
   size_t bg_thread_id = fast_rand.next_u32() % nexus->num_bg_threads;
@@ -317,15 +325,18 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot) {
 
   // Thread-safe
   req_list->unlocked_push_back(
-      typename Nexus<TTr>::BgWorkItem(app_tid, this, context, sslot));
+      typename Nexus<TTr>::BgWorkItem(wi_type, app_tid, this, context, sslot));
 }
 
+// This is a debug function that gets optimized out
 template <class TTr>
-void Rpc<TTr>::check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
-                                        uint8_t req_type) {
-  // This is an sslot that has just received a response packet. The request
-  // MsgBuffer of this sslot must be a dynamic MsgBuffer.
+void Rpc<TTr>::debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
+                                              uint8_t req_type) {
   assert(sslot != nullptr);
+  _unused(sslot);
+  _unused(req_num);
+  _unused(req_type);
+
   const MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
   _unused(req_msgbuf);
 
@@ -335,6 +346,24 @@ void Rpc<TTr>::check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
   assert(req_msgbuf->get_req_num() == req_num);
   assert(req_msgbuf->get_req_type() == req_type);
   assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
+}
+
+// This is a debug function that gets optimized out
+template <class TTr>
+void Rpc<TTr>::debug_check_bg_rx_msgbuf(
+    SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type) {
+  assert(sslot != nullptr);
+  _unused(sslot);
+  _unused(wi_type);
+
+  assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
+  assert(sslot->rx_msgbuf.is_dynamic());
+
+  if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
+    assert(sslot->rx_msgbuf.is_req());
+  } else {
+    assert(sslot->rx_msgbuf.is_resp());
+  }
 }
 
 }  // End ERpc

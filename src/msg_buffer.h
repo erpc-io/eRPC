@@ -57,6 +57,9 @@ class MsgBuffer {
     return false;
   }
 
+  /// Check if this MsgBuffer uses dynamic memory allocation
+  inline bool is_dynamic() const { return buffer.buf != nullptr; }
+
   /// Used by applications to get the current data size of a MsgBuffer
   inline size_t get_data_size() const { return data_size; }
 
@@ -74,9 +77,6 @@ class MsgBuffer {
         << "pkts queued/rcvd " << pkts_queued << "]";
     return ret.str();
   }
-
-  /// Check if this Buffer uses dynamic memory allocation
-  inline bool is_dynamic() const { return buffer.buf != nullptr; }
 
  private:
   /// Construct a MsgBuffer with a dynamic Buffer allocated by eRPC.

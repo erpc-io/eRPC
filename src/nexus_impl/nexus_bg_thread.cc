@@ -32,11 +32,8 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
       _unused(app_tid);
       _unused(session);
 
-      // Sanity-check rx_msgbuf. It must use dynamic memory allocation.
-      assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
-      assert(sslot->rx_msgbuf.is_dynamic());
-      assert(sslot->rx_msgbuf.is_req());
-
+      // Sanity-check RX and TX MsgBuffers
+      Rpc<TTr>::debug_check_bg_rx_msgbuf(sslot, bg_work_item.wi_type);
       assert(sslot->tx_msgbuf == nullptr);  // Sanity-check tx_msgbuf
 
       dpath_dprintf(

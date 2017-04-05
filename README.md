@@ -62,7 +62,6 @@
 
 ## Long-term TODOs
  * Optimize mem-copies using `rte_memcpy`.
- * Optimize `pkthdr_0` filling using preconstructed headers.
  * The first packet size limit should be much smaller than MTU to improve RTT
    measurement accuracy (e.g., it could be around 256 bytes). This will need
    many changes, mostly to code that uses TTr::kMaxDataPerPkt.
@@ -71,11 +70,13 @@
      TX queueing) or we'll mess up RTT measurement.
    * Credit return packets will need the packet number field so that the
      receiver can match RTT.
+ * Handle MsgBuffer allocation failures in eRPC.
 
 ## Longer-term TODOs
  * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,
    function pointers, and unused opcodes/QP types/cases. If inline size is
    fixed at 60 bytes, optimized that. Add fast RECV posting.
+ * Optimize `pkthdr_0` filling using preconstructed headers.
  * Are we losing some performance by using `size_t` instead of `uint32_t` in
    in-memory structs like Buffer and MsgBuffer?
  * Need to have a test for session management request timeouts.
