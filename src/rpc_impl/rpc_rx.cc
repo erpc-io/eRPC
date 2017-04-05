@@ -122,9 +122,9 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     bury_sslot_tx_msgbuf(&sslot);
 
     // Remember request metadata for enqueue_response()
-    sslot.req_func_type = req_func.req_func_type;
-    sslot.rx_msgbuf_saved.req_type = req_type;
-    sslot.rx_msgbuf_saved.req_num = req_num;
+    sslot.srv_save_info.req_func_type = req_func.req_func_type;
+    sslot.srv_save_info.req_type = req_type;
+    sslot.srv_save_info.req_num = req_num;
 
     if (small_rpc_likely(!req_func.is_background())) {
       // Create a "fake" static MsgBuffer for the foreground request handler
@@ -276,9 +276,10 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
 
   // If we're here, we received all packets of this message
   if (pkthdr->is_req()) {
-    sslot.req_func_type = req_func.req_func_type;
-    sslot.rx_msgbuf_saved.req_type = req_type;
-    sslot.rx_msgbuf_saved.req_num = req_num;
+    // Remember request metadata for enqueue_response()
+    sslot.srv_save_info.req_func_type = req_func.req_func_type;
+    sslot.srv_save_info.req_type = req_type;
+    sslot.srv_save_info.req_num = req_num;
 
     if (!req_func.is_background()) {
       req_func.req_func((ReqHandle *)&sslot, context);

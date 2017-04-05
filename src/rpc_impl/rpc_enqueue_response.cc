@@ -15,12 +15,10 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   // Foreground request handlers must call enqueue_response() *before* returning
   // to the event loop, which frees the request MsgBuffer. For these handlers,
   // rx_msgbuf must be valid for now (but not for other handlers).
-  MsgBuffer *rx_msgbuf = &sslot->rx_msgbuf;
-  _unused(rx_msgbuf);
-  switch (sslot->req_func_type) {
+  switch (sslot->srv_save_info.req_func_type) {
     case ReqFuncType::kFgTerminal:
       // rx_msgbuf could be fake
-      assert(rx_msgbuf->buf != nullptr && rx_msgbuf->check_magic());
+      assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
       break;
     default:
       // We can't assert anything for other request handler types
@@ -40,12 +38,13 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // Step 1: Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
-  resp_pkthdr_0->req_type = sslot->rx_msgbuf_saved.req_type;
+  resp_pkthdr_0->req_type = sslot->srv_save_info.req_type;
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
   resp_pkthdr_0->dest_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
 
-  if (small_rpc_likely(sslot->req_func_type == ReqFuncType::kFgTerminal)) {
+  if (small_rpc_likely(sslot->srv_save_info.req_func_type ==
+                       ReqFuncType::kFgTerminal)) {
     // Fg terminal req function: 1st resp packet is Expected
     resp_pkthdr_0->is_unexp = 0;
     resp_pkthdr_0->fgt_resp = 1;
@@ -56,7 +55,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   }
 
   resp_pkthdr_0->pkt_num = 0;
-  resp_pkthdr_0->req_num = sslot->rx_msgbuf_saved.req_num;
+  resp_pkthdr_0->req_num = sslot->srv_save_info.req_num;
   assert(resp_pkthdr_0->check_magic());
 
   // Step 2: Fill in non-zeroth packet headers, if any

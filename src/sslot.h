@@ -50,8 +50,6 @@ class SSlot {
   bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
 
  private:
-  ReqFuncType req_func_type;  ///< The type of the request function
-
   // Client-only
   erpc_cont_func_t cont_func;  ///< Continuation function for the request
   size_t tag;                  ///< Tag of the request
@@ -62,7 +60,8 @@ class SSlot {
   struct {
     uint8_t req_type;
     uint64_t req_num;
-  } rx_msgbuf_saved;
+    ReqFuncType req_func_type;
+  } srv_save_info;
 
   /// Return a string representation of this session slot
   std::string to_string() const {
