@@ -102,8 +102,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // Fill in the slot, reset queueing progress, and upsert session
   SSlot &sslot = session->sslot_arr[sslot_i];
-  sslot.cont_func = cont_func;
-  sslot.tag = tag;
+  sslot.clt_save_info.cont_func = cont_func;
+  sslot.clt_save_info.tag = tag;
 
   // The tx_msgbuf and rx_msgbuf (i.e., the request and response for the
   // previous request in this sslot) were buried after the response handler

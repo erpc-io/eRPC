@@ -50,9 +50,11 @@ class SSlot {
   bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
 
  private:
-  // Client-only
-  erpc_cont_func_t cont_func;  ///< Continuation function for the request
-  size_t tag;                  ///< Tag of the request
+  // Request info saved at the client
+  struct {
+    erpc_cont_func_t cont_func;  ///< Continuation function for the request
+    size_t tag;                  ///< Tag of the request
+  } clt_save_info;
 
   /// Request metadata saved by the server before calling the request handler.
   /// These fields are needed in enqueue_response(), and the request's rx_msgbuf
