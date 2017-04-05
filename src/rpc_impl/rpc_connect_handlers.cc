@@ -17,13 +17,13 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
 
   // Ensure that server fields known by the client were filled correctly
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
-  assert(sm_pkt->server.app_tid == app_tid);
+  assert(sm_pkt->server.rpc_id == rpc_id);
   assert(sm_pkt->server.secret == sm_pkt->client.secret);
 
   // Create the basic issue message
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",
-          app_tid, sm_pkt->client.name().c_str());
+          rpc_id, sm_pkt->client.name().c_str());
 
   // Check that the transport matches
   Transport::TransportType pkt_tr_type = sm_pkt->server.transport_type;
@@ -55,11 +55,11 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
     //
     // If the check succeeds, we cannot own old_session as the client:
     // sm_pkt was sent by a different Rpc than us, since an Rpc cannot send
-    // session management packets to itself. So the client hostname and app_tid
+    // session management packets to itself. So the client hostname and rpc_id
     // in the located session cannot be ours, since they are same as sm_pkt's.
     if ((old_session != nullptr) &&
         strcmp(old_session->client.hostname, sm_pkt->client.hostname) == 0 &&
-        (old_session->client.app_tid == sm_pkt->client.app_tid)) {
+        (old_session->client.rpc_id == sm_pkt->client.rpc_id)) {
       assert(old_session->is_server());
       assert(old_session->is_connected());
 
@@ -89,7 +89,7 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
   // Try to resolve the client's routing info into the packet. If session
   // creation succeeds, we'll copy it to the server's session endpoint.
   Transport::RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
-  erpc_dprintf("eRPC Rpc %u: Resolving client's routing info %s.\n", app_tid,
+  erpc_dprintf("eRPC Rpc %u: Resolving client's routing info %s.\n", rpc_id,
                TTr::routing_info_str(client_rinfo).c_str());
 
   bool resolve_success = transport->resolve_remote_routing_info(client_rinfo);
@@ -156,7 +156,7 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   sprintf(issue_msg,
           "eRPC Rpc %u: Received connect response from %s for session %u. "
           "Issue",
-          app_tid, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
+          rpc_id, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
 
   // Try to locate the requester session for this response
   uint16_t session_num = sm_pkt->client.session_num;
@@ -197,12 +197,12 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   mgmt_retryq_remove_st(session);
 
   // If the session was not already disconnected, the session endpoint metadata
-  // (hostname, app TID, session num) from the pkt should match our local copy.
+  // (hostname, Rpc ID, session num) from the pkt should match our local copy.
   //
   // We don't have the server's session number locally yet, so we cannot use
   // SessionEndpoint comparator to compare server endpoint metadata.
   assert(strcmp(session->server.hostname, sm_pkt->server.hostname) == 0);
-  assert(session->server.app_tid == sm_pkt->server.app_tid);
+  assert(session->server.rpc_id == sm_pkt->server.rpc_id);
   assert(session->server.session_num == kInvalidSessionNum);
 
   assert(session->client == sm_pkt->client);
@@ -226,7 +226,7 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   // Try to resolve the server's routing information into the packet. If this
   // fails, invoke kConnectFailed callback.
   Transport::RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
-  erpc_dprintf("eRPC Rpc %u: Resolving server's routing info %s.\n", app_tid,
+  erpc_dprintf("eRPC Rpc %u: Resolving server's routing info %s.\n", rpc_id,
                TTr::routing_info_str(srv_routing_info).c_str());
 
   bool resolve_success;
@@ -259,7 +259,7 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
     erpc_dprintf(
         "eRPC Rpc %u: Sending first (callback-less) disconnect request for "
         "session %u, and invoking kConnectFailed callback\n",
-        app_tid, session->local_session_num);
+        rpc_id, session->local_session_num);
     send_disconnect_req_one_st(session);
 
     session_mgmt_handler(

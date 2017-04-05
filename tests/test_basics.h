@@ -13,8 +13,8 @@ static constexpr uint16_t kAppNexusUdpPort = 31851;
 static constexpr double kAppNexusPktDropProb = 0.0;
 static constexpr size_t kAppEventLoopMs = 200;
 static constexpr size_t kAppMaxEventLoopMs = 20000; /* 20 seconds */
-static constexpr uint8_t kAppClientAppTid = 100;
-static constexpr uint8_t kAppServerAppTid = 200;
+static constexpr uint8_t kAppClientRpcId = 100;
+static constexpr uint8_t kAppServerRpcId = 200;
 static constexpr uint8_t kAppReqType = 3;
 static constexpr uint8_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
@@ -89,20 +89,20 @@ void basic_empty_req_handler(ReqHandle *, void *) {
  * @brief The basic server thread function
  *
  * @param nexus The process's Nexus
- * @param app_tid The app TID for the Rpc created by this server thread
+ * @param rpc_id The ID for the Rpc created by this server thread
  * @param num_srv_threads The number of server Rpc (foreground) threads
  * @param connect_servers True if the server threads should be connected
  * @param sm_handler The SM handler for this server thread
  */
-void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
+void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
                               size_t num_srv_threads,
                               ConnectServers connect_servers,
                               session_mgmt_handler_t sm_handler) {
   BasicAppContext context;
   context.is_client = false;
 
-  Rpc<IBTransport> rpc(nexus, (void *)&context, app_tid, sm_handler,
-                       kAppPhyPort, kAppNumaNode);
+  Rpc<IBTransport> rpc(nexus, (void *)&context, rpc_id, sm_handler, kAppPhyPort,
+                       kAppNumaNode);
   context.rpc = &rpc;
   num_servers_ready++;
 
@@ -121,20 +121,20 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
     }
 
     test_printf("test: Server %u connecting to %zu other server threads.\n",
-                app_tid, num_srv_threads - 1);
+                rpc_id, num_srv_threads - 1);
 
-    // Session number for server (kAppServerAppTid + x) is session_num_arr[x]
+    // Session number for server (kAppServerRpcId + x) is session_num_arr[x]
     context.session_num_arr = new int[num_srv_threads];
 
     // Create the sessions
     for (size_t i = 0; i < num_srv_threads; i++) {
-      uint8_t other_app_tid = (uint8_t)(kAppServerAppTid + i);
-      if (other_app_tid == app_tid) {
+      uint8_t other_rpc_id = (uint8_t)(kAppServerRpcId + i);
+      if (other_rpc_id == rpc_id) {
         continue;
       }
 
       context.session_num_arr[i] = context.rpc->create_session(
-          local_hostname, kAppServerAppTid + (uint8_t)i, kAppPhyPort);
+          local_hostname, kAppServerRpcId + (uint8_t)i, kAppPhyPort);
       assert(context.session_num_arr[i] >= 0);
     }
 
@@ -142,7 +142,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
     wait_for_sm_resps_or_timeout(context, num_srv_threads - 1, nexus->freq_ghz);
   } else {
     test_printf("test: Server %u not connecting to other server threads.\n",
-                app_tid);
+                rpc_id);
   }
 
   while (!client_done) { /* Wait for all clients */
@@ -152,11 +152,11 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid,
   // Disconnect sessions created to other server threads if needed
   if (connect_servers == ConnectServers::kTrue) {
     test_printf("test: Server %u disconnecting from %zu other server threads\n",
-                app_tid, num_srv_threads - 1);
+                rpc_id, num_srv_threads - 1);
 
     for (size_t i = 0; i < num_srv_threads; i++) {
-      uint8_t other_app_tid = (uint8_t)(kAppServerAppTid + i);
-      if (other_app_tid == app_tid) {
+      uint8_t other_rpc_id = (uint8_t)(kAppServerRpcId + i);
+      if (other_rpc_id == rpc_id) {
         continue;
       }
 
@@ -218,7 +218,7 @@ void launch_server_client_threads(
                                                   : basic_sm_handler;
 
     server_thread[i] =
-        std::thread(basic_server_thread_func, &nexus, kAppServerAppTid + i,
+        std::thread(basic_server_thread_func, &nexus, kAppServerRpcId + i,
                     num_sessions, connect_servers, _sm_handler);
   }
 
@@ -243,7 +243,7 @@ void launch_server_client_threads(
  * @param nexus The process's Nexus
  * @param context The uninitialized client context
  * @param num_sessions The number of sessions to create for the client. Session
- * \p i is created to Rpc \p {kAppServerAppTid + i} at localhost
+ * \p i is created to Rpc \p {kAppServerRpcId + i} at localhost
  * @param sm_handler The client's sm handler
  */
 void client_connect_sessions(Nexus<IBTransport> *nexus,
@@ -257,14 +257,14 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
   }
 
   context.is_client = true;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
                                      sm_handler, kAppPhyPort, kAppNumaNode);
 
   /* Connect the sessions */
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
-        local_hostname, kAppServerAppTid + (uint8_t)i, kAppPhyPort);
+        local_hostname, kAppServerRpcId + (uint8_t)i, kAppPhyPort);
   }
 
   while (context.num_sm_resps < num_sessions) {

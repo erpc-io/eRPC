@@ -25,11 +25,11 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     assert(req_list.size > 0);
 
     for (BgWorkItem bg_work_item : req_list.list) {
-      uint8_t app_tid = bg_work_item.app_tid;  // Debug-only
-      void *context = bg_work_item.context;    // The app's context
+      uint8_t rpc_id = bg_work_item.rpc_id;  // Debug-only
+      void *context = bg_work_item.context;  // The app's context
       SSlot *sslot = bg_work_item.sslot;
       Session *session = sslot->session;  // Debug-only
-      _unused(app_tid);
+      _unused(rpc_id);
       _unused(session);
 
       // Sanity-check RX and TX MsgBuffers
@@ -39,7 +39,7 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
       dpath_dprintf(
           "eRPC Background: Background thread %zu running request "
           "handler for Rpc %u, session %u. Request number = %zu.\n",
-          bg_thread_id, app_tid, session->local_session_num,
+          bg_thread_id, rpc_id, session->local_session_num,
           sslot->rx_msgbuf.get_req_num());
 
       uint8_t req_type = sslot->rx_msgbuf.get_req_type();

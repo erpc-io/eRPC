@@ -12,12 +12,12 @@
 namespace ERpc {
 
 template <class TTr>
-Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t app_tid,
+Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
               session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port,
               size_t numa_node)
     : nexus(nexus),
       context(context),
-      app_tid(app_tid),
+      rpc_id(rpc_id),
       session_mgmt_handler(session_mgmt_handler),
       phy_port(phy_port),
       numa_node(numa_node),
@@ -25,7 +25,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t app_tid,
       multi_threaded(nexus->num_bg_threads > 0),
       in_event_loop(false),
       req_func_arr(nexus->req_func_arr),
-      nexus_hook(app_tid) {
+      nexus_hook(rpc_id) {
   // Ensure that we're running as root
   if (getuid()) {
     throw std::runtime_error("eRPC Rpc: You need to be root to use eRPC");
@@ -37,8 +37,8 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t app_tid,
     return;
   }
 
-  if (app_tid == kInvalidAppTid || nexus->app_tid_exists(app_tid)) {
-    throw std::invalid_argument("eRPC Rpc: Invalid app_tid");
+  if (rpc_id == kInvalidRpcId || nexus->rpc_id_exists(rpc_id)) {
+    throw std::invalid_argument("eRPC Rpc: Invalid rpc_id");
     return;
   }
 
@@ -55,7 +55,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t app_tid,
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for
   // the hugepage allocator.
-  transport = new TTr(app_tid, phy_port);
+  transport = new TTr(rpc_id, phy_port);
 
   huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
                              transport->reg_mr_func, transport->dereg_mr_func);
@@ -75,7 +75,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t app_tid,
     assert(nexus_hook.bg_req_list_arr[i] != nullptr);
   }
 
-  erpc_dprintf("eRPC Rpc: Created with app TID = %u.\n", app_tid);
+  erpc_dprintf("eRPC Rpc: Created with ID = %u.\n", rpc_id);
 }
 
 template <class TTr>
@@ -83,7 +83,7 @@ Rpc<TTr>::~Rpc() {
   // Rpc can only be destroyed from the creator thread
   if (unlikely(!in_creator())) {
     erpc_dprintf("eRPC Rpc %u: Error. Cannot destroy from background thread.\n",
-                 app_tid);
+                 rpc_id);
     exit(-1);
   }
 
@@ -92,7 +92,7 @@ Rpc<TTr>::~Rpc() {
   // kDatapathChecks mode
   if (kDatapathChecks && in_event_loop) {
     erpc_dprintf("eRPC Rpc %u: Error. Cannot destroy when inside event loop.\n",
-                 app_tid);
+                 rpc_id);
     exit(-1);
   }
 
@@ -103,7 +103,7 @@ Rpc<TTr>::~Rpc() {
     }
   }
 
-  erpc_dprintf("eRPC Rpc: Destroying for app TID = %u.\n", app_tid);
+  erpc_dprintf("eRPC Rpc: Destroying Rpc ID %u.\n", rpc_id);
 
   // First delete the hugepage allocator. This deregisters and deletes the
   // SHM regions. Deregistration is done using \p transport's deregistration
@@ -152,10 +152,10 @@ void Rpc<TTr>::handle_session_management_st() {
     // The sender of a packet cannot be this Rpc
     if (session_mgmt_pkt_type_is_req(sm_pkt->pkt_type)) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname.c_str()) == 0 &&
-               sm_pkt->client.app_tid == app_tid));
+               sm_pkt->client.rpc_id == rpc_id));
     } else {
       assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0 &&
-               sm_pkt->server.app_tid == app_tid));
+               sm_pkt->server.rpc_id == rpc_id));
     }
 
     switch (sm_pkt->pkt_type) {

@@ -50,7 +50,7 @@ class IBTransport : public Transport {
   };
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
 
-  IBTransport(uint8_t phy_port, uint8_t app_tid);
+  IBTransport(uint8_t phy_port, uint8_t rpc_id);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
   ~IBTransport();

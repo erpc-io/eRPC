@@ -89,7 +89,7 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
   size_t req_size_cs = req_msgbuf_cs->get_data_size();
 
   test_printf("Server %u: Received client-server request of length %zu.\n",
-              context->rpc->get_app_tid(), req_size_cs);
+              context->rpc->get_rpc_id(), req_size_cs);
 
   // Record info for the request we're now sending to server #1
   ServerReqInfo *srv_req_info = new ServerReqInfo(req_size_cs, req_handle_cs);
@@ -125,7 +125,7 @@ void req_handler_ss(ReqHandle *req_handle, void *_context) {
   size_t req_size = req_msgbuf_ss->get_data_size();
 
   test_printf("Server %u: Received server-server request of length %zu.\n",
-              context->rpc->get_app_tid(), req_size);
+              context->rpc->get_rpc_id(), req_size);
 
   // eRPC will free dyn_resp_msgbuf
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);

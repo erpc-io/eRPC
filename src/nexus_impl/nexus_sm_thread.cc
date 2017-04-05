@@ -81,45 +81,45 @@ void Nexus<TTr>::sm_thread_func(volatile bool *sm_kill_switch,
       exit(-1);
     }
 
-    uint8_t target_app_tid;  // TID of the Rpc that should handle this packet
+    uint8_t target_rpc_id;  // ID of the Rpc that should handle this packet
     const char *source_hostname;
-    uint8_t source_app_tid;  // Debug-only
-    _unused(source_app_tid);
+    uint8_t source_rpc_id;  // Debug-only
+    _unused(source_rpc_id);
 
     bool is_sm_req = session_mgmt_pkt_type_is_req(sm_pkt->pkt_type);
 
     if (is_sm_req) {
-      target_app_tid = sm_pkt->server.app_tid;
-      source_app_tid = sm_pkt->client.app_tid;
+      target_rpc_id = sm_pkt->server.rpc_id;
+      source_rpc_id = sm_pkt->client.rpc_id;
       source_hostname = sm_pkt->client.hostname;
     } else {
-      target_app_tid = sm_pkt->client.app_tid;
-      source_app_tid = sm_pkt->server.app_tid;
+      target_rpc_id = sm_pkt->client.rpc_id;
+      source_rpc_id = sm_pkt->server.rpc_id;
       source_hostname = sm_pkt->server.hostname;
     }
 
-    // Find the registered Rpc that has this TID
-    Hook *target_hook = (Hook *)(reg_hooks_arr[target_app_tid]);
+    // Find the registered Rpc that has this ID
+    Hook *target_hook = (Hook *)(reg_hooks_arr[target_rpc_id]);
 
     // Lock the Nexus to prevent Rpc registration while we lookup the hook
     nexus_lock->lock();
     if (target_hook == nullptr) {
-      // We don't have an Rpc object for target_app_tid
+      // We don't have an Rpc object for target_rpc_id
       if (is_sm_req) {
         // If it's a request, we must send a response
         erpc_dprintf(
             "eRPC Nexus: Received session mgmt request for invalid Rpc %u "
             "from Rpc [%s, %u]. Sending response.\n",
-            target_app_tid, source_hostname, source_app_tid);
+            target_rpc_id, source_hostname, source_rpc_id);
 
-        sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemoteAppTid,
+        sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemoteRpcId,
                               udp_config);
       } else {
         // If it's a response, we can ignore it
         erpc_dprintf(
             "eRPC Nexus: Received session management resp for invalid Rpc %u "
             "from Rpc [%s, %u]. Ignoring.\n",
-            target_app_tid, source_hostname, source_app_tid);
+            target_rpc_id, source_hostname, source_rpc_id);
       }
 
       nexus_lock->unlock();

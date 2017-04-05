@@ -13,7 +13,7 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
     if (unlikely(!in_creator())) {
       erpc_dprintf(
           "eRPC Rpc %u: Error. Event loop invoked from a background thread.\n",
-          app_tid);
+          rpc_id);
       exit(-1);
     }
   } else {
@@ -24,7 +24,7 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
   if (kDatapathChecks) {
     if (unlikely(in_event_loop)) {
       erpc_dprintf("eRPC Rpc %u: Error. Re-entering event loop not allowed.\n",
-                   app_tid);
+                   rpc_id);
       exit(-1);
     }
 

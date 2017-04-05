@@ -33,8 +33,8 @@ class Transport {
 
   /// Generic struct to store memory registration info for any transport.
   struct MemRegInfo {
-    void*transport_mr;  ///< The transport-specific memory region (eg, ibv_mr)
-    uint32_t lkey;     ///< The lkey of the memory region
+    void* transport_mr;  ///< The transport-specific memory region (eg, ibv_mr)
+    uint32_t lkey;       ///< The lkey of the memory region
 
     MemRegInfo(void* transport_mr, uint32_t lkey)
         : transport_mr(transport_mr), lkey(lkey) {}
@@ -88,7 +88,7 @@ class Transport {
    *
    * @throw runtime_error if creation fails
    */
-  Transport(TransportType transport_type, uint8_t app_tid, uint8_t phy_port);
+  Transport(TransportType transport_type, uint8_t rpc_id, uint8_t phy_port);
 
   /**
    * @brief Initialize transport structures that require hugepages, and fill
@@ -149,7 +149,7 @@ class Transport {
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
-  const uint8_t app_tid;   /* Debug-only */
+  const uint8_t rpc_id;    // Debug-only
   const uint8_t phy_port;  ///< 0-based physical port specified by application
 
   // Other members

@@ -26,7 +26,7 @@ void Rpc<TTr>::process_comps_st() {
       fprintf(stderr,
               "eRPC Rpc %u: Warning: Received packet for buried session %u. "
               "Dropping packet.\n",
-              app_tid, session_num);
+              rpc_id, session_num);
       continue;
     }
 
@@ -34,12 +34,12 @@ void Rpc<TTr>::process_comps_st() {
       fprintf(stderr,
               "eRPC Rpc %u: Warning: Received packet for unconnected "
               "session %u. Session state is %s. Dropping packet.\n",
-              app_tid, session_num, session_state_str(session->state).c_str());
+              rpc_id, session_num, session_state_str(session->state).c_str());
       continue;
     }
 
     // If we are here, we have a valid packet for a connected session
-    dpath_dprintf("eRPC Rpc %u: Received packet %s.\n", app_tid,
+    dpath_dprintf("eRPC Rpc %u: Received packet %s.\n", rpc_id,
                   pkthdr->to_string().c_str());
 
     // All Expected packets are session/window credit returns, and vice versa
@@ -94,7 +94,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     erpc_dprintf(
         "eRPC Rpc %u: Warning: Received packet for unknown request type %u. "
         "Dropping packet.\n",
-        app_tid, req_type);
+        rpc_id, req_type);
     return;
   }
 
@@ -187,7 +187,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     fprintf(stderr,
             "eRPC Rpc %u: Warning: Received packet for unknown "
             "request type %u. Dropping packet.\n",
-            app_tid, (uint8_t)req_type);
+            rpc_id, (uint8_t)req_type);
     return;
   }
 
@@ -239,7 +239,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
       erpc_dprintf(
           "eRPC Rpc %u: Received out-of-order packet on session %u. "
           "Expected packet number = 0, received = %zu.\n",
-          app_tid, session->local_session_num, pkt_num);
+          rpc_id, session->local_session_num, pkt_num);
     }
 
     rx_msgbuf = alloc_msg_buffer(msg_size);
@@ -328,7 +328,7 @@ void Rpc<TTr>::submit_background_st(
 
   // Thread-safe
   req_list->unlocked_push_back(
-      typename Nexus<TTr>::BgWorkItem(wi_type, app_tid, this, context, sslot));
+      typename Nexus<TTr>::BgWorkItem(wi_type, rpc_id, this, context, sslot));
 }
 
 // This is a debug function that gets optimized out

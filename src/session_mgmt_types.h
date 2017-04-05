@@ -21,7 +21,7 @@ static const size_t kSessionMgmtTimeoutMs = 500;  ///< Max time for mgmt reqs
 
 // Invalid metadata values for session endpoint initialization
 static const uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
-static const uint8_t kInvalidAppTid = kMaxAppTid + 1;
+static const uint8_t kInvalidRpcId = kMaxRpcId + 1;
 static const uint16_t kInvalidSessionNum = std::numeric_limits<uint16_t>::max();
 static const uint32_t kInvalidSecret = 0;
 
@@ -47,7 +47,7 @@ enum class SessionMgmtErrType : int {
   kTooManySessions,  ///< Connect req failed because server is out of sessions
   kOutOfMemory,      ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
-  kInvalidRemoteAppTid,
+  kInvalidRemoteRpcId,
   kInvalidRemotePort,
   kInvalidTransport
 };
@@ -152,7 +152,7 @@ static bool session_mgmt_err_type_is_valid(SessionMgmtErrType err_type) {
     case SessionMgmtErrType::kTooManySessions:
     case SessionMgmtErrType::kOutOfMemory:
     case SessionMgmtErrType::kRoutingResolutionFailure:
-    case SessionMgmtErrType::kInvalidRemoteAppTid:
+    case SessionMgmtErrType::kInvalidRemoteRpcId:
     case SessionMgmtErrType::kInvalidRemotePort:
     case SessionMgmtErrType::kInvalidTransport:
       return true;
@@ -172,8 +172,8 @@ static std::string session_mgmt_err_type_str(SessionMgmtErrType err_type) {
       return std::string("[Out of memory]");
     case SessionMgmtErrType::kRoutingResolutionFailure:
       return std::string("[Routing resolution failure]");
-    case SessionMgmtErrType::kInvalidRemoteAppTid:
-      return std::string("[Invalid remote app TID]");
+    case SessionMgmtErrType::kInvalidRemoteRpcId:
+      return std::string("[Invalid remote Rpc ID]");
     case SessionMgmtErrType::kInvalidRemotePort:
       return std::string("[Invalid remote port]");
     case SessionMgmtErrType::kInvalidTransport:
@@ -206,7 +206,7 @@ class SessionEndpoint {
   Transport::TransportType transport_type;
   char hostname[kMaxHostnameLen];  ///< Hostname of this endpoint
   uint8_t phy_port;                ///< Fabric port used by this endpoint
-  uint8_t app_tid;       ///< TID of the Rpc that created this endpoint
+  uint8_t rpc_id;                  ///< ID of the Rpc that created this endpoint
   uint16_t session_num;  ///< The session number of this endpoint in its Rpc
   uint32_t secret : kSecretBits;        ///< Secret for both session endpoints
   Transport::RoutingInfo routing_info;  ///< Endpoint's routing info
@@ -216,14 +216,14 @@ class SessionEndpoint {
     transport_type = Transport::TransportType::kInvalidTransport;
     memset((void *)hostname, 0, sizeof(hostname));
     phy_port = kInvalidPhyPort;
-    app_tid = kInvalidAppTid;
+    rpc_id = kInvalidRpcId;
     session_num = kInvalidSessionNum;
     secret = kInvalidSecret;
     memset((void *)&routing_info, 0, sizeof(routing_info));
   }
 
   /// Return a string with a name for this session endpoint, containing
-  /// its hostname, Rpc TID, and the session number.
+  /// its hostname, Rpc ID, and the session number.
   inline std::string name() {
     std::ostringstream ret;
     std::string session_num_str = (session_num == kInvalidSessionNum)
@@ -231,7 +231,7 @@ class SessionEndpoint {
                                       : std::to_string(session_num);
 
     ret << "[H: " << trim_hostname(hostname)
-        << ", R: " << std::to_string(app_tid) << ", S: " << session_num_str
+        << ", R: " << std::to_string(rpc_id) << ", S: " << session_num_str
         << "]";
     return ret.str();
   }
@@ -240,7 +240,7 @@ class SessionEndpoint {
   inline std::string rpc_name() {
     std::ostringstream ret;
     ret << "[H: " << trim_hostname(hostname)
-        << ", R: " << std::to_string(app_tid) << "]";
+        << ", R: " << std::to_string(rpc_id) << "]";
     return ret.str();
   }
 
@@ -249,7 +249,7 @@ class SessionEndpoint {
   bool operator==(const SessionEndpoint &other) {
     return transport_type == other.transport_type &&
            strcmp(hostname, other.hostname) == 0 &&
-           phy_port == other.phy_port && app_tid == other.app_tid &&
+           phy_port == other.phy_port && rpc_id == other.rpc_id &&
            session_num == other.session_num && secret == other.secret;
   }
 };

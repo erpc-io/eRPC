@@ -12,11 +12,11 @@ namespace ERpc {
 // This function is not on the critical path and is exposed to the user,
 // so the args checking is always enabled.
 template <class TTr>
-int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
+int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
                                 uint8_t rem_phy_port) {
   // Create the basic issue message
   char issue_msg[kMaxIssueMsgLen];
-  sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", app_tid);
+  sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
 
   // Check that the caller is the creator thread
   if (!in_creator()) {
@@ -39,7 +39,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
 
   // Creating a session to one's own Rpc as the client is not allowed
   if (strcmp(rem_hostname, nexus->hostname.c_str()) == 0 &&
-      rem_app_tid == app_tid) {
+      rem_rpc_id == rpc_id) {
     erpc_dprintf("%s: Remote Rpc is same as local.\n", issue_msg);
     return -EINVAL;
   }
@@ -51,9 +51,9 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
     }
 
     if (strcmp(existing_session->server.hostname, rem_hostname) == 0 &&
-        existing_session->server.app_tid == rem_app_tid) {
+        existing_session->server.rpc_id == rem_rpc_id) {
       // existing_session->server != this Rpc, since existing_session->server
-      // matches (rem_hostname, rem_app_tid), which does match this
+      // matches (rem_hostname, rem_rpc_id), which does match this
       // Rpc (checked earlier). So we must be the client.
       assert(existing_session->is_client());
       erpc_dprintf("%s: Session to %s already exists.\n", issue_msg,
@@ -100,7 +100,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
   client_endpoint.transport_type = transport->transport_type;
   strcpy((char *)client_endpoint.hostname, nexus->hostname.c_str());
   client_endpoint.phy_port = phy_port;
-  client_endpoint.app_tid = app_tid;
+  client_endpoint.rpc_id = rpc_id;
   client_endpoint.session_num = session_vec.size();
   client_endpoint.secret = slow_rand.next_u64() & ((1ull << kSecretBits) - 1);
   transport->fill_local_routing_info(&client_endpoint.routing_info);
@@ -109,7 +109,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
   server_endpoint.transport_type = transport->transport_type;
   strcpy((char *)server_endpoint.hostname, rem_hostname);
   server_endpoint.phy_port = rem_phy_port;
-  server_endpoint.app_tid = rem_app_tid;
+  server_endpoint.rpc_id = rem_rpc_id;
   // server_endpoint.session_num = ??
   server_endpoint.secret = client_endpoint.secret;  // Secret is shared
   // server_endpoint.routing_info = ??
@@ -122,7 +122,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_app_tid,
   erpc_dprintf(
       "eRPC Rpc %u: Sending first connect req for session %u "
       "to [%s, %u].\n",
-      app_tid, client_endpoint.session_num, rem_hostname, rem_app_tid);
+      rpc_id, client_endpoint.session_num, rem_hostname, rem_rpc_id);
   send_connect_req_one_st(session);
 
   return client_endpoint.session_num;
@@ -133,8 +133,8 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   // Create the basic issue message
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: destroy_session() failed for session %d. Issue",
-          app_tid, session_num);
+          "eRPC Rpc %u: destroy_session() failed for session %d. Issue", rpc_id,
+          session_num);
 
   // Check that the caller is the creator thread
   if (!in_creator()) {
@@ -191,8 +191,8 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       erpc_dprintf(
           "eRPC Rpc %u: Sending first disconnect req for session %u "
           "to [%s, %u].\n",
-          app_tid, session->local_session_num, session->server.hostname,
-          session->server.app_tid);
+          rpc_id, session->local_session_num, session->server.hostname,
+          session->server.rpc_id);
       send_disconnect_req_one_st(session);
       unlock_cond(&session->lock);
       return 0;

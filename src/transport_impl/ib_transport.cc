@@ -12,14 +12,14 @@ const size_t IBTransport::kMaxDataPerPkt;
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
-IBTransport::IBTransport(uint8_t app_tid, uint8_t phy_port)
-    : Transport(TransportType::kInfiniBand, app_tid, phy_port) {
+IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port)
+    : Transport(TransportType::kInfiniBand, rpc_id, phy_port) {
   resolve_phy_port();
   init_infiniband_structs();
   init_mem_reg_funcs();
 
-  erpc_dprintf("eRPC IBTransport: Created for TID %u. Device %s, port %d.\n",
-               app_tid, ib_ctx->device->name, dev_port_id);
+  erpc_dprintf("eRPC IBTransport: Created for ID %u. Device %s, port %d.\n",
+               rpc_id, ib_ctx->device->name, dev_port_id);
 }
 
 void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
@@ -40,7 +40,7 @@ void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 //
 // We only need to clean up non-hugepage structures.
 IBTransport::~IBTransport() {
-  erpc_dprintf("eRPC IBTransport: Destroying transport for TID %u\n", app_tid);
+  erpc_dprintf("eRPC IBTransport: Destroying transport for ID %u\n", rpc_id);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
   if (ibv_destroy_qp(qp)) {

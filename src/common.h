@@ -93,8 +93,8 @@ struct udp_config_t {
 
 // General constants
 
-/// The max application TID. uint8_t::max() is invalid.
-static constexpr size_t kMaxAppTid = std::numeric_limits<uint8_t>::max() - 1;
+/// The max Rpc ID. uint8_t::max() is invalid.
+static constexpr size_t kMaxRpcId = std::numeric_limits<uint8_t>::max() - 1;
 static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
 static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
 static constexpr size_t kPageSize = 4096;   ///< Page size in bytes

@@ -20,13 +20,13 @@ void Rpc<TTr>::handle_disconnect_req_st(SessionMgmtPkt *sm_pkt) {
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectReq);
 
   // Check that the server fields known by the client were filled correctly
-  assert(sm_pkt->server.app_tid == app_tid);
+  assert(sm_pkt->server.rpc_id == rpc_id);
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
 
   // Create the basic issue message
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %u: Received disconnect request from %s. Issue",
-          app_tid, sm_pkt->client.name().c_str());
+          rpc_id, sm_pkt->client.name().c_str());
 
   uint16_t session_num = sm_pkt->server.session_num;
   assert(session_num < session_vec.size());
@@ -41,7 +41,7 @@ void Rpc<TTr>::handle_disconnect_req_st(SessionMgmtPkt *sm_pkt) {
   }
 
   // If the session was not already disconnected, the session endpoints
-  // (hostname, app TID, session num) in the pkt should match our local copy.
+  // (hostname, Rpc ID, session num) in the pkt should match our local copy.
   Session *session = session_vec.at(session_num);  // The server end point
   assert(session->is_server());
   assert(session->server == sm_pkt->server);
@@ -78,7 +78,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(SessionMgmtPkt *sm_pkt) {
   sprintf(issue_msg,
           "eRPC Rpc %u: Received disconnect response from %s for session %u. "
           "Issue",
-          app_tid, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
+          rpc_id, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
 
   // Try to locate the requester session for this response
   uint16_t session_num = sm_pkt->client.session_num;
@@ -105,7 +105,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(SessionMgmtPkt *sm_pkt) {
   mgmt_retryq_remove_st(session);
 
   // If the session was not already disconnected, the session endpoints
-  // (hostname, app TID, session num) in the pkt should match our local copy.
+  // (hostname, Rpc ID, session num) in the pkt should match our local copy.
   assert(session->server == sm_pkt->server);
   assert(session->client == sm_pkt->client);
 

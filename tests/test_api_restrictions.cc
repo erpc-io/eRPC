@@ -34,7 +34,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 
   // Try to create a session
   int session_num = context->rpc->create_session(local_hostname,
-                                                 kAppServerAppTid, kAppPhyPort);
+                                                 kAppServerRpcId, kAppPhyPort);
   ASSERT_EQ(session_num, -EPERM);
 
   // Try to destroy a valid session number

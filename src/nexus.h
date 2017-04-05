@@ -25,18 +25,18 @@ class Nexus {
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(BgWorkItemType wi_type, uint8_t app_tid, Rpc<TTr> *rpc,
+    BgWorkItem(BgWorkItemType wi_type, uint8_t rpc_id, Rpc<TTr> *rpc,
                void *context, SSlot *sslot)
         : wi_type(wi_type),
-          app_tid(app_tid),
+          rpc_id(rpc_id),
           rpc(rpc),
           context(context),
           sslot(sslot) {}
 
     const BgWorkItemType wi_type;
 
-    /// App TID of the Rpc that submitted this request. Debug-only.
-    const uint8_t app_tid;
+    /// ID of the Rpc that submitted this request. Debug-only.
+    const uint8_t rpc_id;
     Rpc<TTr> *rpc;
     void *context;  ///< The context to use for request handler
     SSlot *sslot;
@@ -63,8 +63,8 @@ class Nexus {
   /// locked.
   class Hook {
    public:
-    Hook(uint8_t app_tid) : app_tid(app_tid) {}
-    const uint8_t app_tid;  ///< App TID of the RPC that created this hook
+    Hook(uint8_t rpc_id) : rpc_id(rpc_id) {}
+    const uint8_t rpc_id;  ///< ID of the Rpc that created this hook
     MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
     /// Background thread request lists
     MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
@@ -101,10 +101,10 @@ class Nexus {
                              const udp_config_t *udp_config);
 
   /**
-   * @brief Check if a hook with app TID = \p app_tid exists in this Nexus. The
+   * @brief Check if a hook with Rpc ID = \p rpc_id exists in this Nexus. The
    * caller must not hold the Nexus lock before calling this.
    */
-  bool app_tid_exists(uint8_t app_tid);
+  bool rpc_id_exists(uint8_t rpc_id);
 
   /// Register a previously unregistered session management hook
   void register_hook(Hook *hook);
@@ -151,7 +151,7 @@ class Nexus {
 
   /// Read-write members exposed to Rpc threads
   std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
-  Hook *reg_hooks_arr[kMaxAppTid + 1] = {nullptr};  ///< Rpc-Nexus hooks
+  Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};  ///< Rpc-Nexus hooks
 
  private:
   // Session management thread

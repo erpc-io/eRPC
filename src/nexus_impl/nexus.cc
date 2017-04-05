@@ -78,9 +78,9 @@ Nexus<TTr>::~Nexus() {
 }
 
 template <class TTr>
-bool Nexus<TTr>::app_tid_exists(uint8_t app_tid) {
+bool Nexus<TTr>::rpc_id_exists(uint8_t rpc_id) {
   nexus_lock.lock();
-  bool ret = (reg_hooks_arr[app_tid] != nullptr);
+  bool ret = (reg_hooks_arr[rpc_id] != nullptr);
   nexus_lock.unlock();
   return ret;
 }
@@ -89,14 +89,14 @@ template <class TTr>
 void Nexus<TTr>::register_hook(Hook *hook) {
   assert(hook != nullptr);
 
-  uint8_t app_tid = hook->app_tid;
-  assert(app_tid <= kMaxAppTid);
-  assert(reg_hooks_arr[app_tid] == nullptr);
+  uint8_t rpc_id = hook->rpc_id;
+  assert(rpc_id <= kMaxRpcId);
+  assert(reg_hooks_arr[rpc_id] == nullptr);
 
   nexus_lock.lock();
 
   req_func_registration_allowed = false;  // Disable future Ops registration
-  reg_hooks_arr[app_tid] = hook;
+  reg_hooks_arr[rpc_id] = hook;
 
   // Install background request and response submission lists
   for (size_t i = 0; i < num_bg_threads; i++) {
@@ -113,13 +113,13 @@ template <class TTr>
 void Nexus<TTr>::unregister_hook(Hook *hook) {
   assert(hook != nullptr);
 
-  uint8_t app_tid = hook->app_tid;
-  assert(app_tid <= kMaxAppTid);
-  assert(reg_hooks_arr[app_tid] == hook);
-  erpc_dprintf("eRPC Nexus: Deregistering Rpc %u.\n", app_tid);
+  uint8_t rpc_id = hook->rpc_id;
+  assert(rpc_id <= kMaxRpcId);
+  assert(reg_hooks_arr[rpc_id] == hook);
+  erpc_dprintf("eRPC Nexus: Deregistering Rpc %u.\n", rpc_id);
 
   nexus_lock.lock();
-  reg_hooks_arr[app_tid] = nullptr;
+  reg_hooks_arr[rpc_id] = nullptr;
   nexus_lock.unlock();
 }
 

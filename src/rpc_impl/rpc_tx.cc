@@ -97,7 +97,7 @@ void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
   tx_batch_i++;
 
   dpath_dprintf("eRPC Rpc %u: Sending single-packet message %s (session %u)\n",
-                app_tid, pkthdr_0->to_string().c_str(),
+                rpc_id, pkthdr_0->to_string().c_str(),
                 session->local_session_num);
 
   if (tx_batch_i == TTr::kPostlist) {
@@ -171,7 +171,7 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
   dpath_dprintf(
       "eRPC Rpc %u: Sending %zu of %zu remaining packets for "
       "multi-packet %s (session %u).\n",
-      app_tid, now_sending, pkts_pending, pkt_type_str(pkt_type).c_str(),
+      rpc_id, now_sending, pkts_pending, pkt_type_str(pkt_type).c_str(),
       session->local_session_num);
 
   for (size_t i = 0; i < now_sending; i++) {

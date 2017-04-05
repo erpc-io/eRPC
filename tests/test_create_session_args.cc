@@ -9,8 +9,8 @@ using namespace ERpc;
 #define NEXUS_UDP_PORT 31851
 #define EVENT_LOOP_MS 200
 
-#define SERVER_APP_TID 100
-#define CLIENT_APP_TID 200
+#define SERVER_RPC_ID 100
+#define CLIENT_RPC_ID 200
 
 /* Shared between client and server thread */
 std::atomic<bool> server_ready;
@@ -35,41 +35,41 @@ void client_thread_func(Nexus<IBTransport> *nexus) {
   }
 
   /* Create the Rpc */
-  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_APP_TID, &test_sm_handler,
+  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_RPC_ID, &test_sm_handler,
                        phy_port, numa_node);
 
   {
     /* Test: Correct args */
     int session_num =
-        rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
+        rpc.create_session(local_hostname, SERVER_RPC_ID, phy_port);
     ASSERT_GE(session_num, 0);
   }
 
   {
     /* Test: Invalid remote port, which can be detected locally */
     int session_num =
-        rpc.create_session(local_hostname, SERVER_APP_TID, kMaxPhyPorts);
+        rpc.create_session(local_hostname, SERVER_RPC_ID, kMaxPhyPorts);
     ASSERT_LT(session_num, 0);
   }
 
   {
     /* Test: Try to create session to self */
     int session_num =
-        rpc.create_session(local_hostname, CLIENT_APP_TID, phy_port);
+        rpc.create_session(local_hostname, CLIENT_RPC_ID, phy_port);
     ASSERT_LT(session_num, 0);
   }
 
   {
     /* Test: Try to create another session to the same remote Rpc. */
     int session_num =
-        rpc.create_session(local_hostname, SERVER_APP_TID, phy_port);
+        rpc.create_session(local_hostname, SERVER_RPC_ID, phy_port);
     ASSERT_LT(session_num, 0);
   }
 }
 
 /* The server thread */
-void server_thread_func(Nexus<IBTransport> *nexus, uint8_t app_tid) {
-  Rpc<IBTransport> rpc(nexus, nullptr, app_tid, &test_sm_handler, phy_port,
+void server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id) {
+  Rpc<IBTransport> rpc(nexus, nullptr, rpc_id, &test_sm_handler, phy_port,
                        numa_node);
 
   server_ready = true;
@@ -81,7 +81,7 @@ TEST(TestBuild, TestBuild) {
   Nexus<IBTransport> nexus(NEXUS_UDP_PORT, 0, 0.0); /* 0 background threads */
 
   /* Launch the server thread */
-  std::thread server_thread(server_thread_func, &nexus, SERVER_APP_TID);
+  std::thread server_thread(server_thread_func, &nexus, SERVER_RPC_ID);
 
   /* Launch the client thread */
   std::thread client_thread(client_thread_func, &nexus);

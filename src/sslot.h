@@ -57,8 +57,8 @@ class SSlot {
   } clt_save_info;
 
   /// Request metadata saved by the server before calling the request handler.
-  /// These fields are needed in enqueue_response(), and the request's rx_msgbuf
-  /// may not be valid when enqueue_response() is called.
+  /// These fields are needed in enqueue_response(), and the request MsgBuffer,
+  /// which can be used to infer these fields, may not be valid at that point.
   struct {
     uint8_t req_type;
     uint64_t req_num;

@@ -42,13 +42,13 @@ void sm_handler(int session_num, SessionMgmtEventType sm_event_type,
 void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
   auto *rpc = context.rpc;
 
   /* Create the session */
   int session_num =
-      rpc->create_session(local_hostname, kAppServerAppTid, kAppPhyPort);
+      rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(session_num, 0);
   ASSERT_NE(rpc->destroy_session(session_num), 0); /* Try early disconnect */
 
@@ -89,13 +89,13 @@ TEST(SimpleDisconnect, SimpleDisconnect) {
 void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
   auto *rpc = context.rpc;
 
   for (size_t i = 0; i < 3; i++) {
     int session_num =
-        rpc->create_session(local_hostname, kAppServerAppTid, kAppPhyPort);
+        rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
     ASSERT_GE(session_num, 0);
 
     /* Connect the session */
@@ -129,13 +129,13 @@ TEST(DisconnectMulti, DisconnectMulti) {
 void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
   auto *rpc = context.rpc;
 
   /* Create a session that uses an invalid remote port */
   int session_num =
-      rpc->create_session(local_hostname, kAppServerAppTid, kAppPhyPort + 1);
+      rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort + 1);
   ASSERT_GE(session_num, 0);
   context.arm(SessionMgmtEventType::kConnectFailed,
               SessionMgmtErrType::kInvalidRemotePort, session_num);
@@ -164,7 +164,7 @@ TEST(DisconnectRemoteError, DisconnectRemoteError) {
 void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
                                      &sm_handler, kAppPhyPort, kAppNumaNode);
   auto *rpc = context.rpc;
 
@@ -172,7 +172,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   rpc->testing_fail_resolve_remote_rinfo_client = true;
 
   int session_num =
-      rpc->create_session(local_hostname, kAppServerAppTid, kAppPhyPort);
+      rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
   context.arm(SessionMgmtEventType::kConnectFailed,
               SessionMgmtErrType::kRoutingResolutionFailure, session_num);
   wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);

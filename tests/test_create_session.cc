@@ -32,13 +32,13 @@ void simple_connect(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc =
-      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
                            &test_sm_handler, kAppPhyPort, kAppNumaNode);
 
   /* Connect the session */
   context.exp_err = SessionMgmtErrType::kNoError;
-  context.session_num = context.rpc->create_session(
-      local_hostname, kAppServerAppTid, kAppPhyPort);
+  context.session_num =
+      context.rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(context.session_num, 0);
 
   context.rpc->run_event_loop_timeout(kAppEventLoopMs);
@@ -65,13 +65,13 @@ void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc =
-      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientAppTid,
+      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
                            &test_sm_handler, kAppPhyPort, kAppNumaNode);
 
   /* Connect the session */
   context.exp_err = SessionMgmtErrType::kInvalidRemotePort;
   context.session_num = context.rpc->create_session(
-      local_hostname, kAppServerAppTid, kAppPhyPort + 1);
+      local_hostname, kAppServerRpcId, kAppPhyPort + 1);
   ASSERT_GE(context.session_num, 0); /* Local session creation works */
 
   context.rpc->run_event_loop_timeout(kAppEventLoopMs);

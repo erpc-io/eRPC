@@ -37,7 +37,7 @@ void Rpc<TTr>::send_credit_return_now_st(Session *session,
   item.data_bytes = 0;
 
   dpath_dprintf("eRPC Rpc %u: Sending credit return packet %s (session %u).\n",
-                app_tid, cr_pkthdr.to_string().c_str(),
+                rpc_id, cr_pkthdr.to_string().c_str(),
                 session->local_session_num);
   transport->tx_burst(tx_burst_arr, 1);
 }
