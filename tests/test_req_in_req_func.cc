@@ -4,7 +4,7 @@
  */
 #include "test_basics.h"
 
-static constexpr size_t kAppNumReqs = 9;
+static constexpr size_t kAppNumReqs = 100;
 
 /// Request type used for client to server 0
 static constexpr uint8_t kAppReqTypeCS = kAppReqType + 1;
@@ -55,9 +55,6 @@ class AppContext : public BasicAppContext {
 
 /// Pick a random message size (>= 1 byte)
 size_t get_rand_msg_size(AppContext *app_context) {
-  _unused(app_context);
-  return 32;
-  /*
   assert(app_context != nullptr);
   uint32_t sample = app_context->fast_rand.next_u32();
   uint32_t msg_size = sample % Rpc<IBTransport>::kMaxMsgSize;
@@ -66,7 +63,6 @@ size_t get_rand_msg_size(AppContext *app_context) {
   }
 
   return (size_t)msg_size;
-  */
 }
 
 ///
@@ -109,6 +105,7 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
   int ret = context->rpc->enqueue_request(
       context->session_num_arr[1], kAppReqTypeSS, &srv_req_info->req_msgbuf_ss,
       server_cont_func, tag.tag);
+  _unused(ret);
   assert(ret == 0);
 }
 
@@ -213,6 +210,7 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
   int ret =
       context->rpc->enqueue_request(context->session_num_arr[0], kAppReqTypeCS,
                                     &req_msgbuf, client_cont_func, tag.tag);
+  _unused(ret);
   assert(ret == 0);
 
   context->num_reqs_sent++;

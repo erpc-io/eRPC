@@ -13,7 +13,6 @@
 #include "transport.h"
 #include "transport_impl/ib_transport.h"
 #include "util/buffer.h"
-#include "util/gettid.h"
 #include "util/huge_alloc.h"
 #include "util/mt_list.h"
 #include "util/rand.h"
@@ -304,8 +303,7 @@ class Rpc {
     assert(sslot->tx_msgbuf == nullptr);
 
     // Bury the response, which may be dynamic
-    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
-    assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
+    assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
     bury_sslot_rx_msgbuf(sslot);
 
     Session *session = sslot->session;
@@ -363,8 +361,9 @@ class Rpc {
 
  private:
   /// Return true iff we're currently running in this Rpc's creator.
-  /// This is pretty fast as we cache the OS thread ID in \p gettid().
-  inline bool in_creator() { return gettid() == creator_os_tid; }
+  inline bool in_creator() {
+    return tls_registry->get_tls_tiny_tid() == creator_tls_tiny_tid;
+  }
 
   /// Return true iff a user-provide session number is in the session vector
   inline bool is_usr_session_num_in_range(int session_num) {
@@ -519,16 +518,22 @@ class Rpc {
   // Constructor args
   Nexus<TTr> *nexus;
   void *context;  ///< The application context
-  uint8_t rpc_id;
-  session_mgmt_handler_t session_mgmt_handler;
-  uint8_t phy_port;  ///< Zero-based physical port specified by application
-  size_t numa_node;
+  const uint8_t rpc_id;
+  const session_mgmt_handler_t session_mgmt_handler;
+  const uint8_t phy_port;  ///< Zero-based physical port specified by app
+  const size_t numa_node;
 
   // Others
-  const int creator_os_tid;   ///< OS thread ID of the creator thread
   const bool multi_threaded;  ///< True iff there are background threads
-  bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
 
+  /// A copy of the request/response handlers from the Nexus. We could use
+  /// a pointer instead, but an array is faster.
+  const std::array<ReqFunc, kMaxReqTypes> req_func_arr;
+
+  TlsRegistry *tls_registry;  ///< Pointer to the Nexus's thread-local registry
+  size_t creator_tls_tiny_tid;  ///< Thread ID of the creator thread
+
+  bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
   TTr *transport = nullptr;  ///< The unreliable transport
 
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
@@ -538,10 +543,6 @@ class Rpc {
   size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
 
   size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available Unexp pkt slots
-
-  /// A copy of the request/response handlers from the Nexus. We could use
-  /// a pointer instead, but an array is faster.
-  const std::array<ReqFunc, kMaxReqTypes> req_func_arr;
 
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};

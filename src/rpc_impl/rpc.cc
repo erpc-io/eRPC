@@ -21,11 +21,8 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
       session_mgmt_handler(session_mgmt_handler),
       phy_port(phy_port),
       numa_node(numa_node),
-      creator_os_tid(gettid()),
       multi_threaded(nexus->num_bg_threads > 0),
-      in_event_loop(false),
-      req_func_arr(nexus->req_func_arr),
-      nexus_hook(rpc_id) {
+      req_func_arr(nexus->req_func_arr) {
   // Ensure that we're running as root
   if (getuid()) {
     throw std::runtime_error("eRPC Rpc: You need to be root to use eRPC");
@@ -52,6 +49,12 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
     return;
   }
 
+  tls_registry = &nexus->tls_registry;
+  tls_registry->init();  // Initialize thread-local variables for this thread
+  creator_tls_tiny_tid = tls_registry->get_tls_tiny_tid();
+
+  in_event_loop = false;
+
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for
   // the hugepage allocator.
@@ -70,12 +73,14 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
   }
 
   // Register the hook with the Nexus + sanity-check background request lists
+  nexus_hook.rpc_id = rpc_id;
   nexus->register_hook(&nexus_hook);
   for (size_t i = 0; i < nexus->num_bg_threads; i++) {
     assert(nexus_hook.bg_req_list_arr[i] != nullptr);
   }
 
-  erpc_dprintf("eRPC Rpc: Created with ID = %u.\n", rpc_id);
+  erpc_dprintf("eRPC Rpc: Created with ID = %u, tiny TID = %zu.\n", rpc_id,
+               creator_tls_tiny_tid);
 }
 
 template <class TTr>

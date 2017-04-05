@@ -172,6 +172,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   // If we're here, RX and TX MsgBuffers in all sslots should be buried
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     SSlot &sslot = session->sslot_arr[i];
+    _unused(sslot);
     assert(sslot.rx_msgbuf.buf == nullptr);
     assert(sslot.tx_msgbuf == nullptr);
   }

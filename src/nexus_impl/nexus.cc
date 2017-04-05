@@ -3,7 +3,6 @@
 #include "common.h"
 #include "rpc.h"
 #include "util/barrier.h"
-#include "util/gettid.h"
 
 namespace ERpc {
 
@@ -51,8 +50,9 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
                num_bg_threads);
   bg_kill_switch = false;
   for (size_t i = 0; i < num_bg_threads; i++) {
-    bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
+    bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
+    bg_thread_ctx_arr[i].tls_registry = &tls_registry;
     bg_thread_ctx_arr[i].bg_thread_id = i;
 
     bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);

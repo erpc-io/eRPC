@@ -8,7 +8,7 @@ add_definitions(-std=c++11)
 
 add_definitions(-Wall -Wextra -Werror)
 add_definitions(-Wsign-conversion)
-#add_definitions(-Winline)
+add_definitions(-Winline)
 
 add_definitions(-Wno-unused-function)
 
@@ -83,6 +83,8 @@ set(SOURCES
   src/util/mt_list.h
   src/util/math_utils.h
   src/util/rand.h
+  src/util/tls_registry.h
+  src/util/tls_registry.cc
   src/util/tsc.h
   src/util/udp_client.cc
   src/util/udp_client.h

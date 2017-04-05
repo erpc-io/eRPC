@@ -63,6 +63,9 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &, const size_t,
 void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
                       SessionMgmtErrType sm_err_type, void *_context) {
   _unused(session_num);
+  _unused(sm_event_type);
+  _unused(sm_err_type);
+  _unused(_context);
 
   auto *context = (BasicAppContext *)_context;
   context->num_sm_resps++;

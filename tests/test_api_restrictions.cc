@@ -101,6 +101,7 @@ void test_func(Nexus<IBTransport> *nexus, size_t num_sessions) {
 
   int ret =
       rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
+  _unused(ret);
   assert(ret == 0);
 
   wait_for_rpc_resps_or_timeout(context, 1, nexus->freq_ghz);

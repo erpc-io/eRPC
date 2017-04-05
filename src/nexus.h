@@ -8,6 +8,7 @@
 #include "small_rpc_optlevel.h"
 #include "transport_impl/ib_transport.h"
 #include "util/mt_list.h"
+#include "util/tls_registry.h"
 
 namespace ERpc {
 
@@ -54,6 +55,7 @@ class Nexus {
     /// request functions are registered.
     std::array<ReqFunc, kMaxReqTypes> *req_func_arr;
 
+    TlsRegistry *tls_registry;       ///< The Nexus's thread-local registry
     size_t bg_thread_id;             ///< ID of the background thread
     MtList<BgWorkItem> bg_req_list;  ///< Background thread request list
   };
@@ -63,8 +65,7 @@ class Nexus {
   /// locked.
   class Hook {
    public:
-    Hook(uint8_t rpc_id) : rpc_id(rpc_id) {}
-    const uint8_t rpc_id;  ///< ID of the Rpc that created this hook
+    uint8_t rpc_id;  ///< ID of the Rpc that created this hook
     MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
     /// Background thread request lists
     MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
@@ -141,6 +142,8 @@ class Nexus {
   const size_t num_bg_threads;    ///< Background threads to process Rpc reqs
 
   const uint8_t pad[64] = {0};
+
+  TlsRegistry tls_registry;  ///< A thread-local registry
 
   /// The ground truth for registered request functions
   std::array<ReqFunc, kMaxReqTypes> req_func_arr;

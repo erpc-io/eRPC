@@ -54,6 +54,8 @@ class SSlot {
   struct {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
+    /// Thread ID of the requester, required if we have background threads
+    size_t requester_tls_tiny_tid;
   } clt_save_info;
 
   /// Request metadata saved by the server before calling the request handler.
