@@ -57,7 +57,7 @@ struct pkthdr_t {
   /// 1 if this packet is unexpected. This can be computed using other fields,
   /// but it's useful to have it separately.
   uint64_t is_unexp : 1;
-  /// 1 if this packet is a response, and the req func was foreground terminal
+  /// 1 if this is a response packet, and the req func was foreground-terminal
   uint64_t fgt_resp : 1;
   uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
   uint64_t req_num : kReqNumBits;     ///< Request number of this packet

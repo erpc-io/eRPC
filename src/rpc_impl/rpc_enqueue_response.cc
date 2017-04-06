@@ -62,14 +62,11 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   if (small_rpc_unlikely(resp_msgbuf->num_pkts > 1)) {
     // Headers for non-zeroth packets are created by copying the 0th header, and
     // changing only the required fields.
-    //
-    // All non-first response packets are Unexpected, for both foreground and
-    // background request handlers.
     for (size_t i = 1; i < resp_msgbuf->num_pkts; i++) {
       pkthdr_t *resp_pkthdr_i = resp_msgbuf->get_pkthdr_n(i);
       *resp_pkthdr_i = *resp_pkthdr_0;
       resp_pkthdr_i->pkt_num = i;
-      resp_pkthdr_i->is_unexp = 1;
+      resp_pkthdr_i->is_unexp = 1;  /// All non-first resp pkts are Unexpected
     }
   }
 

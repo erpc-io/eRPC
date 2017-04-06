@@ -98,7 +98,6 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     return;
   }
 
-  // Send a credit return if needed.
   // For small messages, explicit credit return packets are sent if the
   // request handler is not foreground-terminal.
   if (small_rpc_unlikely((is_req && !req_func.is_fg_terminal()) ||
@@ -127,14 +126,15 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     sslot.srv_save_info.req_num = req_num;
 
     if (small_rpc_likely(!req_func.is_background())) {
-      // Create a "fake" static MsgBuffer for the foreground request handler
+      // For foreground (terminal/non-terminal) request handlers, a "fake",
+      // MsgBuffer suffices (i.e., it's valid for the duration of req_func).
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
       req_func.req_func((ReqHandle *)&sslot, context);
       bury_sslot_rx_msgbuf_nofree(&sslot);
       return;
     } else {
-      // For background request handlers, copy the request MsgBuffer. rx_msgbuf
-      // will be freed on enqueue_response().
+      // For background request handlers, we need a copy of the RX ring--backed
+      // MsgBuffer. The allocated rx_msgbuf will be freed on enqueue_response().
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
       assert(sslot.rx_msgbuf.buf != nullptr);
       memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
@@ -191,26 +191,29 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     return;
   }
 
-  // Send a credit return if needed. For large messages, explicit credit return
-  // packets for are sent in the following cases:
-  //
-  // 1. Background request handler: All packets
-  // 2. Foreground request handler:
+  // For large messages, explicit credit return packets for are sent for:
+  // 1. Foreground-terminal request handlers:
   //   1a. Non-last request packets
   //   1b. Non-first response packets
-  bool is_req_handler_bg = (is_req && req_func.is_background()) ||
-                           (!is_req && pkthdr->fgt_resp == 0);
+  // 2. Non-foreground-terminal request handlers: All packets
+  bool is_req_handler_fgt = (is_req && req_func.is_fg_terminal()) ||
+                            (!is_req && pkthdr->fgt_resp == 1);
 
   size_t pkts_expected =
       (msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
   bool is_last = (pkt_num == pkts_expected - 1);
 
-  if (is_req_handler_bg || (pkthdr->is_req() && !is_last) ||
-      (pkthdr->is_resp() && pkt_num != 0)) {
+  if (is_req_handler_fgt) {
+    // Foreground-terminal request handler (1a. and 1b. above)
+    if ((pkthdr->is_req() && !is_last) || (pkthdr->is_resp() && pkt_num != 0)) {
+      send_credit_return_now_st(session, pkthdr);
+    }
+  } else {
+    // Non-foreground-terminal request handler (2. above)
     send_credit_return_now_st(session, pkthdr);
-    // Continue processing
   }
 
+  // Continue non-credit return processing
   size_t sslot_i = req_num % Session::kSessionReqWindow;  // Bit shift
   SSlot &sslot = session->sslot_arr[sslot_i];
   MsgBuffer &rx_msgbuf = sslot.rx_msgbuf;
@@ -282,12 +285,12 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     sslot.srv_save_info.req_type = req_type;
     sslot.srv_save_info.req_num = req_num;
 
+    // rx_msgbuf here is independent of the RX ring, so we never need a copy
     if (!req_func.is_background()) {
       req_func.req_func((ReqHandle *)&sslot, context);
       bury_sslot_rx_msgbuf(&sslot);
       return;
     } else {
-      // rx_msgbuf here is independent of RX ring, so we don't need to copy
       submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kReq);
       return;
     }

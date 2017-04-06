@@ -4,15 +4,14 @@
  */
 #include "test_basics.h"
 
-static constexpr size_t kAppNumReqs = 100;
+static constexpr size_t kAppNumReqs = 30;
+static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
 /// Request type used for client to server 0
 static constexpr uint8_t kAppReqTypeCS = kAppReqType + 1;
 
 /// Request type used for server 0 to server 1
 static constexpr uint8_t kAppReqTypeSS = kAppReqType + 2;
-
-static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
 union tag_t {
   void *srv_req_info_ptr;
@@ -146,8 +145,9 @@ void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
   assert(!context->is_client);
 
   const MsgBuffer *resp_msgbuf_ss = resp_handle_ss->get_resp_msgbuf();
-  test_printf("Server: Received server-server response %zu of length %zu.\n",
-              context->num_rpc_resps, (char *)resp_msgbuf_ss->get_data_size());
+  test_printf("Server %u: Received server-server response %zu of length %zu.\n",
+              context->rpc->get_rpc_id(), context->num_rpc_resps,
+              (char *)resp_msgbuf_ss->get_data_size());
 
   // Extract the request info
   tag_t tag(_tag);
@@ -241,7 +241,7 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   context->num_rpc_resps++;
   context->rpc->release_respone(resp_handle);
 
-  if (context->num_rpc_resps < kAppNumReqs) {
+  if (context->num_reqs_sent < kAppNumReqs) {
     client_request_helper(context, ((tag_t)tag).msgbuf_i);
   }
 }
@@ -262,7 +262,7 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
   }
 
   wait_for_rpc_resps_or_timeout(context, kAppNumReqs, nexus->freq_ghz);
-  assert(context.num_rpc_resps >= kAppNumReqs);  // We can overshoot a bit
+  assert(context.num_rpc_resps == kAppNumReqs);
 
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
