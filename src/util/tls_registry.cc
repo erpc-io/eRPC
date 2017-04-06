@@ -4,17 +4,17 @@
 namespace ERpc {
 
 thread_local bool tls_initalized;
-thread_local size_t tls_tiny_tid;
+thread_local size_t tiny_tid;
 
 void TlsRegistry::init() {
   assert(!tls_initalized);
   tls_initalized = true;
-  tls_tiny_tid = cur_tiny_tid++;
+  tiny_tid = cur_tiny_tid++;
 }
 
-size_t TlsRegistry::get_tls_tiny_tid() {
+size_t TlsRegistry::get_tiny_tid() const {
   assert(tls_initalized);
-  return tls_tiny_tid;
+  return tiny_tid;
 }
 
 }  // End ERpc

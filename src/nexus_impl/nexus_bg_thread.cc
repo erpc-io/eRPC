@@ -17,10 +17,10 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
 
   // The BgWorkItem request list can be indexed using the background thread's
   // index in the Nexus, or its tiny TID.
-  assert(bg_thread_index == tls_registry->get_tls_tiny_tid());
+  assert(bg_thread_index == tls_registry->get_tiny_tid());
 
   erpc_dprintf("eRPC Nexus: Background thread %zu running. Tiny TID = %zu.\n",
-               bg_thread_index, tls_registry->get_tls_tiny_tid());
+               bg_thread_index, tls_registry->get_tiny_tid());
 
   while (*bg_kill_switch == false) {
     MtList<BgWorkItem> &req_list = bg_thread_ctx->bg_req_list;

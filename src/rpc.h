@@ -65,9 +65,6 @@ class Rpc {
   /// Destroy the Rpc from a foreground thread
   ~Rpc();
 
-  /// Return the ID of this Rpc object
-  uint8_t get_rpc_id() const { return rpc_id; }
-
   //
   // MsgBuffer management
   //
@@ -342,6 +339,12 @@ class Rpc {
   //
 
  public:
+  /// Return the ID of this Rpc object
+  uint8_t get_rpc_id() const { return rpc_id; }
+
+  /// Return the tiny thread ID of the caller
+  size_t get_tiny_tid() const { return tls_registry->get_tiny_tid(); }
+
   // rpc_rx.cc
 
   /// Sanity-check a slot's request MsgBuffer on receiving a response packet.
@@ -361,9 +364,7 @@ class Rpc {
 
  private:
   /// Return true iff we're currently running in this Rpc's creator.
-  inline bool in_creator() {
-    return tls_registry->get_tls_tiny_tid() == creator_tls_tiny_tid;
-  }
+  inline bool in_creator() { return get_tiny_tid() == creator_tiny_tid; }
 
   /// Return true iff a user-provide session number is in the session vector
   inline bool is_usr_session_num_in_range(int session_num) {
@@ -531,7 +532,7 @@ class Rpc {
   const std::array<ReqFunc, kMaxReqTypes> req_func_arr;
 
   TlsRegistry *tls_registry;  ///< Pointer to the Nexus's thread-local registry
-  size_t creator_tls_tiny_tid;  ///< Thread ID of the creator thread
+  size_t creator_tiny_tid;    ///< Tiny thread ID of the creator thread
 
   bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
   TTr *transport = nullptr;  ///< The unreliable transport

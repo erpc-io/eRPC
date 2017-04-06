@@ -51,7 +51,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
 
   tls_registry = &nexus->tls_registry;
   tls_registry->init();  // Initialize thread-local variables for this thread
-  creator_tls_tiny_tid = tls_registry->get_tls_tiny_tid();
+  creator_tiny_tid = get_tiny_tid();
 
   in_event_loop = false;
 
@@ -80,7 +80,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
   }
 
   erpc_dprintf("eRPC Rpc: Created with ID = %u, tiny TID = %zu.\n", rpc_id,
-               creator_tls_tiny_tid);
+               creator_tiny_tid);
 }
 
 template <class TTr>
