@@ -13,21 +13,6 @@ static constexpr uint8_t kAppReqTypeCS = kAppReqType + 1;
 /// Request type used for server 0 to server 1
 static constexpr uint8_t kAppReqTypeSS = kAppReqType + 2;
 
-union tag_t {
-  void *srv_req_info_ptr;
-  struct {
-    uint32_t req_size;
-    uint32_t msgbuf_i;
-  };
-  size_t tag;
-
-  tag_t(void *srv_req_info_ptr) : srv_req_info_ptr(srv_req_info_ptr) {}
-  tag_t(uint32_t req_size, uint32_t msgbuf_i)
-      : req_size(req_size), msgbuf_i(msgbuf_i) {}
-  tag_t(size_t tag) : tag(tag) {}
-};
-static_assert(sizeof(tag_t) == sizeof(size_t), "");
-
 /// Per-request info maintained at the server
 class ServerReqInfo {
  public:
@@ -43,6 +28,22 @@ class ServerReqInfo {
   ServerReqInfo(size_t req_size_cs, ReqHandle *req_handle_cs)
       : req_size_cs(req_size_cs), req_handle_cs(req_handle_cs) {}
 };
+
+union tag_t {
+  ServerReqInfo *srv_req_info_ptr;
+  struct {
+    uint16_t req_i;
+    uint16_t msgbuf_i;
+    uint32_t req_size;
+  };
+  size_t tag;
+
+  tag_t(ServerReqInfo *srv_req_info_ptr) : srv_req_info_ptr(srv_req_info_ptr) {}
+  tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
+      : req_i(req_i), msgbuf_i(msgbuf_i), req_size(req_size) {}
+  tag_t(size_t tag) : tag(tag) {}
+};
+static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
 /// Per-thread application context
 class AppContext : public BasicAppContext {
@@ -98,8 +99,7 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
     req_msgbuf_ss.buf[i] = req_msgbuf_cs->buf[i] + 1;
   }
 
-  // Save the request info pointer in the tag
-  tag_t tag((void *)srv_req_info);
+  tag_t tag(srv_req_info);  // Save the request info pointer in the tag
 
   int ret = context->rpc->enqueue_request(
       context->session_num_arr[1], kAppReqTypeSS, &srv_req_info->req_msgbuf_ss,
@@ -145,8 +145,8 @@ void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
   assert(!context->is_client);
 
   const MsgBuffer *resp_msgbuf_ss = resp_handle_ss->get_resp_msgbuf();
-  test_printf("Server %u: Received server-server response %zu of length %zu.\n",
-              context->rpc->get_rpc_id(), context->num_rpc_resps,
+  test_printf("Server %u: Received server-server response of length %zu.\n",
+              context->rpc->get_rpc_id(),
               (char *)resp_msgbuf_ss->get_data_size());
 
   // Extract the request info
@@ -171,7 +171,7 @@ void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
     req_handle_cs->dyn_resp_msgbuf.buf[i] = resp_msgbuf_ss->buf[i] + 1;
   }
 
-  // Free resources of the server-to-server request before releasing response
+  // Free resources of the server-to-server request
   context->rpc->free_msg_buffer(req_msgbuf_ss);
   delete srv_req_info;
 
@@ -202,8 +202,8 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
     req_msgbuf.buf[i] = (uint8_t)msgbuf_i;
   }
 
-  tag_t tag((uint32_t)req_size, (uint32_t)msgbuf_i);  // Construct tag
-
+  tag_t tag((uint16_t)context->num_reqs_sent, (uint16_t)msgbuf_i,
+            (uint32_t)req_size);
   test_printf("Client: Sending request %zu of size %zu\n",
               context->num_reqs_sent, req_size);
 
@@ -224,13 +224,14 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(context->is_client);
 
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  test_printf("Client: Received response %zu of length %zu.\n",
-              context->num_rpc_resps, (char *)resp_msgbuf->get_data_size());
 
-  // Extract req size and MsgBuffer index from the tag
+  // Extract info from tag
   tag_t tag(_tag);
   size_t req_size = (size_t)(tag.req_size);
   size_t msgbuf_i = (size_t)(tag.msgbuf_i);
+
+  test_printf("Client: Received response for req %u, length = %zu.\n",
+              tag.req_i, (char *)resp_msgbuf->get_data_size());
 
   // Check the response
   ASSERT_EQ(resp_msgbuf->get_data_size(), req_size);

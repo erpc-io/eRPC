@@ -6,15 +6,17 @@
 
 static constexpr size_t kAppNumReqs = 1000;
 static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
+static_assert(kAppNumReqs < std::numeric_limits<uint16_t>::max(), "");
 
 union tag_t {
   struct {
+    uint16_t req_i;
+    uint16_t msgbuf_i;
     uint32_t req_size;
-    uint32_t msgbuf_i;
   };
   size_t tag;
-  tag_t(uint32_t req_size, uint32_t msgbuf_i)
-      : req_size(req_size), msgbuf_i(msgbuf_i) {}
+  tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
+      : req_i(req_i), msgbuf_i(msgbuf_i), req_size(req_size) {}
   tag_t(size_t tag) : tag(tag) {}
 };
 static_assert(sizeof(tag_t) == sizeof(size_t), "");
@@ -76,7 +78,8 @@ void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
   size_t req_size = get_rand_msg_size(context);
   context->rpc->resize_msg_buffer(&context->req_msgbuf[msgbuf_i], req_size);
 
-  tag_t tag((uint32_t)req_size, (uint32_t)msgbuf_i);  // Construct tag
+  tag_t tag((uint16_t)context->num_reqs_sent, (uint16_t)msgbuf_i,
+            (uint32_t)req_size);
 
   test_printf("Client: Sending request %zu of size %zu\n",
               context->num_reqs_sent, req_size);
@@ -90,17 +93,18 @@ void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
   context->num_reqs_sent++;
 }
 
-void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
+void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(resp_handle != nullptr);
   assert(_context != nullptr);
-  _unused(tag);
+  _unused(_tag);
 
   auto *context = (AppContext *)_context;
   assert(context->is_client);
-
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  test_printf("Client: Received response %zu of length %zu.\n",
-              context->num_rpc_resps, (char *)resp_msgbuf->get_data_size());
+  tag_t tag(_tag);
+
+  test_printf("Client: Received response for req %u, length = %zu.\n",
+              tag.req_i, (char *)resp_msgbuf->get_data_size());
 
   ASSERT_EQ(resp_msgbuf->get_data_size(), ((tag_t)tag).req_size);
 
