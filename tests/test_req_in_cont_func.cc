@@ -44,7 +44,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
-  ASSERT_FALSE(context->is_client);
+  assert(!context->is_client);
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf->get_data_size();
@@ -53,7 +53,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 
   // eRPC will free the MsgBuffer
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
-  ASSERT_NE(req_handle->dyn_resp_msgbuf.buf, nullptr);
+  assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
 
   memcpy((char *)req_handle->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
@@ -84,9 +84,10 @@ void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
   int ret = context->rpc->enqueue_request(
       context->session_num_arr[0], kAppReqType, &context->req_msgbuf[msgbuf_i],
       cont_func, tag.tag);
+  _unused(ret);
+  assert(ret == 0);
 
   context->num_reqs_sent++;
-  ASSERT_EQ(ret, 0);
 }
 
 void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
@@ -95,7 +96,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
   _unused(tag);
 
   auto *context = (AppContext *)_context;
-  ASSERT_TRUE(context->is_client);
+  assert(context->is_client);
 
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response %zu of length %zu.\n",
@@ -106,7 +107,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
   context->num_rpc_resps++;
   context->rpc->release_respone(resp_handle);
 
-  if (context->num_rpc_resps < kAppNumReqs) {
+  if (context->num_reqs_sent < kAppNumReqs) {
     enqueue_request_helper(context, ((tag_t)tag).msgbuf_i);
   }
 }
@@ -122,12 +123,12 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     context.req_msgbuf[i] =
         rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
-    ASSERT_NE(context.req_msgbuf[i].buf, nullptr);
+    assert(context.req_msgbuf[i].buf != nullptr);
     enqueue_request_helper(&context, i);
   }
 
   wait_for_rpc_resps_or_timeout(context, kAppNumReqs, nexus->freq_ghz);
-  ASSERT_GE(context.num_rpc_resps, kAppNumReqs);  // We can overshoot a bit
+  assert(context.num_rpc_resps == kAppNumReqs);
 
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
