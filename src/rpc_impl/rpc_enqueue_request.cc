@@ -100,7 +100,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // Fill in the slot, reset queueing progress, and upsert session
+  // Fill in the slot, reset queueing progress, and upsert sslot
   SSlot &sslot = session->sslot_arr[sslot_i];
   sslot.clt_save_info.cont_func = cont_func;
   sslot.clt_save_info.tag = tag;

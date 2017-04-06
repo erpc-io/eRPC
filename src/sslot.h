@@ -50,7 +50,7 @@ class SSlot {
   bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
 
  private:
-  // Request info saved at the client
+  // Request info saved at the client. This is needed for the continuation.
   struct {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request

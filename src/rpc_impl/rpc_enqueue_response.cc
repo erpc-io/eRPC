@@ -70,7 +70,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     }
   }
 
-  // Step 3: Fill in the slot, reset queueing progress, and upsert session
+  // Step 3: Fill in the slot, reset queueing progress, and upsert sslot
   sslot->tx_msgbuf = resp_msgbuf;  // Valid response
   sslot->tx_msgbuf->pkts_queued = 0;
 
