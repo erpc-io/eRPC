@@ -100,12 +100,17 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // Fill in the slot, reset queueing progress, and upsert sslot
+  // Fill in the sslot info
   SSlot &sslot = session->sslot_arr[sslot_i];
   sslot.clt_save_info.cont_func = cont_func;
   sslot.clt_save_info.tag = tag;
   if (small_rpc_unlikely(multi_threaded)) {
-    sslot.clt_save_info.requester_tiny_tid = get_tiny_tid();
+    if (!in_creator()) {
+      sslot.clt_save_info.is_requester_bg = true;
+      sslot.clt_save_info.bg_tiny_tid = get_tiny_tid();
+    } else {
+      sslot.clt_save_info.is_requester_bg = true;
+    }
   }
 
   // The tx_msgbuf and rx_msgbuf (i.e., the request and response for the
@@ -115,10 +120,10 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   assert(sslot.rx_msgbuf.buf == nullptr &&
          sslot.rx_msgbuf.buffer.buf == nullptr);
 
-  sslot.tx_msgbuf = req_msgbuf;  // Valid request
-  sslot.tx_msgbuf->pkts_queued = 0;
+  sslot.tx_msgbuf = req_msgbuf;      // Valid request
+  sslot.tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
 
-  dpath_txq_push_back(&sslot);  // Thread-safe
+  dpath_txq_push_back(&sslot);  // Enqueue sslot for TX. This is thread-safe.
   return 0;
 }
 

@@ -54,8 +54,10 @@ class SSlot {
   struct {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
-    /// Tiny thread ID of the requester, used only if we have background threads
-    size_t requester_tiny_tid;
+
+    // These fields are used only if we have background threads
+    bool is_requester_bg;  ///< True if the requester thread is background
+    size_t bg_tiny_tid;    ///< Tiny thread ID of the background thread
   } clt_save_info;
 
   /// Request metadata saved by the server before calling the request handler.

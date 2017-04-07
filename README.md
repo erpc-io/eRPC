@@ -29,27 +29,23 @@
  * The correctness of this reasoning depends on restrictions on the request
    handler and continuation functions. These functions can only enqueue requests
    and responses, but cannot invoke the event loop. The event loop can modify
-   RX ring memory, which is unsafe if the buffer ownership has been passed to
-   the application.
- * At client:
-   * Request MsgBuffers are owned/allocated by apps and are never freed by eRPC.
-     The client temporarily loses ownership of the request MsgBuffer until the
-     continuation for the request is invoked. During this time, the client may
-     not modify the request MsgBuffer.
-   * Response MsgBuffers are buried when the continuation invokes
-     `release_response()`. A continuation must invoke `release_response()`
-     before returning.
- * At server:
-   * The request handler permanently loses ownership of the request MsgBuffer
-     when it returns, at which point eRPC may free it.
-    * For foreground handlers, eRPC frees the request MsgBuffer when the handler
-      returns.
-    * For background handlers, the buffer is freed when the user calls
-      `enqueue_response()`. This is because the background threads don't have
-      access to the Rpc's MsgBuffer burying functions. 
-   * The request handler permanently loses ownership of the response MsgBuffer
-     when it calls `enqueue_response()`. eRPC will free it when the response
-     is no longer needed for retransmission.
+   RX ring memory, which is unsafe if a fake buffer's ownership has been passed
+   to the application.
+ * The two interesting cases first:
+   * Request MsgBuffer ownership at server: The request handler loses ownership
+     of the request MsgBuffer when it returns, at which point eRPC frees it.
+   * Response MsgBuffer ownership at client: The response MsgBuffer is buried
+     when the continuation invokes `release_response()`. A continuation must
+     invoke `release_response()` before returning. This is required required so
+     that the continuation can enqueue more requests before returning.
+ * The two less interesting cases:
+   * Request MsgBuffer ownership at client: Request MsgBuffers are owned and
+     allocated by apps and are never freed by eRPC. The client temporarily loses
+     ownership of the request MsgBuffer until the continuation for the request
+     is invoked, at which point it is no longer needed for retransmission.
+   * Response MsgBuffer ownership at server: The request handler loses ownership
+     of the response MsgBuffer when it calls `enqueue_response()`. eRPC will
+     free it when the response is no longer needed for retransmission.
 
 ## Short-term TODOs
  * Re-enable large messages for `test_req_in_req_func`

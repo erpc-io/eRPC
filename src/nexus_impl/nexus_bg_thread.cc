@@ -35,29 +35,41 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
     assert(req_list.size > 0);
 
     for (BgWorkItem bg_work_item : req_list.list) {
-      uint8_t rpc_id = bg_work_item.rpc_id;  // Debug-only
-      void *context = bg_work_item.context;  // The app's context
+      const BgWorkItemType wi_type = bg_work_item.wi_type;
+      const uint8_t rpc_id = bg_work_item.rpc_id;  // Debug-only
+      void *context = bg_work_item.context;        // The app's context
       SSlot *sslot = bg_work_item.sslot;
       Session *session = sslot->session;  // Debug-only
       _unused(rpc_id);
       _unused(session);
+      assert(context != nullptr && sslot != nullptr && session != nullptr);
 
       // Sanity-check RX and TX MsgBuffers
       Rpc<TTr>::debug_check_bg_rx_msgbuf(sslot, bg_work_item.wi_type);
       assert(sslot->tx_msgbuf == nullptr);  // Sanity-check tx_msgbuf
 
+      bool is_req = (wi_type == BgWorkItemType::kReq);
+
       dpath_dprintf(
-          "eRPC Background: Background thread %zu running request "
-          "handler for Rpc %u, session %u. Request number = %zu.\n",
-          bg_thread_index, rpc_id, session->local_session_num,
-          sslot->rx_msgbuf.get_req_num());
+          "eRPC Background: Background thread %zu running %s for Rpc %u, "
+          "session %u. Request number = %zu.\n",
+          bg_thread_index, is_req ? "request handler" : "continuation", rpc_id,
+          session->local_session_num, sslot->rx_msgbuf.get_req_num());
 
-      uint8_t req_type = sslot->rx_msgbuf.get_req_type();
-      const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);
-      assert(req_func.is_registered());  // Checked during submit_bg
+      if (is_req) {
+        uint8_t req_type = sslot->rx_msgbuf.get_req_type();
+        const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);
+        assert(req_func.is_registered());  // Checked during submit_bg
 
-      req_func.req_func((ReqHandle *)sslot, context);
-      bg_work_item.rpc->bury_sslot_rx_msgbuf(sslot);
+        req_func.req_func((ReqHandle *)sslot, context);
+        bg_work_item.rpc->bury_sslot_rx_msgbuf(sslot);
+      } else {
+        sslot->clt_save_info.cont_func((RespHandle *)sslot, context,
+                                       sslot->clt_save_info.tag);
+
+        // The continuation must release the response (rx_msgbuf), but the
+        // event loop thread may re-use it. So it may not be null.
+      }
     }
 
     req_list.locked_clear();

@@ -12,9 +12,9 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   // The client has a pending request, so the session can't be disconnected
   assert(session->is_connected());
 
-  // Foreground request handlers must call enqueue_response() *before* returning
-  // to the event loop, which frees the request MsgBuffer. For these handlers,
-  // rx_msgbuf must be valid for now (but not for other handlers).
+  // Foreground-terminal request handlers must call enqueue_response() before
+  // returning to the event loop, which then buries the request MsgBuffers.
+  // For these handlers only, rx_msgbuf must be valid at this point.
   switch (sslot->srv_save_info.req_func_type) {
     case ReqFuncType::kFgTerminal:
       // rx_msgbuf could be fake
@@ -36,7 +36,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic());
   assert(resp_msgbuf->data_size > 0);
 
-  // Step 1: Fill in packet 0's header
+  // Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
   resp_pkthdr_0->req_type = sslot->srv_save_info.req_type;
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
@@ -58,7 +58,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   resp_pkthdr_0->req_num = sslot->srv_save_info.req_num;
   assert(resp_pkthdr_0->check_magic());
 
-  // Step 2: Fill in non-zeroth packet headers, if any
+  // Fill in non-zeroth packet headers, if any
   if (small_rpc_unlikely(resp_msgbuf->num_pkts > 1)) {
     // Headers for non-zeroth packets are created by copying the 0th header, and
     // changing only the required fields.
@@ -70,11 +70,11 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     }
   }
 
-  // Step 3: Fill in the slot, reset queueing progress, and upsert sslot
+  // Fill in the slot and reset queueing progress
   sslot->tx_msgbuf = resp_msgbuf;  // Valid response
   sslot->tx_msgbuf->pkts_queued = 0;
 
-  dpath_txq_push_back(sslot);  // Thread-safe
+  dpath_txq_push_back(sslot);  // Enqueue sslot for TX. This is thread-safe.
 }
 
 }  // End ERpc

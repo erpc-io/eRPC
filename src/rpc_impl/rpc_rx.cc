@@ -133,8 +133,8 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       bury_sslot_rx_msgbuf_nofree(&sslot);
       return;
     } else {
-      // For background request handlers, we need a copy of the RX ring--backed
-      // MsgBuffer. The allocated rx_msgbuf will be freed on enqueue_response().
+      // For background request handlers, we need a RX ring--independent copy of
+      // the request. The allocated rx_msgbuf is freed by the background thread.
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
       assert(sslot.rx_msgbuf.buf != nullptr);
       memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
@@ -150,15 +150,25 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
 
-    // Create a "fake" static MsgBuffer for the foreground continuation
-    sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
-    sslot.clt_save_info.cont_func((RespHandle *)&sslot, context,
-                                  sslot.clt_save_info.tag);
+    if (small_rpc_likely(!sslot.clt_save_info.is_requester_bg)) {
+      // Create a "fake" static MsgBuffer for the foreground continuation
+      sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
+      sslot.clt_save_info.cont_func((RespHandle *)&sslot, context,
+                                    sslot.clt_save_info.tag);
 
-    // The continuation must release the response (rx_msgbuf). The continuation
-    // or a background thread may enqueue a new request that uses this sslot,
-    // but that won't affect rx_msgbuf: only the event loop can do that.
-    assert(sslot.rx_msgbuf.buf == nullptr);
+      // The continuation must release the response (rx_msgbuf), and only the
+      // event loop (this thread) can re-use it and make it non-NULL.
+      assert(sslot.rx_msgbuf.buf == nullptr);
+    } else {
+      // For background continuations, we need a RX ring--independent copy of
+      // the resp. The allocated rx_msgbuf is freed by the background thread.
+      sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
+      assert(sslot.rx_msgbuf.buf != nullptr);
+      memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
+             msg_size + sizeof(pkthdr_t));
+      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kResp);
+      return;
+    }
     return;
   }
 }
@@ -297,13 +307,18 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
   } else {
     // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(&sslot);
-    sslot.clt_save_info.cont_func((RespHandle *)&sslot, context,
-                                  sslot.clt_save_info.tag);
 
-    // The continuation must release the response (rx_msgbuf). The continuation
-    // or a background thread may enqueue a new request that uses this sslot,
-    // but that won't affect rx_msgbuf: only the event loop can do that.
-    assert(sslot.rx_msgbuf.buf == nullptr);
+    if (small_rpc_likely(!sslot.clt_save_info.is_requester_bg)) {
+      sslot.clt_save_info.cont_func((RespHandle *)&sslot, context,
+                                    sslot.clt_save_info.tag);
+
+      // The continuation must release the response (rx_msgbuf), and only the
+      // event loop (this thread) can un-bury it.
+      assert(sslot.rx_msgbuf.buf == nullptr);
+    } else {
+      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kResp);
+      return;
+    }
     return;
   }
 }

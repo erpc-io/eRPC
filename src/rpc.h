@@ -291,7 +291,7 @@ class Rpc {
   /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
-  /// Bury the response MsgBuffer and free up the sslot
+  /// At a client, bury the response MsgBuffer and free up the sslot
   inline void release_respone(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
     SSlot *sslot = (SSlot *)resp_handle;
