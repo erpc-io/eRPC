@@ -58,7 +58,7 @@ void Rpc<TTr>::process_dpath_txq_st() {
 template <class TTr>
 void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
                                                   MsgBuffer *tx_msgbuf) {
-  assert(in_creator());  // Only creator runs event loop
+  assert(in_creator());
   assert(tx_msgbuf->num_pkts == 1 && tx_msgbuf->pkts_queued == 0);
   assert(tx_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
