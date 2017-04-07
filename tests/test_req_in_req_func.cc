@@ -121,7 +121,7 @@ void req_handler_ss(ReqHandle *req_handle, void *_context) {
 
   auto *context = (AppContext *)_context;
   assert(!context->is_client);
-  ASSERT_EQ(context->rpc->in_background(), server_0_bg);
+  ASSERT_EQ(context->rpc->in_background(), server_1_bg);
 
   const MsgBuffer *req_msgbuf_ss = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf_ss->get_data_size();

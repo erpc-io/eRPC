@@ -337,13 +337,13 @@ class Rpc {
 
  public:
   /// Return the ID of this Rpc object
-  uint8_t get_rpc_id() const { return rpc_id; }
+  inline uint8_t get_rpc_id() const { return rpc_id; }
 
   /// Return true iff the caller is running in a background thread
-  inline bool in_background() { return !in_creator(); }
+  inline bool in_background() const { return !in_creator(); }
 
   /// Return the tiny thread ID of the caller
-  size_t get_tiny_tid() const { return tls_registry->get_tiny_tid(); }
+  inline size_t get_tiny_tid() const { return tls_registry->get_tiny_tid(); }
 
   // rpc_rx.cc
 
@@ -364,10 +364,10 @@ class Rpc {
 
  private:
   /// Return true iff we're currently running in this Rpc's creator.
-  inline bool in_creator() { return get_tiny_tid() == creator_tiny_tid; }
+  inline bool in_creator() const { return get_tiny_tid() == creator_tiny_tid; }
 
   /// Return true iff a user-provide session number is in the session vector
-  inline bool is_usr_session_num_in_range(int session_num) {
+  inline bool is_usr_session_num_in_range(int session_num) const {
     return session_num >= 0 && (size_t)session_num < session_vec.size();
   }
 
