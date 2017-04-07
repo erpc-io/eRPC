@@ -1,40 +1,37 @@
 /**
  * @file test_nested_rpc.cc
- * @brief Test issuing requests from within request handlers.
+ * @brief Test issuing requests from within request handlers. This uses a
+ * primary-backup setup, where the client sends requests to the primary,
+ * which completes an RPC with *one* of the backups before replying.
  */
 #include "test_basics.h"
 
-// Set to true if the request handler or contination at server 0 or 1 should
-// run in the background.
-bool server_0_bg, server_1_bg;
+// Set to true if the request handler or continuation at the primary or backup
+// should run in the background.
+bool primary_bg, backup_bg;
 
 static constexpr size_t kAppNumReqs = 30;
 static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
-/// Request type used for client to server 0
-static constexpr uint8_t kAppReqTypeCS = kAppReqType + 1;
+/// Request type used for client to primary
+static constexpr uint8_t kAppReqTypeCP = kAppReqType + 1;
 
-/// Request type used for server 0 to server 1
-static constexpr uint8_t kAppReqTypeSS = kAppReqType + 2;
+/// Request type used for primary to backup
+static constexpr uint8_t kAppReqTypePB = kAppReqType + 2;
 
-/// Per-request info maintained at the server
-class ServerReqInfo {
+/// Per-request info maintained at the primary
+class PrimaryReqInfo {
  public:
-  /// The request size of the client-to-server request
-  size_t req_size_cs;
+  size_t req_size_cp;        ///< Size of client-to-primary request
+  ReqHandle *req_handle_cp;  ///< Handle for client-to-primary request
+  MsgBuffer req_msgbuf_pb;   ///< MsgBuffer for primary-to-backup request
 
-  /// The request handle for the client-to-server request
-  ReqHandle *req_handle_cs;
-
-  /// The MsgBuffer used for the server-to-server request
-  MsgBuffer req_msgbuf_ss;
-
-  ServerReqInfo(size_t req_size_cs, ReqHandle *req_handle_cs)
-      : req_size_cs(req_size_cs), req_handle_cs(req_handle_cs) {}
+  PrimaryReqInfo(size_t req_size_cp, ReqHandle *req_handle_cp)
+      : req_size_cp(req_size_cp), req_handle_cp(req_handle_cp) {}
 };
 
 union tag_t {
-  ServerReqInfo *srv_req_info_ptr;
+  PrimaryReqInfo *srv_req_info_ptr;
   struct {
     uint16_t req_i;
     uint16_t msgbuf_i;
@@ -42,7 +39,8 @@ union tag_t {
   };
   size_t tag;
 
-  tag_t(ServerReqInfo *srv_req_info_ptr) : srv_req_info_ptr(srv_req_info_ptr) {}
+  tag_t(PrimaryReqInfo *srv_req_info_ptr)
+      : srv_req_info_ptr(srv_req_info_ptr) {}
   tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
       : req_i(req_i), msgbuf_i(msgbuf_i), req_size(req_size) {}
   tag_t(size_t tag) : tag(tag) {}
@@ -74,120 +72,121 @@ size_t get_rand_msg_size(AppContext *app_context) {
 ///
 
 // Forward declaration
-void server_cont_func(RespHandle *, void *, size_t);
+void primary_cont_func(RespHandle *, void *, size_t);
 
-/// Server 0's request handler for client to server requests. Forwards the
-/// received request to server #1.
-void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
-  assert(req_handle_cs != nullptr);
+/// The primary's request handler for client-to-primary requests. Forwards the
+/// received request to one of the backup servers.
+void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
+  assert(req_handle_cp != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   assert(!context->is_client);
-  ASSERT_EQ(context->rpc->in_background(), server_0_bg);
+  ASSERT_EQ(context->rpc->in_background(), primary_bg);
 
-  const MsgBuffer *req_msgbuf_cs = req_handle_cs->get_req_msgbuf();
-  size_t req_size_cs = req_msgbuf_cs->get_data_size();
+  const MsgBuffer *req_msgbuf_cp = req_handle_cp->get_req_msgbuf();
+  size_t req_size_cp = req_msgbuf_cp->get_data_size();
 
-  test_printf("Server %u: Received client-server request of length %zu.\n",
-              context->rpc->get_rpc_id(), req_size_cs);
+  test_printf("Primary [Rpc %u]: Received request of length %zu.\n",
+              context->rpc->get_rpc_id(), req_size_cp);
 
   // Record info for the request we're now sending to server #1
-  ServerReqInfo *srv_req_info = new ServerReqInfo(req_size_cs, req_handle_cs);
+  PrimaryReqInfo *srv_req_info = new PrimaryReqInfo(req_size_cp, req_handle_cp);
 
-  MsgBuffer &req_msgbuf_ss = srv_req_info->req_msgbuf_ss;
-  req_msgbuf_ss = context->rpc->alloc_msg_buffer(req_size_cs);
-  assert(req_msgbuf_ss.buf != nullptr);
+  MsgBuffer &req_msgbuf_pb = srv_req_info->req_msgbuf_pb;
+  req_msgbuf_pb = context->rpc->alloc_msg_buffer(req_size_cp);
+  assert(req_msgbuf_pb.buf != nullptr);
 
   // Request to server #1 = client-to-server request + 1
-  for (size_t i = 0; i < req_size_cs; i++) {
-    req_msgbuf_ss.buf[i] = req_msgbuf_cs->buf[i] + 1;
+  for (size_t i = 0; i < req_size_cp; i++) {
+    req_msgbuf_pb.buf[i] = req_msgbuf_cp->buf[i] + 1;
   }
 
   tag_t tag(srv_req_info);  // Save the request info pointer in the tag
 
   int ret = context->rpc->enqueue_request(
-      context->session_num_arr[1], kAppReqTypeSS, &srv_req_info->req_msgbuf_ss,
-      server_cont_func, tag.tag);
+      context->session_num_arr[1], kAppReqTypePB, &srv_req_info->req_msgbuf_pb,
+      primary_cont_func, tag.tag);
   _unused(ret);
   assert(ret == 0);
 }
 
-/// Server 1's request handler for server to server requests. Echoes the
-/// received request back to server 0.
-void req_handler_ss(ReqHandle *req_handle, void *_context) {
+/// The backups' request handler for primary-to-backup to requests. Echoes the
+/// received request back to the primary.
+void req_handler_pb(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   assert(!context->is_client);
-  ASSERT_EQ(context->rpc->in_background(), server_1_bg);
+  ASSERT_EQ(context->rpc->in_background(), backup_bg);
 
-  const MsgBuffer *req_msgbuf_ss = req_handle->get_req_msgbuf();
-  size_t req_size = req_msgbuf_ss->get_data_size();
+  const MsgBuffer *req_msgbuf_pb = req_handle->get_req_msgbuf();
+  size_t req_size = req_msgbuf_pb->get_data_size();
 
-  test_printf("Server %u: Received server-server request of length %zu.\n",
+  test_printf("Backup [Rpc %u]: Received request of length %zu.\n",
               context->rpc->get_rpc_id(), req_size);
 
   // eRPC will free dyn_resp_msgbuf
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
   assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
 
-  // Response to server #0 = server-to-server request + 1
+  // Response to primary = request + 1
   for (size_t i = 0; i < req_size; i++) {
-    req_handle->dyn_resp_msgbuf.buf[i] = req_msgbuf_ss->buf[i] + 1;
+    req_handle->dyn_resp_msgbuf.buf[i] = req_msgbuf_pb->buf[i] + 1;
   }
 
   req_handle->prealloc_used = false;
   context->rpc->enqueue_response(req_handle);
 }
 
-/// Server 0's continuation invoked when it gets a response from server 1
-void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
-  assert(resp_handle_ss != nullptr);
+/// The primary's continuation function when it gets a response from a backup
+void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
+                       size_t _tag) {
+  assert(resp_handle_pb != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   assert(!context->is_client);
-  ASSERT_EQ(context->rpc->in_background(), server_0_bg);
+  ASSERT_EQ(context->rpc->in_background(), primary_bg);
 
-  const MsgBuffer *resp_msgbuf_ss = resp_handle_ss->get_resp_msgbuf();
-  test_printf("Server %u: Received server-server response of length %zu.\n",
+  const MsgBuffer *resp_msgbuf_pb = resp_handle_pb->get_resp_msgbuf();
+  test_printf("Primary [Rpc %u]: Received response of length %zu.\n",
               context->rpc->get_rpc_id(),
-              (char *)resp_msgbuf_ss->get_data_size());
+              (char *)resp_msgbuf_pb->get_data_size());
 
   // Extract the request info
   tag_t tag(_tag);
-  ServerReqInfo *srv_req_info = (ServerReqInfo *)tag.srv_req_info_ptr;
-  size_t req_size_cs = srv_req_info->req_size_cs;
-  ReqHandle *req_handle_cs = srv_req_info->req_handle_cs;
-  MsgBuffer &req_msgbuf_ss = srv_req_info->req_msgbuf_ss;
+  PrimaryReqInfo *srv_req_info = (PrimaryReqInfo *)tag.srv_req_info_ptr;
+  size_t req_size_cp = srv_req_info->req_size_cp;
+  ReqHandle *req_handle_cp = srv_req_info->req_handle_cp;
+  MsgBuffer &req_msgbuf_pb = srv_req_info->req_msgbuf_pb;
 
-  assert(resp_msgbuf_ss->get_data_size() == req_size_cs);
+  assert(resp_msgbuf_pb->get_data_size() == req_size_cp);
 
   // Check the response from server #1
-  for (size_t i = 0; i < req_size_cs; i++) {
-    assert(req_msgbuf_ss.buf[i] + 1 == resp_msgbuf_ss->buf[i]);
+  for (size_t i = 0; i < req_size_cp; i++) {
+    assert(req_msgbuf_pb.buf[i] + 1 == resp_msgbuf_pb->buf[i]);
   }
 
   // eRPC will free dyn_resp_msgbuf
-  req_handle_cs->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size_cs);
+  req_handle_cp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size_cp);
 
   // Response to client = server-to-server response + 1
-  for (size_t i = 0; i < req_size_cs; i++) {
-    req_handle_cs->dyn_resp_msgbuf.buf[i] = resp_msgbuf_ss->buf[i] + 1;
+  for (size_t i = 0; i < req_size_cp; i++) {
+    req_handle_cp->dyn_resp_msgbuf.buf[i] = resp_msgbuf_pb->buf[i] + 1;
   }
 
   // Free resources of the server-to-server request
-  context->rpc->free_msg_buffer(req_msgbuf_ss);
+  context->rpc->free_msg_buffer(req_msgbuf_pb);
   delete srv_req_info;
 
   // Release the server-server response
-  context->rpc->release_respone(resp_handle_ss);
+  context->rpc->release_respone(resp_handle_pb);
 
   // Send response to the client
-  req_handle_cs->prealloc_used = false;
-  context->rpc->enqueue_response(req_handle_cs);
+  req_handle_cp->prealloc_used = false;
+  context->rpc->enqueue_response(req_handle_cp);
 }
 
 ///
@@ -214,7 +213,7 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
               context->num_reqs_sent, req_size);
 
   int ret =
-      context->rpc->enqueue_request(context->session_num_arr[0], kAppReqTypeCS,
+      context->rpc->enqueue_request(context->session_num_arr[0], kAppReqTypeCP,
                                     &req_msgbuf, client_cont_func, tag.tag);
   _unused(ret);
   assert(ret == 0);
@@ -287,43 +286,43 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
   client_done = true;
 }
 
-/// Both server 0 and server 1 run in the foreground
-TEST(SendReqInReqFunc, BothForeground) {
-  server_0_bg = false;
-  server_1_bg = false;
+/// 1 primary, 1 backup, both in foreground
+TEST(SendReqInReqFunc, BothInForeground) {
+  primary_bg = false;
+  backup_bg = false;
 
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqTypeCS, req_handler_cs,
+      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp,
                      ReqFuncType::kFgNonterminal),
-      ReqFuncRegInfo(kAppReqTypeSS, req_handler_ss, ReqFuncType::kFgTerminal)};
+      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kFgTerminal)};
 
   // 2 client sessions (=> 2 server threads), 0 background threads
   launch_server_client_threads(2, 0, client_thread, reg_info_vec,
                                ConnectServers::kTrue);
 }
 
-/// Server 0 runs in background, server 1 in foreground
-TEST(SendReqInReqFunc, ServerZeroBackground) {
-  server_0_bg = true;
-  server_1_bg = false;
+/// 1 primary, 1 backup, primary in background
+TEST(SendReqInReqFunc, PrimaryInBackground) {
+  primary_bg = true;
+  backup_bg = false;
 
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqTypeCS, req_handler_cs, ReqFuncType::kBackground),
-      ReqFuncRegInfo(kAppReqTypeSS, req_handler_ss, ReqFuncType::kFgTerminal)};
+      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
+      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kFgTerminal)};
 
   // 2 client sessions (=> 2 server threads), 1 background thread
   launch_server_client_threads(2, 1, client_thread, reg_info_vec,
                                ConnectServers::kTrue);
 }
 
-/// Both server 0 and server 1 run in the background
-TEST(SendReqInReqFunc, BothBackground) {
-  server_0_bg = true;
-  server_1_bg = true;
+/// 1 primary, 1 backup, both in background
+TEST(SendReqInReqFunc, BothInBackground) {
+  primary_bg = true;
+  backup_bg = true;
 
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqTypeCS, req_handler_cs, ReqFuncType::kBackground),
-      ReqFuncRegInfo(kAppReqTypeSS, req_handler_ss, ReqFuncType::kBackground)};
+      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
+      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kBackground)};
 
   // 2 client sessions (=> 2 server threads), 1 background thread
   launch_server_client_threads(2, 1, client_thread, reg_info_vec,

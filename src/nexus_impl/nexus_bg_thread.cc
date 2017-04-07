@@ -17,7 +17,15 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
 
   // The BgWorkItem request list can be indexed using the background thread's
   // index in the Nexus, or its tiny TID.
-  assert(bg_thread_index == tls_registry->get_tiny_tid());
+  if (bg_thread_index != tls_registry->get_tiny_tid()) {
+    // This error showed up once, but I couldn't reproduce it again. This
+    // should be just an assert, but the exception might help in debugging.
+    std::ostringstream err;
+    err << "eRPC Nexus : Background thread ID mismatch. Nexus-assigned thread "
+        << "index is " << std::to_string(bg_thread_index) << ", but tiny "
+        << "thread ID is " << std::to_string(tls_registry->get_tiny_tid());
+    throw std::runtime_error(err.str());
+  }
 
   erpc_dprintf("eRPC Nexus: Background thread %zu running. Tiny TID = %zu.\n",
                bg_thread_index, tls_registry->get_tiny_tid());
