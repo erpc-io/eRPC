@@ -55,6 +55,21 @@ class ReqFuncRegInfo {
 
 enum class ConnectServers : bool { kTrue, kFalse };
 
+/// Pick a random non-zero message size smaller than \p max_msg_size, with an
+/// approximaietly 20% chance of the message fitting in one packet.
+size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
+                         size_t max_msg_size) {
+  assert(fast_rand != nullptr);
+
+  if (fast_rand->next_u32() % 100 < 20) {
+    uint32_t sample = fast_rand->next_u32();
+    return (sample % max_data_per_pkt) + 1;
+  } else {
+    uint32_t sample = fast_rand->next_u32();
+    return (sample % max_msg_size) + 1;
+  }
+}
+
 // Forward declaration
 void wait_for_sm_resps_or_timeout(BasicAppContext &, const size_t,
                                   const double);

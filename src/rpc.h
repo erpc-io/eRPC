@@ -32,7 +32,7 @@ namespace ERpc {
 template <class TTr>
 class Rpc {
  public:
-  /// Max request or response size, excluding packet headers
+  /// Max request or response *data* size, i.e., excluding packet headers
   static constexpr size_t kMaxMsgSize =
       HugeAlloc::kMaxClassSize -
       ((HugeAlloc::kMaxClassSize / TTr::kMaxDataPerPkt) * sizeof(pkthdr_t));
@@ -44,11 +44,6 @@ class Rpc {
 
   /// Max number of unexpected *packets* kept outstanding by this Rpc
   static constexpr size_t kRpcUnexpPktWindow = 20;
-
-  /// Return the maximum data size that can be sent in one packet
-  static inline constexpr size_t max_data_per_pkt() {
-    return TTr::kMaxDataPerPkt;
-  }
 
   //
   // Constructor/destructor (rpc.cc)
@@ -336,6 +331,14 @@ class Rpc {
   //
 
  public:
+  /// Return the maximum *data* size that can be sent in one packet
+  static inline constexpr size_t get_max_data_per_pkt() {
+    return TTr::kMaxDataPerPkt;
+  }
+
+  /// Return the maximum message *data* size that can be sent
+  static inline size_t get_max_msg_size() { return kMaxMsgSize; }
+
   /// Return the ID of this Rpc object
   inline uint8_t get_rpc_id() const { return rpc_id; }
 

@@ -55,18 +55,6 @@ class AppContext : public BasicAppContext {
   size_t num_reqs_sent = 0;
 };
 
-/// Pick a random message size (>= 1 byte)
-size_t get_rand_msg_size(AppContext *app_context) {
-  assert(app_context != nullptr);
-  uint32_t sample = app_context->fast_rand.next_u32();
-  uint32_t msg_size = sample % Rpc<IBTransport>::kMaxMsgSize;
-  if (msg_size == 0) {
-    msg_size = 1;
-  }
-
-  return (size_t)msg_size;
-}
-
 ///
 /// Server-side code
 ///
@@ -198,7 +186,10 @@ void client_cont_func(RespHandle *, void *, size_t);  // Forward declaration
 void client_request_helper(AppContext *context, size_t msgbuf_i) {
   assert(context != nullptr && msgbuf_i < Session::kSessionReqWindow);
 
-  size_t req_size = get_rand_msg_size(context);
+  size_t req_size = get_rand_msg_size(&context->fast_rand,
+                                      context->rpc->get_max_data_per_pkt(),
+                                      context->rpc->get_max_msg_size());
+
   context->rpc->resize_msg_buffer(&context->req_msgbuf[msgbuf_i], req_size);
 
   // Fill in all the bytes of the request MsgBuffer with msgbuf_i

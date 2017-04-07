@@ -1,7 +1,7 @@
 #include "test_basics.h"
 
 static constexpr size_t kAppMinMsgSize =
-    Rpc<IBTransport>::max_data_per_pkt() + 1; /* At least 2 packets */
+    Rpc<IBTransport>::get_max_data_per_pkt() + 1; /* At least 2 packets */
 
 void req_handler(ReqHandle *, void *);  // Forward declaration
 
