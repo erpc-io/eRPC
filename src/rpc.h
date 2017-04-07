@@ -311,9 +311,6 @@ class Rpc {
     unlock_cond(&session->lock);
   }
 
-  /// Return true iff the caller is running in a background thread
-  inline bool in_background() { return !in_creator(); }
-
   //
   // Event loop
   //
@@ -341,6 +338,9 @@ class Rpc {
  public:
   /// Return the ID of this Rpc object
   uint8_t get_rpc_id() const { return rpc_id; }
+
+  /// Return true iff the caller is running in a background thread
+  inline bool in_background() { return !in_creator(); }
 
   /// Return the tiny thread ID of the caller
   size_t get_tiny_tid() const { return tls_registry->get_tiny_tid(); }

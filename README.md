@@ -48,10 +48,9 @@
      free it when the response is no longer needed for retransmission.
 
 ## Short-term TODOs
- * Re-enable large messages for `test_req_in_req_func`
- * Need background flag for continuations.
- * Should `datapath_tx_work_queue` contain sslots instead of sessions?
- * Do we need `no_free` versions of sslot burying functions?
+ * For large message tests with random message lengths, there should be a
+   significant probability of using small messages.
+ * Cleanup "Only creator runs event loop" comments
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?

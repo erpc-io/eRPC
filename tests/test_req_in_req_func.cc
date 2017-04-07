@@ -4,6 +4,10 @@
  */
 #include "test_basics.h"
 
+// Set to true if the request handler or contination at server 0 or 1 should
+// run in the background.
+bool server_0_bg, server_1_bg;
+
 static constexpr size_t kAppNumReqs = 30;
 static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
@@ -72,14 +76,15 @@ size_t get_rand_msg_size(AppContext *app_context) {
 // Forward declaration
 void server_cont_func(RespHandle *, void *, size_t);
 
-/// Request handler for client to server requests. Forwards the received
-/// request to server #1.
+/// Server 0's request handler for client to server requests. Forwards the
+/// received request to server #1.
 void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
   assert(req_handle_cs != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   assert(!context->is_client);
+  ASSERT_EQ(context->rpc->in_background(), server_0_bg);
 
   const MsgBuffer *req_msgbuf_cs = req_handle_cs->get_req_msgbuf();
   size_t req_size_cs = req_msgbuf_cs->get_data_size();
@@ -108,14 +113,15 @@ void req_handler_cs(ReqHandle *req_handle_cs, void *_context) {
   assert(ret == 0);
 }
 
-/// Request handler for server to server requests. Echoes the received request
-/// using a dynamically-allocated response.
+/// Server 1's request handler for server to server requests. Echoes the
+/// received request back to server 0.
 void req_handler_ss(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   assert(!context->is_client);
+  ASSERT_EQ(context->rpc->in_background(), server_0_bg);
 
   const MsgBuffer *req_msgbuf_ss = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf_ss->get_data_size();
@@ -136,13 +142,14 @@ void req_handler_ss(ReqHandle *req_handle, void *_context) {
   context->rpc->enqueue_response(req_handle);
 }
 
-// The continuation invoked when server 0 gets a response from server 1
+/// Server 0's continuation invoked when it gets a response from server 1
 void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
   assert(resp_handle_ss != nullptr);
   assert(_context != nullptr);
 
   auto *context = (AppContext *)_context;
   assert(!context->is_client);
+  ASSERT_EQ(context->rpc->in_background(), server_0_bg);
 
   const MsgBuffer *resp_msgbuf_ss = resp_handle_ss->get_resp_msgbuf();
   test_printf("Server %u: Received server-server response of length %zu.\n",
@@ -188,8 +195,7 @@ void server_cont_func(RespHandle *resp_handle_ss, void *_context, size_t _tag) {
 ///
 void client_cont_func(RespHandle *, void *, size_t);  // Forward declaration
 
-/// Enqueue a request on the zeroth session using the request MsgBuffer with
-/// index = msgbuf_i
+/// Enqueue a request to server 0 using the request MsgBuffer index msgbuf_i
 void client_request_helper(AppContext *context, size_t msgbuf_i) {
   assert(context != nullptr && msgbuf_i < Session::kSessionReqWindow);
 
@@ -281,7 +287,11 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
   client_done = true;
 }
 
-TEST(SendReqInReqFunc, Foreground) {
+/// Both server 0 and server 1 run in the foreground
+TEST(SendReqInReqFunc, BothForeground) {
+  server_0_bg = false;
+  server_1_bg = false;
+
   auto reg_info_vec = {
       ReqFuncRegInfo(kAppReqTypeCS, req_handler_cs,
                      ReqFuncType::kFgNonterminal),
@@ -289,6 +299,34 @@ TEST(SendReqInReqFunc, Foreground) {
 
   // 2 client sessions (=> 2 server threads), 0 background threads
   launch_server_client_threads(2, 0, client_thread, reg_info_vec,
+                               ConnectServers::kTrue);
+}
+
+/// Server 0 runs in background, server 1 in foreground
+TEST(SendReqInReqFunc, ServerZeroBackground) {
+  server_0_bg = true;
+  server_1_bg = false;
+
+  auto reg_info_vec = {
+      ReqFuncRegInfo(kAppReqTypeCS, req_handler_cs, ReqFuncType::kBackground),
+      ReqFuncRegInfo(kAppReqTypeSS, req_handler_ss, ReqFuncType::kFgTerminal)};
+
+  // 2 client sessions (=> 2 server threads), 1 background thread
+  launch_server_client_threads(2, 1, client_thread, reg_info_vec,
+                               ConnectServers::kTrue);
+}
+
+/// Both server 0 and server 1 run in the background
+TEST(SendReqInReqFunc, BothBackground) {
+  server_0_bg = true;
+  server_1_bg = true;
+
+  auto reg_info_vec = {
+      ReqFuncRegInfo(kAppReqTypeCS, req_handler_cs, ReqFuncType::kBackground),
+      ReqFuncRegInfo(kAppReqTypeSS, req_handler_ss, ReqFuncType::kBackground)};
+
+  // 2 client sessions (=> 2 server threads), 1 background thread
+  launch_server_client_threads(2, 1, client_thread, reg_info_vec,
                                ConnectServers::kTrue);
 }
 
