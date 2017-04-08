@@ -27,15 +27,16 @@ class MsgBuffer {
 
   /// Return a pointer to the pre-appended packet header of this MsgBuffer
   inline pkthdr_t *get_pkthdr_0() const {
-    return (pkthdr_t *)(buf - sizeof(pkthdr_t));
+    return reinterpret_cast<pkthdr_t *>(buf - sizeof(pkthdr_t));
   }
 
   /// Return a pointer to the nth (n >= 1) packet header of this MsgBuffer.
   /// This must use \p max_data_size, not \p data_size.
   inline pkthdr_t *get_pkthdr_n(size_t n) const {
     assert(n >= 1);
-    return (pkthdr_t *)(buf + round_up<sizeof(size_t)>(max_data_size) +
-                        (n - 1) * sizeof(pkthdr_t));
+    return reinterpret_cast<pkthdr_t *>(
+        buf + round_up<sizeof(size_t)>(max_data_size) +
+        (n - 1) * sizeof(pkthdr_t));
   }
 
   ///@{ Accessors for the packet header
@@ -70,7 +71,7 @@ class MsgBuffer {
     }
 
     std::ostringstream ret;
-    ret << "[buf " << (void *)buf << ", "
+    ret << "[buf " << static_cast<void *>(buf) << ", "
         << "buffer " << buffer.to_string() << ", "
         << "data " << data_size << "(" << max_data_size << "), "
         << "pkts " << num_pkts << "(" << max_num_pkts << "), "
@@ -78,7 +79,6 @@ class MsgBuffer {
     return ret.str();
   }
 
- private:
   /// Construct a MsgBuffer with a dynamic Buffer allocated by eRPC.
   /// The zeroth packet header is stored at \p buffer.buf. \p buffer must have
   /// space for at least \p max_data_bytes, and \p max_num_pkts packet headers.
@@ -95,7 +95,7 @@ class MsgBuffer {
     assert(buffer.class_size >=
            max_data_size + max_num_pkts * sizeof(pkthdr_t));
 
-    pkthdr_t *pkthdr_0 = (pkthdr_t *)buffer.buf;
+    pkthdr_t *pkthdr_0 = reinterpret_cast<pkthdr_t *>(buffer.buf);
     pkthdr_0->magic = kPktHdrMagic;
   }
 
@@ -103,7 +103,7 @@ class MsgBuffer {
   /// buffer to invalid so that we know not to free it.
   /// \p pkt must have space for \p max_data_bytes and one packet header.
   MsgBuffer(const uint8_t *pkt, size_t max_data_size)
-      : buf((uint8_t *)pkt + sizeof(pkthdr_t)),
+      : buf(const_cast<uint8_t *>(pkt) + sizeof(pkthdr_t)),
         max_data_size(max_data_size),
         data_size(max_data_size),
         max_num_pkts(1),
@@ -112,8 +112,9 @@ class MsgBuffer {
     // max_data_size can be zero
     buffer.buf = nullptr;  // This is a non-dynamic ("fake") MsgBuffer
 
-    pkthdr_t *pkthdr_0 = (pkthdr_t *)pkt;
-    pkthdr_0->magic = kPktHdrMagic;
+    const pkthdr_t *pkthdr_0 = reinterpret_cast<const pkthdr_t *>(pkt);
+    _unused(pkthdr_0);
+    assert(pkthdr_0->check_magic());
   }
 
   /// Resize this MsgBuffer to any size smaller than its maximum allocation

@@ -10,7 +10,7 @@ class AppContext : public BasicAppContext {
 void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
                      SessionMgmtErrType sm_err_type, void *_context) {
   ASSERT_TRUE(_context != nullptr);
-  AppContext *context = (AppContext *)_context;
+  AppContext *context = static_cast<AppContext *>(_context);
   context->num_sm_resps++;
 
   /* Check that the error type matches the expected value */
@@ -31,9 +31,9 @@ void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
 void simple_connect(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc =
-      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
-                           &test_sm_handler, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
+                                     kAppClientRpcId, &test_sm_handler,
+                                     kAppPhyPort, kAppNumaNode);
 
   /* Connect the session */
   context.exp_err = SessionMgmtErrType::kNoError;
@@ -64,9 +64,9 @@ TEST(SuccessfulConnect, SuccessfulConnect) {
 void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc =
-      new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
-                           &test_sm_handler, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
+                                     kAppClientRpcId, &test_sm_handler,
+                                     kAppPhyPort, kAppNumaNode);
 
   /* Connect the session */
   context.exp_err = SessionMgmtErrType::kInvalidRemotePort;

@@ -68,7 +68,7 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
   assert(req_handle_cp != nullptr);
   assert(_context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
   ASSERT_EQ(context->rpc->in_background(), primary_bg);
 
@@ -105,7 +105,7 @@ void req_handler_pb(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
   ASSERT_EQ(context->rpc->in_background(), backup_bg);
 
@@ -134,18 +134,17 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
   assert(resp_handle_pb != nullptr);
   assert(_context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
   ASSERT_EQ(context->rpc->in_background(), primary_bg);
 
   const MsgBuffer *resp_msgbuf_pb = resp_handle_pb->get_resp_msgbuf();
   test_printf("Primary [Rpc %u]: Received response of length %zu.\n",
-              context->rpc->get_rpc_id(),
-              (char *)resp_msgbuf_pb->get_data_size());
+              context->rpc->get_rpc_id(), resp_msgbuf_pb->get_data_size());
 
   // Extract the request info
   tag_t tag(_tag);
-  PrimaryReqInfo *srv_req_info = (PrimaryReqInfo *)tag.srv_req_info_ptr;
+  PrimaryReqInfo *srv_req_info = tag.srv_req_info_ptr;
   size_t req_size_cp = srv_req_info->req_size_cp;
   ReqHandle *req_handle_cp = srv_req_info->req_handle_cp;
   MsgBuffer &req_msgbuf_pb = srv_req_info->req_msgbuf_pb;
@@ -195,11 +194,11 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
   // Fill in all the bytes of the request MsgBuffer with msgbuf_i
   MsgBuffer &req_msgbuf = context->req_msgbuf[msgbuf_i];
   for (size_t i = 0; i < req_size; i++) {
-    req_msgbuf.buf[i] = (uint8_t)msgbuf_i;
+    req_msgbuf.buf[i] = static_cast<uint8_t>(msgbuf_i);
   }
 
-  tag_t tag((uint16_t)context->num_reqs_sent, (uint16_t)msgbuf_i,
-            (uint32_t)req_size);
+  tag_t tag(static_cast<uint16_t>(context->num_reqs_sent),
+            static_cast<uint16_t>(msgbuf_i), static_cast<uint32_t>(req_size));
   test_printf("Client: Sending request %zu of size %zu\n",
               context->num_reqs_sent, req_size);
 
@@ -216,30 +215,30 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(resp_handle != nullptr);
   assert(_context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
 
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
 
   // Extract info from tag
   tag_t tag(_tag);
-  size_t req_size = (size_t)(tag.req_size);
-  size_t msgbuf_i = (size_t)(tag.msgbuf_i);
+  size_t req_size = static_cast<size_t>(tag.req_size);
+  size_t msgbuf_i = static_cast<size_t>(tag.msgbuf_i);
 
   test_printf("Client: Received response for req %u, length = %zu.\n",
-              tag.req_i, (char *)resp_msgbuf->get_data_size());
+              tag.req_i, resp_msgbuf->get_data_size());
 
   // Check the response
   ASSERT_EQ(resp_msgbuf->get_data_size(), req_size);
   for (size_t i = 0; i < req_size; i++) {
-    ASSERT_EQ(resp_msgbuf->buf[i], ((uint8_t)msgbuf_i) + 3);
+    ASSERT_EQ(resp_msgbuf->buf[i], static_cast<uint8_t>(msgbuf_i) + 3);
   }
 
   context->num_rpc_resps++;
   context->rpc->release_respone(resp_handle);
 
   if (context->num_reqs_sent < kAppNumReqs) {
-    client_request_helper(context, ((tag_t)tag).msgbuf_i);
+    client_request_helper(context, static_cast<tag_t>(tag).msgbuf_i);
   }
 }
 

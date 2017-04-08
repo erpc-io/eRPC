@@ -59,7 +59,8 @@ class IBTransport : public Transport {
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
 
   static std::string routing_info_str(RoutingInfo *routing_info) {
-    ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
+    ib_routing_info_t *ib_routing_info =
+        reinterpret_cast<ib_routing_info_t *>(routing_info);
     std::ostringstream ret;
     ret << "[LID: " << std::to_string(ib_routing_info->port_lid)
         << ", QPN: " << std::to_string(ib_routing_info->qpn) << "]";
@@ -159,7 +160,7 @@ class IBTransport : public Transport {
    * \p dereg_mr_func
    */
   static void ibv_dereg_mr_wrapper(MemRegInfo mr) {
-    struct ibv_mr *ib_mr = (struct ibv_mr *)mr.transport_mr;
+    struct ibv_mr *ib_mr = reinterpret_cast<struct ibv_mr *>(mr.transport_mr);
     size_t size = ib_mr->length;
     uint32_t lkey = ib_mr->lkey;
 

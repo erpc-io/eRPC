@@ -48,6 +48,8 @@
      free it when the response is no longer needed for retransmission.
 
 ## Short-term TODOs
+ * In `test_small_msg`, test that we can send an exactly MTU-sized message.
+ * Variable names in Nexus and its threads are identical.
  * Get rid of foreground-non-terminal request type.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.

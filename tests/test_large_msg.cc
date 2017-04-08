@@ -29,7 +29,7 @@ size_t pick_large_msg_size(AppContext *app_context) {
 
   assert(msg_size >= kAppMinMsgSize &&
          msg_size <= Rpc<IBTransport>::kMaxMsgSize);
-  return (size_t)msg_size;
+  return static_cast<size_t>(msg_size);
 }
 
 /// The common request handler for all subtests. Copies the request string to
@@ -38,7 +38,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   ASSERT_FALSE(context->is_client);
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
@@ -51,13 +51,13 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   ASSERT_NE(req_handle->dyn_resp_msgbuf.buf, nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
 
-  memcpy((char *)req_handle->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
-         req_size);
+  memcpy(reinterpret_cast<char *>(req_handle->dyn_resp_msgbuf.buf),
+         reinterpret_cast<char *>(req_msgbuf->buf), req_size);
 
   test_printf(
       "Server: Received request of length %zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
-      req_size, user_alloc_tot, (double)user_alloc_tot / MB(1));
+      req_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
 
   context->rpc->enqueue_response(req_handle);
 }
@@ -72,14 +72,14 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response of length %zu.\n",
-              (char *)resp_msgbuf->get_data_size());
+              resp_msgbuf->get_data_size());
 
   /*
   ASSERT_EQ(req_msgbuf->get_data_size(), resp_msgbuf->get_data_size());
   ASSERT_STREQ((char *)req_msgbuf->buf, (char *)resp_msgbuf->buf);
   */
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   ASSERT_TRUE(context->is_client);
   context->num_rpc_resps++;
 
@@ -165,7 +165,7 @@ void multi_large_rpc_one_session(Nexus<IBTransport> *nexus,
 
     /* Enqueue as many requests as one session allows */
     for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-      size_t req_len = pick_large_msg_size((AppContext *)&context);
+      size_t req_len = pick_large_msg_size(&context);
       rpc->resize_msg_buffer(&req_msgbuf[i], req_len);
 
       for (size_t j = 0; j < req_len; j++) {
@@ -246,7 +246,7 @@ void multi_large_rpc_multi_session(Nexus<IBTransport> *nexus,
         size_t req_i = (sess_i * Session::kSessionReqWindow) + w_i;
         assert(req_i < tot_reqs_per_iter);
 
-        size_t req_len = pick_large_msg_size((AppContext *)&context);
+        size_t req_len = pick_large_msg_size(&context);
         rpc->resize_msg_buffer(&req_msgbuf[req_i], req_len);
 
         for (size_t j = 0; j < req_len; j++) {
@@ -337,7 +337,7 @@ void memory_leak(Nexus<IBTransport> *nexus, size_t num_sessions) {
         size_t req_i = (sess_i * Session::kSessionReqWindow) + w_i;
         assert(req_i < tot_reqs_per_iter);
 
-        size_t req_len = pick_large_msg_size((AppContext *)&context);
+        size_t req_len = pick_large_msg_size(&context);
         rpc->resize_msg_buffer(&req_msgbuf[req_i], req_len);
 
         for (size_t j = 0; j < req_len; j++) {

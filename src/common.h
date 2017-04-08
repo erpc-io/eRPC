@@ -75,9 +75,9 @@ static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
   }
 }
 
-#define KB(x) ((size_t)(x) << 10)
+#define KB(x) (static_cast<size_t>(x) << 10)
 #define KB_(x) (KB(x) - 1)
-#define MB(x) ((size_t)(x) << 20)
+#define MB(x) (static_cast<size_t>(x) << 20)
 #define MB_(x) (MB(x) - 1)
 
 /// UDP config used throughout eRPC

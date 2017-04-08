@@ -98,7 +98,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
   SessionEndpoint &client_endpoint = session->client;
 
   client_endpoint.transport_type = transport->transport_type;
-  strcpy((char *)client_endpoint.hostname, nexus->hostname.c_str());
+  strcpy(client_endpoint.hostname, nexus->hostname.c_str());
   client_endpoint.phy_port = phy_port;
   client_endpoint.rpc_id = rpc_id;
   client_endpoint.session_num = session_vec.size();
@@ -107,7 +107,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
 
   SessionEndpoint &server_endpoint = session->server;
   server_endpoint.transport_type = transport->transport_type;
-  strcpy((char *)server_endpoint.hostname, rem_hostname);
+  strcpy(server_endpoint.hostname, rem_hostname);
   server_endpoint.phy_port = rem_phy_port;
   server_endpoint.rpc_id = rem_rpc_id;
   // server_endpoint.session_num = ??
@@ -147,7 +147,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     return -EINVAL;
   }
 
-  Session *session = session_vec[(size_t)session_num];
+  Session *session = session_vec[static_cast<size_t>(session_num)];
   if (session == nullptr) {
     erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
     return -EPERM;

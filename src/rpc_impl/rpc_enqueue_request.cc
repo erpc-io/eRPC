@@ -9,7 +9,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                               MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
                               size_t tag) {
   assert(is_usr_session_num_in_range(session_num));
-  Session *session = session_vec[(size_t)session_num];
+  Session *session = session_vec[static_cast<size_t>(session_num)];
 
   if (!kDatapathChecks) {
     assert(session != nullptr);

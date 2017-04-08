@@ -12,6 +12,7 @@ flags = [
     '-Winline',
     '-Wsign-conversion',
     '-Wconversion',
+    '-Wold-style-cast'
     '-Wno-long-long',
     '-Wno-variadic-macros',
     '-fexceptions',

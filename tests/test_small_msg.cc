@@ -21,15 +21,16 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   ASSERT_FALSE(context->is_client);
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   test_printf("Server: Received request %s\n", req_msgbuf->buf);
 
-  size_t resp_size = strlen((char *)req_msgbuf->buf);
+  size_t resp_size = req_msgbuf->get_data_size();
   Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
-  strcpy((char *)req_handle->pre_resp_msgbuf.buf, (char *)req_msgbuf->buf);
+  strcpy(reinterpret_cast<char *>(req_handle->pre_resp_msgbuf.buf),
+         reinterpret_cast<char *>(req_msgbuf->buf));
   req_handle->prealloc_used = true;
 
   context->rpc->enqueue_response(req_handle);
@@ -44,12 +45,12 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response %s, tag = %zu\n",
-              (char *)resp_msgbuf->buf, tag);
+              reinterpret_cast<char *>(resp_msgbuf->buf), tag);
 
   std::string exp_resp = std::string("APP_MSG-") + std::to_string(tag);
-  ASSERT_STREQ((char *)resp_msgbuf->buf, exp_resp.c_str());
+  ASSERT_STREQ(reinterpret_cast<char *>(resp_msgbuf->buf), exp_resp.c_str());
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   ASSERT_TRUE(context->is_client);
   context->num_rpc_resps++;
 
@@ -71,9 +72,10 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
   /* Send a message */
   MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG-0") + 1);
   ASSERT_NE(req_msgbuf.buf, nullptr);
-  strcpy((char *)req_msgbuf.buf, "APP_MSG-0");
+  strcpy(reinterpret_cast<char *>(req_msgbuf.buf), "APP_MSG-0");
 
-  test_printf("test: Sending request %s\n", (char *)req_msgbuf.buf);
+  test_printf("test: Sending request %s\n",
+              reinterpret_cast<char *>(req_msgbuf.buf));
   int ret =
       rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
   if (ret != 0) {
@@ -136,9 +138,10 @@ void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
           std::string("APP_MSG-") + std::to_string(req_suffix);
       rpc->resize_msg_buffer(&req_msgbuf[i], req_msg.length() + 1);
 
-      strcpy((char *)req_msgbuf[i].buf, req_msg.c_str());
+      strcpy(reinterpret_cast<char *>(req_msgbuf[i].buf), req_msg.c_str());
 
-      test_printf("test: Sending request %s\n", (char *)req_msgbuf[i].buf);
+      test_printf("test: Sending request %s\n",
+                  reinterpret_cast<char *>(req_msgbuf[i].buf));
       int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[i],
                                      cont_func, req_suffix);
       if (ret != 0) {
@@ -220,10 +223,11 @@ void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
             std::string("APP_MSG-") + std::to_string(req_suffix);
         rpc->resize_msg_buffer(&req_msgbuf[req_i], req_msg.length() + 1);
 
-        strcpy((char *)req_msgbuf[req_i].buf, req_msg.c_str());
+        strcpy(reinterpret_cast<char *>(req_msgbuf[req_i].buf),
+               req_msg.c_str());
 
         test_printf("test: Sending request %s\n",
-                    (char *)req_msgbuf[req_i].buf);
+                    reinterpret_cast<char *>(req_msgbuf[req_i].buf));
 
         int ret =
             rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,

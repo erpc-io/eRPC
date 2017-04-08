@@ -35,7 +35,7 @@ void client_thread_func(Nexus<IBTransport> *nexus) {
   }
 
   /* Create the Rpc */
-  Rpc<IBTransport> rpc(nexus, (void *)nullptr, CLIENT_RPC_ID, &test_sm_handler,
+  Rpc<IBTransport> rpc(nexus, nullptr, CLIENT_RPC_ID, &test_sm_handler,
                        phy_port, numa_node);
 
   {

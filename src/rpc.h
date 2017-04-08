@@ -289,7 +289,7 @@ class Rpc {
   /// At a client, bury the response MsgBuffer and free up the sslot
   inline void release_respone(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
-    SSlot *sslot = (SSlot *)resp_handle;
+    SSlot *sslot = static_cast<SSlot *>(resp_handle);
 
     // The request MsgBuffer (tx_msgbuf) was buried before calling continuation
     assert(sslot->tx_msgbuf == nullptr);
@@ -371,7 +371,8 @@ class Rpc {
 
   /// Return true iff a user-provide session number is in the session vector
   inline bool is_usr_session_num_in_range(int session_num) const {
-    return session_num >= 0 && (size_t)session_num < session_vec.size();
+    return session_num >= 0 &&
+           static_cast<size_t>(session_num) < session_vec.size();
   }
 
   /// Lock the mutex if the Rpc is accessible from multiple threads

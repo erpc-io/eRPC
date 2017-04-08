@@ -26,7 +26,7 @@ void sm_handler(int session_num, SessionMgmtEventType sm_event_type,
                 SessionMgmtErrType sm_err_type, void *_context) {
   _unused(session_num);
 
-  AppContext *context = (AppContext *)_context;
+  AppContext *context = static_cast<AppContext *>(_context);
   context->num_sm_resps++;
   printf("sm_handler: num_sm_resps = %zu\n", context->num_sm_resps);
 
@@ -42,8 +42,9 @@ void sm_handler(int session_num, SessionMgmtEventType sm_event_type,
 void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
-                                     &sm_handler, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
+                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
+                                     kAppNumaNode);
   auto *rpc = context.rpc;
 
   /* Create the session */
@@ -89,8 +90,9 @@ TEST(SimpleDisconnect, SimpleDisconnect) {
 void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
-                                     &sm_handler, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
+                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
+                                     kAppNumaNode);
   auto *rpc = context.rpc;
 
   for (size_t i = 0; i < 3; i++) {
@@ -129,8 +131,9 @@ TEST(DisconnectMulti, DisconnectMulti) {
 void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
-                                     &sm_handler, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
+                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
+                                     kAppNumaNode);
   auto *rpc = context.rpc;
 
   /* Create a session that uses an invalid remote port */
@@ -164,8 +167,9 @@ TEST(DisconnectRemoteError, DisconnectRemoteError) {
 void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
-                                     &sm_handler, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
+                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
+                                     kAppNumaNode);
   auto *rpc = context.rpc;
 
   /* Force Rpc to fail remote routing info resolution at client */

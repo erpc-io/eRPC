@@ -20,7 +20,7 @@ class Buffer {
   /// Return a string representation of this Buffer (excluding lkey)
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[buf " << (void *)buf << ", "
+    ret << "[buf " << static_cast<void *>(buf) << ", "
         << "class sz " << class_size << "]";
     return ret.str();
   }

@@ -41,8 +41,8 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       // This is the first packet, so we need only 1 SGE. This can be a credit
       // return packet.
       pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
-      sgl[0].addr = (uint64_t)pkthdr;
-      sgl[0].length = (uint32_t)(sizeof(pkthdr_t) + item.data_bytes);
+      sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
+      sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t) + item.data_bytes);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
       // Only single-SGE work requests are inlined
@@ -54,19 +54,20 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       // multi-pkt message.
       size_t pkt_num = (item.offset + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
-      sgl[0].addr = (uint64_t)pkthdr;
-      sgl[0].length = (uint32_t)sizeof(pkthdr_t);
+      sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
+      sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      send_sgl[i][1].addr = (uint64_t) & (msg_buffer->buf[item.offset]);
-      send_sgl[i][1].length = (uint32_t)item.data_bytes;
+      send_sgl[i][1].addr =
+          reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
+      send_sgl[i][1].length = static_cast<uint32_t>(item.data_bytes);
       send_sgl[i][1].lkey = msg_buffer->buffer.lkey;
 
       wr.num_sge = 2;
     }
 
     const ib_routing_info_t* ib_routing_info =
-        (struct ib_routing_info_t*)item.routing_info;
+        reinterpret_cast<ib_routing_info_t*>(item.routing_info);
     wr.wr.ud.remote_qpn = ib_routing_info->qpn;
     wr.wr.ud.ah = ib_routing_info->ah;
   }
@@ -98,7 +99,7 @@ size_t IBTransport::rx_burst() {
     }
   }
 
-  return (size_t)new_comps;
+  return static_cast<size_t>(new_comps);
 }
 
 void IBTransport::post_recvs(size_t num_recvs) {

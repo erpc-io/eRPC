@@ -11,10 +11,10 @@ void Rpc<TTr>::process_comps_st() {
   }
 
   for (size_t i = 0; i < num_pkts; i++) {
-    const uint8_t *pkt = rx_ring[rx_ring_head];
+    uint8_t *pkt = rx_ring[rx_ring_head];
     rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
 
-    const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
+    const pkthdr_t *pkthdr = reinterpret_cast<pkthdr_t *>(pkt);
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
@@ -75,10 +75,10 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
                                               const uint8_t *pkt) {
   assert(in_creator());
   assert(session != nullptr && session->is_connected());
-  assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
+  assert(pkt != nullptr);
 
-  const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
-  assert(pkthdr->pkt_num == 0);
+  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  assert(pkthdr->check_magic() && pkthdr->pkt_num == 0);
   assert(pkthdr->msg_size > 0 &&  // Credit returns already handled
          pkthdr->msg_size <= TTr::kMaxDataPerPkt);
   assert(pkthdr->is_req() || pkthdr->is_resp());
@@ -129,7 +129,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       // For foreground (terminal/non-terminal) request handlers, a "fake",
       // MsgBuffer suffices (i.e., it's valid for the duration of req_func).
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
-      req_func.req_func((ReqHandle *)&sslot, context);
+      req_func.req_func(static_cast<ReqHandle *>(&sslot), context);
       bury_sslot_rx_msgbuf_nofree(&sslot);
       return;
     } else {
@@ -137,7 +137,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       // the request. The allocated rx_msgbuf is freed by the background thread.
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
       assert(sslot.rx_msgbuf.buf != nullptr);
-      memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
+      memcpy(reinterpret_cast<char *>(sslot.rx_msgbuf.get_pkthdr_0()), pkt,
              msg_size + sizeof(pkthdr_t));
       submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kReq);
       return;
@@ -153,7 +153,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
     if (small_rpc_likely(!sslot.clt_save_info.is_requester_bg)) {
       // Create a "fake" static MsgBuffer for the foreground continuation
       sslot.rx_msgbuf = MsgBuffer(pkt, msg_size);
-      sslot.clt_save_info.cont_func((RespHandle *)&sslot, context,
+      sslot.clt_save_info.cont_func(static_cast<RespHandle *>(&sslot), context,
                                     sslot.clt_save_info.tag);
 
       // The continuation must release the response (rx_msgbuf), and only the
@@ -164,7 +164,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       // the resp. The allocated rx_msgbuf is freed by the background thread.
       sslot.rx_msgbuf = alloc_msg_buffer(msg_size);
       assert(sslot.rx_msgbuf.buf != nullptr);
-      memcpy((char *)sslot.rx_msgbuf.get_pkthdr_0(), pkt,
+      memcpy(reinterpret_cast<char *>(sslot.rx_msgbuf.get_pkthdr_0()), pkt,
              msg_size + sizeof(pkthdr_t));
       submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kResp);
       return;
@@ -179,9 +179,10 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
                                               const uint8_t *pkt) {
   assert(in_creator());
   assert(session != nullptr && session->is_connected());
-  assert(pkt != nullptr && ((pkthdr_t *)pkt)->check_magic());
+  assert(pkt != nullptr);
 
-  const pkthdr_t *pkthdr = (pkthdr_t *)pkt;
+  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  assert(pkthdr->check_magic());
   assert(pkthdr->msg_size > TTr::kMaxDataPerPkt);  // Multi-packet
   assert(pkthdr->is_req() || pkthdr->is_resp());   // Credit returns are small
 
@@ -197,7 +198,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     fprintf(stderr,
             "eRPC Rpc %u: Warning: Received packet for unknown "
             "request type %u. Dropping packet.\n",
-            rpc_id, (uint8_t)req_type);
+            rpc_id, req_type);
     return;
   }
 
@@ -280,8 +281,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
   size_t offset = pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
   size_t bytes_to_copy = is_last ? (msg_size - offset) : TTr::kMaxDataPerPkt;
   assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
-  memcpy((char *)&rx_msgbuf.buf[offset], (char *)(pkt + sizeof(pkthdr_t)),
-         bytes_to_copy);
+  memcpy(reinterpret_cast<char *>(&rx_msgbuf.buf[offset]),
+         reinterpret_cast<const char *>(pkt + sizeof(pkthdr_t)), bytes_to_copy);
 
   // Check if we need to invoke the app handler/continuation
   if (rx_msgbuf.pkts_rcvd != pkts_expected) {
@@ -297,7 +298,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
 
     // rx_msgbuf here is independent of the RX ring, so we never need a copy
     if (!req_func.is_background()) {
-      req_func.req_func((ReqHandle *)&sslot, context);
+      req_func.req_func(static_cast<ReqHandle *>(&sslot), context);
       bury_sslot_rx_msgbuf(&sslot);
       return;
     } else {
@@ -309,7 +310,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
     bury_sslot_tx_msgbuf_nofree(&sslot);
 
     if (small_rpc_likely(!sslot.clt_save_info.is_requester_bg)) {
-      sslot.clt_save_info.cont_func((RespHandle *)&sslot, context,
+      sslot.clt_save_info.cont_func(static_cast<RespHandle *>(&sslot), context,
                                     sslot.clt_save_info.tag);
 
       // The continuation must release the response (rx_msgbuf), and only the

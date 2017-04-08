@@ -180,7 +180,7 @@ class HugeAlloc {
   inline size_t get_class(size_t size) {
     assert(size >= 1 && size <= kMaxClassSize);
     // Use bit shift instead of division to make debug-mode code a faster
-    return msb_index((int)((size - 1) >> kMinClassBitShift));
+    return msb_index(static_cast<int>((size - 1) >> kMinClassBitShift));
   }
 
   /// Reference function for the optimized \p get_class function above

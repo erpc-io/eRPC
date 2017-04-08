@@ -69,11 +69,11 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *bg_thread_ctx) {
         const ReqFunc &req_func = bg_thread_ctx->req_func_arr->at(req_type);
         assert(req_func.is_registered());  // Checked during submit_bg
 
-        req_func.req_func((ReqHandle *)sslot, context);
+        req_func.req_func(static_cast<ReqHandle *>(sslot), context);
         bg_work_item.rpc->bury_sslot_rx_msgbuf(sslot);
       } else {
-        sslot->clt_save_info.cont_func((RespHandle *)sslot, context,
-                                       sslot->clt_save_info.tag);
+        sslot->clt_save_info.cont_func(static_cast<RespHandle *>(sslot),
+                                       context, sslot->clt_save_info.tag);
 
         // The continuation must release the response (rx_msgbuf), but the
         // event loop thread may re-use it. So it may not be null.

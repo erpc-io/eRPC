@@ -29,8 +29,8 @@ void Nexus<TTr>::sm_thread_func(volatile bool *sm_kill_switch,
   server.sin_addr.s_addr = INADDR_ANY;
   server.sin_port = htons(udp_config->mgmt_udp_port);
 
-  if (bind(sm_sock_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in)) <
-      0) {
+  if (bind(sm_sock_fd, reinterpret_cast<struct sockaddr *>(&server),
+           sizeof(struct sockaddr_in)) < 0) {
     throw std::runtime_error("eRPC Nexus: Error binding datagram socket.");
   }
 
@@ -50,9 +50,9 @@ void Nexus<TTr>::sm_thread_func(volatile bool *sm_kill_switch,
     int flags = 0;
 
     // Receive a packet from the socket. We're guaranteed to get exactly one.
-    ssize_t recv_bytes =
-        recvfrom(sm_sock_fd, (void *)sm_pkt, sizeof(*sm_pkt), flags,
-                 (struct sockaddr *)&their_addr, &addr_len);
+    ssize_t recv_bytes = recvfrom(
+        sm_sock_fd, static_cast<void *>(sm_pkt), sizeof(*sm_pkt), flags,
+        reinterpret_cast<struct sockaddr *>(&their_addr), &addr_len);
 
     // The recvfrom() call can fail only due to timeouts
     if (recv_bytes == -1) {
@@ -63,7 +63,7 @@ void Nexus<TTr>::sm_thread_func(volatile bool *sm_kill_switch,
       }
     }
 
-    if (recv_bytes != (ssize_t)sizeof(*sm_pkt)) {
+    if (recv_bytes != static_cast<ssize_t>(sizeof(*sm_pkt))) {
       erpc_dprintf(
           "eRPC Nexus: FATAL. Received unexpected data size (%zd) from "
           "session management socket. Expected = %zu.\n",
@@ -99,7 +99,7 @@ void Nexus<TTr>::sm_thread_func(volatile bool *sm_kill_switch,
     }
 
     // Find the registered Rpc that has this ID
-    Hook *target_hook = (Hook *)(reg_hooks_arr[target_rpc_id]);
+    Hook *target_hook = const_cast<Hook *>(reg_hooks_arr[target_rpc_id]);
 
     // Lock the Nexus to prevent Rpc registration while we lookup the hook
     nexus_lock->lock();

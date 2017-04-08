@@ -5,7 +5,7 @@ namespace ERpc {
 template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
-  SSlot *sslot = (SSlot *)req_handle;
+  SSlot *sslot = static_cast<SSlot *>(req_handle);
 
   Session *session = sslot->session;
   assert(session->is_server());

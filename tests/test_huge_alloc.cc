@@ -8,7 +8,7 @@
 #define SYSTEM_HUGEPAGES (512) /* The number of hugepages available */
 #define SYSTEM_4K_PAGES (SYSTEM_HUGEPAGES * 512) /* Number of 4K pages*/
 
-#define DUMMY_MR_PTR ((void *)0x3185)
+#define DUMMY_MR_PTR (reinterpret_cast<void *>(0x3185))
 #define DUMMY_LKEY (3186)
 
 using namespace ERpc;
@@ -61,7 +61,7 @@ TEST(HugeAllocTest, PageAllocPerf) {
       "Time per page allocation = %.2f ns. "
       "Fraction of pages allocated = %.2f (best = 1.0)\n",
       nanoseconds / num_pages_allocated,
-      (double)num_pages_allocated / SYSTEM_4K_PAGES);
+      1.0 * num_pages_allocated / SYSTEM_4K_PAGES);
 
   delete alloc;
 }
@@ -96,7 +96,7 @@ TEST(HugeAllocTest, PageAllocPerfWithCache) {
       "Time per page allocation with page cache = %.2f ns. "
       "Fraction of pages allocated = %.2f (best = 1.0)\n",
       nanoseconds / page_cache_size,
-      (double)num_pages_allocated / page_cache_size);
+      1.0 * num_pages_allocated / page_cache_size);
 
   delete alloc;
 }
@@ -158,7 +158,7 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
     std::vector<ERpc::Buffer> buffer_vec;
 
     while (true) {
-      size_t num_hugepages = 1ul + (unsigned)(std::rand() % 4);
+      size_t num_hugepages = 1ul + static_cast<unsigned>(std::rand() % 4);
       size_t size = num_hugepages * ERpc::kHugepageSize;
       ERpc::Buffer buffer = alloc->alloc(size);
 
@@ -166,13 +166,13 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
         test_printf(
             "Fraction of system memory reserved by alloc at "
             "failure = %.2f (best = 1.0)\n",
-            (double)alloc->get_stat_shm_reserved() /
+            1.0 * alloc->get_stat_shm_reserved() /
                 (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
 
         test_printf(
             "Fraction of memory reserved allocated to user = %.2f "
             "(best = 1.0)\n",
-            (double)app_memory / alloc->get_stat_shm_reserved());
+            1.0 * app_memory / alloc->get_stat_shm_reserved());
 
         break;
       } else {
@@ -209,7 +209,7 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
     size_t new_app_memory;
 
     if (alloc_hugepages) {
-      size_t num_hugepages = 1ul + (unsigned)(std::rand() % 4);
+      size_t num_hugepages = 1ul + static_cast<unsigned>(std::rand() % 4);
       buffer = alloc->alloc(num_hugepages * ERpc::kHugepageSize);
       new_app_memory = (num_hugepages * ERpc::kHugepageSize);
     } else {
@@ -221,11 +221,11 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
       test_printf(
           "Fraction of system memory reserved by alloc at "
           "failure = %.2f\n",
-          (double)alloc->get_stat_shm_reserved() /
+          1.0 * alloc->get_stat_shm_reserved() /
               (SYSTEM_HUGEPAGES * ERpc::kHugepageSize));
 
       test_printf("Fraction of memory reserved allocated to user = %.2f\n",
-                  ((double)app_memory / alloc->get_stat_shm_reserved()));
+                  (1.0 * app_memory / alloc->get_stat_shm_reserved()));
       break;
     } else {
       EXPECT_EQ(buffer.lkey, DUMMY_LKEY);

@@ -33,7 +33,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
@@ -46,13 +46,13 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
 
-  memcpy((char *)req_handle->dyn_resp_msgbuf.buf, (char *)req_msgbuf->buf,
-         req_size);
+  memcpy(reinterpret_cast<char *>(req_handle->dyn_resp_msgbuf.buf),
+         reinterpret_cast<char *>(req_msgbuf->buf), req_size);
 
   test_printf(
       "Server: Received request of length %zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
-      req_size, user_alloc_tot, (double)user_alloc_tot / MB(1));
+      req_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
 
   context->rpc->enqueue_response(req_handle);
 }
@@ -68,8 +68,8 @@ void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
                                       context->rpc->get_max_msg_size());
   context->rpc->resize_msg_buffer(&context->req_msgbuf[msgbuf_i], req_size);
 
-  tag_t tag((uint16_t)context->num_reqs_sent, (uint16_t)msgbuf_i,
-            (uint32_t)req_size);
+  tag_t tag(static_cast<uint16_t>(context->num_reqs_sent),
+            static_cast<uint16_t>(msgbuf_i), static_cast<uint32_t>(req_size));
 
   test_printf("Client: Sending request %zu of size %zu\n",
               context->num_reqs_sent, req_size);
@@ -88,21 +88,21 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(_context != nullptr);
   _unused(_tag);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   tag_t tag(_tag);
 
   test_printf("Client: Received response for req %u, length = %zu.\n",
-              tag.req_i, (char *)resp_msgbuf->get_data_size());
+              tag.req_i, resp_msgbuf->get_data_size());
 
-  ASSERT_EQ(resp_msgbuf->get_data_size(), ((tag_t)tag).req_size);
+  ASSERT_EQ(resp_msgbuf->get_data_size(), static_cast<tag_t>(tag).req_size);
 
   context->num_rpc_resps++;
   context->rpc->release_respone(resp_handle);
 
   if (context->num_reqs_sent < kAppNumReqs) {
-    enqueue_request_helper(context, ((tag_t)tag).msgbuf_i);
+    enqueue_request_helper(context, static_cast<tag_t>(tag).msgbuf_i);
   }
 }
 

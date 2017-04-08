@@ -59,9 +59,9 @@ bool HugeAlloc::create_cache(size_t size, size_t num_buffers) {
 void HugeAlloc::print_stats() {
   fprintf(stderr, "eRPC HugeAlloc stats:\n");
   fprintf(stderr, "Total reserved SHM = %zu bytes (%.2f MB)\n",
-          stats.shm_reserved, (double)stats.shm_reserved / MB(1));
+          stats.shm_reserved, 1.0 * stats.shm_reserved / MB(1));
   fprintf(stderr, "Total memory allocated to user = %zu bytes (%.2f MB)\n",
-          stats.user_alloc_tot, (double)stats.user_alloc_tot / MB(1));
+          stats.user_alloc_tot, 1.0 * stats.user_alloc_tot / MB(1));
 
   fprintf(stderr, "%zu SHM regions\n", shm_list.size());
   size_t shm_region_index = 0;
@@ -137,7 +137,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
     }
   }
 
-  uint8_t *shm_buf = (uint8_t *)shmat(shm_id, nullptr, 0);
+  uint8_t *shm_buf = static_cast<uint8_t *>(shmat(shm_id, nullptr, 0));
   if (shm_buf == nullptr) {
     xmsg << "eRPC HugeAlloc: SHM malloc error: shmat() failed for key "
          << std::to_string(shm_key);
@@ -145,7 +145,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   }
 
   // Bind the buffer to the NUMA node
-  const unsigned long nodemask = (1ul << (unsigned long)numa_node);
+  const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node));
   long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
   if (ret != 0) {
     xmsg << "eRPC HugeAlloc: SHM malloc error. mbind() failed for key "
@@ -208,7 +208,7 @@ void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
     exit(-1);
   }
 
-  ret = shmdt((void *)shm_buf);
+  ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_buf)));
   if (ret != 0) {
     fprintf(stderr, "HugeAlloc: Error freeing SHM buf %p. (SHM key = %d)\n",
             shm_buf, shm_key);

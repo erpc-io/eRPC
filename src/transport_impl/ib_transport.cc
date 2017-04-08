@@ -68,8 +68,9 @@ IBTransport::~IBTransport() {
 
 void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   assert(routing_info != nullptr);
-  memset((void *)routing_info, 0, kMaxRoutingInfoSize);
-  ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
+  memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
+  ib_routing_info_t *ib_routing_info =
+      reinterpret_cast<ib_routing_info_t *>(routing_info);
   ib_routing_info->port_lid = port_lid;
   ib_routing_info->qpn = qp->qp_num;
 }
@@ -78,7 +79,8 @@ bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
   assert(routing_info != nullptr);
   assert(dev_port_id != 0);  // dev_port_id is resolved on object construction
 
-  ib_routing_info_t *ib_routing_info = (ib_routing_info_t *)routing_info;
+  ib_routing_info_t *ib_routing_info =
+      reinterpret_cast<ib_routing_info_t *>(routing_info);
 
   struct ibv_ah_attr ah_attr;
   memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
@@ -185,7 +187,7 @@ void IBTransport::init_infiniband_structs() {
 
   // Initialize QP creation attributes
   struct ibv_qp_init_attr create_attr;
-  memset((void *)&create_attr, 0, sizeof(struct ibv_qp_init_attr));
+  memset(static_cast<void *>(&create_attr), 0, sizeof(struct ibv_qp_init_attr));
   create_attr.send_cq = send_cq;
   create_attr.recv_cq = recv_cq;
   create_attr.qp_type = IBV_QPT_UD;
@@ -203,10 +205,10 @@ void IBTransport::init_infiniband_structs() {
 
   // Transition QP to INIT state
   struct ibv_qp_attr init_attr;
-  memset((void *)&init_attr, 0, sizeof(struct ibv_qp_attr));
+  memset(static_cast<void *>(&init_attr), 0, sizeof(struct ibv_qp_attr));
   init_attr.qp_state = IBV_QPS_INIT;
   init_attr.pkey_index = 0;
-  init_attr.port_num = (uint8_t)dev_port_id;
+  init_attr.port_num = static_cast<uint8_t>(dev_port_id);
   init_attr.qkey = kQKey;
 
   if (ibv_modify_qp(qp, &init_attr, IBV_QP_STATE | IBV_QP_PKEY_INDEX |
@@ -216,7 +218,7 @@ void IBTransport::init_infiniband_structs() {
 
   // RTR state
   struct ibv_qp_attr rtr_attr;
-  memset((void *)&rtr_attr, 0, sizeof(struct ibv_qp_attr));
+  memset(static_cast<void *>(&rtr_attr), 0, sizeof(struct ibv_qp_attr));
   rtr_attr.qp_state = IBV_QPS_RTR;
 
   if (ibv_modify_qp(qp, &rtr_attr, IBV_QP_STATE)) {
@@ -249,13 +251,13 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
   recv_extent = huge_alloc->alloc(recv_extent_size);
   if (recv_extent.buf == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
-         << (double)recv_extent_size / MB(1) << "MB for RECV buffers.";
+         << 1.0 * recv_extent_size / MB(1) << "MB for RECV buffers.";
     throw std::runtime_error(xmsg.str());
   }
 
   // Initialize constant fields of RECV descriptors
   for (size_t i = 0; i < kRecvQueueDepth; i++) {
-    uint8_t *buf = (uint8_t *)recv_extent.buf;
+    uint8_t *buf = recv_extent.buf;
 
     // From each slot of size kRecvSize = (kMTU + 64), we give up the first
     // (64 - kGRHBytes) bytes. Each slot is still large enough to receive the
@@ -265,7 +267,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
 
     recv_sgl[i].length = kRecvSize;
     recv_sgl[i].lkey = recv_extent.lkey;
-    recv_sgl[i].addr = (uintptr_t)&buf[offset];
+    recv_sgl[i].addr = reinterpret_cast<uint64_t>(&buf[offset]);
 
     recv_wr[i].wr_id = recv_sgl[i].addr;  // Debug
     recv_wr[i].sg_list = &recv_sgl[i];

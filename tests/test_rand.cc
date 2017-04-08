@@ -32,7 +32,7 @@ TEST(SlowRandTest, DistributionTest) {
   test_printf("SlowRand: Fraction deviation of mean = %.10f (best = 0)\n",
               fraction_diff);
   test_printf("SlowRand: Range coverage = %.10f (best = 1)\n",
-              (double)(max - min) / std::numeric_limits<uint64_t>::max());
+              1.0 * (max - min) / std::numeric_limits<uint64_t>::max());
 }
 
 /**
@@ -55,7 +55,7 @@ TEST(SlowRandTest, ModHundredTest) {
     min = std::min(min, buckets[i]);
   }
 
-  test_printf("SlowRand: min/max = %.5f (best = 1)\n", (double)min / max);
+  test_printf("SlowRand: min/max = %.5f (best = 1)\n", 1.0 * min / max);
 }
 
 /**
@@ -83,7 +83,7 @@ TEST(FastRandTest, DistributionTest) {
   test_printf("FastRand: Fraction deviation of mean = %.10f (best = 0)\n",
               fraction_diff);
   test_printf("FastRand: Range coverage = %.10f (best = 1)\n",
-              (double)(max - min) / std::numeric_limits<uint32_t>::max());
+              1.0 * (max - min) / std::numeric_limits<uint32_t>::max());
 }
 
 /**
@@ -106,7 +106,7 @@ TEST(FastRandTest, ModHundredTest) {
     min = std::min(min, buckets[i]);
   }
 
-  test_printf("FastRand: min/max = %.5f (best = 1)\n", (double)min / max);
+  test_printf("FastRand: min/max = %.5f (best = 1)\n", 1.0 * min / max);
 }
 
 int main(int argc, char **argv) {

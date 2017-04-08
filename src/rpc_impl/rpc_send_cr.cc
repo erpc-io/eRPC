@@ -26,7 +26,7 @@ void Rpc<TTr>::send_credit_return_now_st(Session *session,
   // cr_pkthdr.magic = pkthdr->magic;
 
   // Step 2: Create a "fake" static MsgBuffer for inline tx_burst
-  MsgBuffer cr_msgbuf = MsgBuffer((uint8_t *)&cr_pkthdr, 0);
+  MsgBuffer cr_msgbuf = MsgBuffer(reinterpret_cast<uint8_t *>(&cr_pkthdr), 0);
   cr_msgbuf.pkts_queued = 1;
 
   assert(tx_batch_i == 0);  // tx_batch_i is 0 outside rpx_tx.cc

@@ -214,12 +214,12 @@ class SessionEndpoint {
   // Fill invalid metadata to aid debugging
   SessionEndpoint() {
     transport_type = Transport::TransportType::kInvalidTransport;
-    memset((void *)hostname, 0, sizeof(hostname));
+    memset(static_cast<void *>(hostname), 0, sizeof(hostname));
     phy_port = kInvalidPhyPort;
     rpc_id = kInvalidRpcId;
     session_num = kInvalidSessionNum;
     secret = kInvalidSecret;
-    memset((void *)&routing_info, 0, sizeof(routing_info));
+    memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));
   }
 
   /// Return a string with a name for this session endpoint, containing
@@ -273,9 +273,10 @@ class SessionMgmtPkt {
 
     UDPClient udp_client(dst_hostname, udp_config->mgmt_udp_port,
                          udp_config->drop_prob);
-    ssize_t ret = udp_client.send((char *)this, sizeof(*this));
+    ssize_t ret =
+        udp_client.send(reinterpret_cast<char *>(this), sizeof(*this));
     _unused(ret);
-    assert(ret == (ssize_t)sizeof(*this));
+    assert(ret == static_cast<ssize_t>(sizeof(*this)));
   }
 
   /**

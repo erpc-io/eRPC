@@ -41,21 +41,29 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
   // Launch the session management thread
   erpc_dprintf_noargs("eRPC Nexus: Launching session management thread.\n");
   sm_kill_switch = false;
-  sm_thread =
-      std::thread(sm_thread_func, (volatile bool *)&sm_kill_switch,
-                  (volatile Hook **)reg_hooks_arr, &nexus_lock, &udp_config);
+  sm_thread = std::thread(
+      sm_thread_func, const_cast<volatile bool *>(&sm_kill_switch),
+      const_cast<volatile Hook **>(reg_hooks_arr), &nexus_lock, &udp_config);
 
   // Launch background threads
   erpc_dprintf("eRPC Nexus: Launching %zu background threads.\n",
                num_bg_threads);
   bg_kill_switch = false;
   for (size_t i = 0; i < num_bg_threads; i++) {
+    assert(tls_registry.cur_tiny_tid == i);
+
     bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
     bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
     bg_thread_ctx_arr[i].tls_registry = &tls_registry;
     bg_thread_ctx_arr[i].bg_thread_index = i;
 
     bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
+
+    // Wait for the launched thread to grab a tiny thread ID, otherwise later
+    // background threads or the foreground thread can grab ID = i.
+    while (tls_registry.cur_tiny_tid == i) {
+      usleep(1);
+    }
   }
 
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
@@ -182,8 +190,9 @@ double Nexus<TTr>::get_freq_ghz() {
   }
 
   clock_gettime(CLOCK_REALTIME, &end);
-  uint64_t clock_ns = (uint64_t)(end.tv_sec - start.tv_sec) * 1000000000 +
-                      (uint64_t)(end.tv_nsec - start.tv_nsec);
+  uint64_t clock_ns =
+      static_cast<uint64_t>(end.tv_sec - start.tv_sec) * 1000000000 +
+      static_cast<uint64_t>(end.tv_nsec - start.tv_nsec);
   uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
 
   double _freq_ghz = rdtsc_cycles / clock_ns;

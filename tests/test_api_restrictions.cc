@@ -28,7 +28,7 @@ auto reg_info_vec = {
 void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
 
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
   assert(context->rpc->in_background());
 
@@ -64,7 +64,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 /// A continuation function with a configurable death mode
 void cont_func(RespHandle *resp_handle, void *_context, size_t) {
   assert(resp_handle != nullptr && _context != nullptr);
-  auto *context = (AppContext *)_context;
+  auto *context = static_cast<AppContext *>(_context);
 
   if (app_death_mode == AppDeathMode::kContFuncRunsEventLoop) {
     // Try to run the event loop. This crashes only in kDatapathChecks mode

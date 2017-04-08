@@ -82,7 +82,7 @@ void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
   _unused(sm_err_type);
   _unused(_context);
 
-  auto *context = (BasicAppContext *)_context;
+  auto *context = static_cast<BasicAppContext *>(_context);
   context->num_sm_resps++;
 
   assert(sm_err_type == SessionMgmtErrType::kNoError);
@@ -119,8 +119,8 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
   BasicAppContext context;
   context.is_client = false;
 
-  Rpc<IBTransport> rpc(nexus, (void *)&context, rpc_id, sm_handler, kAppPhyPort,
-                       kAppNumaNode);
+  Rpc<IBTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
+                       kAppPhyPort, kAppNumaNode);
   context.rpc = &rpc;
   num_servers_ready++;
 
@@ -146,13 +146,14 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
 
     // Create the sessions
     for (size_t i = 0; i < num_srv_threads; i++) {
-      uint8_t other_rpc_id = (uint8_t)(kAppServerRpcId + i);
+      uint8_t other_rpc_id = static_cast<uint8_t>(kAppServerRpcId + i);
       if (other_rpc_id == rpc_id) {
         continue;
       }
 
       context.session_num_arr[i] = context.rpc->create_session(
-          local_hostname, kAppServerRpcId + (uint8_t)i, kAppPhyPort);
+          local_hostname, kAppServerRpcId + static_cast<uint8_t>(i),
+          kAppPhyPort);
       assert(context.session_num_arr[i] >= 0);
     }
 
@@ -173,7 +174,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
                 rpc_id, num_srv_threads - 1);
 
     for (size_t i = 0; i < num_srv_threads; i++) {
-      uint8_t other_rpc_id = (uint8_t)(kAppServerRpcId + i);
+      uint8_t other_rpc_id = static_cast<uint8_t>(kAppServerRpcId + i);
       if (other_rpc_id == rpc_id) {
         continue;
       }
@@ -275,14 +276,15 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
   }
 
   context.is_client = true;
-  context.rpc = new Rpc<IBTransport>(nexus, (void *)&context, kAppClientRpcId,
-                                     sm_handler, kAppPhyPort, kAppNumaNode);
+  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
+                                     kAppClientRpcId, sm_handler, kAppPhyPort,
+                                     kAppNumaNode);
 
   /* Connect the sessions */
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
-        local_hostname, kAppServerRpcId + (uint8_t)i, kAppPhyPort);
+        local_hostname, kAppServerRpcId + static_cast<uint8_t>(i), kAppPhyPort);
   }
 
   while (context.num_sm_resps < num_sessions) {
