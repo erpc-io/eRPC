@@ -14,9 +14,10 @@ auto reg_info_vec_bg = {
 class AppContext : public BasicAppContext {};
 
 /// Configuration for controlling the test
-size_t config_num_sessions;      ///< Number of sessions created by client
-size_t config_num_bg_threads;    ///< Number of background threads
-size_t config_rpcs_per_session;  ///< The number of Rpcs to send on each session
+size_t config_num_sessions;    ///< Number of sessions created by client
+size_t config_num_bg_threads;  ///< Number of background threads
+///< Number of Rpcs to send on each session per iteration
+size_t config_rpcs_per_session;
 size_t config_msg_size;  ///< The size of the request and response messages
 
 /// The common request handler for all subtests. Copies the request string to
