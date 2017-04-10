@@ -1,7 +1,5 @@
 #include "test_basics.h"
 
-static constexpr size_t kAppMaxMsgSize = 64;
-
 void req_handler(ReqHandle *, void *);  // Forward declaration
 
 /// Request handler for foreground testing
@@ -62,14 +60,14 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 /// correct response
 ///
 void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
-  /* Create the Rpc and connect the session */
+  // Create the Rpc and connect the session
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
 
-  /* Send a message */
+  // Send a message
   MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG-0") + 1);
   ASSERT_NE(req_msgbuf.buf, nullptr);
   strcpy(reinterpret_cast<char *>(req_msgbuf.buf), "APP_MSG-0");
@@ -88,11 +86,11 @@ void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
 
   rpc->free_msg_buffer(req_msgbuf);
 
-  /* Disconnect the session */
+  // Disconnect the session
   rpc->destroy_session(session_num);
   rpc->run_event_loop_timeout(kAppEventLoopMs);
 
-  /* Free resources */
+  // Free resources
   delete rpc;
   client_done = true;
 }
@@ -103,7 +101,7 @@ TEST(OneSmallRpc, Foreground) {
 }
 
 TEST(OneSmallRpc, Background) {
-  /* One background thread */
+  // One background thread
   launch_server_client_threads(1, 1, one_small_rpc, reg_info_vec_bg,
                                ConnectServers::kFalse);
 }
@@ -113,26 +111,26 @@ TEST(OneSmallRpc, Background) {
 ///
 void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
                                  size_t num_sessions) {
-  /* Create the Rpc and connect the session */
+  // Create the Rpc and connect the session
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
 
-  /* Pre-create MsgBuffers so we can test reuse and resizing */
+  // Pre-create MsgBuffers so we can test reuse and resizing
   MsgBuffer req_msgbuf[Session::kSessionReqWindow];
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    req_msgbuf[i] = rpc->alloc_msg_buffer(kAppMaxMsgSize);
+    req_msgbuf[i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
     ASSERT_NE(req_msgbuf[i].buf, nullptr);
   }
 
-  size_t req_suffix = 0; /* The integer suffix after every request message */
+  size_t req_suffix = 0; // The integer suffix after every request message
 
   for (size_t iter = 0; iter < 2; iter++) {
     context.num_rpc_resps = 0;
 
-    /* Enqueue as many requests as one session allows */
+    // Enqueue as many requests as one session allows
     for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
       std::string req_msg =
           std::string("APP_MSG-") + std::to_string(req_suffix);
@@ -152,7 +150,7 @@ void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
       req_suffix++;
     }
 
-    /* Try to enqueue one more request - this should fail */
+    // Try to enqueue one more request - this should fail
     int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[0],
                                    cont_func, 0);
     ASSERT_NE(ret, 0);
@@ -162,16 +160,16 @@ void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
     ASSERT_EQ(context.num_rpc_resps, Session::kSessionReqWindow);
   }
 
-  /* Free the request MsgBuffers */
+  // Free the request MsgBuffers
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(req_msgbuf[i]);
   }
 
-  /* Disconnect the session */
+  // Disconnect the session
   rpc->destroy_session(session_num);
   rpc->run_event_loop_timeout(kAppEventLoopMs);
 
-  /* Free resources */
+  // Free resources
   delete rpc;
   client_done = true;
 }
@@ -182,7 +180,7 @@ TEST(MultiSmallRpcOneSession, Foreground) {
 }
 
 TEST(MultiSmallRpcOneSession, Background) {
-  /* 2 background threads */
+  // 2 background threads
   launch_server_client_threads(1, 2, multi_small_rpc_one_session,
                                reg_info_vec_bg, ConnectServers::kFalse);
 }
@@ -192,29 +190,29 @@ TEST(MultiSmallRpcOneSession, Background) {
 ///
 void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
                                    size_t num_sessions) {
-  /* Create the Rpc and connect the session */
+  // Create the Rpc and connect the session
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int *session_num_arr = context.session_num_arr;
 
-  /* Pre-create MsgBuffers so we can test reuse and resizing */
+  // Pre-create MsgBuffers so we can test reuse and resizing
   size_t tot_reqs_per_iter = num_sessions * Session::kSessionReqWindow;
   MsgBuffer req_msgbuf[tot_reqs_per_iter];
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    req_msgbuf[req_i] = rpc->alloc_msg_buffer(kAppMaxMsgSize);
+    req_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
     ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
   }
 
-  size_t req_suffix = 0; /* The integer suffix after every request message */
+  size_t req_suffix = 0; // The integer suffix after every request message
   for (size_t iter = 0; iter < 5; iter++) {
     context.num_rpc_resps = 0;
 
     test_printf("Client: Iteration %zu.\n", iter);
 
     for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
-      /* Enqueue as many requests as this session allows */
+      // Enqueue as many requests as this session allows
       for (size_t w_i = 0; w_i < Session::kSessionReqWindow; w_i++) {
         size_t req_i = (sess_i * Session::kSessionReqWindow) + w_i;
         assert(req_i < tot_reqs_per_iter);
@@ -245,25 +243,25 @@ void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
     ASSERT_EQ(context.num_rpc_resps, tot_reqs_per_iter);
   }
 
-  /* Free the request MsgBuffers */
+  // Free the request MsgBuffers
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
     rpc->free_msg_buffer(req_msgbuf[req_i]);
   }
 
-  /* Disconnect the sessions */
+  // Disconnect the sessions
   for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
     rpc->destroy_session(session_num_arr[sess_i]);
   }
 
   rpc->run_event_loop_timeout(kAppEventLoopMs);
 
-  /* Free resources */
+  // Free resources
   delete rpc;
   client_done = true;
 }
 
 TEST(MultiSmallRpcMultiSession, Foreground) {
-  /* Use enough sessions to exceed the Rpc's unexpected window */
+  // Use enough sessions to exceed the Rpc's unexpected window
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
   launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session,
@@ -271,10 +269,10 @@ TEST(MultiSmallRpcMultiSession, Foreground) {
 }
 
 TEST(MultiSmallRpcMultiSession, Background) {
-  /* Use enough sessions to exceed the Rpc's unexpected window */
+  // Use enough sessions to exceed the Rpc's unexpected window
   size_t num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-  /* 3 background threads */
+  // 3 background threads
   launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session,
                                reg_info_vec_bg, ConnectServers::kFalse);
 }
