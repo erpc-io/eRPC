@@ -112,7 +112,7 @@ class Rpc {
                                        size_t new_data_size) {
     assert(msg_buffer != nullptr);
     assert(msg_buffer->buf != nullptr && msg_buffer->check_magic());
-    assert(new_data_size < msg_buffer->max_data_size);
+    assert(new_data_size <= msg_buffer->max_data_size);
 
     size_t new_num_pkts;
 

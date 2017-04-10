@@ -13,6 +13,12 @@ auto reg_info_vec_bg = {
 /// Per-thread application context
 class AppContext : public BasicAppContext {};
 
+/// Configuration for controlling the test
+size_t config_num_sessions;      ///< Number of sessions created by client
+size_t config_num_bg_threads;    ///< Number of background threads
+size_t config_rpcs_per_session;  ///< The number of Rpcs to send on each session
+size_t config_msg_size;  ///< The size of the request and response messages
+
 /// The common request handler for all subtests. Copies the request string to
 /// the response.
 void req_handler(ReqHandle *req_handle, void *_context) {
@@ -20,15 +26,17 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   assert(_context != nullptr);
 
   auto *context = static_cast<AppContext *>(_context);
-  ASSERT_FALSE(context->is_client);
+  assert(!context->is_client);
+
+  if (config_num_bg_threads > 0) {
+    assert(context->rpc->in_background());
+  }
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  test_printf("Server: Received request %s\n", req_msgbuf->buf);
-
   size_t resp_size = req_msgbuf->get_data_size();
   Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
-  strcpy(reinterpret_cast<char *>(req_handle->pre_resp_msgbuf.buf),
-         reinterpret_cast<char *>(req_msgbuf->buf));
+  memcpy(static_cast<void *>(req_handle->pre_resp_msgbuf.buf),
+         static_cast<void *>(req_msgbuf->buf), resp_size);
   req_handle->prealloc_used = true;
 
   context->rpc->enqueue_response(req_handle);
@@ -42,200 +50,66 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
   assert(_context != nullptr);
 
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  test_printf("Client: Received response %s, tag = %zu\n",
-              reinterpret_cast<char *>(resp_msgbuf->buf), tag);
+  ASSERT_EQ(resp_msgbuf->get_data_size(), config_msg_size);
 
-  std::string exp_resp = std::string("APP_MSG-") + std::to_string(tag);
-  ASSERT_STREQ(reinterpret_cast<char *>(resp_msgbuf->buf), exp_resp.c_str());
+  for (size_t i = 0; i < config_msg_size; i++) {
+    ASSERT_EQ(resp_msgbuf->buf[i], static_cast<uint8_t>(tag));
+  }
 
   auto *context = static_cast<AppContext *>(_context);
-  ASSERT_TRUE(context->is_client);
+  assert(context->is_client);
   context->num_rpc_resps++;
 
   context->rpc->release_respone(resp_handle);
 }
 
+/// The generic test function that issues \p config_rpcs_per_session Rpcs
+/// on each of \p config_num_sessions sessions, for multiple iterations.
 ///
-/// Test: Send one small request packet and check that we receive the
-/// correct response
-///
-void one_small_rpc(Nexus<IBTransport> *nexus, size_t num_sessions) {
+/// The second \p size_t argument exists only because the client thread function
+/// template in test_basics requires it.
+void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
   // Create the Rpc and connect the session
   AppContext context;
-  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
-
-  Rpc<IBTransport> *rpc = context.rpc;
-  int session_num = context.session_num_arr[0];
-
-  // Send a message
-  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(strlen("APP_MSG-0") + 1);
-  ASSERT_NE(req_msgbuf.buf, nullptr);
-  strcpy(reinterpret_cast<char *>(req_msgbuf.buf), "APP_MSG-0");
-
-  test_printf("test: Sending request %s\n",
-              reinterpret_cast<char *>(req_msgbuf.buf));
-  int ret =
-      rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
-  if (ret != 0) {
-    test_printf("test: enqueue_request error %s\n", std::strerror(ret));
-  }
-  ASSERT_EQ(ret, 0);
-
-  wait_for_rpc_resps_or_timeout(context, 1, nexus->freq_ghz);
-  ASSERT_EQ(context.num_rpc_resps, 1);
-
-  rpc->free_msg_buffer(req_msgbuf);
-
-  // Disconnect the session
-  rpc->destroy_session(session_num);
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
-
-  // Free resources
-  delete rpc;
-  client_done = true;
-}
-
-TEST(OneSmallRpc, Foreground) {
-  launch_server_client_threads(1, 0, one_small_rpc, reg_info_vec_fg,
-                               ConnectServers::kFalse);
-}
-
-TEST(OneSmallRpc, Background) {
-  // One background thread
-  launch_server_client_threads(1, 1, one_small_rpc, reg_info_vec_bg,
-                               ConnectServers::kFalse);
-}
-
-///
-/// Test: Repeat: Multiple small Rpcs on one session
-///
-void multi_small_rpc_one_session(Nexus<IBTransport> *nexus,
-                                 size_t num_sessions) {
-  // Create the Rpc and connect the session
-  AppContext context;
-  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
-
-  Rpc<IBTransport> *rpc = context.rpc;
-  int session_num = context.session_num_arr[0];
-
-  // Pre-create MsgBuffers so we can test reuse and resizing
-  MsgBuffer req_msgbuf[Session::kSessionReqWindow];
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    req_msgbuf[i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
-    ASSERT_NE(req_msgbuf[i].buf, nullptr);
-  }
-
-  size_t req_suffix = 0; // The integer suffix after every request message
-
-  for (size_t iter = 0; iter < 2; iter++) {
-    context.num_rpc_resps = 0;
-
-    // Enqueue as many requests as one session allows
-    for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-      std::string req_msg =
-          std::string("APP_MSG-") + std::to_string(req_suffix);
-      rpc->resize_msg_buffer(&req_msgbuf[i], req_msg.length() + 1);
-
-      strcpy(reinterpret_cast<char *>(req_msgbuf[i].buf), req_msg.c_str());
-
-      test_printf("test: Sending request %s\n",
-                  reinterpret_cast<char *>(req_msgbuf[i].buf));
-      int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[i],
-                                     cont_func, req_suffix);
-      if (ret != 0) {
-        test_printf("test: enqueue_request error %s\n", std::strerror(ret));
-      }
-      ASSERT_EQ(ret, 0);
-
-      req_suffix++;
-    }
-
-    // Try to enqueue one more request - this should fail
-    int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf[0],
-                                   cont_func, 0);
-    ASSERT_NE(ret, 0);
-
-    wait_for_rpc_resps_or_timeout(context, Session::kSessionReqWindow,
-                                  nexus->freq_ghz);
-    ASSERT_EQ(context.num_rpc_resps, Session::kSessionReqWindow);
-  }
-
-  // Free the request MsgBuffers
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    rpc->free_msg_buffer(req_msgbuf[i]);
-  }
-
-  // Disconnect the session
-  rpc->destroy_session(session_num);
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
-
-  // Free resources
-  delete rpc;
-  client_done = true;
-}
-
-TEST(MultiSmallRpcOneSession, Foreground) {
-  launch_server_client_threads(1, 0, multi_small_rpc_one_session,
-                               reg_info_vec_fg, ConnectServers::kFalse);
-}
-
-TEST(MultiSmallRpcOneSession, Background) {
-  // 2 background threads
-  launch_server_client_threads(1, 2, multi_small_rpc_one_session,
-                               reg_info_vec_bg, ConnectServers::kFalse);
-}
-
-///
-/// Test: Repeat: Multiple small Rpcs on multiple sessions
-///
-void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
-                                   size_t num_sessions) {
-  // Create the Rpc and connect the session
-  AppContext context;
-  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
+  client_connect_sessions(nexus, context, config_num_sessions,
+                          basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int *session_num_arr = context.session_num_arr;
 
   // Pre-create MsgBuffers so we can test reuse and resizing
-  size_t tot_reqs_per_iter = num_sessions * Session::kSessionReqWindow;
+  size_t tot_reqs_per_iter = config_num_sessions * config_rpcs_per_session;
   MsgBuffer req_msgbuf[tot_reqs_per_iter];
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
     req_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
     ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
   }
 
-  size_t req_suffix = 0; // The integer suffix after every request message
-  for (size_t iter = 0; iter < 5; iter++) {
+  // The main request-issuing loop
+  for (size_t iter = 0; iter < 2; iter++) {
     context.num_rpc_resps = 0;
 
     test_printf("Client: Iteration %zu.\n", iter);
+    size_t iter_req_i = 0;  // Request MsgBuffer index in this iteration
 
-    for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
-      // Enqueue as many requests as this session allows
-      for (size_t w_i = 0; w_i < Session::kSessionReqWindow; w_i++) {
-        size_t req_i = (sess_i * Session::kSessionReqWindow) + w_i;
-        assert(req_i < tot_reqs_per_iter);
+    for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
+      for (size_t w_i = 0; w_i < config_rpcs_per_session; w_i++) {
+        assert(iter_req_i < tot_reqs_per_iter);
+        MsgBuffer &cur_req_msgbuf = req_msgbuf[iter_req_i];
 
-        std::string req_msg =
-            std::string("APP_MSG-") + std::to_string(req_suffix);
-        rpc->resize_msg_buffer(&req_msgbuf[req_i], req_msg.length() + 1);
+        rpc->resize_msg_buffer(&cur_req_msgbuf, config_msg_size);
+        for (size_t i = 0; i < config_msg_size; i++) {
+          cur_req_msgbuf.buf[i] = static_cast<uint8_t>(iter_req_i);
+        }
 
-        strcpy(reinterpret_cast<char *>(req_msgbuf[req_i].buf),
-               req_msg.c_str());
-
-        test_printf("test: Sending request %s\n",
-                    reinterpret_cast<char *>(req_msgbuf[req_i].buf));
-
-        int ret =
-            rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
-                                 &req_msgbuf[req_i], cont_func, req_suffix);
+        int ret = rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
+                                       &cur_req_msgbuf, cont_func, iter_req_i);
         if (ret != 0) {
           test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
         }
         ASSERT_EQ(ret, 0);
 
-        req_suffix++;
+        iter_req_i++;
       }
     }
 
@@ -249,7 +123,7 @@ void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
   }
 
   // Disconnect the sessions
-  for (size_t sess_i = 0; sess_i < num_sessions; sess_i++) {
+  for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
     rpc->destroy_session(session_num_arr[sess_i]);
   }
 
@@ -260,21 +134,72 @@ void multi_small_rpc_multi_session(Nexus<IBTransport> *nexus,
   client_done = true;
 }
 
+void launch_helper() {
+  auto &reg_info_vec =
+      config_num_bg_threads == 0 ? reg_info_vec_fg : reg_info_vec_bg;
+  launch_server_client_threads(config_num_sessions, config_num_bg_threads,
+                               generic_test_func, reg_info_vec,
+                               ConnectServers::kFalse);
+}
+
+TEST(OneSmallRpc, Foreground) {
+  config_num_sessions = 1;
+  config_num_bg_threads = 0;
+  config_rpcs_per_session = 1;
+  config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
+
+  launch_helper();
+}
+
+TEST(OneSmallRpc, Background) {
+  config_num_sessions = 1;
+  config_num_bg_threads = 1;
+  config_rpcs_per_session = 1;
+  config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
+
+  launch_helper();
+}
+
+TEST(MultiSmallRpcOneSession, Foreground) {
+  config_num_sessions = 1;
+  config_num_bg_threads = 0;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
+
+  launch_helper();
+}
+
+TEST(MultiSmallRpcOneSession, Background) {
+  config_num_sessions = 1;
+  config_num_bg_threads = 2;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
+
+  launch_helper();
+}
+
 TEST(MultiSmallRpcMultiSession, Foreground) {
   // Use enough sessions to exceed the Rpc's unexpected window
-  size_t num_sessions =
+  config_num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-  launch_server_client_threads(num_sessions, 0, multi_small_rpc_multi_session,
-                               reg_info_vec_fg, ConnectServers::kFalse);
+
+  config_num_bg_threads = 0;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
+
+  launch_helper();
 }
 
 TEST(MultiSmallRpcMultiSession, Background) {
   // Use enough sessions to exceed the Rpc's unexpected window
-  size_t num_sessions =
+  config_num_sessions =
       (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-  // 3 background threads
-  launch_server_client_threads(num_sessions, 3, multi_small_rpc_multi_session,
-                               reg_info_vec_bg, ConnectServers::kFalse);
+
+  config_num_bg_threads = 3;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
+
+  launch_helper();
 }
 
 int main(int argc, char **argv) {
