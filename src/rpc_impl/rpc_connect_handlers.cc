@@ -10,10 +10,13 @@ namespace ERpc {
 // We need to handle all types of errors in remote arguments that the client can
 // make when calling create_session(), which cannot check for such errors.
 template <class TTr>
-void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
+void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
-  assert(sm_pkt != NULL);
-  assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
+  assert(wi != nullptr && wi->enet_peer != nullptr);
+
+  SessionMgmtPkt *sm_pkt = wi->sm_pkt;
+  assert(sm_pkt != nullptr &&
+         sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
 
   // Ensure that server fields known by the client were filled correctly
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
@@ -30,9 +33,7 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
   if (pkt_tr_type != transport->transport_type) {
     erpc_dprintf("%s: Invalid transport %s. Sending response.\n", issue_msg,
                  Transport::get_transport_name(pkt_tr_type).c_str());
-
-    sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidTransport,
-                          &nexus->udp_config);
+    enqueue_sm_resp(wi, SessionMgmtErrType::kInvalidTransport);
     return;
   }
 
@@ -40,39 +41,15 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
   if (sm_pkt->server.phy_port != phy_port) {
     erpc_dprintf("%s: Invalid server port %u. Sending response.\n", issue_msg,
                  sm_pkt->server.phy_port);
-
-    sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemotePort,
-                          &nexus->udp_config);
+    enqueue_sm_resp(wi, SessionMgmtErrType::kInvalidRemotePort);
     return;
   }
 
-  // Check if we (= this Rpc) already have a session as the server with the
-  // client Rpc (C) that sent this packet. (This is different from if we have a
-  // session as the client Rpc, where C is the server Rpc.) This happens when
-  // the connect request is retransmitted.
-  for (Session *old_session : session_vec) {
-    // This check ensures that we own the session as the server.
-    //
-    // If the check succeeds, we cannot own old_session as the client:
-    // sm_pkt was sent by a different Rpc than us, since an Rpc cannot send
-    // session management packets to itself. So the client hostname and rpc_id
-    // in the located session cannot be ours, since they are same as sm_pkt's.
-    if ((old_session != nullptr) &&
-        strcmp(old_session->client.hostname, sm_pkt->client.hostname) == 0 &&
-        (old_session->client.rpc_id == sm_pkt->client.rpc_id)) {
-      assert(old_session->is_server());
-      assert(old_session->is_connected());
-
-      // There's a valid session, so client endpoint metadata is unchanged
-      assert(old_session->client == sm_pkt->client);
-
-      erpc_dprintf("%s: Duplicate session connect request. Sending response.\n",
-                   issue_msg);
-
-      // Send a connect success response
-      sm_pkt->server = old_session->server;  // Fill server endpoint metadata
-      sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
-      return;
+  // Ensure that we don't have a session as the serrver with this client
+  for (Session *old_ssn : session_vec) {
+    if (old_ssn != nullptr) {
+      assert(strcmp(old_ssn->client.hostname, sm_pkt->client.hostname) != 0 ||
+             (old_ssn->client.rpc_id != sm_pkt->client.rpc_id));
     }
   }
 
@@ -80,9 +57,7 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
   if (session_vec.size() == kMaxSessionsPerThread) {
     erpc_dprintf("%s: Reached session limit %zu. Sending response.\n",
                  issue_msg, kMaxSessionsPerThread);
-
-    sm_pkt->send_resp_mut(SessionMgmtErrType::kTooManySessions,
-                          &nexus->udp_config);
+    enqueue_sm_resp(wi, SessionMgmtErrType::kTooManySessions);
     return;
   }
 
@@ -96,8 +71,7 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
   if (!resolve_success) {
     erpc_dprintf("%s: Unable to resolve routing info %s. Sending response.\n",
                  issue_msg, TTr::routing_info_str(client_rinfo).c_str());
-    sm_pkt->send_resp_mut(SessionMgmtErrType::kRoutingResolutionFailure,
-                          &nexus->udp_config);
+    enqueue_sm_resp(wi, SessionMgmtErrType::kRoutingResolutionFailure);
     return;
   }
 
@@ -119,8 +93,7 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
       }
 
       erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
-      sm_pkt->send_resp_mut(SessionMgmtErrType::kOutOfMemory,
-                            &nexus->udp_config);
+      enqueue_sm_resp(wi, SessionMgmtErrType::kOutOfMemory);
       return;
     }
   }
@@ -140,14 +113,14 @@ void Rpc<TTr>::handle_connect_req_st(SessionMgmtPkt *sm_pkt) {
   session_vec.push_back(session);  // Add to list of all sessions
 
   erpc_dprintf("%s: None. Sending response.\n", issue_msg);
-  sm_pkt->send_resp_mut(SessionMgmtErrType::kNoError, &nexus->udp_config);
+  enqueue_sm_resp(wi, SessionMgmtErrType::kNoError);
   return;
 }
 
 template <class TTr>
 void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   assert(in_creator());
-  assert(sm_pkt != NULL);
+  assert(sm_pkt != nullptr);
   assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
   assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));
 
@@ -158,54 +131,24 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
           "Issue",
           rpc_id, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
 
-  // Try to locate the requester session for this response
+  // Try to locate the requester session and do some sanity checks
   uint16_t session_num = sm_pkt->client.session_num;
   assert(session_num < session_vec.size());
 
   Session *session = session_vec[session_num];
-
-  // Check if the client session was already disconnected. This happens when
-  // we get a (massively delayed) out-of-order duplicate connect response after
-  // a disconnect response. If so, the callback is not invoked.
-  if (session == nullptr) {
-    erpc_dprintf("%s: Client session is already disconnected.\n", issue_msg);
-    return;
-  }
-
+  assert(session != nullptr);
   assert(session->is_client());
+  assert(session->state == SessionState::kConnectInProgress);
+  assert(session->client_info.sm_request_pending);
+  assert(session->client == sm_pkt->client);
 
-  // If we are here, we still have the requester session as Client.
-  //
-  // Check if the session state has advanced beyond kConnectInProgress (due to
-  // a prior connect response). If so, we are not interested in this response
-  // and the callback is not invoked.
-  if (session->state > SessionState::kConnectInProgress) {
-    // We may have a disconnect request outstanding
-    if (mgmt_retryq_contains_st(session)) {
-      assert(session->state == SessionState::kDisconnectInProgress);
-    }
-
-    erpc_dprintf("%s: Ignoring. Client is in state %s.\n", issue_msg,
-                 session_state_str(session->state).c_str());
-    return;
-  }
-
-  // If we are here, this is the first connect response, so the connect request
-  // should be in flight. It's not possible to also have a disconnect request in
-  // flight, since disconnect must wait for the first connect response.
-  assert(mgmt_retryq_contains_st(session));
-  mgmt_retryq_remove_st(session);
-
-  // If the session was not already disconnected, the session endpoint metadata
-  // (hostname, Rpc ID, session num) from the pkt should match our local copy.
-  //
   // We don't have the server's session number locally yet, so we cannot use
   // SessionEndpoint comparator to compare server endpoint metadata.
   assert(strcmp(session->server.hostname, sm_pkt->server.hostname) == 0);
   assert(session->server.rpc_id == sm_pkt->server.rpc_id);
   assert(session->server.session_num == kInvalidSessionNum);
 
-  assert(session->client == sm_pkt->client);
+  session->client_info.sm_request_pending = false;
 
   // If the connect response has an error, the server has not allocated a
   // Session. Mark the session as disconnected and invoke callback.
@@ -240,27 +183,27 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
     erpc_dprintf("%s: Client failed to resolve server routing info.\n",
                  issue_msg);
 
-    // The server has allocated a Session, so we'll try to free server
-    // resources by disconnecting. The user will only get the kConnectFailed
-    // callback, i.e., no callback will be invoked when we get the disconnect
-    // response.
-    //
-    // We need to save the server's endpoint metadata from the packet so we
-    // can send it in the subsequent disconnect request.
-    session->server = sm_pkt->server;
-
-    // This ensures that we don't invoke the disconnect callback later
+    // The server has allocated a Session, so try to free server resources by
+    // disconnecting. The user will only get the kConnectFailed callback, i.e.,
+    // no callback will be invoked when we get the disconnect response.
     session->client_info.sm_callbacks_disabled = true;
+
+    // Save server metadata for when we receieve the disconnect response
+    session->server = sm_pkt->server;
 
     // Do what destroy_session() does with a kConnected session
     session->state = SessionState::kDisconnectInProgress;
-    mgmt_retryq_add_st(session);  // Checks that session is not in flight
+    SessionMgmtPkt *req_sm_pkt = new SessionMgmtPkt();  // Freed by SM thread
+    req_sm_pkt->pkt_type = SessionMgmtPktType::kConnectReq;
+    req_sm_pkt->client = session->client;
+    req_sm_pkt->server = session->server;
+    nexus_hook.sm_tx_list->unlocked_push_back(
+        typename Nexus<TTr>::SmWorkItem(rpc_id, req_sm_pkt));
 
     erpc_dprintf(
-        "eRPC Rpc %u: Sending first (callback-less) disconnect request for "
+        "eRPC Rpc %u: Sending callback-less disconnect request for "
         "session %u, and invoking kConnectFailed callback\n",
         rpc_id, session->local_session_num);
-    send_disconnect_req_one_st(session);
 
     session_mgmt_handler(
         session->local_session_num, SessionMgmtEventType::kConnectFailed,

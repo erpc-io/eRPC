@@ -139,7 +139,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       assert(sslot.rx_msgbuf.buf != nullptr);
       memcpy(reinterpret_cast<char *>(sslot.rx_msgbuf.get_pkthdr_0()), pkt,
              msg_size + sizeof(pkthdr_t));
-      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kReq);
+      submit_background_st(&sslot, Nexus<TTr>::WorkItemType::kReq);
       return;
     }
   } else {
@@ -166,7 +166,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(Session *session,
       assert(sslot.rx_msgbuf.buf != nullptr);
       memcpy(reinterpret_cast<char *>(sslot.rx_msgbuf.get_pkthdr_0()), pkt,
              msg_size + sizeof(pkthdr_t));
-      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kResp);
+      submit_background_st(&sslot, Nexus<TTr>::WorkItemType::kResp);
       return;
     }
     return;
@@ -302,7 +302,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
       bury_sslot_rx_msgbuf(&sslot);
       return;
     } else {
-      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kReq);
+      submit_background_st(&sslot, Nexus<TTr>::WorkItemType::kReq);
       return;
     }
   } else {
@@ -317,7 +317,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
       // event loop (this thread) can un-bury it.
       assert(sslot.rx_msgbuf.buf == nullptr);
     } else {
-      submit_background_st(&sslot, Nexus<TTr>::BgWorkItemType::kResp);
+      submit_background_st(&sslot, Nexus<TTr>::WorkItemType::kResp);
       return;
     }
     return;
@@ -325,13 +325,13 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_background_st(
-    SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type) {
+void Rpc<TTr>::submit_background_st(SSlot *sslot,
+                                    typename Nexus<TTr>::WorkItemType wi_type) {
   assert(in_creator());
   assert(nexus->num_bg_threads > 0);
   assert(sslot != nullptr);
 
-  if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
+  if (wi_type == Nexus<TTr>::WorkItemType::kReq) {
     assert(sslot->session != nullptr && sslot->session->is_server());
   } else {
     assert(sslot->session != nullptr && sslot->session->is_client());
@@ -347,7 +347,7 @@ void Rpc<TTr>::submit_background_st(
 
   // Thread-safe
   req_list->unlocked_push_back(
-      typename Nexus<TTr>::BgWorkItem(wi_type, rpc_id, this, context, sslot));
+      typename Nexus<TTr>::BgWorkItem(wi_type, this, context, sslot));
 }
 
 // This is a debug function that gets optimized out
@@ -373,7 +373,7 @@ void Rpc<TTr>::debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
 // This is a debug function that gets optimized out
 template <class TTr>
 void Rpc<TTr>::debug_check_bg_rx_msgbuf(
-    SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type) {
+    SSlot *sslot, typename Nexus<TTr>::WorkItemType wi_type) {
   assert(sslot != nullptr);
   _unused(sslot);
   _unused(wi_type);
@@ -381,7 +381,7 @@ void Rpc<TTr>::debug_check_bg_rx_msgbuf(
   assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
   assert(sslot->rx_msgbuf.is_dynamic());
 
-  if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
+  if (wi_type == Nexus<TTr>::WorkItemType::kReq) {
     assert(sslot->rx_msgbuf.is_req());
   } else {
     assert(sslot->rx_msgbuf.is_resp());

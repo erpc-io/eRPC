@@ -359,7 +359,7 @@ class Rpc {
   /// valid, dynamic, and the \p is_req field should match. This holds for
   /// both background request handlers and continuations.
   static void debug_check_bg_rx_msgbuf(
-      SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type);
+      SSlot *sslot, typename Nexus<TTr>::WorkItemType wi_type);
 
   //
   // Misc private functions
@@ -401,30 +401,17 @@ class Rpc {
   /// responsible for freeing user-allocated MsgBuffers.
   void bury_session_st(Session *session);
 
+  /// Enqueue a response for the SM packet in \p req_wi
+  void enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
+                       SessionMgmtErrType err_type);
+
   // rpc_connect_handlers.cc
-  void handle_connect_req_st(SessionMgmtPkt *pkt);
+  void handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
   void handle_connect_resp_st(SessionMgmtPkt *pkt);
 
   // rpc_disconnect_handlers.cc
-  void handle_disconnect_req_st(SessionMgmtPkt *pkt);
+  void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
   void handle_disconnect_resp_st(SessionMgmtPkt *pkt);
-
-  // rpc_sm_retry.cc
-
-  /// Send a (possibly retried) connect request for this session
-  void send_connect_req_one_st(Session *session);
-
-  /// Send a (possibly retried) disconnect request for this session
-  void send_disconnect_req_one_st(Session *session);
-
-  ///@{
-  /// Management retry queue functions. These can only be executed by the Rpc
-  /// creator thread.
-  void mgmt_retryq_add_st(Session *session);
-  void mgmt_retryq_remove_st(Session *session);
-  bool mgmt_retryq_contains_st(Session *session);
-  void mgmt_retry();
-  ///@}
 
   /// Add \p sslot to the datapath TX queue
   inline void dpath_txq_push_back(SSlot *sslot) {
@@ -505,7 +492,7 @@ class Rpc {
 
   /// Submit a work item to a background thread
   void submit_background_st(SSlot *sslot,
-                            typename Nexus<TTr>::BgWorkItemType wi_type);
+                            typename Nexus<TTr>::WorkItemType wi_type);
 
   // rpc_send_cr.cc
 
@@ -557,10 +544,6 @@ class Rpc {
   /// Disconnected sessions are denoted by null pointers. This grows as sessions
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
-
-  /// Sessions for which a management request is in flight. This is only
-  /// accessed by the creator thread, so we don't need a lock.
-  std::vector<Session *> mgmt_retry_queue;
 
   /// SSlots that need TX. We don't need a std::list to support efficient
   /// deletes because sslots are implicitly deleted while processing the

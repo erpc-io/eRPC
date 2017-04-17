@@ -24,7 +24,7 @@ class MtList {
     list.clear();
   }
 
-  /// Add an element to the list after grabbing a lock
+  /// Add an element to the list. This function grabs the list lock.
   void unlocked_push_back(T t) {
     lock();
     list.push_back(t);

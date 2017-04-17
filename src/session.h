@@ -80,9 +80,12 @@ class Session {
 
   /// Information that is required only at the client endpoint
   struct {
-    /// We disable the disconnect callback if session connection fails despite
-    /// getting an error-free connect response
+    /// Set to disable the disconnect callback. This is used when session
+    /// connection fails despite getting an error-free connect response
     bool sm_callbacks_disabled = false;
+
+    /// True if this session has a pending session management request
+    bool sm_request_pending = false;
 
     uint64_t mgmt_req_tsc;  ///< Timestamp of the last management request
     bool is_cc = false;     ///< True if this session is congestion controlled

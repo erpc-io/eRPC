@@ -32,13 +32,8 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
   }
 
   // Handle session management events, if any
-  if (unlikely(nexus_hook.sm_pkt_list.size > 0)) {
+  if (unlikely(nexus_hook.sm_rx_list.size > 0)) {
     handle_session_management_st();  // Callee grabs the hook lock
-  }
-
-  // Check if we need to retransmit any session management requests
-  if (unlikely(mgmt_retry_queue.size() > 0)) {
-    mgmt_retry();
   }
 
   process_comps_st();      // RX

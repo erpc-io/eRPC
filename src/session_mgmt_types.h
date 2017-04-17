@@ -4,26 +4,23 @@
 #include <mutex>
 #include "common.h"
 #include "transport.h"
-#include "util/udp_client.h"
 
 namespace ERpc {
 
 /// Maximum number of sessions (both as client and server) that can be created
 /// by an Rpc through its lifetime. Increase this for more sessions.
-static const size_t kMaxSessionsPerThread = 1024;
+static constexpr size_t kMaxSessionsPerThread = 4096;
 static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(), "");
 
-static const size_t kSecretBits = 32;  ///< Session secret for security
-static_assert(kSecretBits <= 32, "");  // Secret must fit in 32 bits
-
-static const size_t kSessionMgmtRetransMs = 20;   ///< Timeout for mgmt reqs
-static const size_t kSessionMgmtTimeoutMs = 500;  ///< Max time for mgmt reqs
+static constexpr size_t kSecretBits = 32;  ///< Session secret for security
+static_assert(kSecretBits <= 32, "");      // Secret must fit in 32 bits
 
 // Invalid metadata values for session endpoint initialization
-static const uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
-static const uint8_t kInvalidRpcId = kMaxRpcId + 1;
-static const uint16_t kInvalidSessionNum = std::numeric_limits<uint16_t>::max();
-static const uint32_t kInvalidSecret = 0;
+static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
+static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
+static constexpr uint16_t kInvalidSessionNum =
+    std::numeric_limits<uint16_t>::max();
+static constexpr uint32_t kInvalidSecret = 0;
 
 /// Session state that can only go forward.
 enum class SessionState {
@@ -200,7 +197,8 @@ static std::string session_mgmt_event_type_str(
   return std::string("[Invalid event type]");
 }
 
-/// Basic metadata about a session end point filled when the session is created
+/// Basic metadata about a session end point. This is sent in session management
+/// packets.
 class SessionEndpoint {
  public:
   Transport::TransportType transport_type;
@@ -263,38 +261,8 @@ class SessionMgmtPkt {
 
   SessionEndpoint client, server;  ///< Endpoint metadata
 
-  SessionMgmtPkt() {}
-  SessionMgmtPkt(SessionMgmtPktType pkt_type) : pkt_type(pkt_type) {}
-
-  /// Send this session management packet "as is"
-  inline void send_to(const char *dst_hostname,
-                      const udp_config_t *udp_config) {
-    assert(dst_hostname != NULL);
-
-    UDPClient udp_client(dst_hostname, udp_config->mgmt_udp_port,
-                         udp_config->drop_prob);
-    ssize_t ret =
-        udp_client.send(reinterpret_cast<char *>(this), sizeof(*this));
-    _unused(ret);
-    assert(ret == static_cast<ssize_t>(sizeof(*this)));
-  }
-
-  /**
-   * @brief Send the response to this session management request packet, using
-   * this packet as the response buffer. This function mutates the packet: it
-   * flips the packet type to response, and fills in the response type.
-   */
-  inline void send_resp_mut(SessionMgmtErrType _err_type,
-                            const udp_config_t *udp_config) {
-    assert(session_mgmt_pkt_type_is_req(pkt_type));
-    pkt_type = session_mgmt_pkt_type_req_to_resp(pkt_type);
-    err_type = _err_type;
-
-    send_to(client.hostname, udp_config);
-  }
+  bool is_req() const { return session_mgmt_pkt_type_is_req(pkt_type); }
 };
-static_assert(sizeof(SessionMgmtPkt) < 1400,
-              "Session management packet too large for UDP");
 
 }  // End ERpc
 

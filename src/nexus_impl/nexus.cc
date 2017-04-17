@@ -9,8 +9,7 @@ namespace ERpc {
 template <class TTr>
 Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
                   double udp_drop_prob)
-    : udp_config(mgmt_udp_port, udp_drop_prob),
-      freq_ghz(get_freq_ghz()),
+    : freq_ghz(get_freq_ghz()),
       hostname(get_hostname()),
       num_bg_threads(num_bg_threads) {
   // Print warning messages if low-performance debug settings are enabled
@@ -38,21 +37,15 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
         "small_rpc_optlevel_extreme.");
   }
 
-  // Launch the session management thread
-  erpc_dprintf_noargs("eRPC Nexus: Launching session management thread.\n");
-  sm_kill_switch = false;
-  sm_thread = std::thread(
-      sm_thread_func, const_cast<volatile bool *>(&sm_kill_switch),
-      const_cast<volatile Hook **>(reg_hooks_arr), &nexus_lock, &udp_config);
+  kill_switch = false;
 
   // Launch background threads
   erpc_dprintf("eRPC Nexus: Launching %zu background threads.\n",
                num_bg_threads);
-  bg_kill_switch = false;
   for (size_t i = 0; i < num_bg_threads; i++) {
     assert(tls_registry.cur_tiny_tid == i);
 
-    bg_thread_ctx_arr[i].bg_kill_switch = &bg_kill_switch;
+    bg_thread_ctx_arr[i].kill_switch = &kill_switch;
     bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
     bg_thread_ctx_arr[i].tls_registry = &tls_registry;
     bg_thread_ctx_arr[i].bg_thread_index = i;
@@ -66,6 +59,14 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
     }
   }
 
+  // Launch the session management thread
+  sm_thread_ctx.mgmt_udp_port = mgmt_udp_port;
+  sm_thread_ctx.kill_switch = &kill_switch;
+  sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
+  sm_thread_ctx.nexus_lock = &nexus_lock;
+
+  erpc_dprintf_noargs("eRPC Nexus: Launching session management thread.\n");
+  sm_thread = std::thread(sm_thread_func, &sm_thread_ctx);
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
                mgmt_udp_port, hostname.c_str());
 }
@@ -75,8 +76,7 @@ Nexus<TTr>::~Nexus() {
   erpc_dprintf_noargs("eRPC Nexus: Destroying Nexus.\n");
 
   // Signal background and session management threads to kill themselves
-  bg_kill_switch = true;
-  sm_kill_switch = true;
+  kill_switch = true;
 
   for (size_t i = 0; i < num_bg_threads; i++) {
     bg_thread_arr[i].join();
@@ -104,15 +104,17 @@ void Nexus<TTr>::register_hook(Hook *hook) {
   nexus_lock.lock();
 
   req_func_registration_allowed = false;  // Disable future Ops registration
-  reg_hooks_arr[rpc_id] = hook;
+  reg_hooks_arr[rpc_id] = hook;           // Save the hook
 
   // Install background request submission lists
   for (size_t i = 0; i < num_bg_threads; i++) {
-    BgThreadCtx &bg_ctx = bg_thread_ctx_arr[i];
-    assert(bg_ctx.bg_thread_index == i);
-
-    hook->bg_req_list_arr[i] = &bg_ctx.bg_req_list;  // Request
+    assert(hook->bg_req_list_arr[i] == nullptr);
+    hook->bg_req_list_arr[i] = &bg_thread_ctx_arr[i].bg_req_list;
   }
+
+  // Install session managment request submission list
+  assert(hook->sm_tx_list == nullptr);
+  hook->sm_tx_list = &sm_thread_ctx.sm_tx_list;
 
   nexus_lock.unlock();
 }

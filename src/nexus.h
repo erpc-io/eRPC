@@ -1,7 +1,9 @@
 #ifndef ERPC_NEXUS_H
 #define ERPC_NEXUS_H
 
+#include <enet/enet.h>
 #include <unistd.h>
+#include <unordered_map>
 #include "common.h"
 #include "session.h"
 #include "session_mgmt_types.h"
@@ -21,33 +23,26 @@ class Nexus {
  public:
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
 
-  enum class BgWorkItemType : bool { kReq, kResp };
+  enum class WorkItemType : bool { kReq, kResp };
 
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(BgWorkItemType wi_type, uint8_t rpc_id, Rpc<TTr> *rpc,
-               void *context, SSlot *sslot)
-        : wi_type(wi_type),
-          rpc_id(rpc_id),
-          rpc(rpc),
-          context(context),
-          sslot(sslot) {}
+    BgWorkItem(WorkItemType wi_type, Rpc<TTr> *rpc, void *context, SSlot *sslot)
+        : wi_type(wi_type), rpc(rpc), context(context), sslot(sslot) {}
 
-    const BgWorkItemType wi_type;
-
-    /// ID of the Rpc that submitted this request. Debug-only.
-    const uint8_t rpc_id;
-    Rpc<TTr> *rpc;
+    const WorkItemType wi_type;
+    Rpc<TTr> *rpc;  ///< The Rpc object that submitted this work item
     void *context;  ///< The context to use for request handler
     SSlot *sslot;
+
+    bool is_req() const { return wi_type == WorkItemType::kReq; }
   };
 
   /// Background thread context
   class BgThreadCtx {
    public:
-    /// A switch used by the Nexus to turn off background threads
-    volatile bool *bg_kill_switch;
+    volatile bool *kill_switch;  ///< The Nexus's kill switch
 
     /// A pointer to the Nexus's request functions. Unlike Rpc threads that
     /// create a copy of the Nexus's request functions, background threads have
@@ -60,15 +55,75 @@ class Nexus {
     MtList<BgWorkItem> bg_req_list;  ///< Background thread request list
   };
 
-  /// A hook created by the per-thread Rpc, and shared with the per-process
-  /// Nexus. All accesses to this hook must be done with @session_mgmt_mutex
-  /// locked.
+  // Session management thread definitions
+  class Hook;  // Forward declaration
+
+  class SmWorkItem {
+   public:
+    // Used by Rpc threads to generate work items for the SM thread
+    SmWorkItem(uint8_t rpc_id, SessionMgmtPkt *sm_pkt)
+        : rpc_id(rpc_id), sm_pkt(sm_pkt), enet_peer(nullptr) {
+      assert(sm_pkt != nullptr);
+    }
+
+    // Used by the SM thread to create work items for the Rpc threads
+    SmWorkItem(uint8_t rpc_id, SessionMgmtPkt *sm_pkt, ENetPeer *enet_peer)
+        : rpc_id(rpc_id), sm_pkt(sm_pkt), enet_peer(enet_peer) {
+      assert(sm_pkt != nullptr);
+
+      if (sm_pkt->is_req()) {
+        assert(enet_peer != nullptr);
+      } else {
+        assert(enet_peer == nullptr);
+      }
+    };
+
+    uint8_t rpc_id;          ///< The local Rpc ID
+    SessionMgmtPkt *sm_pkt;  ///< The SM packet for this work item
+    ENetPeer *enet_peer;
+  };
+
+  /// Session management thread context
+  class SmThreadCtx {
+   public:
+    // Installed by the Nexus
+    uint16_t mgmt_udp_port;         ///< The Nexus's session management port
+    volatile bool *kill_switch;     ///< The Nexus's kill switch
+    volatile Hook **reg_hooks_arr;  ///< A pointer to the Nexus's hooks array
+    std::mutex *nexus_lock;
+    MtList<SmWorkItem> sm_tx_list;  ///< SM packets to transmit
+
+    // Used internally by the SM thread
+    ENetHost *enet_host;
+
+    // Mappings maintained for client sessions only
+    std::unordered_map<std::string, ENetPeer *> name_map;
+    std::unordered_map<uint32_t, std::string> ip_map;
+  };
+
+  /// Peer metadata maintained by client peers
+  class SmPeerData {
+   public:
+    std::string rem_hostname;
+    bool connected;
+    std::vector<SmWorkItem> work_item_vec;
+  };
+
+  /// A hook created by an Rpc thread, and shared with the Nexus
   class Hook {
    public:
     uint8_t rpc_id;  ///< ID of the Rpc that created this hook
-    MtList<SessionMgmtPkt *> sm_pkt_list;  ///< Session management packet list
-    /// Background thread request lists, populated by the Nexus
+
+    /// Background thread request lists, installed by the Nexus
     MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
+
+    /// Session management thread's session management TX list, installed by
+    /// Nexus. This is used by Rpc threads to submit packets to the SM thread.
+    MtList<SmWorkItem> *sm_tx_list = nullptr;
+
+    /// The Rpc thread's session management RX list, installed by the Rpc.
+    /// Packets received by the SM thread for this Rpc are queued here.
+    MtList<SmWorkItem> sm_rx_list;
   };
 
   /**
@@ -93,13 +148,20 @@ class Nexus {
   ~Nexus();
 
   /// The function executed by background threads
-  static void bg_thread_func(BgThreadCtx *bg_thread_ctx);
+  static void bg_thread_func(BgThreadCtx *ctx);
 
   /// The function executed by the session management thread
-  static void sm_thread_func(volatile bool *sm_kill_switch,
-                             volatile Hook **reg_hooks_arr,
-                             std::mutex *nexus_lock,
-                             const udp_config_t *udp_config);
+  static void sm_thread_func(SmThreadCtx *ctx);
+
+  /// Enqueue \p sm_pkt for transmission to \peer, and free \p sm_pkt
+  static void sm_thread_tx_helper(ENetPeer *peer, SessionMgmtPkt *sm_pkt);
+
+  /// Receive session management packets and enqueue them to Rpc threads. This
+  /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.
+  static void sm_thread_rx(SmThreadCtx *ctx);
+
+  /// Transmit session management packets enqueued by Rpc threads
+  static void sm_thread_tx(SmThreadCtx *ctx);
 
   /**
    * @brief Check if a hook with Rpc ID = \p rpc_id exists in this Nexus. The
@@ -135,11 +197,11 @@ class Nexus {
     int ret = gethostname(_hostname, kMaxHostnameLen);
     return ret;
   }
+
   /// Read-mostly members exposed to Rpc threads
-  const udp_config_t udp_config;  ///< UDP port and packet drop probability
-  const double freq_ghz;          ///< Rdtsc frequncy
-  const std::string hostname;     ///< The local host
-  const size_t num_bg_threads;    ///< Background threads to process Rpc reqs
+  const double freq_ghz;        ///< Rdtsc frequncy
+  const std::string hostname;   ///< The local host
+  const size_t num_bg_threads;  ///< Background threads to process Rpc reqs
 
   const uint8_t pad[64] = {0};
 
@@ -157,12 +219,13 @@ class Nexus {
   Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};  ///< Rpc-Nexus hooks
 
  private:
+  volatile bool kill_switch;  ///< Used to turn of SM and background threads
+
   // Session management thread
-  volatile bool sm_kill_switch;  ///< A switch to turn off the SM thread
-  std::thread sm_thread;         ///< The session management thread
+  SmThreadCtx sm_thread_ctx;  ///< Session management thread context
+  std::thread sm_thread;      ///< The session management thread
 
   // Background threads
-  volatile bool bg_kill_switch;  ///< A switch to turn off background threads
   std::thread bg_thread_arr[kMaxBgThreads];      ///< The background threads
   BgThreadCtx bg_thread_ctx_arr[kMaxBgThreads];  ///< Background thread context
 

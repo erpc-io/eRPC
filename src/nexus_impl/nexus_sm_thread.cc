@@ -1,146 +1,281 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-
 #include "nexus.h"
 
 namespace ERpc {
 
+static constexpr size_t kENetChannels = 1;
+
+/// The session management thread blocks on ENet events for 20 ms
+static constexpr size_t kSmThreadEventLoopMs = 20;
+
+/// Timeout for establishing ENet connections
+static constexpr size_t kENetConnectTimeoutMs = 50;
+
 template <class TTr>
-void Nexus<TTr>::sm_thread_func(volatile bool *sm_kill_switch,
-                                volatile Hook **reg_hooks_arr,
-                                std::mutex *nexus_lock,
-                                const udp_config_t *udp_config) {
-  // Create a UDP socket.
-  // AF_INET = IPv4, SOCK_DGRAM = datagrams, IPPROTO_UDP = datagrams over UDP.
-  // Returns a file descriptor.
-  int sm_sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if (sm_sock_fd < 0) {
-    throw std::runtime_error("eRPC Nexus: Error opening datagram socket.");
-  }
+void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
+  assert(ctx != nullptr);
 
-  // Bind the socket to accept packets destined to any IP interface of this
-  // machine (INADDR_ANY), and to mgmt_udp_port.
-  struct sockaddr_in server;
-  memset(&server, 0, sizeof(server));
-  server.sin_family = AF_INET;
-  server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons(udp_config->mgmt_udp_port);
+  ENetEvent event;
+  int ret = enet_host_service(ctx->enet_host, &event, kSmThreadEventLoopMs);
+  assert(ret >= 0);
 
-  if (bind(sm_sock_fd, reinterpret_cast<struct sockaddr *>(&server),
-           sizeof(struct sockaddr_in)) < 0) {
-    throw std::runtime_error("eRPC Nexus: Error binding datagram socket.");
-  }
+  if (ret > 0) {
+    // Process the event
+    ENetPeer *peer = event.peer;
+    uint32_t peer_ip = event.peer->address.host;
 
-  // Set socket timeout to 100 ms, so we can kill ourselves when the Nexus
-  // is destroyed
-  struct timeval tv;
-  tv.tv_sec = 0;
-  tv.tv_usec = 100000;
-  if (setsockopt(sm_sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-    throw std::runtime_error("eRPC Nexus: Error setting SM socket timeout.");
-  }
+    switch (event.type) {
+      case ENET_EVENT_TYPE_CONNECT: {
+        if (peer->data == nullptr) {
+          // This is a server-mode peer, so we don't need to do anything
+          break;
+        }
 
-  while (*sm_kill_switch == false) {
-    uint32_t addr_len = sizeof(struct sockaddr_in);  // Value-result
-    struct sockaddr_in their_addr;  // Sender's address information goes here
-    SessionMgmtPkt *sm_pkt = new SessionMgmtPkt();  // Need new: passed to Rpc
-    int flags = 0;
+        // If we're here, this is a client-mode session
+        auto *peer_data = static_cast<SmPeerData *>(peer->data);
+        assert(!peer_data->connected);
+        assert(peer_data->work_item_vec.size() > 0);
 
-    // Receive a packet from the socket. We're guaranteed to get exactly one.
-    ssize_t recv_bytes = recvfrom(
-        sm_sock_fd, static_cast<void *>(sm_pkt), sizeof(*sm_pkt), flags,
-        reinterpret_cast<struct sockaddr *>(&their_addr), &addr_len);
+        peer_data->connected = true;
+        erpc_dprintf(
+            "eRPC Nexus: ENet socket connected to %s. Transmitting "
+            "%zu queued SM requests.\n",
+            peer_data->rem_hostname.c_str(), peer_data->work_item_vec.size());
 
-    // The recvfrom() call can fail only due to timeouts
-    if (recv_bytes == -1) {
-      if (!(errno == EAGAIN || errno == EWOULDBLOCK)) {
-        throw std::runtime_error("eRPC Nexus: SM socket recvfrom() error.\n");
-      } else {
-        continue;  // Try to recv again, or die if the Nexus is destroyed
+        // Transmit the queued work items.
+        for (auto wi : peer_data->work_item_vec) {
+          assert(wi.sm_pkt->is_req());
+          sm_thread_tx_helper(peer, wi.sm_pkt);
+        }
+        peer_data->work_item_vec.clear();
+
+        break;
       }
+
+      case ENET_EVENT_TYPE_RECEIVE: {
+        assert(event.packet->dataLength == sizeof(SessionMgmtPkt));
+
+        if (peer->data != nullptr) {
+          // This is an event for a client-mode session, so we have mappings
+          assert(ctx->ip_map.count(peer_ip) > 0);
+          assert(ctx->name_map[ctx->ip_map[peer_ip]] == peer);
+        }
+
+        // Copy out the packet and free the ENet packet
+        SessionMgmtPkt *sm_pkt = new SessionMgmtPkt();
+        memcpy(static_cast<void *>(sm_pkt), event.packet->data,
+               sizeof(SessionMgmtPkt));
+        enet_packet_destroy(event.packet);
+
+        assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
+
+        bool is_sm_req = session_mgmt_pkt_type_is_req(sm_pkt->pkt_type);
+        uint8_t target_rpc_id =
+            is_sm_req ? sm_pkt->server.rpc_id : sm_pkt->client.rpc_id;
+        const char *source_hostname =
+            is_sm_req ? sm_pkt->client.hostname : sm_pkt->server.hostname;
+        uint8_t source_rpc_id =
+            is_sm_req ? sm_pkt->client.rpc_id : sm_pkt->server.rpc_id;
+        _unused(source_rpc_id);
+
+        // Lock the Nexus to prevent Rpc registration while we lookup the hook
+        ctx->nexus_lock->lock();
+        Hook *target_hook =
+            const_cast<Hook *>(ctx->reg_hooks_arr[target_rpc_id]);
+
+        if (target_hook == nullptr) {
+          // We don't have an Rpc object for the target Rpc
+          if (is_sm_req) {
+            // If it's a request, we must send a response
+            erpc_dprintf(
+                "eRPC Nexus: Received session mgmt request for invalid Rpc "
+                "%u from Rpc [%s, %u]. Sending response.\n",
+                target_rpc_id, source_hostname, source_rpc_id);
+
+            // Change packet type to response, set error code, and send resp
+            sm_pkt->pkt_type =
+                session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
+            sm_pkt->err_type = SessionMgmtErrType::kInvalidRemoteRpcId;
+
+            ENetPacket *packet = enet_packet_create(static_cast<void *>(sm_pkt),
+                                                    sizeof(SessionMgmtPkt),
+                                                    ENET_PACKET_FLAG_RELIABLE);
+
+            enet_peer_send(peer, 0, packet);
+          } else {
+            // If it's a response, we can ignore it
+            erpc_dprintf(
+                "eRPC Nexus: Received session management resp for invalid "
+                "Rpc %u from Rpc [%s, %u]. Ignoring.\n",
+                target_rpc_id, source_hostname, source_rpc_id);
+          }
+
+          delete sm_pkt;
+          ctx->nexus_lock->unlock();
+        } else {
+          // Create the work item to submit to the Rpc thread. For session
+          // mgmt requests, the Rpc thread uses the ENet peer for responding.
+          if (is_sm_req) {
+            SmWorkItem wi(target_rpc_id, sm_pkt, event.peer);
+            target_hook->sm_rx_list.unlocked_push_back(wi);
+          } else {
+            SmWorkItem wi(target_rpc_id, sm_pkt, nullptr);
+            target_hook->sm_rx_list.unlocked_push_back(wi);
+          }
+
+          // The target Rpc will free sm_pkt
+          ctx->nexus_lock->unlock();
+        }
+        break;
+      }
+
+      case ENET_EVENT_TYPE_DISCONNECT: {
+        if (peer->data == nullptr) {
+          // This is a server-mode peer, so we don't need to do anything
+          break;
+        }
+
+        // If we're here, this is a client mode peer, so we have mappings
+        assert(ctx->ip_map.count(peer_ip) > 0);
+        std::string hostname = ctx->ip_map[peer_ip];
+        assert(ctx->name_map[hostname] == peer);
+
+        erpc_dprintf("eRPC Nexus: ENet socket disconnected from %s.\n",
+                     hostname.c_str());
+
+        // XXX: Do something with outstanding SM requests on this peer. There
+        // may be requests from many sessions.
+
+        // Remove from mappings and free memory
+        ctx->ip_map.erase(peer_ip);
+        ctx->name_map.erase(hostname);
+        delete static_cast<SmPeerData *>(peer->data);
+        peer->data = nullptr;
+        break;
+      }
+
+      default:
+        throw std::runtime_error("eRPC Nexus: Unknown ENet event type.\n");
+        break;
     }
+  }
+}
 
-    if (recv_bytes != static_cast<ssize_t>(sizeof(*sm_pkt))) {
-      erpc_dprintf(
-          "eRPC Nexus: FATAL. Received unexpected data size (%zd) from "
-          "session management socket. Expected = %zu.\n",
-          recv_bytes, sizeof(*sm_pkt));
-      assert(false);
-      exit(-1);
-    }
+template <class TTr>
+void Nexus<TTr>::sm_thread_tx_helper(ENetPeer *peer, SessionMgmtPkt *sm_pkt) {
+  assert(peer != nullptr);
+  assert(sm_pkt != nullptr);
 
-    if (!session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type)) {
-      erpc_dprintf(
-          "eRPC Nexus: FATAL. Received session management packet of "
-          "unexpected type %d.\n",
-          static_cast<int>(sm_pkt->pkt_type));
-      assert(false);
-      exit(-1);
-    }
+  // Create the packet to send
+  ENetPacket *enet_pkt = enet_packet_create(sm_pkt, sizeof(SessionMgmtPkt),
+                                            ENET_PACKET_FLAG_RELIABLE);
+  if (enet_pkt == nullptr) {
+    throw std::runtime_error("eRPC Nexus: Failed to create ENet packet.");
+  }
 
-    uint8_t target_rpc_id;  // ID of the Rpc that should handle this packet
-    const char *source_hostname;
-    uint8_t source_rpc_id;  // Debug-only
-    _unused(source_rpc_id);
+  delete sm_pkt;
 
-    bool is_sm_req = session_mgmt_pkt_type_is_req(sm_pkt->pkt_type);
+  if (enet_peer_send(peer, 0, enet_pkt) != 0) {
+    throw std::runtime_error("eRPC Nexus: Failed to send ENet packet.");
+  }
+}
 
-    if (is_sm_req) {
-      target_rpc_id = sm_pkt->server.rpc_id;
-      source_rpc_id = sm_pkt->client.rpc_id;
-      source_hostname = sm_pkt->client.hostname;
+template <class TTr>
+void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
+  assert(ctx != nullptr);
+
+  if (ctx->sm_tx_list.size == 0) {
+    return;
+  }
+
+  ctx->sm_tx_list.lock();
+
+  for (SmWorkItem &wi : ctx->sm_tx_list.list) {
+    assert(wi.sm_pkt != nullptr);
+    assert(session_mgmt_pkt_type_is_valid(wi.sm_pkt->pkt_type));
+
+    if (wi.sm_pkt->is_req()) {
+      // Transmit a session management request
+      assert(wi.enet_peer == nullptr);
+      std::string rem_hostname = std::string(wi.sm_pkt->server.hostname);
+
+      if (ctx->name_map.count(rem_hostname) != 0) {
+        // We already have a client-mode ENet peer to this remote host
+        ENetPeer *peer = ctx->name_map[rem_hostname];
+
+        // Wait if the peer is not yet connected
+        auto *peer_data = static_cast<SmPeerData *>(peer->data);
+        if (!peer_data->connected) {
+          peer_data->work_item_vec.push_back(wi);
+        } else {
+          sm_thread_tx_helper(ctx->name_map[rem_hostname], wi.sm_pkt);
+        }
+      } else {
+        // Create a client-mode ENet peer to this remote host
+        ENetAddress rem_address;
+        rem_address.port = ctx->mgmt_udp_port;
+        if (enet_address_set_host(&rem_address, rem_hostname.c_str()) != 0) {
+          throw std::runtime_error(
+              "eRPC Nexus: ENet Failed to resolve address " + rem_hostname);
+        }
+
+        ENetPeer *peer =
+            enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
+        if (peer == nullptr) {
+          throw std::runtime_error("eRPC Nexus: Failed to connect ENet to " +
+                                   rem_hostname);
+        }
+
+        // Add the peer to mappings to avoid creating a duplicate peer
+        ctx->name_map[rem_hostname] = peer;
+        ctx->ip_map[rem_address.host] = rem_hostname;
+
+        // Save the work item so that we can transmit it later when the peer
+        // gets connected
+        peer->data = new SmPeerData();
+        auto *peer_data = static_cast<SmPeerData *>(peer->data);
+        peer_data->rem_hostname = rem_hostname;
+        peer_data->connected = false;
+        peer_data->work_item_vec.push_back(wi);
+      }
     } else {
-      target_rpc_id = sm_pkt->client.rpc_id;
-      source_rpc_id = sm_pkt->server.rpc_id;
-      source_hostname = sm_pkt->server.hostname;
+      // Transmit a session management response
+      assert(wi.enet_peer != nullptr);
+      sm_thread_tx_helper(wi.enet_peer, wi.sm_pkt);
     }
+  }
 
-    // Find the registered Rpc that has this ID
-    Hook *target_hook = const_cast<Hook *>(reg_hooks_arr[target_rpc_id]);
+  ctx->sm_tx_list.locked_clear();
+  ctx->sm_tx_list.unlock();
+}
 
-    // Lock the Nexus to prevent Rpc registration while we lookup the hook
-    nexus_lock->lock();
-    if (target_hook == nullptr) {
-      // We don't have an Rpc object for target_rpc_id
-      if (is_sm_req) {
-        // If it's a request, we must send a response
-        erpc_dprintf(
-            "eRPC Nexus: Received session mgmt request for invalid Rpc %u "
-            "from Rpc [%s, %u]. Sending response.\n",
-            target_rpc_id, source_hostname, source_rpc_id);
+template <class TTr>
+void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
+  assert(ctx != nullptr);
 
-        sm_pkt->send_resp_mut(SessionMgmtErrType::kInvalidRemoteRpcId,
-                              udp_config);
-      } else {
-        // If it's a response, we can ignore it
-        erpc_dprintf(
-            "eRPC Nexus: Received session management resp for invalid Rpc %u "
-            "from Rpc [%s, %u]. Ignoring.\n",
-            target_rpc_id, source_hostname, source_rpc_id);
-      }
+  // Create an ENet socket that remote nodes can connect to
+  if (enet_initialize() != 0) {
+    throw std::runtime_error("eRPC Nexus: Failed to initialize ENet.");
+  }
 
-      nexus_lock->unlock();
-      delete sm_pkt;
-      return;
-    }
+  ENetAddress address;
+  enet_address_set_host(&address, "localhost");
+  address.host = ENET_HOST_ANY;
+  address.port = ctx->mgmt_udp_port;
 
-    // Add the packet to the target Rpc's session management packet list
-    target_hook->sm_pkt_list.unlocked_push_back(sm_pkt);
+  ctx->enet_host =
+      enet_host_create(&address, kMaxNumMachines, kENetChannels, 0, 0);
+  if (ctx->enet_host == nullptr) {
+    throw std::runtime_error("eRPC Nexus: Failed to create ENet host.");
+  }
 
-    nexus_lock->unlock();
+  // This is not a busy loop, since sm_thread_rx() blocks for several ms.
+  while (*ctx->kill_switch == false) {
+    sm_thread_tx(ctx);
+    sm_thread_rx(ctx);
   }
 
   erpc_dprintf_noargs("eRPC Nexus: Session management thread exiting.\n");
-
-  // Close the session management socket
-  int ret = close(sm_sock_fd);
-  if (ret != 0) {
-    erpc_dprintf_noargs(
-        "eRPC Nexus: Failed to close session management socket. Ignoring.\n");
-  }
+  enet_deinitialize();
 
   return;
 }

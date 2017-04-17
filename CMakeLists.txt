@@ -16,7 +16,7 @@ add_definitions(-Wno-unused-function)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread)
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet)
 
 # Testing
 enable_testing()
@@ -68,7 +68,6 @@ set(SOURCES
   src/rpc_impl/rpc_connect_handlers.cc
   src/rpc_impl/rpc_disconnect_handlers.cc
   src/rpc_impl/rpc_sm_api.cc
-  src/rpc_impl/rpc_sm_retry.cc
   src/small_rpc_optlevel.h
   src/session.cc
   src/session.h
@@ -87,8 +86,6 @@ set(SOURCES
   src/util/tls_registry.h
   src/util/tls_registry.cc
   src/util/tsc.h
-  src/util/udp_client.cc
-  src/util/udp_client.h
   tests/test_basics.h)
 
 # The tests to run using ctest

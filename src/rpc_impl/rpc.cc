@@ -7,7 +7,6 @@
 #include <stdexcept>
 
 #include "rpc.h"
-#include "util/udp_client.h"
 
 namespace ERpc {
 
@@ -126,9 +125,8 @@ void Rpc<TTr>::bury_session_st(Session *session) {
   assert(in_creator());
   assert(session != nullptr);
 
-  // Server-mode sessions are never in the retry queue, so check only clients
   if (session->is_client()) {
-    assert(!mgmt_retryq_contains_st(session));
+    assert(!session->client_info.sm_request_pending);
   }
 
   // Free session resources
@@ -149,13 +147,17 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 template <class TTr>
 void Rpc<TTr>::handle_session_management_st() {
   assert(in_creator());
-  assert(nexus_hook.sm_pkt_list.size > 0);
-  nexus_hook.sm_pkt_list.lock();
+  assert(nexus_hook.sm_rx_list.size > 0);
+  nexus_hook.sm_rx_list.lock();
 
   // Handle all session management requests
-  for (SessionMgmtPkt *sm_pkt : nexus_hook.sm_pkt_list.list) {
+  for (typename Nexus<TTr>::SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
+    SessionMgmtPkt *sm_pkt = wi.sm_pkt;
+    assert(sm_pkt != nullptr);
+    assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
+
     // The sender of a packet cannot be this Rpc
-    if (session_mgmt_pkt_type_is_req(sm_pkt->pkt_type)) {
+    if (sm_pkt->is_req()) {
       assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname.c_str()) == 0 &&
                sm_pkt->client.rpc_id == rpc_id));
     } else {
@@ -165,13 +167,13 @@ void Rpc<TTr>::handle_session_management_st() {
 
     switch (sm_pkt->pkt_type) {
       case SessionMgmtPktType::kConnectReq:
-        handle_connect_req_st(sm_pkt);
+        handle_connect_req_st(&wi);
         break;
       case SessionMgmtPktType::kConnectResp:
         handle_connect_resp_st(sm_pkt);
         break;
       case SessionMgmtPktType::kDisconnectReq:
-        handle_disconnect_req_st(sm_pkt);
+        handle_disconnect_req_st(&wi);
         break;
       case SessionMgmtPktType::kDisconnectResp:
         handle_disconnect_resp_st(sm_pkt);
@@ -181,13 +183,35 @@ void Rpc<TTr>::handle_session_management_st() {
         break;
     }
 
-    // Free packet memory that was allocated by the Nexus
-    free(sm_pkt);
+    // Free the packet memory allocated by the SM thread
+    delete sm_pkt;
   }
 
-  // Clear the session management packet list
-  nexus_hook.sm_pkt_list.locked_clear();
-  nexus_hook.sm_pkt_list.unlock();
+  // Clear the session management RX list
+  nexus_hook.sm_rx_list.locked_clear();
+  nexus_hook.sm_rx_list.unlock();
+}
+
+template <class TTr>
+void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
+                               SessionMgmtErrType err_type) {
+  assert(req_wi != nullptr);
+  assert(req_wi->enet_peer != nullptr);
+
+  SessionMgmtPkt *req_sm_pkt = req_wi->sm_pkt;
+  assert(req_sm_pkt->is_req());
+
+  // Create a copy of the request packet
+  auto *resp_sm_pkt = new SessionMgmtPkt();
+  *resp_sm_pkt = *req_sm_pkt;
+
+  // Change the packet type to response
+  resp_sm_pkt->pkt_type =
+      session_mgmt_pkt_type_req_to_resp(req_sm_pkt->pkt_type);
+  resp_sm_pkt->err_type = err_type;
+
+  typename Nexus<TTr>::SmWorkItem wi(rpc_id, resp_sm_pkt, req_wi->enet_peer);
+  nexus_hook.sm_tx_list->unlocked_push_back(wi);
 }
 
 }  // End ERpc

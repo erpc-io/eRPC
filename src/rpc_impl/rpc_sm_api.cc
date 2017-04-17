@@ -5,7 +5,6 @@
 #include <algorithm>
 
 #include "rpc.h"
-#include "util/udp_client.h"
 
 namespace ERpc {
 
@@ -93,15 +92,16 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
     }
   }
 
+  session->local_session_num = session_vec.size();
+
   // Fill in client and server endpoint metadata. Commented server fields will
   // be filled when the connect response is received.
   SessionEndpoint &client_endpoint = session->client;
-
   client_endpoint.transport_type = transport->transport_type;
   strcpy(client_endpoint.hostname, nexus->hostname.c_str());
   client_endpoint.phy_port = phy_port;
   client_endpoint.rpc_id = rpc_id;
-  client_endpoint.session_num = session_vec.size();
+  client_endpoint.session_num = session->local_session_num;
   client_endpoint.secret = slow_rand.next_u64() & ((1ull << kSecretBits) - 1);
   transport->fill_local_routing_info(&client_endpoint.routing_info);
 
@@ -114,16 +114,17 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
   server_endpoint.secret = client_endpoint.secret;  // Secret is shared
   // server_endpoint.routing_info = ??
 
-  session->local_session_num = client_endpoint.session_num;
-
   session_vec.push_back(session);  // Add to list of all sessions
-  mgmt_retryq_add_st(session);     // Record management request for retry
 
-  erpc_dprintf(
-      "eRPC Rpc %u: Sending first connect req for session %u "
-      "to [%s, %u].\n",
-      rpc_id, client_endpoint.session_num, rem_hostname, rem_rpc_id);
-  send_connect_req_one_st(session);
+  // Enqueue a session management work request
+  session->client_info.sm_request_pending = true;
+
+  SessionMgmtPkt *sm_pkt = new SessionMgmtPkt();  // Freed by SM thread
+  sm_pkt->pkt_type = SessionMgmtPktType::kConnectReq;
+  sm_pkt->client = client_endpoint;
+  sm_pkt->server = server_endpoint;
+  nexus_hook.sm_tx_list->unlocked_push_back(
+      typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt));
 
   return client_endpoint.session_num;
 }
@@ -153,6 +154,12 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     return -EPERM;
   }
 
+  if (session->client_info.sm_request_pending) {
+    erpc_dprintf("%s: A session management request is already pending.\n",
+                 issue_msg);
+    return -EBUSY;
+  }
+
   // Lock the session to prevent concurrent request submission
   lock_cond(&session->lock);
 
@@ -180,32 +187,37 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   switch (session->state) {
     case SessionState::kConnectInProgress:
       // Can't disconnect right now. User needs to wait.
-      assert(mgmt_retryq_contains_st(session));
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
       unlock_cond(&session->lock);
       return -EPERM;
 
-    case SessionState::kConnected:
+    case SessionState::kConnected: {
       session->state = SessionState::kDisconnectInProgress;
-      mgmt_retryq_add_st(session);  // Checks that session is not in flight
 
       erpc_dprintf(
-          "eRPC Rpc %u: Sending first disconnect req for session %u "
+          "eRPC Rpc %u: Sending disconnect request for session %u "
           "to [%s, %u].\n",
           rpc_id, session->local_session_num, session->server.hostname,
           session->server.rpc_id);
-      send_disconnect_req_one_st(session);
       unlock_cond(&session->lock);
+
+      // Add a session management work request
+      SessionMgmtPkt *sm_pkt = new SessionMgmtPkt();  // Freed by SM thread
+      sm_pkt->pkt_type = SessionMgmtPktType::kConnectReq;
+      sm_pkt->client = session->client;
+      sm_pkt->server = session->server;
+      nexus_hook.sm_tx_list->unlocked_push_back(
+          typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt));
+
       return 0;
+    }
 
     case SessionState::kDisconnectInProgress:
-      assert(mgmt_retryq_contains_st(session));
       erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
       unlock_cond(&session->lock);
       return -EALREADY;
 
     case SessionState::kDisconnected:
-      assert(!mgmt_retryq_contains_st(session));
       erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
       unlock_cond(&session->lock);
       return -ESHUTDOWN;

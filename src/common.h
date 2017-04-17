@@ -80,21 +80,15 @@ static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
 #define MB(x) (static_cast<size_t>(x) << 20)
 #define MB_(x) (MB(x) - 1)
 
-/// UDP config used throughout eRPC
-struct udp_config_t {
-  //  The UDP port used by all Nexus-es in the cluster to listen on for
-  // session management
-  uint16_t mgmt_udp_port;
-  double drop_prob;  // Used to add packet loss to UDP traffic
-
-  udp_config_t(uint16_t mgmt_udp_port, double drop_prob)
-      : mgmt_udp_port(mgmt_udp_port), drop_prob(drop_prob) {}
-};
-
 // General constants
 
-/// The max Rpc ID. uint8_t::max() is invalid.
+/// The max Rpc ID. 256 threads per machine is enough.
 static constexpr size_t kMaxRpcId = std::numeric_limits<uint8_t>::max() - 1;
+
+/// The maximum number of machines in the cluster. This is only limited by
+/// enet's maximum connections.
+static constexpr size_t kMaxNumMachines = 4095;
+
 static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
 static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
 static constexpr size_t kPageSize = 4096;   ///< Page size in bytes
