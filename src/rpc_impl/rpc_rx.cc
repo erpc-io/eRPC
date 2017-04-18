@@ -48,7 +48,7 @@ void Rpc<TTr>::process_comps_st() {
       session->credits++;
 
       // Nothing more to do for explicit credit returns - process other packets
-      if (pkthdr->is_exp_cr()) {
+      if (pkthdr->is_expl_cr()) {
         continue;
       }
     }

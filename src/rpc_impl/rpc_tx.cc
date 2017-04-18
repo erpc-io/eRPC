@@ -27,9 +27,9 @@ void Rpc<TTr>::process_dpath_txq_st() {
     _unused(pkthdr_0);
 
     if (session->is_client()) {
-      assert(pkthdr_0->is_req() || pkthdr_0->is_exp_cr());
+      assert(pkthdr_0->is_req() || pkthdr_0->is_expl_cr());
     } else {
-      assert(pkthdr_0->is_resp() || pkthdr_0->is_exp_cr());
+      assert(pkthdr_0->is_resp() || pkthdr_0->is_expl_cr());
     }
 
     if (small_rpc_likely(tx_msgbuf->num_pkts == 1)) {
