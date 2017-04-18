@@ -193,12 +193,14 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
 
     // Do what destroy_session() does with a kConnected session
     session->state = SessionState::kDisconnectInProgress;
-    enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
 
     erpc_dprintf(
         "eRPC Rpc %u: Sending callback-less disconnect request for "
         "session %u, and invoking kConnectFailed callback\n",
         rpc_id, session->local_session_num);
+
+    session->client_info.sm_request_pending = true;
+    enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
 
     session_mgmt_handler(
         session->local_session_num, SessionMgmtEventType::kConnectFailed,

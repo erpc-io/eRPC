@@ -195,7 +195,8 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
           session->server.rpc_id);
       unlock_cond(&session->lock);
 
-      // Add a session management work request
+      // Enqueue a session management work request
+      session->client_info.sm_request_pending = true;
       enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
       return 0;
     }
