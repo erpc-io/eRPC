@@ -27,9 +27,9 @@ void Rpc<TTr>::process_dpath_txq_st() {
     _unused(pkthdr_0);
 
     if (session->is_client()) {
-      assert(pkthdr_0->is_req() || pkthdr_0->is_credit_return());
+      assert(pkthdr_0->is_req() || pkthdr_0->is_exp_cr());
     } else {
-      assert(pkthdr_0->is_resp() || pkthdr_0->is_credit_return());
+      assert(pkthdr_0->is_resp() || pkthdr_0->is_exp_cr());
     }
 
     if (small_rpc_likely(tx_msgbuf->num_pkts == 1)) {
@@ -67,19 +67,14 @@ void Rpc<TTr>::process_dpath_txq_small_msg_one_st(Session *session,
 
   if (is_unexp) {
     // Well-structured app code should avoid exhausting credits
-    if (likely(session->remote_credits > 0 && unexp_credits > 0)) {
-      session->remote_credits--;
-      unexp_credits--;
+    if (likely(session->credits > 0)) {
+      session->credits--;
     } else {
       // We cannot make progress if the packet is Unexpected and we're out of
-      // either session or Unexpected window credits. In this case, caller will
-      // re-insert the sslot to the TX queue.
-      if (session->remote_credits == 0) {
-        dpath_stat_inc(&session->dpath_stats.remote_credits_exhaused);
-      }
-
-      if (unexp_credits == 0) {
-        dpath_stat_inc(&dpath_stats.unexp_credits_exhausted);
+      // either session credits. In this case, caller will re-insert the sslot
+      // to the TX queue.
+      if (session->credits == 0) {
+        dpath_stat_inc(&session->dpath_stats.credits_exhaused);
       }
       return;
     }
@@ -119,12 +114,9 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
   assert(pkt_type == kPktTypeReq || pkt_type == kPktTypeResp);
 
   size_t pkts_pending = tx_msgbuf->num_pkts - tx_msgbuf->pkts_queued;  // >= 1
-  const size_t min_of_credits =
-      std::min(session->remote_credits, unexp_credits);
 
   // The number of packets (Expected or Unexpected) that we will send
   size_t now_sending = 0;
-  size_t available_credits = min_of_credits;
 
   // It's possible to compute now_sending in O(1), but it's more complicated.
   // This is O(1) per packet sent, and uses header info filled in by
@@ -137,13 +129,10 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
       // Expected packets don't need credits
       now_sending++;
     } else {
-      if (available_credits > 0) {
+      if (session->credits > 0) {
         now_sending++;
-        available_credits--;
-
-        // Update credits tracking
-        session->remote_credits--;
-        unexp_credits--;
+        session->credits--;
+        session->credits--;
       } else {
         // We cannot send this packet, so we're done. There are no more
         // expected packets in this message. (Even if there were more Expected
@@ -154,17 +143,9 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
   }
 
   if (now_sending == 0) {
-    // This can happen too frequently, so don't print a message here
-    assert(min_of_credits == 0);
-
-    if (session->remote_credits == 0) {
-      dpath_stat_inc(&session->dpath_stats.remote_credits_exhaused);
-    }
-
-    if (unexp_credits == 0) {
-      dpath_stat_inc(&dpath_stats.unexp_credits_exhausted);
-    }
-
+    // This can happen very frequently, so don't print a message here
+    assert(session->credits == 0);
+    dpath_stat_inc(&session->dpath_stats.credits_exhaused);
     return;
   }
 
@@ -184,7 +165,6 @@ void Rpc<TTr>::process_dpath_txq_large_msg_one_st(Session *session,
 
     // If we're here, we will enqueue all/part of tx_msgbuf for tx_burst
     tx_msgbuf->pkts_queued++;
-
     tx_batch_i++;
 
     if (tx_batch_i == TTr::kPostlist) {

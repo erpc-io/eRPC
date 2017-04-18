@@ -42,9 +42,6 @@ class Rpc {
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
-  /// Max number of unexpected *packets* kept outstanding by this Rpc
-  static constexpr size_t kRpcUnexpPktWindow = 20;
-
   //
   // Constructor/destructor (rpc.cc)
   //
@@ -545,8 +542,6 @@ class Rpc {
   uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
 
-  size_t unexp_credits = kRpcUnexpPktWindow;  ///< Available Unexp pkt slots
-
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};
   std::mutex req_num_arr_lock;
@@ -569,14 +564,13 @@ class Rpc {
   /// Rx batch information for \p rx_burst
   MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];
 
-  typename Nexus<TTr>::Hook nexus_hook; /* A hook shared with the Nexus */
-  SlowRand slow_rand;
-  FastRand fast_rand;
+  typename Nexus<TTr>::Hook nexus_hook;  ///< A hook shared with the Nexus
+  SlowRand slow_rand;  ///< A slow random generator for "real" randomness
+  FastRand fast_rand;  ///< A fast random generator
 
   // Stats
   struct {
     size_t ev_loop_calls = 0;
-    size_t unexp_credits_exhausted = 0;
   } dpath_stats;
 
  public:

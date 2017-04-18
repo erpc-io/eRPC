@@ -148,7 +148,6 @@ TEST(OneSmallRpc, Foreground) {
   config_num_bg_threads = 0;
   config_rpcs_per_session = 1;
   config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
-
   launch_helper();
 }
 
@@ -157,7 +156,6 @@ TEST(OneSmallRpc, Background) {
   config_num_bg_threads = 1;
   config_rpcs_per_session = 1;
   config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
-
   launch_helper();
 }
 
@@ -166,7 +164,6 @@ TEST(MultiSmallRpcOneSession, Foreground) {
   config_num_bg_threads = 0;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
-
   launch_helper();
 }
 
@@ -175,31 +172,22 @@ TEST(MultiSmallRpcOneSession, Background) {
   config_num_bg_threads = 2;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
-
   launch_helper();
 }
 
 TEST(MultiSmallRpcMultiSession, Foreground) {
-  // Use enough sessions to exceed the Rpc's unexpected window
-  config_num_sessions =
-      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-
+  config_num_sessions = 4;
   config_num_bg_threads = 0;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
-
   launch_helper();
 }
 
 TEST(MultiSmallRpcMultiSession, Background) {
-  // Use enough sessions to exceed the Rpc's unexpected window
-  config_num_sessions =
-      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-
+  config_num_sessions = 4;
   config_num_bg_threads = 3;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_msg_size = Rpc<IBTransport>::get_max_data_per_pkt();
-
   launch_helper();
 }
 

@@ -61,8 +61,8 @@ class Session {
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 
-  size_t remote_credits = kSessionCredits;  ///< This session's current credits
-  SSlot sslot_arr[kSessionReqWindow];       ///< The session slots
+  size_t credits = kSessionCredits;    ///< This session's current credits
+  SSlot sslot_arr[kSessionReqWindow];  ///< The session slots
 
   /// Free session slots. We could use a vector of pointers, but indices are
   /// useful in \p req_num calculation.
@@ -75,7 +75,7 @@ class Session {
   ///@}
 
   struct {
-    size_t remote_credits_exhaused = 0;
+    size_t credits_exhaused = 0;
   } dpath_stats;
 
   /// Information that is required only at the client endpoint

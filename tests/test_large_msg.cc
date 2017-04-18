@@ -169,7 +169,6 @@ TEST(OneLargeRpc, Foreground) {
   config_num_sessions = 1;
   config_rpcs_per_session = 1;
   config_num_bg_threads = 0;
-
   launch_helper();
 }
 
@@ -178,7 +177,6 @@ TEST(OneLargeRpc, Background) {
   config_num_sessions = 1;
   config_rpcs_per_session = 1;
   config_num_bg_threads = 1;
-
   launch_helper();
 }
 
@@ -187,7 +185,6 @@ TEST(MultiLargeRpcOneSession, Foreground) {
   config_num_sessions = 1;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 0;
-
   launch_helper();
 }
 
@@ -196,59 +193,42 @@ TEST(MultiLargeRpcOneSession, Background) {
   config_num_sessions = 1;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 1;
-
   launch_helper();
 }
 
 TEST(MultiLargeRpcMultiSession, Foreground) {
   assert(!kDatapathVerbose);
   config_num_iters = 2;
-  // Use enough sessions to exceed the Rpc's unexpected window
-  config_num_sessions =
-      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-
+  config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 0;
-
   launch_helper();
 }
 
 TEST(MultiLargeRpcMultiSession, Background) {
   assert(!kDatapathVerbose);
   config_num_iters = 2;
-  // Use enough sessions to exceed the Rpc's unexpected window
-  config_num_sessions =
-      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-
+  config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 1;
-
   launch_helper();
 }
 
 TEST(DISABLED_MemoryLeak, Foreground) {
   assert(!kDatapathVerbose);
   config_num_iters = 50;
-  // Use enough sessions to exceed the Rpc's unexpected window
-  config_num_sessions =
-      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-
+  config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 0;
-
   launch_helper();
 }
 
 TEST(DISABLED_MemoryLeak, Background) {
   assert(!kDatapathVerbose);
   config_num_iters = 50;
-  // Use enough sessions to exceed the Rpc's unexpected window
-  config_num_sessions =
-      (Rpc<IBTransport>::kRpcUnexpPktWindow / Session::kSessionReqWindow) + 2;
-
+  config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 1;
-
   launch_helper();
 }
 

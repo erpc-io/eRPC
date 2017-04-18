@@ -42,15 +42,13 @@ void Rpc<TTr>::process_comps_st() {
     dpath_dprintf("eRPC Rpc %u: Received packet %s.\n", rpc_id,
                   pkthdr->to_string().c_str());
 
-    // All Expected packets are session/window credit returns, and vice versa
+    // All Expected packets are credit returns, and vice versa
     if (pkthdr->is_unexp == 0) {
-      assert(unexp_credits < kRpcUnexpPktWindow);
-      assert(session->remote_credits < Session::kSessionCredits);
-      unexp_credits++;
-      session->remote_credits++;
+      assert(session->credits < Session::kSessionCredits);
+      session->credits++;
 
-      // Nothing more to do for credit returns - process other packets
-      if (pkthdr->is_credit_return()) {
+      // Nothing more to do for explicit credit returns - process other packets
+      if (pkthdr->is_exp_cr()) {
         continue;
       }
     }
@@ -325,8 +323,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(Session *session,
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_background_st(SSlot *sslot,
-                                    typename Nexus<TTr>::BgWorkItemType wi_type) {
+void Rpc<TTr>::submit_background_st(
+    SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type) {
   assert(in_creator());
   assert(nexus->num_bg_threads > 0);
   assert(sslot != nullptr);

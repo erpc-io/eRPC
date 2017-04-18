@@ -22,7 +22,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
     if (item.data_bytes == 0) {
-      assert(msg_buffer->is_credit_return());
+      assert(msg_buffer->is_exp_cr());
     }
 
     // Verify constant fields of work request
