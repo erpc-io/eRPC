@@ -401,6 +401,9 @@ class Rpc {
   /// responsible for freeing user-allocated MsgBuffers.
   void bury_session_st(Session *session);
 
+  /// Enqueue a session management request using this SM packet
+  void enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type);
+
   /// Enqueue a response for the SM packet in \p req_wi
   void enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
                        SessionMgmtErrType err_type);

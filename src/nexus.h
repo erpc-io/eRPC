@@ -58,27 +58,15 @@ class Nexus {
   // Session management thread definitions
   class Hook;  // Forward declaration
 
+  /// A work item exchanged between an Rpc thread and an SM thread
   class SmWorkItem {
    public:
-    // Used by Rpc threads to generate work items for the SM thread
-    SmWorkItem(uint8_t rpc_id, SessionMgmtPkt *sm_pkt)
-        : rpc_id(rpc_id), sm_pkt(sm_pkt), enet_peer(nullptr) {
-      assert(sm_pkt != nullptr);
-    }
-
-    // Used by the SM thread to create work items for the Rpc threads
     SmWorkItem(uint8_t rpc_id, SessionMgmtPkt *sm_pkt, ENetPeer *enet_peer)
         : rpc_id(rpc_id), sm_pkt(sm_pkt), enet_peer(enet_peer) {
       assert(sm_pkt != nullptr);
-
-      if (sm_pkt->is_req()) {
-        assert(enet_peer != nullptr);
-      } else {
-        assert(enet_peer == nullptr);
-      }
     };
 
-    uint8_t rpc_id;          ///< The local Rpc ID
+    const uint8_t rpc_id;    ///< The local Rpc ID
     SessionMgmtPkt *sm_pkt;  ///< The SM packet for this work item
     ENetPeer *enet_peer;
   };
@@ -153,8 +141,8 @@ class Nexus {
   /// The function executed by the session management thread
   static void sm_thread_func(SmThreadCtx *ctx);
 
-  /// Enqueue \p sm_pkt for transmission to \peer, and free \p sm_pkt
-  static void sm_thread_tx_helper(ENetPeer *peer, SessionMgmtPkt *sm_pkt);
+  /// Transmit a work item and free its SM packet memory
+  static void sm_tx_work_item_and_free(SmWorkItem *wi);
 
   /// Receive session management packets and enqueue them to Rpc threads. This
   /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.

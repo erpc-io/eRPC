@@ -193,12 +193,7 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
 
     // Do what destroy_session() does with a kConnected session
     session->state = SessionState::kDisconnectInProgress;
-    SessionMgmtPkt *req_sm_pkt = new SessionMgmtPkt();  // Freed by SM thread
-    req_sm_pkt->pkt_type = SessionMgmtPktType::kConnectReq;
-    req_sm_pkt->client = session->client;
-    req_sm_pkt->server = session->server;
-    nexus_hook.sm_tx_list->unlocked_push_back(
-        typename Nexus<TTr>::SmWorkItem(rpc_id, req_sm_pkt));
+    enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
 
     erpc_dprintf(
         "eRPC Rpc %u: Sending callback-less disconnect request for "

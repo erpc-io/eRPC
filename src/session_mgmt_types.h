@@ -222,7 +222,7 @@ class SessionEndpoint {
 
   /// Return a string with a name for this session endpoint, containing
   /// its hostname, Rpc ID, and the session number.
-  inline std::string name() {
+  inline std::string name() const {
     std::ostringstream ret;
     std::string session_num_str = (session_num == kInvalidSessionNum)
                                       ? "XX"
@@ -235,7 +235,7 @@ class SessionEndpoint {
   }
 
   /// Return a string with the name of the Rpc hosting this session endpoint.
-  inline std::string rpc_name() {
+  inline std::string rpc_name() const {
     std::ostringstream ret;
     ret << "[H: " << trim_hostname(hostname)
         << ", R: " << std::to_string(rpc_id) << "]";
@@ -244,7 +244,7 @@ class SessionEndpoint {
 
   /// Compare two endpoints. RoutingInfo is left out because the SessionEndpoint
   /// object in session managament packets may not have routing info.
-  bool operator==(const SessionEndpoint &other) {
+  bool operator==(const SessionEndpoint &other) const {
     return transport_type == other.transport_type &&
            strcmp(hostname, other.hostname) == 0 &&
            phy_port == other.phy_port && rpc_id == other.rpc_id &&

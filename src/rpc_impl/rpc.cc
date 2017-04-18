@@ -193,6 +193,18 @@ void Rpc<TTr>::handle_session_management_st() {
 }
 
 template <class TTr>
+void Rpc<TTr>::enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type) {
+  assert(session != nullptr && session->is_client());
+
+  SessionMgmtPkt *sm_pkt = new SessionMgmtPkt();  // Freed by SM thread
+  sm_pkt->pkt_type = pkt_type;
+  sm_pkt->client = session->client;
+  sm_pkt->server = session->server;
+  nexus_hook.sm_tx_list->unlocked_push_back(
+      typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt, nullptr));
+}
+
+template <class TTr>
 void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
                                SessionMgmtErrType err_type) {
   assert(req_wi != nullptr);
@@ -201,7 +213,7 @@ void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
   SessionMgmtPkt *req_sm_pkt = req_wi->sm_pkt;
   assert(req_sm_pkt->is_req());
 
-  // Create a copy of the request packet
+  // Copy the request - this gets freed by the SM thread
   auto *resp_sm_pkt = new SessionMgmtPkt();
   *resp_sm_pkt = *req_sm_pkt;
 
