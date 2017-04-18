@@ -359,7 +359,7 @@ class Rpc {
   /// valid, dynamic, and the \p is_req field should match. This holds for
   /// both background request handlers and continuations.
   static void debug_check_bg_rx_msgbuf(
-      SSlot *sslot, typename Nexus<TTr>::WorkItemType wi_type);
+      SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type);
 
   //
   // Misc private functions
@@ -495,7 +495,7 @@ class Rpc {
 
   /// Submit a work item to a background thread
   void submit_background_st(SSlot *sslot,
-                            typename Nexus<TTr>::WorkItemType wi_type);
+                            typename Nexus<TTr>::BgWorkItemType wi_type);
 
   // rpc_send_cr.cc
 

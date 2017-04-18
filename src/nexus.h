@@ -23,20 +23,20 @@ class Nexus {
  public:
   static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
 
-  enum class WorkItemType : bool { kReq, kResp };
+  enum class BgWorkItemType : bool { kReq, kResp };
 
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(WorkItemType wi_type, Rpc<TTr> *rpc, void *context, SSlot *sslot)
+    BgWorkItem(BgWorkItemType wi_type, Rpc<TTr> *rpc, void *context, SSlot *sslot)
         : wi_type(wi_type), rpc(rpc), context(context), sslot(sslot) {}
 
-    const WorkItemType wi_type;
+    const BgWorkItemType wi_type;
     Rpc<TTr> *rpc;  ///< The Rpc object that submitted this work item
     void *context;  ///< The context to use for request handler
     SSlot *sslot;
 
-    bool is_req() const { return wi_type == WorkItemType::kReq; }
+    bool is_req() const { return wi_type == BgWorkItemType::kReq; }
   };
 
   /// Background thread context
