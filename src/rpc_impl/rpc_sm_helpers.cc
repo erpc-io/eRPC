@@ -31,7 +31,7 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 }
 
 template <class TTr>
-void Rpc<TTr>::handle_session_management_st() {
+void Rpc<TTr>::handle_session_mgmt_st() {
   assert(in_creator());
   assert(nexus_hook.sm_rx_list.size > 0);
   nexus_hook.sm_rx_list.lock();

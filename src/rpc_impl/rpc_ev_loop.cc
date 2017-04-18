@@ -33,7 +33,7 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
 
   // Handle session management events, if any
   if (unlikely(nexus_hook.sm_rx_list.size > 0)) {
-    handle_session_management_st();  // Callee grabs the hook lock
+    handle_session_mgmt_st();  // Callee grabs the hook lock
   }
 
   process_comps_st();      // RX
