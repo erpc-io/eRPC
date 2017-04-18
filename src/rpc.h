@@ -259,6 +259,37 @@ class Rpc {
   size_t num_active_sessions_st();
 
   //
+  // Session management helper functions
+  //
+ private:
+  // rpc_sm_helpers.cc
+
+  /// Process all session management events in the queue and free them.
+  /// The handlers for individual request/response types should not free
+  /// packets.
+  void handle_session_management_st();
+
+  /// Free a session's resources and mark it as NULL in the session vector.
+  /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
+  /// responsible for freeing user-allocated MsgBuffers.
+  void bury_session_st(Session *session);
+
+  /// Enqueue a session management request using this SM packet
+  void enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type);
+
+  /// Enqueue a response for the SM packet in \p req_wi
+  void enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
+                       SessionMgmtErrType err_type);
+
+  // rpc_connect_handlers.cc
+  void handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
+  void handle_connect_resp_st(SessionMgmtPkt *pkt);
+
+  // rpc_disconnect_handlers.cc
+  void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
+  void handle_disconnect_resp_st(SessionMgmtPkt *pkt);
+
+  //
   // Rpc datapath (rpc_enqueue_request.cc and rpc_enqueue_response.cc)
   //
 
@@ -388,33 +419,6 @@ class Rpc {
       mutex->unlock();
     }
   }
-
-  // rpc.cc
-
-  /// Process all session management events in the queue and free them.
-  /// The handlers for individual request/response types should not free
-  /// packets.
-  void handle_session_management_st();
-
-  /// Free a session's resources and mark it as NULL in the session vector.
-  /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
-  /// responsible for freeing user-allocated MsgBuffers.
-  void bury_session_st(Session *session);
-
-  /// Enqueue a session management request using this SM packet
-  void enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type);
-
-  /// Enqueue a response for the SM packet in \p req_wi
-  void enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
-                       SessionMgmtErrType err_type);
-
-  // rpc_connect_handlers.cc
-  void handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
-  void handle_connect_resp_st(SessionMgmtPkt *pkt);
-
-  // rpc_disconnect_handlers.cc
-  void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
-  void handle_disconnect_resp_st(SessionMgmtPkt *pkt);
 
   /// Add \p sslot to the datapath TX queue
   inline void dpath_txq_push_back(SSlot *sslot) {
