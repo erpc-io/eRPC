@@ -86,9 +86,7 @@ static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
       return std::string("[Disconnect response]");
   };
 
-  assert(false);
-  exit(-1);
-  return std::string("");
+  throw std::runtime_error("eRPC: Invalid session management packet type.");
 }
 
 /// Check if a session management packet type is valid
@@ -107,7 +105,6 @@ static bool session_mgmt_pkt_type_is_valid(SessionMgmtPktType sm_pkt_type) {
 /// the complement of this to check if a packet is a response.
 static bool session_mgmt_pkt_type_is_req(SessionMgmtPktType sm_pkt_type) {
   assert(session_mgmt_pkt_type_is_valid(sm_pkt_type));
-
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
     case SessionMgmtPktType::kDisconnectReq:
@@ -117,9 +114,7 @@ static bool session_mgmt_pkt_type_is_req(SessionMgmtPktType sm_pkt_type) {
       return false;
   }
 
-  assert(false);
-  exit(-1);
-  return false;
+  throw std::runtime_error("eRPC: Invalid session management packet type.");
 }
 
 /// Convert the request session management packet type sm_pkt_type to its
@@ -127,7 +122,6 @@ static bool session_mgmt_pkt_type_is_req(SessionMgmtPktType sm_pkt_type) {
 static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
     SessionMgmtPktType sm_pkt_type) {
   assert(session_mgmt_pkt_type_is_req(sm_pkt_type));
-
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
       return SessionMgmtPktType::kConnectResp;
@@ -138,9 +132,7 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
       break;
   }
 
-  assert(false);
-  exit(-1);
-  return static_cast<SessionMgmtPktType>(-1);
+  throw std::runtime_error("eRPC: Invalid session management packet type.");
 }
 
 static bool session_mgmt_err_type_is_valid(SessionMgmtErrType err_type) {
@@ -177,9 +169,7 @@ static std::string session_mgmt_err_type_str(SessionMgmtErrType err_type) {
       return std::string("[Invalid transport]");
   }
 
-  assert(false);
-  exit(-1);
-  return std::string("");
+  throw std::runtime_error("eRPC: Invalid session management error type");
 }
 
 static std::string session_mgmt_event_type_str(

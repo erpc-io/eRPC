@@ -25,17 +25,18 @@ static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 /// These packet types are stored as bitfields in the packet header, so don't
 /// use an enum class here to avoid casting all over the place.
 enum PktType : uint64_t {
-  kPktTypeReq,   ///< An Rpc request packet
-  kPktTypeResp,  ///< An Rpc response packet
-  /// An *explicit* credit return packet. The first response packet is also
-  /// a credit return.
-  kPktTypeCreditReturn
+  kPktTypeReq,  /// Request data. This is Unexpected and sent by client.
+  kPktTypeRTR,  ///< Ready-to-received. Unexpected and sent by client.
+  kPktTypeCreditReturn, ///< Credit return. This is Expected and sent by server.
+  kPktTypeResp,  ///< Response data. This is Expected and sent by server.
 };
 
 static std::string pkt_type_str(uint64_t pkt_type) {
   switch (pkt_type) {
     case kPktTypeReq:
       return std::string("request");
+    case kPktTypeRTR:
+      return std::string("ready to receive");
     case kPktTypeResp:
       return std::string("response");
     case kPktTypeCreditReturn:
@@ -44,9 +45,7 @@ static std::string pkt_type_str(uint64_t pkt_type) {
       break;
   }
 
-  assert(false);
-  exit(-1);
-  return std::string("");
+  throw std::runtime_error("eRPC: Invalid packet type.");
 }
 
 struct pkthdr_t {
