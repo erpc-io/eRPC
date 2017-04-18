@@ -47,8 +47,18 @@
      of the response MsgBuffer when it calls `enqueue_response()`. eRPC will
      free it when the response is no longer needed for retransmission.
 
+## Session management packet ownership
+ * Rpc threads allocates an SM packet before queueing it to the SM thread. This
+   packet is freed by the SM thread when it transmits it using
+   `sm_tx_work_item_and_free()`.
+    * Rpc threads allocate SM request packets in `enqueue_sm_req()`, and
+      response packets in `enqueue_sm_resp()`.
+ * The SM thread allocates an SM packet when it gets an ENet RECEIVE event.
+   This packet is freed by the Rpc thread, even when it is a request SM packet
+   (for which a response SM packet will be "looped back" to the SM thread).
+     * The Rpc thread frees SM packets in `handle_session_management_st()`.
+
 ## Short-term TODOs
- * In `test_small_msg`, test that we can send an exactly MTU-sized message.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?

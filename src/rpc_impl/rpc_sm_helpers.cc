@@ -95,20 +95,19 @@ void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
                                SessionMgmtErrType err_type) {
   assert(req_wi != nullptr);
   assert(req_wi->peer != nullptr);
+  assert(req_wi->sm_pkt != nullptr);
+  assert(req_wi->sm_pkt->is_req());
 
-  SessionMgmtPkt *req_sm_pkt = req_wi->sm_pkt;
-  assert(req_sm_pkt->is_req());
-
-  // Copy the request - this gets freed by the SM thread
-  auto *resp_sm_pkt = new SessionMgmtPkt();
-  *resp_sm_pkt = *req_sm_pkt;
+  // The SM packet in the work item will be freed later by this thread. Create
+  // a copy that will be freed by the SM thread.
+  auto *sm_pkt = new SessionMgmtPkt();
+  *sm_pkt = *req_wi->sm_pkt;
 
   // Change the packet type to response
-  resp_sm_pkt->pkt_type =
-      session_mgmt_pkt_type_req_to_resp(req_sm_pkt->pkt_type);
-  resp_sm_pkt->err_type = err_type;
+  sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
+  sm_pkt->err_type = err_type;
 
-  typename Nexus<TTr>::SmWorkItem wi(rpc_id, resp_sm_pkt, req_wi->peer);
+  typename Nexus<TTr>::SmWorkItem wi(rpc_id, sm_pkt, req_wi->peer);
   nexus_hook.sm_tx_list->unlocked_push_back(wi);
 }
 

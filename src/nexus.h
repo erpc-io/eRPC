@@ -28,7 +28,8 @@ class Nexus {
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(BgWorkItemType wi_type, Rpc<TTr> *rpc, void *context, SSlot *sslot)
+    BgWorkItem(BgWorkItemType wi_type, Rpc<TTr> *rpc, void *context,
+               SSlot *sslot)
         : wi_type(wi_type), rpc(rpc), context(context), sslot(sslot) {}
 
     const BgWorkItemType wi_type;
@@ -142,7 +143,7 @@ class Nexus {
   static void sm_thread_func(SmThreadCtx *ctx);
 
   /// Transmit a work item and free its SM packet memory
-  static void sm_tx_work_item_and_free(SmWorkItem *wi);
+  static void sm_tx_work_item_and_free(SmWorkItem &wi);
 
   /// Receive session management packets and enqueue them to Rpc threads. This
   /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.

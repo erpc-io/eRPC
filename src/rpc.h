@@ -264,8 +264,8 @@ class Rpc {
  private:
   // rpc_sm_helpers.cc
 
-  /// Process all session management events in the queue and free them.
-  /// The handlers for individual request/response types should not free
+  /// Process all session management packets in the queue and free them, i.e.,
+  /// the handlers for individual request/response types should not free
   /// packets.
   void handle_session_management_st();
 
@@ -274,10 +274,12 @@ class Rpc {
   /// responsible for freeing user-allocated MsgBuffers.
   void bury_session_st(Session *session);
 
-  /// Enqueue a session management request using this SM packet
+  /// Allocate an SM request packet and enqueue it to the SM thread. The
+  /// allocated packet will be freed by the SM thread on transmission.
   void enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type);
 
-  /// Enqueue a response for the SM packet in \p req_wi
+  /// Allocate a response-copy of the SM packet and enqueue it to the SM thread.
+  /// The allocated packet will be freed by the SM thread on transmission.
   void enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
                        SessionMgmtErrType err_type);
 
