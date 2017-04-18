@@ -208,7 +208,7 @@ template <class TTr>
 void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
                                SessionMgmtErrType err_type) {
   assert(req_wi != nullptr);
-  assert(req_wi->enet_peer != nullptr);
+  assert(req_wi->peer != nullptr);
 
   SessionMgmtPkt *req_sm_pkt = req_wi->sm_pkt;
   assert(req_sm_pkt->is_req());
@@ -222,7 +222,7 @@ void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
       session_mgmt_pkt_type_req_to_resp(req_sm_pkt->pkt_type);
   resp_sm_pkt->err_type = err_type;
 
-  typename Nexus<TTr>::SmWorkItem wi(rpc_id, resp_sm_pkt, req_wi->enet_peer);
+  typename Nexus<TTr>::SmWorkItem wi(rpc_id, resp_sm_pkt, req_wi->peer);
   nexus_hook.sm_tx_list->unlocked_push_back(wi);
 }
 

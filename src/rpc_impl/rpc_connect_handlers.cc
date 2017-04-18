@@ -12,7 +12,7 @@ namespace ERpc {
 template <class TTr>
 void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
-  assert(wi != nullptr && wi->enet_peer != nullptr);
+  assert(wi != nullptr && wi->peer != nullptr);
 
   SessionMgmtPkt *sm_pkt = wi->sm_pkt;
   assert(sm_pkt != nullptr &&
