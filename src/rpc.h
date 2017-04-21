@@ -193,7 +193,7 @@ class Rpc {
       // This check is OK, as dynamic sslots must be initialized
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);
-      rx_msgbuf.buffer.buf = nullptr; /* Mark invalid for future */
+      rx_msgbuf.buffer.buf = nullptr; // Mark invalid for future
     }
 
     rx_msgbuf.buf = nullptr;

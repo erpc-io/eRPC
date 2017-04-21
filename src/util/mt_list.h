@@ -39,4 +39,4 @@ class MtList {
 
 }  // End ERpc
 
-#endif /* MT_LIST_H */
+#endif // MT_LIST_H

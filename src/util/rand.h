@@ -6,7 +6,7 @@
 namespace ERpc {
 
 class SlowRand {
-  std::random_device rand_dev; /* Non-pseudorandom seed for twister */
+  std::random_device rand_dev; // Non-pseudorandom seed for twister
   std::mt19937_64 mt;
   std::uniform_int_distribution<uint64_t> dist;
 
