@@ -59,8 +59,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   }
 
   // Fill in the slot and reset queueing progress
-  sslot->tx_msgbuf = resp_msgbuf;  // Valid response
-  sslot->tx_msgbuf->pkts_queued = 0;
+  sslot->tx_msgbuf = resp_msgbuf;     // Valid response
+  sslot->tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
 
   if (small_rpc_likely(req_func_type != ReqFuncType::kBackground)) {
     // We're in the creator thread, so directly enqueue the first resp packet

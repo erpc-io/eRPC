@@ -72,7 +72,7 @@ void Rpc<TTr>::process_comps_st() {
         assert(sslot->tx_msgbuf->is_resp() && sslot->tx_msgbuf->num_pkts > 1);
         assert(sslot->rx_msgbuf.buf == nullptr);
 
-        size_t pkt_num = pkthdr->pkt_type;
+        size_t pkt_num = pkthdr->pkt_num;
         assert(pkt_num < sslot->tx_msgbuf->num_pkts);
 
         // Send the response packet with index = pkt_num
@@ -116,6 +116,10 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
          pkthdr->msg_size <= TTr::kMaxDataPerPkt);
   assert(pkthdr->is_req() || pkthdr->is_resp());
 
+  // The RX MsgBuffer stored previously in this slot was buried earlier
+  assert(sslot->rx_msgbuf.buf == nullptr);
+  assert(sslot->rx_msgbuf.buffer.buf == nullptr);
+
   // Extract packet header fields
   uint8_t req_type = pkthdr->req_type;
   size_t req_num = pkthdr->req_num;
@@ -129,10 +133,6 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
         rpc_id, req_type);
     return;
   }
-
-  // The RX MsgBuffer stored previously in this slot was buried earlier
-  assert(sslot->rx_msgbuf.buf == nullptr);
-  assert(sslot->rx_msgbuf.buffer.buf == nullptr);
 
   if (pkthdr->is_req()) {
     // Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf)
@@ -214,10 +214,10 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
 
   const ReqFunc &req_func = req_func_arr[req_type];
   if (unlikely(!req_func.is_registered())) {
-    fprintf(stderr,
-            "eRPC Rpc %u: Warning: Received packet for unknown "
-            "request type %u. Dropping packet.\n",
-            rpc_id, req_type);
+    erpc_dprintf(
+        "eRPC Rpc %u: Warning: Received packet for unknown request type %u. "
+        "Dropping packet.\n",
+        rpc_id, req_type);
     return;
   }
 

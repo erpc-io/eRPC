@@ -100,8 +100,8 @@ class MsgBuffer {
     pkthdr_0->magic = kPktHdrMagic;
   }
 
-  /// Construct a single-packet MsgBuffer using a received packet, setting
-  /// buffer to invalid so that we know not to free it.
+  /// Construct a single-packet "fake" MsgBuffer using a received packet,
+  /// setting \p buffer to invalid so that we know not to free it.
   /// \p pkt must have space for \p max_data_bytes and one packet header.
   MsgBuffer(const uint8_t *pkt, size_t max_data_size)
       : buf(const_cast<uint8_t *>(pkt) + sizeof(pkthdr_t)),
@@ -140,7 +140,7 @@ class MsgBuffer {
   size_t max_num_pkts;   ///< Max number of packets in this MsgBuffer
   size_t num_pkts;       ///< Current number of packets in this MsgBuffer
 
-  // Progress tracking info
+  // Progress tracking information for dynamic MsgBuffers
   union {
     size_t pkts_queued;  ///< Packets queued for tx_burst
     size_t pkts_rcvd;    ///< Packets received from rx_burst

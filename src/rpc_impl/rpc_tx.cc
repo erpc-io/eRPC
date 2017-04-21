@@ -63,10 +63,6 @@ void Rpc<TTr>::process_req_txq_small_one_st(Session *session,
     return;
   }
 
-  dpath_dprintf("eRPC Rpc %u: Sending single-packet %s (session %u)\n", rpc_id,
-                req_msgbuf->get_pkthdr_0()->to_string().c_str(),
-                session->local_session_num);
-
   enqueue_pkt_tx_burst_st(session->remote_routing_info, req_msgbuf, 0,
                           req_msgbuf->data_size);
 }
@@ -88,12 +84,6 @@ void Rpc<TTr>::process_req_txq_large_one_st(Session *session,
     dpath_stat_inc(&session->dpath_stats.credits_exhaused);
     return;
   }
-
-  dpath_dprintf(
-      "eRPC Rpc %u: Sending %zu of %zu remaining packets for multi-packet "
-      "request %zu (session %u).\n",
-      rpc_id, now_sending, pkts_pending, req_msgbuf->get_req_num(),
-      session->local_session_num);
 
   for (size_t i = 0; i < now_sending; i++) {
     size_t offset = req_msgbuf->pkts_queued * TTr::kMaxDataPerPkt;

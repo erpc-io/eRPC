@@ -437,8 +437,13 @@ class Rpc {
     item.offset = offset;
     item.data_bytes = data_bytes;
 
-    tx_msgbuf->pkts_queued++;
+    tx_msgbuf->pkts_queued++;  // Update queueing progress
     tx_batch_i++;
+
+    dpath_dprintf("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
+                  tx_msgbuf->get_pkthdr_0()
+                      ->to_string(offset / TTr::kMaxDataPerPkt)
+                      .c_str());
 
     if (tx_batch_i == TTr::kPostlist) {
       transport->tx_burst(tx_burst_arr, TTr::kPostlist);
@@ -459,7 +464,12 @@ class Rpc {
     item.msg_buffer = tx_msgbuf;
     item.offset = 0;
     item.data_bytes = 0;
+
+    // This is a fake MsgBuffer, so no need to update queueing progress
     tx_batch_i++;
+
+    dpath_dprintf("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
+                  tx_msgbuf->get_pkthdr_0()->to_string().c_str());
 
     transport->tx_burst(tx_burst_arr, tx_batch_i);
     tx_batch_i = 0;

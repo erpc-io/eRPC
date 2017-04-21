@@ -19,10 +19,6 @@ void Rpc<TTr>::send_req_for_resp_now_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   rfr_pkthdr.req_num = pkthdr->req_num;
   // rfr_pkthdr.magic = pkthdr->magic;
 
-  dpath_dprintf("eRPC Rpc %u: Sending req for resp packet %s (session %u).\n",
-                rpc_id, rfr_pkthdr.to_string().c_str(),
-                sslot->session->local_session_num);
-
   // Create a "fake" static MsgBuffer for inline tx_burst
   MsgBuffer rfr_msgbuf = MsgBuffer(reinterpret_cast<uint8_t *>(&rfr_pkthdr), 0);
   tx_burst_now_st(sslot->session->remote_routing_info, &rfr_msgbuf);

@@ -62,16 +62,26 @@ struct pkthdr_t {
   uint64_t req_num : kReqNumBits;
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
 
-  /// Return a string representation of a packet header. Implicit and explicit
-  /// credit returns are marked with a + sign.
+  /// Return a string representation of this packet header
   std::string to_string() const {
     std::ostringstream ret;
-
     ret << "[type " << pkt_type_str(pkt_type) << ", "
-        << "dest session " << dest_session_num << ", "
-        << "req " << req_num << ", "
-        << "pkt " << pkt_num << ", "
-        << "msg size " << msg_size << "]";
+        << "dest session " << std::to_string(dest_session_num) << ", "
+        << "req " << std::to_string(req_num) << ", "
+        << "pkt " << std::to_string(pkt_num) << ", "
+        << "msg size " << std::to_string(msg_size) << "]";
+
+    return ret.str();
+  }
+
+  /// Return a string representation of a packet header, with custom pkt_num.
+  std::string to_string(size_t _pkt_num) const {
+    std::ostringstream ret;
+    ret << "[type " << pkt_type_str(pkt_type) << ", "
+        << "dest session " << std::to_string(dest_session_num) << ", "
+        << "req " << std::to_string(req_num) << ", "
+        << "pkt " << std::to_string(_pkt_num) << ", "
+        << "msg size " << std::to_string(msg_size) << "]";
 
     return ret.str();
   }

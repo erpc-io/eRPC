@@ -20,10 +20,6 @@ void Rpc<TTr>::send_credit_return_now_st(SSlot *sslot,
   // cr_pkthdr.req_num = pkthdr->req_num;
   // cr_pkthdr.magic = pkthdr->magic;
 
-  dpath_dprintf("eRPC Rpc %u: Sending credit return packet %s (session %u).\n",
-                rpc_id, cr_pkthdr.to_string().c_str(),
-                sslot->session->local_session_num);
-
   // Create a "fake" static MsgBuffer for inline tx_burst
   MsgBuffer cr_msgbuf = MsgBuffer(reinterpret_cast<uint8_t *>(&cr_pkthdr), 0);
   tx_burst_now_st(sslot->session->remote_routing_info, &cr_msgbuf);
