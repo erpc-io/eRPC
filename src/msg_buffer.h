@@ -49,6 +49,12 @@ class MsgBuffer {
   inline uint64_t get_req_num() const { return get_pkthdr_0()->req_num; }
   inline uint64_t get_pkt_type() const { return get_pkthdr_0()->pkt_type; }
   inline uint8_t get_req_type() const { return get_pkthdr_0()->req_type; }
+  inline std::string get_pkthdr_str() const {
+    return get_pkthdr_0()->to_string();
+  }
+  inline std::string get_pkthdr_str(size_t pkt_num) const {
+    return get_pkthdr_0()->to_string(pkt_num);
+  }
   ///@}
 
   /// Check if a MsgBuffer's magic is valid

@@ -440,10 +440,9 @@ class Rpc {
     tx_msgbuf->pkts_queued++;  // Update queueing progress
     tx_batch_i++;
 
-    dpath_dprintf("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
-                  tx_msgbuf->get_pkthdr_0()
-                      ->to_string(offset / TTr::kMaxDataPerPkt)
-                      .c_str());
+    dpath_dprintf(
+        "eRPC Rpc %u: Sending packet %s.\n", rpc_id,
+        tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
 
     if (tx_batch_i == TTr::kPostlist) {
       transport->tx_burst(tx_burst_arr, TTr::kPostlist);
@@ -469,7 +468,7 @@ class Rpc {
     tx_batch_i++;
 
     dpath_dprintf("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
-                  tx_msgbuf->get_pkthdr_0()->to_string().c_str());
+                  tx_msgbuf->get_pkthdr_str().c_str());
 
     transport->tx_burst(tx_burst_arr, tx_batch_i);
     tx_batch_i = 0;
