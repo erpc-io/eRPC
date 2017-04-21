@@ -55,6 +55,9 @@ class SSlot {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
 
+    // These fields are used only for large messages
+    size_t rfr_pkt_num;  ///< Packet number for request-for-response packets
+
     // These fields are used only if we have background threads
     bool is_requester_bg;  ///< True if the requester thread is background
     size_t bg_tiny_tid;    ///< Tiny thread ID of the background thread

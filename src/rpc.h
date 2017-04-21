@@ -421,47 +421,85 @@ class Rpc {
     }
   }
 
-  /// Add \p sslot to the datapath TX queue
-  inline void dpath_txq_push_back(SSlot *sslot) {
-    lock_cond(&dpath_txq_lock);
-    assert(sslot != nullptr);
-    assert(std::find(dpath_txq.begin(), dpath_txq.end(), sslot) ==
-           dpath_txq.end());
-    dpath_txq.push_back(sslot);
-    unlock_cond(&dpath_txq_lock);
+  // rpc_tx.cc
+
+  /// Enqueue a packet for transmission, possibly deferring transmission.
+  inline void enqueue_pkt_tx_burst_st(Transport::RoutingInfo *routing_info,
+                                      MsgBuffer *tx_msgbuf, size_t offset,
+                                      size_t data_bytes) {
+    assert(in_creator());
+    assert(routing_info != nullptr && tx_msgbuf != nullptr);
+    assert(tx_batch_i < TTr::kPostlist);
+
+    Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
+    item.routing_info = routing_info;
+    item.msg_buffer = tx_msgbuf;
+    item.offset = offset;
+    item.data_bytes = data_bytes;
+
+    tx_msgbuf->pkts_queued++;
+    tx_batch_i++;
+
+    if (tx_batch_i == TTr::kPostlist) {
+      transport->tx_burst(tx_burst_arr, TTr::kPostlist);
+      tx_batch_i = 0;
+    }
   }
 
-  // rpc_tx.cc
+  /// Transmit a header-only packet right now
+  inline void tx_burst_now_st(Transport::RoutingInfo *routing_info,
+                              MsgBuffer *tx_msgbuf) {
+    assert(in_creator());
+    assert(routing_info != nullptr && tx_msgbuf != nullptr);
+    assert(tx_batch_i < TTr::kPostlist);
+    assert(tx_msgbuf->is_expl_cr() || tx_msgbuf->is_req_for_resp());
+
+    Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
+    item.routing_info = routing_info;
+    item.msg_buffer = tx_msgbuf;
+    item.offset = 0;
+    item.data_bytes = 0;
+    tx_batch_i++;
+
+    transport->tx_burst(tx_burst_arr, tx_batch_i);
+    tx_batch_i = 0;
+  }
 
   /// Try to transmit packets for sslots in the datapath TX queue. SSlots for
   /// which all packets can be sent are removed from the queue.
-  void process_dpath_txq_st();
+  void process_req_txq_st();
 
   /**
-   * @brief Try to enqueue a single-packet message
+   * @brief Try to transmit a single-packet request
    *
-   * @param session The session to send the message on. This session must be
+   * @param session The session to send the request on. This session must be
    * connected.
    *
-   * @param tx_msgbuf A valid single-packet MsgBuffer that needs one packet to
-   * be queued
+   * @param req_msgbuf A valid single-packet request MsgBuffer that still needs
+   * the packet to be queued
    */
-  void process_dpath_txq_small_msg_one_st(Session *session,
-                                          MsgBuffer *tx_msgbuf);
+  void process_req_txq_small_one_st(Session *session, MsgBuffer *req_msgbuf);
 
   /**
-   * @brief Try to enqueue a multi-packet message
+   * @brief Try to transmit a multi-packet request
    *
-   * @param session The session to send the message on. This seession must be
+   * @param session The session to send the request on. This seession must be
    * connected.
    *
-   * @param tx_msgbuf A valid multi-packet MsgBuffer that needs one or more
-   * packets to be queued
+   * @param req_msgbuf A valid multi-packet request MsgBuffer that still needs
+   * one or more packets to be queued
    */
-  void process_dpath_txq_large_msg_one_st(Session *session,
-                                          MsgBuffer *tx_msgbuf);
+  void process_req_txq_large_one_st(Session *session, MsgBuffer *req_msgbuf);
+
+  void process_bg_resp_txq_st();
 
   // rpc_rx.cc
+
+  inline void bump_credits(Session *session) {
+    assert(session->is_client());
+    assert(session->credits < Session::kSessionCredits);
+    session->credits++;
+  }
 
   /**
    * @brief Process received packets and post RECVs. The ring buffers received
@@ -478,29 +516,30 @@ class Rpc {
    * @brief Process a request or response packet received for a small message.
    * This packet cannot be a credit return.
    *
-   * @param session The session that the message was received on. The session
-   * is connected.
+   * @param sslot XXX
    *
    * @param pkt The received packet. The zeroth byte of this packet is the
    * eRPC packet header.
    */
-  void process_comps_small_msg_one_st(Session *session, const uint8_t *pkt);
+  void process_comps_small_msg_one_st(SSlot *sslot, const uint8_t *pkt);
 
   /**
    * @brief Process a request or response packet received for a large message.
    * This packet cannot be a credit return.
    *
-   * @param session The session that the message was received on. The session
-   * is connected.
+   * @param sslot XXX
    *
    * @param pkt The received packet. The zeroth byte of this packet is the
    * eRPC packet header.
    */
-  void process_comps_large_msg_one_st(Session *session, const uint8_t *pkt);
+  void process_comps_large_msg_one_st(SSlot *sslot, const uint8_t *pkt);
 
   /// Submit a work item to a background thread
   void submit_background_st(SSlot *sslot,
                             typename Nexus<TTr>::BgWorkItemType wi_type);
+
+  // rpc_send_rfr.cc
+  void send_req_for_resp_now_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
 
   // rpc_send_cr.cc
 
@@ -508,12 +547,11 @@ class Rpc {
    * @brief Send a credit return for this session immediately, i.e., the
    * transmission of the packet must not be rescheduled
    *
-   * @param session The session to send the credit return for
-   * @param unexp_pkthdr The packet header of the Unexpected packet that
-   * triggered this credit return
+   * @param sslot The sslot to send the credit return for
+   * @param unexp_pkthdr The packet header of the request packet that triggered
+   * this credit return
    */
-  void send_credit_return_now_st(Session *session,
-                                 const pkthdr_t *unexp_pkthdr);
+  void send_credit_return_now_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
 
   // Constructor args
   Nexus<TTr> *nexus;
@@ -551,11 +589,12 @@ class Rpc {
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
 
-  /// SSlots that need TX. We don't need a std::list to support efficient
-  /// deletes because sslots are implicitly deleted while processing the
-  /// work queue.
-  std::vector<SSlot *> dpath_txq;
-  std::mutex dpath_txq_lock;
+  std::vector<SSlot *> req_txq;  ///< Request sslots that need TX
+  std::mutex req_txq_lock;       ///< Conditional lock for the request TX queue
+
+  /// Responses from background request handlers
+  std::vector<SSlot *> bg_resp_txq;
+  std::mutex bg_resp_txq_lock;  ///< Unconditional lock for bg response TX queue
 
   /// Tx batch info for interfacing between the event loop and the transport
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];

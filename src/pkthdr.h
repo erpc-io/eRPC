@@ -53,13 +53,13 @@ struct pkthdr_t {
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t dest_session_num : 16;    ///< Session number of the destination
   uint64_t pkt_type : 2;             ///< The packet type
-  /// 1 if this packet is unexpected. This can be computed using other fields,
-  /// but it's useful to have it separately.
-  uint64_t is_unexp : 1;
-  /// 1 if this is a response packet, and the req func was foreground-terminal
-  uint64_t fgt_resp : 1;
-  uint64_t pkt_num : kPktNumBits;     ///< Packet number in the request
-  uint64_t req_num : kReqNumBits;     ///< Request number of this packet
+  /// Packet number. For an explicit credit return packet, this is equal to the
+  /// packet number of the corresponding request packet. For a
+  /// request-for-response packet, this is equal to the packet number of the
+  /// corresponding response packet.
+  uint64_t pkt_num : kPktNumBits;
+  /// Request number, carried by all data and control packets for a request.
+  uint64_t req_num : kReqNumBits;
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
 
   /// Return a string representation of a packet header. Implicit and explicit
@@ -71,8 +71,7 @@ struct pkthdr_t {
         << "dest session " << dest_session_num << ", "
         << "req " << req_num << ", "
         << "pkt " << pkt_num << ", "
-        << "fgt_resp " << fgt_resp << ", "
-        << "msg size " << msg_size << "]" << (is_unexp == 0 ? "+" : "");
+        << "msg size " << msg_size << "]";
 
     return ret.str();
   }

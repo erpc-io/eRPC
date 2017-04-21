@@ -17,6 +17,9 @@ namespace ERpc {
 /// understand the overhead of supporting large messages and background threads.
 #define small_rpc_optlevel (small_rpc_optlevel_likely)
 
+#define optlevel_large_rpc_supported \
+  (small_rpc_optlevel != small_rpc_optlevel_extreme)
+
 #if small_rpc_optlevel == small_rpc_optlevel_none
 #define small_rpc_likely(x) (x)
 #define small_rpc_unlikely(x) (x)

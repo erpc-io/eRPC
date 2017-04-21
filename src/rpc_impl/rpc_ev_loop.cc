@@ -36,8 +36,18 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
     handle_session_mgmt_st();  // Callee grabs the hook lock
   }
 
-  process_comps_st();      // RX
-  process_dpath_txq_st();  // TX
+  process_comps_st();    // All RX
+  process_req_txq_st();  // Req TX
+
+  if (small_rpc_unlikely(multi_threaded)) {
+    process_bg_resp_txq_st();  // Background resp TX
+  }
+
+  // Drain all packets
+  if (tx_batch_i > 0) {
+    transport->tx_burst(tx_burst_arr, tx_batch_i);
+    tx_batch_i = 0;
+  }
 
   if (kDatapathChecks) {
     in_event_loop = false;

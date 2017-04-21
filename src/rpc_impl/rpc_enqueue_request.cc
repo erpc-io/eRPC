@@ -83,8 +83,6 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   pkthdr_0->msg_size = req_msgbuf->data_size;
   pkthdr_0->dest_session_num = session->remote_session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
-  pkthdr_0->is_unexp = 1;  // All request packets are unexpected
-  pkthdr_0->fgt_resp = 0;  // A request is not a response
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = req_num;
   assert(pkthdr_0->check_magic());
@@ -104,6 +102,12 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   SSlot &sslot = session->sslot_arr[sslot_i];
   sslot.clt_save_info.cont_func = cont_func;
   sslot.clt_save_info.tag = tag;
+
+  if (optlevel_large_rpc_supported) {
+    // We don't send a request-for-response for the zeroth response packet
+    sslot.clt_save_info.rfr_pkt_num = 1;
+  }
+
   if (small_rpc_unlikely(multi_threaded)) {
     if (!in_creator()) {
       sslot.clt_save_info.is_requester_bg = true;
@@ -123,7 +127,12 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   sslot.tx_msgbuf = req_msgbuf;      // Valid request
   sslot.tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
 
-  dpath_txq_push_back(&sslot);  // Enqueue sslot for TX. This is thread-safe.
+  // Add the sslot to request TX queue
+  lock_cond(&req_txq_lock);
+  assert(std::find(req_txq.begin(), req_txq.end(), &sslot) == req_txq.end());
+  req_txq.push_back(&sslot);
+  unlock_cond(&req_txq_lock);
+
   return 0;
 }
 
