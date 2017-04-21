@@ -26,7 +26,7 @@ size_t config_num_sessions;   ///< Number of sessions created by client
 size_t config_rpcs_per_session;
 size_t config_num_bg_threads;  ///< Number of background threads
 
-/// The common request handler for all subtests. Copies the request string to
+/// The common request handler for all subtests. Copies the request message to
 /// the response.
 void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
