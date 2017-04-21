@@ -163,6 +163,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
   } else {
     // Handle a single-packet response message
     debug_check_req_msgbuf_on_resp(sslot, req_num, req_type);
+    bump_credits(sslot->session);
 
     // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(sslot);

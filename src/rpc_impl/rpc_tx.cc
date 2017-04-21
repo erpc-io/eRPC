@@ -129,11 +129,15 @@ void Rpc<TTr>::process_bg_resp_txq_st() {
 
     // Wait for the background thread to bury this sslot's request MsgBuffer
     if (sslot->rx_msgbuf.buf != nullptr) {
-      assert(write_index < req_txq.size());
+      assert(write_index < bg_resp_txq.size());
       bg_resp_txq[write_index++] = sslot;
+      continue;  // Process other packets
     }
 
     // Send the first response packet
+    size_t data_bytes = std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt);
+    enqueue_pkt_tx_burst_st(session->remote_routing_info, resp_msgbuf, 0,
+                            data_bytes);
   }
 
   bg_resp_txq.resize(write_index);  // Number of sslots left = write_index

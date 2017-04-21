@@ -598,7 +598,7 @@ class Rpc {
 
   /// Tx batch info for interfacing between the event loop and the transport
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];
-  size_t tx_batch_i;  ///< The batch index for \p tx_burst_arr
+  size_t tx_batch_i = 0;  ///< The batch index for \p tx_burst_arr
 
   /// Rx batch information for \p rx_burst
   MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];
