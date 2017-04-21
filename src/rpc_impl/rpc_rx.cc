@@ -262,9 +262,9 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
 
   // Manage credits and request-for-response
   if (is_req) {
-    // Send a credit return for every request packet except the last
+    // Send a credit return for every request packet except the last in sequence
     if (pkt_num != rx_msgbuf.num_pkts - 1) {
-      send_credit_return_now_st(sslot, pkthdr);
+      send_credit_return_now_st(sslot->session, pkthdr);
     }
   } else {
     // This is a response packet

@@ -3,20 +3,21 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::send_req_for_resp_now_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+void Rpc<TTr>::send_req_for_resp_now_st(SSlot *sslot,
+                                        const pkthdr_t *resp_pkthdr) {
   assert(in_creator());
   assert(sslot != nullptr && sslot->session->is_client());
-  assert(pkthdr != nullptr && pkthdr->check_magic());
-  assert(pkthdr->is_resp() || pkthdr->is_expl_cr());
+  assert(resp_pkthdr != nullptr && resp_pkthdr->check_magic());
+  assert(resp_pkthdr->is_resp());
 
   // Fill in the RFR packet header. Commented fields are copied from pkthdr.
-  pkthdr_t rfr_pkthdr = *pkthdr;
+  pkthdr_t rfr_pkthdr = *resp_pkthdr;
   // rfr_pkthdr.req_type = pkthdr->req_type;
   rfr_pkthdr.msg_size = 0;
   rfr_pkthdr.dest_session_num = sslot->session->remote_session_num;
   rfr_pkthdr.pkt_type = kPktTypeReqForResp;
   rfr_pkthdr.pkt_num = sslot->clt_save_info.rfr_pkt_num++;
-  rfr_pkthdr.req_num = pkthdr->req_num;
+  // rfr_pkthdr.req_num = resp_pkthdr->req_num;
   // rfr_pkthdr.magic = pkthdr->magic;
 
   // Create a "fake" static MsgBuffer for inline tx_burst

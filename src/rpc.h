@@ -525,8 +525,7 @@ class Rpc {
    * @brief Process a request or response packet received for a small message.
    * This packet cannot be a credit return.
    *
-   * @param sslot XXX
-   *
+   * @param sslot The session slot used for the request or response packet
    * @param pkt The received packet. The zeroth byte of this packet is the
    * eRPC packet header.
    */
@@ -536,8 +535,7 @@ class Rpc {
    * @brief Process a request or response packet received for a large message.
    * This packet cannot be a credit return.
    *
-   * @param sslot XXX
-   *
+   * @param sslot The session slot for the request or response packet
    * @param pkt The received packet. The zeroth byte of this packet is the
    * eRPC packet header.
    */
@@ -547,20 +545,27 @@ class Rpc {
   void submit_background_st(SSlot *sslot,
                             typename Nexus<TTr>::BgWorkItemType wi_type);
 
-  // rpc_send_rfr.cc
-  void send_req_for_resp_now_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
-
   // rpc_send_cr.cc
 
   /**
-   * @brief Send a credit return for this session immediately, i.e., the
-   * transmission of the packet must not be rescheduled
+   * @brief Send a credit return immediately (i.e., no burst queueing)
    *
-   * @param sslot The sslot to send the credit return for
-   * @param unexp_pkthdr The packet header of the request packet that triggered
+   * @param session The session to send the credit return on
+   * @param req_pkthdr The packet header of the request packet that triggered
    * this credit return
    */
-  void send_credit_return_now_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
+  void send_credit_return_now_st(Session *session, const pkthdr_t *req_pkthdr);
+
+  // rpc_send_rfr.cc
+
+  /**
+   * @brief Send a request-for-response immediately (i.e. no burst queueing)
+   *
+   * @param sslot The session slot to send the request-for-response for
+   * @param req_pkthdr The packet header of the response packet that triggered
+   * this request-for-response
+   */
+  void send_req_for_resp_now_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
 
   // Constructor args
   Nexus<TTr> *nexus;
