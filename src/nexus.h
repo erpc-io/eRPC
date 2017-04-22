@@ -152,6 +152,11 @@ class Nexus {
   /// Transmit session management packets enqueued by Rpc threads
   static void sm_thread_tx(SmThreadCtx *ctx);
 
+  /// Return true iff this is a server-mode peer
+  static bool is_peer_mode_server(ENetPeer *peer) {
+    return peer->data == nullptr;
+  }
+
   /**
    * @brief Check if a hook with Rpc ID = \p rpc_id exists in this Nexus. The
    * caller must not hold the Nexus lock before calling this.

@@ -10,6 +10,20 @@ static constexpr size_t kSmThreadEventLoopMs = 20;
 /// Timeout for establishing ENet connections
 static constexpr size_t kENetConnectTimeoutMs = 50;
 
+// Implementation notes:
+//
+// A Nexus can have two peers established to a host: a client-mode peer used for
+// sending session management requests, and a server-mode peer used for
+// responding to these requests.
+//
+// A client-mode peer is created to each host that we create a client-mode
+// session to. Client-mode peers have non-null peer->data, and are recorded in
+// the maps.
+//
+// A server mode peer is created when we get a ENet connect event from a
+// client-mode peers. Server-mode peers have null peer-data, and are not recored
+// in the maps.
+
 template <class TTr>
 void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
   assert(ctx != nullptr);
@@ -25,12 +39,11 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
 
     switch (event.type) {
       case ENET_EVENT_TYPE_CONNECT: {
-        if (peer->data == nullptr) {
-          // This is a server-mode peer, so we don't need to do anything
+        if (is_peer_mode_server(peer)) {
           break;
         }
 
-        // If we're here, this is a client-mode session
+        // If we're here, this is a client-mode peer
         auto *peer_data = static_cast<SmPeerData *>(peer->data);
         assert(!peer_data->connected);
         assert(peer_data->work_item_vec.size() > 0);
@@ -55,7 +68,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
         assert(event.packet->dataLength == sizeof(SessionMgmtPkt));
 
         if (peer->data != nullptr) {
-          // This is an event for a client-mode session, so we have mappings
+          // This is an event for a client-mode peer, so we have mappings
           assert(ctx->ip_map.count(peer_ip) > 0);
           assert(ctx->name_map[ctx->ip_map[peer_ip]] == peer);
         }
@@ -125,8 +138,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
       }
 
       case ENET_EVENT_TYPE_DISCONNECT: {
-        if (peer->data == nullptr) {
-          // This is a server-mode peer, so we don't need to do anything
+        if (is_peer_mode_server(peer)) {
           break;
         }
 
@@ -196,7 +208,8 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
     assert(session_mgmt_pkt_type_is_valid(wi.sm_pkt->pkt_type));
 
     if (wi.sm_pkt->is_req()) {
-      // Transmit a session management request after filling wi.peer
+      // Transmit a session management request. wi.peer must be filled here
+      // because Rpc threads don't have ENet peer information.
       assert(wi.peer == nullptr);
       std::string rem_hostname = std::string(wi.sm_pkt->server.hostname);
 
@@ -213,7 +226,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
           sm_tx_work_item_and_free(wi);
         }
       } else {
-        // We don't have a client-mode ENet peer to this host - create one
+        // We don't have a client-mode ENet peer to this host, so create one
         ENetAddress rem_address;
         rem_address.port = ctx->mgmt_udp_port;
         if (enet_address_set_host(&rem_address, rem_hostname.c_str()) != 0) {
@@ -273,7 +286,7 @@ void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
     throw std::runtime_error("eRPC Nexus: Failed to create ENet host.");
   }
 
-  // This is not a busy loop, since sm_thread_rx() blocks for several ms.
+  // This is not a busy loop, since sm_thread_rx() blocks for several ms
   while (*ctx->kill_switch == false) {
     sm_thread_tx(ctx);
     sm_thread_rx(ctx);
