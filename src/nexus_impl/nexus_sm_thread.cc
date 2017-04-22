@@ -84,11 +84,6 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
         bool is_sm_req = sm_pkt->is_req();
         uint8_t target_rpc_id =
             is_sm_req ? sm_pkt->server.rpc_id : sm_pkt->client.rpc_id;
-        const char *source_hostname =
-            is_sm_req ? sm_pkt->client.hostname : sm_pkt->server.hostname;
-        uint8_t source_rpc_id =
-            is_sm_req ? sm_pkt->client.rpc_id : sm_pkt->server.rpc_id;
-        _unused(source_rpc_id);
 
         // Lock the Nexus to prevent Rpc registration while we lookup the hook
         ctx->nexus_lock->lock();
@@ -102,7 +97,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
             erpc_dprintf(
                 "eRPC Nexus: Received session mgmt request for invalid Rpc "
                 "%u from Rpc [%s, %u]. Sending response.\n",
-                target_rpc_id, source_hostname, source_rpc_id);
+                target_rpc_id, sm_pkt->client.hostname, sm_pkt->client.rpc_id);
 
             sm_pkt->pkt_type =
                 session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
@@ -115,7 +110,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
             erpc_dprintf(
                 "eRPC Nexus: Received session management resp for invalid "
                 "Rpc %u from Rpc [%s, %u]. Ignoring.\n",
-                target_rpc_id, source_hostname, source_rpc_id);
+                target_rpc_id, sm_pkt->client.hostname, sm_pkt->client.rpc_id);
             delete sm_pkt;
           }
 
