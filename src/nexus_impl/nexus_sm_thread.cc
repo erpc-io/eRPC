@@ -40,7 +40,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
     switch (event.type) {
       case ENET_EVENT_TYPE_CONNECT: {
         if (is_peer_mode_server(peer)) {
-          break;
+          return;
         }
 
         // If we're here, this is a client-mode peer
@@ -54,14 +54,14 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
             "%zu queued SM requests.\n",
             peer_data->rem_hostname.c_str(), peer_data->work_item_vec.size());
 
-        // Transmit the queued work items
+        // Transmit work items queued while waiting for connection
         for (auto wi : peer_data->work_item_vec) {
           assert(wi.sm_pkt->is_req());
           sm_tx_work_item_and_free(wi);
         }
         peer_data->work_item_vec.clear();
 
-        break;
+        return;
       }
 
       case ENET_EVENT_TYPE_RECEIVE: {
@@ -78,8 +78,17 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
         memcpy(static_cast<void *>(sm_pkt), event.packet->data,
                sizeof(SessionMgmtPkt));
         enet_packet_destroy(event.packet);
-
         assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
+
+        // Handle special testing-mode session management packets
+        if (sm_pkt->pkt_type == SessionMgmtPktType::kTestingResetPeerReq) {
+          erpc_dprintf(
+              "eRPC Nexus: Received reset peer request (testing) from "
+              "Rpc [%s, %u]. Disconnecting peer.\n",
+              sm_pkt->client.hostname, sm_pkt->client.rpc_id);
+          enet_peer_reset(peer);
+          return;
+        }
 
         bool is_sm_req = sm_pkt->is_req();
         uint8_t target_rpc_id =
@@ -95,8 +104,8 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
           // response for requests, but we can ignore responses.
           if (is_sm_req) {
             erpc_dprintf(
-                "eRPC Nexus: Received session mgmt request for invalid Rpc "
-                "%u from Rpc [%s, %u]. Sending response.\n",
+                "eRPC Nexus: Received session management request for invalid "
+                "Rpc %u from Rpc [%s, %u]. Sending response.\n",
                 target_rpc_id, sm_pkt->client.hostname, sm_pkt->client.rpc_id);
 
             sm_pkt->pkt_type =
@@ -108,33 +117,32 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
             sm_tx_work_item_and_free(temp_wi);  // This frees sm_pkt
           } else {
             erpc_dprintf(
-                "eRPC Nexus: Received session management resp for invalid "
+                "eRPC Nexus: Received session management response for invalid "
                 "Rpc %u from Rpc [%s, %u]. Ignoring.\n",
                 target_rpc_id, sm_pkt->client.hostname, sm_pkt->client.rpc_id);
             delete sm_pkt;
           }
 
           ctx->nexus_lock->unlock();
-        } else {
-          // Submit a work item to the located Rpc thread. The Rpc thread will
-          // free sm_pkt.
-          if (is_sm_req) {
-            SmWorkItem wi(target_rpc_id, sm_pkt, event.peer);
-            target_hook->sm_rx_list.unlocked_push_back(wi);
-          } else {
-            SmWorkItem wi(target_rpc_id, sm_pkt, nullptr);
-            target_hook->sm_rx_list.unlocked_push_back(wi);
-          }
-
-          // The target Rpc will free sm_pkt
-          ctx->nexus_lock->unlock();
+          return;
         }
-        break;
+
+        // Submit a work item to the target Rpc. The Rpc thread frees sm_pkt.
+        if (is_sm_req) {
+          SmWorkItem wi(target_rpc_id, sm_pkt, event.peer);
+          target_hook->sm_rx_list.unlocked_push_back(wi);
+        } else {
+          SmWorkItem wi(target_rpc_id, sm_pkt, nullptr);
+          target_hook->sm_rx_list.unlocked_push_back(wi);
+        }
+
+        ctx->nexus_lock->unlock();
+        return;
       }
 
       case ENET_EVENT_TYPE_DISCONNECT: {
         if (is_peer_mode_server(peer)) {
-          break;
+          return;
         }
 
         // If we're here, this is a client mode peer, so we have mappings
@@ -153,7 +161,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
         ctx->name_map.erase(hostname);
         delete static_cast<SmPeerData *>(peer->data);
         peer->data = nullptr;
-        break;
+        return;
       }
 
       default:
