@@ -359,6 +359,19 @@ class Rpc {
   void run_event_loop_timeout_st(size_t timeout_ms);
 
   //
+  // Fault injection
+  //
+ public:
+  /**
+   * @brief Check if fault injection is enabled
+   * @throw runtime_error if fault injection is disabled
+   */
+  void check_fault_injection_enabled();
+
+  /// Fail server routing resolution at client
+  void fault_inject_resolve_server_rinfo();
+
+  //
   // Misc public functions
   //
 
@@ -567,6 +580,7 @@ class Rpc {
    */
   void send_req_for_resp_now_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
 
+ private:
   // Constructor args
   Nexus<TTr> *nexus;
   void *context;  ///< The application context
@@ -621,17 +635,17 @@ class Rpc {
   SlowRand slow_rand;  ///< A slow random generator for "real" randomness
   FastRand fast_rand;  ///< A fast random generator
 
-  // Stats
+  /// All the faults that can be injected into ERpc for testing
+  struct {
+    /// Fail server routing info resolution at client. This is used to test the
+    /// case where a client fails to resolve routing info sent by the server.
+    bool resolve_server_rinfo = false;
+  } faults;
+
+  // Datapath stats
   struct {
     size_t ev_loop_calls = 0;
   } dpath_stats;
-
- public:
-  // Fault injection for testing
-
-  /// Fail server routing info resolution at client. This is used to test the
-  /// case where a client fails to resolve the routing info sent by the server.
-  bool flt_inj_resolve_server_rinfo = false;
 };
 
 // Instantiate required Rpc classes so they get compiled for the linker

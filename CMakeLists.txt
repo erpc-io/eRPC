@@ -73,6 +73,7 @@ set(SOURCES
   src/rpc_impl/rpc_enqueue_request.cc
   src/rpc_impl/rpc_enqueue_response.cc
   src/rpc_impl/rpc_ev_loop.cc
+  src/rpc_impl/rpc_fault_inject.cc
   src/rpc_impl/rpc_rx.cc
   src/rpc_impl/rpc_tx.cc
   src/rpc_impl/rpc_connect_handlers.cc

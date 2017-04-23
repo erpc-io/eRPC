@@ -173,7 +173,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   auto *rpc = context.rpc;
 
   // Force Rpc to fail remote routing info resolution at client
-  rpc->flt_inj_resolve_server_rinfo = true;
+  rpc->fault_inject_resolve_server_rinfo();
 
   int session_num =
       rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
@@ -182,11 +182,9 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_sm_resps, 1); /* The connect failed event */
 
-  /*
-   * After invoking the kConnectFailed callback, the Rpc event loop tries to
-   * free session resources at the server. This does not invoke a callback on
-   * completion, so just wait for the callback-less freeing to complete.
-   */
+  // After invoking the kConnectFailed callback, the Rpc event loop tries to
+  // free session resources at the server. This does not invoke a callback on
+  // completion, so just wait for the callback-less freeing to complete.
   rpc->run_event_loop_timeout(kAppEventLoopMs);
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
