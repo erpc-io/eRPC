@@ -10,7 +10,6 @@
 using namespace ERpc;
 
 static constexpr uint16_t kAppNexusUdpPort = 31851;
-static constexpr double kAppNexusPktDropProb = 0.0;
 static constexpr size_t kAppEventLoopMs = 200;
 static constexpr size_t kAppMaxEventLoopMs = 20000; /* 20 seconds */
 static constexpr uint8_t kAppClientRpcId = 100;
@@ -222,8 +221,7 @@ void launch_server_client_threads(
     void (*client_thread_func)(Nexus<IBTransport> *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers) {
-  Nexus<IBTransport> nexus(kAppNexusUdpPort, num_bg_threads,
-                           kAppNexusPktDropProb);
+  Nexus<IBTransport> nexus(kAppNexusUdpPort, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {

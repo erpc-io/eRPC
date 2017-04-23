@@ -80,11 +80,12 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
         enet_packet_destroy(event.packet);
         assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
 
-        // Handle special testing-mode session management packets
-        if (sm_pkt->pkt_type == SessionMgmtPktType::kTestingResetPeerReq) {
+        // Handle fault-injection session management packets
+        if (sm_pkt->pkt_type == SessionMgmtPktType::kFltInjResetPeerReq) {
           erpc_dprintf(
-              "eRPC Nexus: Received reset peer request (testing) from "
-              "Rpc [%s, %u]. Disconnecting peer.\n",
+              "eRPC Nexus: Received %s from Rpc [%s, %u]. "
+              "Forcefully resetting ENet peer.\n",
+              session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str(),
               sm_pkt->client.hostname, sm_pkt->client.rpc_id);
           enet_peer_reset(peer);
           return;

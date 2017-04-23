@@ -193,7 +193,7 @@ class Rpc {
       // This check is OK, as dynamic sslots must be initialized
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);
-      rx_msgbuf.buffer.buf = nullptr; // Mark invalid for future
+      rx_msgbuf.buffer.buf = nullptr;  // Mark invalid for future
     }
 
     rx_msgbuf.buf = nullptr;
@@ -627,12 +627,11 @@ class Rpc {
   } dpath_stats;
 
  public:
-  // Fault injection for testing. These cannot be static or const.
+  // Fault injection for testing
 
-  /// Fail remote routing info resolution at client. This is used to test the
-  /// case where the server creates a session in response to a connect request,
-  /// but the client fails to resolve the routing info sent by the server.
-  bool testing_fail_resolve_remote_rinfo_client = false;
+  /// Fail server routing info resolution at client. This is used to test the
+  /// case where a client fails to resolve the routing info sent by the server.
+  bool flt_inj_resolve_server_rinfo = false;
 };
 
 // Instantiate required Rpc classes so they get compiled for the linker

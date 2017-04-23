@@ -172,8 +172,8 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
                                      kAppNumaNode);
   auto *rpc = context.rpc;
 
-  /* Force Rpc to fail remote routing info resolution at client */
-  rpc->testing_fail_resolve_remote_rinfo_client = true;
+  // Force Rpc to fail remote routing info resolution at client
+  rpc->flt_inj_resolve_server_rinfo = true;
 
   int session_num =
       rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);

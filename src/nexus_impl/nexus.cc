@@ -7,8 +7,7 @@
 namespace ERpc {
 
 template <class TTr>
-Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
-                  double udp_drop_prob)
+Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads)
     : freq_ghz(get_freq_ghz()),
       hostname(get_hostname()),
       num_bg_threads(num_bg_threads) {
@@ -30,10 +29,6 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
 
   if (num_bg_threads > kMaxBgThreads) {
     throw std::runtime_error("eRPC Nexus: Too many background threads.");
-  }
-
-  if (udp_drop_prob > kMaxUdpDropProb) {
-    throw std::runtime_error("eRPC Nexus: UDP drop probability too high.");
   }
 
   if (small_rpc_optlevel == small_rpc_optlevel_extreme && num_bg_threads > 0) {

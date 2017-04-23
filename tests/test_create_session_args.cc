@@ -12,7 +12,7 @@ using namespace ERpc;
 #define SERVER_RPC_ID 100
 #define CLIENT_RPC_ID 200
 
-/* Shared between client and server thread */
+// Shared between client and server thread
 std::atomic<bool> server_ready;
 const uint8_t phy_port = 0;
 const size_t numa_node = 0;
@@ -27,47 +27,47 @@ void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
   _unused(_context);
 }
 
-/* The client thread */
+// The client thread
 void client_thread_func(Nexus<IBTransport> *nexus) {
-  /* Start the tests only after the server is ready */
+  // Start the tests only after the server is ready
   while (!server_ready) {
     usleep(1);
   }
 
-  /* Create the Rpc */
+  // Create the Rpc
   Rpc<IBTransport> rpc(nexus, nullptr, CLIENT_RPC_ID, &test_sm_handler,
                        phy_port, numa_node);
 
   {
-    /* Test: Correct args */
+    // Test: Correct args
     int session_num =
         rpc.create_session(local_hostname, SERVER_RPC_ID, phy_port);
     ASSERT_GE(session_num, 0);
   }
 
   {
-    /* Test: Invalid remote port, which can be detected locally */
+    // Test: Invalid remote port, which can be detected locally
     int session_num =
         rpc.create_session(local_hostname, SERVER_RPC_ID, kMaxPhyPorts);
     ASSERT_LT(session_num, 0);
   }
 
   {
-    /* Test: Try to create session to self */
+    // Test: Try to create session to self
     int session_num =
         rpc.create_session(local_hostname, CLIENT_RPC_ID, phy_port);
     ASSERT_LT(session_num, 0);
   }
 
   {
-    /* Test: Try to create another session to the same remote Rpc. */
+    // Test: Try to create another session to the same remote Rpc
     int session_num =
         rpc.create_session(local_hostname, SERVER_RPC_ID, phy_port);
     ASSERT_LT(session_num, 0);
   }
 }
 
-/* The server thread */
+// The server thread
 void server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id) {
   Rpc<IBTransport> rpc(nexus, nullptr, rpc_id, &test_sm_handler, phy_port,
                        numa_node);
@@ -78,12 +78,12 @@ void server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id) {
 
 /// Test: Check if passing invalid arguments to create_session gives an error
 TEST(TestBuild, TestBuild) {
-  Nexus<IBTransport> nexus(NEXUS_UDP_PORT, 0, 0.0); /* 0 background threads */
+  Nexus<IBTransport> nexus(NEXUS_UDP_PORT, 0);  // 0 background threads
 
-  /* Launch the server thread */
+  // Launch the server thread
   std::thread server_thread(server_thread_func, &nexus, SERVER_RPC_ID);
 
-  /* Launch the client thread */
+  // Launch the client thread
   std::thread client_thread(client_thread_func, &nexus);
 
   server_thread.join();

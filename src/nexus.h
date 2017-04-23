@@ -21,8 +21,6 @@ class Rpc;
 template <class TTr>
 class Nexus {
  public:
-  static constexpr double kMaxUdpDropProb = .95;  ///< Max UDP packet drop prob
-
   enum class BgWorkItemType : bool { kReq, kResp };
 
   /// A work item submitted to a background thread
@@ -125,14 +123,9 @@ class Nexus {
    * threads to launch. This requires small_rpc_optlevel to not be
    * small_rpc_optlevel_extreme, which does not support background threads.
    *
-   * @param udp_drop_prob The probability that a session management packet
-   * will be dropped. This is useful for testing session management packet
-   * retransmission.
-   *
    * @throw runtime_error if Nexus creation fails.
    */
-  Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads = 0,
-        double udp_drop_prob = 0.0);
+  Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads = 0);
 
   ~Nexus();
 

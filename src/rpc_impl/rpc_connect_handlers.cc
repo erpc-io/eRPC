@@ -173,10 +173,10 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
                TTr::routing_info_str(srv_routing_info).c_str());
 
   bool resolve_success;
-  if (!testing_fail_resolve_remote_rinfo_client) {
+  if (!flt_inj_resolve_server_rinfo) {
     resolve_success = transport->resolve_remote_routing_info(srv_routing_info);
   } else {
-    resolve_success = false;  // Inject error for testing
+    resolve_success = false;  // Inject fault
   }
 
   if (!resolve_success) {
