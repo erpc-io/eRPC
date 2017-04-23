@@ -173,7 +173,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   auto *rpc = context.rpc;
 
   // Force Rpc to fail remote routing info resolution at client
-  rpc->fault_inject_resolve_server_rinfo();
+  rpc->fault_inject_resolve_server_rinfo_st();
 
   int session_num =
       rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);

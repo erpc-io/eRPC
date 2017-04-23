@@ -363,18 +363,12 @@ class Rpc {
   //
  public:
   /**
-   * @brief Check if fault injection is enabled
-   * @throw runtime_error if fault injection is disabled
-   */
-  void check_fault_injection_enabled();
-
-  /**
    * @brief Inject a fault that always fails server routing info resolution at
    * all client sessions of this Rpc
    *
-   * @throw runtime_error if fault injection is disabled
+   * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_resolve_server_rinfo();
+  void fault_inject_resolve_server_rinfo_st();
 
   /**
    * @brief Inject a fault that forcefully resets the remote ENet peer for
@@ -382,11 +376,18 @@ class Rpc {
    * will be generated locally when ENet detects the remote peer failure.
    *
    * This will also affect sessions in other Rpc objects on this machine that
-   * are connected to the same host as \p session.
+   * are connected to the same host as the session for \p session_num.
    *
-   * @throw runtime_error if fault injection is disabled
+   * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_reset_remote_epeer(Session *session);
+  void fault_inject_reset_remote_epeer_st(int session_num);
+
+ private:
+  /**
+   * @brief Check if the caller can inject faults
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void check_fault_injection_ok() const;
 
   //
   // Misc public functions
