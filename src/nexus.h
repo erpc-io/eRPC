@@ -129,31 +129,8 @@ class Nexus {
 
   ~Nexus();
 
-  /// The function executed by background threads
-  static void bg_thread_func(BgThreadCtx *ctx);
-
-  /// The function executed by the session management thread
-  static void sm_thread_func(SmThreadCtx *ctx);
-
-  /// Transmit a work item and free its SM packet memory
-  static void sm_tx_work_item_and_free(SmWorkItem &wi);
-
-  /// Receive session management packets and enqueue them to Rpc threads. This
-  /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.
-  static void sm_thread_rx(SmThreadCtx *ctx);
-
-  /// Transmit session management packets enqueued by Rpc threads
-  static void sm_thread_tx(SmThreadCtx *ctx);
-
-  /// Return true iff this is a server-mode peer
-  static bool is_peer_mode_server(ENetPeer *peer) {
-    return peer->data == nullptr;
-  }
-
-  /**
-   * @brief Check if a hook with Rpc ID = \p rpc_id exists in this Nexus. The
-   * caller must not hold the Nexus lock before calling this.
-   */
+  /// Check if a hook with Rpc ID = \p rpc_id exists in this Nexus. The
+  /// caller must not hold the Nexus lock before calling this.
   bool rpc_id_exists(uint8_t rpc_id);
 
   /// Register a previously unregistered session management hook
@@ -161,8 +138,6 @@ class Nexus {
 
   /// Unregister a previously registered session management hook
   void unregister_hook(Hook *hook);
-
-  void session_mgmt_handler();
 
   /**
    * @brief Register application-defined request handler function. This
@@ -183,6 +158,40 @@ class Nexus {
 
     int ret = gethostname(_hostname, kMaxHostnameLen);
     return ret;
+  }
+
+  /// The function executed by background threads
+  static void bg_thread_func(BgThreadCtx *ctx);
+
+  //
+  // Session management thread functions
+  //
+
+  /// The thread function executed by the session management thread
+  static void sm_thread_func(SmThreadCtx *ctx);
+
+  /// Transmit a work item and free its session management packet memory
+  static void sm_thread_tx_and_free(SmWorkItem &wi);
+
+  /// Handle an ENet connect event
+  static void sm_thread_handle_connect(SmThreadCtx *ctx, ENetEvent *event);
+
+  /// Handle an ENet disconnect event
+  static void sm_thread_handle_disconnect(SmThreadCtx *ctx, ENetEvent *event);
+
+  /// Handle an ENet receive event
+  static void sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event);
+
+  /// Receive session management packets and enqueue them to Rpc threads. This
+  /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.
+  static void sm_thread_rx(SmThreadCtx *ctx);
+
+  /// Transmit session management packets enqueued by Rpc threads
+  static void sm_thread_tx(SmThreadCtx *ctx);
+
+  /// Return true iff this is a server-mode peer
+  static bool is_peer_mode_server(ENetPeer *peer) {
+    return peer->data == nullptr;
   }
 
   /// Read-mostly members exposed to Rpc threads
