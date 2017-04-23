@@ -44,7 +44,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 
   /* MsgBuffer allocation is thread safe */
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(resp_size);
-  ASSERT_NE(req_handle->dyn_resp_msgbuf.buf, nullptr);
+  assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
 
   memcpy(reinterpret_cast<char *>(req_handle->dyn_resp_msgbuf.buf),
@@ -100,7 +100,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
   MsgBuffer req_msgbuf[tot_reqs_per_iter];
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
     req_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
-    ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
+    assert(req_msgbuf[req_i].buf != nullptr);
   }
 
   // The main request-issuing loop
@@ -129,14 +129,14 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
         if (ret != 0) {
           test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
         }
-        ASSERT_EQ(ret, 0);
+        assert(ret == 0);
 
         iter_req_i++;
       }
     }
 
     wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter, nexus->freq_ghz);
-    ASSERT_EQ(context.num_rpc_resps, tot_reqs_per_iter);
+    assert(context.num_rpc_resps == tot_reqs_per_iter);
   }
 
   // Free the request MsgBuffers

@@ -14,10 +14,9 @@ auto reg_info_vec_bg = {
 class AppContext : public BasicAppContext {};
 
 /// Configuration for controlling the test
-size_t config_num_sessions;    ///< Number of sessions created by client
-size_t config_num_bg_threads;  ///< Number of background threads
-///< Number of Rpcs to send on each session per iteration
-size_t config_rpcs_per_session;
+size_t config_num_sessions;      ///< Number of sessions created by client
+size_t config_num_bg_threads;    ///< Number of background threads
+size_t config_rpcs_per_session;  ///< Number of Rpcs on each session per iter
 size_t config_msg_size;  ///< The size of the request and response messages
 
 /// The common request handler for all subtests. Copies the request message to
@@ -83,7 +82,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
   MsgBuffer req_msgbuf[tot_reqs_per_iter];
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
     req_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
-    ASSERT_NE(req_msgbuf[req_i].buf, nullptr);
+    assert(req_msgbuf[req_i].buf != nullptr);
   }
 
   // The main request-issuing loop
@@ -91,7 +90,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
     context.num_rpc_resps = 0;
 
     test_printf("Client: Iteration %zu.\n", iter);
-    size_t iter_req_i = 0;  // Request MsgBuffer index in this iteration
+    size_t iter_req_i = 0;  // Request MsgBuffer index in an iteration
 
     for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
       for (size_t w_i = 0; w_i < config_rpcs_per_session; w_i++) {
@@ -108,14 +107,14 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
         if (ret != 0) {
           test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
         }
-        ASSERT_EQ(ret, 0);
+        assert(ret == 0);
 
         iter_req_i++;
       }
     }
 
     wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter, nexus->freq_ghz);
-    ASSERT_EQ(context.num_rpc_resps, tot_reqs_per_iter);
+    assert(context.num_rpc_resps == tot_reqs_per_iter);
   }
 
   // Free the request MsgBuffers
