@@ -23,10 +23,15 @@ static constexpr bool kVerbose = true;  ///< Debug printing for non-datapath
 static constexpr bool kDatapathVerbose = false;  ///< Debug printing in datapath
 static constexpr bool kDatapathStats = true;  ///< Collect stats on the datapath
 
-// Perf defines
-
 /// Datapath checks that can be disabled for maximum performance
 static constexpr bool kDatapathChecks = true;
+
+/// Fault injection code that can be disabled for non-tests
+#ifdef FAULT_INJECTION
+static constexpr bool kFaultInjection = true;
+#else
+static constexpr bool kFaultInjection = false;
+#endif
 
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \

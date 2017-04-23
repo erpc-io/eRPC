@@ -29,7 +29,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
 # Debug mode
-option(DEBUG "Enable debugging" OFF)
+option(DEBUG "Enable debugging" ON)
 if(DEBUG)
   MESSAGE(WARNING "Debugging is enabled (to disable, run `cmake . -DDEBUG=OFF`).")
   add_definitions(-g)
@@ -38,6 +38,15 @@ else(DEBUG)
   add_definitions(-DNDEBUG)
   add_definitions(-O3)
 endif(DEBUG)
+
+# Fault injection (packet losses, machine failure)
+option(FAULT_INJECTION "Enable fault injection" ON)
+if(FAULT_INJECTION)
+  MESSAGE(WARNING "Fault injection is enabled (to disable, run `cmake . -DFAULT_INJECTION=OFF`).")
+  add_definitions(-DFAULT_INJECTION)
+else(FAULT_INJECTION)
+  MESSAGE(WARNING "Fault injection is disabled, so tests may fail (to enable, run `cmake . -DFAULT_INJECTION=ON`).")
+endif(FAULT_INJECTION)
 
 # LTO
 option(LTO "Enable link time optimization" OFF)

@@ -12,15 +12,20 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads,
     : freq_ghz(get_freq_ghz()),
       hostname(get_hostname()),
       num_bg_threads(num_bg_threads) {
-  // Print warning messages if low-performance debug settings are enabled
+  // Print warning messages if low-performance settings are enabled
   if (kDatapathVerbose) {
     fprintf(stderr,
-            "eRPC Nexus: Datapath verbose enabled. Performance will be low.\n");
+            "eRPC Nexus: Verbose datapath enabled. Performance will be low.\n");
   }
 
   if (kDatapathChecks) {
     fprintf(stderr,
             "eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
+  }
+
+  if (kFaultInjection) {
+    fprintf(stderr,
+            "eRPC Nexus: Fault injection enabled. Performance will be low.\n");
   }
 
   if (num_bg_threads > kMaxBgThreads) {
