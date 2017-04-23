@@ -16,7 +16,7 @@ namespace ERpc {
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
-  assert(wi != nullptr && wi->peer != nullptr);
+  assert(wi != nullptr && wi->epeer != nullptr);
 
   const SessionMgmtPkt *sm_pkt = wi->sm_pkt;
   assert(sm_pkt != nullptr &&

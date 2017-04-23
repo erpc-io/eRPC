@@ -38,7 +38,7 @@ enum class SessionMgmtPktType : int {
   kDisconnectResp,  ///< Session disconnect response
   /// A request to reset the remote ENet peer. This is used in testing to
   /// emulate remote server failure.
-  kFltInjResetPeerReq
+  kFaultResetPeerReq
 };
 
 /// The types of responses to a session management packet
@@ -87,7 +87,7 @@ static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
       return std::string("[Disconnect request]");
     case SessionMgmtPktType::kDisconnectResp:
       return std::string("[Disconnect response]");
-    case SessionMgmtPktType::kFltInjResetPeerReq:
+    case SessionMgmtPktType::kFaultResetPeerReq:
       return std::string("[Reset peer request (fault injection)]");
   };
 
@@ -101,7 +101,7 @@ static bool session_mgmt_pkt_type_is_valid(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kConnectResp:
     case SessionMgmtPktType::kDisconnectReq:
     case SessionMgmtPktType::kDisconnectResp:
-    case SessionMgmtPktType::kFltInjResetPeerReq:
+    case SessionMgmtPktType::kFaultResetPeerReq:
       return true;
   }
   return false;
@@ -114,7 +114,7 @@ static bool session_mgmt_pkt_type_is_req(SessionMgmtPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
     case SessionMgmtPktType::kDisconnectReq:
-    case SessionMgmtPktType::kFltInjResetPeerReq:
+    case SessionMgmtPktType::kFaultResetPeerReq:
       return true;
     case SessionMgmtPktType::kConnectResp:
     case SessionMgmtPktType::kDisconnectResp:
@@ -134,7 +134,7 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
       return SessionMgmtPktType::kConnectResp;
     case SessionMgmtPktType::kDisconnectReq:
       return SessionMgmtPktType::kDisconnectResp;
-    case SessionMgmtPktType::kFltInjResetPeerReq:
+    case SessionMgmtPktType::kFaultResetPeerReq:
     case SessionMgmtPktType::kConnectResp:
     case SessionMgmtPktType::kDisconnectResp:
       break;

@@ -60,14 +60,14 @@ class Nexus {
   /// A work item exchanged between an Rpc thread and an SM thread
   class SmWorkItem {
    public:
-    SmWorkItem(uint8_t rpc_id, SessionMgmtPkt *sm_pkt, ENetPeer *peer)
-        : rpc_id(rpc_id), sm_pkt(sm_pkt), peer(peer) {
+    SmWorkItem(uint8_t rpc_id, SessionMgmtPkt *sm_pkt, ENetPeer *epeer)
+        : rpc_id(rpc_id), sm_pkt(sm_pkt), epeer(epeer) {
       assert(sm_pkt != nullptr);
     };
 
     const uint8_t rpc_id;    ///< The local Rpc ID
     SessionMgmtPkt *sm_pkt;  ///< The SM packet for this work item
-    ENetPeer *peer;
+    ENetPeer *epeer;
   };
 
   /// Session management thread context
@@ -88,8 +88,8 @@ class Nexus {
     std::unordered_map<uint32_t, std::string> ip_map;
   };
 
-  /// Peer metadata maintained by client peers
-  class SmPeerData {
+  /// Peer metadata maintained in client-mode ENet peers
+  class SmENetPeerData {
    public:
     std::string rem_hostname;
     bool connected;
@@ -189,9 +189,9 @@ class Nexus {
   /// Transmit session management packets enqueued by Rpc threads
   static void sm_thread_tx(SmThreadCtx *ctx);
 
-  /// Return true iff this is a server-mode peer
-  static bool is_peer_mode_server(ENetPeer *peer) {
-    return peer->data == nullptr;
+  /// Return true iff this is a server-mode ENet peer
+  static bool is_peer_mode_server(ENetPeer *epeer) {
+    return epeer->data == nullptr;
   }
 
   /// Read-mostly members exposed to Rpc threads

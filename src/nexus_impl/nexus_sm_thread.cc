@@ -2,7 +2,7 @@
 
 namespace ERpc {
 
-/// The number of ENet channels per peer. We don't use multiple channels.
+/// The number of ENet channels per ENet peer. We don't use multiple channels.
 static constexpr size_t kENetChannels = 1;
 
 /// Amount of time to block for ENet events
@@ -13,8 +13,8 @@ static constexpr size_t kENetConnectTimeoutMs = 50;
 
 // Implementation notes:
 //
-// A Nexus can have two peers established to a host: a client-mode peer used for
-// sending session management requests, and a server-mode peer used for
+// A Nexus can have two ENet peers established to a host: a client-mode peer
+// used for sending session management requests, and a server-mode peer used for
 // responding to these requests.
 //
 // A client-mode peer is created to each host that we create a client-mode
@@ -30,29 +30,29 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *ctx, ENetEvent *event) {
   assert(ctx != nullptr);
   assert(event != nullptr);
 
-  ENetPeer *peer = event->peer;
-  if (is_peer_mode_server(peer)) {
+  ENetPeer *epeer = event->peer;
+  if (is_peer_mode_server(epeer)) {
     return;
   }
 
-  // If we're here, this is a client-mode peer
-  auto *peer_data = static_cast<SmPeerData *>(peer->data);
-  assert(!peer_data->connected);
-  assert(peer_data->work_item_vec.size() > 0);
+  // If we're here, this is a client-mode ENet peer
+  auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
+  assert(!epeer_data->connected);
+  assert(epeer_data->work_item_vec.size() > 0);
 
-  peer_data->connected = true;
+  epeer_data->connected = true;
   erpc_dprintf(
       "eRPC Nexus: ENet socket connected to %s. Transmitting "
       "%zu queued SM requests.\n",
-      peer_data->rem_hostname.c_str(), peer_data->work_item_vec.size());
+      epeer_data->rem_hostname.c_str(), epeer_data->work_item_vec.size());
 
   // Transmit work items queued while waiting for connection
-  for (auto wi : peer_data->work_item_vec) {
+  for (auto wi : epeer_data->work_item_vec) {
     assert(wi.sm_pkt->is_req());
     sm_thread_tx_and_free(wi);
   }
 
-  peer_data->work_item_vec.clear();
+  epeer_data->work_item_vec.clear();
 }
 
 template <class TTr>
@@ -61,16 +61,16 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
   assert(ctx != nullptr);
   assert(event != nullptr);
 
-  ENetPeer *peer = event->peer;
-  uint32_t peer_ip = event->peer->address.host;
-  if (is_peer_mode_server(peer)) {
+  ENetPeer *epeer = event->peer;
+  uint32_t epeer_ip = epeer->address.host;
+  if (is_peer_mode_server(epeer)) {
     return;
   }
 
   // If we're here, this is a client mode peer, so we have mappings
-  assert(ctx->ip_map.count(peer_ip) > 0);
-  std::string hostname = ctx->ip_map[peer_ip];
-  assert(ctx->name_map[hostname] == peer);
+  assert(ctx->ip_map.count(epeer_ip) > 0);
+  std::string hostname = ctx->ip_map[epeer_ip];
+  assert(ctx->name_map[hostname] == epeer);
 
   erpc_dprintf("eRPC Nexus: ENet socket disconnected from %s.\n",
                hostname.c_str());
@@ -79,10 +79,10 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
   // may be requests from many sessions.
 
   // Remove from mappings and free memory
-  ctx->ip_map.erase(peer_ip);
+  ctx->ip_map.erase(epeer_ip);
   ctx->name_map.erase(hostname);
-  delete static_cast<SmPeerData *>(peer->data);
-  peer->data = nullptr;
+  delete static_cast<SmENetPeerData *>(epeer->data);
+  epeer->data = nullptr;
   return;
 }
 
@@ -92,13 +92,13 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   assert(event != nullptr);
   assert(event->packet->dataLength == sizeof(SessionMgmtPkt));
 
-  ENetPeer *peer = event->peer;
-  uint32_t peer_ip = event->peer->address.host;
+  ENetPeer *epeer = event->peer;
+  uint32_t epeer_ip = epeer->address.host;
 
-  if (!is_peer_mode_server(peer)) {
+  if (!is_peer_mode_server(epeer)) {
     // This is an event for a client-mode peer, so we have mappings
-    assert(ctx->ip_map.count(peer_ip) > 0);
-    assert(ctx->name_map[ctx->ip_map[peer_ip]] == peer);
+    assert(ctx->ip_map.count(epeer_ip) > 0);
+    assert(ctx->name_map[ctx->ip_map[epeer_ip]] == epeer);
   }
 
   // Copy out the ENet packet - this gets freed by the Rpc thread
@@ -109,13 +109,13 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
 
   // Handle fault-injection session management packets
-  if (sm_pkt->pkt_type == SessionMgmtPktType::kFltInjResetPeerReq) {
+  if (sm_pkt->pkt_type == SessionMgmtPktType::kFaultResetPeerReq) {
     erpc_dprintf(
         "eRPC Nexus: Received %s from Rpc [%s, %u]. "
         "Forcefully resetting ENet peer.\n",
         session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str(),
         sm_pkt->client.hostname, sm_pkt->client.rpc_id);
-    enet_peer_reset(peer);
+    enet_peer_reset(epeer);
     return;
   }
 
@@ -140,7 +140,7 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
       sm_pkt->err_type = SessionMgmtErrType::kInvalidRemoteRpcId;
 
       // Create a fake (invalid) work item for sm_thread_tx_and_free
-      SmWorkItem temp_wi(kInvalidRpcId, sm_pkt, peer);
+      SmWorkItem temp_wi(kInvalidRpcId, sm_pkt, epeer);
       sm_thread_tx_and_free(temp_wi);  // This frees sm_pkt
     } else {
       erpc_dprintf(
@@ -196,14 +196,14 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
 
 template <class TTr>
 void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
-  assert(wi.peer != nullptr);
+  assert(wi.epeer != nullptr);
 
   SessionMgmtPkt *sm_pkt = wi.sm_pkt;
   assert(sm_pkt != nullptr);
 
   // If the work item uses a client-mode peer, the peer must be connected
-  if (wi.peer->data != nullptr) {
-    assert(static_cast<SmPeerData *>(wi.peer->data)->connected);
+  if (!is_peer_mode_server(wi.epeer)) {
+    assert(static_cast<SmENetPeerData *>(wi.epeer->data)->connected);
   }
 
   // Create the packet to send
@@ -214,7 +214,7 @@ void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
   }
   delete sm_pkt;
 
-  if (enet_peer_send(wi.peer, 0, enet_pkt) != 0) {
+  if (enet_peer_send(wi.epeer, 0, enet_pkt) != 0) {
     throw std::runtime_error("eRPC Nexus: Failed to send ENet packet.");
   }
 }
@@ -234,20 +234,20 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
     assert(session_mgmt_pkt_type_is_valid(wi.sm_pkt->pkt_type));
 
     if (wi.sm_pkt->is_req()) {
-      // Transmit a session management request. wi.peer must be filled here
+      // Transmit a session management request. wi.epeer must be filled here
       // because Rpc threads don't have ENet peer information.
-      assert(wi.peer == nullptr);
+      assert(wi.epeer == nullptr);
       std::string rem_hostname = std::string(wi.sm_pkt->server.hostname);
 
       if (ctx->name_map.count(rem_hostname) != 0) {
         // We already have a client-mode ENet peer to this host
-        ENetPeer *peer = ctx->name_map[rem_hostname];
-        wi.peer = peer;
+        ENetPeer *epeer = ctx->name_map[rem_hostname];
+        wi.epeer = epeer;
 
         // Wait if the peer is not yet connected
-        auto *peer_data = static_cast<SmPeerData *>(peer->data);
-        if (!peer_data->connected) {
-          peer_data->work_item_vec.push_back(wi);
+        auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
+        if (!epeer_data->connected) {
+          epeer_data->work_item_vec.push_back(wi);
         } else {
           sm_thread_tx_and_free(wi);
         }
@@ -260,30 +260,30 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
               "eRPC Nexus: ENet Failed to resolve address " + rem_hostname);
         }
 
-        ENetPeer *peer =
+        ENetPeer *epeer =
             enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
-        if (peer == nullptr) {
+        if (epeer == nullptr) {
           throw std::runtime_error("eRPC Nexus: Failed to connect ENet to " +
                                    rem_hostname);
         }
 
-        wi.peer = peer;
+        wi.epeer = epeer;
 
         // Add the peer to mappings to avoid creating a duplicate peer
-        ctx->name_map[rem_hostname] = peer;
+        ctx->name_map[rem_hostname] = epeer;
         ctx->ip_map[rem_address.host] = rem_hostname;
 
         // Save the work item - we'll transmit it when we get connected
-        peer->data = new SmPeerData();
-        auto *peer_data = static_cast<SmPeerData *>(peer->data);
-        peer_data->rem_hostname = rem_hostname;
-        peer_data->connected = false;
+        epeer->data = new SmENetPeerData();
+        auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
+        epeer_data->rem_hostname = rem_hostname;
+        epeer_data->connected = false;
 
-        peer_data->work_item_vec.push_back(wi);
+        epeer_data->work_item_vec.push_back(wi);
       }
     } else {
       // Transmit a session management response
-      assert(wi.peer != nullptr);
+      assert(wi.epeer != nullptr);
       sm_thread_tx_and_free(wi);
     }
   }
