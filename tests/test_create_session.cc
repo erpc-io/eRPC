@@ -2,13 +2,13 @@
 
 class AppContext : public BasicAppContext {
  public:
-  SessionMgmtErrType exp_err;
+  SmErrType exp_err;
   int session_num;
 };
 
 /* Only invoked for clients */
-void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
-                     SessionMgmtErrType sm_err_type, void *_context) {
+void test_sm_handler(int session_num, SmEventType sm_event_type,
+                     SmErrType sm_err_type, void *_context) {
   ASSERT_TRUE(_context != nullptr);
   AppContext *context = static_cast<AppContext *>(_context);
   context->num_sm_resps++;
@@ -18,10 +18,10 @@ void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
   ASSERT_EQ(session_num, context->session_num);
 
   /* If the error type is really an error, the event should be connect failed */
-  if (sm_err_type == SessionMgmtErrType::kNoError) {
-    ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnected);
+  if (sm_err_type == SmErrType::kNoError) {
+    ASSERT_EQ(sm_event_type, SmEventType::kConnected);
   } else {
-    ASSERT_EQ(sm_event_type, SessionMgmtEventType::kConnectFailed);
+    ASSERT_EQ(sm_event_type, SmEventType::kConnectFailed);
   }
 }
 
@@ -36,7 +36,7 @@ void simple_connect(Nexus<IBTransport> *nexus, size_t) {
                                      kAppPhyPort, kAppNumaNode);
 
   /* Connect the session */
-  context.exp_err = SessionMgmtErrType::kNoError;
+  context.exp_err = SmErrType::kNoError;
   context.session_num =
       context.rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(context.session_num, 0);
@@ -69,7 +69,7 @@ void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
                                      kAppPhyPort, kAppNumaNode);
 
   /* Connect the session */
-  context.exp_err = SessionMgmtErrType::kInvalidRemotePort;
+  context.exp_err = SmErrType::kInvalidRemotePort;
   context.session_num = context.rpc->create_session(
       local_hostname, kAppServerRpcId, kAppPhyPort + 1);
   ASSERT_GE(context.session_num, 0); /* Local session creation works */

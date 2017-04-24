@@ -86,7 +86,7 @@ template <class TTr>
 void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   assert(ctx != nullptr);
   assert(event != nullptr);
-  assert(event->packet->dataLength == sizeof(SessionMgmtPkt));
+  assert(event->packet->dataLength == sizeof(SmPkt));
 
   ENetPeer *epeer = event->peer;
 
@@ -97,19 +97,18 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   }
 
   // Copy out the ENet packet - this gets freed by the Rpc thread
-  SessionMgmtPkt *sm_pkt = new SessionMgmtPkt();
-  memcpy(static_cast<void *>(sm_pkt), event->packet->data,
-         sizeof(SessionMgmtPkt));
+  SmPkt *sm_pkt = new SmPkt();
+  memcpy(static_cast<void *>(sm_pkt), event->packet->data, sizeof(SmPkt));
   enet_packet_destroy(event->packet);
-  assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
+  assert(sm_pkt_type_is_valid(sm_pkt->pkt_type));
 
   // Handle reset peer request here, since it's not passed to any Rpc
-  if (sm_pkt->pkt_type == SessionMgmtPktType::kFaultResetPeerReq) {
+  if (sm_pkt->pkt_type == SmPktType::kFaultResetPeerReq) {
     erpc_dprintf(
         "eRPC Nexus: Received %s from Rpc [%s, %u]. "
         "Forcefully resetting ENet peer.\n",
-        session_mgmt_pkt_type_str(sm_pkt->pkt_type).c_str(),
-        sm_pkt->client.hostname, sm_pkt->client.rpc_id);
+        sm_pkt_type_str(sm_pkt->pkt_type).c_str(), sm_pkt->client.hostname,
+        sm_pkt->client.rpc_id);
     enet_peer_reset(epeer);
     return;
   }
@@ -127,15 +126,15 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
     // send a response if possible. Ignore if sm_pkt is a response.
     if (is_sm_req) {
       // We don't handle this error for fault-injection session management reqs
-      assert(session_mgmt_pkt_type_req_has_resp(sm_pkt->pkt_type));
+      assert(sm_pkt_type_req_has_resp(sm_pkt->pkt_type));
 
       erpc_dprintf(
           "eRPC Nexus: Received session management request for invalid "
           "Rpc %u from Rpc [%s, %u]. Sending response.\n",
           target_rpc_id, sm_pkt->client.hostname, sm_pkt->client.rpc_id);
 
-      sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
-      sm_pkt->err_type = SessionMgmtErrType::kInvalidRemoteRpcId;
+      sm_pkt->pkt_type = sm_pkt_type_req_to_resp(sm_pkt->pkt_type);
+      sm_pkt->err_type = SmErrType::kInvalidRemoteRpcId;
 
       // Create a fake (invalid) work item for sm_thread_tx_and_free
       SmWorkItem temp_wi(kInvalidRpcId, sm_pkt, epeer);
@@ -196,7 +195,7 @@ template <class TTr>
 void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
   assert(wi.epeer != nullptr);
 
-  SessionMgmtPkt *sm_pkt = wi.sm_pkt;
+  SmPkt *sm_pkt = wi.sm_pkt;
   assert(sm_pkt != nullptr);
 
   // If the work item uses a client-mode peer, the peer must be connected
@@ -205,8 +204,8 @@ void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
   }
 
   // Create the packet to send
-  ENetPacket *enet_pkt = enet_packet_create(sm_pkt, sizeof(SessionMgmtPkt),
-                                            ENET_PACKET_FLAG_RELIABLE);
+  ENetPacket *enet_pkt =
+      enet_packet_create(sm_pkt, sizeof(SmPkt), ENET_PACKET_FLAG_RELIABLE);
   if (enet_pkt == nullptr) {
     throw std::runtime_error("eRPC Nexus: Failed to create ENet packet.");
   }
@@ -229,7 +228,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
 
   for (SmWorkItem &wi : ctx->sm_tx_list.list) {
     assert(wi.sm_pkt != nullptr);
-    assert(session_mgmt_pkt_type_is_valid(wi.sm_pkt->pkt_type));
+    assert(sm_pkt_type_is_valid(wi.sm_pkt->pkt_type));
 
     if (wi.sm_pkt->is_req()) {
       // Transmit a session management request. wi.epeer must be filled here

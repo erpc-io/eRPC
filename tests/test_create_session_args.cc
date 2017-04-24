@@ -19,8 +19,8 @@ const size_t numa_node = 0;
 char local_hostname[kMaxHostnameLen];
 
 /// The session managament handler that is never invoked
-void test_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
-                     SessionMgmtErrType sm_err_type, void *_context) {
+void test_sm_handler(int session_num, SmEventType sm_event_type,
+                     SmErrType sm_err_type, void *_context) {
   _unused(session_num);
   _unused(sm_event_type);
   _unused(sm_err_type);

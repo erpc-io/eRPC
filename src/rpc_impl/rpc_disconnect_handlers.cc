@@ -18,9 +18,8 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
   assert(wi != nullptr && wi->epeer != nullptr);
 
-  const SessionMgmtPkt *sm_pkt = wi->sm_pkt;
-  assert(sm_pkt != nullptr &&
-         sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectReq);
+  const SmPkt *sm_pkt = wi->sm_pkt;
+  assert(sm_pkt != nullptr && sm_pkt->pkt_type == SmPktType::kDisconnectReq);
 
   // Check that the server fields known by the client were filled correctly
   assert(sm_pkt->server.rpc_id == rpc_id);
@@ -53,7 +52,7 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   }
 
   erpc_dprintf("%s. None. Sending response.\n", issue_msg);
-  enqueue_sm_resp(wi, SessionMgmtErrType::kNoError);
+  enqueue_sm_resp(wi, SmErrType::kNoError);
 
   bury_session_st(session);  // Free session resources + NULL in session_vec
 }
@@ -61,11 +60,11 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
 // We don't need to acquire the session lock because this session has been
 // idle since the disconnect request was sent.
 template <class TTr>
-void Rpc<TTr>::handle_disconnect_resp_st(SessionMgmtPkt *sm_pkt) {
+void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != nullptr);
-  assert(sm_pkt->pkt_type == SessionMgmtPktType::kDisconnectResp);
-  assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));
+  assert(sm_pkt->pkt_type == SmPktType::kDisconnectResp);
+  assert(sm_err_type_is_valid(sm_pkt->err_type));
 
   // Create the basic issue message using only the packet
   char issue_msg[kMaxIssueMsgLen];
@@ -86,7 +85,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(SessionMgmtPkt *sm_pkt) {
   assert(session->client == sm_pkt->client);
   assert(session->server == sm_pkt->server);
   // Disconnect requests can only succeed
-  assert(sm_pkt->err_type == SessionMgmtErrType::kNoError);
+  assert(sm_pkt->err_type == SmErrType::kNoError);
 
   session->client_info.sm_api_req_pending = false;
 
@@ -94,9 +93,8 @@ void Rpc<TTr>::handle_disconnect_resp_st(SessionMgmtPkt *sm_pkt) {
 
   if (!session->client_info.sm_callbacks_disabled) {
     erpc_dprintf("%s: None. Session disconnected.\n", issue_msg);
-    session_mgmt_handler(session->local_session_num,
-                         SessionMgmtEventType::kDisconnected,
-                         SessionMgmtErrType::kNoError, context);
+    sm_handler(session->local_session_num, SmEventType::kDisconnected,
+               SmErrType::kNoError, context);
   } else {
     erpc_dprintf(
         "%s: None. Session disconnected. Not invoking disconnect "

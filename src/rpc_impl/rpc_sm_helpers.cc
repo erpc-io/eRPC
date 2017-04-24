@@ -7,16 +7,16 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::handle_session_mgmt_st() {
+void Rpc<TTr>::handle_sm_st() {
   assert(in_creator());
   assert(nexus_hook.sm_rx_list.size > 0);
   nexus_hook.sm_rx_list.lock();
 
   // Handle all session management requests
   for (typename Nexus<TTr>::SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
-    SessionMgmtPkt *sm_pkt = wi.sm_pkt;
+    SmPkt *sm_pkt = wi.sm_pkt;
     assert(sm_pkt != nullptr);
-    assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
+    assert(sm_pkt_type_is_valid(sm_pkt->pkt_type));
 
     // The sender of a packet cannot be this Rpc
     if (sm_pkt->is_req()) {
@@ -28,19 +28,19 @@ void Rpc<TTr>::handle_session_mgmt_st() {
     }
 
     switch (sm_pkt->pkt_type) {
-      case SessionMgmtPktType::kConnectReq:
+      case SmPktType::kConnectReq:
         handle_connect_req_st(&wi);
         break;
-      case SessionMgmtPktType::kConnectResp:
+      case SmPktType::kConnectResp:
         handle_connect_resp_st(sm_pkt);
         break;
-      case SessionMgmtPktType::kDisconnectReq:
+      case SmPktType::kDisconnectReq:
         handle_disconnect_req_st(&wi);
         break;
-      case SessionMgmtPktType::kDisconnectResp:
+      case SmPktType::kDisconnectResp:
         handle_disconnect_resp_st(sm_pkt);
         break;
-      case SessionMgmtPktType::kFaultDropTxRemote:
+      case SmPktType::kFaultDropTxRemote:
         erpc_dprintf("eRPC Rpc %u: Received drop TX remote fault from %s.\n",
                      rpc_id, sm_pkt->client.name().c_str());
         faults.drop_tx_local = true;
@@ -85,10 +85,10 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type) {
+void Rpc<TTr>::enqueue_sm_req(Session *session, SmPktType pkt_type) {
   assert(session != nullptr && session->is_client());
 
-  SessionMgmtPkt *sm_pkt = new SessionMgmtPkt();  // Freed by SM thread
+  SmPkt *sm_pkt = new SmPkt();  // Freed by SM thread
   sm_pkt->pkt_type = pkt_type;
   sm_pkt->client = session->client;
   sm_pkt->server = session->server;
@@ -98,7 +98,7 @@ void Rpc<TTr>::enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type) {
 
 template <class TTr>
 void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
-                               SessionMgmtErrType err_type) {
+                               SmErrType err_type) {
   assert(req_wi != nullptr);
   assert(req_wi->epeer != nullptr);
   assert(req_wi->sm_pkt != nullptr);
@@ -106,11 +106,11 @@ void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
 
   // The SM packet in the work item will be freed later by this thread. Create
   // a copy that will be freed by the SM thread.
-  auto *sm_pkt = new SessionMgmtPkt();
+  auto *sm_pkt = new SmPkt();
   *sm_pkt = *req_wi->sm_pkt;
 
   // Change the packet type to response
-  sm_pkt->pkt_type = session_mgmt_pkt_type_req_to_resp(sm_pkt->pkt_type);
+  sm_pkt->pkt_type = sm_pkt_type_req_to_resp(sm_pkt->pkt_type);
   sm_pkt->err_type = err_type;
 
   typename Nexus<TTr>::SmWorkItem wi(rpc_id, sm_pkt, req_wi->epeer);

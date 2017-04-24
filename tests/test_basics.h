@@ -84,8 +84,8 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &, const size_t,
                                   const double);
 
 /// A basic session management handler that expects successful responses
-void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
-                      SessionMgmtErrType sm_err_type, void *_context) {
+void basic_sm_handler(int session_num, SmEventType sm_event_type,
+                      SmErrType sm_err_type, void *_context) {
   _unused(session_num);
   _unused(sm_event_type);
   _unused(sm_err_type);
@@ -94,14 +94,13 @@ void basic_sm_handler(int session_num, SessionMgmtEventType sm_event_type,
   auto *context = static_cast<BasicAppContext *>(_context);
   context->num_sm_resps++;
 
-  assert(sm_err_type == SessionMgmtErrType::kNoError);
-  assert(sm_event_type == SessionMgmtEventType::kConnected ||
-         sm_event_type == SessionMgmtEventType::kDisconnected);
+  assert(sm_err_type == SmErrType::kNoError);
+  assert(sm_event_type == SmEventType::kConnected ||
+         sm_event_type == SmEventType::kDisconnected);
 }
 
 /// A basic empty session management handler that should never be invoked.
-void basic_empty_sm_handler(int, SessionMgmtEventType, SessionMgmtErrType,
-                            void *) {
+void basic_empty_sm_handler(int, SmEventType, SmErrType, void *) {
   assert(false);
   exit(-1);
 }
@@ -124,7 +123,7 @@ void basic_empty_req_handler(ReqHandle *, void *) {
 void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
                               size_t num_srv_threads,
                               ConnectServers connect_servers,
-                              session_mgmt_handler_t sm_handler) {
+                              sm_handler_t sm_handler) {
   BasicAppContext context;
   context.is_client = false;
 
@@ -240,9 +239,9 @@ void launch_server_client_threads(
   // Launch one server Rpc thread for each client session
   for (size_t i = 0; i < num_sessions; i++) {
     // Server threads need an SM handler iff we're connecting servers together
-    session_mgmt_handler_t _sm_handler =
-        connect_servers == ConnectServers::kFalse ? basic_empty_sm_handler
-                                                  : basic_sm_handler;
+    sm_handler_t _sm_handler = connect_servers == ConnectServers::kFalse
+                                   ? basic_empty_sm_handler
+                                   : basic_sm_handler;
 
     server_thread[i] =
         std::thread(basic_server_thread_func, &nexus, kAppServerRpcId + i,
@@ -275,7 +274,7 @@ void launch_server_client_threads(
  */
 void client_connect_sessions(Nexus<IBTransport> *nexus,
                              BasicAppContext &context, size_t num_sessions,
-                             session_mgmt_handler_t sm_handler) {
+                             sm_handler_t sm_handler) {
   assert(nexus != nullptr);
   assert(num_sessions >= 1);
 

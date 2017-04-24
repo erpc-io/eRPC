@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include "common.h"
 #include "session.h"
-#include "session_mgmt_types.h"
+#include "sm_types.h"
 #include "small_rpc_optlevel.h"
 #include "transport_impl/ib_transport.h"
 #include "util/mt_list.h"
@@ -60,13 +60,13 @@ class Nexus {
   /// A work item exchanged between an Rpc thread and an SM thread
   class SmWorkItem {
    public:
-    SmWorkItem(uint8_t rpc_id, SessionMgmtPkt *sm_pkt, ENetPeer *epeer)
+    SmWorkItem(uint8_t rpc_id, SmPkt *sm_pkt, ENetPeer *epeer)
         : rpc_id(rpc_id), sm_pkt(sm_pkt), epeer(epeer) {
       assert(sm_pkt != nullptr);
     };
 
-    const uint8_t rpc_id;    ///< The local Rpc ID
-    SessionMgmtPkt *sm_pkt;  ///< The SM packet for this work item
+    const uint8_t rpc_id;  ///< The local Rpc ID
+    SmPkt *sm_pkt;         ///< The SM packet for this work item
     ENetPeer *epeer;
   };
 

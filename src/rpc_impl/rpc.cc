@@ -12,12 +12,11 @@ namespace ERpc {
 
 template <class TTr>
 Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
-              session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port,
-              size_t numa_node)
+              sm_handler_t sm_handler, uint8_t phy_port, size_t numa_node)
     : nexus(nexus),
       context(context),
       rpc_id(rpc_id),
-      session_mgmt_handler(session_mgmt_handler),
+      sm_handler(sm_handler),
       phy_port(phy_port),
       numa_node(numa_node),
       multi_threaded(nexus->num_bg_threads > 0),

@@ -9,7 +9,7 @@
 #include "msg_buffer.h"
 #include "ops.h"
 #include "pkthdr.h"
-#include "session_mgmt_types.h"
+#include "sm_types.h"
 #include "sslot.h"
 #include "util/buffer.h"
 #include "util/fixed_vector.h"

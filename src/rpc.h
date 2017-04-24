@@ -50,9 +50,8 @@ class Rpc {
    * @brief Construct the Rpc object from a foreground thread
    * @throw runtime_error if construction fails
    */
-  Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
-      session_mgmt_handler_t session_mgmt_handler, uint8_t phy_port = 0,
-      size_t numa_node = 0);
+  Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,
+      uint8_t phy_port = 0, size_t numa_node = 0);
 
   /// Destroy the Rpc from a foreground thread
   ~Rpc();
@@ -264,7 +263,7 @@ class Rpc {
   /// Process all session management packets in the hook's RX list and free
   /// them. The handlers for individual request/response types should not free
   /// packets.
-  void handle_session_mgmt_st();
+  void handle_sm_st();
 
   /// Free a session's resources and mark it as NULL in the session vector.
   /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
@@ -274,21 +273,21 @@ class Rpc {
   /// Allocate a session management request packet and enqueue it to the
   /// session management thread. The allocated packet will be freed by the
   /// session management thread on transmission.
-  void enqueue_sm_req(Session *session, SessionMgmtPktType pkt_type);
+  void enqueue_sm_req(Session *session, SmPktType pkt_type);
 
   /// Allocate a response-copy of the session manegement packet and enqueue it
   /// to the session management thread. The allocated packet will be freed by
   /// the session management thread on transmission.
   void enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
-                       SessionMgmtErrType err_type);
+                       SmErrType err_type);
 
   // rpc_connect_handlers.cc
   void handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
-  void handle_connect_resp_st(SessionMgmtPkt *pkt);
+  void handle_connect_resp_st(SmPkt *pkt);
 
   // rpc_disconnect_handlers.cc
   void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
-  void handle_disconnect_resp_st(SessionMgmtPkt *pkt);
+  void handle_disconnect_resp_st(SmPkt *pkt);
 
   //
   // Rpc datapath (rpc_enqueue_request.cc and rpc_enqueue_response.cc)
@@ -485,12 +484,19 @@ class Rpc {
     item.offset = offset;
     item.data_bytes = data_bytes;
 
-    if (kFaultInjection && faults.drop_tx_local) {
-      erpc_dprintf(
-          "eRPC Rpc %u: Dropping packet %s.\n", rpc_id,
-          tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
-      item.drop = true;
-      faults.drop_tx_local = false;
+    if (kFaultInjection) {
+      // We need to maintain item.drop
+      if (faults.drop_tx_local) {
+        erpc_dprintf(
+            "eRPC Rpc %u: Dropping packet %s.\n", rpc_id,
+            tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
+        item.drop = true;
+        faults.drop_tx_local = false;
+      } else {
+        item.drop = false;
+      }
+    } else {
+      assert(!item.drop);
     }
 
     tx_msgbuf->pkts_queued++;  // Update queueing progress
@@ -628,7 +634,7 @@ class Rpc {
   Nexus<TTr> *nexus;
   void *context;  ///< The application context
   const uint8_t rpc_id;
-  const session_mgmt_handler_t session_mgmt_handler;
+  const sm_handler_t sm_handler;
   const uint8_t phy_port;  ///< Zero-based physical port specified by app
   const size_t numa_node;
 
@@ -683,7 +689,7 @@ class Rpc {
     /// Fail server routing info resolution at client. This is used to test the
     /// case where a client fails to resolve routing info sent by the server.
     bool resolve_server_rinfo = false;
-    bool drop_tx_local;  ///< Drop a local TX packet
+    bool drop_tx_local = false;  ///< Drop a local TX packet
   } faults;
 
   // Datapath stats

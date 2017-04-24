@@ -14,9 +14,8 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
   assert(wi != nullptr && wi->epeer != nullptr);
 
-  SessionMgmtPkt *sm_pkt = wi->sm_pkt;
-  assert(sm_pkt != nullptr &&
-         sm_pkt->pkt_type == SessionMgmtPktType::kConnectReq);
+  SmPkt *sm_pkt = wi->sm_pkt;
+  assert(sm_pkt != nullptr && sm_pkt->pkt_type == SmPktType::kConnectReq);
 
   // Ensure that server fields known by the client were filled correctly
   assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
@@ -33,7 +32,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   if (pkt_tr_type != transport->transport_type) {
     erpc_dprintf("%s: Invalid transport %s. Sending response.\n", issue_msg,
                  Transport::get_transport_name(pkt_tr_type).c_str());
-    enqueue_sm_resp(wi, SessionMgmtErrType::kInvalidTransport);
+    enqueue_sm_resp(wi, SmErrType::kInvalidTransport);
     return;
   }
 
@@ -41,7 +40,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   if (sm_pkt->server.phy_port != phy_port) {
     erpc_dprintf("%s: Invalid server port %u. Sending response.\n", issue_msg,
                  sm_pkt->server.phy_port);
-    enqueue_sm_resp(wi, SessionMgmtErrType::kInvalidRemotePort);
+    enqueue_sm_resp(wi, SmErrType::kInvalidRemotePort);
     return;
   }
 
@@ -57,7 +56,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   if (session_vec.size() == kMaxSessionsPerThread) {
     erpc_dprintf("%s: Reached session limit %zu. Sending response.\n",
                  issue_msg, kMaxSessionsPerThread);
-    enqueue_sm_resp(wi, SessionMgmtErrType::kTooManySessions);
+    enqueue_sm_resp(wi, SmErrType::kTooManySessions);
     return;
   }
 
@@ -71,7 +70,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   if (!resolve_success) {
     erpc_dprintf("%s: Unable to resolve routing info %s. Sending response.\n",
                  issue_msg, TTr::routing_info_str(client_rinfo).c_str());
-    enqueue_sm_resp(wi, SessionMgmtErrType::kRoutingResolutionFailure);
+    enqueue_sm_resp(wi, SmErrType::kRoutingResolutionFailure);
     return;
   }
 
@@ -93,7 +92,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
       }
 
       erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
-      enqueue_sm_resp(wi, SessionMgmtErrType::kOutOfMemory);
+      enqueue_sm_resp(wi, SmErrType::kOutOfMemory);
       return;
     }
   }
@@ -113,16 +112,16 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   session_vec.push_back(session);  // Add to list of all sessions
 
   erpc_dprintf("%s: None. Sending response.\n", issue_msg);
-  enqueue_sm_resp(wi, SessionMgmtErrType::kNoError);
+  enqueue_sm_resp(wi, SmErrType::kNoError);
   return;
 }
 
 template <class TTr>
-void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
+void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != nullptr);
-  assert(sm_pkt->pkt_type == SessionMgmtPktType::kConnectResp);
-  assert(session_mgmt_err_type_is_valid(sm_pkt->err_type));
+  assert(sm_pkt->pkt_type == SmPktType::kConnectResp);
+  assert(sm_err_type_is_valid(sm_pkt->err_type));
 
   // Create the basic issue message using only the packet
   char issue_msg[kMaxIssueMsgLen];
@@ -152,14 +151,13 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
 
   // If the connect response has an error, the server has not allocated a
   // Session. Mark the session as disconnected and invoke callback.
-  if (sm_pkt->err_type != SessionMgmtErrType::kNoError) {
+  if (sm_pkt->err_type != SmErrType::kNoError) {
     erpc_dprintf("%s: Error %s.\n", issue_msg,
-                 session_mgmt_err_type_str(sm_pkt->err_type).c_str());
+                 sm_err_type_str(sm_pkt->err_type).c_str());
 
     session->state = SessionState::kDisconnected;
-    session_mgmt_handler(session->local_session_num,
-                         SessionMgmtEventType::kConnectFailed, sm_pkt->err_type,
-                         context);
+    sm_handler(session->local_session_num, SmEventType::kConnectFailed,
+               sm_pkt->err_type, context);
     bury_session_st(session);
     return;
   }
@@ -201,11 +199,10 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
 
     // Enqueue a session management work request
     session->client_info.sm_api_req_pending = true;
-    enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
+    enqueue_sm_req(session, SmPktType::kDisconnectReq);
 
-    session_mgmt_handler(
-        session->local_session_num, SessionMgmtEventType::kConnectFailed,
-        SessionMgmtErrType::kRoutingResolutionFailure, context);
+    sm_handler(session->local_session_num, SmEventType::kConnectFailed,
+               SmErrType::kRoutingResolutionFailure, context);
 
     return;
   }
@@ -216,9 +213,8 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   session->state = SessionState::kConnected;
 
   erpc_dprintf("%s: None. Session connected.\n", issue_msg);
-  session_mgmt_handler(session->local_session_num,
-                       SessionMgmtEventType::kConnected,
-                       SessionMgmtErrType::kNoError, context);
+  sm_handler(session->local_session_num, SmEventType::kConnected,
+             SmErrType::kNoError, context);
 }
 
 }  // End ERpc

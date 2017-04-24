@@ -118,7 +118,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
 
   // Enqueue a session management work request
   session->client_info.sm_api_req_pending = true;
-  enqueue_sm_req(session, SessionMgmtPktType::kConnectReq);
+  enqueue_sm_req(session, SmPktType::kConnectReq);
 
   return client_endpoint.session_num;
 }
@@ -196,7 +196,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
 
       // Enqueue a session management work request
       session->client_info.sm_api_req_pending = true;
-      enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
+      enqueue_sm_req(session, SmPktType::kDisconnectReq);
 
       unlock_cond(&session->lock);
       return 0;

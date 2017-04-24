@@ -43,10 +43,10 @@ class Transport {
   /// Info about a packet that needs TX
   struct tx_burst_item_t {
     RoutingInfo* routing_info;  ///< Routing info for this packet
-    MsgBuffer* msg_buffer;      ///< The MsgBuffer for this packet
-    size_t offset;              ///< The offset for this packet in the MsgBuffer
-    size_t data_bytes;  ///< The number of data bytes to TX from \p offset
-    bool drop;          ///< Drop this packet (requires kFaultInjection)
+    MsgBuffer* msg_buffer;      ///< MsgBuffer for this packet
+    size_t offset;              ///< Offset for this packet in the MsgBuffer
+    size_t data_bytes;          ///< Number of data bytes to TX from \p offset
+    bool drop = false;          ///< Drop this packet (requires kFaultInjection)
   };
 
   /// Generic types for memory registration and deregistration functions.

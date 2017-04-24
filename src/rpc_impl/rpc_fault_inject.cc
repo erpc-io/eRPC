@@ -57,7 +57,7 @@ void Rpc<TTr>::fault_inject_drop_tx_remote(int session_num) {
       session->server.rpc_id);
 
   // Enqueue a session management work request
-  enqueue_sm_req(session, SessionMgmtPktType::kFaultDropTxRemote);
+  enqueue_sm_req(session, SmPktType::kFaultDropTxRemote);
 
   unlock_cond(&session->lock);
 }
@@ -90,7 +90,7 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
       session->server.rpc_id);
 
   // Enqueue a session management work request
-  enqueue_sm_req(session, SessionMgmtPktType::kFaultResetPeerReq);
+  enqueue_sm_req(session, SmPktType::kFaultResetPeerReq);
 
   unlock_cond(&session->lock);
 }
