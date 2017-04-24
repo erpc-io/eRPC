@@ -20,6 +20,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
       phy_port(phy_port),
       numa_node(numa_node),
       multi_threaded(nexus->num_bg_threads > 0),
+      pkt_loss_epoch_cycles(kPktLossEpochMs * 1000000 * nexus->freq_ghz),
       req_func_arr(nexus->req_func_arr) {
   // Ensure that we're running as root
   if (getuid()) {

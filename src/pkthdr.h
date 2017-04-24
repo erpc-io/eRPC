@@ -7,11 +7,9 @@ namespace ERpc {
 
 // Packet header
 static constexpr size_t kMaxReqTypes = std::numeric_limits<uint8_t>::max();
-static constexpr size_t kInvalidReqType = (kMaxReqTypes - 1);
 static constexpr size_t kMsgSizeBits = 24;  ///< Bits for message size
 static constexpr size_t kReqNumBits = 44;   ///< Bits for request number
-static constexpr size_t kInvalidReqNum = ((1ull << kReqNumBits) - 1);
-static constexpr size_t kPktNumBits = 13;  ///< Bits for packet number
+static constexpr size_t kPktNumBits = 13;   ///< Bits for packet number
 
 /// Debug bits for packet header. Also useful for making the total size of all
 /// pkthdr_t bitfields equal to 128 bits, which makes copying faster.

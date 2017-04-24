@@ -195,7 +195,7 @@ class Nexus {
   }
 
   /// Read-mostly members exposed to Rpc threads
-  const double freq_ghz;        ///< Rdtsc frequncy
+  const double freq_ghz;        ///< TSC frequncy
   const std::string hostname;   ///< The local host
   const size_t num_bg_threads;  ///< Background threads to process Rpc reqs
 

@@ -39,6 +39,9 @@ class Rpc {
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 
+  /// Packet loss detection epoch time (milliseconds)
+  static constexpr size_t kPktLossEpochMs = 50;
+
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
@@ -648,49 +651,44 @@ class Rpc {
 
   // Others
   const bool multi_threaded;  ///< True iff there are background threads
+  const size_t pkt_loss_epoch_cycles;  ///< Packet loss epoch in TSC cycles
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.
   const std::array<ReqFunc, kMaxReqTypes> req_func_arr;
 
+  size_t creator_tiny_tid;  ///< Tiny thread ID of the creator thread
+  typename Nexus<TTr>::Hook nexus_hook;  ///< A hook shared with the Nexus
   TlsRegistry *tls_registry;  ///< Pointer to the Nexus's thread-local registry
-  size_t creator_tiny_tid;    ///< Tiny thread ID of the creator thread
-
-  bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
-  TTr *transport = nullptr;  ///< The unreliable transport
-
-  HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
-  std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
-
-  uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
-  size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
-
-  /// The next request number prefix for each session request window slot
-  size_t req_num_arr[Session::kSessionReqWindow] = {0};
-  std::mutex req_num_arr_lock;
 
   /// The append-only list of session pointers, indexed by session number.
   /// Disconnected sessions are denoted by null pointers. This grows as sessions
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
+  /// The next request number prefix for each session request window slot
+  size_t req_num_arr[Session::kSessionReqWindow] = {0};
+  std::mutex req_num_arr_lock;
+
+  TTr *transport = nullptr;  ///< The unreliable transport
+  Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx baych info
+  size_t tx_batch_i = 0;  ///< The batch index for \p tx_burst_arr
+  MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];   /// Batch info for \p rx_burst
+  uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
+  size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
+
+  HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
+  std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
 
   std::vector<SSlot *> req_txq;  ///< Request sslots that need TX
   std::mutex req_txq_lock;       ///< Conditional lock for the request TX queue
 
-  /// Responses from background request handlers
-  std::vector<SSlot *> bg_resp_txq;
+  std::vector<SSlot *> bg_resp_txq;  ///< Responses from background req handlers
   std::mutex bg_resp_txq_lock;  ///< Unconditional lock for bg response TX queue
 
-  /// Tx batch info for interfacing between the event loop and the transport
-  Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];
-  size_t tx_batch_i = 0;  ///< The batch index for \p tx_burst_arr
-
-  /// Rx batch information for \p rx_burst
-  MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];
-
-  typename Nexus<TTr>::Hook nexus_hook;  ///< A hook shared with the Nexus
   SlowRand slow_rand;  ///< A slow random generator for "real" randomness
   FastRand fast_rand;  ///< A fast random generator
+
+  bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
 
   /// All the faults that can be injected into ERpc for testing
   struct {

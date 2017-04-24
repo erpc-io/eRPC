@@ -105,7 +105,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
   }
 
   // Reset the remote peer
-  rpc->fault_inject_reset_remote_epeer_st(session_num_arr[0]);
+  rpc->fault_inject_drop_tx_local(0);
 
   // The main request-issuing loop
   for (size_t iter = 0; iter < config_num_iters; iter++) {
@@ -147,8 +147,6 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
     rpc->free_msg_buffer(req_msgbuf[req_i]);
   }
-
-  rpc->run_event_loop_timeout(10000);
 
   // Disconnect the sessions
   for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
