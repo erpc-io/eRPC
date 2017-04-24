@@ -42,10 +42,10 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   ASSERT_EQ(ret, -EPERM);
 
   if (app_death_mode == AppDeathMode::kReqHandlerRunsEventLoop) {
-    // Try to run the event loop. This crashes only in kDatapathChecks mode
+    // Try to run the event loop
     if (kDatapathChecks) {
       test_printf("test: Trying to run event loop in req handler.\n");
-      ASSERT_DEATH(context->rpc->run_event_loop_one(), ".*");
+      ASSERT_THROW(context->rpc->run_event_loop_one(), std::runtime_error);
     }
   }
 
@@ -65,12 +65,13 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 void cont_func(RespHandle *resp_handle, void *_context, size_t) {
   assert(resp_handle != nullptr && _context != nullptr);
   auto *context = static_cast<AppContext *>(_context);
+  assert(context->is_client);
 
   if (app_death_mode == AppDeathMode::kContFuncRunsEventLoop) {
-    // Try to run the event loop. This crashes only in kDatapathChecks mode
+    // Try to run the event loop
     if (kDatapathChecks) {
       test_printf("test: Trying to run event loop in cont func.\n");
-      ASSERT_DEATH(context->rpc->run_event_loop_one(), ".*");
+      ASSERT_THROW(context->rpc->run_event_loop_one(), std::runtime_error);
     }
   }
 
@@ -80,9 +81,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t) {
     ASSERT_DEATH(delete context->rpc, ".*");
   }
 
-  ASSERT_TRUE(context->is_client);
   context->num_rpc_resps++;
-
   context->rpc->release_respone(resp_handle);
 }
 

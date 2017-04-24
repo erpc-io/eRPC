@@ -13,10 +13,8 @@ void Rpc<TTr>::process_req_txq_st() {
   for (size_t i = 0; i < req_txq.size(); i++) {
     SSlot *sslot = req_txq[i];
     assert(sslot != nullptr);
-
-    Session *session = sslot->session;
-    assert(session->is_client());
-    assert(session->is_connected());
+    assert(sslot->session->is_client());
+    assert(sslot->session->is_connected());
 
     MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
     assert(req_msgbuf != nullptr);
@@ -26,9 +24,9 @@ void Rpc<TTr>::process_req_txq_st() {
 
     if (small_rpc_likely(req_msgbuf->num_pkts == 1)) {
       // Optimize for small messages that fit in one packet
-      process_req_txq_small_one_st(session, req_msgbuf);
+      process_req_txq_small_one_st(sslot, req_msgbuf);
     } else {
-      process_req_txq_large_one_st(session, req_msgbuf);
+      process_req_txq_large_one_st(sslot, req_msgbuf);
     }
 
     // Sslots that still need TX stay in the queue
@@ -43,14 +41,15 @@ void Rpc<TTr>::process_req_txq_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_req_txq_small_one_st(Session *session,
+void Rpc<TTr>::process_req_txq_small_one_st(SSlot *sslot,
                                             MsgBuffer *req_msgbuf) {
   assert(in_creator());
 
-  // req_msgbuf is generally valid. Do some small-req
+  // req_msgbuf is generally valid. Do some small request--specific checks.
   assert(req_msgbuf->num_pkts == 1 && req_msgbuf->pkts_queued == 0);
   assert(req_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
+  Session *session = sslot->session;
   if (likely(session->credits > 0)) {
     session->credits--;
   } else {
@@ -68,12 +67,13 @@ void Rpc<TTr>::process_req_txq_small_one_st(Session *session,
 }
 
 template <class TTr>
-void Rpc<TTr>::process_req_txq_large_one_st(Session *session,
+void Rpc<TTr>::process_req_txq_large_one_st(SSlot *sslot,
                                             MsgBuffer *req_msgbuf) {
   assert(in_creator());
   assert(req_msgbuf->num_pkts > 1 &&
          req_msgbuf->pkts_queued < req_msgbuf->num_pkts);
 
+  Session *session = sslot->session;
   size_t pkts_pending = req_msgbuf->num_pkts - req_msgbuf->pkts_queued;  // >= 1
   size_t now_sending = std::min(session->credits, pkts_pending);
   session->credits -= now_sending;

@@ -11,10 +11,7 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
   // In kDatapathChecks mode, alert user if background thread calls event loop
   if (kDatapathChecks) {
     if (unlikely(!in_creator())) {
-      erpc_dprintf(
-          "eRPC Rpc %u: Error. Event loop invoked from a background thread.\n",
-          rpc_id);
-      exit(-1);
+      throw std::runtime_error("eRPC Rpc: Event loop invoked from background.");
     }
   } else {
     assert(in_creator());
@@ -23,17 +20,19 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
   // In kDatapathChecks mode, track event loop reentrance
   if (kDatapathChecks) {
     if (unlikely(in_event_loop)) {
-      erpc_dprintf("eRPC Rpc %u: Error. Re-entering event loop not allowed.\n",
-                   rpc_id);
-      exit(-1);
+      throw std::runtime_error("eRPC Rpc: Re-entering event loop not allowed.");
     }
-
     in_event_loop = true;
   }
 
   // Handle session management events, if any
   if (unlikely(nexus_hook.sm_rx_list.size > 0)) {
     handle_sm_st();  // Callee grabs the hook lock
+  }
+
+  size_t cur_ts = rdtsc();
+  if (cur_ts - prev_epoch_ts >= pkt_loss_epoch_cycles) {
+    prev_epoch_ts = cur_ts;
   }
 
   process_comps_st();    // All RX

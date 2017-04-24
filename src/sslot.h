@@ -54,9 +54,10 @@ class SSlot {
   struct {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
+    size_t req_tx_done_ts;       ///< Timestamp taken when a request finishes TX
 
     // These fields are used only for large messages
-    size_t rfr_pkt_num;  ///< Packet number for request-for-response packets
+    size_t rfr_pkt_num;  ///< Next pkt number for request-for-response packets
 
     // These fields are used only if we have background threads
     bool is_requester_bg;  ///< True if the requester thread is background

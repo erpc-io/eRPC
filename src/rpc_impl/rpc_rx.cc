@@ -165,7 +165,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
     debug_check_req_msgbuf_on_resp(sslot, req_num, req_type);
     bump_credits(sslot->session);
 
-    // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
+    // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(sslot);
 
     if (small_rpc_likely(!sslot->clt_save_info.is_requester_bg)) {
@@ -324,7 +324,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
       return;
     }
   } else {
-    // Bury request MsgBuffer (tx_msgbuf) without freeing user-owned memory
+    // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(sslot);
 
     if (small_rpc_likely(!sslot->clt_save_info.is_requester_bg)) {

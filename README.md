@@ -64,6 +64,8 @@
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
 
 ## Long-term TODOs
+ * Enable marking an Rpc object as server-only. Such an Rpc object can bypass
+   packet loss detection code in the event loop.
  * Optimize mem-copies using `rte_memcpy`.
  * The first packet size limit should be much smaller than MTU to improve RTT
    measurement accuracy (e.g., it could be around 256 bytes). This will need
@@ -83,24 +85,9 @@
  * Are we losing some performance by using `size_t` instead of `uint32_t` in
    in-memory structs like Buffer and MsgBuffer?
  * Need to have a test for session management request timeouts.
- * What happens in the following case:
-   1. Requester sends a connect packet (packet 1). Packet 1 gets delayed.
-   2. Requester re-sends the connect packet (packet 2).
-   3. Responder receives packet 2 and sends a connect response.
-   4. Requester receives connect response and transitions the session to
-      kConnected.
-   5. Requester successfully disconnects the session.
-   6. Packet 1 arrives at the responder. The responder has no way of recalling
-      that it already replied to this connect request, since the connect request
-      does not have the server's sessio number. (One solution is to let the
-      server create the server-side end point and reply with a successful connect
-      response - the client can just ignore the response because it will see
-      that session_vec[sm_pkt->client.session_num] == nullptr. This causes a
-      memory leak at the server since the allocated server-side endpoint will
-      never get destroyed.)
  * Use pool for session object allocation?
 
 ## Perf notes
  * Flags that control performance:
    * kDataPathChecks
-   * `small_msg_likely`
+   * `small_rpc_likely`
