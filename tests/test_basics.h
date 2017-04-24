@@ -11,7 +11,7 @@ using namespace ERpc;
 
 static constexpr uint16_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppEventLoopMs = 200;
-static constexpr size_t kAppMaxEventLoopMs = 20000; /* 20 seconds */
+static constexpr size_t kAppMaxEventLoopMs = 20000;  // 20 seconds
 static constexpr uint8_t kAppClientRpcId = 100;
 static constexpr uint8_t kAppServerRpcId = 200;
 static constexpr uint8_t kAppReqType = 3;
@@ -173,7 +173,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
                 rpc_id);
   }
 
-  while (!client_done) { /* Wait for all clients */
+  while (!client_done) {  // Wait for all clients
     rpc.run_event_loop_timeout(kAppEventLoopMs);
   }
 
@@ -196,7 +196,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
   }
 
   if (server_check_all_disconnected) {
-    /* The client is done only after disconnecting */
+    // The client is done only after disconnecting
     assert(rpc.num_active_sessions() == 0);
   }
 }
@@ -288,7 +288,7 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
                                      kAppClientRpcId, sm_handler, kAppPhyPort,
                                      kAppNumaNode);
 
-  /* Connect the sessions */
+  // Connect the sessions
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
@@ -299,7 +299,7 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
     context.rpc->run_event_loop_one();
   }
 
-  /* basic_sm_handler checks that the callbacks have no errors */
+  // basic_sm_handler checks that the callbacks have no errors
   assert(context.num_sm_resps == num_sessions);
 }
 
@@ -315,7 +315,7 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
 void wait_for_sm_resps_or_timeout(BasicAppContext &context,
                                   const size_t num_resps,
                                   const double freq_ghz) {
-  /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
+  // Run the event loop for up to kAppMaxEventLoopMs milliseconds
   uint64_t cycles_start = rdtsc();
   while (context.num_sm_resps < num_resps) {
     context.rpc->run_event_loop_timeout(kAppEventLoopMs);
@@ -338,7 +338,7 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &context,
 void wait_for_rpc_resps_or_timeout(BasicAppContext &context,
                                    const size_t num_resps,
                                    const double freq_ghz) {
-  /* Run the event loop for up to kAppMaxEventLoopMs milliseconds */
+  // Run the event loop for up to kAppMaxEventLoopMs milliseconds
   uint64_t cycles_start = rdtsc();
   while (context.num_rpc_resps < num_resps) {
     context.rpc->run_event_loop_timeout(kAppEventLoopMs);

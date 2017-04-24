@@ -38,7 +38,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
 
-  /* MsgBuffer allocation is thread safe */
+  // MsgBuffer allocation is thread safe
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(resp_size);
   assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();

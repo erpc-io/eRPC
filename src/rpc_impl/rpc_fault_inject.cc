@@ -52,7 +52,6 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
       session->server.rpc_id);
 
   // Enqueue a session management work request
-  session->client_info.sm_request_pending = true;
   enqueue_sm_req(session, SessionMgmtPktType::kFaultResetPeerReq);
 
   unlock_cond(&session->lock);

@@ -84,8 +84,9 @@ class Session {
     /// connection fails despite getting an error-free connect response
     bool sm_callbacks_disabled = false;
 
-    /// True if this session has a pending session management request
-    bool sm_request_pending = false;
+    /// True if this session has a pending session management API request.
+    /// This does not account for fault-injection requests.
+    bool sm_api_req_pending = false;
 
     uint64_t mgmt_req_tsc;  ///< Timestamp of the last management request
     bool is_cc = false;     ///< True if this session is congestion controlled

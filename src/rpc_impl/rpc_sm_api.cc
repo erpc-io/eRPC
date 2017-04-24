@@ -117,7 +117,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
   session_vec.push_back(session);  // Add to list of all sessions
 
   // Enqueue a session management work request
-  session->client_info.sm_request_pending = true;
+  session->client_info.sm_api_req_pending = true;
   enqueue_sm_req(session, SessionMgmtPktType::kConnectReq);
 
   return client_endpoint.session_num;
@@ -148,8 +148,8 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     return -EPERM;
   }
 
-  if (session->client_info.sm_request_pending) {
-    erpc_dprintf("%s: A session management request is already pending.\n",
+  if (session->client_info.sm_api_req_pending) {
+    erpc_dprintf("%s: A session management API request is already pending.\n",
                  issue_msg);
     return -EBUSY;
   }
@@ -165,7 +165,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
 
   // A session can be destroyed only when all its sslots are free
   if (session->sslot_free_vec.size() != Session::kSessionReqWindow) {
-    erpc_dprintf("%s: Session has pending requests.\n", issue_msg);
+    erpc_dprintf("%s: Session has pending RPC requests.\n", issue_msg);
     unlock_cond(&session->lock);
     return -EBUSY;
   }
@@ -195,7 +195,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
           session->server.rpc_id);
 
       // Enqueue a session management work request
-      session->client_info.sm_request_pending = true;
+      session->client_info.sm_api_req_pending = true;
       enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
 
       unlock_cond(&session->lock);

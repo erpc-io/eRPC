@@ -82,13 +82,13 @@ void Rpc<TTr>::handle_disconnect_resp_st(SessionMgmtPkt *sm_pkt) {
   assert(session != nullptr);
   assert(session->is_client());
   assert(session->state == SessionState::kDisconnectInProgress);
-  assert(session->client_info.sm_request_pending);
+  assert(session->client_info.sm_api_req_pending);
   assert(session->client == sm_pkt->client);
   assert(session->server == sm_pkt->server);
   // Disconnect requests can only succeed
   assert(sm_pkt->err_type == SessionMgmtErrType::kNoError);
 
-  session->client_info.sm_request_pending = false;
+  session->client_info.sm_api_req_pending = false;
 
   session->state = SessionState::kDisconnected;  // Mark session connected
 

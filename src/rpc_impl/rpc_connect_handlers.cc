@@ -139,7 +139,7 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   assert(session != nullptr);
   assert(session->is_client());
   assert(session->state == SessionState::kConnectInProgress);
-  assert(session->client_info.sm_request_pending);
+  assert(session->client_info.sm_api_req_pending);
   assert(session->client == sm_pkt->client);
 
   // We don't have the server's session number locally yet, so we cannot use
@@ -148,7 +148,7 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
   assert(session->server.rpc_id == sm_pkt->server.rpc_id);
   assert(session->server.session_num == kInvalidSessionNum);
 
-  session->client_info.sm_request_pending = false;
+  session->client_info.sm_api_req_pending = false;
 
   // If the connect response has an error, the server has not allocated a
   // Session. Mark the session as disconnected and invoke callback.
@@ -199,7 +199,8 @@ void Rpc<TTr>::handle_connect_resp_st(SessionMgmtPkt *sm_pkt) {
         "session %u, and invoking kConnectFailed callback\n",
         rpc_id, session->local_session_num);
 
-    session->client_info.sm_request_pending = true;
+    // Enqueue a session management work request
+    session->client_info.sm_api_req_pending = true;
     enqueue_sm_req(session, SessionMgmtPktType::kDisconnectReq);
 
     session_mgmt_handler(

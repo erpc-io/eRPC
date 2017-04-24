@@ -6,10 +6,7 @@ namespace ERpc {
 static constexpr size_t kENetChannels = 1;
 
 /// Amount of time to block for ENet events
-static constexpr size_t kSmThreadEventLoopMs = 20;
-
-/// Timeout for establishing ENet connections
-static constexpr size_t kENetConnectTimeoutMs = 50;
+static constexpr size_t kSmThreadEventLoopMs = 1;
 
 // Implementation notes:
 //
@@ -26,8 +23,7 @@ static constexpr size_t kENetConnectTimeoutMs = 50;
 // in the maps.
 
 template <class TTr>
-void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *ctx, ENetEvent *event) {
-  assert(ctx != nullptr);
+void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
   assert(event != nullptr);
 
   ENetPeer *epeer = event->peer;
@@ -93,12 +89,11 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   assert(event->packet->dataLength == sizeof(SessionMgmtPkt));
 
   ENetPeer *epeer = event->peer;
-  uint32_t epeer_ip = epeer->address.host;
 
   if (!is_peer_mode_server(epeer)) {
     // This is an event for a client-mode peer, so we have mappings
-    assert(ctx->ip_map.count(epeer_ip) > 0);
-    assert(ctx->name_map[ctx->ip_map[epeer_ip]] == epeer);
+    assert(ctx->ip_map.count(epeer->address.host) > 0);
+    assert(ctx->name_map[ctx->ip_map[epeer->address.host]] == epeer);
   }
 
   // Copy out the ENet packet - this gets freed by the Rpc thread
@@ -241,11 +236,10 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
 
       if (ctx->name_map.count(rem_hostname) != 0) {
         // We already have a client-mode ENet peer to this host
-        ENetPeer *epeer = ctx->name_map[rem_hostname];
-        wi.epeer = epeer;
+        wi.epeer = ctx->name_map[rem_hostname];
 
         // Wait if the peer is not yet connected
-        auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
+        auto *epeer_data = static_cast<SmENetPeerData *>(wi.epeer->data);
         if (!epeer_data->connected) {
           epeer_data->work_item_vec.push_back(wi);
         } else {
@@ -260,22 +254,24 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
               "eRPC Nexus: ENet Failed to resolve address " + rem_hostname);
         }
 
-        ENetPeer *epeer =
+        wi.epeer =
             enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
-        if (epeer == nullptr) {
+        if (wi.epeer == nullptr) {
           throw std::runtime_error("eRPC Nexus: Failed to connect ENet to " +
                                    rem_hostname);
         }
 
-        wi.epeer = epeer;
+        // Reduce ENet peer timeout. This needs more work (e.g., what values
+        // can we safely use without false positives?)
+        enet_peer_timeout(wi.epeer, 1, 1, 100);
 
         // Add the peer to mappings to avoid creating a duplicate peer
-        ctx->name_map[rem_hostname] = epeer;
+        ctx->name_map[rem_hostname] = wi.epeer;
         ctx->ip_map[rem_address.host] = rem_hostname;
 
         // Save the work item - we'll transmit it when we get connected
-        epeer->data = new SmENetPeerData();
-        auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
+        wi.epeer->data = new SmENetPeerData();
+        auto *epeer_data = static_cast<SmENetPeerData *>(wi.epeer->data);
         epeer_data->rem_hostname = rem_hostname;
         epeer_data->connected = false;
 

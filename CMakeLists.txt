@@ -9,7 +9,7 @@ add_definitions(-std=c++11)
 add_definitions(-Wall -Wextra -Werror)
 add_definitions(-Wsign-conversion)
 add_definitions(-Wold-style-cast)
-add_definitions(-Winline)
+add_definitions(-Wno-inline)
 
 add_definitions(-Wno-unused-function)
 
@@ -109,9 +109,10 @@ set(CTEST_TESTS
   test_small_msg
   test_large_msg
   test_req_in_cont_func
-  test_req_in_req_func)
+  test_req_in_req_func
+  test_server_failure)
 
-# Other tests that can be run without ctest
+# Other tests that are run without ctest
 set(OTHER_TESTS
   test_huge_alloc
   test_rand

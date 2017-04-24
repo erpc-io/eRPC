@@ -12,7 +12,7 @@ void Rpc<TTr>::bury_session_st(Session *session) {
   assert(session != nullptr);
 
   if (session->is_client()) {
-    assert(!session->client_info.sm_request_pending);
+    assert(!session->client_info.sm_api_req_pending);
   }
 
   // Free session resources
