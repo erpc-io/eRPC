@@ -275,6 +275,7 @@ class SmPkt {
  public:
   SmPktType pkt_type;
   SmErrType err_type;  ///< Error type, for responses only
+  size_t gen_data;     ///< General-purpose data
 
   SessionEndpoint client, server;  ///< Endpoint metadata
 

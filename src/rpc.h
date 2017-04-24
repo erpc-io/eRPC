@@ -273,7 +273,8 @@ class Rpc {
   /// Allocate a session management request packet and enqueue it to the
   /// session management thread. The allocated packet will be freed by the
   /// session management thread on transmission.
-  void enqueue_sm_req(Session *session, SmPktType pkt_type);
+  void enqueue_sm_req(Session *session, SmPktType pkt_type,
+                      size_t gen_data = 0);
 
   /// Allocate a response-copy of the session manegement packet and enqueue it
   /// to the session management thread. The allocated packet will be freed by
@@ -385,17 +386,20 @@ class Rpc {
    * @brief Inject a fault that drops a packet transmitted by this Rpc. We do
    * not control which session the drop will affect.
    *
+   * @param pkt_countdown Packets to transmit locally before dropping one
    * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_drop_tx_local();
+  void fault_inject_drop_tx_local(size_t pkt_countdown);
 
   /**
    * @brief Inject a fault that drops a packet transmitted by the server
    * Rpc for this client session. This can affect any session of the server Rpc.
    *
+   * @param session_num The client session to send the fault for
+   * @param pkt_countdown Packets to transmit at the server before dropping one
    * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_drop_tx_remote(int session_num);
+  void fault_inject_drop_tx_remote(int session_num, size_t pkt_countdown);
 
  private:
   /**
@@ -485,13 +489,17 @@ class Rpc {
     item.data_bytes = data_bytes;
 
     if (kFaultInjection) {
-      // We need to maintain item.drop
-      if (faults.drop_tx_local) {
+      // Fault injection is enabled, so we need to set item.drop
+      if (faults.drop_tx_local && faults.drop_tx_local_countdown == 0) {
         erpc_dprintf(
             "eRPC Rpc %u: Dropping packet %s.\n", rpc_id,
             tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
         item.drop = true;
         faults.drop_tx_local = false;
+      } else if (faults.drop_tx_local) {
+        assert(faults.drop_tx_local_countdown > 0);
+        faults.drop_tx_local_countdown--;
+        item.drop = false;
       } else {
         item.drop = false;
       }
@@ -689,7 +697,9 @@ class Rpc {
     /// Fail server routing info resolution at client. This is used to test the
     /// case where a client fails to resolve routing info sent by the server.
     bool resolve_server_rinfo = false;
-    bool drop_tx_local = false;  ///< Drop a local TX packet
+
+    bool drop_tx_local = false;      ///< Drop a local TX packet
+    size_t drop_tx_local_countdown;  ///< Packets to TX before dropping one
   } faults;
 
   // Datapath stats

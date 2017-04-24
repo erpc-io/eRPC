@@ -25,13 +25,15 @@ void Rpc<TTr>::fault_inject_resolve_server_rinfo_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_drop_tx_local() {
+void Rpc<TTr>::fault_inject_drop_tx_local(size_t pkt_countdown) {
   check_fault_injection_ok();
   faults.drop_tx_local = true;
+  faults.drop_tx_local_countdown = pkt_countdown;
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_drop_tx_remote(int session_num) {
+void Rpc<TTr>::fault_inject_drop_tx_remote(int session_num,
+                                           size_t pkt_countdown) {
   check_fault_injection_ok();
 
   if (!is_usr_session_num_in_range(session_num)) {
@@ -52,12 +54,13 @@ void Rpc<TTr>::fault_inject_drop_tx_remote(int session_num) {
   }
 
   erpc_dprintf(
-      "eRPC Rpc %u: Sending drop TX remote fault for session %u to [%s, %u].\n",
-      rpc_id, session->local_session_num, session->server.hostname,
-      session->server.rpc_id);
+      "eRPC Rpc %u: Sending drop-TX-remote fault (countdown = %zu) "
+      "for session %u to [%s, %u].\n",
+      rpc_id, pkt_countdown, session->local_session_num,
+      session->server.hostname, session->server.rpc_id);
 
   // Enqueue a session management work request
-  enqueue_sm_req(session, SmPktType::kFaultDropTxRemote);
+  enqueue_sm_req(session, SmPktType::kFaultDropTxRemote, pkt_countdown);
 
   unlock_cond(&session->lock);
 }
@@ -84,7 +87,7 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   }
 
   erpc_dprintf(
-      "eRPC Rpc %u: Sending reset remote peer fault for session %u "
+      "eRPC Rpc %u: Sending reset-remote-peer fault for session %u "
       "to [%s, %u].\n",
       rpc_id, session->local_session_num, session->server.hostname,
       session->server.rpc_id);

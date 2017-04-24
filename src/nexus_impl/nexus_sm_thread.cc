@@ -105,10 +105,9 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   // Handle reset peer request here, since it's not passed to any Rpc
   if (sm_pkt->pkt_type == SmPktType::kFaultResetPeerReq) {
     erpc_dprintf(
-        "eRPC Nexus: Received %s from Rpc [%s, %u]. "
+        "eRPC Nexus: Received reset-remote-peer fault from Rpc [%s, %u]. "
         "Forcefully resetting ENet peer.\n",
-        sm_pkt_type_str(sm_pkt->pkt_type).c_str(), sm_pkt->client.hostname,
-        sm_pkt->client.rpc_id);
+        sm_pkt->client.hostname, sm_pkt->client.rpc_id);
     enet_peer_reset(epeer);
     return;
   }
