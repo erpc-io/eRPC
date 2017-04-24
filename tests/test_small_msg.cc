@@ -16,10 +16,10 @@ class AppContext : public BasicAppContext {};
 /// Configuration for controlling the test
 size_t config_num_sessions;      ///< Number of sessions created by client
 size_t config_num_bg_threads;    ///< Number of background threads
-size_t config_rpcs_per_session;  ///< Number of Rpcs on each session per iter
+size_t config_rpcs_per_session;  ///< Number of Rpcs per session per iteration
 size_t config_msg_size;  ///< The size of the request and response messages
 
-/// The common request handler for all subtests. Copies the request message to
+/// The common request handler for all subtests. Copies the requestmessage to
 /// the response.
 void req_handler(ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
