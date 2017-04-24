@@ -110,7 +110,7 @@ set(CTEST_TESTS
   test_large_msg
   test_req_in_cont_func
   test_req_in_req_func
-  test_server_failure)
+  test_packet_loss)
 
 # Other tests that are run without ctest
 set(OTHER_TESTS

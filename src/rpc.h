@@ -382,6 +382,22 @@ class Rpc {
    */
   void fault_inject_reset_remote_epeer_st(int session_num);
 
+  /**
+   * @brief Inject a fault that drops a packet transmitted by this Rpc. We do
+   * not control which session the drop will affect.
+   *
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_drop_tx_local();
+
+  /**
+   * @brief Inject a fault that drops a packet transmitted by the server
+   * Rpc for this client session. This can affect any session of the server Rpc.
+   *
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_drop_tx_remote(int session_num);
+
  private:
   /**
    * @brief Check if the caller can inject faults
@@ -455,6 +471,7 @@ class Rpc {
   // rpc_tx.cc
 
   /// Enqueue a packet for transmission, possibly deferring transmission.
+  /// This handles fault injection for dropping packets.
   inline void enqueue_pkt_tx_burst_st(Transport::RoutingInfo *routing_info,
                                       MsgBuffer *tx_msgbuf, size_t offset,
                                       size_t data_bytes) {
@@ -467,6 +484,14 @@ class Rpc {
     item.msg_buffer = tx_msgbuf;
     item.offset = offset;
     item.data_bytes = data_bytes;
+
+    if (kFaultInjection && faults.drop_tx_local) {
+      erpc_dprintf(
+          "eRPC Rpc %u: Dropping packet %s.\n", rpc_id,
+          tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
+      item.drop = true;
+      faults.drop_tx_local = false;
+    }
 
     tx_msgbuf->pkts_queued++;  // Update queueing progress
     tx_batch_i++;
@@ -658,6 +683,7 @@ class Rpc {
     /// Fail server routing info resolution at client. This is used to test the
     /// case where a client fails to resolve routing info sent by the server.
     bool resolve_server_rinfo = false;
+    bool drop_tx_local;  ///< Drop a local TX packet
   } faults;
 
   // Datapath stats

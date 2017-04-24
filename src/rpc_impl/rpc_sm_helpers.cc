@@ -7,30 +7,6 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::bury_session_st(Session *session) {
-  assert(in_creator());
-  assert(session != nullptr);
-
-  if (session->is_client()) {
-    assert(!session->client_info.sm_api_req_pending);
-  }
-
-  // Free session resources
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    // Free the preallocated MsgBuffer
-    MsgBuffer &msg_buf = session->sslot_arr[i].pre_resp_msgbuf;
-    free_msg_buffer(msg_buf);
-
-    // XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
-    // guaranteed to have been freed at this point?
-  }
-
-  // No need to lock the session to nullify it
-  session_vec.at(session->local_session_num) = nullptr;
-  delete session;  // This does nothing
-}
-
-template <class TTr>
 void Rpc<TTr>::handle_session_mgmt_st() {
   assert(in_creator());
   assert(nexus_hook.sm_rx_list.size > 0);
@@ -64,8 +40,14 @@ void Rpc<TTr>::handle_session_mgmt_st() {
       case SessionMgmtPktType::kDisconnectResp:
         handle_disconnect_resp_st(sm_pkt);
         break;
+      case SessionMgmtPktType::kFaultDropTxRemote:
+        erpc_dprintf("eRPC Rpc %u: Received drop TX remote fault from %s.\n",
+                     rpc_id, sm_pkt->client.name().c_str());
+        faults.drop_tx_local = true;
+        break;
       default:
-        assert(false);
+        throw std::runtime_error(
+            "eRPC Rpc: Invalid session management packet type.\n");
         break;
     }
 
@@ -76,6 +58,30 @@ void Rpc<TTr>::handle_session_mgmt_st() {
   // Clear the session management RX list
   nexus_hook.sm_rx_list.locked_clear();
   nexus_hook.sm_rx_list.unlock();
+}
+
+template <class TTr>
+void Rpc<TTr>::bury_session_st(Session *session) {
+  assert(in_creator());
+  assert(session != nullptr);
+
+  if (session->is_client()) {
+    assert(!session->client_info.sm_api_req_pending);
+  }
+
+  // Free session resources
+  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+    // Free the preallocated MsgBuffer
+    MsgBuffer &msg_buf = session->sslot_arr[i].pre_resp_msgbuf;
+    free_msg_buffer(msg_buf);
+
+    // XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
+    // guaranteed to have been freed at this point?
+  }
+
+  // No need to lock the session to nullify it
+  session_vec.at(session->local_session_num) = nullptr;
+  delete session;  // This does nothing
 }
 
 template <class TTr>

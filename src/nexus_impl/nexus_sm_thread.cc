@@ -103,7 +103,7 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   enet_packet_destroy(event->packet);
   assert(session_mgmt_pkt_type_is_valid(sm_pkt->pkt_type));
 
-  // Handle fault-injection session management packets
+  // Handle reset peer request here, since it's not passed to any Rpc
   if (sm_pkt->pkt_type == SessionMgmtPktType::kFaultResetPeerReq) {
     erpc_dprintf(
         "eRPC Nexus: Received %s from Rpc [%s, %u]. "
@@ -123,9 +123,12 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   Hook *target_hook = const_cast<Hook *>(ctx->reg_hooks_arr[target_rpc_id]);
 
   if (target_hook == nullptr) {
-    // We don't have an Rpc object for the target Rpc. We must send a
-    // response for requests, but we can ignore responses.
+    // We don't have an Rpc object for the target Rpc. If sm_pkt is a request,
+    // send a response if possible. Ignore if sm_pkt is a response.
     if (is_sm_req) {
+      // We don't handle this error for fault-injection session management reqs
+      assert(session_mgmt_pkt_type_req_has_resp(sm_pkt->pkt_type));
+
       erpc_dprintf(
           "eRPC Nexus: Received session management request for invalid "
           "Rpc %u from Rpc [%s, %u]. Sending response.\n",

@@ -46,6 +46,7 @@ class Transport {
     MsgBuffer* msg_buffer;      ///< The MsgBuffer for this packet
     size_t offset;              ///< The offset for this packet in the MsgBuffer
     size_t data_bytes;  ///< The number of data bytes to TX from \p offset
+    bool drop;          ///< Drop this packet (requires kFaultInjection)
   };
 
   /// Generic types for memory registration and deregistration functions.

@@ -32,13 +32,12 @@ enum class SessionState {
 
 /// Packet types used for session management
 enum class SessionMgmtPktType : int {
-  kConnectReq,      ///< Session connect request
-  kConnectResp,     ///< Session connect response
-  kDisconnectReq,   ///< Session disconnect request
-  kDisconnectResp,  ///< Session disconnect response
-  /// A request to reset the remote ENet peer. This is used in testing to
-  /// emulate remote server failure.
-  kFaultResetPeerReq
+  kConnectReq,         ///< Session connect request
+  kConnectResp,        ///< Session connect response
+  kDisconnectReq,      ///< Session disconnect request
+  kDisconnectResp,     ///< Session disconnect response
+  kFaultResetPeerReq,  ///< Reset the remote ENet peer
+  kFaultDropTxRemote   ///< Drop a TX packet at the remote ENet peer
 };
 
 /// The types of responses to a session management packet
@@ -89,6 +88,8 @@ static std::string session_mgmt_pkt_type_str(SessionMgmtPktType sm_pkt_type) {
       return std::string("[Disconnect response]");
     case SessionMgmtPktType::kFaultResetPeerReq:
       return std::string("[Reset peer request (fault injection)]");
+    case SessionMgmtPktType::kFaultDropTxRemote:
+      return std::string("[Drop TX remote (fault injection)]");
   };
 
   throw std::runtime_error("eRPC: Invalid session management packet type.");
@@ -102,6 +103,7 @@ static bool session_mgmt_pkt_type_is_valid(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kDisconnectReq:
     case SessionMgmtPktType::kDisconnectResp:
     case SessionMgmtPktType::kFaultResetPeerReq:
+    case SessionMgmtPktType::kFaultDropTxRemote:
       return true;
   }
   return false;
@@ -115,6 +117,7 @@ static bool session_mgmt_pkt_type_is_req(SessionMgmtPktType sm_pkt_type) {
     case SessionMgmtPktType::kConnectReq:
     case SessionMgmtPktType::kDisconnectReq:
     case SessionMgmtPktType::kFaultResetPeerReq:
+    case SessionMgmtPktType::kFaultDropTxRemote:
       return true;
     case SessionMgmtPktType::kConnectResp:
     case SessionMgmtPktType::kDisconnectResp:
@@ -124,8 +127,7 @@ static bool session_mgmt_pkt_type_is_req(SessionMgmtPktType sm_pkt_type) {
   throw std::runtime_error("eRPC: Invalid session management packet type.");
 }
 
-/// Convert the request session management packet type sm_pkt_type to its
-/// corresponding response packet type.
+/// Return the response type for request type \p sm_pkt_type
 static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
     SessionMgmtPktType sm_pkt_type) {
   assert(session_mgmt_pkt_type_is_req(sm_pkt_type));
@@ -135,6 +137,26 @@ static SessionMgmtPktType session_mgmt_pkt_type_req_to_resp(
     case SessionMgmtPktType::kDisconnectReq:
       return SessionMgmtPktType::kDisconnectResp;
     case SessionMgmtPktType::kFaultResetPeerReq:
+    case SessionMgmtPktType::kFaultDropTxRemote:
+    case SessionMgmtPktType::kConnectResp:
+    case SessionMgmtPktType::kDisconnectResp:
+      break;
+  }
+
+  throw std::runtime_error("eRPC: Invalid session management packet type.");
+}
+
+/// Return true iff this request packet type has a response type. Some request
+/// packet types don't have a response packet type.
+static bool session_mgmt_pkt_type_req_has_resp(SessionMgmtPktType sm_pkt_type) {
+  assert(session_mgmt_pkt_type_is_req(sm_pkt_type));
+  switch (sm_pkt_type) {
+    case SessionMgmtPktType::kConnectReq:
+    case SessionMgmtPktType::kDisconnectReq:
+      return true;
+    case SessionMgmtPktType::kFaultResetPeerReq:
+    case SessionMgmtPktType::kFaultDropTxRemote:
+      return false;
     case SessionMgmtPktType::kConnectResp:
     case SessionMgmtPktType::kDisconnectResp:
       break;

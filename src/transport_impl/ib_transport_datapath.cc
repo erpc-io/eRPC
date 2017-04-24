@@ -68,7 +68,13 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
     const ib_routing_info_t* ib_routing_info =
         reinterpret_cast<ib_routing_info_t*>(item.routing_info);
-    wr.wr.ud.remote_qpn = ib_routing_info->qpn;
+
+    if (kFaultInjection && item.drop) {
+      // Remote QPN = 0 is reserved by IB, so the packet will be dropped
+      wr.wr.ud.remote_qpn = 0;
+    } else {
+      wr.wr.ud.remote_qpn = ib_routing_info->qpn;
+    }
     wr.wr.ud.ah = ib_routing_info->ah;
   }
 
