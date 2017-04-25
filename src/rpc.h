@@ -304,7 +304,7 @@ class Rpc {
   /**
    * @brief Try to enqueue a request for transmission.
    *
-   * If a message slot is available for this session, the request will be
+   * If a session slot is available for this session, the request will be
    * enqueued. If this call succeeds, eRPC owns \p msg_buffer until the request
    * completes (i.e., the continuation is invoked).
    *
@@ -337,11 +337,10 @@ class Rpc {
     bury_sslot_rx_msgbuf(sslot);
 
     Session *session = sslot->session;
-    assert(session->is_client());
-
-    lock_cond(&session->sslot_free_vec_lock);
+    assert(session != nullptr && session->is_client());
+    lock_cond(&session->lock);
     session->sslot_free_vec.push_back(sslot->index);
-    unlock_cond(&session->sslot_free_vec_lock);
+    unlock_cond(&session->lock);
   }
 
   //

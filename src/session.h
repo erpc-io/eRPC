@@ -56,6 +56,10 @@ class Session {
   inline bool is_server() const { return role == Role::kServer; }
   inline bool is_connected() const { return state == SessionState::kConnected; }
 
+  /// The lock for this session, held for short durations (i.e., it must not be
+  /// held across network round trips)
+  std::mutex lock;
+
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
@@ -66,7 +70,6 @@ class Session {
   /// Free session slots. We could use a vector of SSlot pointers, but indices
   /// are useful in request number calculations.
   FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
-  std::mutex sslot_free_vec_lock;  ///< A lock to guard sslot_free_vec
 
   ///@{ Info saved for faster unconditional access
   Transport::RoutingInfo *remote_routing_info;

@@ -148,25 +148,24 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     return -EPERM;
   }
 
+  lock_cond(&session->lock);
+
   if (session->client_info.sm_api_req_pending) {
     erpc_dprintf("%s: A session management API request is already pending.\n",
                  issue_msg);
     return -EBUSY;
   }
 
-  // Prevent concurrent datapath/management operations on this session
-  lock_cond(&session->sslot_free_vec_lock);
-
   if (!session->is_client()) {
     erpc_dprintf("%s: User cannot destroy server session.\n", issue_msg);
-    unlock_cond(&session->sslot_free_vec_lock);
+    unlock_cond(&session->lock);
     return -EINVAL;
   }
 
   // A session can be destroyed only when all its sslots are free
   if (session->sslot_free_vec.size() != Session::kSessionReqWindow) {
     erpc_dprintf("%s: Session has pending RPC requests.\n", issue_msg);
-    unlock_cond(&session->sslot_free_vec_lock);
+    unlock_cond(&session->lock);
     return -EBUSY;
   }
 
@@ -182,7 +181,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     case SessionState::kConnectInProgress:
       // Can't disconnect right now. User needs to wait.
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
-      unlock_cond(&session->sslot_free_vec_lock);
+      unlock_cond(&session->lock);
       return -EPERM;
 
     case SessionState::kConnected: {
@@ -197,23 +196,24 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       // Enqueue a session management work request
       session->client_info.sm_api_req_pending = true;
       enqueue_sm_req(session, SmPktType::kDisconnectReq);
-
-      unlock_cond(&session->sslot_free_vec_lock);
+      unlock_cond(&session->lock);
       return 0;
     }
 
     case SessionState::kDisconnectInProgress:
       erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
-      unlock_cond(&session->sslot_free_vec_lock);
+      unlock_cond(&session->lock);
       return -EALREADY;
 
     case SessionState::kDisconnected:
       erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
-      unlock_cond(&session->sslot_free_vec_lock);
+      unlock_cond(&session->lock);
       return -ESHUTDOWN;
+
+    default:
+      unlock_cond(&session->lock);
+      throw std::runtime_error("eRPC Rpc: Invalid session state");
   }
-  exit(-1);
-  return false;
 }
 
 template <class TTr>
@@ -221,6 +221,7 @@ size_t Rpc<TTr>::num_active_sessions_st() {
   assert(in_creator());
 
   size_t ret = 0;
+  // session_vec can only be modified by the creator, so no need to lock
   for (Session *session : session_vec) {
     if (session != nullptr) {
       ret++;

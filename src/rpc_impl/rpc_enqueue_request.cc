@@ -19,13 +19,22 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // Prevent disconnection of this session
-  lock_cond(&session->sslot_free_vec_lock);
+  lock_cond(&session->lock);
 
-  // Sanity checks. If datapath checks are enabled, return error codes.
+  // Checks that are required even without kDatapathChecks
+  if (unlikely(session->sslot_free_vec.size() == 0)) {
+    unlock_cond(&session->lock);
+    return -ENOMEM;
+  }
+
+  if (unlikely(!session->is_connected())) {
+    unlock_cond(&session->lock);
+    return -ESHUTDOWN;
+  }
+
+  // Checks that are done only if kDatapathChecks is enabled
   if (!kDatapathChecks) {
     assert(session->is_client());
-    assert(session->is_connected());
     assert(req_msgbuf != nullptr);
     assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic() &&
            req_msgbuf->is_dynamic());
@@ -33,40 +42,28 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     assert(req_msgbuf->num_pkts > 0);
   } else {
     if (unlikely(!session->is_client())) {
-      unlock_cond(&session->sslot_free_vec_lock);
+      unlock_cond(&session->lock);
       return -EPERM;
-    }
-
-    if (unlikely(!session->is_connected())) {
-      unlock_cond(&session->sslot_free_vec_lock);
-      return -ESHUTDOWN;
     }
 
     if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
                  !req_msgbuf->check_magic() || !req_msgbuf->is_dynamic())) {
-      unlock_cond(&session->sslot_free_vec_lock);
+      unlock_cond(&session->lock);
       return -EINVAL;
     }
 
     if (unlikely(req_msgbuf->data_size == 0 ||
                  req_msgbuf->data_size > kMaxMsgSize ||
                  req_msgbuf->num_pkts == 0)) {
-      unlock_cond(&session->sslot_free_vec_lock);
+      unlock_cond(&session->lock);
       return -EINVAL;
     }
-  }
-
-  // Fail if we are out of sslots, even without kDatapathChecks
-  if (unlikely(session->sslot_free_vec.size() == 0)) {
-    unlock_cond(&session->sslot_free_vec_lock);
-    return -ENOMEM;
   }
 
   // Grab a free message slot, and unlock the session. At this point, the
   // creator thread can't disconnect the session.
   size_t sslot_i = session->sslot_free_vec.pop_back();
   assert(sslot_i < Session::kSessionReqWindow);
-  unlock_cond(&session->sslot_free_vec_lock);
 
   // Generate req num. All sessions share req_num_arr, so we need to lock.
   lock_cond(&req_num_arr_lock);
@@ -116,9 +113,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // The tx_msgbuf and rx_msgbuf (i.e., the request and response for the
-  // previous request in this sslot) were buried after the response handler
-  // returned.
+  // The request and response (tx_msgbuf and rx_msgbuf) for the previous request
+  // in this sslot were buried when the response handler returned.
   assert(sslot.tx_msgbuf == nullptr);
   assert(sslot.rx_msgbuf.buf == nullptr &&
          sslot.rx_msgbuf.buffer.buf == nullptr);
@@ -132,6 +128,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   req_txq.push_back(&sslot);
   unlock_cond(&req_txq_lock);
 
+  unlock_cond(&session->lock);
   return 0;
 }
 

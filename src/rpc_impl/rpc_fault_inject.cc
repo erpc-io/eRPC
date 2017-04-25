@@ -36,23 +36,13 @@ void Rpc<TTr>::fault_inject_drop_tx_remote_st(int session_num,
                                               size_t pkt_countdown) {
   fault_inject_check_ok();
 
-  if (!is_usr_session_num_in_range(session_num)) {
-    throw std::runtime_error("eRPC Rpc: Invalid session number.");
-  }
+  assert(is_usr_session_num_in_range(session_num));
 
   Session *session = session_vec[static_cast<size_t>(session_num)];
-  if (session == nullptr) {
-    throw std::runtime_error("eRPC Rpc: Session already destroyed.");
-  }
+  assert(session != nullptr);
+  lock_cond(&session->lock);
 
-  // Prevent disconnection of this session
-  lock_cond(&session->sslot_free_vec_lock);
-
-  if (!session->is_client()) {
-    unlock_cond(&session->sslot_free_vec_lock);
-    throw std::runtime_error("eRPC Rpc: Session is not a client session.");
-  }
-
+  assert(session->is_client());
   erpc_dprintf(
       "eRPC Rpc %u: Sending drop-TX-remote fault (countdown = %zu) "
       "for session %u to [%s, %u].\n",
@@ -61,31 +51,19 @@ void Rpc<TTr>::fault_inject_drop_tx_remote_st(int session_num,
 
   // Enqueue a session management work request
   enqueue_sm_req(session, SmPktType::kFaultDropTxRemote, pkt_countdown);
-
-  unlock_cond(&session->sslot_free_vec_lock);
+  unlock_cond(&session->lock);
 }
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   fault_inject_check_ok();
 
-  if (!is_usr_session_num_in_range(session_num)) {
-    throw std::runtime_error("eRPC Rpc: Invalid session number.");
-  }
-
+  assert(is_usr_session_num_in_range(session_num));
   Session *session = session_vec[static_cast<size_t>(session_num)];
-  if (session == nullptr) {
-    throw std::runtime_error("eRPC Rpc: Session already destroyed.");
-  }
+  assert(session != nullptr);
+  lock_cond(&session->lock);
 
-  // Prevent disconnection of this session
-  lock_cond(&session->sslot_free_vec_lock);
-
-  if (!session->is_client()) {
-    unlock_cond(&session->sslot_free_vec_lock);
-    throw std::runtime_error("eRPC Rpc: Session is not a client session.");
-  }
-
+  assert(session->is_client());
   erpc_dprintf(
       "eRPC Rpc %u: Sending reset-remote-peer fault for session %u "
       "to [%s, %u].\n",
@@ -94,8 +72,7 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
 
   // Enqueue a session management work request
   enqueue_sm_req(session, SmPktType::kFaultResetPeerReq);
-
-  unlock_cond(&session->sslot_free_vec_lock);
+  unlock_cond(&session->lock);
 }
 
 }  // End ERpc

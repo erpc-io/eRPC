@@ -6,10 +6,10 @@ template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
   SSlot *sslot = static_cast<SSlot *>(req_handle);
-
-  // The client has a pending request, so the session can't be disconnected.
-  // So we don't need to grab sslot_free_vec_lock to prevent disconnection.
   Session *session = sslot->session;
+  assert(session != nullptr);
+  lock_cond(&session->lock);
+
   assert(session->is_server());
   assert(session->is_connected());
 
@@ -77,5 +77,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     bg_resp_txq.push_back(sslot);
     bg_resp_txq_lock.unlock();
   }
+
+  unlock_cond(&session->lock);
 }
 }  // End ERpc
