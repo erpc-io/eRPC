@@ -200,6 +200,11 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       return 0;
     }
 
+    case SessionState::kPktLossRecovery:
+      erpc_dprintf("%s: Packet loss recovery in progress.\n", issue_msg);
+      unlock_cond(&session->lock);
+      return -EPERM;
+
     case SessionState::kDisconnectInProgress:
       erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
       unlock_cond(&session->lock);
@@ -209,11 +214,9 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
       unlock_cond(&session->lock);
       return -ESHUTDOWN;
-
-    default:
-      unlock_cond(&session->lock);
-      throw std::runtime_error("eRPC Rpc: Invalid session state");
   }
+
+  throw std::runtime_error("eRPC Rpc: Invalid session state");
 }
 
 template <class TTr>

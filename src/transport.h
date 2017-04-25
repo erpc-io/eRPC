@@ -53,7 +53,7 @@ class Transport {
   typedef std::function<MemRegInfo(void*, size_t)> reg_mr_func_t;
   typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
 
-  enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalidTransport };
+  enum class TransportType { kInfiniBand, kRoCE, kOmniPath };
 
   static std::string get_transport_name(TransportType transport_type) {
     switch (transport_type) {
@@ -63,9 +63,8 @@ class Transport {
         return std::string("[RoCE]");
       case TransportType::kOmniPath:
         return std::string("[OmniPath]");
-      default:
-        return std::string("[Invalid transport]");
     }
+    throw std::runtime_error("eRPC: Invalid transport");
   }
 
   // Queue depths

@@ -17,14 +17,9 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   // returning to the event loop, which then buries the request MsgBuffers.
   // For these handlers only, rx_msgbuf must be valid at this point.
   ReqFuncType req_func_type = sslot->srv_save_info.req_func_type;
-  switch (req_func_type) {
-    case ReqFuncType::kFgTerminal:
-      // rx_msgbuf could be fake
-      assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
-      break;
-    default:
-      // We can't assert anything for other request handler types
-      break;
+  if (req_func_type == ReqFuncType::kFgTerminal) {
+    // rx_msgbuf could be fake
+    assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
   }
 
   MsgBuffer *resp_msgbuf;

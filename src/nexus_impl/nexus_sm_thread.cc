@@ -183,9 +183,8 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
       case ENET_EVENT_TYPE_RECEIVE:
         sm_thread_handle_receive(ctx, &event);
         break;
-      default:
+      case ENET_EVENT_TYPE_NONE:
         throw std::runtime_error("eRPC Nexus: Unknown ENet event type.\n");
-        break;
     }
   }
 }

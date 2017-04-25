@@ -39,8 +39,6 @@ static std::string pkt_type_str(uint64_t pkt_type) {
       return std::string("explicit credit return");
     case kPktTypeResp:
       return std::string("response");
-    default:
-      break;
   }
 
   throw std::runtime_error("eRPC: Invalid packet type.");

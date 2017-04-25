@@ -22,12 +22,12 @@ static constexpr uint16_t kInvalidSessionNum =
     std::numeric_limits<uint16_t>::max();
 static constexpr uint32_t kInvalidSecret = 0;
 
-/// Session state that can only go forward.
 enum class SessionState {
   kConnectInProgress,
-  kConnected,  ///< The only state for server-side sessions
+  kConnected,        ///< The only state for server-side sessions
+  kPktLossRecovery,  ///< Recovering from a packet loss
   kDisconnectInProgress,
-  kDisconnected,  ///< Temporary state just for the disconnected callback
+  kDisconnected,  ///< Temporary state for the disconnected callback
 };
 
 /// Packet types used for session management
@@ -67,6 +67,8 @@ static std::string session_state_str(SessionState state) {
       return std::string("[Connect in progress]");
     case SessionState::kConnected:
       return std::string("[Connected]");
+    case SessionState::kPktLossRecovery:
+      return std::string("[Packet loss recovery]");
     case SessionState::kDisconnectInProgress:
       return std::string("[Disconnect in progress]");
     case SessionState::kDisconnected:
@@ -228,7 +230,6 @@ class SessionEndpoint {
 
   // Fill invalid metadata to aid debugging
   SessionEndpoint() {
-    transport_type = Transport::TransportType::kInvalidTransport;
     memset(static_cast<void *>(hostname), 0, sizeof(hostname));
     phy_port = kInvalidPhyPort;
     rpc_id = kInvalidRpcId;
