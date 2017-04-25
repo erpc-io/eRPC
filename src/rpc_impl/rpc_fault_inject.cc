@@ -7,7 +7,7 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::check_fault_injection_ok() const {
+void Rpc<TTr>::fault_inject_check_ok() const {
   if (!kFaultInjection) {
     throw std::runtime_error("eRPC Rpc: Fault injection is disabled.");
   }
@@ -20,21 +20,21 @@ void Rpc<TTr>::check_fault_injection_ok() const {
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_resolve_server_rinfo_st() {
-  check_fault_injection_ok();
+  fault_inject_check_ok();
   faults.resolve_server_rinfo = true;
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_drop_tx_local(size_t pkt_countdown) {
-  check_fault_injection_ok();
+void Rpc<TTr>::fault_inject_drop_tx_local_st(size_t pkt_countdown) {
+  fault_inject_check_ok();
   faults.drop_tx_local = true;
   faults.drop_tx_local_countdown = pkt_countdown;
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_drop_tx_remote(int session_num,
-                                           size_t pkt_countdown) {
-  check_fault_injection_ok();
+void Rpc<TTr>::fault_inject_drop_tx_remote_st(int session_num,
+                                              size_t pkt_countdown) {
+  fault_inject_check_ok();
 
   if (!is_usr_session_num_in_range(session_num)) {
     throw std::runtime_error("eRPC Rpc: Invalid session number.");
@@ -45,11 +45,11 @@ void Rpc<TTr>::fault_inject_drop_tx_remote(int session_num,
     throw std::runtime_error("eRPC Rpc: Session already destroyed.");
   }
 
-  // Lock the session to prevent concurrent request submission
-  lock_cond(&session->lock);
+  // Prevent disconnection of this session
+  lock_cond(&session->sslot_free_vec_lock);
 
   if (!session->is_client()) {
-    unlock_cond(&session->lock);
+    unlock_cond(&session->sslot_free_vec_lock);
     throw std::runtime_error("eRPC Rpc: Session is not a client session.");
   }
 
@@ -62,12 +62,12 @@ void Rpc<TTr>::fault_inject_drop_tx_remote(int session_num,
   // Enqueue a session management work request
   enqueue_sm_req(session, SmPktType::kFaultDropTxRemote, pkt_countdown);
 
-  unlock_cond(&session->lock);
+  unlock_cond(&session->sslot_free_vec_lock);
 }
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
-  check_fault_injection_ok();
+  fault_inject_check_ok();
 
   if (!is_usr_session_num_in_range(session_num)) {
     throw std::runtime_error("eRPC Rpc: Invalid session number.");
@@ -78,11 +78,11 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
     throw std::runtime_error("eRPC Rpc: Session already destroyed.");
   }
 
-  // Lock the session to prevent concurrent request submission
-  lock_cond(&session->lock);
+  // Prevent disconnection of this session
+  lock_cond(&session->sslot_free_vec_lock);
 
   if (!session->is_client()) {
-    unlock_cond(&session->lock);
+    unlock_cond(&session->sslot_free_vec_lock);
     throw std::runtime_error("eRPC Rpc: Session is not a client session.");
   }
 
@@ -95,7 +95,7 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   // Enqueue a session management work request
   enqueue_sm_req(session, SmPktType::kFaultResetPeerReq);
 
-  unlock_cond(&session->lock);
+  unlock_cond(&session->sslot_free_vec_lock);
 }
 
 }  // End ERpc

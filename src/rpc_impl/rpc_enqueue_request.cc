@@ -19,8 +19,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // Prevent concurrent datapath/management operations on this session
-  lock_cond(&session->lock);
+  // Prevent disconnection of this session
+  lock_cond(&session->sslot_free_vec_lock);
 
   // Sanity checks. If datapath checks are enabled, return error codes.
   if (!kDatapathChecks) {
@@ -33,42 +33,40 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     assert(req_msgbuf->num_pkts > 0);
   } else {
     if (unlikely(!session->is_client())) {
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return -EPERM;
     }
 
     if (unlikely(!session->is_connected())) {
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return -ESHUTDOWN;
     }
 
     if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
                  !req_msgbuf->check_magic() || !req_msgbuf->is_dynamic())) {
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return -EINVAL;
     }
 
     if (unlikely(req_msgbuf->data_size == 0 ||
                  req_msgbuf->data_size > kMaxMsgSize ||
                  req_msgbuf->num_pkts == 0)) {
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return -EINVAL;
     }
   }
 
-  // If there are no free message slots left in session, so we can't queue this
-  // request. This needs to be done even when kDatapathChecks is disabled.
+  // Fail if we are out of sslots, even without kDatapathChecks
   if (unlikely(session->sslot_free_vec.size() == 0)) {
-    unlock_cond(&session->lock);
+    unlock_cond(&session->sslot_free_vec_lock);
     return -ENOMEM;
   }
 
   // Grab a free message slot, and unlock the session. At this point, the
-  // creator thread can't disconnect the session, and other enqueueing threads
-  // can't grab this sslot.
+  // creator thread can't disconnect the session.
   size_t sslot_i = session->sslot_free_vec.pop_back();
   assert(sslot_i < Session::kSessionReqWindow);
-  unlock_cond(&session->lock);
+  unlock_cond(&session->sslot_free_vec_lock);
 
   // Generate req num. All sessions share req_num_arr, so we need to lock.
   lock_cond(&req_num_arr_lock);

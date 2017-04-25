@@ -154,19 +154,19 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     return -EBUSY;
   }
 
-  // Lock the session to prevent concurrent request submission
-  lock_cond(&session->lock);
+  // Prevent concurrent datapath/management operations on this session
+  lock_cond(&session->sslot_free_vec_lock);
 
   if (!session->is_client()) {
     erpc_dprintf("%s: User cannot destroy server session.\n", issue_msg);
-    unlock_cond(&session->lock);
+    unlock_cond(&session->sslot_free_vec_lock);
     return -EINVAL;
   }
 
   // A session can be destroyed only when all its sslots are free
   if (session->sslot_free_vec.size() != Session::kSessionReqWindow) {
     erpc_dprintf("%s: Session has pending RPC requests.\n", issue_msg);
-    unlock_cond(&session->lock);
+    unlock_cond(&session->sslot_free_vec_lock);
     return -EBUSY;
   }
 
@@ -182,7 +182,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     case SessionState::kConnectInProgress:
       // Can't disconnect right now. User needs to wait.
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return -EPERM;
 
     case SessionState::kConnected: {
@@ -198,18 +198,18 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       session->client_info.sm_api_req_pending = true;
       enqueue_sm_req(session, SmPktType::kDisconnectReq);
 
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return 0;
     }
 
     case SessionState::kDisconnectInProgress:
       erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return -EALREADY;
 
     case SessionState::kDisconnected:
       erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
-      unlock_cond(&session->lock);
+      unlock_cond(&session->sslot_free_vec_lock);
       return -ESHUTDOWN;
   }
   exit(-1);

@@ -32,6 +32,7 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
 
   size_t cur_ts = rdtsc();
   if (cur_ts - prev_epoch_ts >= pkt_loss_epoch_cycles) {
+    pkt_loss_scan_reqs_st();
     prev_epoch_ts = cur_ts;
   }
 

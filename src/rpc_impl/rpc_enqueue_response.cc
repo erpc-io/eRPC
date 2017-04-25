@@ -7,9 +7,10 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
   SSlot *sslot = static_cast<SSlot *>(req_handle);
 
+  // The client has a pending request, so the session can't be disconnected.
+  // So we don't need to grab sslot_free_vec_lock to prevent disconnection.
   Session *session = sslot->session;
   assert(session->is_server());
-  // The client has a pending request, so the session can't be disconnected
   assert(session->is_connected());
 
   // Foreground-terminal request handlers must call enqueue_response() before

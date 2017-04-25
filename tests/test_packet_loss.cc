@@ -104,8 +104,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
     assert(req_msgbuf[req_i].buf != nullptr);
   }
 
-  // Reset the remote peer
-  rpc->fault_inject_drop_tx_local(0);
+  rpc->fault_inject_drop_tx_local_st(0);  // Inject a packet loss
 
   // The main request-issuing loop
   for (size_t iter = 0; iter < config_num_iters; iter++) {

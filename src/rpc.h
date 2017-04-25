@@ -324,7 +324,7 @@ class Rpc {
   /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
-  /// At a client, bury the response MsgBuffer and free up the sslot
+  /// From a continuation, bury the response MsgBuffer and free up the sslot
   inline void release_respone(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
     SSlot *sslot = static_cast<SSlot *>(resp_handle);
@@ -339,9 +339,9 @@ class Rpc {
     Session *session = sslot->session;
     assert(session->is_client());
 
-    lock_cond(&session->lock);
+    lock_cond(&session->sslot_free_vec_lock);
     session->sslot_free_vec.push_back(sslot->index);
-    unlock_cond(&session->lock);
+    unlock_cond(&session->sslot_free_vec_lock);
   }
 
   //
@@ -554,7 +554,7 @@ class Rpc {
    * @param pkt_countdown Packets to transmit locally before dropping one
    * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_drop_tx_local(size_t pkt_countdown);
+  void fault_inject_drop_tx_local_st(size_t pkt_countdown);
 
   /**
    * @brief Inject a fault that drops a packet transmitted by the server
@@ -564,14 +564,21 @@ class Rpc {
    * @param pkt_countdown Packets to transmit at the server before dropping one
    * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_drop_tx_remote(int session_num, size_t pkt_countdown);
+  void fault_inject_drop_tx_remote_st(int session_num, size_t pkt_countdown);
 
  private:
   /**
    * @brief Check if the caller can inject faults
    * @throw runtime_error if the caller cannot inject faults
    */
-  void check_fault_injection_ok() const;
+  void fault_inject_check_ok() const;
+
+  //
+  // Packet loss handling (rpc_pkt_loss.cc)
+  //
+
+  /// Scan all outstanding requests for suspected packet loss
+  void pkt_loss_scan_reqs_st();
 
   //
   // Misc public functions
@@ -679,20 +686,18 @@ class Rpc {
 
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport
-
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx baych info
   size_t tx_batch_i = 0;  ///< The batch index for \p tx_burst_arr
-
   MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];  /// Batch info for \p rx_burst
-
-  uint8_t *rx_ring[TTr::kRecvQueueDepth];  ///< The transport's RX ring
-  size_t rx_ring_head = 0;                 ///< Current unused RX ring buffer
+  uint8_t *rx_ring[TTr::kRecvQueueDepth];       ///< The transport's RX ring
+  size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
   std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
 
-  // Requests and response
+  // Request and response queues. We don't have a response TX queue because
+  // response TX is driven by request-for-response packets from clients.
   std::vector<SSlot *> req_txq;  ///< Request sslots that need TX
   std::mutex req_txq_lock;       ///< Conditional lock for the request TX queue
 
