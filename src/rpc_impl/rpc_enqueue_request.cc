@@ -102,6 +102,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   SSlot &sslot = session->sslot_arr[sslot_i];
   sslot.clt_save_info.cont_func = cont_func;
   sslot.clt_save_info.tag = tag;
+  sslot.clt_save_info.enqueue_req_ts = rdtsc();
 
   if (optlevel_large_rpc_supported) {
     // We don't send a request-for-response for the zeroth response packet

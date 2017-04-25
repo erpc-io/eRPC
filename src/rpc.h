@@ -39,8 +39,11 @@ class Rpc {
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 
-  /// Packet loss detection epoch time (milliseconds)
+  /// Duration of a packet loss detection epoch in milliseconds
   static constexpr size_t kPktLossEpochMs = 50;
+
+  /// Packet loss timeout for an RPC request in milliseconds
+  static constexpr size_t kPktLossTimeoutMs = 500;
 
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
@@ -344,6 +347,7 @@ class Rpc {
   //
   // Event loop
   //
+
  public:
   /// Run one iteration of the event loop
   inline void run_event_loop_one() { run_event_loop_one_st(); }
@@ -362,120 +366,10 @@ class Rpc {
   void run_event_loop_timeout_st(size_t timeout_ms);
 
   //
-  // Fault injection
-  //
- public:
-  /**
-   * @brief Inject a fault that always fails server routing info resolution at
-   * all client sessions of this Rpc
-   *
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_resolve_server_rinfo_st();
-
-  /**
-   * @brief Inject a fault that forcefully resets the remote ENet peer for
-   * a client session, emulating failure of the server. An ENet disconnect event
-   * will be generated locally when ENet detects the remote peer failure.
-   *
-   * This will also affect sessions in other Rpc objects on this machine that
-   * are connected to the same host as the session for \p session_num.
-   *
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_reset_remote_epeer_st(int session_num);
-
-  /**
-   * @brief Inject a fault that drops a packet transmitted by this Rpc. We do
-   * not control which session the drop will affect.
-   *
-   * @param pkt_countdown Packets to transmit locally before dropping one
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_drop_tx_local(size_t pkt_countdown);
-
-  /**
-   * @brief Inject a fault that drops a packet transmitted by the server
-   * Rpc for this client session. This can affect any session of the server Rpc.
-   *
-   * @param session_num The client session to send the fault for
-   * @param pkt_countdown Packets to transmit at the server before dropping one
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_drop_tx_remote(int session_num, size_t pkt_countdown);
-
- private:
-  /**
-   * @brief Check if the caller can inject faults
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void check_fault_injection_ok() const;
-
-  //
-  // Misc public functions
-  //
-
- public:
-  /// Return the maximum *data* size that can be sent in one packet
-  static inline constexpr size_t get_max_data_per_pkt() {
-    return TTr::kMaxDataPerPkt;
-  }
-
-  /// Return the maximum message *data* size that can be sent
-  static inline size_t get_max_msg_size() { return kMaxMsgSize; }
-
-  /// Return the ID of this Rpc object
-  inline uint8_t get_rpc_id() const { return rpc_id; }
-
-  /// Return true iff the caller is running in a background thread
-  inline bool in_background() const { return !in_creator(); }
-
-  /// Return the tiny thread ID of the caller
-  inline size_t get_tiny_tid() const { return tls_registry->get_tiny_tid(); }
-
-  // rpc_rx.cc
-
-  /// Sanity-check a slot's request MsgBuffer on receiving a response packet.
-  /// It should be valid, dynamic, and the request number/type should match.
-  static void debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
-                                             uint8_t req_type);
-
-  /// Check an RX MsgBuffer submitted to a background thread. It should be
-  /// valid, dynamic, and the \p is_req field should match. This holds for
-  /// both background request handlers and continuations.
-  static void debug_check_bg_rx_msgbuf(
-      SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type);
-
-  //
-  // Misc private functions
+  // TX (rpc_tx.cc)
   //
 
  private:
-  /// Return true iff we're currently running in this Rpc's creator.
-  inline bool in_creator() const { return get_tiny_tid() == creator_tiny_tid; }
-
-  /// Return true iff a user-provide session number is in the session vector
-  inline bool is_usr_session_num_in_range(int session_num) const {
-    return session_num >= 0 &&
-           static_cast<size_t>(session_num) < session_vec.size();
-  }
-
-  /// Lock the mutex if the Rpc is accessible from multiple threads
-  inline void lock_cond(std::mutex *mutex) {
-    if (small_rpc_unlikely(multi_threaded)) {
-      mutex->lock();
-    }
-  }
-
-  /// Unlock the mutex if the Rpc is accessible from multiple threads
-  inline void unlock_cond(std::mutex *mutex) {
-    if (small_rpc_unlikely(multi_threaded)) {
-      mutex->unlock();
-    }
-  }
-
-  // rpc_tx.cc
-
   /// Enqueue a packet for transmission, possibly deferring transmission.
   /// This handles fault injection for dropping packets.
   inline void enqueue_pkt_tx_burst_st(Transport::RoutingInfo *routing_info,
@@ -571,7 +465,21 @@ class Rpc {
 
   void process_bg_resp_txq_st();
 
+  //
   // rpc_rx.cc
+  //
+
+ public:
+  /// Sanity-check a slot's request MsgBuffer on receiving a response packet.
+  /// It should be valid, dynamic, and the request number/type should match.
+  static void debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
+                                             uint8_t req_type);
+
+  /// Check an RX MsgBuffer submitted to a background thread. It should be
+  /// valid, dynamic, and the \p is_req field should match. This holds for
+  /// both background request handlers and continuations.
+  static void debug_check_bg_rx_msgbuf(
+      SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type);
 
   inline void bump_credits(Session *session) {
     assert(session->is_client());
@@ -579,6 +487,7 @@ class Rpc {
     session->credits++;
   }
 
+ private:
   /**
    * @brief Process received packets and post RECVs. The ring buffers received
    * from `rx_burst` must not be used after new RECVs are posted.
@@ -613,6 +522,106 @@ class Rpc {
   /// Submit a work item to a background thread
   void submit_background_st(SSlot *sslot,
                             typename Nexus<TTr>::BgWorkItemType wi_type);
+
+  //
+  // Fault injection
+  //
+ public:
+  /**
+   * @brief Inject a fault that always fails server routing info resolution at
+   * all client sessions of this Rpc
+   *
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_resolve_server_rinfo_st();
+
+  /**
+   * @brief Inject a fault that forcefully resets the remote ENet peer for
+   * a client session, emulating failure of the server. An ENet disconnect event
+   * will be generated locally when ENet detects the remote peer failure.
+   *
+   * This will also affect sessions in other Rpc objects on this machine that
+   * are connected to the same host as the session for \p session_num.
+   *
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_reset_remote_epeer_st(int session_num);
+
+  /**
+   * @brief Inject a fault that drops a packet transmitted by this Rpc. We do
+   * not control which session the drop will affect.
+   *
+   * @param pkt_countdown Packets to transmit locally before dropping one
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_drop_tx_local(size_t pkt_countdown);
+
+  /**
+   * @brief Inject a fault that drops a packet transmitted by the server
+   * Rpc for this client session. This can affect any session of the server Rpc.
+   *
+   * @param session_num The client session to send the fault for
+   * @param pkt_countdown Packets to transmit at the server before dropping one
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_drop_tx_remote(int session_num, size_t pkt_countdown);
+
+ private:
+  /**
+   * @brief Check if the caller can inject faults
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void check_fault_injection_ok() const;
+
+  //
+  // Misc public functions
+  //
+
+ public:
+  /// Return the maximum *data* size that can be sent in one packet
+  static inline constexpr size_t get_max_data_per_pkt() {
+    return TTr::kMaxDataPerPkt;
+  }
+
+  /// Return the maximum message *data* size that can be sent
+  static inline size_t get_max_msg_size() { return kMaxMsgSize; }
+
+  /// Return the ID of this Rpc object
+  inline uint8_t get_rpc_id() const { return rpc_id; }
+
+  /// Return true iff the caller is running in a background thread
+  inline bool in_background() const { return !in_creator(); }
+
+  /// Return the tiny thread ID of the caller
+  inline size_t get_tiny_tid() const { return tls_registry->get_tiny_tid(); }
+
+  //
+  // Misc private functions
+  //
+
+ private:
+  /// Return true iff we're currently running in this Rpc's creator.
+  inline bool in_creator() const { return get_tiny_tid() == creator_tiny_tid; }
+
+  /// Return true iff a user-provide session number is in the session vector
+  inline bool is_usr_session_num_in_range(int session_num) const {
+    return session_num >= 0 &&
+           static_cast<size_t>(session_num) < session_vec.size();
+  }
+
+  /// Lock the mutex if the Rpc is accessible from multiple threads
+  inline void lock_cond(std::mutex *mutex) {
+    if (small_rpc_unlikely(multi_threaded)) {
+      mutex->lock();
+    }
+  }
+
+  /// Unlock the mutex if the Rpc is accessible from multiple threads
+  inline void unlock_cond(std::mutex *mutex) {
+    if (small_rpc_unlikely(multi_threaded)) {
+      mutex->unlock();
+    }
+  }
 
   // rpc_send_cr.cc
 
