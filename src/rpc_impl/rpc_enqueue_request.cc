@@ -19,6 +19,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
+  // Prevent concurrent operations on this session until we grab and fill sslot
   lock_cond(&session->lock);
 
   // Checks that are required even without kDatapathChecks
@@ -65,6 +66,37 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   size_t sslot_i = session->sslot_free_vec.pop_back();
   assert(sslot_i < Session::kSessionReqWindow);
 
+  // Fill in the sslot info
+  SSlot &sslot = session->sslot_arr[sslot_i];
+  // The request and response (tx_msgbuf and rx_msgbuf) for the previous request
+  // in this sslot were buried when the response handler returned.
+  assert(sslot.tx_msgbuf == nullptr);
+  assert(sslot.rx_msgbuf.buf == nullptr &&
+         sslot.rx_msgbuf.buffer.buf == nullptr);
+
+  sslot.tx_msgbuf = req_msgbuf;      // Valid request
+  sslot.tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
+
+  sslot.clt_save_info.cont_func = cont_func;
+  sslot.clt_save_info.tag = tag;
+  sslot.clt_save_info.enqueue_req_ts = rdtsc();
+
+  if (optlevel_large_rpc_supported) {
+    // We don't send a request-for-response for the zeroth response packet
+    sslot.clt_save_info.rfr_pkt_num = 1;
+  }
+
+  if (small_rpc_unlikely(multi_threaded)) {
+    if (!in_creator()) {
+      sslot.clt_save_info.is_requester_bg = true;
+      sslot.clt_save_info.bg_tiny_tid = get_tiny_tid();
+    } else {
+      sslot.clt_save_info.is_requester_bg = true;
+    }
+  }
+
+  unlock_cond(&session->lock);  // Avoid holding lock while filling pkthdr
+
   // Generate req num. All sessions share req_num_arr, so we need to lock.
   lock_cond(&req_num_arr_lock);
   size_t req_num =
@@ -93,42 +125,11 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // Fill in the sslot info
-  SSlot &sslot = session->sslot_arr[sslot_i];
-  sslot.clt_save_info.cont_func = cont_func;
-  sslot.clt_save_info.tag = tag;
-  sslot.clt_save_info.enqueue_req_ts = rdtsc();
-
-  if (optlevel_large_rpc_supported) {
-    // We don't send a request-for-response for the zeroth response packet
-    sslot.clt_save_info.rfr_pkt_num = 1;
-  }
-
-  if (small_rpc_unlikely(multi_threaded)) {
-    if (!in_creator()) {
-      sslot.clt_save_info.is_requester_bg = true;
-      sslot.clt_save_info.bg_tiny_tid = get_tiny_tid();
-    } else {
-      sslot.clt_save_info.is_requester_bg = true;
-    }
-  }
-
-  // The request and response (tx_msgbuf and rx_msgbuf) for the previous request
-  // in this sslot were buried when the response handler returned.
-  assert(sslot.tx_msgbuf == nullptr);
-  assert(sslot.rx_msgbuf.buf == nullptr &&
-         sslot.rx_msgbuf.buffer.buf == nullptr);
-
-  sslot.tx_msgbuf = req_msgbuf;      // Valid request
-  sslot.tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
-
   // Add the sslot to request TX queue
   lock_cond(&req_txq_lock);
   assert(std::find(req_txq.begin(), req_txq.end(), &sslot) == req_txq.end());
   req_txq.push_back(&sslot);
   unlock_cond(&req_txq_lock);
-
-  unlock_cond(&session->lock);
   return 0;
 }
 

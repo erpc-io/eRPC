@@ -88,8 +88,9 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_req(Session *session, SmPktType pkt_type,
-                              size_t gen_data) {
+void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type,
+                                 size_t gen_data) {
+  assert(in_creator());
   assert(session != nullptr && session->is_client());
 
   SmPkt *sm_pkt = new SmPkt();  // Freed by SM thread
@@ -103,8 +104,9 @@ void Rpc<TTr>::enqueue_sm_req(Session *session, SmPktType pkt_type,
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_resp(typename Nexus<TTr>::SmWorkItem *req_wi,
-                               SmErrType err_type) {
+void Rpc<TTr>::enqueue_sm_resp_st(typename Nexus<TTr>::SmWorkItem *req_wi,
+                                  SmErrType err_type) {
+  assert(in_creator());
   assert(req_wi != nullptr);
   assert(req_wi->epeer != nullptr);
   assert(req_wi->sm_pkt != nullptr);

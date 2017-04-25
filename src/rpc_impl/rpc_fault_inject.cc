@@ -35,44 +35,41 @@ template <class TTr>
 void Rpc<TTr>::fault_inject_drop_tx_remote_st(int session_num,
                                               size_t pkt_countdown) {
   fault_inject_check_ok();
-
   assert(is_usr_session_num_in_range(session_num));
 
+  // We don't grab session lock because, for this session, other management ops
+  // are handled by this thread, and we don't care about datapath operations
   Session *session = session_vec[static_cast<size_t>(session_num)];
   assert(session != nullptr);
-  lock_cond(&session->lock);
+  assert(session->is_connected() && session->is_client());
 
-  assert(session->is_client());
   erpc_dprintf(
       "eRPC Rpc %u: Sending drop-TX-remote fault (countdown = %zu) "
       "for session %u to [%s, %u].\n",
       rpc_id, pkt_countdown, session->local_session_num,
       session->server.hostname, session->server.rpc_id);
 
-  // Enqueue a session management work request
-  enqueue_sm_req(session, SmPktType::kFaultDropTxRemote, pkt_countdown);
-  unlock_cond(&session->lock);
+  enqueue_sm_req_st(session, SmPktType::kFaultDropTxRemote, pkt_countdown);
 }
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   fault_inject_check_ok();
-
   assert(is_usr_session_num_in_range(session_num));
+
+  // We don't grab session lock because, for this session, other management ops
+  // are handled by this thread, and we don't care about datapath operations
   Session *session = session_vec[static_cast<size_t>(session_num)];
   assert(session != nullptr);
-  lock_cond(&session->lock);
+  assert(session->is_client() && session->is_connected());
 
-  assert(session->is_client());
   erpc_dprintf(
       "eRPC Rpc %u: Sending reset-remote-peer fault for session %u "
       "to [%s, %u].\n",
       rpc_id, session->local_session_num, session->server.hostname,
       session->server.rpc_id);
 
-  // Enqueue a session management work request
-  enqueue_sm_req(session, SmPktType::kFaultResetPeerReq);
-  unlock_cond(&session->lock);
+  enqueue_sm_req_st(session, SmPktType::kFaultResetPeerReq);
 }
 
 }  // End ERpc
