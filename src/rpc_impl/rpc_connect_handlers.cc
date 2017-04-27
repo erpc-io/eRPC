@@ -150,7 +150,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   session->client_info.sm_api_req_pending = false;
 
   // If the connect response has an error, the server has not allocated a
-  // Session. Mark the session as disconnected and invoke callback.
+  // session object. Mark the session as disconnected and invoke callback.
   if (sm_pkt->err_type != SmErrType::kNoError) {
     erpc_dprintf("%s: Error %s.\n", issue_msg,
                  sm_err_type_str(sm_pkt->err_type).c_str());
@@ -163,7 +163,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   }
 
   // If we are here, the server has created a session endpoint.
-  //
+
   // Try to resolve the server's routing information into the packet. If this
   // fails, invoke kConnectFailed callback.
   Transport::RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);

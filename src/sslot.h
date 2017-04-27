@@ -35,6 +35,12 @@ class SSlot {
   friend class ReqHandle;
   friend class RespHandle;
 
+ public:
+  // Server-only members. These are exposed to request handlers.
+  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
+  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
+  bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
+
  private:
   // Members that are valid for both server and client
   uint8_t pad[64];       ///< Padding to prevent false sharing
@@ -43,13 +49,6 @@ class SSlot {
   MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
   MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
 
- public:
-  // Server-only
-  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
-  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
-  bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
-
- private:
   // Request info saved at the client. This is needed for the continuation.
   struct {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request

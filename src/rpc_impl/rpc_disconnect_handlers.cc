@@ -73,7 +73,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
           "Issue",
           rpc_id, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
 
-  // Try to locate the requester session and do some sanity checks
+  // Locate the requester session and do some sanity checks
   uint16_t session_num = sm_pkt->client.session_num;
   assert(session_num < session_vec.size());
 
@@ -84,6 +84,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
   assert(session->client_info.sm_api_req_pending);
   assert(session->client == sm_pkt->client);
   assert(session->server == sm_pkt->server);
+
   // Disconnect requests can only succeed
   assert(sm_pkt->err_type == SmErrType::kNoError);
 
