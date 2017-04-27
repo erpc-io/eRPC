@@ -24,6 +24,11 @@ class MtList {
     list.clear();
   }
 
+  void locked_resize(size_t new_size) {
+    list.resize(new_size);
+    size = new_size;
+  }
+
   /// Add an element to the list. This function grabs the list lock.
   void unlocked_push_back(T t) {
     lock();
@@ -39,4 +44,4 @@ class MtList {
 
 }  // End ERpc
 
-#endif // MT_LIST_H
+#endif  // MT_LIST_H

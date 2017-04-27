@@ -158,6 +158,7 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
 
   // eRPC will free dyn_resp_msgbuf
   req_handle_cp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size_cp);
+  assert(req_handle_cp->dyn_resp_msgbuf.buf != nullptr);
 
   // Response to client = server-to-server response + 1
   for (size_t i = 0; i < req_size_cp; i++) {
@@ -277,7 +278,7 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
 }
 
 /// 1 primary, 1 backup, both in foreground
-TEST(SendReqInReqFunc, BothInForeground) {
+TEST(Base, BothInForeground) {
   primary_bg = false;
   backup_bg = false;
 
@@ -292,7 +293,7 @@ TEST(SendReqInReqFunc, BothInForeground) {
 }
 
 /// 1 primary, 1 backup, primary in background
-TEST(SendReqInReqFunc, PrimaryInBackground) {
+TEST(Base, PrimaryInBackground) {
   primary_bg = true;
   backup_bg = false;
 
@@ -306,7 +307,7 @@ TEST(SendReqInReqFunc, PrimaryInBackground) {
 }
 
 /// 1 primary, 1 backup, both in background
-TEST(SendReqInReqFunc, BothInBackground) {
+TEST(Base, BothInBackground) {
   primary_bg = true;
   backup_bg = true;
 

@@ -6,9 +6,19 @@ template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
   SSlot *sslot = static_cast<SSlot *>(req_handle);
+
+  // When called from a background thread, enqueue to the foreground thread
+  if (small_rpc_unlikely(!in_creator())) {
+    assert(sslot->srv_save_info.req_func_type == ReqFuncType::kBackground);
+    bg_queues.enqueue_response.unlocked_push_back(req_handle);
+    return;
+  }
+
+  // If we're here, we are in the foreground thread
+  assert(in_creator());
+
   Session *session = sslot->session;
   assert(session != nullptr);
-  lock_cond(&session->lock);
 
   assert(session->is_server());
   assert(session->is_connected());
@@ -58,21 +68,10 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   sslot->tx_msgbuf = resp_msgbuf;     // Valid response
   sslot->tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
 
-  if (small_rpc_likely(req_func_type != ReqFuncType::kBackground)) {
-    // We're in the creator thread, so directly enqueue the first resp packet
-    size_t data_bytes = std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt);
-    enqueue_pkt_tx_burst_st(session->remote_routing_info, resp_msgbuf, 0,
-                            data_bytes);
-  } else {
-    // We're not in the creator, so we need to enqueue a response so that the
-    // foreground Rpc thread can process it.
-    bg_resp_txq_lock.lock();
-    assert(std::find(bg_resp_txq.begin(), bg_resp_txq.end(), sslot) ==
-           bg_resp_txq.end());
-    bg_resp_txq.push_back(sslot);
-    bg_resp_txq_lock.unlock();
-  }
-
-  unlock_cond(&session->lock);
+  // Enqueue the first response packet
+  size_t data_bytes = std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt);
+  enqueue_pkt_tx_burst_st(session->remote_routing_info, resp_msgbuf, 0,
+                          data_bytes);
 }
+
 }  // End ERpc

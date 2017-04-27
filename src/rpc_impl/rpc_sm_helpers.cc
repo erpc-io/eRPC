@@ -67,6 +67,7 @@ template <class TTr>
 void Rpc<TTr>::bury_session_st(Session *session) {
   assert(in_creator());
   assert(session != nullptr);
+  assert(session->state == SessionState::kDisconnected);
 
   if (session->is_client()) {
     assert(!session->client_info.sm_api_req_pending);
@@ -82,9 +83,8 @@ void Rpc<TTr>::bury_session_st(Session *session) {
     // guaranteed to have been freed at this point?
   }
 
-  // No need to lock the session to nullify it
   session_vec.at(session->local_session_num) = nullptr;
-  delete session;  // This does nothing
+  delete session;  // This does nothing except free the session memory
 }
 
 template <class TTr>

@@ -310,26 +310,55 @@ class Rpc {
    *
    * @param session_num The session number to send the request on
    * @param req_type The type of the request
-   * @param msg_buffer The user-created MsgBuffer containing the request payload
+   * @param req_msgbuf The user-created MsgBuffer containing the request payload
    * but not packet headers
    * @param cont_func The continuation function for this request
    * @tag The tag for this request
    *
    * @return 0 on success (i.e., if the request was queued). Negative errno is
-   * returned if the request was not queued.
+   * returned if the request was not queued. -ENOMEM is returned iff the request
+   * cannot be enqueued because the session is out of slots.
    */
-  int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *msg_buffer,
+  int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
                       erpc_cont_func_t cont_func, size_t tag);
+
+  /// The arguments to enqueue_request
+  struct enqueue_request_args_t {
+    int session_num;
+    uint8_t req_type;
+    MsgBuffer *req_msgbuf;
+    erpc_cont_func_t cont_func;
+    size_t tag;
+
+    enqueue_request_args_t() {}
+    enqueue_request_args_t(int session_num, uint8_t req_type,
+                           MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
+                           size_t tag)
+        : session_num(session_num),
+          req_type(req_type),
+          req_msgbuf(req_msgbuf),
+          cont_func(cont_func),
+          tag(tag) {}
+  };
 
   /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
-  /// From a continuation, bury the response MsgBuffer and free up the sslot
-  inline void release_respone(RespHandle *resp_handle) {
+  /// From a continuation, release ownership of a response handle
+  inline void release_response(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
     SSlot *sslot = static_cast<SSlot *>(resp_handle);
 
-    // The request MsgBuffer (tx_msgbuf) was buried before calling continuation
+    // When called from a background thread, enqueue to the foreground thread
+    if (small_rpc_unlikely(!in_creator())) {
+      bg_queues.release_response.unlocked_push_back(resp_handle);
+      return;
+    }
+
+    // If we're here, we are in the foreground thread
+    assert(in_creator());
+
+    // Request MsgBuffer (tx_msgbuf) was buried when this response was received
     assert(sslot->tx_msgbuf == nullptr);
 
     // Bury the response, which may be dynamic
@@ -338,9 +367,7 @@ class Rpc {
 
     Session *session = sslot->session;
     assert(session != nullptr && session->is_client());
-    lock_cond(&session->lock);
     session->sslot_free_vec.push_back(sslot->index);
-    unlock_cond(&session->lock);
   }
 
   //
@@ -462,8 +489,6 @@ class Rpc {
    */
   void process_req_txq_large_one_st(SSlot *sslot, MsgBuffer *req_msgbuf);
 
-  void process_bg_resp_txq_st();
-
   //
   // rpc_rx.cc
   //
@@ -518,9 +543,22 @@ class Rpc {
    */
   void process_comps_large_msg_one_st(SSlot *sslot, const uint8_t *pkt);
 
-  /// Submit a work item to a background thread
+  /// Submit a request or a response sslot to a background thread
   void submit_background_st(SSlot *sslot,
                             typename Nexus<TTr>::BgWorkItemType wi_type);
+
+  //
+  // Background queue handlers (rpc_bg_queues.cc)
+  //
+ private:
+  /// Process the requests enqueued by background threads
+  void process_bg_queues_enqueue_request_st();
+
+  /// Process the responses enqueued by background threads
+  void process_bg_queues_enqueue_response_st();
+
+  /// Process the responses freed by background threads
+  void process_bg_queues_release_response_st();
 
   //
   // Fault injection
@@ -681,7 +719,7 @@ class Rpc {
   std::vector<Session *> session_vec;
   /// The next request number prefix for each session request window slot
   size_t req_num_arr[Session::kSessionReqWindow] = {0};
-  std::mutex req_num_arr_lock;
+  std::mutex req_num_arr_lock;  ///< Lock for the request number array
 
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport
@@ -695,13 +733,15 @@ class Rpc {
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
   std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
 
-  // Request and response queues. We don't have a response TX queue because
-  // response TX is driven by request-for-response packets from clients.
+  // Request and response queues
   std::vector<SSlot *> req_txq;  ///< Request sslots that need TX
-  std::mutex req_txq_lock;       ///< Conditional lock for the request TX queue
 
-  std::vector<SSlot *> bg_resp_txq;  ///< Responses from background req handlers
-  std::mutex bg_resp_txq_lock;  ///< Unconditional lock for bg response TX queue
+  // Queues for datapath API requests from background threads
+  struct {
+    MtList<enqueue_request_args_t> enqueue_request;
+    MtList<ReqHandle *> enqueue_response;
+    MtList<RespHandle *> release_response;
+  } bg_queues;
 
   // Packet loss
   size_t prev_epoch_ts;  ///< Timestamp of the previous epoch

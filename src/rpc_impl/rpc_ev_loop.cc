@@ -2,10 +2,8 @@
 
 namespace ERpc {
 
-// The Rpc object stays valid for this iteration of the event loop, i.e., it
-// cannot be destroyed
 template <class TTr>
-inline void Rpc<TTr>::run_event_loop_one_st() {
+void Rpc<TTr>::run_event_loop_one_st() {
   dpath_stat_inc(&dpath_stats.ev_loop_calls);
 
   // In kDatapathChecks mode, alert user if background thread calls event loop
@@ -40,7 +38,10 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
   process_req_txq_st();  // Req TX
 
   if (small_rpc_unlikely(multi_threaded)) {
-    process_bg_resp_txq_st();  // Background resp TX
+    // Process the background queues
+    process_bg_queues_enqueue_request_st();
+    process_bg_queues_enqueue_response_st();
+    process_bg_queues_release_response_st();
   }
 
   // Drain all packets
@@ -55,7 +56,7 @@ inline void Rpc<TTr>::run_event_loop_one_st() {
 }
 
 template <class TTr>
-inline void Rpc<TTr>::run_event_loop_st() {
+void Rpc<TTr>::run_event_loop_st() {
   assert(in_creator());
   while (true) {
     run_event_loop_one();
@@ -63,7 +64,7 @@ inline void Rpc<TTr>::run_event_loop_st() {
 }
 
 template <class TTr>
-inline void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
+void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
   assert(in_creator());
 
   uint64_t start_tsc = rdtsc();

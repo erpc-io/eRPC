@@ -54,6 +54,7 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   erpc_dprintf("%s. None. Sending response.\n", issue_msg);
   enqueue_sm_resp_st(wi, SmErrType::kNoError);
 
+  session->state = SessionState::kDisconnected;
   bury_session_st(session);  // Free session resources + NULL in session_vec
 }
 

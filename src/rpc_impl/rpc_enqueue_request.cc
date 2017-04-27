@@ -8,58 +8,49 @@ template <class TTr>
 int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                               MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
                               size_t tag) {
+  // Since this can be called from a background thread, only do basic checks
+  // that don't require accessing the session.
   assert(is_usr_session_num_in_range(session_num));
-  Session *session = session_vec[static_cast<size_t>(session_num)];
-
   if (!kDatapathChecks) {
-    assert(session != nullptr);
-  } else {
-    if (unlikely(session == nullptr)) {
-      return -EINVAL;
-    }
-  }
-
-  // Prevent concurrent operations on this session until we grab and fill sslot
-  lock_cond(&session->lock);
-
-  // Checks that are required even without kDatapathChecks
-  if (unlikely(session->sslot_free_vec.size() == 0)) {
-    unlock_cond(&session->lock);
-    return -ENOMEM;
-  }
-
-  if (unlikely(!session->is_connected())) {
-    unlock_cond(&session->lock);
-    return -ESHUTDOWN;
-  }
-
-  // Checks that are done only if kDatapathChecks is enabled
-  if (!kDatapathChecks) {
-    assert(session->is_client());
     assert(req_msgbuf != nullptr);
     assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic() &&
            req_msgbuf->is_dynamic());
     assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
     assert(req_msgbuf->num_pkts > 0);
   } else {
-    if (unlikely(!session->is_client())) {
-      unlock_cond(&session->lock);
-      return -EPERM;
-    }
-
     if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
                  !req_msgbuf->check_magic() || !req_msgbuf->is_dynamic())) {
-      unlock_cond(&session->lock);
       return -EINVAL;
     }
 
     if (unlikely(req_msgbuf->data_size == 0 ||
                  req_msgbuf->data_size > kMaxMsgSize ||
                  req_msgbuf->num_pkts == 0)) {
-      unlock_cond(&session->lock);
       return -EINVAL;
     }
   }
+
+  // When called from a background thread, enqueue to the foreground thread
+  if (small_rpc_unlikely(!in_creator())) {
+    auto req_args = enqueue_request_args_t(session_num, req_type, req_msgbuf,
+                                           cont_func, tag);
+    bg_queues.enqueue_request.unlocked_push_back(req_args);
+    return 0;
+  }
+
+  // If we're here, we are in the foreground thread
+  assert(in_creator());
+
+  Session *session = session_vec[static_cast<size_t>(session_num)];
+  if (!kDatapathChecks) {
+    assert(session != nullptr);
+    assert(session->is_client());
+  } else {
+    if (unlikely(session == nullptr)) return -EINVAL;
+    if (unlikely(!session->is_client())) return -EPERM;
+  }
+
+  if (unlikely(session->sslot_free_vec.size() == 0)) return -ENOMEM;
 
   // Grab a free message slot, and unlock the session. At this point, the
   // creator thread can't disconnect the session.
@@ -95,8 +86,6 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  unlock_cond(&session->lock);  // Avoid holding lock while filling pkthdr
-
   // Generate req num. All sessions share req_num_arr, so we need to lock.
   lock_cond(&req_num_arr_lock);
   size_t req_num =
@@ -126,10 +115,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   }
 
   // Add the sslot to request TX queue
-  lock_cond(&req_txq_lock);
   assert(std::find(req_txq.begin(), req_txq.end(), &sslot) == req_txq.end());
   req_txq.push_back(&sslot);
-  unlock_cond(&req_txq_lock);
   return 0;
 }
 

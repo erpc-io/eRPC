@@ -16,8 +16,16 @@
 
 namespace ERpc {
 
+// Forward declarations for friendship. Prevent Nexus's background threads
+// from accessing session members.
+class IBTransport;
+template <typename T>
+class Rpc;
+
 /// A one-to-one session class for all transports
 class Session {
+  friend class Rpc<IBTransport>;
+
  public:
   enum class Role : int {
     // Weird numbers to help detect use of freed session pointers
@@ -35,30 +43,15 @@ class Session {
   // number assignment and slot number decoding, respectively.
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
+ private:
   Session(Role role, SessionState state);
 
   /// Session resources are freed in Rpc::bury_session(), so this is empty
   ~Session() {}
 
-  /// Enable congestion control for this session
-  void enable_congestion_control() {
-    assert(role == Role::kClient);
-    client_info.is_cc = true;
-  }
-
-  /// Disable congestion control for this session
-  void disable_congestion_control() {
-    assert(role == Role::kClient);
-    client_info.is_cc = false;
-  }
-
   inline bool is_client() const { return role == Role::kClient; }
   inline bool is_server() const { return role == Role::kServer; }
   inline bool is_connected() const { return state == SessionState::kConnected; }
-
-  /// The lock for this session, held for short durations (i.e., it must not be
-  /// held across network round trips)
-  std::mutex lock;
 
   Role role;           ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint

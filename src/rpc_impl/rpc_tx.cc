@@ -7,9 +7,6 @@ void Rpc<TTr>::process_req_txq_st() {
   assert(in_creator());
   size_t write_index = 0;  // Re-add incomplete sslots at this index
 
-  // Prevent background threads from enqueueing while processing the queue
-  lock_cond(&req_txq_lock);
-
   for (size_t i = 0; i < req_txq.size(); i++) {
     SSlot *sslot = req_txq[i];
     assert(sslot != nullptr);
@@ -37,7 +34,6 @@ void Rpc<TTr>::process_req_txq_st() {
   }
 
   req_txq.resize(write_index);  // Number of sslots left = write_index
-  unlock_cond(&req_txq_lock);   // Re-allow bg threads to enqueue sslots
 }
 
 template <class TTr>
@@ -92,45 +88,6 @@ void Rpc<TTr>::process_req_txq_large_one_st(SSlot *sslot,
     enqueue_pkt_tx_burst_st(session->remote_routing_info, req_msgbuf, offset,
                             data_bytes);
   }
-}
-
-template <class TTr>
-void Rpc<TTr>::process_bg_resp_txq_st() {
-  assert(in_creator());
-  size_t write_index = 0;  // Re-add incomplete sslots at this index
-
-  // Prevent background threads from enqueueing while processing the queue
-  bg_resp_txq_lock.lock();
-
-  for (size_t i = 0; i < bg_resp_txq.size(); i++) {
-    SSlot *sslot = bg_resp_txq[i];
-    assert(sslot != nullptr);
-
-    Session *session = sslot->session;
-    assert(session->is_server());
-    assert(session->is_connected());
-
-    MsgBuffer *resp_msgbuf = sslot->tx_msgbuf;
-    assert(resp_msgbuf != nullptr);
-    assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic());
-    assert(resp_msgbuf->pkts_queued < resp_msgbuf->num_pkts);
-    assert(resp_msgbuf->is_resp());
-
-    // Wait for the background thread to bury this sslot's request MsgBuffer
-    if (sslot->rx_msgbuf.buf != nullptr) {
-      assert(write_index < bg_resp_txq.size());
-      bg_resp_txq[write_index++] = sslot;
-      continue;  // Process other packets
-    }
-
-    // Send the first response packet
-    size_t data_bytes = std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt);
-    enqueue_pkt_tx_burst_st(session->remote_routing_info, resp_msgbuf, 0,
-                            data_bytes);
-  }
-
-  bg_resp_txq.resize(write_index);  // Number of sslots left = write_index
-  bg_resp_txq_lock.unlock();        // Re-allow bg threads to enqueue sslots
 }
 
 }  // End ERpc
