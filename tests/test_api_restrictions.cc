@@ -82,7 +82,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t) {
   }
 
   context->num_rpc_resps++;
-  context->rpc->release_respone(resp_handle);
+  context->rpc->release_response(resp_handle);
 }
 
 /// The test function

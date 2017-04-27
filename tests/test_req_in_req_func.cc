@@ -169,7 +169,7 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
   delete srv_req_info;
 
   // Release the server-server response
-  context->rpc->release_respone(resp_handle_pb);
+  context->rpc->release_response(resp_handle_pb);
 
   // Send response to the client
   req_handle_cp->prealloc_used = false;
@@ -235,7 +235,7 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 
   context->num_rpc_resps++;
-  context->rpc->release_respone(resp_handle);
+  context->rpc->release_response(resp_handle);
 
   if (context->num_reqs_sent < kAppNumReqs) {
     client_request_helper(context, static_cast<tag_t>(tag).msgbuf_i);

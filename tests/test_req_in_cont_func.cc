@@ -99,7 +99,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   ASSERT_EQ(resp_msgbuf->get_data_size(), static_cast<tag_t>(tag).req_size);
 
   context->num_rpc_resps++;
-  context->rpc->release_respone(resp_handle);
+  context->rpc->release_response(resp_handle);
 
   if (context->num_reqs_sent < kAppNumReqs) {
     enqueue_request_helper(context, static_cast<tag_t>(tag).msgbuf_i);
