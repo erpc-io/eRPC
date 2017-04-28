@@ -179,7 +179,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
       return -EPERM;
 
-    case SessionState::kConnected: {
+    case SessionState::kConnected:
       session->state = SessionState::kDisconnectInProgress;
 
       erpc_dprintf(
@@ -192,7 +192,6 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       session->client_info.sm_api_req_pending = true;
       enqueue_sm_req_st(session, SmPktType::kDisconnectReq);
       return 0;
-    }
 
     case SessionState::kPktLossRecovery:
       erpc_dprintf("%s: Packet loss recovery in progress.\n", issue_msg);
