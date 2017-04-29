@@ -134,7 +134,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
 
   if (pkthdr->is_req()) {
     // Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf)
-    bury_sslot_tx_msgbuf(sslot);
+    bury_tx_msgbuf_server(sslot);
 
     // Remember request metadata for enqueue_response()
     sslot->srv_save_info.req_func_type = req_func.req_func_type;
@@ -146,7 +146,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
       // MsgBuffer suffices (i.e., it's valid for the duration of req_func).
       sslot->rx_msgbuf = MsgBuffer(pkt, msg_size);
       req_func.req_func(static_cast<ReqHandle *>(sslot), context);
-      bury_sslot_rx_msgbuf_nofree(sslot);
+      bury_rx_msgbuf_nofree(sslot);
       return;
     } else {
       // For background request handlers, we need a RX ring--independent copy of
@@ -164,7 +164,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
     bump_credits(sslot->session);
 
     // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
-    bury_sslot_tx_msgbuf_nofree(sslot);
+    bury_tx_msgbuf_client(sslot);
 
     if (small_rpc_likely(sslot->clt_save_info.cont_etid == kInvalidBgETid)) {
       // Continuation will run in foreground with a "fake" static MsgBuffer
@@ -228,8 +228,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     assert(rx_msgbuf.is_buried());  // Buried earlier
 
     if (pkthdr->is_req()) {
-      // Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf)
-      bury_sslot_tx_msgbuf(sslot);
+      bury_tx_msgbuf_server(sslot);  // Bury the previous response MsgBuffer
     }
 
     if (unlikely(pkt_num != 0)) {
@@ -316,7 +315,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     // rx_msgbuf here is independent of the RX ring, so we never need a copy
     if (!req_func.is_background()) {
       req_func.req_func(static_cast<ReqHandle *>(sslot), context);
-      bury_sslot_rx_msgbuf(sslot);
+      bury_rx_msgbuf(sslot);
       return;
     } else {
       submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kReq);
@@ -324,7 +323,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     }
   } else {
     // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
-    bury_sslot_tx_msgbuf_nofree(sslot);
+    bury_tx_msgbuf_client(sslot);
 
     if (small_rpc_likely(sslot->clt_save_info.cont_etid == kInvalidBgETid)) {
       sslot->clt_save_info.cont_func(static_cast<RespHandle *>(sslot), context,
