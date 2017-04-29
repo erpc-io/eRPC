@@ -8,14 +8,14 @@ namespace ERpc {
 
 class TlsRegistry {
  public:
-  TlsRegistry() : cur_tiny_tid(0) {}
-  std::atomic<size_t> cur_tiny_tid;
+  TlsRegistry() : cur_etid(0) {}
+  std::atomic<size_t> cur_etid;
 
   /// Initialize all the thread-local registry members
   void init();
 
-  /// Return the tiny thread ID of the caller
-  size_t get_tiny_tid() const;
+  /// Return the ERpc thread ID of the caller
+  size_t get_etid() const;
 };  // End ERpc
 }
 

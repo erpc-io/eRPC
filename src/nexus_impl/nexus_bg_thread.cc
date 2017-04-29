@@ -12,10 +12,10 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *ctx) {
   ctx->tls_registry->init();  // Initialize thread-local variables
 
   // The BgWorkItem request list can be indexed using the background thread's
-  // index in the Nexus, or its tiny TID.
-  assert(ctx->bg_thread_index == ctx->tls_registry->get_tiny_tid());
+  // index in the Nexus, or its ERpc TID.
+  assert(ctx->bg_thread_index == ctx->tls_registry->get_etid());
   erpc_dprintf("eRPC Nexus: Background thread %zu running. Tiny TID = %zu.\n",
-               ctx->bg_thread_index, ctx->tls_registry->get_tiny_tid());
+               ctx->bg_thread_index, ctx->tls_registry->get_etid());
 
   while (*ctx->kill_switch == false) {
     if (ctx->bg_req_list.size == 0) {

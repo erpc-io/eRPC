@@ -50,7 +50,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
 
   tls_registry = &nexus->tls_registry;
   tls_registry->init();  // Initialize thread-local variables for this thread
-  creator_tiny_tid = get_tiny_tid();
+  creator_etid = get_etid();
 
   in_event_loop = false;
 
@@ -78,8 +78,8 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
     assert(nexus_hook.bg_req_list_arr[i] != nullptr);
   }
 
-  erpc_dprintf("eRPC Rpc: Created with ID = %u, tiny TID = %zu.\n", rpc_id,
-               creator_tiny_tid);
+  erpc_dprintf("eRPC Rpc: Created with ID = %u, ERpc TID = %zu.\n", rpc_id,
+               creator_etid);
 
   prev_epoch_ts = rdtsc();  // Assign epoch timestamp as late as possible
 }

@@ -4,10 +4,12 @@
 
 namespace ERpc {
 
+// The cont_etid parameter is passed only when the event loop processes the
+// background threads' queue of enqueue_request calls.
 template <class TTr>
 int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                               MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
-                              size_t tag) {
+                              size_t tag, size_t cont_etid) {
   // Since this can be called from a background thread, only do basic checks
   // that don't require accessing the session.
   assert(is_usr_session_num_in_range(session_num));
@@ -32,8 +34,9 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // When called from a background thread, enqueue to the foreground thread
   if (small_rpc_unlikely(!in_creator())) {
+    assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
     auto req_args = enqueue_request_args_t(session_num, req_type, req_msgbuf,
-                                           cont_func, tag);
+                                           cont_func, tag, get_etid());
     bg_queues.enqueue_request.unlocked_push_back(req_args);
     return 0;
   }
@@ -77,13 +80,9 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     sslot.clt_save_info.rfr_pkt_num = 1;
   }
 
-  if (small_rpc_unlikely(multi_threaded)) {
-    if (!in_creator()) {
-      sslot.clt_save_info.is_requester_bg = true;
-      sslot.clt_save_info.bg_tiny_tid = get_tiny_tid();
-    } else {
-      sslot.clt_save_info.is_requester_bg = true;
-    }
+  if (small_rpc_unlikely(cont_etid != kInvalidBgETid)) {
+    // We need to run the continuation in a background thread
+    sslot.clt_save_info.cont_etid = cont_etid;
   }
 
   // Generate req num. All sessions share req_num_arr, so we need to lock.

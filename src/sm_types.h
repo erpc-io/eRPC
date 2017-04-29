@@ -16,8 +16,6 @@ static constexpr size_t kSecretBits = 32;  ///< Session secret for security
 static_assert(kSecretBits <= 32, "");      // Secret must fit in 32 bits
 
 // Invalid metadata values for session endpoint initialization
-static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
-static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
 static constexpr uint16_t kInvalidSessionNum =
     std::numeric_limits<uint16_t>::max();
 static constexpr uint32_t kInvalidSecret = 0;

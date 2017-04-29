@@ -312,15 +312,21 @@ class Rpc {
    * @param req_type The type of the request
    * @param req_msgbuf The user-created MsgBuffer containing the request payload
    * but not packet headers
+   *
    * @param cont_func The continuation function for this request
    * @tag The tag for this request
+   * @cont_etid The ERpc thread ID of the background thread to run the
+   * continuation on. The default value of \p kInvalidBgETid means that the
+   * continuation runs in the foreground. This argument is meant only for
+   * internal use by eRPC (i.e., user calls must ignore it).
    *
    * @return 0 on success (i.e., if the request was queued). Negative errno is
    * returned if the request was not queued. -ENOMEM is returned iff the request
    * cannot be enqueued because the session is out of slots.
    */
   int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
-                      erpc_cont_func_t cont_func, size_t tag);
+                      erpc_cont_func_t cont_func, size_t tag,
+                      size_t cont_etid = kInvalidBgETid);
 
   /// The arguments to enqueue_request
   struct enqueue_request_args_t {
@@ -329,16 +335,18 @@ class Rpc {
     MsgBuffer *req_msgbuf;
     erpc_cont_func_t cont_func;
     size_t tag;
+    size_t cont_etid;
 
     enqueue_request_args_t() {}
     enqueue_request_args_t(int session_num, uint8_t req_type,
                            MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
-                           size_t tag)
+                           size_t tag, size_t cont_etid)
         : session_num(session_num),
           req_type(req_type),
           req_msgbuf(req_msgbuf),
           cont_func(cont_func),
-          tag(tag) {}
+          tag(tag),
+          cont_etid(cont_etid) {}
   };
 
   /// Enqueue a response for transmission at the server
@@ -543,9 +551,16 @@ class Rpc {
    */
   void process_comps_large_msg_one_st(SSlot *sslot, const uint8_t *pkt);
 
-  /// Submit a request or a response sslot to a background thread
+  /**
+   * @brief Submit a work item to a background thread
+   *
+   * @param sslot Session sslot with a complete request or response MsgBuffer
+   * @param wi_type Work item type (request or response)
+   * @param bg_etid ERpc thread ID of the background thread to submit to
+   */
   void submit_background_st(SSlot *sslot,
-                            typename Nexus<TTr>::BgWorkItemType wi_type);
+                            typename Nexus<TTr>::BgWorkItemType wi_type,
+                            size_t bg_etid = kMaxBgThreads);
 
   //
   // Background queue handlers (rpc_bg_queues.cc)
@@ -636,16 +651,16 @@ class Rpc {
   /// Return true iff the caller is running in a background thread
   inline bool in_background() const { return !in_creator(); }
 
-  /// Return the tiny thread ID of the caller
-  inline size_t get_tiny_tid() const { return tls_registry->get_tiny_tid(); }
+  /// Return the ERpc thread ID of the caller
+  inline size_t get_etid() const { return tls_registry->get_etid(); }
 
   //
   // Misc private functions
   //
 
  private:
-  /// Return true iff we're currently running in this Rpc's creator.
-  inline bool in_creator() const { return get_tiny_tid() == creator_tiny_tid; }
+  /// Return true iff we're currently running in this Rpc's creator thread
+  inline bool in_creator() const { return get_etid() == creator_etid; }
 
   /// Return true iff a user-provide session number is in the session vector
   inline bool is_usr_session_num_in_range(int session_num) const {
@@ -707,7 +722,7 @@ class Rpc {
   const std::array<ReqFunc, kMaxReqTypes> req_func_arr;
 
   // Rpc metadata
-  size_t creator_tiny_tid;  ///< Tiny thread ID of the creator thread
+  size_t creator_etid;  ///< ERpc thread ID of the creator thread
   typename Nexus<TTr>::Hook nexus_hook;  ///< A hook shared with the Nexus
   TlsRegistry *tls_registry;  ///< Pointer to the Nexus's thread-local registry
 

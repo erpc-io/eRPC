@@ -43,7 +43,7 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads)
   erpc_dprintf("eRPC Nexus: Launching %zu background threads.\n",
                num_bg_threads);
   for (size_t i = 0; i < num_bg_threads; i++) {
-    assert(tls_registry.cur_tiny_tid == i);
+    assert(tls_registry.cur_etid == i);
 
     bg_thread_ctx_arr[i].kill_switch = &kill_switch;
     bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
@@ -52,9 +52,9 @@ Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads)
 
     bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
 
-    // Wait for the launched thread to grab a tiny thread ID, otherwise later
+    // Wait for the launched thread to grab a ERpc thread ID, otherwise later
     // background threads or the foreground thread can grab ID = i.
-    while (tls_registry.cur_tiny_tid == i) {
+    while (tls_registry.cur_etid == i) {
       usleep(1);
     }
   }

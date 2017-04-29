@@ -25,9 +25,10 @@ class PrimaryReqInfo {
   size_t req_size_cp;        ///< Size of client-to-primary request
   ReqHandle *req_handle_cp;  ///< Handle for client-to-primary request
   MsgBuffer req_msgbuf_pb;   ///< MsgBuffer for primary-to-backup request
+  size_t etid;               ///< ERpc thread ID in the request handler
 
-  PrimaryReqInfo(size_t req_size_cp, ReqHandle *req_handle_cp)
-      : req_size_cp(req_size_cp), req_handle_cp(req_handle_cp) {}
+  PrimaryReqInfo(size_t req_size_cp, ReqHandle *req_handle_cp, size_t etid)
+      : req_size_cp(req_size_cp), req_handle_cp(req_handle_cp), etid(etid) {}
 };
 
 union tag_t {
@@ -78,8 +79,9 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
   test_printf("Primary [Rpc %u]: Received request of length %zu.\n",
               context->rpc->get_rpc_id(), req_size_cp);
 
-  // Record info for the request we're now sending to server #1
-  PrimaryReqInfo *srv_req_info = new PrimaryReqInfo(req_size_cp, req_handle_cp);
+  // Record info for the request that we are now sending to server #1
+  PrimaryReqInfo *srv_req_info =
+      new PrimaryReqInfo(req_size_cp, req_handle_cp, context->rpc->get_etid());
 
   MsgBuffer &req_msgbuf_pb = srv_req_info->req_msgbuf_pb;
   req_msgbuf_pb = context->rpc->alloc_msg_buffer(req_size_cp);
@@ -142,9 +144,13 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
   test_printf("Primary [Rpc %u]: Received response of length %zu.\n",
               context->rpc->get_rpc_id(), resp_msgbuf_pb->get_data_size());
 
-  // Extract the request info
+  // Check that we're still running in the same thread as for the
+  // client-to-primary request
   tag_t tag(_tag);
   PrimaryReqInfo *srv_req_info = tag.srv_req_info_ptr;
+  assert(srv_req_info->etid == context->rpc->get_etid());
+
+  // Extract the request info
   size_t req_size_cp = srv_req_info->req_size_cp;
   ReqHandle *req_handle_cp = srv_req_info->req_handle_cp;
   MsgBuffer &req_msgbuf_pb = srv_req_info->req_msgbuf_pb;
@@ -301,7 +307,7 @@ TEST(Base, PrimaryInBackground) {
       ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
       ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kFgTerminal)};
 
-  // 2 client sessions (=> 2 server threads), 1 background thread
+  // 2 client sessions (=> 2 server threads), 3 background threads
   launch_server_client_threads(2, 1, client_thread, reg_info_vec,
                                ConnectServers::kTrue);
 }
@@ -315,8 +321,8 @@ TEST(Base, BothInBackground) {
       ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
       ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kBackground)};
 
-  // 2 client sessions (=> 2 server threads), 1 background thread
-  launch_server_client_threads(2, 1, client_thread, reg_info_vec,
+  // 2 client sessions (=> 2 server threads), 3 background threads
+  launch_server_client_threads(2, 3, client_thread, reg_info_vec,
                                ConnectServers::kTrue);
 }
 

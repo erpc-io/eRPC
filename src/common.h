@@ -90,18 +90,24 @@ static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
 /// The max Rpc ID. 256 threads per machine is enough.
 static constexpr size_t kMaxRpcId = std::numeric_limits<uint8_t>::max() - 1;
 
-/// The maximum number of machines in the cluster. This is only limited by
-/// enet's maximum connections.
+/// The maximum number of machines in the cluster (ENet's connection limit)
 static constexpr size_t kMaxNumMachines = 4095;
 
+static constexpr size_t kMaxPhyPorts = 16;  ///< Max fabric device ports
 static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
 static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
 static constexpr size_t kPageSize = 4096;   ///< Page size in bytes
 static constexpr size_t kHugepageSize = (2 * 1024 * 1024);  ///< Hugepage size
-static constexpr size_t kMaxPhyPorts = 16;      ///< Max fabric device ports
 static constexpr size_t kMaxHostnameLen = 128;  ///< Max hostname length
 static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
     (240 + kMaxHostnameLen * 2);           // Three lines and two hostnames
+
+// Invalid values
+static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
+static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
+
+/// Invalid ERpc thread ID of a background thread
+static constexpr size_t kInvalidBgETid = kMaxBgThreads;
 
 // Simple methods
 

@@ -59,8 +59,7 @@ class SSlot {
     size_t rfr_pkt_num;  ///< Next pkt number for request-for-response packets
 
     // These fields are used only if we have background threads
-    bool is_requester_bg;  ///< True if the requester thread is background
-    size_t bg_tiny_tid;    ///< Tiny thread ID of the background thread
+    size_t cont_etid;  ///< Thread ID to run the continuation on
   } clt_save_info;
 
   /// Request metadata saved by the server before calling the request handler.

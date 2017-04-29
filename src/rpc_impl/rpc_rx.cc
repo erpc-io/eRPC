@@ -168,8 +168,8 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
     // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(sslot);
 
-    if (small_rpc_likely(!sslot->clt_save_info.is_requester_bg)) {
-      // Create a "fake" static MsgBuffer for the foreground continuation
+    if (small_rpc_likely(sslot->clt_save_info.cont_etid == kInvalidBgETid)) {
+      // Continuation will run in foreground with a "fake" static MsgBuffer
       sslot->rx_msgbuf = MsgBuffer(pkt, msg_size);
       sslot->clt_save_info.cont_func(static_cast<RespHandle *>(sslot), context,
                                      sslot->clt_save_info.tag);
@@ -184,7 +184,8 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
       assert(sslot->rx_msgbuf.buf != nullptr);
       memcpy(reinterpret_cast<char *>(sslot->rx_msgbuf.get_pkthdr_0()), pkt,
              msg_size + sizeof(pkthdr_t));
-      submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp);
+      submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
+                           sslot->clt_save_info.cont_etid);
       return;
     }
     return;
@@ -327,7 +328,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_sslot_tx_msgbuf_nofree(sslot);
 
-    if (small_rpc_likely(!sslot->clt_save_info.is_requester_bg)) {
+    if (small_rpc_likely(sslot->clt_save_info.cont_etid == kInvalidBgETid)) {
       sslot->clt_save_info.cont_func(static_cast<RespHandle *>(sslot), context,
                                      sslot->clt_save_info.tag);
 
@@ -335,7 +336,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
       // event loop (this thread) can un-bury it.
       assert(sslot->rx_msgbuf.buf == nullptr);
     } else {
-      submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp);
+      submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
+                           sslot->clt_save_info.cont_etid);
       return;
     }
     return;
@@ -343,25 +345,24 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_background_st(
-    SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type) {
+void Rpc<TTr>::submit_background_st(SSlot *sslot,
+                                    typename Nexus<TTr>::BgWorkItemType wi_type,
+                                    size_t bg_etid) {
   assert(in_creator());
-  assert(nexus->num_bg_threads > 0);
   assert(sslot != nullptr);
-
-  if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
-    assert(sslot->session != nullptr && sslot->session->is_server());
-  } else {
-    assert(sslot->session != nullptr && sslot->session->is_client());
-  }
+  assert(bg_etid < nexus->num_bg_threads || bg_etid == kInvalidBgETid);
+  assert(nexus->num_bg_threads > 0);
 
   // Sanity-check RX and TX MsgBuffers
   debug_check_bg_rx_msgbuf(sslot, wi_type);
   assert(sslot->tx_msgbuf == nullptr);
 
-  // Choose a background thread at random
-  size_t bg_thread_id = fast_rand.next_u32() % nexus->num_bg_threads;
-  auto *req_list = nexus_hook.bg_req_list_arr[bg_thread_id];
+  if (bg_etid == kInvalidBgETid) {
+    // Background thread was not specified, so choose one at random
+    bg_etid = fast_rand.next_u32() % nexus->num_bg_threads;
+  }
+
+  auto *req_list = nexus_hook.bg_req_list_arr[bg_etid];
 
   // Thread-safe
   req_list->unlocked_push_back(

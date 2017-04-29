@@ -27,7 +27,7 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
     sslot.rx_msgbuf.buf = nullptr;         // Bury rx_msgbuf
     sslot.tx_msgbuf = nullptr;             // Bury tx_msgbuf
 
-    sslot.clt_save_info.is_requester_bg = false;
+    sslot.clt_save_info.cont_etid = kInvalidBgETid;
 
     sslot_free_vec.push_back(sslot_i);
   }
