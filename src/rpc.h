@@ -190,11 +190,9 @@ class Rpc {
   inline void bury_sslot_rx_msgbuf(SSlot *sslot) {
     assert(sslot != nullptr);
 
-    // The RX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
-    // Its buf can be non-NULL even when dynamic allocation is not used.
     MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
     if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
-      // This check is OK, as dynamic sslots must be initialized
+      // This check is OK, as dynamic MsgBuffers must be initialized
       assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
       free_msg_buffer(rx_msgbuf);
       rx_msgbuf.buffer.buf = nullptr;  // Mark invalid for future

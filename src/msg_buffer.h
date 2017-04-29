@@ -68,6 +68,11 @@ class MsgBuffer {
   /// Check if this MsgBuffer uses dynamic memory allocation
   inline bool is_dynamic() const { return buffer.buf != nullptr; }
 
+  /// Check if this MsgBuffer is buried
+  inline bool is_buried() const {
+    return (buf == nullptr && buffer.buf == nullptr);
+  }
+
   /// Used by applications to get the current data size of a MsgBuffer
   inline size_t get_data_size() const { return data_size; }
 

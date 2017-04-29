@@ -43,8 +43,7 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   // Check that responses for all sslots have been sent
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     SSlot &sslot = session->sslot_arr[i];
-    assert(sslot.rx_msgbuf.buf == nullptr &&
-           sslot.rx_msgbuf.buffer.buf == nullptr);
+    assert(sslot.rx_msgbuf.is_buried());
 
     if (sslot.tx_msgbuf != nullptr) {
       assert(sslot.tx_msgbuf->pkts_queued == sslot.tx_msgbuf->num_pkts);

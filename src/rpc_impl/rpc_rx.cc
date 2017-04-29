@@ -116,9 +116,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
          pkthdr->msg_size <= TTr::kMaxDataPerPkt);
   assert(pkthdr->is_req() || pkthdr->is_resp());
 
-  // The RX MsgBuffer stored previously in this slot was buried earlier
-  assert(sslot->rx_msgbuf.buf == nullptr);
-  assert(sslot->rx_msgbuf.buffer.buf == nullptr);
+  assert(sslot->rx_msgbuf.is_buried());  // Older rx_msgbuf was buried earlier
 
   // Extract packet header fields
   uint8_t req_type = pkthdr->req_type;
@@ -227,7 +225,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
   if (rx_msgbuf.buf == nullptr) {
     // This is the first time that we have received a packet for this message.
     // This may not be the zeroth packet of the message due to reordering.
-    assert(rx_msgbuf.buffer.buf == nullptr);  // Buried earlier
+    assert(rx_msgbuf.is_buried());  // Buried earlier
 
     if (pkthdr->is_req()) {
       // Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf)
