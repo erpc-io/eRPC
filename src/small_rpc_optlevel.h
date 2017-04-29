@@ -1,6 +1,8 @@
 #ifndef SMALL_RPC_OPTLEVEL_H
 #define SMALL_RPC_OPTLEVEL_H
 
+#include <assert.h>
+
 namespace ERpc {
 
 /// No optimization for small messages and foreground request handlers
@@ -27,11 +29,13 @@ namespace ERpc {
 #define small_rpc_likely(x) likely(x)
 #define small_rpc_unlikely(x) unlikely(x)
 #elif small_rpc_optlevel == small_rpc_optlevel_extreme
-static constexpr bool small_rpc_likely(x) {
+static constexpr bool small_rpc_likely(bool x) {
+  ((void)(x));
   assert(x);
   return true;
 }
-static constexpr bool small_rpc_unlikely(x) {
+static constexpr bool small_rpc_unlikely(bool x) {
+  ((void)(x));
   assert(!x);
   return false;
 }

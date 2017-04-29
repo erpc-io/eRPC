@@ -4,7 +4,7 @@ project(eRPC)
 set(CMAKE_CXX_COMPILER g++)
 set(CMAKE_C_LINK_EXECUTABLE g++)
 
-add_definitions(-std=c++11)
+add_definitions(-std=c++14)
 
 add_definitions(-Wall -Wextra -Werror)
 add_definitions(-Wsign-conversion)

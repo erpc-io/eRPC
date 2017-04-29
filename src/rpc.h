@@ -157,7 +157,6 @@ class Rpc {
     assert(sslot != nullptr);
 
     // The TX MsgBuffer used dynamic allocation if its buffer.buf is non-NULL.
-    // Its buf can be non-NULL even when dynamic allocation is not used.
     MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
     if (small_rpc_unlikely(tx_msgbuf != nullptr && tx_msgbuf->is_dynamic())) {
       // This check is OK, as dynamic sslots must be initialized
