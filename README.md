@@ -48,7 +48,7 @@
      free it when the response is no longer needed for retransmission.
 
 ## Session management packet ownership
- * Rpc threads allocates an SM packet before queueing it to the SM thread. This
+ * Rpc threads allocate an SM packet before queueing it to the SM thread. This
    packet is freed by the SM thread when it transmits it using
    `sm_tx_work_item_and_free()`.
     * Rpc threads allocate SM request packets in `enqueue_sm_req()`, and
@@ -67,6 +67,7 @@
  * Enable marking an Rpc object as server-only. Such an Rpc object can bypass
    packet loss detection code in the event loop.
  * Optimize mem-copies using `rte_memcpy`.
+ * Create session objects from a hugepage-backed pool to reduce TLB misses.
  * The first packet size limit should be much smaller than MTU to improve RTT
    measurement accuracy (e.g., it could be around 256 bytes). This will need
    many changes, mostly to code that uses TTr::kMaxDataPerPkt.
