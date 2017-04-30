@@ -47,6 +47,7 @@ class Rpc {
 
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
+  static constexpr size_t kFlushCredits = 4;  ///< Packet loss credit pool
 
   //
   // Constructor/destructor (rpc.cc)
@@ -295,6 +296,27 @@ class Rpc {
   // rpc_disconnect_handlers.cc
   void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
   void handle_disconnect_resp_st(SmPkt *pkt);
+
+  //
+  // Handle available RECVs
+  //
+
+  /// Return true iff there are sufficient RECVs available for one session
+  bool have_recvs() const {
+    return recvs_available >= Session::kSessionCredits;
+  }
+
+  /// Allocate RECVs for one session
+  void alloc_recvs() {
+    assert(have_recvs());
+    recvs_available -= Session::kSessionCredits;
+  }
+
+  /// Free RECVs allocated for one session
+  void free_recvs() {
+    recvs_available += Session::kSessionCredits;
+    assert(recvs_available <= Transport::kRecvQueueDepth - kFlushCredits);
+  }
 
   //
   // Rpc datapath (rpc_enqueue_request.cc and rpc_enqueue_response.cc)
@@ -738,8 +760,14 @@ class Rpc {
 
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport
+
+  /// Current number of RECVs available to use for sessions
+  size_t recvs_available = TTr::kRecvQueueDepth - kFlushCredits;
+  size_t flush_credits_available = kFlushCredits;  ///< Available flush credits
+
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx baych info
   size_t tx_batch_i = 0;  ///< The batch index for \p tx_burst_arr
+
   MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];  /// Batch info for \p rx_burst
   uint8_t *rx_ring[TTr::kRecvQueueDepth];       ///< The transport's RX ring
   size_t rx_ring_head = 0;  ///< Current unused RX ring buffer

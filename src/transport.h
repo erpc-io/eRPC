@@ -18,8 +18,19 @@ class HugeAlloc;  // Forward declaration: HugeAlloc needs MemRegInfo
 /// Generic mostly-reliable transport
 class Transport {
  public:
-  static const size_t kMaxRoutingInfoSize = 32;  ///< Space for routing info
-  static const size_t kMaxMemRegInfoSize = 64;   ///< Space for memory reg info
+  static constexpr size_t kMaxRoutingInfoSize = 32;  ///< Space for routing info
+  static constexpr size_t kMaxMemRegInfoSize = 64;   ///< Space for mem reg info
+
+  // Queue depths
+  static constexpr size_t kRecvQueueDepth = 2048;  ///< RECV queue size
+  static constexpr size_t kSendQueueDepth = 128;   ///< SEND queue size
+
+  /// The transport must allow inline posting of the packet header, as we
+  /// don't maintain DMA-able MsgBuffers for credit returns.
+  static constexpr size_t kMinInline = sizeof(pkthdr_t);
+
+  static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
+  static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 
   /**
    * @brief Generic struct to store routing info for any transport.
@@ -66,17 +77,6 @@ class Transport {
     }
     throw std::runtime_error("eRPC: Invalid transport");
   }
-
-  // Queue depths
-  static constexpr size_t kRecvQueueDepth = 2048;  ///< RECV queue size
-  static constexpr size_t kSendQueueDepth = 128;   ///< SEND queue size
-
-  /// The transport must allow inline posting of the packet header, as we
-  /// don't maintain DMA-able MsgBuffers for credit returns.
-  static constexpr size_t kMinInline = sizeof(pkthdr_t);
-
-  static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
-  static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 
   /**
    * @brief Partially construct the transport object without using eRPC's

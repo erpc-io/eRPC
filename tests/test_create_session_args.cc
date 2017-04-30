@@ -58,13 +58,6 @@ void client_thread_func(Nexus<IBTransport> *nexus) {
         rpc.create_session(local_hostname, CLIENT_RPC_ID, phy_port);
     ASSERT_LT(session_num, 0);
   }
-
-  {
-    // Test: Try to create another session to the same remote Rpc
-    int session_num =
-        rpc.create_session(local_hostname, SERVER_RPC_ID, phy_port);
-    ASSERT_LT(session_num, 0);
-  }
 }
 
 // The server thread

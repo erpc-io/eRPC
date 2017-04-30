@@ -44,15 +44,12 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
     return;
   }
 
-  // Ensure that we don't have a session as the serrver with this client
-  for (Session *old_ssn : session_vec) {
-    if (old_ssn != nullptr) {
-      assert(strcmp(old_ssn->client.hostname, sm_pkt->client.hostname) != 0 ||
-             (old_ssn->client.rpc_id != sm_pkt->client.rpc_id));
-    }
+  // Check if we are allowed to create another session
+  if (!have_recvs()) {
+    erpc_dprintf("%s: RECVs exhausted. Sending response.\n", issue_msg);
+    enqueue_sm_resp_st(wi, SmErrType::kRecvsExhausted);
   }
 
-  // Check if we are allowed to create another session
   if (session_vec.size() == kMaxSessionsPerThread) {
     erpc_dprintf("%s: Reached session limit %zu. Sending response.\n",
                  issue_msg, kMaxSessionsPerThread);
@@ -74,17 +71,14 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
     return;
   }
 
-  // If we are here, create a new session and fill preallocated MsgBuffers.
-  // XXX: Use pool?
-  Session *session =
-      new Session(Session::Role::kServer, SessionState::kConnected);
+  // If we are here, create a new session and fill preallocated MsgBuffers
+  auto *session = new Session(Session::Role::kServer, SessionState::kConnected);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     MsgBuffer &msgbuf_i = session->sslot_arr[i].pre_resp_msgbuf;
     msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
 
     if (msgbuf_i.buf == nullptr) {
-      // We haven't assigned a session number or allocated non-prealloc
-      // MsgBuffers yet, so just free prealloc MsgBuffers 0 -- (i - 1).
+      // Cleanup everything allocated for this session
       for (size_t j = 0; j < i; j++) {
         MsgBuffer &msgbuf_j = session->sslot_arr[j].pre_resp_msgbuf;
         assert(msgbuf_j.buf != nullptr);
@@ -109,6 +103,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   session->local_session_num = sm_pkt->server.session_num;
   session->remote_session_num = sm_pkt->client.session_num;
 
+  alloc_recvs();
   session_vec.push_back(session);  // Add to list of all sessions
 
   erpc_dprintf("%s: None. Sending response.\n", issue_msg);
@@ -156,8 +151,10 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
                  sm_err_type_str(sm_pkt->err_type).c_str());
 
     session->state = SessionState::kDisconnected;
+    free_recvs();  // Free before calling handler, which might want a reconnect
     sm_handler(session->local_session_num, SmEventType::kConnectFailed,
                sm_pkt->err_type, context);
+
     bury_session_st(session);
     return;
   }
@@ -191,6 +188,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
 
     // Do what destroy_session() does with a kConnected session
     session->state = SessionState::kDisconnectInProgress;
+    free_recvs();  // Free before calling handler, which might want a reconnect
 
     erpc_dprintf(
         "eRPC Rpc %u: Sending callback-less disconnect request for "

@@ -9,10 +9,6 @@ namespace ERpc {
 
 // We don't need to check remote arguments since the session was already
 // connected successfully.
-//
-// We don't need to lock the session since it is idle, i.e., the session client
-// has received responses for all outstanding requests.
-
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
@@ -50,20 +46,22 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
     }
   }
 
+  session->state = SessionState::kDisconnected;
+  free_recvs();
+
   erpc_dprintf("%s. None. Sending response.\n", issue_msg);
   enqueue_sm_resp_st(wi, SmErrType::kNoError);
 
-  session->state = SessionState::kDisconnected;
   bury_session_st(session);  // Free session resources + NULL in session_vec
 }
 
-// We don't need to acquire the session lock because this session has been
-// idle since the disconnect request was sent.
+// We free RECVs before sending the disconnect request, not here.
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != nullptr);
   assert(sm_pkt->pkt_type == SmPktType::kDisconnectResp);
+  assert(sm_pkt->err_type == SmErrType::kNoError);  // Disconnects don't fail
   assert(sm_err_type_is_valid(sm_pkt->err_type));
 
   // Create the basic issue message using only the packet
@@ -85,12 +83,8 @@ void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
   assert(session->client == sm_pkt->client);
   assert(session->server == sm_pkt->server);
 
-  // Disconnect requests can only succeed
-  assert(sm_pkt->err_type == SmErrType::kNoError);
-
   session->client_info.sm_api_req_pending = false;
-
-  session->state = SessionState::kDisconnected;  // Mark session connected
+  session->state = SessionState::kDisconnected;
 
   if (!session->client_info.sm_callbacks_disabled) {
     erpc_dprintf("%s: None. Session disconnected.\n", issue_msg);

@@ -43,24 +43,6 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
     return -EINVAL;
   }
 
-  // Creating two sessions as client to the same remote Rpc is not allowed
-  for (Session *existing_session : session_vec) {
-    if (existing_session == nullptr) {
-      continue;
-    }
-
-    if (strcmp(existing_session->server.hostname, rem_hostname) == 0 &&
-        existing_session->server.rpc_id == rem_rpc_id) {
-      // existing_session->server != this Rpc, since existing_session->server
-      // matches (rem_hostname, rem_rpc_id), which does match this
-      // Rpc (checked earlier). So we must be the client.
-      assert(existing_session->is_client());
-      erpc_dprintf("%s: Session to %s already exists.\n", issue_msg,
-                   existing_session->server.rpc_name().c_str());
-      return -EEXIST;
-    }
-  }
-
   // Ensure bounded session_vec size
   if (session_vec.size() >= kMaxSessionsPerThread) {
     erpc_dprintf("%s: Session limit (%zu) reached.\n", issue_msg,
@@ -68,9 +50,14 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
     return -ENOMEM;
   }
 
-  // Create a new session and fill prealloc MsgBuffers. No need to lock the
-  // session since we haven't given the session number to the user.
-  Session *session =
+  // Ensure that we have RECV credits for this session
+  if (!have_recvs()) {
+    erpc_dprintf("%s: RECVs exhausted.\n", issue_msg);
+    return -ENOMEM;
+  }
+
+  // Create the session
+  auto *session =
       new Session(Session::Role::kClient, SessionState::kConnectInProgress);
 
   // Fill prealloc response MsgBuffers for the client session
@@ -79,8 +66,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
     resp_msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
 
     if (resp_msgbuf_i.buf == nullptr) {
-      // We haven't assigned a session number or allocated non-prealloc
-      // MsgBuffers yet, so just free prealloc MsgBuffers 0 -- (i - 1).
+      // Cleanup everything allocated for this session
       for (size_t j = 0; j < i; j++) {
         MsgBuffer &resp_msgbuf_j = session->sslot_arr[j].pre_resp_msgbuf;
         assert(resp_msgbuf_j.buf != nullptr);
@@ -114,6 +100,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
   server_endpoint.secret = client_endpoint.secret;  // Secret is shared
   // server_endpoint.routing_info = ??
 
+  alloc_recvs();
   session_vec.push_back(session);  // Add to list of all sessions
 
   // Enqueue a session management work request
@@ -181,6 +168,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
 
     case SessionState::kConnected:
       session->state = SessionState::kDisconnectInProgress;
+      free_recvs();  // Don't wait for the disconnect response to reclaim RECVs
 
       erpc_dprintf(
           "eRPC Rpc %u: Sending disconnect request for session %u "

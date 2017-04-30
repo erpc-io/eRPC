@@ -42,6 +42,7 @@ enum class SmPktType : int {
 enum class SmErrType : int {
   kNoError,          ///< The only non-error error type
   kTooManySessions,  ///< Connect req failed because server is out of sessions
+  kRecvsExhausted,   ///< Connect req failed because server is out of RECVs
   kOutOfMemory,      ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
   kInvalidRemoteRpcId,
@@ -167,6 +168,7 @@ static bool sm_err_type_is_valid(SmErrType err_type) {
   switch (err_type) {
     case SmErrType::kNoError:
     case SmErrType::kTooManySessions:
+    case SmErrType::kRecvsExhausted:
     case SmErrType::kOutOfMemory:
     case SmErrType::kRoutingResolutionFailure:
     case SmErrType::kInvalidRemoteRpcId:
@@ -185,6 +187,8 @@ static std::string sm_err_type_str(SmErrType err_type) {
       return std::string("[No error]");
     case SmErrType::kTooManySessions:
       return std::string("[Too many sessions]");
+    case SmErrType::kRecvsExhausted:
+      return std::string("[RECVs exhausted]");
     case SmErrType::kOutOfMemory:
       return std::string("[Out of memory]");
     case SmErrType::kRoutingResolutionFailure:
