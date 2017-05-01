@@ -41,10 +41,10 @@ void Rpc<TTr>::handle_sm_st() {
         handle_disconnect_resp_st(sm_pkt);
         break;
       case SmPktType::kFlushCreditReq:
-        handle_flush_req_st(&wi);
+        handle_sm_flush_req_st(&wi);
         break;
       case SmPktType::kFlushCreditResp:
-        handle_flush_resp_st(sm_pkt);
+        handle_sm_flush_resp_st(sm_pkt);
         break;
       case SmPktType::kFaultResetPeerReq:
         // This is handled in the Nexus

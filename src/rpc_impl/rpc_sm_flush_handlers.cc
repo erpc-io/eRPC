@@ -1,5 +1,5 @@
 /**
- * @file rpc_flush_handlers.cc
+ * @file rpc_sm_flush_handlers.cc
  * @brief Handlers for session management flush requests and responses
  */
 #include "rpc.h"
@@ -9,12 +9,12 @@ namespace ERpc {
 // We don't need to check remote arguments since the session was already
 // connected successfully.
 template <class TTr>
-void Rpc<TTr>::handle_flush_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
+void Rpc<TTr>::handle_sm_flush_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
   assert(wi != nullptr && wi->epeer != nullptr);
 
   const SmPkt *sm_pkt = wi->sm_pkt;
-  assert(sm_pkt != nullptr && sm_pkt->pkt_type == SmPktType::kDisconnectReq);
+  assert(sm_pkt != nullptr && sm_pkt->pkt_type == SmPktType::kFlushCreditReq);
 
   // Check that the server fields known by the client were filled correctly
   assert(sm_pkt->server.rpc_id == rpc_id);
@@ -55,7 +55,7 @@ void Rpc<TTr>::handle_flush_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
 }
 
 template <class TTr>
-void Rpc<TTr>::handle_flush_resp_st(SmPkt *sm_pkt) {
+void Rpc<TTr>::handle_sm_flush_resp_st(SmPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != nullptr);
   assert(sm_pkt->pkt_type == SmPktType::kDisconnectResp);
