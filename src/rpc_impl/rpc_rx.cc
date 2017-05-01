@@ -23,18 +23,19 @@ void Rpc<TTr>::process_comps_st() {
 
     Session *session = session_vec[session_num];
     if (unlikely(session == nullptr)) {
-      fprintf(stderr,
-              "eRPC Rpc %u: Warning: Received packet for buried session %u. "
-              "Dropping packet.\n",
-              rpc_id, session_num);
+      erpc_dprintf(
+          "eRPC Rpc %u: Warning: Received packet %s for buried session. "
+          "Dropping packet.\n",
+          rpc_id, pkthdr->to_string().c_str());
       continue;
     }
 
     if (unlikely(!session->is_connected())) {
-      fprintf(stderr,
-              "eRPC Rpc %u: Warning: Received packet for unconnected "
-              "session %u. Session state is %s. Dropping packet.\n",
-              rpc_id, session_num, session_state_str(session->state).c_str());
+      erpc_dprintf(
+          "eRPC Rpc %u: Warning: Received packet %s for unconnected "
+          "session (state is %s). Dropping packet.\n",
+          rpc_id, pkthdr->to_string().c_str(),
+          session_state_str(session->state).c_str());
       continue;
     }
 
@@ -46,7 +47,15 @@ void Rpc<TTr>::process_comps_st() {
     size_t sslot_i = pkthdr->req_num % Session::kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
-    // Process control packets. This entire block can get optimized away.
+    // Drop packets for old requests
+    if (unlikely(pkthdr->req_num < sslot->max_rx_req_num)) {
+      erpc_dprintf("eRPC Rpc %u: Warning: Received stale packet %s.\n", rpc_id,
+                   pkthdr->to_string().c_str());
+    } else {
+      sslot->max_rx_req_num = pkthdr->req_num;
+    }
+
+    // Process large-message control packets. This block can get optimized out.
     if (session->is_client()) {
       // Client-side processing
       assert(pkthdr->is_resp() || pkthdr->is_expl_cr());
@@ -123,16 +132,16 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
   size_t req_num = pkthdr->req_num;
   size_t msg_size = pkthdr->msg_size;
 
-  const ReqFunc &req_func = req_func_arr[req_type];
-  if (unlikely(!req_func.is_registered())) {
-    erpc_dprintf(
-        "eRPC Rpc %u: Warning: Received packet for unknown request type %u. "
-        "Dropping packet.\n",
-        rpc_id, req_type);
-    return;
-  }
-
   if (pkthdr->is_req()) {
+    const ReqFunc &req_func = req_func_arr[req_type];
+    if (unlikely(!req_func.is_registered())) {
+      erpc_dprintf(
+          "eRPC Rpc %u: Warning: Received packet for unknown request type %u. "
+          "Dropping packet.\n",
+          rpc_id, req_type);
+      return;
+    }
+
     // Bury the previous possibly-dynamic response MsgBuffer (tx_msgbuf)
     bury_tx_msgbuf_server(sslot);
 
@@ -281,7 +290,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
       assert(num_rfr_to_send > 0);
 
       for (size_t i = 0; i < num_rfr_to_send; i++) {
-        // This doesn't use pkthdr->pkt_num -- it uses sslot's rfr_pkt_num
+        // This doesn't use pkthdr->pkt_num: it uses sslot's rfr_pkt_num
         send_req_for_resp_now_st(sslot, pkthdr);
         assert(rfr_pkt_num <= rx_msgbuf.num_pkts);
       }

@@ -781,10 +781,10 @@ class Rpc {
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
   std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
 
-  // Request and response queues
+  // RPC work queues
   std::vector<SSlot *> req_txq;  ///< Request sslots that need TX
 
-  // Queues for datapath API requests from background threads
+  /// Queues for datapath API requests from background threads
   struct {
     MtList<enqueue_request_args_t> enqueue_request;
     MtList<ReqHandle *> enqueue_response;
@@ -792,7 +792,8 @@ class Rpc {
   } bg_queues;
 
   // Packet loss
-  size_t prev_epoch_ts;  ///< Timestamp of the previous epoch
+  size_t prev_epoch_ts;                 ///< Timestamp of the previous epoch
+  std::vector<SSlot *> recovery_queue;  /// Queue of recovering sslots
 
   // Misc
   bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)

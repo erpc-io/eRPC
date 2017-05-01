@@ -11,7 +11,9 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
   assert(in_creator());
 
   for (Session *session : session_vec) {
-    if (session == nullptr || session->is_server()) {
+    // Process only connected client sessions
+    if (session == nullptr || session->is_server() ||
+        !session->is_connected()) {
       continue;
     }
   }

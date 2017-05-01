@@ -43,17 +43,20 @@ class SSlot {
 
  private:
   // Members that are valid for both server and client
-  uint8_t pad[64];       ///< Padding to prevent false sharing
-  Session *session;      ///< Pointer to the session that this sslot belongs to
-  size_t index;          ///< Index of this sslot in the session's sslot_arr
-  MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
-  MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
+  Session *session;       ///< Pointer to this sslot's session
+  size_t index;           ///< Index of this sslot in the session's sslot_arr
+  size_t max_rx_req_num;  ///< Max request number received by this sslot
+  MsgBuffer *tx_msgbuf;   ///< The TX MsgBuffer, valid if it is not NULL
+  MsgBuffer rx_msgbuf;    ///< The RX MsgBuffer, valid if \p buf is not NULL
 
-  // Request info saved at the client. This is needed for the continuation.
+  // Info saved only at the client
   struct {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
-    size_t enqueue_req_ts;       ///< Timestamp taken when request is enqueued
+
+    // For packet loss handling
+    size_t enqueue_req_ts;    ///< Timestamp taken when request is enqueued
+    bool recovering = false;  ///< Is this sslot recovering from a packet loss?
 
     // These fields are used only for large messages
     size_t rfr_pkt_num;  ///< Next pkt number for request-for-response packets

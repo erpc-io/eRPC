@@ -65,6 +65,7 @@
    at runtime.
 
 ## Short-term TODOs
+ * RFR sending needs to be paced, so we cannot use `send_rfr_now`.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?

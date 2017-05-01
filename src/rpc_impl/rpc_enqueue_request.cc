@@ -70,6 +70,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   sslot.tx_msgbuf = req_msgbuf;      // Valid request
   sslot.tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
 
+  // Fill in client-save info
   sslot.clt_save_info.cont_func = cont_func;
   sslot.clt_save_info.tag = tag;
   sslot.clt_save_info.enqueue_req_ts = rdtsc();

@@ -23,6 +23,7 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
 
     sslot.session = this;
     sslot.index = sslot_i;
+    sslot.max_rx_req_num = 0;
     sslot.rx_msgbuf.buffer.buf = nullptr;  // Bury rx_msgbuf
     sslot.rx_msgbuf.buf = nullptr;         // Bury rx_msgbuf
     sslot.tx_msgbuf = nullptr;             // Bury tx_msgbuf

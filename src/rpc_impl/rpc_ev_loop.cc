@@ -28,14 +28,15 @@ void Rpc<TTr>::run_event_loop_one_st() {
     handle_sm_st();  // Callee grabs the hook lock
   }
 
+  // Check for packet loss if we're in a new epoch
   size_t cur_ts = rdtsc();
   if (cur_ts - prev_epoch_ts >= pkt_loss_epoch_cycles) {
     pkt_loss_scan_reqs_st();
     prev_epoch_ts = cur_ts;
   }
 
-  process_comps_st();    // All RX
-  process_req_txq_st();  // Req TX
+  process_comps_st();
+  process_req_txq_st();
 
   if (small_rpc_unlikely(multi_threaded)) {
     // Process the background queues
