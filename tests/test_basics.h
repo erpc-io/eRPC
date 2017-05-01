@@ -71,7 +71,7 @@ size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
     if (fast_rand->next_u32() % 100 < 80) {
       // Choose a message size that fits in 1 to 10 packets
       uint32_t num_pkts = (fast_rand->next_u32() % 10) + 1;
-      return (fast_rand->next_u32() % (num_pkts * max_data_per_pkt));
+      return (fast_rand->next_u32() % (num_pkts * max_data_per_pkt)) + 1;
     } else {
       // Choose any message size up to the max size
       return (fast_rand->next_u32() % max_msg_size) + 1;
