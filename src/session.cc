@@ -29,9 +29,9 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
     sslot.tx_msgbuf = nullptr;             // Bury tx_msgbuf
 
     sslot.prealloc_used = true;  // There's no user-allocated memory to free
-    sslot.clt_save_info.cont_etid = kInvalidBgETid;  // Continuations in fg
+    sslot.client_info.cont_etid = kInvalidBgETid;  // Continuations in fg
 
-    sslot_free_vec.push_back(sslot_i);
+    client_info.sslot_free_vec.push_back(sslot_i);
   }
 }
 

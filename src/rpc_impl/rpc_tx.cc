@@ -46,12 +46,12 @@ void Rpc<TTr>::process_req_txq_small_one_st(SSlot *sslot,
   assert(req_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
   Session *session = sslot->session;
-  if (likely(session->credits > 0)) {
-    session->credits--;
+  if (likely(session->client_info.credits > 0)) {
+    session->client_info.credits--;
   } else {
     // We cannot make progress if the packet is Unexpected and we're out of
     // credits. In this case, caller will re-insert the sslot to the TX queue.
-    if (session->credits == 0) {
+    if (session->client_info.credits == 0) {
       dpath_stat_inc(&session->dpath_stats.credits_exhaused);
     }
     return;
@@ -70,12 +70,12 @@ void Rpc<TTr>::process_req_txq_large_one_st(SSlot *sslot,
 
   Session *session = sslot->session;
   size_t pkts_pending = req_msgbuf->num_pkts - req_msgbuf->pkts_queued;  // >= 1
-  size_t now_sending = std::min(session->credits, pkts_pending);
-  session->credits -= now_sending;
+  size_t now_sending = std::min(session->client_info.credits, pkts_pending);
+  session->client_info.credits -= now_sending;
 
   if (now_sending == 0) {
     // This can happen very frequently, so don't print a message here
-    assert(session->credits == 0);
+    assert(session->client_info.credits == 0);
     dpath_stat_inc(&session->dpath_stats.credits_exhaused);
     return;
   }

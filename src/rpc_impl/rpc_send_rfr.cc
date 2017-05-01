@@ -16,7 +16,7 @@ void Rpc<TTr>::send_req_for_resp_now_st(SSlot *sslot,
   rfr_pkthdr.msg_size = 0;
   rfr_pkthdr.dest_session_num = sslot->session->remote_session_num;
   rfr_pkthdr.pkt_type = kPktTypeReqForResp;
-  rfr_pkthdr.pkt_num = sslot->clt_save_info.rfr_pkt_num++;
+  rfr_pkthdr.pkt_num = sslot->client_info.rfr_pkt_num++;
   // rfr_pkthdr.req_num = resp_pkthdr->req_num;
   // rfr_pkthdr.magic = pkthdr->magic;
 

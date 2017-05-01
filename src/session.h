@@ -57,12 +57,7 @@ class Session {
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 
-  size_t credits = kSessionCredits;    ///< This session's current credits
   SSlot sslot_arr[kSessionReqWindow];  ///< The session slots
-
-  /// Free session slots. We could use a vector of SSlot pointers, but indices
-  /// are useful in request number calculations.
-  FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
   ///@{ Info saved for faster unconditional access
   Transport::RoutingInfo *remote_routing_info;
@@ -76,6 +71,15 @@ class Session {
 
   /// Information that is required only at the client endpoint
   struct {
+    /// Free session slots. We could use a vector of SSlot pointers, but indices
+    /// are useful in request number calculations.
+    FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
+
+    /// The next request number prefix for each session request window slot
+    size_t req_num_arr[Session::kSessionReqWindow] = {0};
+
+    size_t credits = kSessionCredits;  ///< Currently available credits
+
     /// Set to disable the disconnect callback. This is used when session
     /// connection fails despite getting an error-free connect response
     bool sm_callbacks_disabled = false;

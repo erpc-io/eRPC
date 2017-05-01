@@ -146,9 +146,9 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
     bury_tx_msgbuf_server(sslot);
 
     // Remember request metadata for enqueue_response()
-    sslot->srv_save_info.req_func_type = req_func.req_func_type;
-    sslot->srv_save_info.req_type = req_type;
-    sslot->srv_save_info.req_num = req_num;
+    sslot->server_info.req_func_type = req_func.req_func_type;
+    sslot->server_info.req_type = req_type;
+    sslot->server_info.req_num = req_num;
 
     if (small_rpc_likely(!req_func.is_background())) {
       // For foreground (terminal/non-terminal) request handlers, a "fake",
@@ -175,11 +175,11 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
     // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_tx_msgbuf_client(sslot);
 
-    if (small_rpc_likely(sslot->clt_save_info.cont_etid == kInvalidBgETid)) {
+    if (small_rpc_likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
       // Continuation will run in foreground with a "fake" static MsgBuffer
       sslot->rx_msgbuf = MsgBuffer(pkt, msg_size);
-      sslot->clt_save_info.cont_func(static_cast<RespHandle *>(sslot), context,
-                                     sslot->clt_save_info.tag);
+      sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
+                                   sslot->client_info.tag);
 
       // The continuation must release the response (rx_msgbuf), and only the
       // event loop (this thread) can re-use it and make it non-NULL.
@@ -192,7 +192,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
       memcpy(reinterpret_cast<char *>(sslot->rx_msgbuf.get_pkthdr_0()), pkt,
              msg_size + sizeof(pkthdr_t));
       submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
-                           sslot->clt_save_info.cont_etid);
+                           sslot->client_info.cont_etid);
       return;
     }
     return;
@@ -278,15 +278,15 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     debug_check_req_msgbuf_on_resp(sslot, req_num, req_type);
     bump_credits(sslot->session);  // We have at least one credit
 
-    size_t &rfr_pkt_num = sslot->clt_save_info.rfr_pkt_num;
+    size_t &rfr_pkt_num = sslot->client_info.rfr_pkt_num;
 
     // Check if we need to send more request-for-response packets
     if (rfr_pkt_num < rx_msgbuf.num_pkts) {
       // rfr_pkt_num is the (0-based) index of the first response packet for
       // which we haven't sent a request-for-response. (num_pkts - rfr_pkt_num)
       // is the maximum number of RFRs that we can still send.
-      size_t num_rfr_to_send =
-          std::min(sslot->session->credits, rx_msgbuf.num_pkts - rfr_pkt_num);
+      size_t num_rfr_to_send = std::min(sslot->session->client_info.credits,
+                                        rx_msgbuf.num_pkts - rfr_pkt_num);
       assert(num_rfr_to_send > 0);
 
       for (size_t i = 0; i < num_rfr_to_send; i++) {
@@ -295,7 +295,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
         assert(rfr_pkt_num <= rx_msgbuf.num_pkts);
       }
 
-      sslot->session->credits -= num_rfr_to_send;
+      sslot->session->client_info.credits -= num_rfr_to_send;
     }
   }
 
@@ -317,9 +317,9 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
   // If we're here, we received all packets of this message
   if (pkthdr->is_req()) {
     // Remember request metadata for enqueue_response()
-    sslot->srv_save_info.req_func_type = req_func.req_func_type;
-    sslot->srv_save_info.req_type = req_type;
-    sslot->srv_save_info.req_num = req_num;
+    sslot->server_info.req_func_type = req_func.req_func_type;
+    sslot->server_info.req_type = req_type;
+    sslot->server_info.req_num = req_num;
 
     // rx_msgbuf here is independent of the RX ring, so we never need a copy
     if (!req_func.is_background()) {
@@ -334,16 +334,16 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
     bury_tx_msgbuf_client(sslot);
 
-    if (small_rpc_likely(sslot->clt_save_info.cont_etid == kInvalidBgETid)) {
-      sslot->clt_save_info.cont_func(static_cast<RespHandle *>(sslot), context,
-                                     sslot->clt_save_info.tag);
+    if (small_rpc_likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
+      sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
+                                   sslot->client_info.tag);
 
       // The continuation must release the response (rx_msgbuf), and only the
       // event loop (this thread) can un-bury it.
       assert(sslot->rx_msgbuf.buf == nullptr);
     } else {
       submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
-                           sslot->clt_save_info.cont_etid);
+                           sslot->client_info.cont_etid);
       return;
     }
     return;

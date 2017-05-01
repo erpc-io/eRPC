@@ -53,11 +53,9 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     if (unlikely(!session->is_client())) return -EPERM;
   }
 
-  if (unlikely(session->sslot_free_vec.size() == 0)) return -ENOMEM;
-
-  // Grab a free message slot, and unlock the session. At this point, the
-  // creator thread can't disconnect the session.
-  size_t sslot_i = session->sslot_free_vec.pop_back();
+  // Try to grab a free session slot
+  if (unlikely(session->client_info.sslot_free_vec.size() == 0)) return -ENOMEM;
+  size_t sslot_i = session->client_info.sslot_free_vec.pop_back();
   assert(sslot_i < Session::kSessionReqWindow);
 
   // Fill in the sslot info
@@ -71,26 +69,23 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   sslot.tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
 
   // Fill in client-save info
-  sslot.clt_save_info.cont_func = cont_func;
-  sslot.clt_save_info.tag = tag;
-  sslot.clt_save_info.enqueue_req_ts = rdtsc();
+  sslot.client_info.cont_func = cont_func;
+  sslot.client_info.tag = tag;
+  sslot.client_info.enqueue_req_ts = rdtsc();
 
   if (optlevel_large_rpc_supported) {
     // We don't send a request-for-response for the zeroth response packet
-    sslot.clt_save_info.rfr_pkt_num = 1;
+    sslot.client_info.rfr_pkt_num = 1;
   }
 
   if (small_rpc_unlikely(cont_etid != kInvalidBgETid)) {
     // We need to run the continuation in a background thread
-    sslot.clt_save_info.cont_etid = cont_etid;
+    sslot.client_info.cont_etid = cont_etid;
   }
 
-  // Generate req num. All sessions share req_num_arr, so we need to lock.
-  lock_cond(&req_num_arr_lock);
-  size_t req_num =
-      (req_num_arr[sslot_i]++ * Session::kSessionReqWindow) +  // Shift
-      sslot_i;
-  unlock_cond(&req_num_arr_lock);  // Avoid holding lock while header-filling
+  // Generate req num
+  size_t &prev_req_num = session->client_info.req_num_arr[sslot_i];
+  size_t req_num = (prev_req_num++ * Session::kSessionReqWindow) + sslot_i;
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();

@@ -402,7 +402,7 @@ class Rpc {
 
     Session *session = sslot->session;
     assert(session != nullptr && session->is_client());
-    session->sslot_free_vec.push_back(sslot->index);
+    session->client_info.sslot_free_vec.push_back(sslot->index);
   }
 
   //
@@ -542,8 +542,8 @@ class Rpc {
 
   inline void bump_credits(Session *session) {
     assert(session->is_client());
-    assert(session->credits < Session::kSessionCredits);
-    session->credits++;
+    assert(session->client_info.credits < Session::kSessionCredits);
+    session->client_info.credits++;
   }
 
  private:
@@ -759,9 +759,6 @@ class Rpc {
   /// Disconnected sessions are denoted by null pointers. This grows as sessions
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
-  /// The next request number prefix for each session request window slot
-  size_t req_num_arr[Session::kSessionReqWindow] = {0};
-  std::mutex req_num_arr_lock;  ///< Lock for the request number array
 
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport

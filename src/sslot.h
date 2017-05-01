@@ -63,7 +63,7 @@ class SSlot {
 
     // These fields are used only if we have background threads
     size_t cont_etid;  ///< Thread ID to run the continuation on
-  } clt_save_info;
+  } client_info;
 
   /// Request metadata saved by the server before calling the request handler.
   /// These fields are needed in enqueue_response(), and the request MsgBuffer,
@@ -72,7 +72,7 @@ class SSlot {
     uint8_t req_type;
     uint64_t req_num;
     ReqFuncType req_func_type;
-  } srv_save_info;
+  } server_info;
 
   /// Return a string representation of this session slot
   std::string to_string() const {

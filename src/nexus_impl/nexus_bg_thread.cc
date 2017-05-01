@@ -49,9 +49,8 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *ctx) {
         req_func.req_func(static_cast<ReqHandle *>(wi.sslot), wi.context);
         wi.rpc->bury_rx_msgbuf(wi.sslot);  // Bury dynamic request MsgBuffer
       } else {
-        wi.sslot->clt_save_info.cont_func(static_cast<RespHandle *>(wi.sslot),
-                                          wi.context,
-                                          wi.sslot->clt_save_info.tag);
+        wi.sslot->client_info.cont_func(static_cast<RespHandle *>(wi.sslot),
+                                        wi.context, wi.sslot->client_info.tag);
 
         // The continuation's release_response() will be handled by the
         // foreground thread later, so we can't check that it was called here.

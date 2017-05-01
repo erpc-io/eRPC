@@ -9,7 +9,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // When called from a background thread, enqueue to the foreground thread
   if (small_rpc_unlikely(!in_creator())) {
-    assert(sslot->srv_save_info.req_func_type == ReqFuncType::kBackground);
+    assert(sslot->server_info.req_func_type == ReqFuncType::kBackground);
     bg_queues.enqueue_response.unlocked_push_back(req_handle);
     return;
   }
@@ -26,7 +26,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   // Foreground-terminal request handlers must call enqueue_response() before
   // returning to the event loop, which then buries the request MsgBuffers.
   // For these handlers only, rx_msgbuf must be valid at this point.
-  ReqFuncType req_func_type = sslot->srv_save_info.req_func_type;
+  ReqFuncType req_func_type = sslot->server_info.req_func_type;
   if (req_func_type == ReqFuncType::kFgTerminal) {
     // rx_msgbuf could be fake
     assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
@@ -45,12 +45,12 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
-  resp_pkthdr_0->req_type = sslot->srv_save_info.req_type;
+  resp_pkthdr_0->req_type = sslot->server_info.req_type;
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
   resp_pkthdr_0->dest_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
   resp_pkthdr_0->pkt_num = 0;
-  resp_pkthdr_0->req_num = sslot->srv_save_info.req_num;
+  resp_pkthdr_0->req_num = sslot->server_info.req_num;
   assert(resp_pkthdr_0->check_magic());
 
   // Fill in non-zeroth packet headers, if any
