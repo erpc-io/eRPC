@@ -46,3 +46,6 @@ CMakeScripts
 Makefile
 Testing
 CTestTestfile.cmake
+
+# gdb
+.gdb_history

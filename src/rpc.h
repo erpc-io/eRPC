@@ -289,11 +289,16 @@ class Rpc {
   void enqueue_sm_resp_st(typename Nexus<TTr>::SmWorkItem *req_wi,
                           SmErrType err_type);
 
-  // rpc_connect_handlers.cc
+  //
+  // Session management packet handlers (rpc_connect_handlers.cc,
+  // rpc_disconnect_handlers.cc, rpc_flush_handlers.cc)
+  //
   void handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
   void handle_connect_resp_st(SmPkt *pkt);
 
-  // rpc_disconnect_handlers.cc
+  void handle_flush_req_st(typename Nexus<TTr>::SmWorkItem *wi);
+  void handle_flush_resp_st(SmPkt *pkt);
+
   void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
   void handle_disconnect_resp_st(SmPkt *pkt);
 

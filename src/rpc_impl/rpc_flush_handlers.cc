@@ -1,6 +1,6 @@
 /**
- * @file rpc_disconnect_handlers.cc
- * @brief Handlers for session management disconnect requests and responses.
+ * @file rpc_flush_handlers.cc
+ * @brief Handlers for session management flush requests and responses
  */
 #include "rpc.h"
 
@@ -9,7 +9,7 @@ namespace ERpc {
 // We don't need to check remote arguments since the session was already
 // connected successfully.
 template <class TTr>
-void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
+void Rpc<TTr>::handle_flush_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(in_creator());
   assert(wi != nullptr && wi->epeer != nullptr);
 
@@ -54,9 +54,8 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   bury_session_st(session);  // Free session resources + NULL in session_vec
 }
 
-// We free the session's RECVs before sending the disconnect request, not here.
 template <class TTr>
-void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
+void Rpc<TTr>::handle_flush_resp_st(SmPkt *sm_pkt) {
   assert(in_creator());
   assert(sm_pkt != nullptr);
   assert(sm_pkt->pkt_type == SmPktType::kDisconnectResp);

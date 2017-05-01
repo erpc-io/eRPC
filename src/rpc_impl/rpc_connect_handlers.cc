@@ -3,7 +3,6 @@
  * @brief Handlers for session management connect requests and responses.
  */
 #include "rpc.h"
-#include <algorithm>
 
 namespace ERpc {
 
