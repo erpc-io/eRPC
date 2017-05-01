@@ -277,9 +277,9 @@ class Rpc {
   /// responsible for freeing user-allocated MsgBuffers.
   void bury_session_st(Session *session);
 
-  /// Allocate a session management request packet and enqueue it to the
-  /// session management thread. The allocated packet will be freed by the
-  /// session management thread on transmission.
+  /// Allocate and enqueue a session management request packet to the session
+  /// management thread. The allocated packet will be freed by the session
+  /// management thread after transmission.
   void enqueue_sm_req_st(Session *session, SmPktType pkt_type,
                          size_t gen_data = 0);
 

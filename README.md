@@ -58,6 +58,12 @@
    (for which a response SM packet will be "looped back" to the SM thread).
      * The Rpc thread frees SM packets in `handle_session_management_st()`.
 
+## Compile-time optimization notes:
+ * Setting `small_rpc_optlevel` to `small_rpc_optlevel_extreme` will disable
+   support for large messages and background threads.
+ * Setting `FAULT_INJECTION` to off will disable support to inject eRPC faults
+   at runtime.
+
 ## Short-term TODOs
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.

@@ -49,7 +49,7 @@ void Rpc<TTr>::fault_inject_drop_tx_remote_st(int session_num,
       rpc_id, pkt_countdown, session->local_session_num,
       session->server.hostname, session->server.rpc_id);
 
-  enqueue_sm_req_st(session, SmPktType::kFaultDropTxRemote, pkt_countdown);
+  enqueue_sm_req_st(session, SmPktType::kFaultDropTxRemoteReq, pkt_countdown);
 }
 
 template <class TTr>

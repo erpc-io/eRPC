@@ -40,7 +40,7 @@ void Rpc<TTr>::handle_sm_st() {
       case SmPktType::kDisconnectResp:
         handle_disconnect_resp_st(sm_pkt);
         break;
-      case SmPktType::kFaultDropTxRemote:
+      case SmPktType::kFaultDropTxRemoteReq:
         erpc_dprintf(
             "eRPC Rpc %u: Received drop-TX-remote fault (countdown = %zu) "
             "from %s.\n",
