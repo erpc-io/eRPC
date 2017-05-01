@@ -16,24 +16,19 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   const SmPkt *sm_pkt = wi->sm_pkt;
   assert(sm_pkt != nullptr && sm_pkt->pkt_type == SmPktType::kDisconnectReq);
 
-  // Check that the server fields known by the client were filled correctly
-  assert(sm_pkt->server.rpc_id == rpc_id);
-  assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
+  // Check the info filled by the client
+  uint16_t session_num = sm_pkt->server.session_num;
+  assert(session_num < session_vec.size());
+
+  Session *session = session_vec.at(session_num);
+  assert(session != nullptr && session->is_server());
+  assert(session->server == sm_pkt->server);
+  assert(session->client == sm_pkt->client);
 
   // Create the basic issue message
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg, "eRPC Rpc %u: Received disconnect request from %s. Issue",
           rpc_id, sm_pkt->client.name().c_str());
-
-  // Do some sanity checks
-  uint16_t session_num = sm_pkt->server.session_num;
-  assert(session_num < session_vec.size());
-
-  Session *session = session_vec.at(session_num);  // The server end point
-  assert(session != nullptr);
-  assert(session->is_server());
-  assert(session->server == sm_pkt->server);
-  assert(session->client == sm_pkt->client);
 
   // Check that responses for all sslots have been sent
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
@@ -61,7 +56,6 @@ void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
   assert(sm_pkt != nullptr);
   assert(sm_pkt->pkt_type == SmPktType::kDisconnectResp);
   assert(sm_pkt->err_type == SmErrType::kNoError);  // Disconnects don't fail
-  assert(sm_err_type_is_valid(sm_pkt->err_type));
 
   // Create the basic issue message using only the packet
   char issue_msg[kMaxIssueMsgLen];
@@ -75,8 +69,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
   assert(session_num < session_vec.size());
 
   Session *session = session_vec[session_num];
-  assert(session != nullptr);
-  assert(session->is_client());
+  assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kDisconnectInProgress);
   assert(session->client_info.sm_api_req_pending);
   assert(session->client == sm_pkt->client);
