@@ -46,6 +46,12 @@
    * Response MsgBuffer ownership at server: The request handler loses ownership
      of the response MsgBuffer when it calls `enqueue_response()`. eRPC will
      free it when the response is no longer needed for retransmission.
+ * Burying invariants:
+   * At clients, the request MsgBuffer is buried on receiving the complete
+     response, and before invoking the continuation. So, a null value of
+     `sslot->tx_msgbuf` indicates that the sslot is not waiting for a response.
+     Similarly, a non-null value of `sslot->tx_msgbuf` indicates that the sslot
+     is waiting for a response.
 
 ## Session management packet ownership
  * Rpc threads allocate an SM packet before queueing it to the SM thread. This
