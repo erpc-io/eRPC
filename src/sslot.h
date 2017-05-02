@@ -43,11 +43,14 @@ class SSlot {
 
  private:
   // Members that are valid for both server and client
-  Session *session;       ///< Pointer to this sslot's session
-  size_t index;           ///< Index of this sslot in the session's sslot_arr
-  size_t max_rx_req_num;  ///< Max request number received by this sslot
-  MsgBuffer *tx_msgbuf;   ///< The TX MsgBuffer, valid if it is not NULL
-  MsgBuffer rx_msgbuf;    ///< The RX MsgBuffer, valid if \p buf is not NULL
+  Session *session;      ///< Pointer to this sslot's session
+  size_t index;          ///< Index of this sslot in the session's sslot_arr
+  MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
+  MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
+
+  size_t cur_req_num;
+  size_t pkts_queued;
+  size_t pkts_rcvd;
 
   // Info saved only at the client
   struct {

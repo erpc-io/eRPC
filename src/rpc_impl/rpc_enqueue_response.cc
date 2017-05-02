@@ -65,13 +65,12 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   }
 
   // Fill in the slot and reset queueing progress
-  sslot->tx_msgbuf = resp_msgbuf;     // Valid response
-  sslot->tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
+  sslot->tx_msgbuf = resp_msgbuf;  // Valid response
+  sslot->pkts_queued = 0;          // Reset queueing progress
 
   // Enqueue the first response packet
   size_t data_bytes = std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt);
-  enqueue_pkt_tx_burst_st(session->remote_routing_info, resp_msgbuf, 0,
-                          data_bytes);
+  enqueue_pkt_tx_burst_st(sslot, 0, data_bytes);
 }
 
 }  // End ERpc

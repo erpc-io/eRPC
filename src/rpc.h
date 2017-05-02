@@ -433,15 +433,16 @@ class Rpc {
  private:
   /// Enqueue a packet for transmission, possibly deferring transmission.
   /// This handles fault injection for dropping packets.
-  inline void enqueue_pkt_tx_burst_st(Transport::RoutingInfo *routing_info,
-                                      MsgBuffer *tx_msgbuf, size_t offset,
+  inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t offset,
                                       size_t data_bytes) {
     assert(in_creator());
-    assert(routing_info != nullptr && tx_msgbuf != nullptr);
+    assert(sslot != nullptr && sslot->tx_msgbuf != nullptr);
     assert(tx_batch_i < TTr::kPostlist);
 
+    MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
+
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
-    item.routing_info = routing_info;
+    item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = tx_msgbuf;
     item.offset = offset;
     item.data_bytes = data_bytes;
@@ -465,7 +466,7 @@ class Rpc {
       assert(!item.drop);
     }
 
-    tx_msgbuf->pkts_queued++;  // Update queueing progress
+    sslot->pkts_queued++;  // Update queueing progress
     tx_batch_i++;
 
     dpath_dprintf(
@@ -540,13 +541,37 @@ class Rpc {
   static void debug_check_bg_rx_msgbuf(
       SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type);
 
+ private:
+  /// Return a credit to this session
   inline void bump_credits(Session *session) {
     assert(session->is_client());
     assert(session->client_info.credits < Session::kSessionCredits);
     session->client_info.credits++;
   }
 
- private:
+  /// Return true iff \p pkthdr is the next packet in order for \p sslot
+  inline bool is_ordered(const SSlot *sslot, const pkthdr_t *pkthdr) const {
+    assert(pkthdr->is_req() || pkthdr->is_resp());
+    assert(sslot != nullptr && pkthdr != nullptr);
+
+    // Check if this is the next request/response packet for the active request.
+    // This is the only ordered data packet that clients can get.
+    if ((pkthdr->req_num == sslot->cur_req_num) &&
+        (pkthdr->pkt_num == sslot->pkts_rcvd)) {
+      return true;
+    }
+
+    if (sslot->session->is_server()) {
+      // For servers, check if this is the first packet of the next request
+      if (likely((pkthdr->req_num == sslot->cur_req_num + 1) &&
+                 (pkthdr->pkt_num == 0))) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   /**
    * @brief Process received packets and post RECVs. The ring buffers received
    * from `rx_burst` must not be used after new RECVs are posted.
@@ -558,24 +583,13 @@ class Rpc {
    */
   void process_comps_st();
 
-  /**
-   * @brief Process a request or response packet received for a small message.
-   * This packet cannot be a credit return.
-   *
-   * @param sslot The session slot used for the request or response packet
-   * @param pkt The received packet. The zeroth byte of this packet is the
-   * eRPC packet header.
-   */
+  /// Process a control message (credit return or request-for-response)
+  void process_control_msg_st(SSlot *sslot, const pkthdr_t *pkthdr);
+
+  /// Process a packet for a single-packet request or response message
   void process_comps_small_msg_one_st(SSlot *sslot, const uint8_t *pkt);
 
-  /**
-   * @brief Process a request or response packet received for a large message.
-   * This packet cannot be a credit return.
-   *
-   * @param sslot The session slot for the request or response packet
-   * @param pkt The received packet. The zeroth byte of this packet is the
-   * eRPC packet header.
-   */
+  /// Process a packet for a multi-packet request or response message
   void process_comps_large_msg_one_st(SSlot *sslot, const uint8_t *pkt);
 
   /**

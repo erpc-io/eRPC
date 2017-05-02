@@ -47,56 +47,24 @@ void Rpc<TTr>::process_comps_st() {
     size_t sslot_i = pkthdr->req_num % Session::kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
-    // Drop packets for old requests
-    if (unlikely(pkthdr->req_num < sslot->max_rx_req_num)) {
-      erpc_dprintf("eRPC Rpc %u: Warning: Received stale packet %s.\n", rpc_id,
-                   pkthdr->to_string().c_str());
-    } else {
-      sslot->max_rx_req_num = pkthdr->req_num;
-    }
-
-    // Process large-message control packets. This block can get optimized out.
-    if (session->is_client()) {
-      // Client-side processing
-      assert(pkthdr->is_resp() || pkthdr->is_expl_cr());
-
-      // Handle explicit credit returns
-      if (small_rpc_unlikely(pkthdr->is_expl_cr())) {
-        // sslot contains a multi-pkt req (tx_msgbuf) and no resp (rx_msgbuf)
-        assert(sslot->tx_msgbuf != nullptr);
-        assert(sslot->tx_msgbuf->is_req() && sslot->tx_msgbuf->num_pkts > 1);
-        assert(sslot->rx_msgbuf.buf == nullptr);
-
-        bump_credits(session);
-        continue;  // Process other packets
-      }
-    } else {
-      // Server-side processing
-      assert(pkthdr->is_req() || pkthdr->is_req_for_resp());
-
-      // Handle request-for-response packets
-      if (small_rpc_unlikely(pkthdr->is_req_for_resp())) {
-        // sslot contains a multi-pkt resp (tx_msgbuf) and no req (rx_msgbuf)
-        assert(sslot->tx_msgbuf != nullptr);
-        assert(sslot->tx_msgbuf->is_resp() && sslot->tx_msgbuf->num_pkts > 1);
-        assert(sslot->rx_msgbuf.buf == nullptr);
-
-        size_t pkt_num = pkthdr->pkt_num;
-        assert(pkt_num < sslot->tx_msgbuf->num_pkts);
-
-        // Send the response packet with index = pkt_num
-        size_t offset = pkt_num * TTr::kMaxDataPerPkt;
-        assert(offset < sslot->tx_msgbuf->data_size);
-        size_t data_bytes =
-            std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
-        enqueue_pkt_tx_burst_st(sslot->session->remote_routing_info,
-                                sslot->tx_msgbuf, offset, data_bytes);
-        continue;  // Process other packets
-      }
+    // Process control messages without checking for reordering. These messages
+    // are sent only for large RPCs.
+    if (small_rpc_unlikely(pkthdr->msg_size == 0)) {
+      process_control_msg_st(sslot, pkthdr);
+      continue;
     }
 
     // If we're here, this is a data packet
     assert(pkthdr->is_req() || pkthdr->is_resp());
+
+    // Drop reordered and duplicate data packets
+    if (likely(is_ordered(sslot, pkthdr))) {
+      sslot->cur_req_num = pkthdr->req_num;
+    } else {
+      erpc_dprintf(
+          "eRPC Rpc %u: Warning: Received reorderd packet %s. Dropping.\n",
+          rpc_id, pkthdr->to_string().c_str());
+    }
 
     if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
       // Optimize for when the received packet is a single-packet message
@@ -109,6 +77,45 @@ void Rpc<TTr>::process_comps_st() {
   // Technically, these RECVs can be posted immediately after rx_burst(), or
   // even in the rx_burst() code.
   transport->post_recvs(num_pkts);
+}
+
+template <class TTr>
+void Rpc<TTr>::process_control_msg_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+  assert(in_creator());
+  assert(sslot != nullptr);
+  assert(pkthdr != nullptr);
+  assert(pkthdr->is_expl_cr() || pkthdr->is_req_for_resp());
+
+  Session *session = sslot->session;
+  if (session->is_client()) {
+    // Client-side processing
+    assert(pkthdr->is_expl_cr());
+
+    // sslot must contain a multi-packet req (tx_msgbuf) and no resp (rx_msgbuf)
+    assert(sslot->tx_msgbuf != nullptr);
+    assert(sslot->tx_msgbuf->is_req() && sslot->tx_msgbuf->num_pkts > 1);
+    assert(sslot->rx_msgbuf.buf == nullptr);
+
+    bump_credits(session);
+  } else {
+    // Server-side processing
+    assert(pkthdr->is_req_for_resp());
+
+    // sslot must contain a multi-pkt resp (tx_msgbuf) and no req (rx_msgbuf)
+    assert(sslot->tx_msgbuf != nullptr);
+    assert(sslot->tx_msgbuf->is_resp() && sslot->tx_msgbuf->num_pkts > 1);
+    assert(sslot->rx_msgbuf.buf == nullptr);
+
+    size_t pkt_num = pkthdr->pkt_num;
+    assert(pkt_num < sslot->tx_msgbuf->num_pkts);
+
+    // Send the response packet with index = pkt_num
+    size_t offset = pkt_num * TTr::kMaxDataPerPkt;
+    assert(offset < sslot->tx_msgbuf->data_size);
+    size_t data_bytes =
+        std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
+    enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+  }
 }
 
 template <class TTr>
@@ -126,6 +133,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
   assert(pkthdr->is_req() || pkthdr->is_resp());
 
   assert(sslot->rx_msgbuf.is_buried());  // Older rx_msgbuf was buried earlier
+  sslot->pkts_rcvd = 1;  // We need this for detecting duplicates
 
   // Extract packet header fields
   uint8_t req_type = pkthdr->req_type;
@@ -231,9 +239,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
 
   // Allocate/locate the RX MsgBuffer for this message if needed
   MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
-  if (rx_msgbuf.buf == nullptr) {
+  if (pkthdr->pkt_num == 0) {
     // This is the first time that we have received a packet for this message.
-    // This may not be the zeroth packet of the message due to reordering.
     assert(rx_msgbuf.is_buried());  // Buried earlier
 
     if (pkthdr->is_req()) {
@@ -249,7 +256,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
 
     rx_msgbuf = alloc_msg_buffer(msg_size);
     assert(sslot->rx_msgbuf.buf != nullptr);
-    rx_msgbuf.pkts_rcvd = 1;
+    sslot->pkts_rcvd = 1;
 
     // Store the received packet header into the zeroth rx_msgbuf packet header.
     // It's possible to copy fewer fields, but copying pkthdr_t is cheap.
@@ -263,8 +270,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     assert(rx_msgbuf.get_req_type() == req_type);
     assert(rx_msgbuf.get_req_num() == req_num);
 
-    assert(rx_msgbuf.pkts_rcvd >= 1);
-    rx_msgbuf.pkts_rcvd++;
+    assert(sslot->pkts_rcvd >= 1);
+    sslot->pkts_rcvd++;
   }
 
   // Manage credits and request-for-response
@@ -310,7 +317,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
          reinterpret_cast<const char *>(pkt + sizeof(pkthdr_t)), bytes_to_copy);
 
   // Check if we need to invoke the request handler or continuation
-  if (rx_msgbuf.pkts_rcvd != rx_msgbuf.num_pkts) {
+  if (sslot->pkts_rcvd != rx_msgbuf.num_pkts) {
     return;
   }
 
@@ -392,7 +399,6 @@ void Rpc<TTr>::debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
   assert(req_msgbuf->is_req());
   assert(req_msgbuf->get_req_num() == req_num);
   assert(req_msgbuf->get_req_type() == req_type);
-  assert(req_msgbuf->pkts_queued == req_msgbuf->num_pkts);
 }
 
 // This is a debug function that gets optimized out

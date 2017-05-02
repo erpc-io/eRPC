@@ -75,9 +75,6 @@ class Session {
     /// are useful in request number calculations.
     FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
-    /// The next request number prefix for each session request window slot
-    size_t req_num_arr[Session::kSessionReqWindow] = {0};
-
     size_t credits = kSessionCredits;  ///< Currently available credits
 
     /// Set to disable the disconnect callback. This is used when session

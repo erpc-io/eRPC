@@ -65,8 +65,9 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   assert(sslot.tx_msgbuf == nullptr);
   assert(sslot.rx_msgbuf.is_buried());
 
-  sslot.tx_msgbuf = req_msgbuf;      // Valid request
-  sslot.tx_msgbuf->pkts_queued = 0;  // Reset queueing progress
+  sslot.tx_msgbuf = req_msgbuf;
+  sslot.pkts_queued = 0;
+  sslot.pkts_rcvd = 0;
 
   // Fill in client-save info
   sslot.client_info.cont_func = cont_func;
@@ -84,8 +85,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   }
 
   // Generate req num
-  size_t &prev_req_num = session->client_info.req_num_arr[sslot_i];
-  size_t req_num = (prev_req_num++ * Session::kSessionReqWindow) + sslot_i;
+  size_t req_num = (sslot.cur_req_num++ * Session::kSessionReqWindow) + sslot_i;
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
@@ -108,8 +108,6 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // Add the sslot to request TX queue
-  assert(std::find(req_txq.begin(), req_txq.end(), &sslot) == req_txq.end());
   req_txq.push_back(&sslot);
   return 0;
 }

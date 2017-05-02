@@ -85,9 +85,8 @@ class MsgBuffer {
     std::ostringstream ret;
     ret << "[buf " << static_cast<void *>(buf) << ", "
         << "buffer " << buffer.to_string() << ", "
-        << "data " << data_size << "(" << max_data_size << "), "
-        << "pkts " << num_pkts << "(" << max_num_pkts << "), "
-        << "pkts queued/rcvd " << pkts_queued << "]";
+        << "data_size " << data_size << "(" << max_data_size << "), "
+        << "pkts " << num_pkts << "(" << max_num_pkts << ")]";
     return ret.str();
   }
 
@@ -150,12 +149,6 @@ class MsgBuffer {
   size_t data_size;      ///< Current data bytes in the MsgBuffer
   size_t max_num_pkts;   ///< Max number of packets in this MsgBuffer
   size_t num_pkts;       ///< Current number of packets in this MsgBuffer
-
-  // Progress tracking information for dynamic MsgBuffers
-  union {
-    size_t pkts_queued;  ///< Packets queued for tx_burst
-    size_t pkts_rcvd;    ///< Packets received from rx_burst
-  };
 };
 }
 
