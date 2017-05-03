@@ -57,15 +57,9 @@ void Rpc<TTr>::process_comps_st() {
     // If we're here, this is a data packet
     assert(pkthdr->is_req() || pkthdr->is_resp());
 
-    // Drop reordered and duplicate data packets
-    if (likely(is_ordered(sslot, pkthdr))) {
-      if (session->is_client()) {
-        assert(sslot->cur_req_num == pkthdr->req_num);
-      }
-
-      // Update cur_req_num unconditionally, but it stays unchanged for clients
-      sslot->cur_req_num = pkthdr->req_num;
-    } else {
+    // Drop out-of-order data packets. check_order() updates cur_req_num for
+    // server sessions.
+    if (unlikely(!check_order(sslot, pkthdr))) {
       erpc_dprintf(
           "eRPC Rpc %u: Warning: Received reordered packet %s. Dropping.\n",
           rpc_id, pkthdr->to_string().c_str());

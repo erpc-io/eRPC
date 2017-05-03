@@ -549,8 +549,17 @@ class Rpc {
     session->client_info.credits++;
   }
 
-  /// Return true iff \p pkthdr is the next packet in order for \p sslot
-  inline bool is_ordered(const SSlot *sslot, const pkthdr_t *pkthdr) const {
+  /**
+   * @brief Check packet ordering for a received packet. If \p sslot belongs to
+   * a server session and this packet is the first in the next request,
+   * \p sslot's current request number is updated.
+   *
+   * @param sslot Session slot for which the packet is received
+   * @param pkthdr The received packet's header
+   *
+   * @return True iff the packet is in order
+   */
+  inline bool check_order(SSlot *sslot, const pkthdr_t *pkthdr) const {
     assert(pkthdr->is_req() || pkthdr->is_resp());
     assert(sslot != nullptr && pkthdr != nullptr);
 
@@ -566,6 +575,7 @@ class Rpc {
       if (likely((pkthdr->req_num ==
                   sslot->cur_req_num + Session::kSessionReqWindow) &&
                  (pkthdr->pkt_num == 0))) {
+        sslot->cur_req_num = pkthdr->req_num;
         return true;
       }
     }
