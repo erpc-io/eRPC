@@ -41,12 +41,13 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
         if (flush_credits_available == 0) {
           erpc_dprintf("%s: No flush credits available. Ignoring.\n",
                        issue_msg);
-          break;  // Process other sessions
+          return;  // There's no use processing other sslots/sessions right now
         }
 
-        // If we're here, we have a flush credit
+        // If we're here, we have a local flush credit. Try to get a remote one.
         flush_credits_available--;
-        enqueue_sm_req_st(session, SmPktType::kFlushCreditReq);
+        enqueue_sm_req_st(session, SmPktType::kFlushMgmtReq,
+                          static_cast<size_t>(FlushMgmtReqType::kAcquire));
       }
     }
   }

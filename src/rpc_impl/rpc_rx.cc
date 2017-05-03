@@ -59,11 +59,17 @@ void Rpc<TTr>::process_comps_st() {
 
     // Drop reordered and duplicate data packets
     if (likely(is_ordered(sslot, pkthdr))) {
+      if (session->is_client()) {
+        assert(sslot->cur_req_num == pkthdr->req_num);
+      }
+
+      // Update cur_req_num unconditionally, but it stays unchanged for clients
       sslot->cur_req_num = pkthdr->req_num;
     } else {
       erpc_dprintf(
-          "eRPC Rpc %u: Warning: Received reorderd packet %s. Dropping.\n",
+          "eRPC Rpc %u: Warning: Received reordered packet %s. Dropping.\n",
           rpc_id, pkthdr->to_string().c_str());
+      return;
     }
 
     if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {

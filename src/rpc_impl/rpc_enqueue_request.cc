@@ -46,11 +46,13 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   Session *session = session_vec[static_cast<size_t>(session_num)];
   if (!kDatapathChecks) {
-    assert(session != nullptr);
-    assert(session->is_client());
+    assert(session != nullptr && session->is_client() &&
+           session->is_connected());
   } else {
-    if (unlikely(session == nullptr)) return -EINVAL;
-    if (unlikely(!session->is_client())) return -EPERM;
+    if (unlikely(session == nullptr || !session->is_client() ||
+                 !session->is_connected())) {
+      return -EINVAL;
+    }
   }
 
   // Try to grab a free session slot
@@ -84,8 +86,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     sslot.client_info.cont_etid = cont_etid;
   }
 
-  // Generate req num
-  size_t req_num = (sslot.cur_req_num++ * Session::kSessionReqWindow) + sslot_i;
+  sslot.cur_req_num += Session::kSessionReqWindow;  // Generate req num
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
@@ -94,7 +95,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   pkthdr_0->dest_session_num = session->remote_session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->pkt_num = 0;
-  pkthdr_0->req_num = req_num;
+  pkthdr_0->req_num = sslot.cur_req_num;
   assert(pkthdr_0->check_magic());
 
   // Fill in non-zeroth packet headers, if any

@@ -291,13 +291,13 @@ class Rpc {
 
   //
   // Session management packet handlers (rpc_connect_handlers.cc,
-  // rpc_disconnect_handlers.cc, rpc_flush_sm_handlers.cc)
+  // rpc_disconnect_handlers.cc, rpc_flush_mgmt_handlers.cc)
   //
   void handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
   void handle_connect_resp_st(SmPkt *pkt);
 
-  void handle_sm_flush_req_st(typename Nexus<TTr>::SmWorkItem *wi);
-  void handle_sm_flush_resp_st(SmPkt *pkt);
+  void handle_flush_mgmt_req_st(typename Nexus<TTr>::SmWorkItem *wi);
+  void handle_flush_mgmt_resp_st(SmPkt *pkt);
 
   void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
   void handle_disconnect_resp_st(SmPkt *pkt);
@@ -563,7 +563,8 @@ class Rpc {
 
     if (sslot->session->is_server()) {
       // For servers, check if this is the first packet of the next request
-      if (likely((pkthdr->req_num == sslot->cur_req_num + 1) &&
+      if (likely((pkthdr->req_num ==
+                  sslot->cur_req_num + Session::kSessionReqWindow) &&
                  (pkthdr->pkt_num == 0))) {
         return true;
       }

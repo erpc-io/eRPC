@@ -22,8 +22,7 @@ static constexpr uint32_t kInvalidSecret = 0;
 
 enum class SessionState {
   kConnectInProgress,
-  kConnected,        ///< The only state for server-side sessions
-  kPktLossRecovery,  ///< Recovering from a packet loss
+  kConnected,  ///< The only state for server-side sessions
   kDisconnectInProgress,
   kDisconnected,  ///< Temporary state for the disconnected callback
 };
@@ -34,8 +33,8 @@ enum class SmPktType : int {
   kConnectResp,          ///< Session connect response
   kDisconnectReq,        ///< Session disconnect request
   kDisconnectResp,       ///< Session disconnect response
-  kFlushCreditReq,       ///< Request for a flush credit
-  kFlushCreditResp,      ///< Response to a flush credit request
+  kFlushMgmtReq,         ///< Flush management (acquire/release) request
+  kFlushMgmtResp,        ///< Flush management acquire response
   kFaultResetPeerReq,    ///< Reset the remote ENet peer
   kFaultDropTxRemoteReq  ///< Drop a TX packet at the remote ENet peer
 };
@@ -43,9 +42,10 @@ enum class SmPktType : int {
 /// The types of responses to a session management packet
 enum class SmErrType : int {
   kNoError,          ///< The only non-error error type
+  kSrvDisconnected,  ///< The server session is disconnected
   kTooManySessions,  ///< Connect req failed because server is out of sessions
   kRecvsExhausted,   ///< Connect req failed because server is out of RECVs
-  kFlushCreditsExhausted,  ///< Server is out of flush credits, so req failed
+  kFlushCreditsExhausted,  ///< Server is out of flush credits
   kOutOfMemory,  ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
   kInvalidRemoteRpcId,
@@ -61,6 +61,12 @@ enum class SmEventType {
   kDisconnectFailed
 };
 
+/// Embedded request types for a flush management request
+enum class FlushMgmtReqType : size_t {
+  kAcquire,  ///< Request to acquire a flush credit
+  kRelease   ///< Request to release a flush credit
+};
+
 typedef void (*sm_handler_t)(int, SmEventType, SmErrType, void *);
 
 static std::string session_state_str(SessionState state) {
@@ -69,8 +75,6 @@ static std::string session_state_str(SessionState state) {
       return std::string("[Connect in progress]");
     case SessionState::kConnected:
       return std::string("[Connected]");
-    case SessionState::kPktLossRecovery:
-      return std::string("[Packet loss recovery]");
     case SessionState::kDisconnectInProgress:
       return std::string("[Disconnect in progress]");
     case SessionState::kDisconnected:
@@ -89,10 +93,10 @@ static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
       return std::string("[Disconnect request]");
     case SmPktType::kDisconnectResp:
       return std::string("[Disconnect response]");
-    case SmPktType::kFlushCreditReq:
-      return std::string("[Flush credit request]");
-    case SmPktType::kFlushCreditResp:
-      return std::string("[Flush credit response]");
+    case SmPktType::kFlushMgmtReq:
+      return std::string("[Flush management request]");
+    case SmPktType::kFlushMgmtResp:
+      return std::string("[Flush management response]");
     case SmPktType::kFaultResetPeerReq:
       return std::string("[Reset peer request (fault injection)]");
     case SmPktType::kFaultDropTxRemoteReq:
@@ -109,8 +113,8 @@ static bool sm_pkt_type_is_valid(SmPktType sm_pkt_type) {
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectReq:
     case SmPktType::kDisconnectResp:
-    case SmPktType::kFlushCreditReq:
-    case SmPktType::kFlushCreditResp:
+    case SmPktType::kFlushMgmtReq:
+    case SmPktType::kFlushMgmtResp:
     case SmPktType::kFaultResetPeerReq:
     case SmPktType::kFaultDropTxRemoteReq:
       return true;
@@ -125,13 +129,13 @@ static bool sm_pkt_type_is_req(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SmPktType::kConnectReq:
     case SmPktType::kDisconnectReq:
-    case SmPktType::kFlushCreditReq:
+    case SmPktType::kFlushMgmtReq:
     case SmPktType::kFaultResetPeerReq:
     case SmPktType::kFaultDropTxRemoteReq:
       return true;
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:
-    case SmPktType::kFlushCreditResp:
+    case SmPktType::kFlushMgmtResp:
       return false;
   }
 
@@ -146,13 +150,13 @@ static SmPktType sm_pkt_type_req_to_resp(SmPktType sm_pkt_type) {
       return SmPktType::kConnectResp;
     case SmPktType::kDisconnectReq:
       return SmPktType::kDisconnectResp;
-    case SmPktType::kFlushCreditReq:
-      return SmPktType::kFlushCreditResp;
+    case SmPktType::kFlushMgmtReq:
+      return SmPktType::kFlushMgmtResp;
     case SmPktType::kFaultResetPeerReq:
     case SmPktType::kFaultDropTxRemoteReq:
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:
-    case SmPktType::kFlushCreditResp:
+    case SmPktType::kFlushMgmtResp:
       break;
   }
 
@@ -166,14 +170,14 @@ static bool sm_pkt_type_req_has_resp(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SmPktType::kConnectReq:
     case SmPktType::kDisconnectReq:
-    case SmPktType::kFlushCreditReq:
+    case SmPktType::kFlushMgmtReq:
       return true;
     case SmPktType::kFaultResetPeerReq:
     case SmPktType::kFaultDropTxRemoteReq:
       return false;
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:
-    case SmPktType::kFlushCreditResp:
+    case SmPktType::kFlushMgmtResp:
       break;
   }
 
@@ -183,6 +187,7 @@ static bool sm_pkt_type_req_has_resp(SmPktType sm_pkt_type) {
 static bool sm_err_type_is_valid(SmErrType err_type) {
   switch (err_type) {
     case SmErrType::kNoError:
+    case SmErrType::kSrvDisconnected:
     case SmErrType::kTooManySessions:
     case SmErrType::kRecvsExhausted:
     case SmErrType::kFlushCreditsExhausted:
@@ -202,6 +207,8 @@ static std::string sm_err_type_str(SmErrType err_type) {
   switch (err_type) {
     case SmErrType::kNoError:
       return std::string("[No error]");
+    case SmErrType::kSrvDisconnected:
+      return std::string("[Server disconnected]");
     case SmErrType::kTooManySessions:
       return std::string("[Too many sessions]");
     case SmErrType::kRecvsExhausted:

@@ -22,6 +22,7 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
 
   Session *session = session_vec.at(session_num);
   assert(session != nullptr && session->is_server());
+  assert(session->is_connected());
   assert(session->server == sm_pkt->server);
   assert(session->client == sm_pkt->client);
 
