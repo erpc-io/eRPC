@@ -57,15 +57,23 @@ class SSlot {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
 
-    // For packet loss handling
-    size_t enqueue_req_ts;    ///< Timestamp taken when request is enqueued
-    bool recovering = false;  ///< Is this sslot recovering from a packet loss?
-
     // These fields are used only for large messages
     size_t rfr_pkt_num;  ///< Next pkt number for request-for-response packets
 
     // These fields are used only if we have background threads
     size_t cont_etid;  ///< Thread ID to run the continuation on
+
+    // Fields for or packet loss handling
+    size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
+
+    /// True if we have detected that this sslot needs recovery. This can be
+    /// set before we send out the flush management request.
+    bool recovering = false;
+
+    /// The request number for which we detected that recovery is needed. If
+    /// \p cur_req_num advances beyond this, we must ignore recovery messages.
+    size_t recovery_req_num;
+
   } client_info;
 
   /// Request metadata saved by the server before calling the request handler.

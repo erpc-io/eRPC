@@ -18,18 +18,19 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
     }
 
     for (SSlot &sslot : session->sslot_arr) {
-      // Ignore session slots that don't have active requests
-      if (sslot.tx_msgbuf == nullptr) {
-        continue;
-      }
+      // Ignore sslots that don't have active requests or are already recovering
+      if (sslot.tx_msgbuf == nullptr) continue;
+      if (sslot.client_info.recovering) continue;
 
-      // If we're here, we have an active request
+      // If we're here, sslot has an active request and it isn't recovering
       assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
 
       size_t cycles_since_enqueue = rdtsc() - sslot.client_info.enqueue_req_ts;
       size_t ms_since_enqueue = to_msec(cycles_since_enqueue, nexus->freq_ghz);
 
       if (ms_since_enqueue >= kPktLossTimeoutMs) {
+        sslot.client_info.recovering = true;
+
         // Create the basic issue message
         char issue_msg[kMaxIssueMsgLen];
         sprintf(issue_msg,
@@ -39,7 +40,7 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
                 sslot.tx_msgbuf->get_req_num());
 
         if (flush_credits_available == 0) {
-          erpc_dprintf("%s: No flush credits available. Ignoring.\n",
+          erpc_dprintf("%s: No flush credits available. Deferring.\n",
                        issue_msg);
           return;  // There's no use processing other sslots/sessions right now
         }

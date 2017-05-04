@@ -48,7 +48,7 @@ void Rpc<TTr>::handle_flush_mgmt_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
                      issue_msg);
         enqueue_sm_resp_st(wi, SmErrType::kFlushCreditsExhausted);
       } else {
-        erpc_dprintf("%s: None.\n", issue_msg);
+        erpc_dprintf("%s: None. Sending response.\n", issue_msg);
         flush_credits_available--;
         enqueue_sm_resp_st(wi, SmErrType::kNoError);
       }
@@ -93,6 +93,7 @@ void Rpc<TTr>::handle_flush_mgmt_resp_st(SmPkt *sm_pkt) {
   // XXX: Do something with the response
   if (sm_pkt->err_type == SmErrType::kFlushCreditsExhausted) {
   } else {
+    erpc_dprintf("%s: None. Processing response.\n", issue_msg);
   }
 }
 
