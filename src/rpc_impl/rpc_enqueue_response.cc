@@ -66,7 +66,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // Fill in the slot and reset queueing progress
   sslot->tx_msgbuf = resp_msgbuf;  // Valid response
-  sslot->pkts_queued = 0;          // Reset queueing progress
+  if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
 
   // Enqueue the first response packet
   size_t data_bytes = std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt);

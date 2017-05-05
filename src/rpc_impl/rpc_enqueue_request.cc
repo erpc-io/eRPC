@@ -68,18 +68,19 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   assert(sslot.rx_msgbuf.is_buried());
 
   sslot.tx_msgbuf = req_msgbuf;
-  sslot.pkts_queued = 0;
-  sslot.pkts_rcvd = 0;
 
   // Fill in client-save info
   sslot.client_info.cont_func = cont_func;
   sslot.client_info.tag = tag;
-  sslot.client_info.enqueue_req_ts = rdtsc();
+  sslot.client_info.req_sent = 0;  // Reset queueing progress
+  sslot.client_info.resp_rcvd = 0;
 
   if (optlevel_large_rpc_supported) {
     sslot.client_info.rfr_sent = 0;
     sslot.client_info.cr_rcvd = 0;
   }
+
+  sslot.client_info.enqueue_req_ts = rdtsc();
 
   if (small_rpc_unlikely(cont_etid != kInvalidBgETid)) {
     // We need to run the continuation in a background thread

@@ -16,8 +16,8 @@ void Rpc<TTr>::process_req_txq_st() {
     MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
     assert(req_msgbuf != nullptr);
     assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
-    assert(sslot->pkts_queued < req_msgbuf->num_pkts);
     assert(req_msgbuf->is_req());
+    assert(sslot->client_info.req_sent < req_msgbuf->num_pkts);
 
     if (small_rpc_likely(req_msgbuf->num_pkts == 1)) {
       // Optimize for small messages that fit in one packet
@@ -27,7 +27,7 @@ void Rpc<TTr>::process_req_txq_st() {
     }
 
     // Session slots that still need TX stay in the queue
-    if (sslot->pkts_queued != req_msgbuf->num_pkts) {
+    if (sslot->client_info.req_sent != req_msgbuf->num_pkts) {
       assert(write_index < req_txq.size());
       req_txq[write_index++] = sslot;
     }
@@ -40,10 +40,6 @@ template <class TTr>
 void Rpc<TTr>::process_req_txq_small_one_st(SSlot *sslot,
                                             MsgBuffer *req_msgbuf) {
   assert(in_creator());
-
-  // req_msgbuf is generally valid. Do some small request--specific checks.
-  assert(req_msgbuf->num_pkts == 1 && sslot->pkts_queued == 0);
-  assert(req_msgbuf->data_size <= TTr::kMaxDataPerPkt);
 
   Session *session = sslot->session;
   if (likely(session->client_info.credits > 0)) {
@@ -58,16 +54,16 @@ void Rpc<TTr>::process_req_txq_small_one_st(SSlot *sslot,
   }
 
   enqueue_pkt_tx_burst_st(sslot, 0, req_msgbuf->data_size);
+  sslot->client_info.req_sent++;
 }
 
 template <class TTr>
 void Rpc<TTr>::process_req_txq_large_one_st(SSlot *sslot,
                                             MsgBuffer *req_msgbuf) {
   assert(in_creator());
-  assert(req_msgbuf->num_pkts > 1 && sslot->pkts_queued < req_msgbuf->num_pkts);
 
   Session *session = sslot->session;
-  size_t pkts_pending = req_msgbuf->num_pkts - sslot->pkts_queued;  // >= 1
+  size_t pkts_pending = req_msgbuf->num_pkts - sslot->client_info.req_sent;
   size_t now_sending = std::min(session->client_info.credits, pkts_pending);
   session->client_info.credits -= now_sending;
 
@@ -79,10 +75,11 @@ void Rpc<TTr>::process_req_txq_large_one_st(SSlot *sslot,
   }
 
   for (size_t i = 0; i < now_sending; i++) {
-    size_t offset = sslot->pkts_queued * TTr::kMaxDataPerPkt;
+    size_t offset = sslot->client_info.req_sent * TTr::kMaxDataPerPkt;
     size_t data_bytes =
         std::min(req_msgbuf->data_size - offset, TTr::kMaxDataPerPkt);
     enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+    sslot->client_info.req_sent++;
   }
 }
 

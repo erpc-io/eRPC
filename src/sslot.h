@@ -49,13 +49,14 @@ class SSlot {
   MsgBuffer rx_msgbuf;   ///< The RX MsgBuffer, valid if \p buf is not NULL
 
   size_t cur_req_num;
-  size_t pkts_queued;
-  size_t pkts_rcvd;
 
   // Info saved only at the client
   struct {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
+
+    size_t req_sent;   ///< Number of request packets sent
+    size_t resp_rcvd;  ///< Number of response packets received
 
     // Fields for supporting large messages
     size_t rfr_sent;  ///< Number of request-for-response packets sent
@@ -86,6 +87,8 @@ class SSlot {
     uint8_t req_type;
     uint64_t req_num;
     ReqFuncType req_func_type;
+
+    size_t req_rcvd;  ///< Number of request packets received
 
     // Fields for supporting large messages
     size_t rfr_rcvd;  ///< Number of request-for-response packets received

@@ -38,7 +38,7 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
 
     // If there's a response in this sslot, we've finished sending it
     if (sslot.tx_msgbuf != nullptr) {
-      assert(sslot.pkts_queued == sslot.tx_msgbuf->num_pkts);
+      assert(sslot.server_info.rfr_rcvd == sslot.tx_msgbuf->num_pkts - 1);
     }
   }
 

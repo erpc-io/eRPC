@@ -431,19 +431,20 @@ class Rpc {
   //
 
  private:
-  /// Enqueue a packet for transmission, possibly deferring transmission.
-  /// This handles fault injection for dropping packets.
-  inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t offset,
+  /// Enqueue a packet starting at \p offset in \p sslot's \p tx_msgbuf,
+  /// possibly deferring transmission. This handles fault injection for dropping
+  /// packets.
+  inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t offset,
                                       size_t data_bytes) {
     assert(in_creator());
     assert(sslot != nullptr && sslot->tx_msgbuf != nullptr);
     assert(tx_batch_i < TTr::kPostlist);
 
-    MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
+    const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
-    item.msg_buffer = tx_msgbuf;
+    item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
     item.offset = offset;
     item.data_bytes = data_bytes;
 
@@ -466,7 +467,6 @@ class Rpc {
       assert(!item.drop);
     }
 
-    sslot->pkts_queued++;  // Update queueing progress
     tx_batch_i++;
 
     dpath_dprintf(
@@ -547,40 +547,6 @@ class Rpc {
     assert(session->is_client());
     assert(session->client_info.credits < Session::kSessionCredits);
     session->client_info.credits++;
-  }
-
-  /**
-   * @brief Check packet ordering for a received packet. If \p sslot belongs to
-   * a server session and this packet is the first in the next request,
-   * \p sslot's current request number is updated.
-   *
-   * @param sslot Session slot for which the packet is received
-   * @param pkthdr The received packet's header
-   *
-   * @return True iff the packet is in order
-   */
-  inline bool check_order(SSlot *sslot, const pkthdr_t *pkthdr) const {
-    assert(pkthdr->is_req() || pkthdr->is_resp());
-    assert(sslot != nullptr && pkthdr != nullptr);
-
-    // Check if this is the next request/response packet for the active request.
-    // This is the only ordered data packet that clients can get.
-    if ((pkthdr->req_num == sslot->cur_req_num) &&
-        (pkthdr->pkt_num == sslot->pkts_rcvd)) {
-      return true;
-    }
-
-    if (sslot->session->is_server()) {
-      // For servers, check if this is the first packet of the next request
-      if (likely((pkthdr->req_num ==
-                  sslot->cur_req_num + Session::kSessionReqWindow) &&
-                 (pkthdr->pkt_num == 0))) {
-        sslot->cur_req_num = pkthdr->req_num;
-        return true;
-      }
-    }
-
-    return false;
   }
 
   /**

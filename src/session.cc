@@ -25,10 +25,8 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
     sslot.session = this;
     sslot.index = sslot_i;
 
-    // Initialize request numbers to generate expected request numbers in Rpc
-    sslot.cur_req_num =
-        std::numeric_limits<size_t>::max() - (kSessionReqWindow - sslot_i - 1);
-    assert(sslot.cur_req_num + kSessionReqWindow == sslot_i);
+    // The first request number for this sslot is (sslot_i + kSessionReqWindow)
+    sslot.cur_req_num = sslot_i;
 
     sslot.rx_msgbuf.buffer.buf = nullptr;  // Bury rx_msgbuf
     sslot.rx_msgbuf.buf = nullptr;         // Bury rx_msgbuf
