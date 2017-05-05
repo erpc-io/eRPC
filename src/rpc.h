@@ -594,8 +594,17 @@ class Rpc {
    */
   void process_comps_st();
 
-  /// Process a control message (credit return or request-for-response)
-  void process_control_msg_st(SSlot *sslot, const pkthdr_t *pkthdr);
+  /// Process a credit return
+  void process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr);
+
+  /// Process a request-for-response
+  void process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr);
+
+  /// Process a single-packet request message
+  void process_small_req_st(SSlot *sslot, const uint8_t *pkt);
+
+  /// Process a single-packet request message
+  void process_small_resp_st(SSlot *sslot, const uint8_t *pkt);
 
   /// Process a packet for a single-packet request or response message
   void process_comps_small_msg_one_st(SSlot *sslot, const uint8_t *pkt);
