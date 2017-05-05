@@ -78,33 +78,6 @@ void Rpc<TTr>::process_comps_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
-  assert(in_creator());
-  assert(sslot != nullptr);
-  assert(pkthdr != nullptr);
-
-  // XXX: Handle reordering
-  bump_credits(sslot->session);
-}
-
-template <class TTr>
-void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
-  assert(in_creator());
-  assert(sslot != nullptr);
-  assert(pkthdr != nullptr);
-
-  size_t pkt_num = pkthdr->pkt_num;
-  assert(pkt_num < sslot->tx_msgbuf->num_pkts);
-
-  // Send the response packet with index = pkt_num. XXX: Handle reordering.
-  size_t offset = pkt_num * TTr::kMaxDataPerPkt;
-  assert(offset < sslot->tx_msgbuf->data_size);
-  size_t data_bytes =
-      std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
-  enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
-}
-
-template <class TTr>
 void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
   assert(sslot != nullptr);
@@ -195,6 +168,33 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   }
 }
 
+template <class TTr>
+void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+  assert(in_creator());
+  assert(sslot != nullptr);
+  assert(pkthdr != nullptr);
+
+  // XXX: Handle reordering
+  bump_credits(sslot->session);
+}
+
+template <class TTr>
+void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+  assert(in_creator());
+  assert(sslot != nullptr);
+  assert(pkthdr != nullptr);
+
+  size_t pkt_num = pkthdr->pkt_num;
+  assert(pkt_num < sslot->tx_msgbuf->num_pkts);
+
+  // Send the response packet with index = pkt_num. XXX: Handle reordering.
+  size_t offset = pkt_num * TTr::kMaxDataPerPkt;
+  assert(offset < sslot->tx_msgbuf->data_size);
+  size_t data_bytes =
+      std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
+  enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+}
+
 // This function is for large messages, so don't use small_rpc_likely()
 template <class TTr>
 void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
@@ -203,29 +203,9 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
   assert(sslot != nullptr);
   assert(pkt != nullptr);
 
-  // pkt is generally valid. Do some large message-specific checks.
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
-  assert(pkthdr->check_magic());
-  assert(pkthdr->msg_size > TTr::kMaxDataPerPkt);  // Multi-packet
-  assert(pkthdr->is_req() || pkthdr->is_resp());
 
-  // Extract packet header fields
-  uint8_t req_type = pkthdr->req_type;
-  size_t req_num = pkthdr->req_num;
-  size_t msg_size = pkthdr->msg_size;
-  size_t pkt_num = pkthdr->pkt_num;
-  bool is_req = pkthdr->is_req();
-
-  const ReqFunc &req_func = req_func_arr[req_type];
-  if (unlikely(!req_func.is_registered())) {
-    erpc_dprintf(
-        "eRPC Rpc %u: Warning: Received packet for unknown request type %u. "
-        "Dropping packet.\n",
-        rpc_id, req_type);
-    return;
-  }
-
-  // Allocate/locate the RX MsgBuffer for this message if needed
+  // Allocate or locate the RX MsgBuffer for this message
   MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
   if (pkthdr->pkt_num == 0) {
     // This is the first time that we have received a packet for this message.
@@ -235,14 +215,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
       bury_tx_msgbuf_server(sslot);  // Bury the previous response MsgBuffer
     }
 
-    if (unlikely(pkt_num != 0)) {
-      erpc_dprintf(
-          "eRPC Rpc %u: Received out-of-order packet on session %u. "
-          "Expected packet number = 0, received = %zu.\n",
-          rpc_id, sslot->session->local_session_num, pkt_num);
-    }
-
-    rx_msgbuf = alloc_msg_buffer(msg_size);
+    rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(sslot->rx_msgbuf.buf != nullptr);
     sslot->pkts_rcvd = 1;
 
@@ -255,22 +228,22 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     // dynamically-allocated RX MsgBuffer.
     assert(rx_msgbuf.buf != nullptr);
     assert(rx_msgbuf.is_dynamic() && rx_msgbuf.check_magic());
-    assert(rx_msgbuf.get_req_type() == req_type);
-    assert(rx_msgbuf.get_req_num() == req_num);
+    assert(rx_msgbuf.get_req_type() == pkthdr->req_type);
+    assert(rx_msgbuf.get_req_num() == pkthdr->req_num);
 
     assert(sslot->pkts_rcvd >= 1);
     sslot->pkts_rcvd++;
   }
 
   // Manage credits and request-for-response
-  if (is_req) {
+  if (pkthdr->is_req()) {
     // Send a credit return for every request packet except the last in sequence
-    if (pkt_num != rx_msgbuf.num_pkts - 1) {
+    if (pkthdr->pkt_num != rx_msgbuf.num_pkts - 1) {
       send_credit_return_now_st(sslot->session, pkthdr);
     }
   } else {
     // This is a response packet
-    debug_check_req_msgbuf_on_resp(sslot, req_num, req_type);
+    debug_check_req_msgbuf_on_resp(sslot, pkthdr->req_num, pkthdr->req_type);
     bump_credits(sslot->session);  // We have at least one credit
 
     size_t &rfr_sent = sslot->client_info.rfr_sent;
@@ -294,9 +267,9 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
 
   // Copy the received packet's data only. The message's common packet header
   // was copied to rx_msgbuf.pkthdr_0 earlier.
-  size_t offset = pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
-  size_t bytes_to_copy = (pkt_num == rx_msgbuf.num_pkts - 1)
-                             ? (msg_size - offset)
+  size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
+  size_t bytes_to_copy = (pkthdr->pkt_num == rx_msgbuf.num_pkts - 1)
+                             ? (pkthdr->msg_size - offset)
                              : TTr::kMaxDataPerPkt;
   assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
   memcpy(reinterpret_cast<char *>(&rx_msgbuf.buf[offset]),
@@ -309,10 +282,19 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
 
   // If we're here, we received all packets of this message
   if (pkthdr->is_req()) {
+    const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
+    if (unlikely(!req_func.is_registered())) {
+      erpc_dprintf(
+          "eRPC Rpc %u: Warning: Received packet for unknown request type %zu. "
+          "Dropping packet.\n",
+          rpc_id, pkthdr->req_type);
+      return;
+    }
+
     // Remember request metadata for enqueue_response()
     sslot->server_info.req_func_type = req_func.req_func_type;
-    sslot->server_info.req_type = req_type;
-    sslot->server_info.req_num = req_num;
+    sslot->server_info.req_type = pkthdr->req_type;
+    sslot->server_info.req_num = pkthdr->req_num;
     if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
 
     // rx_msgbuf here is independent of the RX ring, so we never need a copy
