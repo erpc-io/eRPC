@@ -77,13 +77,18 @@ class SSlot {
 
   } client_info;
 
-  /// Request metadata saved by the server before calling the request handler.
-  /// These fields are needed in enqueue_response(), and the request MsgBuffer,
-  /// which can be used to infer these fields, may not be valid at that point.
   struct {
+    ///@{
+    /// Request metadata saved by the server before calling the request handler.
+    /// These fields are needed in enqueue_response(), and the req MsgBuffer,
+    /// which can be used to infer these fields, may not be valid at that point.
+    ///@}
     uint8_t req_type;
     uint64_t req_num;
     ReqFuncType req_func_type;
+
+    // Fields for supporting large messages
+    size_t rfr_rcvd;  ///< Number of request-for-response packets received
   } server_info;
 
   /// Return a string representation of this session slot

@@ -156,6 +156,7 @@ void Rpc<TTr>::process_comps_small_msg_one_st(SSlot *sslot,
     sslot->server_info.req_func_type = req_func.req_func_type;
     sslot->server_info.req_type = req_type;
     sslot->server_info.req_num = req_num;
+    if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
 
     if (small_rpc_likely(!req_func.is_background())) {
       // For foreground (terminal/non-terminal) request handlers, a "fake",
@@ -325,6 +326,7 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     sslot->server_info.req_func_type = req_func.req_func_type;
     sslot->server_info.req_type = req_type;
     sslot->server_info.req_num = req_num;
+    if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
 
     // rx_msgbuf here is independent of the RX ring, so we never need a copy
     if (!req_func.is_background()) {
