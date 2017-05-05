@@ -71,9 +71,6 @@
    at runtime.
 
 ## Short-term TODOs
- * How to we detect and handle out-of-order/duplicate control packets (credit
-   returns and request-for-response)? These are sent only for large RPCs, so
-   we don't have to be thrifty.
  * RFR sending needs to be paced, so we cannot use `send_rfr_now`.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
