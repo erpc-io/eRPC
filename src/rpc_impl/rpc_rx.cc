@@ -47,8 +47,7 @@ void Rpc<TTr>::process_comps_st() {
     size_t sslot_i = pkthdr->req_num % Session::kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
-    // Process control messages without checking for reordering. These messages
-    // are sent only for large RPCs.
+    // Process control messages
     if (small_rpc_unlikely(pkthdr->msg_size == 0)) {
       process_control_msg_st(sslot, pkthdr);
       continue;
@@ -286,24 +285,22 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     debug_check_req_msgbuf_on_resp(sslot, req_num, req_type);
     bump_credits(sslot->session);  // We have at least one credit
 
-    size_t &rfr_pkt_num = sslot->client_info.rfr_pkt_num;
+    size_t &rfr_sent = sslot->client_info.rfr_sent;
 
     // Check if we need to send more request-for-response packets
-    if (rfr_pkt_num < rx_msgbuf.num_pkts) {
-      // rfr_pkt_num is the (0-based) index of the first response packet for
-      // which we haven't sent a request-for-response. (num_pkts - rfr_pkt_num)
-      // is the maximum number of RFRs that we can still send.
-      size_t num_rfr_to_send = std::min(sslot->session->client_info.credits,
-                                        rx_msgbuf.num_pkts - rfr_pkt_num);
-      assert(num_rfr_to_send > 0);
+    size_t rfr_pending = ((rx_msgbuf.num_pkts - 1) - rfr_sent);
+    if (rfr_pending > 0) {
+      size_t now_sending =
+          std::min(sslot->session->client_info.credits, rfr_pending);
+      assert(now_sending > 0);
 
-      for (size_t i = 0; i < num_rfr_to_send; i++) {
-        // This doesn't use pkthdr->pkt_num: it uses sslot's rfr_pkt_num
+      for (size_t i = 0; i < now_sending; i++) {
+        // This doesn't use pkthdr->pkt_num: it uses sslot's rfr_sent
         send_req_for_resp_now_st(sslot, pkthdr);
-        assert(rfr_pkt_num <= rx_msgbuf.num_pkts);
+        assert(rfr_sent <= rx_msgbuf.num_pkts - 1);
       }
 
-      sslot->session->client_info.credits -= num_rfr_to_send;
+      sslot->session->client_info.credits -= now_sending;
     }
   }
 

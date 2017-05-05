@@ -77,8 +77,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   sslot.client_info.enqueue_req_ts = rdtsc();
 
   if (optlevel_large_rpc_supported) {
-    // We don't send a request-for-response for the zeroth response packet
-    sslot.client_info.rfr_pkt_num = 1;
+    sslot.client_info.rfr_sent = 0;
+    sslot.client_info.cr_rcvd = 0;
   }
 
   if (small_rpc_unlikely(cont_etid != kInvalidBgETid)) {

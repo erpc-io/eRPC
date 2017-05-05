@@ -7,6 +7,7 @@ void Rpc<TTr>::send_req_for_resp_now_st(SSlot *sslot,
                                         const pkthdr_t *resp_pkthdr) {
   assert(in_creator());
   assert(sslot != nullptr && sslot->session->is_client());
+  assert(sslot->rx_msgbuf.is_dynamic() && sslot->rx_msgbuf.is_resp());
   assert(resp_pkthdr != nullptr && resp_pkthdr->check_magic());
   assert(resp_pkthdr->is_resp());
 
@@ -16,7 +17,7 @@ void Rpc<TTr>::send_req_for_resp_now_st(SSlot *sslot,
   rfr_pkthdr.msg_size = 0;
   rfr_pkthdr.dest_session_num = sslot->session->remote_session_num;
   rfr_pkthdr.pkt_type = kPktTypeReqForResp;
-  rfr_pkthdr.pkt_num = sslot->client_info.rfr_pkt_num++;
+  rfr_pkthdr.pkt_num = (sslot->client_info.rfr_sent++) + 1;
   // rfr_pkthdr.req_num = resp_pkthdr->req_num;
   // rfr_pkthdr.magic = pkthdr->magic;
 

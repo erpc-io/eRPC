@@ -57,13 +57,11 @@ class SSlot {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
 
-    // These fields are used only for large messages
-    size_t rfr_pkt_num;  ///< Next pkt number for request-for-response packets
+    // Fields for supporting large messages
+    size_t rfr_sent;  ///< Number of request-for-response packets sent
+    size_t cr_rcvd;   ///< Number of credit return packets received
 
-    // These fields are used only if we have background threads
-    size_t cont_etid;  ///< Thread ID to run the continuation on
-
-    // Fields for or packet loss handling
+    // Fields for packet loss handling
     size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
 
     /// True if we have detected that this sslot needs recovery. This can be
@@ -73,6 +71,9 @@ class SSlot {
     /// The request number for which we detected that recovery is needed. If
     /// \p cur_req_num advances beyond this, we must ignore recovery messages.
     size_t recovery_req_num;
+
+    // Fields for supporting background threads
+    size_t cont_etid;  ///< Thread ID to run the continuation on
 
   } client_info;
 
