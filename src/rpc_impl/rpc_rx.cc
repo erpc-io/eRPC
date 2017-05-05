@@ -47,25 +47,16 @@ void Rpc<TTr>::process_comps_st() {
     size_t sslot_i = pkthdr->req_num % Session::kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
-    // Process control messages
-    if (small_rpc_unlikely(pkthdr->msg_size == 0)) {
-      process_control_msg_st(sslot, pkthdr);
-      continue;
-    }
-
-    // If we're here, this is a data packet
-    assert(pkthdr->is_req() || pkthdr->is_resp());
-
-    // Drop out-of-order data packets. check_order() updates cur_req_num for
-    // server sessions.
-    if (unlikely(!check_order(sslot, pkthdr))) {
-      erpc_dprintf(
-          "eRPC Rpc %u: Warning: Received reordered packet %s. Dropping.\n",
-          rpc_id, pkthdr->to_string().c_str());
-      return;
-    }
-
     if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
+      // Process control messages
+      if (small_rpc_unlikely(pkthdr->msg_size == 0)) {
+        process_control_msg_st(sslot, pkthdr);
+        continue;
+      }
+
+      // If we're here, this is a data packet
+      assert(pkthdr->is_req() || pkthdr->is_resp());
+
       // Optimize for when the received packet is a single-packet message
       process_comps_small_msg_one_st(sslot, pkt);
     } else {
