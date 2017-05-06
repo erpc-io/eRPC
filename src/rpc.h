@@ -544,6 +544,21 @@ class Rpc {
     session->client_info.credits++;
   }
 
+  /// Copy the data from \p pkt to \p sslot's RX MsgBuffer
+  inline void copy_to_rx_msgbuf(SSlot *sslot, const uint8_t *pkt) {
+    const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
+
+    size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
+    size_t bytes_to_copy = (pkthdr->pkt_num == rx_msgbuf.num_pkts - 1)
+                               ? (pkthdr->msg_size - offset)
+                               : TTr::kMaxDataPerPkt;
+    assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
+    memcpy(reinterpret_cast<char *>(&rx_msgbuf.buf[offset]),
+           reinterpret_cast<const char *>(pkt + sizeof(pkthdr_t)),
+           bytes_to_copy);
+  }
+
   /**
    * @brief Process received packets and post RECVs. The ring buffers received
    * from `rx_burst` must not be used after new RECVs are posted.

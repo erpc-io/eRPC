@@ -338,14 +338,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     send_credit_return_now_st(sslot->session, pkthdr);
   }
 
-  // Copy packet data (header was copied earlier)
-  size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
-  size_t bytes_to_copy = (pkthdr->pkt_num == rx_msgbuf.num_pkts - 1)
-                             ? (pkthdr->msg_size - offset)
-                             : TTr::kMaxDataPerPkt;
-  assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
-  memcpy(reinterpret_cast<char *>(&rx_msgbuf.buf[offset]),
-         reinterpret_cast<const char *>(pkt + sizeof(pkthdr_t)), bytes_to_copy);
+  copy_to_rx_msgbuf(sslot, pkt);  // Copy data (header 0 was copied earlier)
 
   // Invoke the request handler iff we have all the request packets
   if (sslot->server_info.req_rcvd != rx_msgbuf.num_pkts) {
@@ -428,14 +421,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
     sslot->session->client_info.credits -= now_sending;
   }
 
-  // Copy packet data (header was copied earlier)
-  size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
-  size_t bytes_to_copy = (pkthdr->pkt_num == rx_msgbuf.num_pkts - 1)
-                             ? (pkthdr->msg_size - offset)
-                             : TTr::kMaxDataPerPkt;
-  assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
-  memcpy(reinterpret_cast<char *>(&rx_msgbuf.buf[offset]),
-         reinterpret_cast<const char *>(pkt + sizeof(pkthdr_t)), bytes_to_copy);
+  copy_to_rx_msgbuf(sslot, pkt);  // Copy data (header 0 was copied earlier)
 
   // Invoke the continuation iff we have all the response packets
   if (sslot->client_info.resp_rcvd != rx_msgbuf.num_pkts) {
