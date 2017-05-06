@@ -335,12 +335,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     *(rx_msgbuf.get_pkthdr_0()) = *pkthdr;
     rx_msgbuf.get_pkthdr_0()->pkt_num = 0;
   } else {
-    // This is not the 1st packet received for this message, so we have a valid,
-    // dynamically-allocated RX MsgBuffer.
-    assert(rx_msgbuf.buf != nullptr);
-    assert(rx_msgbuf.is_dynamic() && rx_msgbuf.check_magic());
-    assert(rx_msgbuf.get_req_type() == pkthdr->req_type);
-    assert(rx_msgbuf.get_req_num() == pkthdr->req_num);
+    // We already have a valid, dynamically-allocated RX MsgBuffer.
+    assert(rx_msgbuf.is_dynamic_and_matches(pkthdr));
 
     if (pkthdr->is_req()) {
       assert(sslot->server_info.req_rcvd >= 1);
