@@ -530,11 +530,6 @@ class Rpc {
   //
 
  public:
-  /// Sanity-check a slot's request MsgBuffer on receiving a response packet.
-  /// It should be valid, dynamic, and the request number/type should match.
-  static void debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
-                                             uint8_t req_type);
-
   /// Check an RX MsgBuffer submitted to a background thread. It should be
   /// valid, dynamic, and the \p is_req field should match. This holds for
   /// both background request handlers and continuations.

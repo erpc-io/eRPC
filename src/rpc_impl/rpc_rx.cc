@@ -182,9 +182,10 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
 
   // If we're here, this is the first (and only) packet of the response
   assert(sslot->rx_msgbuf.is_buried());  // Older rx_msgbuf was buried earlier
-  sslot->client_info.resp_rcvd = 1;
+  assert(sslot->tx_msgbuf != nullptr &&  // Check the request MsgBuffer
+         sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
-  debug_check_req_msgbuf_on_resp(sslot, pkthdr->req_num, pkthdr->req_type);
+  sslot->client_info.resp_rcvd = 1;
   bump_credits(sslot->session);
 
   // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory.
@@ -358,7 +359,8 @@ void Rpc<TTr>::process_comps_large_msg_one_st(SSlot *sslot,
     }
   } else {
     // This is a response packet
-    debug_check_req_msgbuf_on_resp(sslot, pkthdr->req_num, pkthdr->req_type);
+    assert(sslot->tx_msgbuf != nullptr &&  // Check the request MsgBuffer
+           sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
     bump_credits(sslot->session);  // We have at least one credit
 
     size_t &rfr_sent = sslot->client_info.rfr_sent;
@@ -468,25 +470,6 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot,
   // Thread-safe
   req_list->unlocked_push_back(
       typename Nexus<TTr>::BgWorkItem(wi_type, this, context, sslot));
-}
-
-// This is a debug function that gets optimized out
-template <class TTr>
-void Rpc<TTr>::debug_check_req_msgbuf_on_resp(SSlot *sslot, uint64_t req_num,
-                                              uint8_t req_type) {
-  assert(sslot != nullptr);
-  _unused(sslot);
-  _unused(req_num);
-  _unused(req_type);
-
-  const MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
-  _unused(req_msgbuf);
-
-  assert(req_msgbuf != nullptr && req_msgbuf->buf != nullptr &&
-         req_msgbuf->check_magic() && req_msgbuf->is_dynamic());
-  assert(req_msgbuf->is_req());
-  assert(req_msgbuf->get_req_num() == req_num);
-  assert(req_msgbuf->get_req_type() == req_type);
 }
 
 // This is a debug function that gets optimized out

@@ -68,6 +68,14 @@ class MsgBuffer {
   /// Check if this MsgBuffer uses dynamic memory allocation
   inline bool is_dynamic() const { return buffer.buf != nullptr; }
 
+  /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
+  /// fields match.
+  bool is_dynamic_and_matches(const pkthdr_t *pkthdr) const {
+    return is_dynamic() && check_magic() &&
+           (get_req_type() == pkthdr->req_type) &&
+           (get_req_num() == pkthdr->req_num);
+  }
+
   /// Check if this MsgBuffer is buried
   inline bool is_buried() const {
     return (buf == nullptr && buffer.buf == nullptr);
