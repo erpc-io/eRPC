@@ -170,13 +170,22 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   assert(sslot != nullptr);
   assert(pkt != nullptr);
 
-  // XXX: Handle reordering
+  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+
+  // Handle reordering
+  assert(pkthdr->req_num <= sslot->cur_req_num);
+  if (unlikely(pkthdr->req_num < sslot->cur_req_num)) {
+    erpc_dprintf(
+        "eRPC Rpc %u: Warning: Received out-of-order response packet for "
+        "current small RPC %zu. Dropping.\n",
+        rpc_id, sslot->cur_req_num);
+    return;
+  }
+
+  // If we're here, this is the first (and only) packet of the response
   assert(sslot->rx_msgbuf.is_buried());  // Older rx_msgbuf was buried earlier
   sslot->client_info.resp_rcvd = 1;
 
-  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
-
-  // Handle a single-packet response message
   debug_check_req_msgbuf_on_resp(sslot, pkthdr->req_num, pkthdr->req_type);
   bump_credits(sslot->session);
 
