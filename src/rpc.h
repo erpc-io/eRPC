@@ -567,11 +567,11 @@ class Rpc {
   /// Process a single-packet request message
   void process_small_resp_st(SSlot *sslot, const uint8_t *pkt);
 
-  /// Process a packet for a single-packet request or response message
-  void process_comps_small_msg_one_st(SSlot *sslot, const uint8_t *pkt);
+  /// Process a packet for a multi-packet request
+  void process_large_req_one_st(SSlot *sslot, const uint8_t *pkt);
 
-  /// Process a packet for a multi-packet request or response message
-  void process_comps_large_msg_one_st(SSlot *sslot, const uint8_t *pkt);
+  /// Process a packet for a multi-packet response
+  void process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt);
 
   /**
    * @brief Submit a work item to a background thread
