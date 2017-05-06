@@ -222,15 +222,17 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
   if (unlikely(pkthdr->req_num < sslot->cur_req_num)) {
+    // Reject credit returns for old requests
     erpc_dprintf(
-        "eRPC Rpc %u: Received out-of-order credit return packet. "
+        "eRPC Rpc %u: Received out-of-order explicit credit return packet. "
         "Request numbers: %zu (packet), %zu (sslot). Dropping.\n",
         rpc_id, pkthdr->req_num, sslot->cur_req_num);
     return;
   } else {
+    // Reject credit returns for previous and later packets
     if (unlikely(pkthdr->pkt_num != sslot->client_info.cr_rcvd)) {
       erpc_dprintf(
-          "eRPC Rpc %u: Received out-of-order credit return packet. "
+          "eRPC Rpc %u: Received out-of-order explicit credit return packet. "
           "Packet numbers: %zu (packet), %zu (expected). Dropping.\n",
           rpc_id, pkthdr->pkt_num, sslot->client_info.cr_rcvd);
       return;
@@ -247,12 +249,48 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(sslot != nullptr);
   assert(pkthdr != nullptr);
 
-  size_t pkt_num = pkthdr->pkt_num;
-  assert(pkt_num < sslot->tx_msgbuf->num_pkts);
+  // Handle reordering
+  assert(pkthdr->req_num <= sslot->cur_req_num);
+  if (unlikely(pkthdr->req_num < sslot->cur_req_num)) {
+    // Reject RFR for old requests
+    erpc_dprintf(
+        "eRPC Rpc %u: Received out-of-order request-for-response packet. "
+        "Request numbers: %zu (packet), %zu (sslot). Dropping.\n",
+        rpc_id, pkthdr->req_num, sslot->cur_req_num);
+    return;
+  } else {
+    // The expected packet number is (rfr_rcvd + 1). Reject future packets.
+    if (unlikely(pkthdr->pkt_num > sslot->server_info.rfr_rcvd + 1)) {
+      erpc_dprintf(
+          "eRPC Rpc %u: Received out-of-order credit return packet. "
+          "Packet numbers: %zu (packet), %zu (expected). Dropping.\n",
+          rpc_id, pkthdr->pkt_num, sslot->server_info.rfr_rcvd + 1);
+      return;
+    }
 
-  // Send the response packet with index = pkt_num. XXX: Handle reordering.
+    // Re-send RFR response for older packets
+    if (unlikely(pkthdr->pkt_num < sslot->server_info.rfr_rcvd + 1)) {
+      erpc_dprintf(
+          "eRPC Rpc %u: Received out-of-order credit return packet. "
+          "Packet numbers: %zu (packet), %zu (expected). "
+          "Re-sending response packet.\n",
+          rpc_id, pkthdr->pkt_num, sslot->server_info.rfr_rcvd + 1);
+
+      // Send the response packet with index = pkthdr->pkt_num (same as below)
+      size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
+      assert(offset < sslot->tx_msgbuf->data_size);
+      size_t data_bytes =
+          std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
+      enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+
+      return;
+    }
+  }
+
   sslot->server_info.rfr_rcvd++;
-  size_t offset = pkt_num * TTr::kMaxDataPerPkt;
+
+  // Send the response packet with index = pkthdr->pktnum (same as above)
+  size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
   assert(offset < sslot->tx_msgbuf->data_size);
   size_t data_bytes =
       std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
