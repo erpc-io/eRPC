@@ -87,6 +87,13 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
 
   // Handle reordering
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
+    // Create the basic issue message
+    char issue_msg[kMaxIssueMsgLen];
+    sprintf(issue_msg,
+            "eRPC Rpc %u: Received out-of-order request packet. "
+            "Request numbers: %zu (packet), %zu (sslot). Action:",
+            rpc_id, pkthdr->req_num, sslot->cur_req_num);
+
     if (pkthdr->req_num == sslot->cur_req_num) {
       // This is a retransmission of the currently active request
       assert(sslot->server_info.req_rcvd == 1);
@@ -95,27 +102,18 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
         // The response is available, so resend it
         assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
 
-        erpc_dprintf(
-            "eRPC Rpc %u: Warning: Received out-of-order request packet for "
-            "current small RPC %zu. Re-sending response.\n",
-            rpc_id, sslot->cur_req_num);
-
+        erpc_dprintf("%s: Re-sending response.\n", issue_msg);
         enqueue_pkt_tx_burst_st(sslot, 0, sslot->tx_msgbuf->data_size);
         return;
       } else {
         // The response is not available yet, client will have to timeout again
-        erpc_dprintf(
-            "eRPC Rpc %u: Warning: Received out-of-order request packet for "
-            "current small RPC %zu. Response not available yet. Dropping.\n",
-            rpc_id, sslot->cur_req_num);
+        erpc_dprintf("%s: Dropping because response not available yet.\n",
+                     issue_msg);
         return;
       }
     } else {
       // This is a massively-delayed retransmission of an old request
-      erpc_dprintf(
-          "eRPC Rpc %u: Warning: Received out-of-order request packet for "
-          "buried small RPC %zu. Dropping.\n",
-          rpc_id, sslot->cur_req_num);
+      erpc_dprintf("%s: Dropping.\n", issue_msg);
       return;
     }
   }
@@ -176,9 +174,9 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   assert(pkthdr->req_num <= sslot->cur_req_num);
   if (unlikely(pkthdr->req_num < sslot->cur_req_num)) {
     erpc_dprintf(
-        "eRPC Rpc %u: Warning: Received out-of-order response packet for "
-        "current small RPC %zu. Dropping.\n",
-        rpc_id, sslot->cur_req_num);
+        "eRPC Rpc %u: Received out-of-order response packet. "
+        "Request numbers: %zu (packet), %zu (sslot). Dropping.\n",
+        rpc_id, pkthdr->req_num, sslot->cur_req_num);
     return;
   }
 
@@ -221,7 +219,25 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(sslot != nullptr);
   assert(pkthdr != nullptr);
 
-  // XXX: Handle reordering
+  // Handle reordering
+  assert(pkthdr->req_num <= sslot->cur_req_num);
+  if (unlikely(pkthdr->req_num < sslot->cur_req_num)) {
+    erpc_dprintf(
+        "eRPC Rpc %u: Received out-of-order credit return packet. "
+        "Request numbers: %zu (packet), %zu (sslot). Dropping.\n",
+        rpc_id, pkthdr->req_num, sslot->cur_req_num);
+    return;
+  } else {
+    if (unlikely(pkthdr->pkt_num != sslot->client_info.cr_rcvd)) {
+      erpc_dprintf(
+          "eRPC Rpc %u: Received out-of-order credit return packet. "
+          "Packet numbers: %zu (packet), %zu (expected). Dropping.\n",
+          rpc_id, pkthdr->pkt_num, sslot->client_info.cr_rcvd);
+      return;
+    }
+  }
+
+  sslot->client_info.cr_rcvd++;
   bump_credits(sslot->session);
 }
 
