@@ -21,8 +21,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(sm_pkt->server.rpc_id == rpc_id);
   assert(sm_pkt->server.secret == sm_pkt->client.secret);
 
-  // Create the basic issue message
-  char issue_msg[kMaxIssueMsgLen];
+  char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",
           rpc_id, sm_pkt->client.name().c_str());
 

@@ -13,8 +13,7 @@ namespace ERpc {
 template <class TTr>
 int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
                                 uint8_t rem_phy_port) {
-  // Create the basic issue message
-  char issue_msg[kMaxIssueMsgLen];
+  char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
 
   // Check that the caller is the creator thread
@@ -112,8 +111,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
 
 template <class TTr>
 int Rpc<TTr>::destroy_session_st(int session_num) {
-  // Create the basic issue message
-  char issue_msg[kMaxIssueMsgLen];
+  char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
           "eRPC Rpc %u: destroy_session() failed for session %d. Issue", rpc_id,
           session_num);

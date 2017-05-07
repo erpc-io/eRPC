@@ -135,8 +135,7 @@ void Nexus<TTr>::unregister_hook(Hook *hook) {
 
 template <class TTr>
 int Nexus<TTr>::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
-  // Create the basic issue message
-  char issue_msg[kMaxIssueMsgLen];
+  char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
           "eRPC Nexus: Failed to register handlers for request type %u. Issue",
           req_type);

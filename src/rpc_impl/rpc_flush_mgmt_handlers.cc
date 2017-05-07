@@ -18,8 +18,7 @@ void Rpc<TTr>::handle_flush_mgmt_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
 
   auto fm_req_type = static_cast<FlushMgmtReqType>(sm_pkt->gen_data);
 
-  // Create the basic issue message
-  char issue_msg[kMaxIssueMsgLen];
+  char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
           "eRPC Rpc %u: Received flush management %s request from %s. Issue",
           rpc_id,

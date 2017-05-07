@@ -26,8 +26,7 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   assert(session->server == sm_pkt->server);
   assert(session->client == sm_pkt->client);
 
-  // Create the basic issue message
-  char issue_msg[kMaxIssueMsgLen];
+  char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received disconnect request from %s. Issue",
           rpc_id, sm_pkt->client.name().c_str());
 

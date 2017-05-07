@@ -31,8 +31,7 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
       if (ms_since_enqueue >= kPktLossTimeoutMs) {
         sslot.client_info.recovering = true;
 
-        // Create the basic issue message
-        char issue_msg[kMaxIssueMsgLen];
+        char issue_msg[kMaxIssueMsgLen];  // The basic issue message
         sprintf(issue_msg,
                 "eRPC Rpc %u: Packet loss suspected for session %u, "
                 "req num %zu. Issue",

@@ -91,7 +91,6 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
 
   // Handle reordering
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
-    // Create the basic issue message
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
             "eRPC Rpc %u: Received out-of-order request packet. "
