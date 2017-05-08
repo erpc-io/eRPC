@@ -364,20 +364,23 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   // Allocate or locate the RX MsgBuffer for this message
   MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
   if (pkthdr->pkt_num == 0) {
-    // This is the first time that we have received a packet for this message.
-    assert(rx_msgbuf.is_buried());  // Buried earlier
-    bury_tx_msgbuf_server(sslot);   // Bury the previous response MsgBuffer
+    // This is the first packet received for this request
+    assert(rx_msgbuf.is_buried());  // Buried earlier when req handler returned
+
+    // Update sslot tracking
+    sslot->cur_req_num = pkthdr->req_num;
+    sslot->server_info.req_rcvd = 1;
+    bury_tx_msgbuf_server(sslot);  // Bury previous possibly-dynamic response
 
     rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(sslot->rx_msgbuf.buf != nullptr);
     *(rx_msgbuf.get_pkthdr_0()) = *pkthdr;  // Copy packet header
-
-    sslot->server_info.req_rcvd = 1;
-    sslot->cur_req_num = pkthdr->req_num;  // XXX: Reordering
   } else {
-    // We already have a valid, dynamically-allocated RX MsgBuffer
+    // This is not the first packet for this request
     assert(rx_msgbuf.is_dynamic_and_matches(pkthdr));
     assert(sslot->server_info.req_rcvd >= 1);
+    assert(sslot->server_info.req_num == pkthdr->req_num);
+
     sslot->server_info.req_rcvd++;
   }
 
