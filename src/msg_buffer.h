@@ -69,11 +69,21 @@ class MsgBuffer {
   inline bool is_dynamic() const { return buffer.buf != nullptr; }
 
   /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
-  /// fields match.
+  /// fields match those in \p pkthdr
   bool is_dynamic_and_matches(const pkthdr_t *pkthdr) const {
+    assert(pkthdr != nullptr);
     return is_dynamic() && check_magic() &&
            (get_req_type() == pkthdr->req_type) &&
            (get_req_num() == pkthdr->req_num);
+  }
+
+  /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
+  /// fields match those in \p other
+  bool is_dynamic_and_matches(const MsgBuffer *other) const {
+    assert(other != nullptr);
+    return is_dynamic() && check_magic() &&
+           (get_req_type() == other->get_req_type()) &&
+           (get_req_num() == other->get_req_num());
   }
 
   /// Check if this MsgBuffer is buried

@@ -665,6 +665,9 @@ class Rpc {
   /// Scan all outstanding requests for suspected packet loss
   void pkt_loss_scan_reqs_st();
 
+  /// Retransmit packets for an sslot for which we suspect a packet loss
+  void pkt_loss_retransmit_st(SSlot *sslot);
+
   //
   // Misc public functions
   //
