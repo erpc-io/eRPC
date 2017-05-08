@@ -95,7 +95,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
             "eRPC Rpc %u: Received out-of-order request packet. "
-            "Request numbers: %zu (packet), %zu (sslot). Action:",
+            "Request numbers: %zu (packet), %zu (sslot). Action",
             rpc_id, pkthdr->req_num, sslot->cur_req_num);
 
     if (pkthdr->req_num < sslot->cur_req_num) {
@@ -323,7 +323,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
             "eRPC Rpc %u: Received out-of-order request packet. "
-            "Req/pkt numbers: %zu/%zu (packet), %zu/%zu (sslot). Action:",
+            "Req/pkt numbers: %zu/%zu (packet), %zu/%zu (sslot). Action",
             rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
             sslot->server_info.req_rcvd);
 

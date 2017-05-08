@@ -62,10 +62,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // Fill in the sslot info
   SSlot &sslot = session->sslot_arr[sslot_i];
-  // The request and response (tx_msgbuf and rx_msgbuf) for the previous request
-  // in this sslot were buried when the response handler returned.
-  assert(sslot.tx_msgbuf == nullptr);
-  assert(sslot.rx_msgbuf.is_buried());
+  assert(sslot.tx_msgbuf == nullptr);  // Buried before calling continuation
+  assert(sslot.rx_msgbuf.is_buried());  // Buried on release_response()
 
   sslot.tx_msgbuf = req_msgbuf;
 
