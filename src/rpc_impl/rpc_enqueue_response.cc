@@ -50,7 +50,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   resp_pkthdr_0->dest_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
   resp_pkthdr_0->pkt_num = 0;
-  resp_pkthdr_0->req_num = sslot->server_info.req_num;
+  resp_pkthdr_0->req_num = sslot->cur_req_num;
   assert(resp_pkthdr_0->check_magic());
 
   // Fill in non-zeroth packet headers, if any

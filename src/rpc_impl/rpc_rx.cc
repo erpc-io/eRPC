@@ -145,7 +145,6 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   // Remember request metadata for enqueue_response()
   sslot->server_info.req_func_type = req_func.req_func_type;
   sslot->server_info.req_type = pkthdr->req_type;
-  sslot->server_info.req_num = pkthdr->req_num;
 
   if (small_rpc_likely(!req_func.is_background())) {
     // For foreground (terminal/non-terminal) request handlers, a "fake",
@@ -235,16 +234,16 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     return;
   } else {
     // Reject credit returns for previous and later packets
-    if (unlikely(pkthdr->pkt_num != sslot->client_info.cr_rcvd)) {
+    if (unlikely(pkthdr->pkt_num != sslot->client_info.expl_cr_rcvd)) {
       erpc_dprintf(
           "eRPC Rpc %u: Received out-of-order explicit credit return packet. "
           "Packet numbers: %zu (packet), %zu (expected). Dropping.\n",
-          rpc_id, pkthdr->pkt_num, sslot->client_info.cr_rcvd);
+          rpc_id, pkthdr->pkt_num, sslot->client_info.expl_cr_rcvd);
       return;
     }
   }
 
-  sslot->client_info.cr_rcvd++;
+  sslot->client_info.expl_cr_rcvd++;
   bump_credits(sslot->session);
 }
 
@@ -379,7 +378,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     // This is not the first packet for this request
     assert(rx_msgbuf.is_dynamic_and_matches(pkthdr));
     assert(sslot->server_info.req_rcvd >= 1);
-    assert(sslot->server_info.req_num == pkthdr->req_num);
+    assert(sslot->cur_req_num == pkthdr->req_num);
 
     sslot->server_info.req_rcvd++;
   }
@@ -408,7 +407,6 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   // Remember request metadata for enqueue_response()
   sslot->server_info.req_func_type = req_func.req_func_type;
   sslot->server_info.req_type = pkthdr->req_type;
-  sslot->server_info.req_num = pkthdr->req_num;
 
   // rx_msgbuf here is independent of the RX ring, so we never need a copy
   if (!req_func.is_background()) {
@@ -428,14 +426,35 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
-  // XXX: Handle reordering
+  // Handle reordering
+  assert(pkthdr->req_num <= sslot->cur_req_num);
+  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
+                  (pkthdr->pkt_num == sslot->client_info.resp_rcvd);
+
+  // Check if the response has been reordered before a credit return. Since
+  // the response packet is in order, we still have the request MsgBuffer.
+  if (in_order) {
+    assert(sslot->tx_msgbuf != nullptr &&
+           sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
+    in_order &=
+        (sslot->client_info.expl_cr_rcvd == sslot->tx_msgbuf->num_pkts - 1);
+  }
+
+  if (unlikely(!in_order)) {
+    erpc_dprintf(
+        "eRPC Rpc %u: Received out-of-order response packet. "
+        "Req/pkt numbers: %zu/%zu (packet), %zu/%zu (sslot). Dropping.\n",
+        rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
+        sslot->client_info.resp_rcvd);
+    return;
+  }
 
   bump_credits(sslot->session);
 
   // Allocate or locate the RX MsgBuffer for this message
   MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
   if (pkthdr->pkt_num == 0) {
-    // This is the first time that we have received a packet for this message.
+    // This is the first packet received for this response
     assert(rx_msgbuf.is_buried());  // Buried earlier
 
     rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
@@ -444,15 +463,12 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
 
     sslot->client_info.resp_rcvd = 1;
   } else {
-    // We already have a valid, dynamically-allocated RX MsgBuffer.
+    // This is not the first packet for this request
     assert(rx_msgbuf.is_dynamic_and_matches(pkthdr));
     assert(sslot->client_info.resp_rcvd >= 1);
 
     sslot->client_info.resp_rcvd++;
   }
-
-  assert(sslot->tx_msgbuf != nullptr &&  // Check the request MsgBuffer
-         sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
   size_t &rfr_sent = sslot->client_info.rfr_sent;
 

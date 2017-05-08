@@ -59,8 +59,8 @@ class SSlot {
     size_t resp_rcvd;  ///< Number of response packets received
 
     // Fields for supporting large messages
-    size_t rfr_sent;  ///< Number of request-for-response packets sent
-    size_t cr_rcvd;   ///< Number of credit return packets received
+    size_t rfr_sent;      ///< Number of request-for-response packets sent
+    size_t expl_cr_rcvd;  ///< Number of explicit credit returns received
 
     // Fields for packet loss handling
     size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
@@ -85,7 +85,6 @@ class SSlot {
     /// which can be used to infer these fields, may not be valid at that point.
     ///@}
     uint8_t req_type;
-    uint64_t req_num;
     ReqFuncType req_func_type;
 
     size_t req_rcvd;  ///< Number of request packets received

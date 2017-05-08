@@ -77,7 +77,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   if (optlevel_large_rpc_supported) {
     sslot.client_info.rfr_sent = 0;
-    sslot.client_info.cr_rcvd = 0;
+    sslot.client_info.expl_cr_rcvd = 0;
   }
 
   sslot.client_info.enqueue_req_ts = rdtsc();
