@@ -18,9 +18,8 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
     }
 
     for (SSlot &sslot : session->sslot_arr) {
-      // Ignore sslots that don't have active requests or are already recovering
+      // Ignore sslots that don't have a request with an incomplete response
       if (sslot.tx_msgbuf == nullptr) continue;
-      if (sslot.client_info.recovering) continue;
 
       // If we're here, sslot has an active request and it isn't recovering
       assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
@@ -29,8 +28,6 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
       size_t ms_since_enqueue = to_msec(cycles_since_enqueue, nexus->freq_ghz);
 
       if (ms_since_enqueue >= kPktLossTimeoutMs) {
-        sslot.client_info.recovering = true;
-
         char issue_msg[kMaxIssueMsgLen];  // The basic issue message
         sprintf(issue_msg,
                 "eRPC Rpc %u: Packet loss suspected for session %u, "

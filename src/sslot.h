@@ -65,10 +65,6 @@ class SSlot {
     // Fields for packet loss handling
     size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
 
-    /// True if we have detected that this sslot needs recovery. This can be
-    /// set before we send out the flush management request.
-    bool recovering = false;
-
     /// The request number for which we detected that recovery is needed. If
     /// \p cur_req_num advances beyond this, we must ignore recovery messages.
     size_t recovery_req_num;
