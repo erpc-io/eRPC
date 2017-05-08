@@ -22,10 +22,11 @@ class AppContext : public BasicAppContext {
 };
 
 /// Configuration for controlling the test
-size_t config_num_iters = 0;     ///< The number of iterations
+size_t config_num_iters;         ///< The number of iterations
 size_t config_num_sessions;      ///< Number of sessions created by client
 size_t config_rpcs_per_session;  ///< Number of Rpcs per session per iteration
 size_t config_num_bg_threads;    ///< Number of background threads
+double config_pkt_drop_prob;     ///< The packet drop probability
 
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
@@ -94,6 +95,8 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
                           basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
+  rpc->fault_inject_set_pkt_drop_prob_st(config_pkt_drop_prob);
+
   int *session_num_arr = context.session_num_arr;
 
   // Pre-create MsgBuffers so we can test reuse and resizing
@@ -103,8 +106,6 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
     req_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
     assert(req_msgbuf[req_i].buf != nullptr);
   }
-
-  rpc->fault_inject_drop_tx_local_st(0);  // Inject a packet loss
 
   // The main request-issuing loop
   for (size_t iter = 0; iter < config_num_iters; iter++) {
@@ -172,6 +173,7 @@ TEST(OneLargeRpc, Foreground) {
   config_num_sessions = 1;
   config_rpcs_per_session = 1;
   config_num_bg_threads = 0;
+  config_pkt_drop_prob = 0.5;
   launch_helper();
 }
 

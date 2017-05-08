@@ -43,7 +43,7 @@ class Rpc {
   static constexpr size_t kPktLossEpochMs = 50;
 
   /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kPktLossTimeoutMs = 500;
+  static constexpr size_t kPktLossTimeoutMs = 2000;
 
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
@@ -446,18 +446,12 @@ class Rpc {
 
     if (kFaultInjection) {
       // Fault injection is enabled, so we need to set item.drop
-      if (faults.drop_tx_local && faults.drop_tx_local_countdown == 0) {
+      item.drop = ((fast_rand.next_u32() % 100) < faults.pkt_drop_prob * 100);
+
+      if (item.drop) {
         erpc_dprintf(
-            "eRPC Rpc %u: Dropping packet %s.\n", rpc_id,
+            "eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
             tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
-        item.drop = true;
-        faults.drop_tx_local = false;
-      } else if (faults.drop_tx_local) {
-        assert(faults.drop_tx_local_countdown > 0);
-        faults.drop_tx_local_countdown--;
-        item.drop = false;
-      } else {
-        item.drop = false;
       }
     } else {
       assert(!item.drop);
@@ -633,23 +627,10 @@ class Rpc {
   void fault_inject_reset_remote_epeer_st(int session_num);
 
   /**
-   * @brief Inject a fault that drops a packet transmitted by this Rpc. We do
-   * not control which session the drop will affect.
-   *
-   * @param pkt_countdown Packets to transmit locally before dropping one
+   * @brief Set the TX packet drop probability for this Rpc
    * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_drop_tx_local_st(size_t pkt_countdown);
-
-  /**
-   * @brief Inject a fault that drops a packet transmitted by the server
-   * Rpc for this client session. This can affect any session of the server Rpc.
-   *
-   * @param session_num The client session to send the fault for
-   * @param pkt_countdown Packets to transmit at the server before dropping one
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_drop_tx_remote_st(int session_num, size_t pkt_countdown);
+  void fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob);
 
  private:
   /**
@@ -813,8 +794,7 @@ class Rpc {
     /// case where a client fails to resolve routing info sent by the server.
     bool resolve_server_rinfo = false;
 
-    bool drop_tx_local = false;      ///< Drop a local TX packet
-    size_t drop_tx_local_countdown;  ///< Packets to TX before dropping one
+    double pkt_drop_prob = 0.0;  ///< Probability of dropping a packet
   } faults;
 
   // Datapath stats

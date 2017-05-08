@@ -43,14 +43,6 @@ void Rpc<TTr>::handle_sm_st() {
       case SmPktType::kFaultResetPeerReq:
         // This is handled in the Nexus
         throw std::runtime_error("Invalid packet type");
-      case SmPktType::kFaultDropTxRemoteReq:
-        erpc_dprintf(
-            "eRPC Rpc %u: Received drop-TX-remote fault (countdown = %zu) "
-            "from %s.\n",
-            rpc_id, sm_pkt->gen_data, sm_pkt->client.name().c_str());
-        faults.drop_tx_local = true;
-        faults.drop_tx_local_countdown = sm_pkt->gen_data;
-        break;
     }
 
     // Free the packet memory allocated by the SM thread

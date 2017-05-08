@@ -25,31 +25,10 @@ void Rpc<TTr>::fault_inject_resolve_server_rinfo_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_drop_tx_local_st(size_t pkt_countdown) {
+void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob) {
   fault_inject_check_ok();
-  faults.drop_tx_local = true;
-  faults.drop_tx_local_countdown = pkt_countdown;
-}
-
-template <class TTr>
-void Rpc<TTr>::fault_inject_drop_tx_remote_st(int session_num,
-                                              size_t pkt_countdown) {
-  fault_inject_check_ok();
-  assert(is_usr_session_num_in_range(session_num));
-
-  // We don't grab session lock because, for this session, other management ops
-  // are handled by this thread, and we don't care about datapath operations
-  Session *session = session_vec[static_cast<size_t>(session_num)];
-  assert(session != nullptr);
-  assert(session->is_connected() && session->is_client());
-
-  erpc_dprintf(
-      "eRPC Rpc %u: Sending drop-TX-remote fault (countdown = %zu) "
-      "for session %u to [%s, %u].\n",
-      rpc_id, pkt_countdown, session->local_session_num,
-      session->server.hostname, session->server.rpc_id);
-
-  enqueue_sm_req_st(session, SmPktType::kFaultDropTxRemoteReq, pkt_countdown);
+  assert(pkt_drop_prob >= 0.0 && pkt_drop_prob < .95);
+  faults.pkt_drop_prob = pkt_drop_prob;
 }
 
 template <class TTr>

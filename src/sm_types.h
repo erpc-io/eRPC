@@ -29,12 +29,11 @@ enum class SessionState {
 
 /// Packet types used for session management
 enum class SmPktType : int {
-  kConnectReq,           ///< Session connect request
-  kConnectResp,          ///< Session connect response
-  kDisconnectReq,        ///< Session disconnect request
-  kDisconnectResp,       ///< Session disconnect response
-  kFaultResetPeerReq,    ///< Reset the remote ENet peer
-  kFaultDropTxRemoteReq  ///< Drop a TX packet at the remote ENet peer
+  kConnectReq,         ///< Session connect request
+  kConnectResp,        ///< Session connect response
+  kDisconnectReq,      ///< Session disconnect request
+  kDisconnectResp,     ///< Session disconnect response
+  kFaultResetPeerReq,  ///< Reset the remote ENet peer
 };
 
 /// The types of responses to a session management packet
@@ -86,8 +85,6 @@ static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
       return std::string("[Disconnect response]");
     case SmPktType::kFaultResetPeerReq:
       return std::string("[Reset peer request (fault injection)]");
-    case SmPktType::kFaultDropTxRemoteReq:
-      return std::string("[Drop TX remote (fault injection)]");
   };
 
   throw std::runtime_error("eRPC: Invalid session management packet type.");
@@ -101,7 +98,6 @@ static bool sm_pkt_type_is_valid(SmPktType sm_pkt_type) {
     case SmPktType::kDisconnectReq:
     case SmPktType::kDisconnectResp:
     case SmPktType::kFaultResetPeerReq:
-    case SmPktType::kFaultDropTxRemoteReq:
       return true;
   }
   return false;
@@ -115,7 +111,6 @@ static bool sm_pkt_type_is_req(SmPktType sm_pkt_type) {
     case SmPktType::kConnectReq:
     case SmPktType::kDisconnectReq:
     case SmPktType::kFaultResetPeerReq:
-    case SmPktType::kFaultDropTxRemoteReq:
       return true;
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:
@@ -134,7 +129,6 @@ static SmPktType sm_pkt_type_req_to_resp(SmPktType sm_pkt_type) {
     case SmPktType::kDisconnectReq:
       return SmPktType::kDisconnectResp;
     case SmPktType::kFaultResetPeerReq:
-    case SmPktType::kFaultDropTxRemoteReq:
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:
       break;
@@ -152,7 +146,6 @@ static bool sm_pkt_type_req_has_resp(SmPktType sm_pkt_type) {
     case SmPktType::kDisconnectReq:
       return true;
     case SmPktType::kFaultResetPeerReq:
-    case SmPktType::kFaultDropTxRemoteReq:
       return false;
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:

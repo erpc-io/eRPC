@@ -101,14 +101,12 @@ void basic_sm_handler(int session_num, SmEventType sm_event_type,
 
 /// A basic empty session management handler that should never be invoked.
 void basic_empty_sm_handler(int, SmEventType, SmErrType, void *) {
-  assert(false);
-  exit(-1);
+  throw std::runtime_error("Empty SM handler invoked.");
 }
 
 /// A basic request handler that should never be invoked
 void basic_empty_req_handler(ReqHandle *, void *) {
-  assert(false);
-  exit(-1);
+  throw std::runtime_error("Empty req handler invoked.");
 }
 
 /**
