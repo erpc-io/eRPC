@@ -62,6 +62,7 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->is_req() || pkthdr->is_resp());
 
     if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
+      assert(pkthdr->pkt_num == 0);
       if (pkthdr->is_req()) {
         process_small_req_st(sslot, pkt);
       } else {
@@ -97,8 +98,12 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
             "Request numbers: %zu (packet), %zu (sslot). Action:",
             rpc_id, pkthdr->req_num, sslot->cur_req_num);
 
-    if (pkthdr->req_num == sslot->cur_req_num) {
-      // This is a retransmission of the currently active request
+    if (pkthdr->req_num < sslot->cur_req_num) {
+      // This is a massively-delayed retransmission of an old request
+      erpc_dprintf("%s: Dropping.\n", issue_msg);
+      return;
+    } else {
+      // This is a retransmission for the currently active request
       assert(sslot->server_info.req_rcvd == 1);
 
       if (sslot->tx_msgbuf != nullptr) {
@@ -114,10 +119,6 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
                      issue_msg);
         return;
       }
-    } else {
-      // This is a massively-delayed retransmission of an old request
-      erpc_dprintf("%s: Dropping.\n", issue_msg);
-      return;
     }
   }
 
@@ -310,7 +311,65 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
-  // XXX: Handle reordering
+  // Handle reordering
+  bool is_next_pkt_same_req =  // Is this the next packet in this request?
+      (pkthdr->req_num == sslot->cur_req_num) &&
+      (pkthdr->pkt_num == sslot->server_info.req_rcvd);
+  bool is_first_pkt_next_req = // Is this the first packet in the next request?
+      (pkthdr->req_num == sslot->cur_req_num + Session::kSessionReqWindow) &&
+      (pkthdr->pkt_num == 0);
+
+  bool is_ordered = is_next_pkt_same_req || is_first_pkt_next_req;
+  if (unlikely(!is_ordered)) {
+    char issue_msg[kMaxIssueMsgLen];
+    sprintf(issue_msg,
+            "eRPC Rpc %u: Received out-of-order request packet. "
+            "Req/pkt numbers: %zu/%zu (packet), %zu/%zu (sslot). Action:",
+            rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
+            sslot->server_info.req_rcvd);
+
+    if (pkthdr->req_num < sslot->cur_req_num) {
+      // This is a massively-delayed retransmission of an old request
+      erpc_dprintf("%s: Dropping.\n", issue_msg);
+      return;
+    } else if (pkthdr->req_num == sslot->cur_req_num) {
+      // This is an out-of-order packet for the currently active request
+      if (pkthdr->pkt_num > sslot->server_info.req_rcvd) {
+        // Drop future request packets
+        erpc_dprintf("%s: Dropping.\n", issue_msg);
+        return;
+      }
+
+      // If we're here, we've received this packet before
+      assert(sslot->rx_msgbuf.is_dynamic_and_matches(pkthdr));
+
+      if (pkthdr->pkt_num != sslot->rx_msgbuf.num_pkts - 1) {
+        // This is not the last packet so we just send a credit return
+        erpc_dprintf("%s: Re-sending credit return.\n", issue_msg);
+        send_credit_return_now_st(sslot->session, pkthdr);
+        return;
+      }
+
+      // If we're here, this is the last request packet, so try to resend resp
+      if (sslot->tx_msgbuf != nullptr) {
+        // The response is available, so resend it
+        assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
+
+        erpc_dprintf("%s: Re-sending response.\n", issue_msg);
+        enqueue_pkt_tx_burst_st(sslot, 0, sslot->tx_msgbuf->data_size);
+        return;
+      } else {
+        // The response is not available yet, client will have to timeout again
+        erpc_dprintf("%s: Dropping because response not available yet.\n",
+                     issue_msg);
+        return;
+      }
+    } else {
+      // This is an out-of-order packet of the next request
+      erpc_dprintf("%s: Dropping.\n", issue_msg);
+      return;
+    }
+  }
 
   // Allocate or locate the RX MsgBuffer for this message
   MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
@@ -414,6 +473,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
     for (size_t i = 0; i < now_sending; i++) {
       // This doesn't use pkthdr->pkt_num: it uses sslot's rfr_sent
       send_req_for_resp_now_st(sslot, pkthdr);
+      rfr_sent++;
       assert(rfr_sent <= rx_msgbuf.num_pkts - 1);
     }
 

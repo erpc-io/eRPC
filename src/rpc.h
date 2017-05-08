@@ -722,24 +722,26 @@ class Rpc {
   // rpc_send_cr.cc
 
   /**
-   * @brief Send a credit return immediately (i.e., no burst queueing)
+   * @brief Send a credit return immediately (i.e., no TX burst queueing)
    *
    * @param session The session to send the credit return on
    * @param req_pkthdr The packet header of the request packet that triggered
    * this credit return
    */
-  void send_credit_return_now_st(Session *session, const pkthdr_t *req_pkthdr);
+  void send_credit_return_now_st(const Session *session,
+                                 const pkthdr_t *req_pkthdr);
 
   // rpc_send_rfr.cc
 
   /**
-   * @brief Send a request-for-response immediately (i.e. no burst queueing)
+   * @brief Send a request-for-response immediately (i.e. no TX burst queueing)
    *
    * @param sslot The session slot to send the request-for-response for
    * @param req_pkthdr The packet header of the response packet that triggered
    * this request-for-response
    */
-  void send_req_for_resp_now_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
+  void send_req_for_resp_now_st(const SSlot *sslot,
+                                const pkthdr_t *resp_pkthdr);
 
  private:
   // Constructor args

@@ -3,7 +3,7 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::send_credit_return_now_st(Session *session,
+void Rpc<TTr>::send_credit_return_now_st(const Session *session,
                                          const pkthdr_t *req_pkthdr) {
   assert(in_creator());
   assert(session != nullptr && session->is_server());
