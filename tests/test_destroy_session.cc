@@ -91,10 +91,7 @@ void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
   auto *rpc = context.rpc;
 
   // The number of sessions we can create before running out of RECVs
-  size_t num_sessions =
-      (Transport::kRecvQueueDepth - Rpc<IBTransport>::kFlushCredits) /
-      Session::kSessionCredits;
-
+  size_t num_sessions = Transport::kRecvQueueDepth / Session::kSessionCredits;
   context.session_num_arr = new int[num_sessions];
 
   for (size_t iter = 0; iter < 3; iter++) {

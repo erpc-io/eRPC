@@ -40,12 +40,6 @@ void Rpc<TTr>::handle_sm_st() {
       case SmPktType::kDisconnectResp:
         handle_disconnect_resp_st(sm_pkt);
         break;
-      case SmPktType::kFlushMgmtReq:
-        handle_flush_mgmt_req_st(&wi);
-        break;
-      case SmPktType::kFlushMgmtResp:
-        handle_flush_mgmt_resp_st(sm_pkt);
-        break;
       case SmPktType::kFaultResetPeerReq:
         // This is handled in the Nexus
         throw std::runtime_error("Invalid packet type");

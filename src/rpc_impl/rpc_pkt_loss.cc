@@ -34,17 +34,6 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
                 "req num %zu. Issue",
                 rpc_id, session->local_session_num,
                 sslot.tx_msgbuf->get_req_num());
-
-        if (flush_credits_available == 0) {
-          erpc_dprintf("%s: No flush credits available. Deferring.\n",
-                       issue_msg);
-          return;  // There's no use processing other sslots/sessions right now
-        }
-
-        // If we're here, we have a local flush credit. Try to get a remote one.
-        flush_credits_available--;
-        enqueue_sm_req_st(session, SmPktType::kFlushMgmtReq,
-                          static_cast<size_t>(FlushMgmtReqType::kAcquire));
       }
     }
   }
