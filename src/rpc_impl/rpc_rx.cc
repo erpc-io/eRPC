@@ -315,7 +315,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   bool is_next_pkt_same_req =  // Is this the next packet in this request?
       (pkthdr->req_num == sslot->cur_req_num) &&
       (pkthdr->pkt_num == sslot->server_info.req_rcvd);
-  bool is_first_pkt_next_req = // Is this the first packet in the next request?
+  bool is_first_pkt_next_req =  // Is this the first packet in the next request?
       (pkthdr->req_num == sslot->cur_req_num + Session::kSessionReqWindow) &&
       (pkthdr->pkt_num == 0);
 
@@ -328,47 +328,37 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
             rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
             sslot->server_info.req_rcvd);
 
-    if (pkthdr->req_num < sslot->cur_req_num) {
-      // This is a massively-delayed retransmission of an old request
-      erpc_dprintf("%s: Dropping.\n", issue_msg);
-      return;
-    } else if (pkthdr->req_num == sslot->cur_req_num) {
-      // This is an out-of-order packet for the currently active request
-      if (pkthdr->pkt_num > sslot->server_info.req_rcvd) {
-        // Drop future request packets
-        erpc_dprintf("%s: Dropping.\n", issue_msg);
-        return;
-      }
-
-      // If we're here, we've received this packet before
-      assert(sslot->rx_msgbuf.is_dynamic_and_matches(pkthdr));
-
-      if (pkthdr->pkt_num != sslot->rx_msgbuf.num_pkts - 1) {
-        // This is not the last packet so we just send a credit return
-        erpc_dprintf("%s: Re-sending credit return.\n", issue_msg);
-        send_credit_return_now_st(sslot->session, pkthdr);
-        return;
-      }
-
-      // If we're here, this is the last request packet, so try to resend resp
-      if (sslot->tx_msgbuf != nullptr) {
-        // The response is available, so resend it
-        assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
-
-        erpc_dprintf("%s: Re-sending response.\n", issue_msg);
-        enqueue_pkt_tx_burst_st(sslot, 0, sslot->tx_msgbuf->data_size);
-        return;
-      } else {
-        // The response is not available yet, client will have to timeout again
-        erpc_dprintf("%s: Dropping because response not available yet.\n",
-                     issue_msg);
-        return;
-      }
-    } else {
-      // This is an out-of-order packet of the next request
+    // Reordered packets that belong to the previous or next request, or packets
+    // in the future for this request, are dropped
+    if ((pkthdr->req_num != sslot->cur_req_num) ||
+        (pkthdr->pkt_num > sslot->server_info.req_rcvd)) {
       erpc_dprintf("%s: Dropping.\n", issue_msg);
       return;
     }
+
+    // If we're here, this is a past packet for the currently active request
+    assert(sslot->rx_msgbuf.is_dynamic_and_matches(pkthdr));
+
+    if (pkthdr->pkt_num != sslot->rx_msgbuf.num_pkts - 1) {
+      // This is not the last packet in the request => send a credit return
+      erpc_dprintf("%s: Re-sending credit return.\n", issue_msg);
+      send_credit_return_now_st(sslot->session, pkthdr);
+      return;
+    }
+
+    // If we're here, this is the last request packet, so try to resend response
+    if (sslot->tx_msgbuf != nullptr) {
+      // The response is available, so resend it
+      assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
+
+      erpc_dprintf("%s: Re-sending response.\n", issue_msg);
+      enqueue_pkt_tx_burst_st(sslot, 0, sslot->tx_msgbuf->data_size);
+    } else {
+      // The response is not available yet, client will have to timeout again
+      erpc_dprintf("%s: Dropping because response not available yet.\n",
+                   issue_msg);
+    }
+    return;
   }
 
   // Allocate or locate the RX MsgBuffer for this message
