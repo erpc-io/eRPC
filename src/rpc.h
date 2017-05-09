@@ -414,7 +414,7 @@ class Rpc {
  private:
   /// Enqueue a packet starting at \p offset in \p sslot's \p tx_msgbuf,
   /// possibly deferring transmission. This handles fault injection for dropping
-  /// packets.
+  /// data packets.
   inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t offset,
                                       size_t data_bytes) {
     assert(in_creator());
@@ -442,19 +442,19 @@ class Rpc {
       assert(!item.drop);
     }
 
-    tx_batch_i++;
-
     dpath_dprintf(
         "eRPC Rpc %u: Sending packet %s.\n", rpc_id,
         tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
 
+    tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) {
       transport->tx_burst(tx_burst_arr, TTr::kPostlist);
       tx_batch_i = 0;
     }
   }
 
-  /// Transmit a header-only packet right now
+  /// Transmit a header-only packet right now. This handles fault injection for
+  /// dropping control packets.
   inline void tx_burst_now_st(Transport::RoutingInfo *routing_info,
                               MsgBuffer *tx_msgbuf) {
     assert(in_creator());
@@ -468,12 +468,22 @@ class Rpc {
     item.offset = 0;
     item.data_bytes = 0;
 
-    // This is a fake MsgBuffer, so no need to update queueing progress
-    tx_batch_i++;
+    if (kFaultInjection) {
+      // Fault injection is enabled, so we need to set item.drop
+      item.drop = ((fast_rand.next_u32() % 100) < faults.pkt_drop_prob * 100);
+
+      if (item.drop) {
+        erpc_dprintf("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
+                     tx_msgbuf->get_pkthdr_str(0).c_str());
+      }
+    } else {
+      assert(!item.drop);
+    }
 
     dpath_dprintf("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
                   tx_msgbuf->get_pkthdr_str().c_str());
 
+    tx_batch_i++;
     transport->tx_burst(tx_burst_arr, tx_batch_i);
     tx_batch_i = 0;
   }
