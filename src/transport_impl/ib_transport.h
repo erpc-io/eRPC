@@ -67,32 +67,13 @@ class IBTransport : public Transport {
     return std::string(ret.str());
   }
 
-  /*
-  XXX: These functions might be useful when we implemented small-first-pkt.
   static size_t data_size_to_num_pkts(size_t data_size) {
-    if (small_rpc_likely(data_size < kMaxDataPerPkt)) {
+    if (small_rpc_likely(data_size <= kMaxDataPerPkt)) {
       return 1;
     } else {
-      return (data_size + kMaxDataPerPkt - 1)  / kMaxDataPerPkt;
+      return (data_size + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
     }
   }
-
-  static size_t data_offset_to_pkt_num(size_t data_offset) {
-    if (small_rpc_likely(data_offset < kMaxDataPerPkt)) {
-      return 0;
-    } else {
-      return 1 + ((data_offset - kMaxDataPerPkt) / kMaxDataPerPkt);
-    }
-  }
-
-  static size_t pkt_num_to_data_offset(size_t pkt_num) {
-    if (small_rpc_likely(pkt_num == 0)) {
-      return 0;
-    } else {
-      return pkt_num * kMaxDataPerPkt;
-    }
-  }
-  */
 
   // ib_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);

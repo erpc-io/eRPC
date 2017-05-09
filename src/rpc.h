@@ -83,15 +83,8 @@ class Rpc {
    * if allocation fails simply because we ran out of memory.
    */
   inline MsgBuffer alloc_msg_buffer(size_t max_data_size) {
-    size_t max_num_pkts;
-
-    // Avoid division for small packets
-    if (small_rpc_likely(max_data_size <= TTr::kMaxDataPerPkt)) {
-      max_num_pkts = 1;
-    } else {
-      max_num_pkts =
-          (max_data_size + (TTr::kMaxDataPerPkt - 1)) / TTr::kMaxDataPerPkt;
-    }
+    // This function avoids division for small data sizes
+    size_t max_num_pkts = TTr::data_size_to_num_pkts(max_data_size);
 
     lock_cond(&huge_alloc_lock);
     Buffer buffer =
@@ -116,16 +109,8 @@ class Rpc {
     assert(msg_buffer->buf != nullptr && msg_buffer->check_magic());
     assert(new_data_size <= msg_buffer->max_data_size);
 
-    size_t new_num_pkts;
-
-    // Avoid division for small packets
-    if (small_rpc_likely(new_data_size <= TTr::kMaxDataPerPkt)) {
-      new_num_pkts = 1;
-    } else {
-      new_num_pkts =
-          (new_data_size + (TTr::kMaxDataPerPkt - 1)) / TTr::kMaxDataPerPkt;
-    }
-
+    // This function avoids division for small data sizes
+    size_t new_num_pkts = TTr::data_size_to_num_pkts(new_data_size);
     msg_buffer->resize(new_data_size, new_num_pkts);
   }
 

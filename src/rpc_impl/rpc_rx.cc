@@ -327,25 +327,28 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
             rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
             sslot->server_info.req_rcvd);
 
-    // Reordered packets that belong to the previous or next request, or packets
-    // in the future for this request, are dropped
+    // Only past packets belonging to this request are not dropped
     if ((pkthdr->req_num != sslot->cur_req_num) ||
         (pkthdr->pkt_num > sslot->server_info.req_rcvd)) {
       erpc_dprintf("%s: Dropping.\n", issue_msg);
       return;
     }
 
-    // If we're here, this is a past packet for the currently active request
-    assert(sslot->rx_msgbuf.is_dynamic_and_matches(pkthdr));
+    // rx_msgbuf could be buried if we've received the entire request and
+    // processed it, so directly compute the number of packets in the request
+    size_t num_pkts_in_req = TTr::data_size_to_num_pkts(pkthdr->msg_size);
+    if (sslot->server_info.req_rcvd != num_pkts_in_req) {
+      assert(sslot->rx_msgbuf.is_dynamic_and_matches(pkthdr));
+    }
 
-    if (pkthdr->pkt_num != sslot->rx_msgbuf.num_pkts - 1) {
+    if (pkthdr->pkt_num != num_pkts_in_req - 1) {
       // This is not the last packet in the request => send a credit return
       erpc_dprintf("%s: Re-sending credit return.\n", issue_msg);
       send_credit_return_now_st(sslot->session, pkthdr);
       return;
     }
 
-    // If we're here, this is the last request packet, so try to resend response
+    // This is the last request packet, so re-send response if it's available
     if (sslot->tx_msgbuf != nullptr) {
       // The response is available, so resend it
       assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
