@@ -22,7 +22,7 @@ class AppContext : public BasicAppContext {
 };
 
 /// Don't use very large messages, which can cause the test to time out
-static constexpr size_t kMaxPacketsInMsg = 100;
+static constexpr size_t kMaxPacketsInMsg = 20;
 
 /// Configuration for controlling the test
 size_t config_num_iters;         ///< The number of iterations
@@ -176,6 +176,33 @@ TEST(OneLargeRpc, Foreground) {
   config_num_sessions = 1;
   config_rpcs_per_session = 1;
   config_num_bg_threads = 0;
+  config_pkt_drop_prob = 0.5;
+  launch_helper();
+}
+
+TEST(OneLargeRpc, Background) {
+  config_num_iters = 1;
+  config_num_sessions = 1;
+  config_rpcs_per_session = 1;
+  config_num_bg_threads = 1;
+  config_pkt_drop_prob = 0.5;
+  launch_helper();
+}
+
+TEST(MultiLargeRpcOneSession, Foreground) {
+  config_num_iters = 1;
+  config_num_sessions = 1;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_num_bg_threads = 0;
+  config_pkt_drop_prob = 0.5;
+  launch_helper();
+}
+
+TEST(MultiLargeRpcOneSession, Background) {
+  config_num_iters = 1;
+  config_num_sessions = 1;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_num_bg_threads = 1;
   config_pkt_drop_prob = 0.5;
   launch_helper();
 }
