@@ -295,7 +295,7 @@ TEST(Base, BothInForeground) {
 
   // 2 client sessions (=> 2 server threads), 0 background threads
   launch_server_client_threads(2, 0, client_thread, reg_info_vec,
-                               ConnectServers::kTrue);
+                               ConnectServers::kTrue, 0.0);
 }
 
 /// 1 primary, 1 backup, primary in background
@@ -309,7 +309,7 @@ TEST(Base, PrimaryInBackground) {
 
   // 2 client sessions (=> 2 server threads), 3 background threads
   launch_server_client_threads(2, 1, client_thread, reg_info_vec,
-                               ConnectServers::kTrue);
+                               ConnectServers::kTrue, 0.0);
 }
 
 /// 1 primary, 1 backup, both in background
@@ -323,7 +323,7 @@ TEST(Base, BothInBackground) {
 
   // 2 client sessions (=> 2 server threads), 3 background threads
   launch_server_client_threads(2, 3, client_thread, reg_info_vec,
-                               ConnectServers::kTrue);
+                               ConnectServers::kTrue, 0.0);
 }
 
 int main(int argc, char **argv) {

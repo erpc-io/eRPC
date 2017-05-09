@@ -114,19 +114,23 @@ void basic_empty_req_handler(ReqHandle *, void *) {
  *
  * @param nexus The process's Nexus
  * @param rpc_id The ID for the Rpc created by this server thread
- * @param num_srv_threads The number of server Rpc (foreground) threads
- * @param connect_servers True if the server threads should be connected
  * @param sm_handler The SM handler for this server thread
+ * @param num_srv_threads The number of server Rpc (foreground) threads
+ * @param connect_servers True iff the server threads should be connected
  */
 void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
-                              size_t num_srv_threads,
+                              sm_handler_t sm_handler, size_t num_srv_threads,
                               ConnectServers connect_servers,
-                              sm_handler_t sm_handler) {
+                              double pkt_loss_prob) {
   BasicAppContext context;
   context.is_client = false;
 
   Rpc<IBTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
                        kAppPhyPort, kAppNumaNode);
+  if (kFaultInjection) {
+    rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
+  }
+
   context.rpc = &rpc;
   num_servers_ready++;
 
@@ -212,12 +216,13 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
  *
  * @param req_func_vec The request handlers to register
  * @param connect_servers True if the created server threads should be connected
+ * @param srv_pkt_drop_prob The packet drop probability of the server Rpcs
  */
 void launch_server_client_threads(
     size_t num_sessions, size_t num_bg_threads,
     void (*client_thread_func)(Nexus<IBTransport> *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
-    ConnectServers connect_servers) {
+    ConnectServers connect_servers, double srv_pkt_drop_prob) {
   Nexus<IBTransport> nexus(kAppNexusUdpPort, num_bg_threads);
 
   // Register the request handler functions
@@ -241,9 +246,9 @@ void launch_server_client_threads(
                                    ? basic_empty_sm_handler
                                    : basic_sm_handler;
 
-    server_thread[i] =
-        std::thread(basic_server_thread_func, &nexus, kAppServerRpcId + i,
-                    num_sessions, connect_servers, _sm_handler);
+    server_thread[i] = std::thread(
+        basic_server_thread_func, &nexus, kAppServerRpcId + i, _sm_handler,
+        num_sessions, connect_servers, srv_pkt_drop_prob);
   }
 
   // Wait for all servers to be ready before launching client thread

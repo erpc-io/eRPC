@@ -165,7 +165,7 @@ void launch_helper() {
       config_num_bg_threads == 0 ? reg_info_vec_fg : reg_info_vec_bg;
   launch_server_client_threads(config_num_sessions, config_num_bg_threads,
                                generic_test_func, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, config_pkt_drop_prob);
 }
 
 TEST(OneLargeRpc, Foreground) {

@@ -144,7 +144,7 @@ TEST(SendReqInContFunc, Foreground) {
   auto reg_info_vec = {
       ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kFgTerminal)};
   launch_server_client_threads(1, 0, client_thread, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 int main(int argc, char **argv) {

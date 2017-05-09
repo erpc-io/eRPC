@@ -75,7 +75,7 @@ void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(Base, SimpleDisconnect) {
   launch_server_client_threads(1, 0, simple_disconnect, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 ///
@@ -131,7 +131,7 @@ void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(Base, DisconnectMulti) {
   launch_server_client_threads(1, 0, disconnect_multi, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 ///
@@ -163,7 +163,7 @@ void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(Base, DisconnectRemoteError) {
   launch_server_client_threads(1, 0, disconnect_remote_error, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 ///
@@ -202,7 +202,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(Base, DisconnectLocalError) {
   launch_server_client_threads(1, 0, disconnect_local_error, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 int main(int argc, char **argv) {

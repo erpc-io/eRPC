@@ -122,7 +122,7 @@ void test_func(Nexus<IBTransport> *nexus, size_t num_sessions) {
 /// hugepages.
 void TEST_HELPER() {
   launch_server_client_threads(1, 1, test_func, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 TEST(Restrictions, ReqHandlerRunsEventLoop) {

@@ -54,7 +54,7 @@ TEST(Base, SimpleConnect) {
                                       ReqFuncType::kFgTerminal)};
 
   launch_server_client_threads(1, 0, simple_connect, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 //
@@ -87,7 +87,7 @@ TEST(Base, InvalidRemotePort) {
                                       ReqFuncType::kFgTerminal)};
 
   launch_server_client_threads(1, 0, invalid_remote_port, reg_info_vec,
-                               ConnectServers::kFalse);
+                               ConnectServers::kFalse, 0.0);
 }
 
 int main(int argc, char **argv) {
