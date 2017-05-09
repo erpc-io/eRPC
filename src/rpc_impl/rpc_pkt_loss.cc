@@ -63,6 +63,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       erpc_dprintf("%s: Retransmitting request.\n", issue_msg);
       credits += delta;  // Reclaim credits
       ci.req_sent = ci.expl_cr_rcvd;
+
+      // Credits will be consumed when req_txq is processed
       if (std::find(req_txq.begin(), req_txq.end(), sslot) == req_txq.end()) {
         req_txq.push_back(sslot);
       }

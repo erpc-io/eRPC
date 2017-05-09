@@ -436,9 +436,9 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
                   (pkthdr->pkt_num == sslot->client_info.resp_rcvd);
 
-  // Check if the response has been reordered before a credit return. Since
-  // the response packet is in order, we still have the request MsgBuffer.
   if (in_order) {
+    // Check if the response has been reordered before a credit return. Since
+    // the response packet is in order, we still have the request MsgBuffer.
     assert(sslot->tx_msgbuf != nullptr &&
            sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
     in_order &=
