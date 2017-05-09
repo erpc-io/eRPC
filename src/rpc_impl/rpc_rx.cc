@@ -111,7 +111,8 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
         assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
 
         erpc_dprintf("%s: Re-sending response.\n", issue_msg);
-        enqueue_pkt_tx_burst_st(sslot, 0, sslot->tx_msgbuf->data_size);
+        enqueue_pkt_tx_burst_st(sslot, 0, std::min(sslot->tx_msgbuf->data_size,
+                                                   TTr::kMaxDataPerPkt));
         return;
       } else {
         // The response is not available yet, client will have to timeout again
@@ -266,7 +267,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // The expected packet number is (rfr_rcvd + 1). Reject future packets.
     if (unlikely(pkthdr->pkt_num > sslot->server_info.rfr_rcvd + 1)) {
       erpc_dprintf(
-          "eRPC Rpc %u: Received out-of-order credit return packet. "
+          "eRPC Rpc %u: Received out-of-order request-for-response packet. "
           "Packet numbers: %zu (packet), %zu (expected). Dropping.\n",
           rpc_id, pkthdr->pkt_num, sslot->server_info.rfr_rcvd + 1);
       return;
@@ -275,7 +276,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // Re-send RFR response for older packets
     if (unlikely(pkthdr->pkt_num < sslot->server_info.rfr_rcvd + 1)) {
       erpc_dprintf(
-          "eRPC Rpc %u: Received out-of-order credit return packet. "
+          "eRPC Rpc %u: Received out-of-order request for response packet. "
           "Packet numbers: %zu (packet), %zu (expected). "
           "Re-sending response packet.\n",
           rpc_id, pkthdr->pkt_num, sslot->server_info.rfr_rcvd + 1);
@@ -354,7 +355,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
       assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
 
       erpc_dprintf("%s: Re-sending response.\n", issue_msg);
-      enqueue_pkt_tx_burst_st(sslot, 0, sslot->tx_msgbuf->data_size);
+      enqueue_pkt_tx_burst_st(
+          sslot, 0, std::min(sslot->tx_msgbuf->data_size, TTr::kMaxDataPerPkt));
     } else {
       // The response is not available yet, client will have to timeout again
       erpc_dprintf("%s: Dropping because response not available yet.\n",

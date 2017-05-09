@@ -86,6 +86,9 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       erpc_dprintf("%s: Retransmitting RFR.\n", issue_msg);
       credits += delta;  // Reclaim credits
       ci.rfr_sent = ci.resp_rcvd - 1;
+
+      assert(credits > 0);
+      credits--;  // Use one credit for this RFR
       send_req_for_resp_now_st(sslot, sslot->rx_msgbuf.get_pkthdr_0());
     }
   }

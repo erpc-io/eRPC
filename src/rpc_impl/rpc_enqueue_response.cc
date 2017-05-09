@@ -68,9 +68,9 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   sslot->tx_msgbuf = resp_msgbuf;  // Valid response
   if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
 
-  // Enqueue the first response packet
-  size_t data_bytes = std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt);
-  enqueue_pkt_tx_burst_st(sslot, 0, data_bytes);
+  // Enqueue the zeroth response packet
+  enqueue_pkt_tx_burst_st(
+      sslot, 0, std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt));
 }
 
 }  // End ERpc
