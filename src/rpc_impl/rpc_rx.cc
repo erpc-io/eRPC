@@ -485,7 +485,6 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
     assert(now_sending > 0);
 
     for (size_t i = 0; i < now_sending; i++) {
-      // This doesn't use pkthdr->pkt_num: it uses sslot's rfr_sent
       send_req_for_resp_now_st(sslot, pkthdr);
       rfr_sent++;
       assert(rfr_sent <= rx_msgbuf.num_pkts - 1);

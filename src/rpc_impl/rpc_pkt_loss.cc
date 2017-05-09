@@ -42,11 +42,11 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
-          "eRPC Rpc %u: Packet loss suspected for session %u, req %zu "
-          "(req_sent %zu, expl_cr_rcvd %zu, resp_rcvd %zu). Action",
+          "eRPC Rpc %u: Packet loss suspected for session %u, req %zu. "
+          "req_sent %zu, expl_cr_rcvd %zu, rfr_sent %zu, resp_rcvd %zu. Action",
           rpc_id, sslot->session->local_session_num,
           sslot->tx_msgbuf->get_req_num(), ci.req_sent, ci.expl_cr_rcvd,
-          ci.resp_rcvd);
+          ci.rfr_sent, ci.resp_rcvd);
 
   if (sslot->rx_msgbuf.is_buried()) {
     // We haven't received the first response packet
@@ -92,6 +92,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       assert(credits > 0);
       credits--;  // Use one credit for this RFR
       send_req_for_resp_now_st(sslot, sslot->rx_msgbuf.get_pkthdr_0());
+      sslot->client_info.rfr_sent++;
     }
   }
 }

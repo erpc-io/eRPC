@@ -21,6 +21,9 @@ class AppContext : public BasicAppContext {
   FastRand fastrand;  ///< Used for picking large message sizes
 };
 
+/// Don't use very large messages, which can cause the test to time out
+static constexpr size_t kMaxPacketsInMsg = 100;
+
 /// Configuration for controlling the test
 size_t config_num_iters;         ///< The number of iterations
 size_t config_num_sessions;      ///< Number of sessions created by client
@@ -121,7 +124,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
 
         size_t req_size =
             get_rand_msg_size(&context.fastrand, rpc->get_max_data_per_pkt(),
-                              rpc->get_max_msg_size());
+                              rpc->get_max_data_per_pkt() * kMaxPacketsInMsg);
 
         rpc->resize_msg_buffer(&cur_req_msgbuf, req_size);
         for (size_t i = 0; i < req_size; i++) {

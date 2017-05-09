@@ -43,7 +43,7 @@ class Rpc {
   static constexpr size_t kPktLossEpochMs = 50;
 
   /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kPktLossTimeoutMs = 2000;
+  static constexpr size_t kPktLossTimeoutMs = 500;
 
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
