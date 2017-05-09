@@ -31,7 +31,9 @@ void Rpc<TTr>::run_event_loop_one_st() {
   // Check for packet loss if we're in a new epoch
   size_t cur_ts = rdtsc();
   if (cur_ts - prev_epoch_ts >= pkt_loss_epoch_cycles) {
-    pkt_loss_scan_reqs_st();
+    if (!(kFaultInjection && faults.disable_pkt_loss_handling)) {
+      pkt_loss_scan_reqs_st();
+    }
     prev_epoch_ts = cur_ts;
   }
 

@@ -19,9 +19,9 @@ void Rpc<TTr>::fault_inject_check_ok() const {
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_resolve_server_rinfo_st() {
+void Rpc<TTr>::fault_inject_fail_resolve_server_rinfo_st() {
   fault_inject_check_ok();
-  faults.resolve_server_rinfo = true;
+  faults.fail_resolve_server_rinfo = true;
 }
 
 template <class TTr>
@@ -29,6 +29,12 @@ void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob) {
   fault_inject_check_ok();
   assert(pkt_drop_prob >= 0.0 && pkt_drop_prob < .95);
   faults.pkt_drop_prob = pkt_drop_prob;
+}
+
+template <class TTr>
+void Rpc<TTr>::fault_inject_disable_pkt_loss_handling() {
+  fault_inject_check_ok();
+  faults.disable_pkt_loss_handling = true;
 }
 
 template <class TTr>

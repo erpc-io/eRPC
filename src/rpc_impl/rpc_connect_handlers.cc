@@ -166,7 +166,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
                TTr::routing_info_str(srv_routing_info).c_str());
 
   bool resolve_success;
-  if (kFaultInjection && faults.resolve_server_rinfo) {
+  if (kFaultInjection && faults.fail_resolve_server_rinfo) {
     resolve_success = false;  // Inject fault
   } else {
     resolve_success = transport->resolve_remote_routing_info(srv_routing_info);

@@ -612,7 +612,7 @@ class Rpc {
    *
    * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_resolve_server_rinfo_st();
+  void fault_inject_fail_resolve_server_rinfo_st();
 
   /**
    * @brief Inject a fault that forcefully resets the remote ENet peer for
@@ -631,6 +631,9 @@ class Rpc {
    * @throw runtime_error if the caller cannot inject faults
    */
   void fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob);
+
+  /// Disable packet loss handling by this Rpc
+  void fault_inject_disable_pkt_loss_handling();
 
  private:
   /**
@@ -792,8 +795,9 @@ class Rpc {
   struct {
     /// Fail server routing info resolution at client. This is used to test the
     /// case where a client fails to resolve routing info sent by the server.
-    bool resolve_server_rinfo = false;
+    bool fail_resolve_server_rinfo = false;
 
+    bool disable_pkt_loss_handling = false;  ///< Disable packet loss handling
     double pkt_drop_prob = 0.0;  ///< Probability of dropping a packet
   } faults;
 
