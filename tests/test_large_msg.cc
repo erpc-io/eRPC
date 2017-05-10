@@ -17,7 +17,7 @@ class AppContext : public BasicAppContext {
 };
 
 /// Configuration for controlling the test
-size_t config_num_iters = 0;     ///< The number of iterations
+size_t config_num_iters;         ///< The number of iterations
 size_t config_num_sessions;      ///< Number of sessions created by client
 size_t config_rpcs_per_session;  ///< Number of Rpcs per session per iteration
 size_t config_num_bg_threads;    ///< Number of background threads

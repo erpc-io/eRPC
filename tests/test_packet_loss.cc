@@ -23,13 +23,13 @@ class AppContext : public BasicAppContext {
 
 /// Don't use very large messages, which can cause the test to time out
 static constexpr size_t kMaxPacketsInMsg = 20;
+static constexpr double kPktDropProb = 0.5;
 
 /// Configuration for controlling the test
 size_t config_num_iters;         ///< The number of iterations
 size_t config_num_sessions;      ///< Number of sessions created by client
 size_t config_rpcs_per_session;  ///< Number of Rpcs per session per iteration
 size_t config_num_bg_threads;    ///< Number of background threads
-double config_pkt_drop_prob;     ///< The packet drop probability
 
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
@@ -98,7 +98,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
                           basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
-  rpc->fault_inject_set_pkt_drop_prob_st(config_pkt_drop_prob);
+  rpc->fault_inject_set_pkt_drop_prob_st(kPktDropProb);
 
   int *session_num_arr = context.session_num_arr;
 
@@ -142,14 +142,12 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
       }
     }
 
-    size_t initial_resps = context.num_rpc_resps;
-    while (true) {
+    // The default timeout for tests is 20 seconds. This test takes more time
+    // because of packet drops.
+    for (size_t i = 0; i < 5; i++) {
       wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter,
                                     nexus->freq_ghz);
-      // Stop running the event loop when we either receive all responses, or
-      // we don't receive any response in a run.
-      if (context.num_rpc_resps == tot_reqs_per_iter ||
-          initial_resps == context.num_rpc_resps) {
+      if (context.num_rpc_resps == tot_reqs_per_iter) {
         break;
       }
     }
@@ -178,7 +176,7 @@ void launch_helper() {
       config_num_bg_threads == 0 ? reg_info_vec_fg : reg_info_vec_bg;
   launch_server_client_threads(config_num_sessions, config_num_bg_threads,
                                generic_test_func, reg_info_vec,
-                               ConnectServers::kFalse, config_pkt_drop_prob);
+                               ConnectServers::kFalse, kPktDropProb);
 }
 
 TEST(OneLargeRpc, Foreground) {
@@ -186,7 +184,6 @@ TEST(OneLargeRpc, Foreground) {
   config_num_sessions = 1;
   config_rpcs_per_session = 1;
   config_num_bg_threads = 0;
-  config_pkt_drop_prob = 0.5;
   launch_helper();
 }
 
@@ -195,7 +192,6 @@ TEST(OneLargeRpc, Background) {
   config_num_sessions = 1;
   config_rpcs_per_session = 1;
   config_num_bg_threads = 1;
-  config_pkt_drop_prob = 0.5;
   launch_helper();
 }
 
@@ -204,7 +200,6 @@ TEST(MultiLargeRpcOneSession, Foreground) {
   config_num_sessions = 1;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 0;
-  config_pkt_drop_prob = 0.5;
   launch_helper();
 }
 
@@ -213,7 +208,6 @@ TEST(MultiLargeRpcOneSession, Background) {
   config_num_sessions = 1;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 1;
-  config_pkt_drop_prob = 0.5;
   launch_helper();
 }
 
@@ -222,7 +216,6 @@ TEST(MultiLargeRpcMultiSession, Foreground) {
   config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 0;
-  config_pkt_drop_prob = 0.5;
   launch_helper();
 }
 
@@ -231,7 +224,6 @@ TEST(MultiLargeRpcMultiSession, Background) {
   config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 1;
-  config_pkt_drop_prob = 0.5;
   launch_helper();
 }
 
