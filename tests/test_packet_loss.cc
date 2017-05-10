@@ -142,7 +142,17 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
       }
     }
 
-    wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter, nexus->freq_ghz);
+    size_t initial_resps = context.num_rpc_resps;
+    while (true) {
+      wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter,
+                                    nexus->freq_ghz);
+      // Stop running the event loop when we either receive all responses, or
+      // we don't receive any response in a run.
+      if (context.num_rpc_resps == tot_reqs_per_iter ||
+          initial_resps == context.num_rpc_resps) {
+        break;
+      }
+    }
     assert(context.num_rpc_resps == tot_reqs_per_iter);
   }
 
@@ -190,7 +200,7 @@ TEST(OneLargeRpc, Background) {
 }
 
 TEST(MultiLargeRpcOneSession, Foreground) {
-  config_num_iters = 1;
+  config_num_iters = 2;
   config_num_sessions = 1;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 0;
@@ -199,8 +209,26 @@ TEST(MultiLargeRpcOneSession, Foreground) {
 }
 
 TEST(MultiLargeRpcOneSession, Background) {
-  config_num_iters = 1;
+  config_num_iters = 2;
   config_num_sessions = 1;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_num_bg_threads = 1;
+  config_pkt_drop_prob = 0.5;
+  launch_helper();
+}
+
+TEST(MultiLargeRpcMultiSession, Foreground) {
+  config_num_iters = 2;
+  config_num_sessions = 4;
+  config_rpcs_per_session = Session::kSessionReqWindow;
+  config_num_bg_threads = 0;
+  config_pkt_drop_prob = 0.5;
+  launch_helper();
+}
+
+TEST(MultiLargeRpcMultiSession, Background) {
+  config_num_iters = 2;
+  config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
   config_num_bg_threads = 1;
   config_pkt_drop_prob = 0.5;
