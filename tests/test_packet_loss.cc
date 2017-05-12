@@ -1,6 +1,6 @@
 /**
- * @file test_server_failure.cc
- * @brief Test server failures. Most of the code here is derived from
+ * @file test_packet_loss.cc
+ * @brief Test packet losses. Most of the code here is derived from
  * `test_large_msg.cc`.
  */
 #include "test_basics.h"

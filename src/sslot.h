@@ -56,21 +56,20 @@ class SSlot {
     size_t tag;                  ///< Tag of the request
 
     size_t req_sent;   ///< Number of request packets sent
+    size_t expl_cr_rcvd;  ///< Number of explicit credit returns received
+    size_t rfr_sent;      ///< Number of request-for-response packets sent
     size_t resp_rcvd;  ///< Number of response packets received
 
-    // Fields for supporting large messages
-    size_t rfr_sent;      ///< Number of request-for-response packets sent
-    size_t expl_cr_rcvd;  ///< Number of explicit credit returns received
-
-    // Fields for packet loss handling
     size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
-
-    /// The request number for which we detected that recovery is needed. If
-    /// \p cur_req_num advances beyond this, we must ignore recovery messages.
-    size_t recovery_req_num;
-
-    // Fields for supporting background threads
     size_t cont_etid;  ///< Thread ID to run the continuation on
+
+    std::string progress_str() const {
+      std::ostringstream ret;
+      ret << "[req_sent " << req_sent << ", expl_cr_rcvd " << expl_cr_rcvd
+          << ", rfr_sent " << rfr_sent << ", resp_rcvd " << resp_rcvd << "]";
+
+      return ret.str();
+    }
 
   } client_info;
 
@@ -83,9 +82,8 @@ class SSlot {
     uint8_t req_type;
     ReqFuncType req_func_type;
 
+    // Note that the server does not track any TX progress
     size_t req_rcvd;  ///< Number of request packets received
-
-    // Fields for supporting large messages
     size_t rfr_rcvd;  ///< Number of request-for-response packets received
   } server_info;
 

@@ -226,9 +226,15 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
-  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (pkthdr->pkt_num == sslot->client_info.expl_cr_rcvd);
+  bool cond_1 = (pkthdr->req_num == sslot->cur_req_num) &&
+                (pkthdr->pkt_num == sslot->client_info.expl_cr_rcvd);
 
+  // When we roll back req_sent during packet loss recovery, for instance from 8
+  // to 0, we can get credit returns for request packets 0--7 before the event
+  // loop re-sends these requst packets. These packets are out of order.
+  bool cond_2 = (pkthdr->pkt_num < sslot->client_info.req_sent);
+
+  bool in_order = cond_1 && cond_2;
   if (unlikely(!in_order)) {
     erpc_dprintf(
         "eRPC Rpc %u: Received out-of-order explicit credit return. "
@@ -256,7 +262,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
             "eRPC Rpc %u: Received out-of-order explicit credit return. "
-            "Packet = %zu/%zu. cur_req_num = %zu, rfr_rcvd = %zu. Action\n",
+            "Packet = %zu/%zu. cur_req_num = %zu, rfr_rcvd = %zu. Action",
             rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
             sslot->server_info.rfr_rcvd);
 
