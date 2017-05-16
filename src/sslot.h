@@ -55,19 +55,24 @@ class SSlot {
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
 
-    size_t req_sent;   ///< Number of request packets sent
+    size_t req_sent;      ///< Number of request packets sent
     size_t expl_cr_rcvd;  ///< Number of explicit credit returns received
     size_t rfr_sent;      ///< Number of request-for-response packets sent
-    size_t resp_rcvd;  ///< Number of response packets received
+    size_t resp_rcvd;     ///< Number of response packets received
 
     size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
-    size_t cont_etid;  ///< Thread ID to run the continuation on
+    size_t cont_etid;       ///< Thread ID to run the continuation on
 
-    std::string progress_str() const {
+    /// Return a string representation of the progress made by this sslot.
+    /// Progress fields that are zero are not included in the string.
+    std::string progress_str(size_t req_num) const {
       std::ostringstream ret;
-      ret << "[req_sent " << req_sent << ", expl_cr_rcvd " << expl_cr_rcvd
-          << ", rfr_sent " << rfr_sent << ", resp_rcvd " << resp_rcvd << "]";
-
+      ret << "[req " << req_num << ",";
+      if (req_sent != 0) ret << "[req_sent " << req_sent;
+      if (expl_cr_rcvd != 0) ret << ", expl_cr_rcvd " << expl_cr_rcvd;
+      if (rfr_sent != 0) ret << ", rfr_sent " << rfr_sent;
+      if (resp_rcvd != 0) ret << ", resp_rcvd " << resp_rcvd;
+      ret << "]";
       return ret.str();
     }
 

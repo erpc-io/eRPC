@@ -94,9 +94,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "eRPC Rpc %u: Received out-of-order request packet. "
-            "Request numbers: %zu (packet), %zu (sslot). Action",
-            rpc_id, pkthdr->req_num, sslot->cur_req_num);
+            "eRPC Rpc %u: Received out-of-order request for session %u. "
+            "Req num: %zu (pkt), %zu (sslot). Action",
+            rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+            sslot->cur_req_num);
 
     if (pkthdr->req_num < sslot->cur_req_num) {
       // This is a massively-delayed retransmission of an old request
@@ -176,11 +177,28 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
-  if (unlikely(pkthdr->req_num < sslot->cur_req_num)) {
+  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
+                  (sslot->client_info.resp_rcvd == 0);
+
+  if (likely(in_order)) {
+    // resp_rcvd == 0 means that we haven't received the response before now,
+    // so the request MsgBuffer (tx_msgbuf) is valid.
+    assert(sslot->tx_msgbuf != nullptr &&
+           sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
+
+    // When we roll back req_sent during packet loss recovery, for instance
+    // from 8 to 7 for an 8-packet request, we can get response packet 0 before
+    // the event loop re-sends the 8th request packet. This received response
+    // packet is out-of-order.
+    in_order &= (sslot->client_info.req_sent == sslot->tx_msgbuf->num_pkts);
+  }
+
+  if (unlikely(!in_order)) {
     erpc_dprintf(
-        "eRPC Rpc %u: Received out-of-order response packet. "
-        "Request numbers: %zu (packet), %zu (sslot). Dropping.\n",
-        rpc_id, pkthdr->req_num, sslot->cur_req_num);
+        "eRPC Rpc %u: Received out-of-order response for session %u. "
+        "Request num: %zu (pkt), %zu (sslot). Dropping.\n",
+        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+        sslot->cur_req_num);
     return;
   }
 
@@ -226,21 +244,20 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
-  bool cond_1 = (pkthdr->req_num == sslot->cur_req_num) &&
-                (pkthdr->pkt_num == sslot->client_info.expl_cr_rcvd);
+  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
+                  (pkthdr->pkt_num == sslot->client_info.expl_cr_rcvd);
 
   // When we roll back req_sent during packet loss recovery, for instance from 8
   // to 0, we can get credit returns for request packets 0--7 before the event
-  // loop re-sends these requst packets. These packets are out of order.
-  bool cond_2 = (pkthdr->pkt_num < sslot->client_info.req_sent);
+  // loop re-sends the request packets. These received packets are out of order.
+  in_order &= (pkthdr->pkt_num < sslot->client_info.req_sent);
 
-  bool in_order = cond_1 && cond_2;
   if (unlikely(!in_order)) {
     erpc_dprintf(
-        "eRPC Rpc %u: Received out-of-order explicit credit return. "
-        "Packet = %zu/%zu. cur_req_num = %zu, expl_cr_rcvd = %zu. Dropping.\n",
-        rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
-        sslot->client_info.expl_cr_rcvd);
+        "eRPC Rpc %u: Received out-of-order explicit CR for session %u. "
+        "Pkt = %zu/%zu. cur_req_num = %zu, expl_cr_rcvd = %zu. Dropping.\n",
+        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.expl_cr_rcvd);
     return;
   }
 
@@ -261,10 +278,10 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   if (unlikely(!in_order)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "eRPC Rpc %u: Received out-of-order explicit credit return. "
-            "Packet = %zu/%zu. cur_req_num = %zu, rfr_rcvd = %zu. Action",
-            rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
-            sslot->server_info.rfr_rcvd);
+            "eRPC Rpc %u: Received out-of-order RFR for session %u. "
+            "Pkt = %zu/%zu. cur_req_num = %zu, rfr_rcvd = %zu. Action",
+            rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+            pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.rfr_rcvd);
 
     if (pkthdr->req_num < sslot->cur_req_num) {
       // Reject RFR for old requests
@@ -323,10 +340,10 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   if (unlikely(!in_order)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "eRPC Rpc %u: Received out-of-order request packet. "
-            "Req/pkt numbers: %zu/%zu (packet), %zu/%zu (sslot). Action",
-            rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
-            sslot->server_info.req_rcvd);
+            "eRPC Rpc %u: Received out-of-order request for session %u. "
+            "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Action",
+            rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+            pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.req_rcvd);
 
     // Only past packets belonging to this request are not dropped
     if ((pkthdr->req_num != sslot->cur_req_num) ||
@@ -436,21 +453,34 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
                   (pkthdr->pkt_num == sslot->client_info.resp_rcvd);
 
-  if (in_order) {
-    // Check if the response has been reordered before a credit return. Since
-    // the response packet is in order, we still have the request MsgBuffer.
+  if (likely(in_order)) {
+    // pkt_num == resp_rcvd means that we haven't received the full response
+    // before now, so the request MsgBuffer (tx_msgbuf) is valid.
     assert(sslot->tx_msgbuf != nullptr &&
            sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
+
+    // Check if the response has been reordered before a credit return.
     in_order &=
         (sslot->client_info.expl_cr_rcvd == sslot->tx_msgbuf->num_pkts - 1);
+
+    // When we roll back req_sent during packet loss recovery, for instance
+    // from 8 to 7 for an 8-packet request, we can get response packet 0 before
+    // the event loop re-sends the 8th request packet. This received response
+    // packet is out-of-order.
+    in_order &= (sslot->client_info.req_sent == sslot->tx_msgbuf->num_pkts);
+
+    // When we roll back rfr_sent during packet loss recovery, for instance from
+    // 8 to 0, we can get response packets 1--8 before the event loop re-sends
+    // the RFR packets. These received packets are out of order.
+    in_order &= (pkthdr->pkt_num <= sslot->client_info.rfr_sent);
   }
 
   if (unlikely(!in_order)) {
     erpc_dprintf(
-        "eRPC Rpc %u: Received out-of-order response packet. "
-        "Req/pkt numbers: %zu/%zu (packet), %zu/%zu (sslot). Dropping.\n",
-        rpc_id, pkthdr->req_num, pkthdr->pkt_num, sslot->cur_req_num,
-        sslot->client_info.resp_rcvd);
+        "eRPC Rpc %u: Received out-of-order response for session %u. "
+        "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
+        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.resp_rcvd);
     return;
   }
 

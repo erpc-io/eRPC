@@ -18,8 +18,12 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
     }
 
     for (SSlot &sslot : session->sslot_arr) {
-      // Ignore sslots that don't have a request with an incomplete response
+      // Ignore sslots that don't have a request
       if (sslot.tx_msgbuf == nullptr) continue;
+
+      // Ignore sslots for which we haven't sent any request packets
+      if (sslot.client_info.req_sent == 0) continue;
+
       assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
 
       size_t cycles_since_enqueue = rdtsc() - sslot.client_info.enqueue_req_ts;
