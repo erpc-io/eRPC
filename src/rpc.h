@@ -40,10 +40,10 @@ class Rpc {
   static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 
   /// Duration of a packet loss detection epoch in milliseconds
-  static constexpr size_t kPktLossEpochMs = 50;
+  static constexpr size_t kPktLossEpochMs = 1;
 
   /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kPktLossTimeoutMs = 500;
+  static constexpr size_t kPktLossTimeoutMs = 5;
 
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));

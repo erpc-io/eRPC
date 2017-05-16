@@ -1,7 +1,9 @@
+/**
+ * @file common.h
+ * @brief Header file with conveinence defines that is included everywhere
+ */
 #ifndef ERPC_COMMON_H
 #define ERPC_COMMON_H
-
-// Header file with convenience defines/functions that is included everywhere
 
 #include <assert.h>
 #include <stdint.h>
@@ -15,6 +17,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "optlevel.h"
 
 namespace ERpc {
 
@@ -25,13 +28,6 @@ static constexpr bool kDatapathStats = true;  ///< Collect stats on the datapath
 
 /// Datapath checks that can be disabled for maximum performance
 static constexpr bool kDatapathChecks = true;
-
-/// Fault injection code that can be disabled for non-tests
-#ifdef FAULT_INJECTION
-static constexpr bool kFaultInjection = true;
-#else
-static constexpr bool kFaultInjection = false;
-#endif
 
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \

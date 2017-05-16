@@ -2,7 +2,6 @@
 #define ERPC_INFINIBAND_TRANSPORT_H
 
 #include <infiniband/verbs.h>
-#include "small_rpc_optlevel.h"
 #include "transport.h"
 
 namespace ERpc {

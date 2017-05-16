@@ -1,23 +1,27 @@
-#ifndef SMALL_RPC_OPTLEVEL_H
-#define SMALL_RPC_OPTLEVEL_H
+/**
+ * @file optlevel.h
+ * @brief Defines for compile-time optimizations
+ */
+#ifndef OPTLEVEL_H
+#define OPTLEVEL_H
 
 #include <assert.h>
 
 namespace ERpc {
 
+// Optimizations for small RPCs
+
 /// No optimization for small messages and foreground request handlers
+///@{
+/// Optimization level for small RPCs and foreground request handlers
+/// 0 (none): No optimization
+/// 1 (likely): Small RPCs and foreground request handlers are very likely
+/// 2 (extreme): Large messages & background request handlers are not supported
 #define small_rpc_optlevel_none (0)
-
-/// Small messages and foreground request handlers are very likely
 #define small_rpc_optlevel_likely (1)
-
-/// Large messages and background request handlers are not supported
 #define small_rpc_optlevel_extreme (2)
-
-/// This controls how much the code is optimized at compile time for the common
-/// case of small messages and foreground request handlers. This helps
-/// understand the overhead of supporting large messages and background threads.
 #define small_rpc_optlevel (small_rpc_optlevel_likely)
+///@}
 
 #define optlevel_large_rpc_supported \
   (small_rpc_optlevel != small_rpc_optlevel_extreme)
@@ -40,8 +44,15 @@ static constexpr bool small_rpc_unlikely(bool x) {
   return false;
 }
 #else
-static_assert(false, "");
+static_assert(false, "");  // Invalid value of small_rpc_optlevel
+#endif
+
+/// Fault injection code that can be disabled for non-tests
+#ifdef FAULT_INJECTION
+static constexpr bool kFaultInjection = true;
+#else
+static constexpr bool kFaultInjection = false;
 #endif
 }
 
-#endif  // SMALL_RPC_OPTLEVEL_H
+#endif  // OPTLEVEL_H

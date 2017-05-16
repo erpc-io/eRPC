@@ -7,7 +7,6 @@
 #include "common.h"
 #include "session.h"
 #include "sm_types.h"
-#include "small_rpc_optlevel.h"
 #include "transport_impl/ib_transport.h"
 #include "util/mt_list.h"
 #include "util/tls_registry.h"
