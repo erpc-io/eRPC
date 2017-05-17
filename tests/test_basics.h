@@ -36,8 +36,8 @@ class BasicAppContext {
   Rpc<IBTransport> *rpc = nullptr;
   int *session_num_arr = nullptr;  ///< Sessions created as client
 
-  volatile size_t num_sm_resps = 0;   ///< Number of SM responses
-  volatile size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+  size_t num_sm_resps = 0;   ///< Number of SM responses
+  size_t num_rpc_resps = 0;  ///< Number of Rpc responses
 };
 
 /// Info required to register a request handler function

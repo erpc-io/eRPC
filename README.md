@@ -71,6 +71,7 @@
    at runtime.
 
 ## Short-term TODOs
+ * Remove foreground non-terminal request handler type.
  * RFR sending needs to be paced, so we cannot use `send_rfr_now`.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
