@@ -27,8 +27,8 @@ DEFINE_validator(batch_size, &validate_batch_size);
 static std::string get_hostname_for_machine(size_t server_i) {
   std::ostringstream ret;
   // ret << "akaliaNode-" << std::to_string(server_i + 1)
-  //    << ".RDMA.fawn.apt.emulab.net";
-  ret << "3.1.8." << std::to_string(server_i);
+  //    << ".RDMA.fawn.apt.emulab.net"
+  ret << "3.1.8." << std::to_string(server_i + 1);
   return ret.str();
 }
 
@@ -153,7 +153,11 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   size_t session_index = 0;
   for (size_t machine_i = 0; machine_i < FLAGS_num_machines; machine_i++) {
     const char *hostname = get_hostname_for_machine(machine_i).c_str();
+
     for (size_t thread_i = 0; thread_i < FLAGS_num_threads; thread_i++) {
+      // Do not create a session to self
+      if (machine_i == FLAGS_machine_id && thread_i == thread_id) continue;
+
       context.session_arr[session_index] = rpc.create_session(
           hostname, static_cast<uint8_t>(thread_id), kAppPhyPort);
       session_index++;
