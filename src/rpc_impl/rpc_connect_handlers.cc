@@ -140,6 +140,17 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   assert(session->server.rpc_id == sm_pkt->server.rpc_id);
   assert(session->server.session_num == kInvalidSessionNum);
 
+  // Handle special error cases for which we retry the connect request
+  if (sm_pkt->err_type == SmErrType::kInvalidRemoteRpcId) {
+    if (retry_connect_on_invalid_rpc_id) {
+      erpc_dprintf("eRPC Rpc %u: Retrying connection for session %u.\n", rpc_id,
+                   session_num);
+      enqueue_sm_req_st(session, SmPktType::kConnectReq);
+      return;
+    }
+  }
+
+  // Mark the request as complete
   session->client_info.sm_api_req_pending = false;
 
   // If the connect response has an error, the server has not allocated a

@@ -82,7 +82,6 @@ set(SOURCES
   src/rpc_impl/rpc_disconnect_handlers.cc
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
-  src/small_rpc_optlevel.h
   src/session.cc
   src/session.h
   src/transport.cc
@@ -119,6 +118,9 @@ set(OTHER_TESTS
   test_huge_alloc
   test_rand
   test_fixed_vector)
+
+set(APPS
+  small_rpc_tput)
 
 if(LTO)
   # Using a compiled eRPC library with CMake and LTO is difficult.
@@ -159,5 +161,10 @@ else(LTO)
   foreach(test_name IN LISTS OTHER_TESTS)
     add_executable(${test_name} tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  endforeach()
+
+  foreach(app_name IN LISTS APPS)
+    add_executable(${app_name} apps/${app_name}/${app_name}.cc)
+    target_link_libraries(${app_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
   endforeach()
 endif(LTO)

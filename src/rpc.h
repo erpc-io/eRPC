@@ -721,6 +721,11 @@ class Rpc {
   void send_req_for_resp_now_st(const SSlot *sslot,
                                 const pkthdr_t *resp_pkthdr);
 
+ public:
+  /// Retry session connection if the remote RPC ID was invalid. This usually
+  /// happens when the server RPC thread has not started.
+  bool retry_connect_on_invalid_rpc_id = false;
+
  private:
   // Constructor args
   Nexus<TTr> *nexus;
