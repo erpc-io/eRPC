@@ -1,34 +1,59 @@
 #include <gflags/gflags.h>
+#include <cstring>
 #include "rpc.h"
-
-using namespace ERpc;
-
-DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
-DEFINE_uint64(machine_id, 0, "The ID of this machine");
-DEFINE_uint64(num_threads, 0, "Number of threads per machine");
-DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
-DEFINE_uint64(msg_size, 0, "Request and response size");
-DEFINE_uint64(window_size, 0, "Number of outstanding requests per thread");
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;
 static constexpr size_t kAppTestMs = 10000;  /// Test duration in milliseconds
+static constexpr size_t kAppMaxBatchSize = 32;
+
+DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
+DEFINE_uint64(machine_id, 0, "The ID of this machine");
+DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
+DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
+DEFINE_uint64(msg_size, 0, "Request and response size");
+DEFINE_uint64(batch_size, 0, "Request batch size");
+DEFINE_uint64(window_size, 0, "Number of outstanding requests per thread");
+
+static bool validate_batch_size(const char *, uint64_t batch_size) {
+  return batch_size <= kAppMaxBatchSize;
+}
+
+DEFINE_validator(batch_size, &validate_batch_size);
+
+/// Return the control net IP address of the machine with index server_i
+static std::string get_hostname_for_machine(size_t server_i) {
+  std::ostringstream ret;
+  // ret << "akaliaNode-" << std::to_string(server_i + 1)
+  //    << ".RDMA.fawn.apt.emulab.net";
+  ret << "3.1.8." << std::to_string(server_i);
+  return ret.str();
+}
 
 /// Per-thread application context
 class AppContext {
  public:
-  Rpc<IBTransport> *rpc = nullptr;
-  int *session_num_arr = nullptr;  ///< Sessions created as client
+  ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
 
+  /// Number of slots in session_arr, including an unused one for this thread
+  size_t num_sessions;
+  int *session_arr = nullptr;  ///< Sessions created as client
+
+  ERpc::MsgBuffer req_msgbuf[kAppMaxBatchSize];
+
+  /// The entry in session_arr for this thread, so we don't send reqs to ourself
+  size_t my_session_offset;
+  size_t thread_id;          ///< The ID of the thread that owns this context
   size_t num_sm_resps = 0;   ///< Number of SM responses
   size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+  ERpc::FastRand fastrand;
 };
 
 /// A basic session management handler that expects successful responses
-void basic_sm_handler(int session_num, SmEventType sm_event_type,
-                      SmErrType sm_err_type, void *_context) {
+void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
+                      ERpc::SmErrType sm_err_type, void *_context) {
   _unused(session_num);
   _unused(sm_event_type);
   _unused(sm_err_type);
@@ -37,20 +62,37 @@ void basic_sm_handler(int session_num, SmEventType sm_event_type,
   auto *context = static_cast<AppContext *>(_context);
   context->num_sm_resps++;
 
-  assert(sm_err_type == SmErrType::kNoError);
-  assert(sm_event_type == SmEventType::kConnected ||
-         sm_event_type == SmEventType::kDisconnected);
+  assert(sm_err_type == ERpc::SmErrType::kNoError);
+  assert(sm_event_type == ERpc::SmEventType::kConnected ||
+         sm_event_type == ERpc::SmEventType::kDisconnected);
 }
 
-void req_handler(ReqHandle *req_handle, void *_context) {
+void cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+void send_req_batch(AppContext *c) {
+  assert(c != nullptr);
+  for (size_t i = 0; i < FLAGS_msg_size; i++) {
+    size_t rand_session_offset = c->my_session_offset;
+    while (rand_session_offset == c->my_session_offset) {
+      rand_session_offset = c->fastrand.next_u32() % c->num_sessions;
+    }
+
+    int ret =
+        c->rpc->enqueue_request(c->session_arr[rand_session_offset],
+                                kAppReqType, &c->req_msgbuf[i], cont_func, 0);
+    if (ret != 0) throw std::runtime_error("Enqueue request error.");
+  }
+}
+
+void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
   auto *context = static_cast<AppContext *>(_context);
 
-  const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
-  Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
+  ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                  resp_size);
   memcpy(static_cast<void *>(req_handle->pre_resp_msgbuf.buf),
          static_cast<void *>(req_msgbuf->buf), resp_size);
   req_handle->prealloc_used = true;
@@ -58,104 +100,74 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   context->rpc->enqueue_response(req_handle);
 }
 
-void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
+void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   assert(resp_handle != nullptr);
   assert(_context != nullptr);
+  _unused(tag);
 
-  const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
+  const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
+  printf("Received response.\n");
+
   // XXX: This can be removed
-  for (size_t i = 0; i < FLAGS_msg_size; i++) {
-    assert(resp_msgbuf->buf[i] == static_cast<uint8_t>(tag));
-  }
+  // for (size_t i = 0; i < FLAGS_msg_size; i++) {
+  //  assert(resp_msgbuf->buf[i] == static_cast<uint8_t>(tag));
+  //}
 
   auto *context = static_cast<AppContext *>(_context);
   context->num_rpc_resps++;
-
   context->rpc->release_response(resp_handle);
-}
 
-void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
-  // Create the Rpc and connect the session
-  AppContext context;
-  client_connect_sessions(nexus, context, config_num_sessions,
-                          basic_sm_handler);
-
-  Rpc<IBTransport> *rpc = context.rpc;
-  int *session_num_arr = context.session_num_arr;
-
-  // Pre-create MsgBuffers so we can test reuse and resizing
-  size_t tot_reqs_per_iter = config_num_sessions * config_rpcs_per_session;
-  MsgBuffer req_msgbuf[tot_reqs_per_iter];
-  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    req_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
-    assert(req_msgbuf[req_i].buf != nullptr);
+  if (context->num_rpc_resps == FLAGS_batch_size) {
+    context->num_rpc_resps = 0;
+    send_req_batch(context);
   }
-
-  // The main request-issuing loop
-  for (size_t iter = 0; iter < 2; iter++) {
-    context.num_rpc_resps = 0;
-
-    test_printf("Client: Iteration %zu.\n", iter);
-    size_t iter_req_i = 0;  // Request MsgBuffer index in an iteration
-
-    for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
-      for (size_t w_i = 0; w_i < config_rpcs_per_session; w_i++) {
-        assert(iter_req_i < tot_reqs_per_iter);
-        MsgBuffer &cur_req_msgbuf = req_msgbuf[iter_req_i];
-
-        rpc->resize_msg_buffer(&cur_req_msgbuf, config_msg_size);
-        for (size_t i = 0; i < config_msg_size; i++) {
-          cur_req_msgbuf.buf[i] = static_cast<uint8_t>(iter_req_i);
-        }
-
-        int ret = rpc->enqueue_request(session_num_arr[sess_i], kAppReqType,
-                                       &cur_req_msgbuf, cont_func, iter_req_i);
-        if (ret != 0) {
-          test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
-        }
-        assert(ret == 0);
-
-        iter_req_i++;
-      }
-    }
-
-    wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter, nexus->freq_ghz);
-    assert(context.num_rpc_resps == tot_reqs_per_iter);
-  }
-
-  // Free the request MsgBuffers
-  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    rpc->free_msg_buffer(req_msgbuf[req_i]);
-  }
-
-  // Disconnect the sessions
-  for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
-    rpc->destroy_session(session_num_arr[sess_i]);
-  }
-
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
-
-  // Free resources
-  delete rpc;
-  client_done = true;
 }
 
 /// The function executed by each thread in the cluster
-void thread_func(size_t thread_id, Nexus<IBTransport> *nexus) {
-  uint8_t rpc_id = static_cast<uint8_t>(thread_id);
+void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext context;
+  context.thread_id = thread_id;
 
-  Rpc<IBTransport> rpc(nexus, static_cast<void *>(&context), rpc_id,
-                       basic_sm_handler, kAppPhyPort, kAppNumaNode);
+  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&context),
+                                   static_cast<uint8_t>(thread_id),
+                                   basic_sm_handler, kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   context.rpc = &rpc;
 
-  // Create a session to each thread in the cluster
-  size_t num_sessions = FLAGS_num_machines * FLAGS_num_threads;
+  // Pre-allocate request MsgBuffers
+  for (size_t i = 0; i < FLAGS_batch_size; i++) {
+    context.req_msgbuf[i] = rpc.alloc_msg_buffer(FLAGS_msg_size);
+    assert(context.req_msgbuf[i].buf != nullptr);
+  }
 
-  rpc.run_event_loop();
+  // Allocate session array
+  context.num_sessions = FLAGS_num_machines * FLAGS_num_threads;
+  context.session_arr = new int[FLAGS_num_machines * FLAGS_num_threads];
+  for (size_t i = 0; i < FLAGS_num_machines * FLAGS_num_threads; i++) {
+    context.session_arr[i] = -1;
+  }
+
+  // Initiate session connection
+  size_t session_index = 0;
+  for (size_t machine_i = 0; machine_i < FLAGS_num_machines; machine_i++) {
+    const char *hostname = get_hostname_for_machine(machine_i).c_str();
+    for (size_t thread_i = 0; thread_i < FLAGS_num_threads; thread_i++) {
+      context.session_arr[session_index] = rpc.create_session(
+          hostname, static_cast<uint8_t>(thread_id), kAppPhyPort);
+      session_index++;
+    }
+  }
+
+  while (context.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
+    rpc.run_event_loop_timeout(200);  // 200 milliseconds
+  }
+
+  // All sessions connected, so run event loop
+  send_req_batch(&context);
+  rpc.run_event_loop_timeout(kAppTestMs);
+  delete context.session_arr;
 }
 
 int main(int argc, char **argv) {
@@ -163,9 +175,9 @@ int main(int argc, char **argv) {
 
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  Nexus<IBTransport> nexus(kAppNexusUdpPort, FLAGS_num_bg_threads);
-  nexus.register_req_func(kAppReqType,
-                          ReqFunc(req_handler, ReqFuncType::kFgTerminal));
+  ERpc::Nexus<ERpc::IBTransport> nexus(kAppNexusUdpPort, FLAGS_num_bg_threads);
+  nexus.register_req_func(
+      kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kFgTerminal));
 
   std::thread *threads[FLAGS_num_threads];
   for (size_t i = 0; i < FLAGS_num_threads; i++) {

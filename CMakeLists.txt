@@ -16,7 +16,7 @@ add_definitions(-Wno-unused-function)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet)
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet gflags)
 
 # Testing
 enable_testing()
