@@ -228,7 +228,6 @@ TEST(MultiLargeRpcMultiSession, Background) {
 }
 
 int main(int argc, char **argv) {
-  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

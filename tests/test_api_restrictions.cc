@@ -33,8 +33,8 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   assert(context->rpc->in_background());
 
   // Try to create a session
-  int session_num = context->rpc->create_session(local_hostname,
-                                                 kAppServerRpcId, kAppPhyPort);
+  int session_num =
+      context->rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
   ASSERT_EQ(session_num, -EPERM);
 
   // Try to destroy a valid session number
@@ -146,7 +146,6 @@ TEST(Restrictions, ContFuncDeletesRpc) {
 }
 
 int main(int argc, char **argv) {
-  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

@@ -7,9 +7,10 @@
 namespace ERpc {
 
 template <class TTr>
-Nexus<TTr>::Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads)
+Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
+                  size_t num_bg_threads)
     : freq_ghz(get_freq_ghz()),
-      hostname(get_hostname()),
+      hostname(hostname),
       num_bg_threads(num_bg_threads) {
   // Print warning messages if low-performance settings are enabled
   if (kDatapathVerbose) {
@@ -206,21 +207,6 @@ double Nexus<TTr>::get_freq_ghz() {
   }
 
   return _freq_ghz;
-}
-
-template <class TTr>
-std::string Nexus<TTr>::get_hostname() {
-  char _hostname[kMaxHostnameLen];
-
-  // Get the local hostname
-  int ret = get_hostname(_hostname);
-  if (ret == -1) {
-    erpc_dprintf("eRPC Nexus: FATAL. gethostname failed. Error = %s.\n",
-                 strerror(errno));
-    throw std::runtime_error("eRPC Nexus: get_hostname() failed.");
-  }
-
-  return std::string(_hostname);
 }
 
 }  // End ERpc

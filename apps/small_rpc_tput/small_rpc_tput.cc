@@ -179,7 +179,9 @@ int main(int argc, char **argv) {
 
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  ERpc::Nexus<ERpc::IBTransport> nexus(kAppNexusUdpPort, FLAGS_num_bg_threads);
+  std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
+  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name.c_str(), kAppNexusUdpPort,
+                                       FLAGS_num_bg_threads);
   nexus.register_req_func(
       kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kFgTerminal));
 

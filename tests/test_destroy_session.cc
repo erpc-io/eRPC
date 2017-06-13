@@ -45,7 +45,7 @@ void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
 
   // Create the session
   int session_num =
-      rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
+      rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(session_num, 0);
   ASSERT_NE(rpc->destroy_session(session_num), 0);  // Try early disconnect
 
@@ -97,14 +97,14 @@ void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
   for (size_t iter = 0; iter < 3; iter++) {
     for (size_t i = 0; i < num_sessions; i++) {
       int session_num =
-          rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
+          rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
       ASSERT_GE(session_num, 0);
       context.session_num_arr[i] = session_num;
     }
 
     // Try to create one more session. This should fail.
     int session_num =
-        rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
+        rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
     ASSERT_LT(session_num, 0);
 
     // Connect the sessions
@@ -147,7 +147,7 @@ void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
 
   // Create a session that uses an invalid remote port
   int session_num =
-      rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort + 1);
+      rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort + 1);
   ASSERT_GE(session_num, 0);
   context.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemotePort);
   wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
@@ -182,7 +182,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   rpc->fault_inject_fail_resolve_server_rinfo_st();
 
   int session_num =
-      rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
+      rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(session_num, 0);
 
   context.arm(SmEventType::kConnectFailed,
@@ -206,7 +206,6 @@ TEST(Base, DisconnectLocalError) {
 }
 
 int main(int argc, char **argv) {
-  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

@@ -16,11 +16,11 @@ static constexpr size_t kSmThreadEventLoopMs = 1;
 //
 // A client-mode peer is created to each host that we create a client-mode
 // session to. Client-mode peers have non-null peer->data, and are recorded in
-// the maps.
+// the SM thread context maps.
 //
 // A server mode peer is created when we get a ENet connect event from a
-// client-mode peers. Server-mode peers have null peer-data, and are not recored
-// in the maps.
+// client-mode peers. Server-mode peers have null peer-data, and are not
+// recorded in the SM threa context maps.
 
 template <class TTr>
 void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {

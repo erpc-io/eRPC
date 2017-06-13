@@ -22,7 +22,6 @@ static constexpr size_t kAppNumaNode = 0;
 std::atomic<size_t> num_servers_ready;  ///< Number of ready servers
 std::atomic<bool> all_servers_ready;  ///< True iff all server threads are ready
 std::atomic<bool> client_done;        ///< True when the client has disconnected
-char local_hostname[kMaxHostnameLen];
 
 // Hack: The server threads check that their Rpcs have zero active sessions
 // after the client exits. This needs to be disabled for test_create_session,
@@ -162,8 +161,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
       }
 
       context.session_num_arr[i] = context.rpc->create_session(
-          local_hostname, kAppServerRpcId + static_cast<uint8_t>(i),
-          kAppPhyPort);
+          "localhost", kAppServerRpcId + static_cast<uint8_t>(i), kAppPhyPort);
       assert(context.session_num_arr[i] >= 0);
     }
 
@@ -223,7 +221,7 @@ void launch_server_client_threads(
     void (*client_thread_func)(Nexus<IBTransport> *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers, double srv_pkt_drop_prob) {
-  Nexus<IBTransport> nexus(kAppNexusUdpPort, num_bg_threads);
+  Nexus<IBTransport> nexus("localhost", kAppNexusUdpPort, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
@@ -294,7 +292,7 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
-        local_hostname, kAppServerRpcId + static_cast<uint8_t>(i), kAppPhyPort);
+        "localhost", kAppServerRpcId + static_cast<uint8_t>(i), kAppPhyPort);
   }
 
   while (context.num_sm_resps < num_sessions) {

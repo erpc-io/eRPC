@@ -90,7 +90,7 @@ class Nexus {
   /// Peer metadata maintained in client-mode ENet peers
   class SmENetPeerData {
    public:
-    std::string rem_hostname;
+    std::string rem_hostname;  ///< Hostname received in the session mgmt packet
     bool connected;
     std::vector<SmWorkItem> work_item_vec;
   };
@@ -115,6 +115,8 @@ class Nexus {
   /**
    * @brief Create the one-per-process Nexus object.
    *
+   * @param hostname The IP host name of this host
+   *
    * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
    * listen for session management packets
    *
@@ -124,7 +126,8 @@ class Nexus {
    *
    * @throw runtime_error if Nexus creation fails.
    */
-  Nexus(uint16_t mgmt_udp_port, size_t num_bg_threads = 0);
+  Nexus(std::string hostname, uint16_t mgmt_udp_port,
+        size_t num_bg_threads = 0);
 
   ~Nexus();
 
@@ -145,19 +148,6 @@ class Nexus {
    * @return 0 on success, negative errno on failure.
    */
   int register_req_func(uint8_t req_type, ReqFunc req_func);
-
-  /**
-   * @brief Copy the hostname of this machine to \p hostname. \p hostname must
-   * have space for kMaxHostnameLen characters.
-   *
-   * @return 0 on success, -1 on error.
-   */
-  static int get_hostname(char *_hostname) {
-    assert(_hostname != nullptr);
-
-    int ret = gethostname(_hostname, kMaxHostnameLen);
-    return ret;
-  }
 
   /// The function executed by background threads
   static void bg_thread_func(BgThreadCtx *ctx);
@@ -226,9 +216,6 @@ class Nexus {
 
   /// Return the frequency of rdtsc in GHz
   static double get_freq_ghz();
-
-  /// Return the hostname of this machine
-  static std::string get_hostname();
 };
 
 // Instantiate required Nexus classes so they get compiled for the linker

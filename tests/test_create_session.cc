@@ -38,7 +38,7 @@ void simple_connect(Nexus<IBTransport> *nexus, size_t) {
   // Connect the session
   context.exp_err = SmErrType::kNoError;
   context.session_num =
-      context.rpc->create_session(local_hostname, kAppServerRpcId, kAppPhyPort);
+      context.rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(context.session_num, 0);
 
   context.rpc->run_event_loop_timeout(kAppEventLoopMs);
@@ -71,7 +71,7 @@ void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
   // Connect the session
   context.exp_err = SmErrType::kInvalidRemotePort;
   context.session_num = context.rpc->create_session(
-      local_hostname, kAppServerRpcId, kAppPhyPort + 1);
+      "localhost", kAppServerRpcId, kAppPhyPort + 1);
   ASSERT_GE(context.session_num, 0);  // Local session creation works
 
   context.rpc->run_event_loop_timeout(kAppEventLoopMs);
@@ -93,8 +93,6 @@ TEST(Base, InvalidRemotePort) {
 int main(int argc, char **argv) {
   // We don't have disconnection logic here
   server_check_all_disconnected = false;
-
-  Nexus<IBTransport>::get_hostname(local_hostname);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
