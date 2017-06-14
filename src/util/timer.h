@@ -1,8 +1,14 @@
-#ifndef ERPC_TSC_H
-#define ERPC_TSC_H
+/**
+ * @file timer.h
+ * @brief Helper functions for timers
+ */
+
+#ifndef ERPC_TIMER_H
+#define ERPC_TIMER_H
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 
 namespace ERpc {
 
@@ -34,6 +40,26 @@ static double to_nsec(size_t cycles, double freq_ghz) {
   return (cycles / freq_ghz);
 }
 
+/// Return seconds elapsed since timestamp \p t0
+static double sec_since(const struct timespec &t0) {
+  struct timespec t1;
+  clock_gettime(CLOCK_REALTIME, &t1);
+  size_t sec_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
+  size_t ns_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
+
+  return sec_diff + static_cast<double>(ns_diff) / 1000000000;
+}
+
+/// Return nanoseconds elapsed since timestamp \p t0
+static size_t ns_since(const struct timespec &t0) {
+  struct timespec t1;
+  clock_gettime(CLOCK_REALTIME, &t1);
+  size_t sec_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
+  size_t ns_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
+
+  return sec_diff * 1000000000 + ns_diff;
+}
+
 }  /// End ERpc
 
-#endif  // ERPC_TSC_H
+#endif  // ERPC_TIMER_H

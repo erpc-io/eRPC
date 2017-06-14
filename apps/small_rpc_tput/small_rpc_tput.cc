@@ -50,9 +50,11 @@ class AppContext {
 
   /// The entry in session_arr for this thread, so we don't send reqs to ourself
   size_t self_session_index;
-  size_t thread_id;          ///< The ID of the thread that owns this context
-  size_t num_sm_resps = 0;   ///< Number of SM responses
-  size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+  size_t thread_id;             ///< The ID of the thread that owns this context
+  size_t num_sm_resps = 0;      ///< Number of SM responses
+  size_t num_pending_reqs = 0;  ///< Pending requests in the current batch
+  size_t stat_rpc_resps = 0;    ///< Number of responses received
+  struct timespec tput_t0;      ///< Start time for throughput measurement
   ERpc::FastRand fastrand;
 };
 
@@ -75,6 +77,7 @@ void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
 void cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 void send_req_batch(AppContext *c) {
   assert(c != nullptr);
+  c->num_pending_reqs += FLAGS_batch_size;
 
   for (size_t i = 0; i < FLAGS_batch_size; i++) {
     // Compute a random session to send the request on
@@ -115,20 +118,28 @@ void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
-  printf("Received response.\n");
-
   // XXX: This can be removed
   // for (size_t i = 0; i < FLAGS_msg_size; i++) {
   //  assert(resp_msgbuf->buf[i] == static_cast<uint8_t>(tag));
   //}
 
-  auto *context = static_cast<AppContext *>(_context);
-  context->num_rpc_resps++;
-  context->rpc->release_response(resp_handle);
+  auto *c = static_cast<AppContext *>(_context);
+  c->num_pending_reqs--;
+  c->stat_rpc_resps++;
 
-  if (context->num_rpc_resps == FLAGS_batch_size) {
-    context->num_rpc_resps = 0;
-    send_req_batch(context);
+  if (c->stat_rpc_resps == 1000000) {
+    double seconds = ERpc::sec_since(c->tput_t0);
+    printf("Thread %zu: Throughput = %.2f Mrps.\n", c->thread_id,
+           1000000 / seconds);
+
+    c->stat_rpc_resps = 0;
+    clock_gettime(CLOCK_REALTIME, &c->tput_t0);
+  }
+
+  c->rpc->release_response(resp_handle);
+
+  if (c->num_pending_reqs == 0) {
+    send_req_batch(c);
   }
 }
 
@@ -178,6 +189,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   }
 
   // All sessions connected, so run event loop
+  clock_gettime(CLOCK_REALTIME, &context.tput_t0);
   send_req_batch(&context);
   rpc.run_event_loop_timeout(kAppTestMs);
   delete context.session_arr;

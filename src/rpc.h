@@ -16,7 +16,7 @@
 #include "util/huge_alloc.h"
 #include "util/mt_list.h"
 #include "util/rand.h"
-#include "util/tsc.h"
+#include "util/timer.h"
 
 namespace ERpc {
 

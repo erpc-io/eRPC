@@ -98,7 +98,7 @@ set(SOURCES
   src/util/rand.h
   src/util/tls_registry.h
   src/util/tls_registry.cc
-  src/util/tsc.h
+  src/util/timer.h
   tests/test_basics.h)
 
 # The tests to run using ctest
