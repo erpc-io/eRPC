@@ -75,7 +75,9 @@ void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
 void cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 void send_req_batch(AppContext *c) {
   assert(c != nullptr);
-  for (size_t i = 0; i < FLAGS_msg_size; i++) {
+
+  for (size_t i = 0; i < FLAGS_batch_size; i++) {
+    // Compute a random session to send the request on
     size_t rand_session_index = c->self_session_index;
     while (rand_session_index == c->self_session_index) {
       rand_session_index = c->fastrand.next_u32() % c->num_sessions;
