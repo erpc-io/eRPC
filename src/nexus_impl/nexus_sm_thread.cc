@@ -73,14 +73,14 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
     // This peer didn't connect successfully, so try again. Carry over the
     // ENet peer data from the previous peer to the new peer.
     erpc_dprintf(
-        "eRPC Nexus: ENet socket disconnected from %s. Reconnecting.\n",
+        "eRPC Nexus: ENet failed to connect peer to %s. Reconnecting.\n",
         hostname.c_str());
 
     ENetAddress rem_address;
     rem_address.port = ctx->mgmt_udp_port;
     if (enet_address_set_host(&rem_address, epeer_data->rem_hostname.c_str()) !=
         0) {
-      throw std::runtime_error("eRPC Nexus: ENet Failed to resolve address " +
+      throw std::runtime_error("eRPC Nexus: ENet failed to resolve address " +
                                epeer_data->rem_hostname);
     }
 
@@ -279,7 +279,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
         rem_address.port = ctx->mgmt_udp_port;
         if (enet_address_set_host(&rem_address, rem_hostname.c_str()) != 0) {
           throw std::runtime_error(
-              "eRPC Nexus: ENet Failed to resolve address " + rem_hostname);
+              "eRPC Nexus: ENet failed to resolve address " + rem_hostname);
         }
 
         wi.epeer =

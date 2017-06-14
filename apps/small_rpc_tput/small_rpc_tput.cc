@@ -49,7 +49,7 @@ class AppContext {
   ERpc::MsgBuffer req_msgbuf[kAppMaxBatchSize];
 
   /// The entry in session_arr for this thread, so we don't send reqs to ourself
-  size_t my_session_offset;
+  size_t self_session_index;
   size_t thread_id;          ///< The ID of the thread that owns this context
   size_t num_sm_resps = 0;   ///< Number of SM responses
   size_t num_rpc_resps = 0;  ///< Number of Rpc responses
@@ -76,14 +76,14 @@ void cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 void send_req_batch(AppContext *c) {
   assert(c != nullptr);
   for (size_t i = 0; i < FLAGS_msg_size; i++) {
-    size_t rand_session_offset = c->my_session_offset;
-    while (rand_session_offset == c->my_session_offset) {
-      rand_session_offset = c->fastrand.next_u32() % c->num_sessions;
+    size_t rand_session_index = c->self_session_index;
+    while (rand_session_index == c->self_session_index) {
+      rand_session_index = c->fastrand.next_u32() % c->num_sessions;
     }
 
     int ret =
-        c->rpc->enqueue_request(c->session_arr[rand_session_offset],
-                                kAppReqType, &c->req_msgbuf[i], cont_func, 0);
+        c->rpc->enqueue_request(c->session_arr[rand_session_index], kAppReqType,
+                                &c->req_msgbuf[i], cont_func, 0);
     if (ret != 0) throw std::runtime_error("Enqueue request error.");
   }
 }
@@ -147,25 +147,27 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     assert(context.req_msgbuf[i].buf != nullptr);
   }
 
-  // Allocate session array
   context.num_sessions = FLAGS_num_machines * FLAGS_num_threads;
+  context.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
+
+  // Allocate session array
   context.session_arr = new int[FLAGS_num_machines * FLAGS_num_threads];
   for (size_t i = 0; i < FLAGS_num_machines * FLAGS_num_threads; i++) {
     context.session_arr[i] = -1;
   }
 
-  // Initiate session connection
-  size_t session_index = 0;
+  // Initiate connection for sessions
   for (size_t machine_i = 0; machine_i < FLAGS_num_machines; machine_i++) {
     const char *hostname = get_hostname_for_machine(machine_i).c_str();
 
     for (size_t thread_i = 0; thread_i < FLAGS_num_threads; thread_i++) {
+      size_t session_index = (machine_i * FLAGS_num_threads) + thread_i;
       // Do not create a session to self
-      if (machine_i == FLAGS_machine_id && thread_i == thread_id) continue;
+      if (session_index == context.self_session_index) continue;
 
       context.session_arr[session_index] = rpc.create_session(
           hostname, static_cast<uint8_t>(thread_id), kAppPhyPort);
-      session_index++;
+      assert(context.session_arr[session_index] >= 0);
     }
   }
 
