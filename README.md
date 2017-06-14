@@ -53,6 +53,14 @@
      Similarly, a non-null value of `sslot->tx_msgbuf` indicates that the sslot
      is waiting for a response.
 
+## Session management retries
+ * A session management operation is retried by the client in these cases:
+   * An ENet disconnect event is received before the connect event. This happens
+     when the ENet client tries to connect before the server is running. In
+     this case, a new ENet peer is created and the connection is retried.
+   * A session connect request fails because the server does not have the
+     requested RPC ID running, and `retry_connect_on_invalid_rpc_id` is set.
+
 ## Session management packet ownership
  * Rpc threads allocate an SM packet before queueing it to the SM thread. This
    packet is freed by the SM thread when it transmits it using
