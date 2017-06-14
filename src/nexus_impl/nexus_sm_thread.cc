@@ -57,7 +57,7 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
   assert(ctx != nullptr);
   assert(event != nullptr);
 
-  ENetPeer *epeer = event->peer;
+  ENetPeer *epeer = event->peer;  // Freed by ENet
   uint32_t epeer_ip = epeer->address.host;
   if (is_peer_mode_server(epeer)) {
     return;
@@ -68,17 +68,45 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
   std::string hostname = ctx->ip_map[epeer_ip];
   assert(ctx->name_map[hostname] == epeer);
 
-  erpc_dprintf("eRPC Nexus: ENet socket disconnected from %s.\n",
-               hostname.c_str());
+  SmENetPeerData *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
+  if (!epeer_data->connected) {
+    // This peer didn't connect successfully, so try again. Carry over the
+    // ENet peer data from the previous peer to the new peer.
+    erpc_dprintf(
+        "eRPC Nexus: ENet socket disconnected from %s. Reconnecting.\n",
+        hostname.c_str());
 
-  // XXX: Do something with outstanding SM requests on this peer. There
-  // may be requests from many sessions.
+    ENetAddress rem_address;
+    rem_address.port = ctx->mgmt_udp_port;
+    if (enet_address_set_host(&rem_address, epeer_data->rem_hostname.c_str()) !=
+        0) {
+      throw std::runtime_error("eRPC Nexus: ENet Failed to resolve address " +
+                               epeer_data->rem_hostname);
+    }
 
-  // Remove from mappings and free memory
-  ctx->ip_map.erase(epeer_ip);
-  ctx->name_map.erase(hostname);
-  delete static_cast<SmENetPeerData *>(epeer->data);
-  epeer->data = nullptr;
+    ENetPeer *new_epeer =
+        enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
+    for (SmWorkItem wi : epeer_data->work_item_vec) {
+      assert(wi.epeer == epeer);
+      wi.epeer = new_epeer;
+    }
+
+    new_epeer->data = epeer->data;
+  } else {
+    erpc_dprintf(
+        "eRPC Nexus: ENet socket disconnected from %s. Not reconnecting.\n",
+        hostname.c_str());
+
+    // XXX: Do something with outstanding SM requests on this peer (it could
+    // be a session connect request). There may be requests from many sessions.
+
+    // Remove from mappings and free memory
+    ctx->ip_map.erase(epeer_ip);
+    ctx->name_map.erase(hostname);
+    delete static_cast<SmENetPeerData *>(epeer->data);
+    epeer->data = nullptr;
+  }
+
   return;
 }
 
@@ -234,7 +262,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
       assert(wi.epeer == nullptr);
       std::string rem_hostname = std::string(wi.sm_pkt->server.hostname);
 
-      if (ctx->name_map.count(rem_hostname) != 0) {
+      if (ctx->name_map.count(rem_hostname) > 0) {
         // We already have a client-mode ENet peer to this host
         wi.epeer = ctx->name_map[rem_hostname];
 

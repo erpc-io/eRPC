@@ -10,7 +10,7 @@ static constexpr size_t kAppTestMs = 10000;  /// Test duration in milliseconds
 static constexpr size_t kAppMaxBatchSize = 32;
 
 DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
-DEFINE_uint64(machine_id, 0, "The ID of this machine");
+DEFINE_uint64(machine_id, ERpc::kMaxNumMachines, "The ID of this machine");
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(msg_size, 0, "Request and response size");
@@ -21,6 +21,11 @@ static bool validate_batch_size(const char *, uint64_t batch_size) {
   return batch_size <= kAppMaxBatchSize;
 }
 
+static bool validate_machine_id(const char *, uint64_t machine_id) {
+  return machine_id < ERpc::kMaxNumMachines;
+}
+
+DEFINE_validator(machine_id, &validate_machine_id);
 DEFINE_validator(batch_size, &validate_batch_size);
 
 /// Return the control net IP address of the machine with index server_i

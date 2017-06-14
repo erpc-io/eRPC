@@ -90,7 +90,7 @@ class Nexus {
   /// Peer metadata maintained in client-mode ENet peers
   class SmENetPeerData {
    public:
-    std::string rem_hostname;  ///< Hostname received in the session mgmt packet
+    std::string rem_hostname;  ///< Specified by the ERpc user
     bool connected;
     std::vector<SmWorkItem> work_item_vec;
   };
