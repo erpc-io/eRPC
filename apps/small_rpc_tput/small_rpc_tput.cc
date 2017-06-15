@@ -60,12 +60,10 @@ class AppContext {
 };
 
 /// A basic session management handler that expects successful responses
-void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
+void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
                       ERpc::SmErrType sm_err_type, void *_context) {
-  _unused(session_num);
   _unused(sm_event_type);
   _unused(sm_err_type);
-  _unused(_context);
 
   auto *context = static_cast<AppContext *>(_context);
   context->num_sm_resps++;
