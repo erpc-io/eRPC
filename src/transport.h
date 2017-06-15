@@ -5,6 +5,7 @@
 #ifndef ERPC_TRANSPORT_H
 #define ERPC_TRANSPORT_H
 
+#include <functional>
 #include "common.h"
 #include "msg_buffer.h"
 #include "pkthdr.h"

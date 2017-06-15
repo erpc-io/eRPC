@@ -43,25 +43,30 @@ IBTransport::~IBTransport() {
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
   if (ibv_destroy_qp(qp)) {
-    throw std::runtime_error("eRPC IBTransport: Failed to destroy QP.");
+    fprintf(stderr, "eRPC IBTransport: Failed to destroy QP.");
+    exit(-1);
   }
 
   if (ibv_destroy_cq(send_cq)) {
-    throw std::runtime_error("eRPC IBTransport: Failed to destroy send CQ.");
+    fprintf(stderr, "eRPC IBTransport: Failed to destroy send CQ.");
+    exit(-1);
   }
 
   if (ibv_destroy_cq(recv_cq)) {
-    throw std::runtime_error("eRPC IBTransport: Failed to destroy recv CQ.");
+    fprintf(stderr, "eRPC IBTransport: Failed to destroy recv CQ.");
+    exit(-1);
   }
 
   // Destroy protection domain and device context
   if (ibv_dealloc_pd(pd)) {
-    throw std::runtime_error(
-        "eRPC IBTransport: Failed to deallocate protection domain.");
+    fprintf(stderr,
+            "eRPC IBTransport: Failed to deallocate protection domain.");
+    exit(-1);
   }
 
   if (ibv_close_device(ib_ctx)) {
-    throw std::runtime_error("eRPC IBTransport: Failed to close device.");
+    fprintf(stderr, "eRPC IBTransport: Failed to close device.");
+    exit(-1);
   }
 }
 

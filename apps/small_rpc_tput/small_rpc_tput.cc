@@ -16,6 +16,8 @@ DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(msg_size, 0, "Request and response size");
 DEFINE_uint64(batch_size, 0, "Request batch size");
 
+// XXX: g++-5 shows an unused variable warning for validators
+// https://github.com/gflags/gflags/issues/123. Current fix: use g++-7
 static bool validate_batch_size(const char *, uint64_t batch_size) {
   return batch_size <= kAppMaxBatchSize;
 }
@@ -116,6 +118,7 @@ void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
 
   const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
+  _unused(resp_msgbuf);
 
   // XXX: This can be removed
   // for (size_t i = 0; i < FLAGS_msg_size; i++) {

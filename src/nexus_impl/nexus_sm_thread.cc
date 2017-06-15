@@ -43,7 +43,7 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
       epeer_data->rem_hostname.c_str(), epeer_data->work_item_vec.size());
 
   // Transmit work items queued while waiting for connection
-  for (auto wi : epeer_data->work_item_vec) {
+  for (SmWorkItem &wi : epeer_data->work_item_vec) {
     assert(wi.sm_pkt->is_req());
     sm_thread_tx_and_free(wi);
   }
@@ -86,7 +86,7 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
 
     ENetPeer *new_epeer =
         enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
-    for (SmWorkItem wi : epeer_data->work_item_vec) {
+    for (SmWorkItem &wi : epeer_data->work_item_vec) {
       assert(wi.epeer == epeer);
       wi.epeer = new_epeer;
     }
