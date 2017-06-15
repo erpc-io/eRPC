@@ -172,16 +172,16 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   }
 
   // Initiate connection for sessions
-  for (size_t machine_i = 0; machine_i < FLAGS_num_machines; machine_i++) {
-    const char *hostname = get_hostname_for_machine(machine_i).c_str();
+  for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
+    const char *hostname = get_hostname_for_machine(m_i).c_str();
 
-    for (size_t thread_i = 0; thread_i < FLAGS_num_threads; thread_i++) {
-      size_t session_index = (machine_i * FLAGS_num_threads) + thread_i;
+    for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
+      size_t session_index = (m_i * FLAGS_num_threads) + t_i;
       // Do not create a session to self
       if (session_index == context.self_session_index) continue;
 
-      context.session_arr[session_index] = rpc.create_session(
-          hostname, static_cast<uint8_t>(thread_id), kAppPhyPort);
+      context.session_arr[session_index] =
+          rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
       assert(context.session_arr[session_index] >= 0);
     }
   }
