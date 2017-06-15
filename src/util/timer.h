@@ -44,20 +44,14 @@ static double to_nsec(size_t cycles, double freq_ghz) {
 static double sec_since(const struct timespec &t0) {
   struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t1);
-  size_t sec_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
-  size_t ns_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
-
-  return sec_diff + static_cast<double>(ns_diff) / 1000000000;
+  return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 }
 
 /// Return nanoseconds elapsed since timestamp \p t0
-static size_t ns_since(const struct timespec &t0) {
+static double ns_since(const struct timespec &t0) {
   struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t1);
-  size_t sec_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
-  size_t ns_diff = static_cast<size_t>(t1.tv_sec - t0.tv_sec);
-
-  return sec_diff * 1000000000 + ns_diff;
+  return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
 }
 
 }  /// End ERpc

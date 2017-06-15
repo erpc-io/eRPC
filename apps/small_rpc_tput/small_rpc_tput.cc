@@ -15,7 +15,6 @@ DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(msg_size, 0, "Request and response size");
 DEFINE_uint64(batch_size, 0, "Request batch size");
-DEFINE_uint64(window_size, 0, "Number of outstanding requests per thread");
 
 static bool validate_batch_size(const char *, uint64_t batch_size) {
   return batch_size <= kAppMaxBatchSize;
