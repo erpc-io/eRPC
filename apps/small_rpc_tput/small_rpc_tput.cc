@@ -1,4 +1,5 @@
 #include <gflags/gflags.h>
+#include <signal.h>
 #include <cstring>
 #include "rpc.h"
 
@@ -28,6 +29,9 @@ static bool validate_machine_id(const char *, uint64_t machine_id) {
 
 DEFINE_validator(machine_id, &validate_machine_id);
 DEFINE_validator(batch_size, &validate_batch_size);
+
+volatile sig_atomic_t ctrl_c_pressed = 0;
+void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 /// Return the control net IP address of the machine with index server_i
 static std::string get_hostname_for_machine(size_t server_i) {
@@ -186,17 +190,28 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 
   while (context.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
     rpc.run_event_loop_timeout(200);  // 200 milliseconds
+
+    if (ctrl_c_pressed == 1) {
+      delete context.session_arr;
+      return;
+    }
   }
 
   // All sessions connected, so run event loop
   clock_gettime(CLOCK_REALTIME, &context.tput_t0);
   send_req_batch(&context);
-  rpc.run_event_loop_timeout(kAppTestMs);
+
+  for (size_t i = 0; i < kAppTestMs; i += 1000) {
+    rpc.run_event_loop_timeout(1000);  // 1 second
+    if (ctrl_c_pressed == 1) break;
+  }
+
   delete context.session_arr;
 }
 
 int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
+  signal(SIGINT, ctrl_c_handler);
 
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 

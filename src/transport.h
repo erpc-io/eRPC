@@ -23,8 +23,8 @@ class Transport {
   static constexpr size_t kMaxMemRegInfoSize = 64;   ///< Space for mem reg info
 
   // Queue depths
-  static constexpr size_t kRecvQueueDepth = 128;  ///< RECV queue size
-  static constexpr size_t kSendQueueDepth = 128;  ///< SEND queue size
+  static constexpr size_t kRecvQueueDepth = 2048;  ///< RECV queue size
+  static constexpr size_t kSendQueueDepth = 128;   ///< SEND queue size
 
   /// The transport must allow inline posting of the packet header, as we
   /// don't maintain DMA-able MsgBuffers for credit returns.

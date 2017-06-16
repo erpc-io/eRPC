@@ -31,7 +31,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 # Debug mode
 option(DEBUG "Enable debugging" ON)
 if(DEBUG)
-  MESSAGE(WARNING "Debugging is enabled (to disable, run `cmake . -DDEBUG=OFF`).")
+  MESSAGE(STATUS "Debugging is enabled (to disable, run `cmake . -DDEBUG=OFF`).")
   add_definitions(-g)
 else(DEBUG)
   MESSAGE(STATUS "Debugging is disabled (to enable, run `cmake . -DDEBUG=ON`).")
@@ -42,19 +42,19 @@ endif(DEBUG)
 # Fault injection (packet losses, machine failure)
 option(FAULT_INJECTION "Enable fault injection" ON)
 if(FAULT_INJECTION)
-  MESSAGE(WARNING "Fault injection is enabled (to disable, run `cmake . -DFAULT_INJECTION=OFF`).")
+  MESSAGE(STATUS "Fault injection is enabled. Performance will be low. To disable, run `cmake . -DFAULT_INJECTION=OFF`.")
   add_definitions(-DFAULT_INJECTION)
 else(FAULT_INJECTION)
-  MESSAGE(WARNING "Fault injection is disabled, so tests may fail (to enable, run `cmake . -DFAULT_INJECTION=ON`).")
+  MESSAGE(STATUS "Fault injection is disabled, so tests may fail. To enable, run `cmake . -DFAULT_INJECTION=ON`.")
 endif(FAULT_INJECTION)
 
 # LTO
 option(LTO "Enable link time optimization" OFF)
 if(LTO)
-  MESSAGE(WARNING "LTO is enabled (to disable, run `cmake . -DLTO=OFF`). Compilation will be slow.")
+  MESSAGE(STATUS "LTO is enabled. Tests won't be compiled. To disable, run `cmake . -DLTO=OFF`.")
   add_definitions(-flto)
 else(LTO)
-  MESSAGE(STATUS "LTO is disabled (to enable, run `cmake . -DLTO=ON`).")
+  MESSAGE(STATUS "LTO is disabled. To enable, run `cmake . -DLTO=ON`.")
 endif(LTO)
 
 set(SOURCES
@@ -125,30 +125,10 @@ set(APPS
 if(LTO)
   # Using a compiled eRPC library with CMake and LTO is difficult.
   # See Evernote for details.
-  add_executable(test_create_session tests/test_create_session.cc ${SOURCES})
-  target_link_libraries(test_create_session ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_create_session COMMAND test_create_session)
-
-  add_executable(test_create_session_args tests/test_create_session_args.cc ${SOURCES})
-  target_link_libraries(test_create_session_args ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_create_session_args COMMAND test_create_session_args)
-
-  add_executable(test_destroy_session tests/test_destroy_session.cc ${SOURCES})
-  target_link_libraries(test_destroy_session ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_destroy_session COMMAND test_destroy_session)
-
-  add_executable(test_small_msg tests/test_small_msg.cc ${SOURCES})
-  target_link_libraries(test_small_msg ${GTEST_LIBRARIES} ${LIBRARIES})
-  add_test(NAME test_small_msg COMMAND test_small_msg)
-
-  add_executable(test_huge_alloc tests/test_huge_alloc.cc ${SOURCES})
-  target_link_libraries(test_huge_alloc ${GTEST_LIBRARIES} ${LIBRARIES})
-
-  add_executable(test_rand tests/test_rand.cc ${SOURCES})
-  target_link_libraries(test_rand ${GTEST_LIBRARIES} ${LIBRARIES})
-
-  add_executable(test_fixed_vector tests/test_fixed_vector.cc ${SOURCES})
-  target_link_libraries(test_fixed_vector ${GTEST_LIBRARIES} ${LIBRARIES})
+  foreach(app_name IN LISTS APPS)
+    add_executable(${app_name} apps/${app_name}/${app_name}.cc ${SOURCES})
+    target_link_libraries(${app_name} ${GTEST_LIBRARIES} ${LIBRARIES})
+  endforeach()
 else(LTO)
   add_library(erpc ${SOURCES})
 
