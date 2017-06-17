@@ -22,7 +22,7 @@ void Rpc<TTr>::send_credit_return_now_st(const Session *session,
 
   // Create a "fake" static MsgBuffer for inline tx_burst
   MsgBuffer cr_msgbuf = MsgBuffer(reinterpret_cast<uint8_t *>(&cr_pkthdr), 0);
-  tx_burst_now_st(session->remote_routing_info, &cr_msgbuf);
+  enqueue_hdr_tx_burst_and_drain_st(session->remote_routing_info, &cr_msgbuf);
 }
 
 }  // End ERpc

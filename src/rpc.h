@@ -453,11 +453,11 @@ class Rpc {
     }
   }
 
-  /// Transmit a header-only packet right now. This handles fault injection for
-  /// dropping control packets.
-  inline void tx_burst_now_st(Transport::RoutingInfo *routing_info,
-                              MsgBuffer *tx_msgbuf) {
-    assert(in_creator());
+  /// Transmit a header-only packet for TX burst, and drain the TX batch.
+  /// This handles fault injection for dropping control packets.
+  inline void enqueue_hdr_tx_burst_and_drain_st(
+      Transport::RoutingInfo *routing_info, MsgBuffer *tx_msgbuf) {
+    assert(in_creator() && optlevel_large_rpc_supported);
     assert(routing_info != nullptr && tx_msgbuf != nullptr);
     assert(tx_batch_i < TTr::kPostlist);
     assert(tx_msgbuf->is_expl_cr() || tx_msgbuf->is_req_for_resp());
@@ -763,10 +763,10 @@ class Rpc {
   /// Current number of RECVs available to use for sessions
   size_t recvs_available = TTr::kRecvQueueDepth;
 
-  Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx baych info
-  size_t tx_batch_i = 0;  ///< The batch index for \p tx_burst_arr
+  Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx batch info
+  size_t tx_batch_i = 0;  ///< The batch index for TX burst array
 
-  MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];  /// Batch info for \p rx_burst
+  MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];  ///< Batch info for rx_burst
   uint8_t *rx_ring[TTr::kRecvQueueDepth];       ///< The transport's RX ring
   size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
 
@@ -786,7 +786,7 @@ class Rpc {
 
   // Packet loss
   size_t prev_epoch_ts;                 ///< Timestamp of the previous epoch
-  std::vector<SSlot *> recovery_queue;  /// Queue of recovering sslots
+  std::vector<SSlot *> recovery_queue;  ///< Queue of recovering sslots
 
   // Misc
   bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
@@ -806,6 +806,8 @@ class Rpc {
   // Datapath stats
   struct {
     size_t ev_loop_calls = 0;
+    size_t pkts_sent = 0;
+    size_t post_send_calls = 0;
   } dpath_stats;
 };
 
