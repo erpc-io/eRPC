@@ -56,13 +56,13 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   }
 
   // Try to grab a free session slot
-  if (unlikely(session->client_info.sslot_free_vec.size() == 0)) return -ENOMEM;
+  if (unlikely(session->client_info.sslot_free_vec.size() == 0)) return -EBUSY;
   size_t sslot_i = session->client_info.sslot_free_vec.pop_back();
   assert(sslot_i < Session::kSessionReqWindow);
 
   // Fill in the sslot info
   SSlot &sslot = session->sslot_arr[sslot_i];
-  assert(sslot.tx_msgbuf == nullptr);  // Buried before calling continuation
+  assert(sslot.tx_msgbuf == nullptr);   // Buried before calling continuation
   assert(sslot.rx_msgbuf.is_buried());  // Buried on release_response()
 
   sslot.tx_msgbuf = req_msgbuf;

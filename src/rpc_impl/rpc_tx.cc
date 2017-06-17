@@ -45,11 +45,8 @@ void Rpc<TTr>::process_req_txq_small_one_st(SSlot *sslot,
   if (likely(session->client_info.credits > 0)) {
     session->client_info.credits--;
   } else {
-    // We cannot make progress if the packet is Unexpected and we're out of
-    // credits. In this case, caller will re-insert the sslot to the TX queue.
-    if (session->client_info.credits == 0) {
-      dpath_stat_inc(&session->dpath_stats.credits_exhaused);
-    }
+    // Out of credits; caller will re-insert the sslot to the request TX queue.
+    dpath_stat_inc(&session->dpath_stats.credits_exhaused);
     return;
   }
 

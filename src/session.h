@@ -33,8 +33,8 @@ class Session {
     kClient = 95
   };
 
-  static constexpr size_t kSessionReqWindow = 8;  ///< *Request* window size
-  static constexpr size_t kSessionCredits = 8;    ///< *Packet* credits
+  static constexpr size_t kSessionReqWindow = 16;  ///< *Request* window size
+  static constexpr size_t kSessionCredits = 8;     ///< *Packet* credits
 
   /// Controls printing of credit exhausted alerts
   static constexpr size_t kCreditsExhaustedWarnLim = 1000000000;
