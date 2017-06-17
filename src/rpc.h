@@ -447,10 +447,7 @@ class Rpc {
         tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
 
     tx_batch_i++;
-    if (tx_batch_i == TTr::kPostlist) {
-      transport->tx_burst(tx_burst_arr, TTr::kPostlist);
-      tx_batch_i = 0;
-    }
+    if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
   }
 
   /// Transmit a header-only packet for TX burst, and drain the TX batch.
@@ -484,6 +481,17 @@ class Rpc {
                   tx_msgbuf->get_pkthdr_str().c_str());
 
     tx_batch_i++;
+    do_tx_burst_st();
+  }
+
+  /// Transmit packets in the TX batch
+  inline void do_tx_burst_st() {
+    assert(in_creator());
+    assert(tx_batch_i > 0);
+
+    dpath_stat_inc(dpath_stats.post_send_calls, 1);
+    dpath_stat_inc(dpath_stats.pkts_sent, tx_batch_i);
+
     transport->tx_burst(tx_burst_arr, tx_batch_i);
     tx_batch_i = 0;
   }
@@ -646,6 +654,22 @@ class Rpc {
 
   /// Retransmit packets for an sslot for which we suspect a packet loss
   void pkt_loss_retransmit_st(SSlot *sslot);
+
+  //
+  // Stats functions
+  //
+
+  /// Return the average number of packets in a TX batch
+  double get_avg_tx_burst_size() const {
+    return static_cast<double>(dpath_stats.pkts_sent) /
+           dpath_stats.post_send_calls;
+  }
+
+  /// Reset all datapath stats
+  void reset_dpath_stats_st() {
+    assert(in_creator());
+    memset(&dpath_stats, 0, sizeof(dpath_stats));
+  }
 
   //
   // Misc public functions

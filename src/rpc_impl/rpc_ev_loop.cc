@@ -4,7 +4,7 @@ namespace ERpc {
 
 template <class TTr>
 void Rpc<TTr>::run_event_loop_one_st() {
-  dpath_stat_inc(&dpath_stats.ev_loop_calls);
+  dpath_stat_inc(dpath_stats.ev_loop_calls, 1);
 
   // In kDatapathChecks mode, alert user if background thread calls event loop
   if (kDatapathChecks) {
@@ -48,10 +48,7 @@ void Rpc<TTr>::run_event_loop_one_st() {
   }
 
   // Drain all packets
-  if (tx_batch_i > 0) {
-    transport->tx_burst(tx_burst_arr, tx_batch_i);
-    tx_batch_i = 0;
-  }
+  if (tx_batch_i > 0) do_tx_burst_st();
 
   if (kDatapathChecks) {
     in_event_loop = false;

@@ -67,12 +67,12 @@ static constexpr bool kDatapathChecks = true;
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-/// Collect datapath stats if datapath stats are enabled
-static inline void dpath_stat_inc(size_t *stat, size_t val = 1) {
+/// Collect datapath if enabled
+static inline constexpr void dpath_stat_inc(size_t &stat, size_t val) {
   if (!kDatapathStats) {
     return;
   } else {
-    *stat += val;
+    stat += val;
   }
 }
 

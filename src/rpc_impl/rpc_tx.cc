@@ -46,7 +46,7 @@ void Rpc<TTr>::process_req_txq_small_one_st(SSlot *sslot,
     session->client_info.credits--;
   } else {
     // Out of credits; caller will re-insert the sslot to the request TX queue.
-    dpath_stat_inc(&session->dpath_stats.credits_exhaused);
+    dpath_stat_inc(session->dpath_stats.credits_exhaused, 1);
     return;
   }
 
@@ -67,7 +67,7 @@ void Rpc<TTr>::process_req_txq_large_one_st(SSlot *sslot,
   if (now_sending == 0) {
     // This can happen very frequently, so don't print a message here
     assert(session->client_info.credits == 0);
-    dpath_stat_inc(&session->dpath_stats.credits_exhaused);
+    dpath_stat_inc(session->dpath_stats.credits_exhaused, 1);
     return;
   }
 
