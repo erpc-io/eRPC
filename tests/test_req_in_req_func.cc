@@ -10,7 +10,7 @@
 // should run in the background.
 bool primary_bg, backup_bg;
 
-static constexpr size_t kAppNumReqs = 30;
+static constexpr size_t kAppNumReqs = 33;
 static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 
 /// Request type used for client to primary
