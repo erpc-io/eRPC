@@ -658,9 +658,10 @@ class Rpc {
   //
   // Stats functions
   //
-
+ public:
   /// Return the average number of packets in a TX batch
   double get_avg_tx_burst_size() const {
+    if (!kDatapathStats) return -1;
     return static_cast<double>(dpath_stats.pkts_sent) /
            dpath_stats.post_send_calls;
   }
