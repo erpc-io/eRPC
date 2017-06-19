@@ -68,12 +68,16 @@ void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
   assert(in_creator());
 
   uint64_t start_tsc = rdtsc();
+  size_t iters = 0;
   while (true) {
     run_event_loop_one();  // Run at least once even if timeout_ms is 0
+    iters++;
 
-    double elapsed_ms = to_sec(rdtsc() - start_tsc, nexus->freq_ghz) * 1000;
-    if (elapsed_ms > timeout_ms) {
-      return;
+    // Amortize timer overhead over event loop iterations
+    if (iters == 1000) {
+      double elapsed_ms = to_sec(rdtsc() - start_tsc, nexus->freq_ghz) * 1000;
+      if (elapsed_ms > timeout_ms) return;
+      iters = 0;
     }
   }
 }
