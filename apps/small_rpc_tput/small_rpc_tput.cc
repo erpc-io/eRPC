@@ -1,6 +1,7 @@
 #include <gflags/gflags.h>
 #include <signal.h>
 #include <cstring>
+#include <papi.h>
 #include "rpc.h"
 
 static constexpr bool kAppVerbose = false;
@@ -9,7 +10,7 @@ static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;
-static constexpr size_t kAppTestMs = 15000;  /// Test duration in milliseconds
+static constexpr size_t kAppTestMs = 150000;  /// Test duration in milliseconds
 static constexpr size_t kAppMaxBatchSize = 32;
 static constexpr size_t kMaxConcurrency = 32;
 
@@ -170,7 +171,7 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   //       static_cast<void *>(req_msgbuf->buf), resp_size);
   req_handle->prealloc_used = true;
 
-  //c->rpc->nano_sleep(20);
+  // c->rpc->nano_sleep(20);
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -228,6 +229,18 @@ void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->stat_resp_rx[i] = 0;
     }
     printf("\n");
+
+    if (FLAGS_num_threads == 1) {
+      float real_time, proc_time, ipc;
+      long long ins;
+      int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
+      if (ret < PAPI_OK) {
+        fprintf(stderr, "PAPI initialization failed.\n");
+        exit(-1);
+      } else {
+        printf("IPC = %.3f.\n", ipc);
+      }
+    }
 
     c->rpc->reset_dpath_stats_st();
     c->stat_resp_rx_tot = 0;
@@ -294,6 +307,17 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   fprintf(stderr, "Thread %zu: All sessions connected. Running event loop.\n",
           thread_id);
   clock_gettime(CLOCK_REALTIME, &context.tput_t0);
+
+  // Do PAPI measurement if we're running one thread
+  if (FLAGS_num_threads == 1) {
+    float real_time, proc_time, ipc;
+    long long ins;
+    int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
+    if (ret < PAPI_OK) {
+      fprintf(stderr, "PAPI initialization failed.\n");
+      exit(-1);
+    }
+  }
 
   for (size_t i = 0; i < FLAGS_batch_size; i++) {
     send_reqs(&context, i);
