@@ -699,7 +699,7 @@ class Rpc {
     size_t start = rdtsc();
     size_t end = start;
     size_t upp = static_cast<size_t>(nexus->freq_ghz * ns);
-    while(end - start < upp) {
+    while (end - start < upp) {
       end = rdtsc();
     }
   }
