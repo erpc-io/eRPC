@@ -48,9 +48,10 @@ union tag_t {
     uint64_t msgbuf_i : 32;
   };
 
-  size_t _tag;;
+  size_t _tag;
 
-  tag_t(uint64_t batch_i, uint64_t msgbuf_i) : batch_i(batch_i), msgbuf_i(msgbuf_i) {}
+  tag_t(uint64_t batch_i, uint64_t msgbuf_i)
+      : batch_i(batch_i), msgbuf_i(msgbuf_i) {}
   tag_t(size_t _tag) : _tag(_tag) {}
 };
 
@@ -84,13 +85,14 @@ class AppContext {
 
   /// The entry in session_arr for this thread, so we don't send reqs to ourself
   size_t self_session_index;
-  size_t thread_id;           ///< The ID of the thread that owns this context
-  size_t num_sm_resps = 0;    ///< Number of SM responses
-  struct timespec tput_t0;    ///< Start time for throughput measurement
+  size_t thread_id;         ///< The ID of the thread that owns this context
+  size_t num_sm_resps = 0;  ///< Number of SM responses
+  struct timespec tput_t0;  ///< Start time for throughput measurement
   ERpc::FastRand fastrand;
 
-  size_t stat_rpc_resps[kMaxConcurrency] = {0};  ///< Resps for batch i
-  size_t stat_rpc_resps_tot = 0;  ///< Total responses received (all batches)
+  size_t stat_resp_rx[kMaxConcurrency] = {0};  ///< Resps received for batch i
+  size_t stat_resp_rx_tot = 0;  ///< Total responses received (all batches)
+  size_t stat_req_rx_tot = 0;   ///< Total requests received (all batches)
 
   std::array<BatchContext, kMaxConcurrency> batch_arr;  ///< Per-batch context
 };
@@ -135,8 +137,8 @@ void send_reqs(AppContext *c, size_t batch_i) {
     size_t msgbuf_index = initial_num_reqs_sent + i;
 
     if (kAppVerbose) {
-      printf("Sending request for batch %zu, msgbuf_index = %zu.\n",
-             batch_i, msgbuf_index);
+      printf("Sending request for batch %zu, msgbuf_index = %zu.\n", batch_i,
+             msgbuf_index);
     }
 
     tag_t tag(batch_i, msgbuf_index);
@@ -157,17 +159,18 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
-  auto *context = static_cast<AppContext *>(_context);
+  auto *c = static_cast<AppContext *>(_context);
+  c->stat_req_rx_tot++;
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
   ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                   resp_size);
-  //memcpy(static_cast<void *>(req_handle->pre_resp_msgbuf.buf),
+  // memcpy(static_cast<void *>(req_handle->pre_resp_msgbuf.buf),
   //       static_cast<void *>(req_msgbuf->buf), resp_size);
   req_handle->prealloc_used = true;
 
-  context->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle);
 }
 
 void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
@@ -180,8 +183,8 @@ void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   tag_t tag = static_cast<tag_t>(_tag);
   if (kAppVerbose) {
-    printf("Received response for batch %zu, msgbuf %zu.\n",
-          tag.batch_i, tag.msgbuf_i);
+    printf("Received response for batch %zu, msgbuf %zu.\n", tag.batch_i,
+           tag.msgbuf_i);
   }
 
   auto *c = static_cast<AppContext *>(_context);
@@ -208,22 +211,26 @@ void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
   }
 
-  c->stat_rpc_resps_tot++;
-  c->stat_rpc_resps[tag.batch_i]++;
+  c->stat_resp_rx_tot++;
+  c->stat_resp_rx[tag.batch_i]++;
 
-  if (c->stat_rpc_resps_tot == 1000000) {
+  if (c->stat_resp_rx_tot == 1000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
-    printf("Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f\n",
-           c->thread_id, 1000000 / seconds, c->rpc->get_avg_tx_burst_size());
+    printf(
+        "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
+        "Responses received = %zu, requests received = %zu.\n",
+        c->thread_id, 1000000 / seconds, c->rpc->get_avg_tx_burst_size(),
+        c->stat_resp_rx_tot, c->stat_req_rx_tot);
 
     for (size_t i = 0; i < FLAGS_concurrency; i++) {
-      printf("%zu, ", c->stat_rpc_resps[i]);
-      c->stat_rpc_resps[i] = 0;
+      printf("%zu, ", c->stat_resp_rx[i]);
+      c->stat_resp_rx[i] = 0;
     }
     printf("\n");
 
     c->rpc->reset_dpath_stats_st();
-    c->stat_rpc_resps_tot = 0;
+    c->stat_resp_rx_tot = 0;
+    c->stat_req_rx_tot = 0;
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
