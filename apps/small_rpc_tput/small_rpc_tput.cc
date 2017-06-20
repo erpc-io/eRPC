@@ -1,7 +1,7 @@
 #include <gflags/gflags.h>
+#include <papi.h>
 #include <signal.h>
 #include <cstring>
-#include <papi.h>
 #include "rpc.h"
 
 static constexpr bool kAppVerbose = false;
