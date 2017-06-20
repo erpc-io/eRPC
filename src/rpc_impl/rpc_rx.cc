@@ -6,9 +6,7 @@ template <class TTr>
 void Rpc<TTr>::process_comps_st() {
   assert(in_creator());
   size_t num_pkts = transport->rx_burst();
-  if (num_pkts == 0) {
-    return;
-  }
+  if (num_pkts == 0) return;
 
   for (size_t i = 0; i < num_pkts; i++) {
     uint8_t *pkt = rx_ring[rx_ring_head];

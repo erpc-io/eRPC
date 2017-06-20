@@ -273,7 +273,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
     recv_sgl[i].lkey = recv_extent.lkey;
     recv_sgl[i].addr = reinterpret_cast<uint64_t>(&buf[offset]);
 
-    recv_wr[i].wr_id = recv_sgl[i].addr;  // Debug
+    recv_wr[i].wr_id = recv_sgl[i].addr + kGRHBytes;  // For quick prefetch
     recv_wr[i].sg_list = &recv_sgl[i];
     recv_wr[i].num_sge = 1;
 
