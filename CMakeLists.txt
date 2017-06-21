@@ -106,6 +106,7 @@ set(SOURCES
   src/util/buffer.h
   src/util/huge_alloc.cc
   src/util/huge_alloc.h
+  src/util/misc.h
   src/util/mt_list.h
   src/util/math_utils.h
   src/util/rand.h
