@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <cstring>
 #include "rpc.h"
+#include "util/misc.h"
 
 static constexpr bool kAppVerbose = false;
 
@@ -22,8 +23,6 @@ DEFINE_uint64(msg_size, 0, "Request and response size");
 DEFINE_uint64(batch_size, 0, "Request batch size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 
-// XXX: g++-5 shows an unused variable warning for validators
-// https://github.com/gflags/gflags/issues/123. Current fix: use g++-7
 static bool validate_batch_size(const char *, uint64_t batch_size) {
   return batch_size <= kAppMaxBatchSize;
 }
@@ -336,6 +335,7 @@ int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
+  // g++-5 shows an unused variable warning for validators
   _unused(machine_id_validator_registered);
   _unused(batch_size_validator_registered);
   _unused(concurrency_validator_registered);
@@ -347,12 +347,13 @@ int main(int argc, char **argv) {
   nexus.register_req_func(
       kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kFgTerminal));
 
-  std::thread *threads[FLAGS_num_threads];
+  std::thread threads[FLAGS_num_threads];
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
-    threads[i] = new std::thread(thread_func, i, &nexus);
+    threads[i] = std::thread(thread_func, i, &nexus);
+    ERpc::bind_to_core(threads[i], i);
   }
 
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
-    threads[i]->join();
+    threads[i].join();
   }
 }
