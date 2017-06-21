@@ -319,7 +319,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
   }
 
-  for (size_t i = 0; i < FLAGS_batch_size; i++) {
+  for (size_t i = 0; i < FLAGS_concurrency; i++) {
     send_reqs(&context, i);
   }
 

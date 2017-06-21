@@ -42,7 +42,7 @@ void Rpc<TTr>::process_req_txq_small_one_st(SSlot *sslot,
   assert(in_creator());
 
   Session *session = sslot->session;
-  if (likely(session->client_info.credits > 0)) {
+  if (session->client_info.credits > 0) {
     session->client_info.credits--;
   } else {
     // Out of credits; caller will re-insert the sslot to the request TX queue.
