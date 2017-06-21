@@ -6,8 +6,8 @@
 #ifndef ERPC_MISC_H
 #define ERPC_MISC_H
 
-#include <thread>
 #include <stdio.h>
+#include <thread>
 
 namespace ERpc {
 
