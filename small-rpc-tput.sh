@@ -5,4 +5,4 @@ for i in $(ipcs -m | awk '{ print $1; }'); do
 done                                                                            
 
 (cd ~/libmlx4-1.2.1mlnx1/ && ./update_driver.sh)
-sudo taskset -c 0 ./build/small_rpc_tput $(cat apps/small_rpc_tput/config) --machine_id $1
+sudo ./build/small_rpc_tput $(cat apps/small_rpc_tput/config) --machine_id $1
