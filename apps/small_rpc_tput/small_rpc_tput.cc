@@ -10,7 +10,7 @@ static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;
-static constexpr size_t kAppTestMs = 150000;  /// Test duration in milliseconds
+static constexpr size_t kAppTestMs = 50000;  /// Test duration in milliseconds
 static constexpr size_t kAppMaxBatchSize = 32;
 static constexpr size_t kMaxConcurrency = 32;
 
@@ -117,13 +117,13 @@ size_t get_rand_session_index(AppContext *c) {
 
   size_t rand_session_index = c->self_session_index;
   while (rand_session_index == c->self_session_index) {
-    rand_session_index = c->fastrand.next_u32() & (c->num_sessions - 1);
+    rand_session_index = c->fastrand.next_u32() % c->num_sessions;
   }
 
   return rand_session_index;
 }
 
-void cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 void send_reqs(AppContext *c, size_t batch_i) {
   assert(c != nullptr);
   assert(batch_i < FLAGS_concurrency);
@@ -145,7 +145,7 @@ void send_reqs(AppContext *c, size_t batch_i) {
     tag_t tag(batch_i, msgbuf_index);
     int ret = c->rpc->enqueue_request(c->session_arr[rand_session_index],
                                       kAppReqType, &bc.req_msgbuf[msgbuf_index],
-                                      cont_func, tag._tag);
+                                      app_cont_func, tag._tag);
     assert(ret == 0 || ret == -EBUSY);
 
     if (ret == -EBUSY) {
@@ -175,7 +175,7 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
+void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(resp_handle != nullptr);
   assert(_context != nullptr);
 
@@ -221,8 +221,9 @@ void cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     printf(
         "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
         "Responses received = %zu, requests received = %zu.\n",
-        c->thread_id, 1000000 / seconds, c->rpc->get_avg_tx_burst_size(),
-        c->stat_resp_rx_tot, c->stat_req_rx_tot);
+        c->thread_id, c->stat_resp_rx_tot / seconds,
+        c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
+        c->stat_req_rx_tot);
 
     for (size_t i = 0; i < FLAGS_concurrency; i++) {
       printf("%zu, ", c->stat_resp_rx[i]);
@@ -335,6 +336,9 @@ int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
+  _unused(machine_id_validator_registered);
+  _unused(batch_size_validator_registered);
+  _unused(concurrency_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
