@@ -510,7 +510,7 @@ class Rpc {
    * @param req_msgbuf A valid single-packet request MsgBuffer that still needs
    * the packet to be queued
    */
-  void process_req_txq_small_one_st(SSlot *sslot, MsgBuffer *req_msgbuf);
+  void tx_small_msg_one_st(SSlot *sslot, MsgBuffer *req_msgbuf);
 
   /**
    * @brief Try to transmit a multi-packet request
@@ -519,7 +519,7 @@ class Rpc {
    * @param req_msgbuf A valid multi-packet request MsgBuffer that still needs
    * one or more packets to be queued
    */
-  void process_req_txq_large_one_st(SSlot *sslot, MsgBuffer *req_msgbuf);
+  void tx_large_msg_one_st(SSlot *sslot, MsgBuffer *req_msgbuf);
 
   //
   // rpc_rx.cc

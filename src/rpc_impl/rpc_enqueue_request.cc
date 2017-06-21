@@ -108,7 +108,18 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  req_txq.push_back(&sslot);
+  // Try to transmit small requests right now. Large requests, and small
+  // requests that cannot be transmitted (e.g., due to lack of credits) are
+  // queued in req_txq.
+  if (small_rpc_likely(req_msgbuf->num_pkts == 1)) {
+    tx_small_msg_one_st(&sslot, req_msgbuf);
+    if (sslot.client_info.req_sent == 0) {
+      req_txq.push_back(&sslot);
+    }
+  } else {
+    req_txq.push_back(&sslot);
+  }
+
   return 0;
 }
 
