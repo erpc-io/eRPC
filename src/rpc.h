@@ -39,14 +39,17 @@ class Rpc {
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 
+  /// Initial capacity of the hugepage allocator
+  static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
+
+  /// Disable packet loss handling
+  static constexpr bool kDisablePktLossHandling = true;
+
   /// Duration of a packet loss detection epoch in milliseconds
   static constexpr size_t kPktLossEpochMs = kFaultInjection ? 1 : 10;
 
   /// Packet loss timeout for an RPC request in milliseconds
   static constexpr size_t kPktLossTimeoutMs = kFaultInjection ? 5 : 500;
-
-  /// Initial capacity of the hugepage allocator
-  static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
   //
   // Constructor/destructor (rpc.cc)
@@ -694,7 +697,7 @@ class Rpc {
   /// Return the ERpc thread ID of the caller
   inline size_t get_etid() const { return tls_registry->get_etid(); }
 
-  /// Busy-sleep for ns nanoseconds
+  /// Busy-sleep for \p ns nanoseconds
   void nano_sleep(size_t ns) {
     size_t start = rdtsc();
     size_t end = start;
