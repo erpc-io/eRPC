@@ -3,6 +3,7 @@
 #include "common.h"
 #include "rpc.h"
 #include "util/barrier.h"
+#include "util/misc.h"
 
 namespace ERpc {
 
@@ -66,8 +67,11 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
 
-  erpc_dprintf_noargs("eRPC Nexus: Launching session management thread.\n");
+  erpc_dprintf("eRPC Nexus: Launching session management thread on core %zu.",
+               kNexusSmThreadCore);
   sm_thread = std::thread(sm_thread_func, &sm_thread_ctx);
+  bind_to_core(sm_thread, kNexusSmThreadCore);
+
   erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
                mgmt_udp_port, hostname.c_str());
 }

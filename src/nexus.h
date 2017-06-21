@@ -20,6 +20,7 @@ class Rpc;
 template <class TTr>
 class Nexus {
  public:
+  static constexpr size_t kNexusSmThreadCore = 15;  /// CPU core for SM thread
   enum class BgWorkItemType : bool { kReq, kResp };
 
   /// A work item submitted to a background thread
