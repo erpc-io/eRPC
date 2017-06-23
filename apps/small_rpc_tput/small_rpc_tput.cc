@@ -114,9 +114,9 @@ void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
 size_t get_rand_session_index(AppContext *c) {
   assert(c != nullptr);
 
-  size_t rand_session_index = c->self_session_index;
+  size_t rand_session_index = c->fastrand.next_u32() & (c->num_sessions - 1);
   while (rand_session_index == c->self_session_index) {
-    rand_session_index = c->fastrand.next_u32() % c->num_sessions;
+    rand_session_index = c->fastrand.next_u32() & (c->num_sessions - 1);
   }
 
   return rand_session_index;
@@ -135,6 +135,8 @@ void send_reqs(AppContext *c, size_t batch_i) {
     // Compute a random session to send the request on
     size_t rand_session_index = get_rand_session_index(c);
     size_t msgbuf_index = initial_num_reqs_sent + i;
+
+    bc.req_msgbuf[msgbuf_index].buf[0] = 3;  // Touch req MsgBuffer
 
     if (kAppVerbose) {
       printf("Sending request for batch %zu, msgbuf_index = %zu.\n", batch_i,
@@ -166,8 +168,7 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   size_t resp_size = req_msgbuf->get_data_size();
   ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                   resp_size);
-  // memcpy(static_cast<void *>(req_handle->pre_resp_msgbuf.buf),
-  //       static_cast<void *>(req_msgbuf->buf), resp_size);
+  req_handle->pre_resp_msgbuf.buf[0] = 3;  // Touch resp MsgBuffer
   req_handle->prealloc_used = true;
 
   // c->rpc->nano_sleep(20);
@@ -235,7 +236,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       long long ins;
       int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
       if (ret < PAPI_OK) {
-        fprintf(stderr, "PAPI initialization failed.\n");
+        fprintf(stderr, "PAPI IPC failed.\n");
         exit(-1);
       } else {
         printf("IPC = %.3f.\n", ipc);
