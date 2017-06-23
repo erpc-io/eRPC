@@ -132,6 +132,9 @@ void IBTransport::post_recvs(size_t num_recvs) {
       exit(-1);
     }
 
+    // Reset slack counter
+    recvs_to_post = 0;
+
     return;
   }
 
