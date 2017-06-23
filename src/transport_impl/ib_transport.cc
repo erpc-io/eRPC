@@ -6,7 +6,7 @@
 
 namespace ERpc {
 
-const size_t IBTransport::kMaxDataPerPkt;
+constexpr size_t IBTransport::kMaxDataPerPkt;
 
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage

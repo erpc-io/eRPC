@@ -2,8 +2,8 @@
 
 namespace ERpc {
 
-const size_t Session::kSessionReqWindow;
-const size_t Session::kSessionCredits;
+constexpr size_t Session::kSessionReqWindow;
+constexpr size_t Session::kSessionCredits;
 
 Session::Session(Role role, SessionState state) : role(role), state(state) {
   // A session may be created by the client in kConnectInProgress state, or
@@ -34,6 +34,9 @@ Session::Session(Role role, SessionState state) : role(role), state(state) {
 
     sslot.prealloc_used = true;  // There's no user-allocated memory to free
     sslot.client_info.cont_etid = kInvalidBgETid;  // Continuations in fg
+
+    sslot.server_info.req_rcvd = 0;
+    sslot.server_info.rfr_rcvd = 0;
 
     client_info.sslot_free_vec.push_back(sslot_i);
   }
