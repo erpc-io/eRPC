@@ -9,7 +9,6 @@ add_definitions(-std=c++14)
 add_definitions(-Wall -Wextra -Werror)
 add_definitions(-Wsign-conversion)
 add_definitions(-Wold-style-cast)
-add_definitions(-Wno-inline)
 
 add_definitions(-Wno-unused-function)
 
