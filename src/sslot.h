@@ -37,8 +37,9 @@ class SSlot {
 
  public:
   // Server-only members. These are exposed to request handlers.
-  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
   MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
+
+  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
   bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
 
  private:
