@@ -118,6 +118,23 @@ void IBTransport::post_recvs(size_t num_recvs) {
     return;
   }
 
+  if (use_fast_recv) {
+    // Construct a special RECV wr that the modded driver understands. Encode
+    // the number of required RECVs in its num_sge field.
+    struct ibv_recv_wr special_wr;
+    special_wr.wr_id = kMagicWrIDForFastRecv;
+    special_wr.num_sge = recvs_to_post;
+
+    struct ibv_recv_wr* bad_wr = &special_wr;
+    int ret = ibv_post_recv(qp, nullptr, &bad_wr);
+    if (unlikely(ret != 0)) {
+      fprintf(stderr, "eRPC IBTransport: Post RECV (fast) error %d\n", ret);
+      exit(-1);
+    }
+
+    return;
+  }
+
   // The recvs posted are @first_wr through @last_wr, inclusive
   struct ibv_recv_wr *first_wr, *last_wr, *temp_wr, *bad_wr;
 
@@ -135,8 +152,8 @@ void IBTransport::post_recvs(size_t num_recvs) {
   last_wr->next = nullptr;  // Breaker of chains
 
   ret = ibv_post_recv(qp, first_wr, &bad_wr);
-  if (ret != 0) {
-    fprintf(stderr, "eRPC IBTransport: ibv_post_recv error %d\n", ret);
+  if (unlikely(ret != 0)) {
+    fprintf(stderr, "eRPC IBTransport: Post RECV (normal) error %d\n", ret);
     exit(-1);
   }
 

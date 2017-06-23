@@ -9,15 +9,20 @@ namespace ERpc {
 class IBTransport : public Transport {
  public:
   // Transport-specific constants
-  static const TransportType kTransportType = TransportType::kInfiniBand;
-  static const size_t kMTU = 3840;              ///< Make (kRecvSize / 64) prime
-  static const size_t kRecvSize = (kMTU + 64);  ///< RECV buf size (with GRH)
-  static const size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
-  static const size_t kPostlist = 16;    ///< Maximum postlist size for SENDs
-  static const size_t kMaxInline = 60;   ///< Maximum send wr inline data
-  static const size_t kRecvSlack = 32;   ///< RECVs accumulated before posting
-  static const uint32_t kQKey = 0xffffffff;  ///< Secure key for all eRPC nodes
-  static const size_t kGRHBytes = 40;
+  static constexpr TransportType kTransportType = TransportType::kInfiniBand;
+  static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
+  static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
+  static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
+  static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
+  static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
+  static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
+  static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
+  static constexpr size_t kGRHBytes = 40;
+
+  // Constants for fast RECV driver mod
+  static constexpr uint64_t kMagicWrIDForFastRecv = 3185;
+  static constexpr uint64_t kModdedProbeWrID = 3186;
+  static constexpr int kModdedProbeRet = 3187;
 
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, "");  // Capacity check
   static_assert(kPostlist <= kUnsigBatch, "");            // Postlist check
@@ -79,7 +84,7 @@ class IBTransport : public Transport {
   size_t rx_burst();
   void post_recvs(size_t num_recvs);
 
-  /// Get the current signaling flag, and poll the send CQ if we need to.
+  /// Get the current SEND signaling flag, and poll the send CQ if we need to.
   inline int get_signaled_flag() {
     int flag = (nb_pending == 0) ? IBV_SEND_SIGNALED : 0;
     if (nb_pending == kUnsigBatch - 1) {
@@ -181,6 +186,7 @@ class IBTransport : public Transport {
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
   Buffer recv_extent;
+  bool use_fast_recv;  ///< True iff fast RECVs are enabled
 
   // SEND
   size_t nb_pending = 0;                      ///< For selective signalling

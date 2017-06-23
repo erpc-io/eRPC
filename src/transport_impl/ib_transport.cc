@@ -236,6 +236,20 @@ void IBTransport::init_infiniband_structs() {
   if (ibv_modify_qp(qp, &rtr_attr, IBV_QP_STATE | IBV_QP_SQ_PSN)) {
     throw std::runtime_error("eRPC IBTransport: Failed to modify QP to RTS");
   }
+
+  // Check if driver is modded for fast RECVs
+  struct ibv_recv_wr mod_probe_wr;
+  mod_probe_wr.wr_id = kModdedProbeWrID;
+  struct ibv_recv_wr *bad_wr = &mod_probe_wr;
+
+  int probe_ret = ibv_post_recv(qp, nullptr, &bad_wr);
+  if (probe_ret != kModdedProbeRet) {
+    erpc_dprintf_noargs("eRPC IBTransport: No driver support for fast RECV.\n");
+    use_fast_recv = false;
+  } else {
+    erpc_dprintf_noargs("eRPC IBTransport: Driver supports fast RECVs.\n");
+    use_fast_recv = true;
+  }
 }
 
 void IBTransport::init_mem_reg_funcs() {
@@ -284,8 +298,15 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
     rx_ring[i] = &buf[offset + kGRHBytes];
   }
 
-  // Fill the RECV queue
-  post_recvs(kRecvQueueDepth);
+  // Fill the RECV queu. post_recv can use fast RECV, so it's not usable here.
+  struct ibv_recv_wr *bad_wr;
+  recv_wr[kRecvQueueDepth - 1].next = nullptr;  // Breaker of chains
+
+  int ret = ibv_post_recv(qp, &recv_wr[0], &bad_wr);
+  if (ret != 0) {
+    throw std::runtime_error("eRPC IBTransport: Failed to fill RECV queue.\n");
+  }
+  recv_wr[kRecvQueueDepth - 1].next = &recv_wr[0];  // Restore circularity
 }
 
 void IBTransport::init_sends() {
