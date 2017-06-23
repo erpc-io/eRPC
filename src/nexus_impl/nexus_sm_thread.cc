@@ -6,7 +6,7 @@ namespace ERpc {
 static constexpr size_t kENetChannels = 1;
 
 /// Amount of time to block for ENet events
-static constexpr size_t kSmThreadEventLoopMs = 1;
+static constexpr size_t kSmThreadEventLoopMs = 20;
 
 // Implementation notes:
 //
