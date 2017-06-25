@@ -27,18 +27,44 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
+# Compile the ERPC library unless we cannot (profile-guided optimization or LTO)
+set(COMPILE_ERPC_LIB ON)
+
+# Options exposed to the user
 option(PERF "Compile for performance" OFF)
+option(PGO_GENERATE "Generate profiling info for profile-guided optimization" OFF)
+option(PGO_USE "Use profiling info from a profile-guided optimization session" OFF)
+
+# Parse the user-exposed options
 if(PERF)
-  MESSAGE(STATUS "Compilation optimized for performance (DEBUG = OFF, LTO = ON, FAULT_INJECTION = OFF)")
+  MESSAGE(STATUS "Compilation optimized for performance.")
   SET(DEBUG OFF)
   SET(LTO ON)
   SET(FAULT_INJECTION OFF)
 else(PERF)
-  MESSAGE(STATUS "Compilation not optimized for performance (DEBUG = OFF, LTO = ON, FAULT_INJECTION = OFF)")
+  MESSAGE(STATUS "Compilation not optimized for performance.")
   SET(DEBUG ON)
   SET(LTO OFF)
   SET(FAULT_INJECTION ON)
 endif(PERF)
+
+# Handle profile-guided optimization options
+if(PGO_GENERATE AND PGO_USE)
+  MESSAGE(FATAL_ERROR "Both profile-guided optimization modes cannot be enabled.")
+endif()
+
+if(PGO_GENERATE)
+  MESSAGE(STATUS "Profile-guided optimization (generate mode) enabled. Performance will be low.")
+  add_definitions(-fprofile-generate)
+  SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-generate")
+  SET(COMPILE_ERPC_LIB OFF)
+endif(PGO_GENERATE)
+
+if(PGO_USE)
+  MESSAGE(STATUS "Profile-guided optimization (use mode) enabled.")
+  add_definitions(-fprofile-use -fprofile-correction)
+  SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-use -fprofile-correction")
+endif(PGO_USE)
 
 # Debug mode
 option(DEBUG "Enable debugging" ON)
@@ -64,7 +90,9 @@ endif(FAULT_INJECTION)
 option(LTO "Enable link time optimization" OFF)
 if(LTO)
   MESSAGE(STATUS "LTO is enabled. Tests won't be compiled. To disable, run `cmake . -DLTO=OFF`.")
+  SET(COMPILE_ERPC_LIB OFF)
   add_definitions(-flto)
+  SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
 else(LTO)
   MESSAGE(STATUS "LTO is disabled. To enable, run `cmake . -DLTO=ON`.")
 endif(LTO)
@@ -135,14 +163,8 @@ set(OTHER_TESTS
 set(APPS
   small_rpc_tput)
 
-if(LTO)
-  # Using a compiled eRPC library with CMake and LTO is difficult.
-  # See Evernote for details.
-  foreach(app_name IN LISTS APPS)
-    add_executable(${app_name} apps/${app_name}/${app_name}.cc ${SOURCES})
-    target_link_libraries(${app_name} ${GTEST_LIBRARIES} ${LIBRARIES})
-  endforeach()
-else(LTO)
+if(COMPILE_ERPC_LIB)
+  MESSAGE(STATUS "Compiling ERPC as a library")
   add_library(erpc ${SOURCES})
 
   foreach(test_name IN LISTS CTEST_TESTS)
@@ -160,4 +182,13 @@ else(LTO)
     add_executable(${app_name} apps/${app_name}/${app_name}.cc)
     target_link_libraries(${app_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
   endforeach()
-endif(LTO)
+else(COMPILE_ERPC_LIB)
+  # Using a compiled eRPC library with CMake and LTO is difficult.
+  # See Evernote for details.
+  MESSAGE(STATUS "Not compiling ERPC as a library")
+
+  foreach(app_name IN LISTS APPS)
+    add_executable(${app_name} apps/${app_name}/${app_name}.cc ${SOURCES})
+    target_link_libraries(${app_name} ${GTEST_LIBRARIES} ${LIBRARIES})
+  endforeach()
+endif(COMPILE_ERPC_LIB)
