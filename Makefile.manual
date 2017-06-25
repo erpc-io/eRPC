@@ -1,0 +1,53 @@
+all: small_rpc_tput
+
+CXX := g++-7
+LD := ${CXX}
+
+# Flags to enable link-time optimization and GDB
+LTO := -flto
+ENABLE_DGB :=
+
+INC	:= -I src
+#PROFILE := -fprofile-generate
+PROFILE := -fprofile-use -fprofile-correction
+
+DEBUG := -DNDEBUG
+CPPFLAGS := ${ENABLE_DGB} ${LTO} -O3 ${DEBUG} -std=c++14 ${INC} -Wall -Werror \
+	-Wno-unused-result -Wno-unused-value -Wno-unused-function -march=native \
+	-Wno-inline ${PROFILE}
+
+LDFLAGS := ${ENABLE_DGB} ${LTO} -O3 -libverbs -lrt -pthread -lmemcached -lnuma \
+	-lpapi -lgflags -lenet ${PROFILE}
+
+src := src/nexus_impl/nexus.o \
+  src/nexus_impl/nexus_bg_thread.o \
+  src/nexus_impl/nexus_sm_thread.o \
+  src/rpc_impl/rpc.o \
+  src/rpc_impl/rpc_bg_queues.o \
+  src/rpc_impl/rpc_send_rfr.o \
+  src/rpc_impl/rpc_send_cr.o \
+  src/rpc_impl/rpc_enqueue_request.o \
+  src/rpc_impl/rpc_enqueue_response.o \
+  src/rpc_impl/rpc_ev_loop.o \
+  src/rpc_impl/rpc_fault_inject.o \
+  src/rpc_impl/rpc_pkt_loss.o \
+  src/rpc_impl/rpc_rx.o \
+  src/rpc_impl/rpc_tx.o \
+  src/rpc_impl/rpc_connect_handlers.o \
+  src/rpc_impl/rpc_disconnect_handlers.o \
+  src/rpc_impl/rpc_sm_api.o \
+  src/rpc_impl/rpc_sm_helpers.o \
+  src/session.o \
+  src/transport.o \
+  src/transport_impl/ib_transport.o \
+  src/transport_impl/ib_transport_datapath.o \
+  src/util/huge_alloc.o \
+  src/util/tls_registry.o \
+	apps/small_rpc_tput/small_rpc_tput.o 
+
+small_rpc_tput: ${src}
+	${LD} -o $@ $^ ${LDFLAGS}
+
+PHONY: clean
+clean:
+	rm -f *.o main ${src}
