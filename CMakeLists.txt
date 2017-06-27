@@ -32,7 +32,7 @@ set(COMPILE_ERPC_LIB ON)
 
 # Options exposed to the user
 option(PERF "Compile for performance" OFF)
-set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use)")
+set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 
 # Parse the user-exposed options
 if(PERF)
@@ -48,16 +48,16 @@ else(PERF)
 endif(PERF)
 
 if(PGO STREQUAL "generate")
-  MESSAGE(STATUS "Profile-guided optimization (generate mode) enabled. Performance will be low.")
+  MESSAGE(STATUS "Profile-guided optimization (generate mode) is enabled. Performance will be low.")
   add_definitions(-fprofile-generate)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-generate")
   SET(COMPILE_ERPC_LIB OFF)
 elseif(PGO STREQUAL "use")
-  MESSAGE(STATUS "Profile-guided optimization (use mode) enabled.")
+  MESSAGE(STATUS "Profile-guided optimization (use mode) is enabled.")
   add_definitions(-fprofile-use -fprofile-correction)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-use -fprofile-correction")
 elseif(PGO STREQUAL "none")
-  MESSAGE(STATUS "Profile-guided optimization disabled.")
+  MESSAGE(STATUS "Profile-guided optimization is disabled.")
 endif()
 
 # Debug mode

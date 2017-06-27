@@ -21,7 +21,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(item.data_bytes <= kMaxDataPerPkt);
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
-    if (item.data_bytes == 0) {
+    if (small_rpc_unlikely(item.data_bytes == 0)) {
       assert(msg_buffer->is_expl_cr() || msg_buffer->is_req_for_resp());
     }
 

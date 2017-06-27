@@ -87,20 +87,20 @@ class IBTransport : public Transport {
   /// Get the current SEND signaling flag, and poll the send CQ if we need to.
   inline int get_signaled_flag() {
     int flag = (nb_pending == 0) ? IBV_SEND_SIGNALED : 0;
-    if (nb_pending == kUnsigBatch - 1) {
+    if (nb_pending < kUnsigBatch - 1) {
+      nb_pending++;
+    } else {
       struct ibv_wc wc;
-      while (ibv_poll_cq(send_cq, 1, &wc) != 1) {
-        // Do nothing
+      while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
+        // Do nothing while we have zero completions and no poll_cq errors
       }
 
       // XXX: Don't exit!
-      if (wc.status != 0) {
+      if (unlikely(wc.status != 0)) {
         fprintf(stderr, "Bad SEND wc status %d\n", wc.status);
         exit(-1);
       }
       nb_pending = 0;
-    } else {
-      nb_pending++;
     }
 
     return flag;
