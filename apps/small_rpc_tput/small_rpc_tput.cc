@@ -114,10 +114,14 @@ void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
 
 size_t get_rand_session_index(AppContext *c) {
   assert(c != nullptr);
+  static_assert(sizeof(c->num_sessions) == 8, "");
 
-  size_t rand_session_index = c->fastrand.next_u32() & (c->num_sessions - 1);
+  // Use Lemire's trick to compute random numbers modulo c->num_sessions
+  uint32_t x = c->fastrand.next_u32();
+  size_t rand_session_index = (static_cast<size_t>(x) * c->num_sessions) >> 32;
   while (rand_session_index == c->self_session_index) {
-    rand_session_index = c->fastrand.next_u32() & (c->num_sessions - 1);
+    x = c->fastrand.next_u32();
+    rand_session_index = (static_cast<size_t>(x) * c->num_sessions) >> 32;
   }
 
   return rand_session_index;
