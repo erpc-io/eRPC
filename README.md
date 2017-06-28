@@ -53,6 +53,21 @@
      Similarly, a non-null value of `sslot->tx_msgbuf` indicates that the sslot
      is waiting for a response.
 
+## General session management notes
+ * Applications generate session management packets using eRPC API calls
+   `create_session()` and `destroy_session()`. `create_session()` sends a
+   connect request, and `destroy_session()` sends a disconnect request.
+ * The Nexus runs a session management thread that listens for session
+   management packets. This thread enqueues received packets into the session
+   management queue of the Rpc specified by the packet's destination application
+   TID.
+ * To handle session management requests, an Rpc must enter its event loop.
+   Although session management packets can be generated outside the event loop,
+   they can only be handled inside an event loop.
+ * On entering the event loop, the Rpc checks its Nexus hook for new session
+   management packets. If there are new packets, it invokes the appropriate
+   session management handler, and frees the packet.
+
 ## Session management retries
  * A session management operation is retried by the client in these cases:
    * An ENet disconnect event is received before the connect event. This happens

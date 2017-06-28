@@ -67,7 +67,7 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
 
-  erpc_dprintf("eRPC Nexus: Launching session management thread on core %zu.",
+  erpc_dprintf("eRPC Nexus: Launching session management thread on core %zu.\n",
                kNexusSmThreadCore);
   sm_thread = std::thread(sm_thread_func, &sm_thread_ctx);
   bind_to_core(sm_thread, kNexusSmThreadCore);
