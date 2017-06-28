@@ -63,7 +63,7 @@ void server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id) {
                        numa_node);
 
   server_ready = true;
-  rpc.run_event_loop_timeout(EVENT_LOOP_MS);
+  rpc.run_event_loop(EVENT_LOOP_MS);
 }
 
 /// Test: Check if passing invalid arguments to create_session gives an error

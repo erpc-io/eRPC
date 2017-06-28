@@ -173,7 +173,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
   }
 
   while (!client_done) {  // Wait for all clients
-    rpc.run_event_loop_timeout(kAppEventLoopMs);
+    rpc.run_event_loop(kAppEventLoopMs);
   }
 
   // Disconnect sessions created to other server threads if needed
@@ -296,7 +296,7 @@ void client_connect_sessions(Nexus<IBTransport> *nexus,
   }
 
   while (context.num_sm_resps < num_sessions) {
-    context.rpc->run_event_loop_one();
+    context.rpc->run_event_loop(kAppEventLoopMs);
   }
 
   // basic_sm_handler checks that the callbacks have no errors
@@ -318,7 +318,7 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &context,
   // Run the event loop for up to kAppMaxEventLoopMs milliseconds
   uint64_t cycles_start = rdtsc();
   while (context.num_sm_resps < num_resps) {
-    context.rpc->run_event_loop_timeout(kAppEventLoopMs);
+    context.rpc->run_event_loop(kAppEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
     if (ms_elapsed > kAppMaxEventLoopMs) {
@@ -341,7 +341,7 @@ void wait_for_rpc_resps_or_timeout(BasicAppContext &context,
   // Run the event loop for up to kAppMaxEventLoopMs milliseconds
   uint64_t cycles_start = rdtsc();
   while (context.num_rpc_resps < num_resps) {
-    context.rpc->run_event_loop_timeout(kAppEventLoopMs);
+    context.rpc->run_event_loop(kAppEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
     if (ms_elapsed > kAppMaxEventLoopMs) {

@@ -307,7 +307,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   }
 
   while (context.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
-    rpc.run_event_loop_timeout(200);  // 200 milliseconds
+    rpc.run_event_loop(200);  // 200 milliseconds
 
     if (ctrl_c_pressed == 1) {
       delete context.session_arr;
@@ -335,7 +335,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   }
 
   for (size_t i = 0; i < kAppTestMs; i += 1000) {
-    rpc.run_event_loop_timeout(1000);  // 1 second
+    rpc.run_event_loop(1000);  // 1 second
     if (ctrl_c_pressed == 1) break;
   }
 

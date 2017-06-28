@@ -193,7 +193,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
   // After invoking the kConnectFailed callback, the Rpc event loop tries to
   // free session resources at the server. This does not invoke a callback on
   // completion, so just wait for the callback-less freeing to complete.
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
+  rpc->run_event_loop(kAppEventLoopMs);
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
   delete context.rpc;

@@ -127,7 +127,7 @@ void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
     rpc->destroy_session(session_num_arr[sess_i]);
   }
 
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
+  rpc->run_event_loop(kAppEventLoopMs);
 
   // Free resources
   delete rpc;

@@ -41,7 +41,7 @@ void simple_connect(Nexus<IBTransport> *nexus, size_t) {
       context.rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(context.session_num, 0);
 
-  context.rpc->run_event_loop_timeout(kAppEventLoopMs);
+  context.rpc->run_event_loop(kAppEventLoopMs);
   ASSERT_EQ(context.num_sm_resps, 1);
 
   // Free resources
@@ -74,7 +74,7 @@ void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
       "localhost", kAppServerRpcId, kAppPhyPort + 1);
   ASSERT_GE(context.session_num, 0);  // Local session creation works
 
-  context.rpc->run_event_loop_timeout(kAppEventLoopMs);
+  context.rpc->run_event_loop(kAppEventLoopMs);
   ASSERT_EQ(context.num_sm_resps, 1);
 
   // Free resources
