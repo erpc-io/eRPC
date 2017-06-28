@@ -52,8 +52,6 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
   tls_registry->init();  // Initialize thread-local variables for this thread
   creator_etid = get_etid();
 
-  in_event_loop = false;
-
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for
   // the hugepage allocator.

@@ -51,6 +51,11 @@ class Rpc {
   /// Packet loss timeout for an RPC request in milliseconds
   static constexpr size_t kPktLossTimeoutMs = kFaultInjection ? 5 : 500;
 
+  /// Reset threshold of the event loop ticker. Assuming each iteration of the
+  /// event loop lasts 10 microseconds (it is much smaller in reality), the
+  /// time until reset is 10 ms.
+  static constexpr size_t kEvLoopTickerReset = 1000;
+
   //
   // Constructor/destructor (rpc.cc)
   //
@@ -394,20 +399,13 @@ class Rpc {
   //
 
  public:
-  /// Run one iteration of the event loop
-  inline void run_event_loop_one() { run_event_loop_one_st(); }
-
-  /// Run the event loop forever
-  inline void run_event_loop() { run_event_loop_st(); }
-
   /// Run the event loop for \p timeout_ms milliseconds
-  inline void run_event_loop_timeout(size_t timeout_ms) {
+  inline void run_event_loop(size_t timeout_ms) {
     run_event_loop_timeout_st(timeout_ms);
   }
 
  private:
   void run_event_loop_one_st();
-  void run_event_loop_st();
   void run_event_loop_timeout_st(size_t timeout_ms);
 
   //
@@ -827,7 +825,10 @@ class Rpc {
   std::vector<SSlot *> recovery_queue;  ///< Queue of recovering sslots
 
   // Misc
-  bool in_event_loop;  ///< Track event loop reentrance (w/ kDatapathChecks)
+
+  /// For tracking event loop reentrance (only with kDatapathChecks)
+  bool in_event_loop = false;
+  size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
   SlowRand slow_rand;  ///< A slow random generator for "real" randomness
   FastRand fast_rand;  ///< A fast random generator
 
