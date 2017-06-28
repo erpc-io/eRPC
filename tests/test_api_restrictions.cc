@@ -45,7 +45,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
     // Try to run the event loop
     if (kDatapathChecks) {
       test_printf("test: Trying to run event loop in req handler.\n");
-      ASSERT_THROW(context->rpc->run_event_loop_one(), std::runtime_error);
+      ASSERT_DEATH(context->rpc->run_event_loop(kAppEventLoopMs), ".*");
     }
   }
 
@@ -66,12 +66,13 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t) {
   assert(resp_handle != nullptr && _context != nullptr);
   auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
+  assert(!context->rpc->in_background());
 
   if (app_death_mode == AppDeathMode::kContFuncRunsEventLoop) {
     // Try to run the event loop
     if (kDatapathChecks) {
       test_printf("test: Trying to run event loop in cont func.\n");
-      ASSERT_THROW(context->rpc->run_event_loop_one(), std::runtime_error);
+      ASSERT_DEATH(context->rpc->run_event_loop(kAppEventLoopMs), ".*");
     }
   }
 
@@ -87,17 +88,18 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t) {
 
 /// The test function
 void test_func(Nexus<IBTransport> *nexus, size_t num_sessions) {
-  /* Create the Rpc and connect the session */
+  // Create the Rpc and connect the session
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
   Rpc<IBTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
 
-  /* Send a message */
+  // Send a message
   MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(kAppReqSize);
   assert(req_msgbuf.buf != nullptr);
 
+  // Run continuation in foreground thread
   int ret =
       rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
   _unused(ret);
@@ -108,11 +110,11 @@ void test_func(Nexus<IBTransport> *nexus, size_t num_sessions) {
 
   rpc->free_msg_buffer(req_msgbuf);
 
-  /* Disconnect the session */
+  // Disconnect the session
   rpc->destroy_session(session_num);
-  rpc->run_event_loop_timeout(kAppEventLoopMs);
+  rpc->run_event_loop(kAppEventLoopMs);
 
-  /* Free resources */
+  // Free resources
   delete rpc;
   client_done = true;
 }
@@ -121,6 +123,8 @@ void test_func(Nexus<IBTransport> *nexus, size_t num_sessions) {
 /// keep running a copy of the program after the crash, which cleans up
 /// hugepages.
 void TEST_HELPER() {
+  // Run one background thread to run the request handler; continuation runs
+  // in the foreground.
   launch_server_client_threads(1, 1, test_func, reg_info_vec,
                                ConnectServers::kFalse, 0.0);
 }
