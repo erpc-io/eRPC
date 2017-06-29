@@ -128,6 +128,9 @@ size_t get_rand_session_index(AppContext *c) {
 }
 
 void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+
+// Try to send a request for batch_i. If the request is successfully sent,
+// increment the batch's num_reqs_sent.
 void send_reqs(AppContext *c, size_t batch_i) {
   assert(c != nullptr);
   assert(batch_i < FLAGS_concurrency);
@@ -204,11 +207,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   bc.num_resps_rcvd++;
 
   if (bc.num_resps_rcvd == FLAGS_batch_size) {
+    // If we have a full batch, reset batch progress and send more requests
     assert(bc.num_reqs_sent == FLAGS_batch_size);
     bc.num_reqs_sent = 0;
     bc.num_resps_rcvd = 0;
     send_reqs(c, tag.batch_i);
   } else if (bc.num_reqs_sent != FLAGS_batch_size) {
+    // If we haven't sent a full batch, send more requests
     send_reqs(c, tag.batch_i);
   }
 
