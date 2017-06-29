@@ -154,8 +154,10 @@ set(OTHER_TESTS
   test_rand
   test_fixed_vector)
 
+# The apps to compile
+# Available apps: small_rpc_tput, large_rpc_tput
 set(APPS
-  small_rpc_tput)
+  large_rpc_tput)
 
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling ERPC as a library")
