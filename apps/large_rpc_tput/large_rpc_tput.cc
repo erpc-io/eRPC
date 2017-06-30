@@ -1,3 +1,15 @@
+/**
+ * @file large_rpc_tput.cc
+ *
+ * @brief Benchmark to measure large RPC throughput. Each thread measures its
+ * response RX and TX bandwidth. For this measurement to be useful, request
+ * size should be small and response size large.
+ *
+ * Requests are described by a MsgBuffer index and a session index, and are
+ * queued into req_vec until they can be transmitted. Before queueing a request
+ * descriptor, the MsgBuffer for the request must be filled with request data.
+ */
+
 #include <gflags/gflags.h>
 #include <papi.h>
 #include <signal.h>
@@ -19,7 +31,8 @@ DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
 DEFINE_uint64(machine_id, ERpc::kMaxNumMachines, "The ID of this machine");
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
-DEFINE_uint64(msg_size, 0, "Request and response size");
+DEFINE_uint64(req_size, 0, "Request data size");
+DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 
 static bool validate_machine_id(const char *, uint64_t machine_id) {
@@ -36,7 +49,7 @@ DEFINE_validator(concurrency, &validate_concurrency);
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
-/// Return the control net IP address of the machine with index server_i
+// Return the control net IP address of the machine with index server_i
 static std::string get_hostname_for_machine(size_t server_i) {
   std::ostringstream ret;
   // ret << "akaliaNode-" << std::to_string(server_i + 1)
@@ -45,31 +58,47 @@ static std::string get_hostname_for_machine(size_t server_i) {
   return ret.str();
 }
 
-/// Per-thread application context
+// Request tag, which doubles up as the request descriptor in req_vec
+union tag_t {
+  struct {
+    uint64_t session_index : 32;  // Index into context's session_num array
+    uint64_t msgbuf_index : 32;   // Index into context's req_msgbuf array
+  };
+
+  size_t _tag;
+
+  tag_t(uint64_t session_index, uint64_t msgbuf_index)
+      : session_index(session_index), msgbuf_index(msgbuf_index) {}
+  tag_t(size_t _tag) : _tag(_tag) {}
+  tag_t() : _tag(0) {}
+};
+
+static_assert(sizeof(tag_t) == sizeof(size_t), "");
+
+// Per-thread application context
 class AppContext {
  public:
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
 
-  /// Number of slots in session_arr, including an unused one for this thread
-  size_t num_sessions;
-  int *session_arr = nullptr;  ///< Sessions created as client
+  std::vector<int> session_num_vec;
 
-  /// The entry in session_arr for this thread, so we don't send reqs to ourself
+  // The entry in session_arr for this thread, so we don't send reqs to ourself
   size_t self_session_index;
-  size_t thread_id;         ///< The ID of the thread that owns this context
-  size_t num_sm_resps = 0;  ///< Number of SM responses
-  struct timespec tput_t0;  ///< Start time for throughput measurement
+  size_t thread_id;         // The ID of the thread that owns this context
+  size_t num_sm_resps = 0;  // Number of SM responses
+  struct timespec tput_t0;  // Start time for throughput measurement
   ERpc::FastRand fastrand;
 
-  size_t stat_resp_rx_tot = 0;  ///< Total responses received (all batches)
-  size_t stat_req_rx_tot = 0;   ///< Total requests received (all batches)
+  size_t stat_resp_rx_bytes_tot = 0;       // Total response bytes received
+  size_t stat_resp_tx_bytes_tot = 0;       // Total response bytes transmitted
+  std::vector<size_t> stat_resp_rx_bytes;  // Resp bytes received on a session
 
-  std::vector<size_t> req_vec;  ///< Request queue containing MsgBuffer indices
+  std::vector<tag_t> req_vec;  // Request queue
 
-  ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];  ///< MsgBuffers for requests
+  ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];  // MsgBuffers for requests
 };
 
-/// A basic session management handler that expects successful responses
+// A basic session management handler that expects successful responses
 void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
                       ERpc::SmErrType sm_err_type, void *_context) {
   _unused(sm_event_type);
@@ -85,14 +114,14 @@ void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
 
 size_t get_rand_session_index(AppContext *c) {
   assert(c != nullptr);
-  static_assert(sizeof(c->num_sessions) == 8, "");
+  size_t num_sessions = c->session_num_vec.size();
 
   // Use Lemire's trick to compute random numbers modulo c->num_sessions
   uint32_t x = c->fastrand.next_u32();
-  size_t rand_session_index = (static_cast<size_t>(x) * c->num_sessions) >> 32;
+  size_t rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
   while (rand_session_index == c->self_session_index) {
     x = c->fastrand.next_u32();
-    rand_session_index = (static_cast<size_t>(x) * c->num_sessions) >> 32;
+    rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
   }
 
   return rand_session_index;
@@ -107,26 +136,25 @@ void send_reqs(AppContext *c) {
 
   size_t write_index = 0;
   for (size_t i = 0; i < c->req_vec.size(); i++) {
-    size_t msgbuf_index = c->req_vec[i];
+    size_t msgbuf_index = c->req_vec[i].msgbuf_index;
+    size_t session_index = c->req_vec[i].session_index;
 
     ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_index];
-    assert(req_msgbuf.get_data_size() == FLAGS_msg_size);
-
-    size_t rand_session_index = get_rand_session_index(c);
+    assert(req_msgbuf.get_data_size() == FLAGS_req_size);
 
     if (kAppVerbose) {
       printf("Sending request for session %zu, msgbuf_index = %zu.\n",
-             rand_session_index, msgbuf_index);
+             session_index, msgbuf_index);
     }
 
     // Use the MsgBuffer index as tag
     int ret =
-        c->rpc->enqueue_request(c->session_arr[rand_session_index], kAppReqType,
+        c->rpc->enqueue_request(c->session_num_vec[session_index], kAppReqType,
                                 &req_msgbuf, app_cont_func, msgbuf_index);
     assert(ret == 0 || ret == -EBUSY);
 
     if (ret == -EBUSY) {
-      c->req_vec[write_index] = msgbuf_index;
+      c->req_vec[write_index] = c->req_vec[i];
       write_index++;
     }
   }
@@ -139,7 +167,6 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(_context != nullptr);
 
   auto *c = static_cast<AppContext *>(_context);
-  c->stat_req_rx_tot++;
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
@@ -151,6 +178,7 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(resp_msgbuf.buf != nullptr);
 
   memset(resp_msgbuf.buf, kAppDataByte, resp_size);  // Touch response bytes
+  c->stat_resp_tx_bytes_tot += FLAGS_resp_size;
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -161,49 +189,49 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
+  size_t msgbuf_index = static_cast<tag_t>(_tag).msgbuf_index;
+  size_t session_index = static_cast<tag_t>(_tag).session_index;
+  if (kAppVerbose) {
+    printf("Received response for msgbuf %zu, session %zu.\n", msgbuf_index,
+           session_index);
+  }
+
   // Examine resp MsgBuffer
-  if (unlikely(resp_msgbuf->get_data_size() != FLAGS_msg_size)) {
+  if (unlikely(resp_msgbuf->get_data_size() != FLAGS_resp_size)) {
     fprintf(stderr, "Invalid response size.\n");
     exit(-1);
   }
 
-  for (size_t i = 0; i < FLAGS_msg_size; i++) {
+  for (size_t i = 0; i < FLAGS_resp_size; i++) {
     if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
       fprintf(stderr, "Invalid response data.\n");
       exit(-1);
     }
   }
 
-  size_t msgbuf_index = _tag;
-  if (kAppVerbose) {
-    printf("Received response for msgbuf %zu.\n", msgbuf_index);
-  }
-
-  auto *c = static_cast<AppContext *>(_context);
-
   // Create a new request clocking this response, and put in request queue
+  auto *c = static_cast<AppContext *>(_context);
   ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_index];
-  memset(req_msgbuf.buf, kAppDataByte, FLAGS_msg_size);
-  c->req_vec.push_back(msgbuf_index);
+  memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
+  c->req_vec.push_back(tag_t(get_rand_session_index(c), msgbuf_index));
 
   // Try to send the queued requests. The request buffer for these requests is
   // already filled.
   send_reqs(c);
 
-  c->stat_resp_rx_tot++;
+  c->stat_resp_rx_bytes_tot += FLAGS_resp_size;
 
-  if (c->stat_resp_rx_tot == 1000000) {
+  if (c->stat_resp_rx_bytes_tot == 100000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
     printf(
-        "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
-        "Responses received = %zu, requests received = %zu.\n",
-        c->thread_id, c->stat_resp_rx_tot / seconds,
-        c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
-        c->stat_req_rx_tot);
+        "Thread %zu: Response RX tput = %.2f GB/s. Response RX = %.2f MB, "
+        "TX = %.2f MB.\n",
+        c->thread_id, c->stat_resp_rx_bytes_tot / (1000000000.0 * seconds),
+        c->stat_resp_rx_bytes_tot / 1000000.0,
+        c->stat_resp_tx_bytes_tot / 1000000.0);
 
-    for (size_t i = 0; i < FLAGS_concurrency; i++) {
-      printf("%zu, ", c->stat_resp_rx[i]);
-      c->stat_resp_rx[i] = 0;
+    for (size_t i = 0; i < c->session_num_vec.size(); i++) {
+      printf("%.2f, ", c->stat_resp_rx_bytes[i] / 1000000.0);
     }
     printf("\n");
 
@@ -220,8 +248,9 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
 
     c->rpc->reset_dpath_stats_st();
-    c->stat_resp_rx_tot = 0;
-    c->stat_req_rx_tot = 0;
+    std::fill(c->stat_resp_rx_bytes.begin(), c->stat_resp_rx_bytes.end(), 0);
+    c->stat_resp_rx_bytes_tot = 0;
+    c->stat_resp_tx_bytes_tot = 0;
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
@@ -229,11 +258,10 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->rpc->release_response(resp_handle);
 }
 
-/// The function executed by each thread in the cluster
+// The function executed by each thread in the cluster
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext c;
   c.thread_id = thread_id;
-  c.num_sessions = FLAGS_num_machines * FLAGS_num_threads;
   c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
@@ -242,11 +270,13 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 
-  // Allocate session array
-  c.session_arr = new int[FLAGS_num_machines * FLAGS_num_threads];
-  for (size_t i = 0; i < FLAGS_num_machines * FLAGS_num_threads; i++) {
-    c.session_arr[i] = -1;
-  }
+  // Allocate per-session info
+  size_t num_sessions = FLAGS_num_machines * FLAGS_num_threads;
+  c.session_num_vec.resize(num_sessions);
+  std::fill(c.session_num_vec.begin(), c.session_num_vec.end(), -1);
+
+  c.stat_resp_rx_bytes.resize(num_sessions);
+  std::fill(c.stat_resp_rx_bytes.begin(), c.stat_resp_rx_bytes.end(), 0);
 
   // Initiate connection for sessions
   for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
@@ -257,9 +287,9 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
       // Do not create a session to self
       if (session_index == c.self_session_index) continue;
 
-      c.session_arr[session_index] =
+      c.session_num_vec[session_index] =
           rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
-      assert(c.session_arr[session_index] >= 0);
+      assert(c.session_num_vec[session_index] >= 0);
     }
   }
 
@@ -267,7 +297,6 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     rpc.run_event_loop(200);  // 200 milliseconds
 
     if (ctrl_c_pressed == 1) {
-      delete c.session_arr;
       return;
     }
   }
@@ -276,13 +305,15 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
           thread_id);
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
-  // Pre-allocate request MsgBuffers
-  for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    c.req_msgbuf[i] = rpc.alloc_msg_buffer(FLAGS_msg_size);
-    assert(c.req_msgbuf[i].buf != nullptr);
+  // Generate the initial requests
+  for (size_t msgbuf_index = 0; msgbuf_index < FLAGS_concurrency;
+       msgbuf_index++) {
+    auto &req_msgbuf = c.req_msgbuf[msgbuf_index];
+    req_msgbuf = rpc.alloc_msg_buffer(FLAGS_req_size);
+    assert(req_msgbuf.buf != nullptr);
 
-    memset(c.req_msgbuf[i].buf, kAppDataByte, FLAGS_msg_size);  // Fill request
-    c.req_vec.push_back(i);
+    memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);  // Fill request
+    c.req_vec.push_back(tag_t(get_rand_session_index(&c), msgbuf_index));
   }
 
   // Do PAPI measurement if we're running one thread
@@ -303,8 +334,6 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     rpc.run_event_loop(1000);  // 1 second
     if (ctrl_c_pressed == 1) break;
   }
-
-  delete c.session_arr;
 }
 
 int main(int argc, char **argv) {
