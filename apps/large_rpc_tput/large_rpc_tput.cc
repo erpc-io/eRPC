@@ -17,7 +17,11 @@
 #include "rpc.h"
 #include "util/misc.h"
 
-static constexpr bool kAppVerbose = true;
+static constexpr bool kAppVerbose = false;
+
+// If true, we memset() request and respose buffers to kAppDataByte. If false,
+// only the first data byte is touched.
+static constexpr bool kAppMemset = false;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
@@ -176,7 +180,13 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_resp_size);  // Freed by eRPC
   assert(resp_msgbuf.buf != nullptr);
 
-  memset(resp_msgbuf.buf, resp_byte, FLAGS_resp_size);  // Touch response bytes
+  // Touch the response
+  if (kAppMemset) {
+    memset(resp_msgbuf.buf, resp_byte, FLAGS_resp_size);
+  } else {
+    resp_msgbuf.buf[0] = resp_byte;
+  }
+
   c->stat_resp_tx_bytes_tot += FLAGS_resp_size;
   c->rpc->enqueue_response(req_handle);
 }
@@ -201,8 +211,16 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     exit(-1);
   }
 
-  for (size_t i = 0; i < FLAGS_resp_size; i++) {
-    if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
+  // Check the response
+  if (kAppMemset) {
+    for (size_t i = 0; i < FLAGS_resp_size; i++) {
+      if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
+        fprintf(stderr, "Invalid response data.\n");
+        exit(-1);
+      }
+    }
+  } else {
+    if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
       fprintf(stderr, "Invalid response data.\n");
       exit(-1);
     }
@@ -211,7 +229,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   // Create a new request clocking this response, and put in request queue
   auto *c = static_cast<AppContext *>(_context);
   ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_index];
-  memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
+
+  if (kAppMemset) {
+    memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
+  } else {
+    req_msgbuf.buf[0] = kAppDataByte;
+  }
+
   c->req_vec.push_back(tag_t(get_rand_session_index(c), msgbuf_index));
 
   // Try to send the queued requests. The request buffer for these requests is
@@ -219,18 +243,22 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   send_reqs(c);
 
   c->stat_resp_rx_bytes_tot += FLAGS_resp_size;
+  c->stat_resp_rx_bytes[session_index] += FLAGS_resp_size;
 
   if (c->stat_resp_rx_bytes_tot == 100000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
+    double ns = seconds * 1000000000;
     printf(
-        "Thread %zu: Response RX tput = %.2f GB/s. Response RX = %.2f MB, "
-        "TX = %.2f MB.\n",
-        c->thread_id, c->stat_resp_rx_bytes_tot / (1000000000.0 * seconds),
+        "Thread %zu: Response tput: RX %.3f GB/s, TX %.3f GB/s. "
+        "Response bytes: RX %.3f MB, TX = %.3f MB.\n",
+        c->thread_id, c->stat_resp_rx_bytes_tot / ns,
+        c->stat_resp_tx_bytes_tot / ns,
         c->stat_resp_rx_bytes_tot / 1000000.0,
         c->stat_resp_tx_bytes_tot / 1000000.0);
 
+    printf("Tput per session: ");
     for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-      printf("%.2f, ", c->stat_resp_rx_bytes[i] / 1000000.0);
+      printf("%zu: %.2f, ", i, c->stat_resp_rx_bytes[i] / ns);
     }
     printf("\n");
 
@@ -311,7 +339,13 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     req_msgbuf = rpc.alloc_msg_buffer(FLAGS_req_size);
     assert(req_msgbuf.buf != nullptr);
 
-    memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);  // Fill request
+    // Fill request
+    if (kAppMemset) {
+      memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
+    }  else {
+      req_msgbuf.buf[0] = kAppDataByte;
+    }
+
     c.req_vec.push_back(tag_t(get_rand_session_index(&c), msgbuf_index));
   }
 
