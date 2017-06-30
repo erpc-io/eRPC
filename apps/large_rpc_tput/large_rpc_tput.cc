@@ -17,7 +17,7 @@
 #include "rpc.h"
 #include "util/misc.h"
 
-static constexpr bool kAppVerbose = false;
+static constexpr bool kAppVerbose = true;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
@@ -169,15 +169,15 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  size_t resp_size = req_msgbuf->get_data_size();
+  uint8_t resp_byte = req_msgbuf->buf[0];
 
   // Use dynamic response
   req_handle->prealloc_used = false;
   ERpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
-  resp_msgbuf = c->rpc->alloc_msg_buffer(resp_size);  // ERpc will free this
+  resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_resp_size);  // Freed by eRPC
   assert(resp_msgbuf.buf != nullptr);
 
-  memset(resp_msgbuf.buf, kAppDataByte, resp_size);  // Touch response bytes
+  memset(resp_msgbuf.buf, resp_byte, FLAGS_resp_size);  // Touch response bytes
   c->stat_resp_tx_bytes_tot += FLAGS_resp_size;
   c->rpc->enqueue_response(req_handle);
 }
