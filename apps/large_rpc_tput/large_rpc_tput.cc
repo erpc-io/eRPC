@@ -147,10 +147,9 @@ void send_reqs(AppContext *c) {
              session_index, msgbuf_index);
     }
 
-    // Use the MsgBuffer index as tag
     int ret =
         c->rpc->enqueue_request(c->session_num_vec[session_index], kAppReqType,
-                                &req_msgbuf, app_cont_func, msgbuf_index);
+                                &req_msgbuf, app_cont_func, c->req_vec[i]._tag);
     assert(ret == 0 || ret == -EBUSY);
 
     if (ret == -EBUSY) {
