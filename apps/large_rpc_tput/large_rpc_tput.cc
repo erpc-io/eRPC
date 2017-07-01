@@ -21,7 +21,7 @@ static constexpr bool kAppVerbose = false;
 
 // If true, we memset() request and respose buffers to kAppDataByte. If false,
 // only the first data byte is touched.
-static constexpr bool kAppMemset = false;
+static constexpr bool kAppMemset = true;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
@@ -100,6 +100,10 @@ class AppContext {
   std::vector<tag_t> req_vec;  // Request queue
 
   ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];  // MsgBuffers for requests
+
+  // The response MsgBuffer created by eRPC is copied to this MsgBuffer. This
+  // mimics an application copying the response to app-owned memory.
+  ERpc::MsgBuffer resp_dest_msgbuf[kMaxConcurrency];
 };
 
 // A basic session management handler that expects successful responses
@@ -205,35 +209,29 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
            session_index);
   }
 
-  // Examine resp MsgBuffer
+  // Check the response
   if (unlikely(resp_msgbuf->get_data_size() != FLAGS_resp_size)) {
     fprintf(stderr, "Invalid response size.\n");
     exit(-1);
   }
 
-  // Check the response
+  if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
+    fprintf(stderr, "Invalid response data.\n");
+    exit(-1);
+  }
+
+  auto *c = static_cast<AppContext *>(_context);
   if (kAppMemset) {
-    for (size_t i = 0; i < FLAGS_resp_size; i++) {
-      if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
-        fprintf(stderr, "Invalid response data.\n");
-        exit(-1);
-      }
-    }
-  } else {
-    if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
-      fprintf(stderr, "Invalid response data.\n");
-      exit(-1);
-    }
+    // Copy response to application's response destination
+    memcpy(c->resp_dest_msgbuf[msgbuf_index].buf, resp_msgbuf->buf,
+           FLAGS_resp_size);
   }
 
   // Create a new request clocking this response, and put in request queue
-  auto *c = static_cast<AppContext *>(_context);
-  ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_index];
-
   if (kAppMemset) {
-    memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
+    memset(c->req_msgbuf[msgbuf_index].buf, kAppDataByte, FLAGS_req_size);
   } else {
-    req_msgbuf.buf[0] = kAppDataByte;
+    c->req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;
   }
 
   c->req_vec.push_back(tag_t(get_rand_session_index(c), msgbuf_index));
@@ -245,9 +243,8 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_resp_rx_bytes_tot += FLAGS_resp_size;
   c->stat_resp_rx_bytes[session_index] += FLAGS_resp_size;
 
-  if (c->stat_resp_rx_bytes_tot == 100000000) {
-    double seconds = ERpc::sec_since(c->tput_t0);
-    double ns = seconds * 1000000000;
+  if (c->stat_resp_rx_bytes_tot == 500000000) {
+    double ns = ERpc::ns_since(c->tput_t0);
     printf(
         "Thread %zu: Response tput: RX %.3f GB/s, TX %.3f GB/s. "
         "Response bytes: RX %.3f MB, TX = %.3f MB.\n",
@@ -336,9 +333,11 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
        msgbuf_index++) {
     auto &req_msgbuf = c.req_msgbuf[msgbuf_index];
     req_msgbuf = rpc.alloc_msg_buffer(FLAGS_req_size);
-    assert(req_msgbuf.buf != nullptr);
+    if (req_msgbuf.buf == nullptr) {
+      throw std::runtime_error("Failed to pre-allocate req MsgBuffer.");
+    }
 
-    // Fill request
+    // Fill request and enqueue it
     if (kAppMemset) {
       memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
     } else {
@@ -346,6 +345,12 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
 
     c.req_vec.push_back(tag_t(get_rand_session_index(&c), msgbuf_index));
+
+    // Allocate response destination buffers
+    c.resp_dest_msgbuf[msgbuf_index] = rpc.alloc_msg_buffer(FLAGS_resp_size);
+    if (c.resp_dest_msgbuf[msgbuf_index].buf == nullptr) {
+      throw std::runtime_error("Failed to pre-allocate resp MsgBuffer.");
+    }
   }
 
   // Do PAPI measurement if we're running one thread
