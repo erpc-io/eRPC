@@ -252,8 +252,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         "Thread %zu: Response tput: RX %.3f GB/s, TX %.3f GB/s. "
         "Response bytes: RX %.3f MB, TX = %.3f MB.\n",
         c->thread_id, c->stat_resp_rx_bytes_tot / ns,
-        c->stat_resp_tx_bytes_tot / ns,
-        c->stat_resp_rx_bytes_tot / 1000000.0,
+        c->stat_resp_tx_bytes_tot / ns, c->stat_resp_rx_bytes_tot / 1000000.0,
         c->stat_resp_tx_bytes_tot / 1000000.0);
 
     printf("Tput per session: ");
@@ -342,7 +341,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     // Fill request
     if (kAppMemset) {
       memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
-    }  else {
+    } else {
       req_msgbuf.buf[0] = kAppDataByte;
     }
 
