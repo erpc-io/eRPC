@@ -22,17 +22,13 @@ typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
                                  size_t tag);
 
 /// The request handler types
-enum class ReqFuncType : uint8_t { kFgTerminal, kFgNonterminal, kBackground };
+enum class ReqFuncType : uint8_t { kForeground, kBackground };
 
 /// The application-specified eRPC request handler
 class ReqFunc {
  public:
   erpc_req_func_t req_func;
   ReqFuncType req_func_type;
-
-  inline bool is_fg_terminal() const {
-    return req_func_type == ReqFuncType::kFgTerminal;
-  }
 
   inline bool is_background() const {
     return req_func_type == ReqFuncType::kBackground;

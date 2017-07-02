@@ -2,6 +2,11 @@
 
 namespace ERpc {
 
+// For both foreground and background request handlers, enqueue_response() may
+// be called before or after the request handler returns to the event loop, at
+// which point the event loop buries the request MsgBuffer.
+//
+// So sslot->rx_msgbuf may or may not be valid at this point.
 template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
@@ -22,15 +27,6 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   assert(session->is_server());
   assert(session->is_connected());
-
-  // Foreground-terminal request handlers must call enqueue_response() before
-  // returning to the event loop, which then buries the request MsgBuffers.
-  // For these handlers only, rx_msgbuf must be valid at this point.
-  ReqFuncType req_func_type = sslot->server_info.req_func_type;
-  if (req_func_type == ReqFuncType::kFgTerminal) {
-    // rx_msgbuf could be fake
-    assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
-  }
 
   MsgBuffer *resp_msgbuf;
   if (small_rpc_likely(sslot->prealloc_used)) {

@@ -386,7 +386,7 @@ int main(int argc, char **argv) {
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name.c_str(), kAppNexusUdpPort,
                                        FLAGS_num_bg_threads);
   nexus.register_req_func(
-      kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kFgTerminal));
+      kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
 
   std::thread threads[FLAGS_num_threads];
   for (size_t i = 0; i < FLAGS_num_threads; i++) {

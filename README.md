@@ -34,6 +34,7 @@
  * The two interesting cases first:
    * Request MsgBuffer ownership at server: The request handler loses ownership
      of the request MsgBuffer when it returns, at which point eRPC frees it.
+     This is true for both foreground and background request handlers.
    * Response MsgBuffer ownership at client: The response MsgBuffer is buried
      when the continuation invokes `release_response()`. A continuation must
      invoke `release_response()` before returning. This is required required so
@@ -94,7 +95,6 @@
    at runtime.
 
 ## Short-term TODOs
- * Remove foreground non-terminal request handler type.
  * RFR sending needs to be paced, so we cannot use `send_rfr_now`.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.

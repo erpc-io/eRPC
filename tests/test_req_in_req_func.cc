@@ -289,9 +289,8 @@ TEST(Base, BothInForeground) {
   backup_bg = false;
 
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp,
-                     ReqFuncType::kFgNonterminal),
-      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kFgTerminal)};
+      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kForeground),
+      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kForeground)};
 
   // 2 client sessions (=> 2 server threads), 0 background threads
   launch_server_client_threads(2, 0, client_thread, reg_info_vec,
@@ -305,7 +304,7 @@ TEST(Base, PrimaryInBackground) {
 
   auto reg_info_vec = {
       ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
-      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kFgTerminal)};
+      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kForeground)};
 
   // 2 client sessions (=> 2 server threads), 3 background threads
   launch_server_client_threads(2, 1, client_thread, reg_info_vec,

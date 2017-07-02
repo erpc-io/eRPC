@@ -2,7 +2,7 @@
 
 /// This test uses a request handler that is never invoked
 auto reg_info_vec = {ReqFuncRegInfo(kAppReqType, basic_empty_req_handler,
-                                    ReqFuncType::kFgTerminal)};
+                                    ReqFuncType::kForeground)};
 
 /// Per-thread application context
 class AppContext : public BasicAppContext {

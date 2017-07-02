@@ -4,7 +4,7 @@ void req_handler(ReqHandle *, void *);  // Forward declaration
 
 /// Request handler for foreground testing
 auto reg_info_vec_fg = {
-    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kFgTerminal)};
+    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kForeground)};
 
 /// Request handler for background testing
 auto reg_info_vec_bg = {

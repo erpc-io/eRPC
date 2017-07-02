@@ -51,7 +51,7 @@ void simple_connect(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(Base, SimpleConnect) {
   auto reg_info_vec = {ReqFuncRegInfo(kAppReqType, basic_empty_req_handler,
-                                      ReqFuncType::kFgTerminal)};
+                                      ReqFuncType::kForeground)};
 
   launch_server_client_threads(1, 0, simple_connect, reg_info_vec,
                                ConnectServers::kFalse, 0.0);
@@ -84,7 +84,7 @@ void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
 
 TEST(Base, InvalidRemotePort) {
   auto reg_info_vec = {ReqFuncRegInfo(kAppReqType, basic_empty_req_handler,
-                                      ReqFuncType::kFgTerminal)};
+                                      ReqFuncType::kForeground)};
 
   launch_server_client_threads(1, 0, invalid_remote_port, reg_info_vec,
                                ConnectServers::kFalse, 0.0);

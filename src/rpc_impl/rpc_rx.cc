@@ -147,8 +147,8 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->server_info.req_type = pkthdr->req_type;
 
   if (small_rpc_likely(!req_func.is_background())) {
-    // For foreground (terminal/non-terminal) request handlers, a "fake",
-    // MsgBuffer suffices (i.e., it's valid for the duration of req_func).
+    // For foreground request handlers, a "fake" request MsgBuffer suffices --
+    // it's valid for the duration of req_func().
     sslot->rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
     bury_rx_msgbuf_nofree(sslot);
