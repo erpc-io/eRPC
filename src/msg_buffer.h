@@ -91,7 +91,8 @@ class MsgBuffer {
     return (buf == nullptr && buffer.buf == nullptr);
   }
 
-  /// Used by applications to get the current data size of a MsgBuffer
+  /// Return the current amount of data in the MsgBuffer. This can be smaller
+  /// than the maximum data capacity of the MsgBuffer.
   inline size_t get_data_size() const { return data_size; }
 
   /// Return a string representation of this MsgBuffer
