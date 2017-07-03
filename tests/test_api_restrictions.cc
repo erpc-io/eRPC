@@ -99,9 +99,12 @@ void test_func(Nexus<IBTransport> *nexus, size_t num_sessions) {
   MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(kAppReqSize);
   assert(req_msgbuf.buf != nullptr);
 
+  MsgBuffer resp_msgbuf = rpc->alloc_msg_buffer(kAppReqSize);
+  assert(resp_msgbuf.buf != nullptr);
+
   // Run continuation in foreground thread
-  int ret =
-      rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf, cont_func, 0);
+  int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf,
+                                 &resp_msgbuf, cont_func, 0);
   _unused(ret);
   assert(ret == 0);
 

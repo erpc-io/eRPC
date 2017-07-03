@@ -25,6 +25,7 @@ class PrimaryReqInfo {
   size_t req_size_cp;        ///< Size of client-to-primary request
   ReqHandle *req_handle_cp;  ///< Handle for client-to-primary request
   MsgBuffer req_msgbuf_pb;   ///< MsgBuffer for primary-to-backup request
+  MsgBuffer resp_msgbuf_pb;  ///< MsgBuffer for primary-to-backup response
   size_t etid;               ///< ERpc thread ID in the request handler
 
   PrimaryReqInfo(size_t req_size_cp, ReqHandle *req_handle_cp, size_t etid)
@@ -53,6 +54,7 @@ class AppContext : public BasicAppContext {
  public:
   FastRand fast_rand;
   MsgBuffer req_msgbuf[Session::kSessionReqWindow];
+  MsgBuffer resp_msgbuf[Session::kSessionReqWindow];
   size_t num_reqs_sent = 0;
 };
 
@@ -87,6 +89,10 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
   req_msgbuf_pb = context->rpc->alloc_msg_buffer(req_size_cp);
   assert(req_msgbuf_pb.buf != nullptr);
 
+  MsgBuffer &resp_msgbuf_pb = srv_req_info->resp_msgbuf_pb;
+  resp_msgbuf_pb = context->rpc->alloc_msg_buffer(req_size_cp);
+  assert(resp_msgbuf_pb.buf != nullptr);
+
   // Request to server #1 = client-to-server request + 1
   for (size_t i = 0; i < req_size_cp; i++) {
     req_msgbuf_pb.buf[i] = req_msgbuf_cp->buf[i] + 1;
@@ -95,8 +101,8 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
   tag_t tag(srv_req_info);  // Save the request info pointer in the tag
 
   int ret = context->rpc->enqueue_request(
-      context->session_num_arr[1], kAppReqTypePB, &srv_req_info->req_msgbuf_pb,
-      primary_cont_func, tag.tag);
+      context->session_num_arr[1], kAppReqTypePB, &req_msgbuf_pb,
+      &resp_msgbuf_pb, primary_cont_func, tag.tag);
   _unused(ret);
   assert(ret == 0);
 }
@@ -209,9 +215,9 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
   test_printf("Client: Sending request %zu of size %zu\n",
               context->num_reqs_sent, req_size);
 
-  int ret =
-      context->rpc->enqueue_request(context->session_num_arr[0], kAppReqTypeCP,
-                                    &req_msgbuf, client_cont_func, tag.tag);
+  int ret = context->rpc->enqueue_request(
+      context->session_num_arr[0], kAppReqTypeCP, &req_msgbuf,
+      &context->resp_msgbuf[msgbuf_i], client_cont_func, tag.tag);
   _unused(ret);
   assert(ret == 0);
 
@@ -261,6 +267,11 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
     context.req_msgbuf[i] =
         rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
     assert(context.req_msgbuf[i].buf != nullptr);
+
+    context.resp_msgbuf[i] =
+        rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+    assert(context.resp_msgbuf[i].buf != nullptr);
+
     client_request_helper(&context, i);
   }
 

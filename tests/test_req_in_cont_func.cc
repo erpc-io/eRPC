@@ -26,6 +26,7 @@ class AppContext : public BasicAppContext {
  public:
   FastRand fast_rand;
   MsgBuffer req_msgbuf[Session::kSessionReqWindow];
+  MsgBuffer resp_msgbuf[Session::kSessionReqWindow];
   size_t num_reqs_sent = 0;
 };
 
@@ -60,27 +61,27 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 void cont_func(RespHandle *, void *, size_t);  // Forward declaration
 
 /// Enqueue a request using the request MsgBuffer with index = msgbuf_i
-void enqueue_request_helper(AppContext *context, size_t msgbuf_i) {
-  assert(context != nullptr && msgbuf_i < Session::kSessionReqWindow);
+void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
+  assert(c != nullptr && msgbuf_i < Session::kSessionReqWindow);
 
-  size_t req_size = get_rand_msg_size(&context->fast_rand,
-                                      context->rpc->get_max_data_per_pkt(),
-                                      context->rpc->get_max_msg_size());
-  context->rpc->resize_msg_buffer(&context->req_msgbuf[msgbuf_i], req_size);
+  size_t req_size =
+      get_rand_msg_size(&c->fast_rand, c->rpc->get_max_data_per_pkt(),
+                        c->rpc->get_max_msg_size());
+  c->rpc->resize_msg_buffer(&c->req_msgbuf[msgbuf_i], req_size);
 
-  tag_t tag(static_cast<uint16_t>(context->num_reqs_sent),
+  tag_t tag(static_cast<uint16_t>(c->num_reqs_sent),
             static_cast<uint16_t>(msgbuf_i), static_cast<uint32_t>(req_size));
 
-  test_printf("Client: Sending request %zu of size %zu\n",
-              context->num_reqs_sent, req_size);
+  test_printf("Client: Sending request %zu of size %zu\n", c->num_reqs_sent,
+              req_size);
 
-  int ret = context->rpc->enqueue_request(
-      context->session_num_arr[0], kAppReqType, &context->req_msgbuf[msgbuf_i],
-      cont_func, tag.tag);
+  int ret = c->rpc->enqueue_request(
+      c->session_num_arr[0], kAppReqType, &c->req_msgbuf[msgbuf_i],
+      &c->resp_msgbuf[msgbuf_i], cont_func, tag.tag);
   _unused(ret);
   assert(ret == 0);
 
-  context->num_reqs_sent++;
+  c->num_reqs_sent++;
 }
 
 void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
@@ -115,9 +116,12 @@ void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
 
   // Start by filling the request window
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    context.req_msgbuf[i] =
-        rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+    context.req_msgbuf[i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
     assert(context.req_msgbuf[i].buf != nullptr);
+
+    context.resp_msgbuf[i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
+    assert(context.resp_msgbuf[i].buf != nullptr);
+
     enqueue_request_helper(&context, i);
   }
 

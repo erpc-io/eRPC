@@ -8,8 +8,9 @@ namespace ERpc {
 // background threads' queue of enqueue_request calls.
 template <class TTr>
 int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
-                              MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
-                              size_t tag, size_t cont_etid) {
+                              MsgBuffer *req_msgbuf, MsgBuffer *resp_msgbuf,
+                              erpc_cont_func_t cont_func, size_t tag,
+                              size_t cont_etid) {
   // Since this can be called from a background thread, only do basic checks
   // that don't require accessing the session.
   assert(is_usr_session_num_in_range(session_num));
@@ -19,6 +20,12 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
            req_msgbuf->is_dynamic());
     assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
     assert(req_msgbuf->num_pkts > 0);
+
+    assert(resp_msgbuf != nullptr);
+    assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic() &&
+           resp_msgbuf->is_dynamic());
+    assert(resp_msgbuf->data_size > 0 && resp_msgbuf->data_size <= kMaxMsgSize);
+    assert(resp_msgbuf->num_pkts > 0);
   } else {
     if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
                  !req_msgbuf->check_magic() || !req_msgbuf->is_dynamic())) {
@@ -30,13 +37,25 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                  req_msgbuf->num_pkts == 0)) {
       return -EINVAL;
     }
+
+    if (unlikely(resp_msgbuf == nullptr || resp_msgbuf->buf == nullptr ||
+                 !resp_msgbuf->check_magic() || !resp_msgbuf->is_dynamic())) {
+      return -EINVAL;
+    }
+
+    if (unlikely(resp_msgbuf->data_size == 0 ||
+                 resp_msgbuf->data_size > kMaxMsgSize ||
+                 resp_msgbuf->num_pkts == 0)) {
+      return -EINVAL;
+    }
   }
 
   // When called from a background thread, enqueue to the foreground thread
   if (small_rpc_unlikely(!in_creator())) {
     assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
-    auto req_args = enqueue_request_args_t(session_num, req_type, req_msgbuf,
-                                           cont_func, tag, get_etid());
+    auto req_args =
+        enqueue_request_args_t(session_num, req_type, req_msgbuf, resp_msgbuf,
+                               cont_func, tag, get_etid());
     bg_queues.enqueue_request.unlocked_push_back(req_args);
     return 0;
   }
@@ -62,10 +81,10 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // Fill in the sslot info
   SSlot &sslot = session->sslot_arr[sslot_i];
-  assert(sslot.tx_msgbuf == nullptr);   // Buried before calling continuation
-  assert(sslot.rx_msgbuf.is_buried());  // Buried on release_response()
+  assert(sslot.tx_msgbuf == nullptr);  // Buried before calling continuation
 
   sslot.tx_msgbuf = req_msgbuf;
+  sslot.client_info.resp_msgbuf = resp_msgbuf;
 
   // Fill in client-save info
   sslot.client_info.cont_func = cont_func;

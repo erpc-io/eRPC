@@ -73,6 +73,7 @@ class BatchContext {
   size_t num_reqs_sent = 0;   ///< Number of requests sent
   size_t num_resps_rcvd = 0;  ///< Number of responses received
   ERpc::MsgBuffer req_msgbuf[kAppMaxBatchSize];
+  ERpc::MsgBuffer resp_msgbuf[kAppMaxBatchSize];
 };
 
 /// Per-thread application context
@@ -154,6 +155,7 @@ void send_reqs(AppContext *c, size_t batch_i) {
     tag_t tag(batch_i, msgbuf_index);
     int ret = c->rpc->enqueue_request(c->session_arr[rand_session_index],
                                       kAppReqType, &bc.req_msgbuf[msgbuf_index],
+                                      &bc.resp_msgbuf[msgbuf_index],
                                       app_cont_func, tag._tag);
     assert(ret == 0 || ret == -EBUSY);
 
@@ -279,11 +281,15 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   rpc.retry_connect_on_invalid_rpc_id = true;
   context.rpc = &rpc;
 
-  // Pre-allocate request MsgBuffers for each batch
+  // Pre-allocate request and response MsgBuffers for each batch
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
+    BatchContext &bc = context.batch_arr[i];
     for (size_t j = 0; j < FLAGS_batch_size; j++) {
-      context.batch_arr[i].req_msgbuf[j] = rpc.alloc_msg_buffer(FLAGS_msg_size);
-      assert(context.batch_arr[i].req_msgbuf[j].buf != nullptr);
+      bc.req_msgbuf[j] = rpc.alloc_msg_buffer(FLAGS_msg_size);
+      assert(bc.req_msgbuf[j].buf != nullptr);
+
+      bc.resp_msgbuf[j] = rpc.alloc_msg_buffer(FLAGS_msg_size);
+      assert(bc.resp_msgbuf[j].buf != nullptr);
     }
   }
 

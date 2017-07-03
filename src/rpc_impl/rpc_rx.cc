@@ -126,7 +126,8 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   assert(pkthdr->req_num == sslot->cur_req_num + Session::kSessionReqWindow);
 
   // The previous request MsgBuffer was buried when its handler returned
-  assert(sslot->rx_msgbuf.is_buried());
+  auto &req_msgbuf = sslot->server_info.req_msgbuf;
+  assert(req_msgbuf.is_buried());
 
   // Update sslot tracking
   sslot->cur_req_num = pkthdr->req_num;
@@ -149,16 +150,16 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   if (small_rpc_likely(!req_func.is_background())) {
     // For foreground request handlers, a "fake" request MsgBuffer suffices --
     // it's valid for the duration of req_func().
-    sslot->rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
+    req_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
     bury_rx_msgbuf_nofree(sslot);
     return;
   } else {
     // For background request handlers, we need a RX ring--independent copy of
-    // the request. The allocated rx_msgbuf is freed by the background thread.
-    sslot->rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
-    assert(sslot->rx_msgbuf.buf != nullptr);
-    memcpy(reinterpret_cast<char *>(sslot->rx_msgbuf.get_pkthdr_0()), pkt,
+    // the request. The allocated req_msgbuf is freed by the background thread.
+    req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
+    assert(req_msgbuf.buf != nullptr);
+    memcpy(reinterpret_cast<char *>(req_msgbuf.get_pkthdr_0()), pkt,
            pkthdr->msg_size + sizeof(pkthdr_t));
     submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kReq);
     return;
@@ -201,9 +202,14 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   }
 
   // If we're here, this is the first (and only) packet of the response
-  assert(sslot->rx_msgbuf.is_buried());  // Older rx_msgbuf was buried earlier
   assert(sslot->tx_msgbuf != nullptr &&  // Check the request MsgBuffer
          sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
+
+  // Check that the app's response MsgBuffer has sufficient space, and resize it
+  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
+  assert(resp_msgbuf != nullptr);
+  assert(resp_msgbuf->max_data_size >= pkthdr->msg_size);
+  resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
 
   sslot->client_info.resp_rcvd = 1;
   bump_credits(sslot->session);
@@ -212,22 +218,16 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   // This also records that the full response has been received.
   bury_tx_msgbuf_client(sslot);
 
+  // Copy the header and data
+  memcpy(reinterpret_cast<char *>(resp_msgbuf->get_pkthdr_0()),
+         reinterpret_cast<const char *>(pkt),
+         pkthdr->msg_size + sizeof(pkthdr_t));
+
   if (small_rpc_likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
-    // Continuation will run in foreground with a "fake" static MsgBuffer
-    sslot->rx_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
                                  sslot->client_info.tag);
-
-    // The continuation must release the response (rx_msgbuf), and only the
-    // event loop (this thread) can re-use it and make it non-NULL.
-    assert(sslot->rx_msgbuf.buf == nullptr);
   } else {
-    // For background continuations, we need a RX ring--independent copy of
-    // the resp. The allocated rx_msgbuf is freed by the background thread.
-    sslot->rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
-    assert(sslot->rx_msgbuf.buf != nullptr);
-    memcpy(reinterpret_cast<char *>(sslot->rx_msgbuf.get_pkthdr_0()), pkt,
-           pkthdr->msg_size + sizeof(pkthdr_t));
+    // Background thread will run continuation
     submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
                          sslot->client_info.cont_etid);
     return;
@@ -325,6 +325,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   assert(pkt != nullptr);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
 
   // Handle reordering
   bool is_next_pkt_same_req =  // Is this the next packet in this request?
@@ -354,7 +355,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     // processed it, so directly compute the number of packets in the request
     size_t num_pkts_in_req = TTr::data_size_to_num_pkts(pkthdr->msg_size);
     if (sslot->server_info.req_rcvd != num_pkts_in_req) {
-      assert(sslot->rx_msgbuf.is_dynamic_and_matches(pkthdr));
+      assert(req_msgbuf.is_dynamic_and_matches(pkthdr));
     }
 
     if (pkthdr->pkt_num != num_pkts_in_req - 1) {
@@ -380,23 +381,22 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     return;
   }
 
-  // Allocate or locate the RX MsgBuffer for this message
-  MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
+  // Allocate or locate the request MsgBuffer
   if (pkthdr->pkt_num == 0) {
     // This is the first packet received for this request
-    assert(rx_msgbuf.is_buried());  // Buried earlier when req handler returned
+    assert(req_msgbuf.is_buried());  // Buried earlier when req handler returned
 
     // Update sslot tracking
     sslot->cur_req_num = pkthdr->req_num;
     sslot->server_info.req_rcvd = 1;
     bury_tx_msgbuf_server(sslot);  // Bury previous possibly-dynamic response
 
-    rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
-    assert(sslot->rx_msgbuf.buf != nullptr);
-    *(rx_msgbuf.get_pkthdr_0()) = *pkthdr;  // Copy packet header
+    req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
+    assert(req_msgbuf.buf != nullptr);
+    *(req_msgbuf.get_pkthdr_0()) = *pkthdr;  // Copy packet header
   } else {
     // This is not the first packet for this request
-    assert(rx_msgbuf.is_dynamic_and_matches(pkthdr));
+    assert(req_msgbuf.is_dynamic_and_matches(pkthdr));
     assert(sslot->server_info.req_rcvd >= 1);
     assert(sslot->cur_req_num == pkthdr->req_num);
 
@@ -404,14 +404,14 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   }
 
   // Send a credit return for every request packet except the last in sequence
-  if (pkthdr->pkt_num != rx_msgbuf.num_pkts - 1) {
+  if (pkthdr->pkt_num != req_msgbuf.num_pkts - 1) {
     send_credit_return_now_st(sslot->session, pkthdr);
   }
 
-  copy_to_rx_msgbuf(sslot, pkt);  // Copy data (header 0 was copied earlier)
+  copy_to_msgbuf(&req_msgbuf, pkt);  // Copy data (header 0 was copied earlier)
 
   // Invoke the request handler iff we have all the request packets
-  if (sslot->server_info.req_rcvd != rx_msgbuf.num_pkts) {
+  if (sslot->server_info.req_rcvd != req_msgbuf.num_pkts) {
     return;
   }
 
@@ -431,7 +431,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   // rx_msgbuf here is independent of the RX ring, so we never need a copy
   if (!req_func.is_background()) {
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
-    bury_rx_msgbuf(sslot);
+    bury_req_msgbuf(sslot);
   } else {
     submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kReq);
   }
@@ -484,20 +484,17 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
 
   bump_credits(sslot->session);
 
-  // Allocate or locate the RX MsgBuffer for this message
-  MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
+  // Allocate or locate the response MsgBuffer
+  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
   if (pkthdr->pkt_num == 0) {
     // This is the first packet received for this response
-    assert(rx_msgbuf.is_buried());  // Buried earlier
-
-    rx_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
-    assert(sslot->rx_msgbuf.buf != nullptr);
-    *(rx_msgbuf.get_pkthdr_0()) = *pkthdr;  // Copy packet header
+    resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
+    *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;  // Copy packet header XXX
 
     sslot->client_info.resp_rcvd = 1;
   } else {
     // This is not the first packet for this request
-    assert(rx_msgbuf.is_dynamic_and_matches(pkthdr));
+    assert(resp_msgbuf->is_dynamic_and_matches(pkthdr));
     assert(sslot->client_info.resp_rcvd >= 1);
 
     sslot->client_info.resp_rcvd++;
@@ -506,7 +503,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   size_t &rfr_sent = sslot->client_info.rfr_sent;
 
   // Check if we need to send more request-for-response packets
-  size_t rfr_pending = ((rx_msgbuf.num_pkts - 1) - rfr_sent);
+  size_t rfr_pending = ((resp_msgbuf->num_pkts - 1) - rfr_sent);
   if (rfr_pending > 0) {
     size_t now_sending =
         std::min(sslot->session->client_info.credits, rfr_pending);
@@ -515,16 +512,16 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
     for (size_t i = 0; i < now_sending; i++) {
       send_req_for_resp_now_st(sslot, pkthdr);
       rfr_sent++;
-      assert(rfr_sent <= rx_msgbuf.num_pkts - 1);
+      assert(rfr_sent <= resp_msgbuf->num_pkts - 1);
     }
 
     sslot->session->client_info.credits -= now_sending;
   }
 
-  copy_to_rx_msgbuf(sslot, pkt);  // Copy data (header 0 was copied earlier)
+  copy_to_msgbuf(sslot->client_info.resp_msgbuf, pkt);  // Copy only data
 
   // Invoke the continuation iff we have all the response packets
-  if (sslot->client_info.resp_rcvd != rx_msgbuf.num_pkts) {
+  if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) {
     return;
   }
 
@@ -535,10 +532,6 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   if (small_rpc_likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
                                  sslot->client_info.tag);
-
-    // The continuation must release the response (rx_msgbuf), and only the
-    // event loop (this thread) can un-bury it.
-    assert(sslot->rx_msgbuf.buf == nullptr);
   } else {
     submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
                          sslot->client_info.cont_etid);
@@ -579,13 +572,17 @@ void Rpc<TTr>::debug_check_bg_rx_msgbuf(
   _unused(sslot);
   _unused(wi_type);
 
-  assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
-  assert(sslot->rx_msgbuf.is_dynamic());
+  MsgBuffer *rx_msgbuf = sslot->is_client ? sslot->client_info.resp_msgbuf
+                                          : &sslot->server_info.req_msgbuf;
+  _unused(rx_msgbuf);
+
+  assert(rx_msgbuf->buf != nullptr && rx_msgbuf->check_magic());
+  assert(rx_msgbuf->is_dynamic());
 
   if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
-    assert(sslot->rx_msgbuf.is_req());
+    assert(rx_msgbuf->is_req());
   } else {
-    assert(sslot->rx_msgbuf.is_resp());
+    assert(rx_msgbuf->is_resp());
   }
 }
 

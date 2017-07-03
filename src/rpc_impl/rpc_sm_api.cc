@@ -155,8 +155,10 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     SSlot &sslot = session->sslot_arr[i];
     _unused(sslot);
-    assert(sslot.rx_msgbuf.buf == nullptr);
     assert(sslot.tx_msgbuf == nullptr);
+    if (!sslot.is_client) {
+      assert(sslot.server_info.req_msgbuf.buf == nullptr);
+    }
   }
 
   switch (session->state) {

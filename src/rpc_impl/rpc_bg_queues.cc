@@ -13,9 +13,10 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
 
   for (size_t i = 0; i < queue.size; i++) {
     enqueue_request_args_t &req_args = queue.list[i];
-    int ret = enqueue_request(req_args.session_num, req_args.req_type,
-                              req_args.req_msgbuf, req_args.cont_func,
-                              req_args.tag, req_args.cont_etid);
+    int ret =
+        enqueue_request(req_args.session_num, req_args.req_type,
+                        req_args.req_msgbuf, req_args.resp_msgbuf,
+                        req_args.cont_func, req_args.tag, req_args.cont_etid);
 
     assert(ret == 0 || ret == -ENOMEM);  // XXX: Handle other failures
 

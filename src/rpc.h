@@ -177,34 +177,36 @@ class Rpc {
   }
 
   /**
-   * @brief Free the session slot's RX MsgBuffer if it is dynamic, and NULL-ify
-   * it in any case. This does not fully validate the MsgBuffer, since we don't
-   * want to conditinally bury only initialized MsgBuffers.
+   * @brief Free the session slot's request MsgBuffer if it is dynamic, and
+   * NULL-ify it in any case. This does not fully validate the MsgBuffer, since
+   * we don't want to conditinally bury only initialized MsgBuffers.
    *
    * This is thread-safe, as \p free_msg_buffer() is thread-safe.
    */
-  inline void bury_rx_msgbuf(SSlot *sslot) {
+  inline void bury_req_msgbuf(SSlot *sslot) {
     assert(sslot != nullptr);
+    assert(sslot->session->is_server());
 
-    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
-    if (small_rpc_unlikely(rx_msgbuf.is_dynamic())) {
+    MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
+    if (small_rpc_unlikely(req_msgbuf.is_dynamic())) {
       // This check is OK, as dynamic MsgBuffers must be initialized
-      assert(rx_msgbuf.buf != nullptr && rx_msgbuf.check_magic());
-      free_msg_buffer(rx_msgbuf);
-      rx_msgbuf.buffer.buf = nullptr;  // Mark invalid for future
+      assert(req_msgbuf.buf != nullptr && req_msgbuf.check_magic());
+      free_msg_buffer(req_msgbuf);
+      req_msgbuf.buffer.buf = nullptr;  // Mark invalid for future
     }
 
-    rx_msgbuf.buf = nullptr;
+    req_msgbuf.buf = nullptr;
   }
 
   /**
-   * @brief Bury a session slot's RX MsgBuffer without freeing possibly
-   * dynamically allocated memory. This is used for burying fake RX MsgBuffers.
+   * @brief Bury a session slot's request MsgBuffer without freeing possibly
+   * dynamically allocated memory. This is used for burying fake request
+   * MsgBuffers.
    */
   static inline void bury_rx_msgbuf_nofree(SSlot *sslot) {
     assert(sslot != nullptr);
-    assert(!sslot->rx_msgbuf.is_dynamic());  // It's fake
-    sslot->rx_msgbuf.buf = nullptr;
+    assert(!sslot->server_info.req_msgbuf.is_dynamic());  // It's fake
+    sslot->server_info.req_msgbuf.buf = nullptr;
   }
 
   //
@@ -341,25 +343,28 @@ class Rpc {
    * cannot be enqueued because the session is out of slots.
    */
   int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
-                      erpc_cont_func_t cont_func, size_t tag,
-                      size_t cont_etid = kInvalidBgETid);
+                      MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
+                      size_t tag, size_t cont_etid = kInvalidBgETid);
 
   /// The arguments to enqueue_request
   struct enqueue_request_args_t {
     int session_num;
     uint8_t req_type;
     MsgBuffer *req_msgbuf;
+    MsgBuffer *resp_msgbuf;
     erpc_cont_func_t cont_func;
     size_t tag;
     size_t cont_etid;
 
     enqueue_request_args_t() {}
     enqueue_request_args_t(int session_num, uint8_t req_type,
-                           MsgBuffer *req_msgbuf, erpc_cont_func_t cont_func,
-                           size_t tag, size_t cont_etid)
+                           MsgBuffer *req_msgbuf, MsgBuffer *resp_msgbuf,
+                           erpc_cont_func_t cont_func, size_t tag,
+                           size_t cont_etid)
         : session_num(session_num),
           req_type(req_type),
           req_msgbuf(req_msgbuf),
+          resp_msgbuf(resp_msgbuf),
           cont_func(cont_func),
           tag(tag),
           cont_etid(cont_etid) {}
@@ -368,7 +373,8 @@ class Rpc {
   /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
-  /// From a continuation, release ownership of a response handle
+  /// From a continuation, release ownership of a response handle. The response
+  /// MsgBuffer is owned by the app and shouldn't be freed.
   inline void release_response(RespHandle *resp_handle) {
     assert(resp_handle != nullptr);
     SSlot *sslot = static_cast<SSlot *>(resp_handle);
@@ -384,10 +390,6 @@ class Rpc {
 
     // Request MsgBuffer (tx_msgbuf) was buried when this response was received
     assert(sslot->tx_msgbuf == nullptr);
-
-    // Bury the response, which may be dynamic
-    assert(sslot->rx_msgbuf.buf != nullptr && sslot->rx_msgbuf.check_magic());
-    bury_rx_msgbuf(sslot);
 
     Session *session = sslot->session;
     assert(session != nullptr && session->is_client());
@@ -538,17 +540,27 @@ class Rpc {
     session->client_info.credits++;
   }
 
-  /// Copy the data from \p pkt to \p sslot's RX MsgBuffer
-  inline void copy_to_rx_msgbuf(SSlot *sslot, const uint8_t *pkt) {
+  /// Copy the data from \p pkt to \p msgbuf
+  inline void copy_to_msgbuf(MsgBuffer *msgbuf, const uint8_t *pkt) {
     const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
-    MsgBuffer &rx_msgbuf = sslot->rx_msgbuf;
 
     size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
-    size_t bytes_to_copy = (pkthdr->pkt_num == rx_msgbuf.num_pkts - 1)
-                               ? (pkthdr->msg_size - offset)
-                               : TTr::kMaxDataPerPkt;
+
+    size_t bytes_to_copy;
+    if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
+      bytes_to_copy = pkthdr->msg_size;
+    } else {
+      size_t num_pkts_in_msg =
+          (pkthdr->msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
+      bytes_to_copy = (pkthdr->pkt_num == num_pkts_in_msg - 1)
+                          ? (pkthdr->msg_size - offset)
+                          : TTr::kMaxDataPerPkt;
+    }
+
     assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
-    memcpy(reinterpret_cast<char *>(&rx_msgbuf.buf[offset]),
+    assert(offset + bytes_to_copy <= msgbuf->get_data_size());
+
+    memcpy(reinterpret_cast<char *>(&msgbuf->buf[offset]),
            reinterpret_cast<const char *>(pkt + sizeof(pkthdr_t)),
            bytes_to_copy);
   }
@@ -829,8 +841,8 @@ class Rpc {
   /// For tracking event loop reentrance (only with kDatapathChecks)
   bool in_event_loop = false;
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
-  SlowRand slow_rand;  ///< A slow random generator for "real" randomness
-  FastRand fast_rand;  ///< A fast random generator
+  SlowRand slow_rand;         ///< A slow random generator for "real" randomness
+  FastRand fast_rand;         ///< A fast random generator
 
   /// All the faults that can be injected into ERpc for testing
   struct {

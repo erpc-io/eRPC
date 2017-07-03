@@ -52,7 +52,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
           sslot->tx_msgbuf->get_req_num(), ci.req_sent, ci.expl_cr_rcvd,
           ci.rfr_sent, ci.resp_rcvd);
 
-  if (sslot->rx_msgbuf.is_buried()) {
+  if (sslot->client_info.resp_rcvd == 0) {
     // We haven't received the first response packet
     assert(ci.expl_cr_rcvd <= ci.req_sent &&
            ci.expl_cr_rcvd < sslot->tx_msgbuf->num_pkts);
@@ -84,7 +84,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     } else {
       // We don't have the full response (which must be multi-packet), so
       // the background thread can't bury rx_msgbuf
-      assert(sslot->rx_msgbuf.is_dynamic_and_matches(sslot->tx_msgbuf));
+      MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
+      assert(resp_msgbuf->is_dynamic_and_matches(sslot->tx_msgbuf));
       size_t delta = ci.rfr_sent - (ci.resp_rcvd - 1);
       assert(credits + delta <= Session::kSessionCredits);
 
@@ -95,7 +96,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
       assert(credits > 0);
       credits--;  // Use one credit for this RFR
-      send_req_for_resp_now_st(sslot, sslot->rx_msgbuf.get_pkthdr_0());
+      send_req_for_resp_now_st(sslot, resp_msgbuf->get_pkthdr_0());
       sslot->client_info.rfr_sent++;
     }
   }
