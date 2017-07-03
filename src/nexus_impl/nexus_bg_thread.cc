@@ -39,15 +39,15 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *ctx) {
           "Request number = %zu.\n",
           ctx->bg_thread_index,
           wi.is_req() ? "request handler" : "continuation",
-          wi.rpc->get_rpc_id(), wi.sslot->rx_msgbuf.get_req_num());
+          wi.rpc->get_rpc_id(), wi.sslot->server_info.req_msgbuf.get_req_num());
 
       if (wi.is_req()) {
-        uint8_t req_type = wi.sslot->rx_msgbuf.get_req_type();
+        uint8_t req_type = wi.sslot->server_info.req_msgbuf.get_req_type();
         const ReqFunc &req_func = ctx->req_func_arr->at(req_type);
         assert(req_func.is_registered());  // Checked during submit_bg
 
         req_func.req_func(static_cast<ReqHandle *>(wi.sslot), wi.context);
-        wi.rpc->bury_rx_msgbuf(wi.sslot);  // Bury dynamic request MsgBuffer
+        wi.rpc->bury_req_msgbuf(wi.sslot);  // Bury dynamic request MsgBuffer
       } else {
         wi.sslot->client_info.cont_func(static_cast<RespHandle *>(wi.sslot),
                                         wi.context, wi.sslot->client_info.tag);
