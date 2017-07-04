@@ -19,7 +19,7 @@ static constexpr uint8_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 
 // Shared between client and server thread
-std::atomic<size_t> num_servers_ready;  ///< Number of ready servers
+std::atomic<size_t> num_servers_up;  ///< Number of ready servers
 std::atomic<bool> all_servers_ready;  ///< True iff all server threads are ready
 std::atomic<bool> client_done;        ///< True when the client has disconnected
 
@@ -131,22 +131,17 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
   }
 
   context.rpc = &rpc;
-  num_servers_ready++;
+  num_servers_up++;
 
   // Wait for all servers to come up
-  while (num_servers_ready < num_srv_threads) {
+  while (num_servers_up < num_srv_threads) {
     usleep(1);
   }
   all_servers_ready = true;
 
   // Connect to all other server threads if needed
   if (connect_servers == ConnectServers::kTrue) {
-    if (num_srv_threads <= 1) {
-      throw std::runtime_error(
-          "basic_server_thread_func: At least 2 server "
-          "threads needed to connect servers.");
-    }
-
+    assert(num_srv_threads > 1);
     test_printf("test: Server %u connecting to %zu other server threads.\n",
                 rpc_id, num_srv_threads - 1);
 
@@ -168,7 +163,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
     // Wait for the sessions to connect
     wait_for_sm_resps_or_timeout(context, num_srv_threads - 1, nexus->freq_ghz);
   } else {
-    test_printf("test: Server %u not connecting to other server threads.\n",
+    test_printf("Server %u: not connecting to other server threads.\n",
                 rpc_id);
   }
 
@@ -178,8 +173,9 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
 
   // Disconnect sessions created to other server threads if needed
   if (connect_servers == ConnectServers::kTrue) {
-    test_printf("test: Server %u disconnecting from %zu other server threads\n",
-                rpc_id, num_srv_threads - 1);
+    test_printf("Server %u: disconnecting from %zu other server threads. "
+                "Current active sessions = %zu.\n",
+                rpc_id, num_srv_threads - 1, rpc.num_active_sessions());
 
     for (size_t i = 0; i < num_srv_threads; i++) {
       uint8_t other_rpc_id = static_cast<uint8_t>(kAppServerRpcId + i);
@@ -190,8 +186,17 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
       context.rpc->destroy_session(context.session_num_arr[i]);
     }
 
+    // We cannot stop running the event loop after receiving the disconnect
+    // responses required by this thread. We need to keep the event loop running
+    // to send disconnect responses to other server threads.
     context.num_sm_resps = 0;
-    wait_for_sm_resps_or_timeout(context, num_srv_threads - 1, nexus->freq_ghz);
+    while (num_servers_up > 0) {
+      rpc.run_event_loop(kAppEventLoopMs);
+      if (context.num_sm_resps == num_srv_threads - 1) {
+        num_servers_up--;  // Mark this server as down
+        context.num_sm_resps = 0;
+      }
+    }
   }
 
   if (server_check_all_disconnected) {
@@ -229,7 +234,7 @@ void launch_server_client_threads(
                             ReqFunc(info.req_func, info.req_func_type));
   }
 
-  num_servers_ready = 0;
+  num_servers_up = 0;
   all_servers_ready = false;
   client_done = false;
 
