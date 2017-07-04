@@ -83,7 +83,7 @@ void Rpc<TTr>::process_comps_st() {
 template <class TTr>
 void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr);
+  assert(sslot != nullptr && sslot->session->is_server());
   assert(pkt != nullptr);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
@@ -169,7 +169,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
 template <class TTr>
 void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr);
+  assert(sslot != nullptr && sslot->session->is_client());
   assert(pkt != nullptr);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
@@ -237,7 +237,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
 template <class TTr>
 void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_creator());
-  assert(sslot != nullptr);
+  assert(sslot != nullptr && sslot->session->is_client());
   assert(pkthdr != nullptr);
 
   // Handle reordering
@@ -266,7 +266,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 template <class TTr>
 void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_creator());
-  assert(sslot != nullptr);
+  assert(sslot != nullptr && sslot->session->is_server());
   assert(pkthdr != nullptr);
 
   // Handle reordering
@@ -321,7 +321,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 template <class TTr>
 void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr);
+  assert(sslot != nullptr && sslot->session->is_server());
   assert(pkt != nullptr);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
@@ -441,7 +441,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
 template <class TTr>
 void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr);
+  assert(sslot != nullptr && sslot->session->is_client());
   assert(pkt != nullptr);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
