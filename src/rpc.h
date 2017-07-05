@@ -49,7 +49,7 @@ class Rpc {
   static constexpr size_t kPktLossEpochMs = kFaultInjection ? 1 : 10;
 
   /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kPktLossTimeoutMs = kFaultInjection ? 5 : 500;
+  static constexpr size_t kPktLossTimeoutMs = kFaultInjection ? 1 : 500;
 
   /// Reset threshold of the event loop ticker. Assuming each iteration of the
   /// event loop lasts 10 microseconds (it is much smaller in reality), the
@@ -139,8 +139,13 @@ class Rpc {
     return ret;
   }
 
+  // Methods to bury server-side request and response MsgBuffers. Client-side
+  // request and response MsgBuffers are owned by user apps, so eRPC doesn't
+  // free their backing memory.
+
   /**
-   * @brief Bury a server session slot's TX MsgBuffer containing the response.
+   * @brief Bury a server sslot's response MsgBuffer (i.e., sslot->tx_msgbuf).
+   *
    * This does not fully validate the MsgBuffer, since we don't want to
    * conditionally bury only initialized MsgBuffers.
    *
@@ -148,7 +153,7 @@ class Rpc {
    * even prealloc response MsgBuffers are non-fake: the \p prealloc_used field
    * is used to decide if we need to free memory.
    */
-  inline void bury_tx_msgbuf_server(SSlot *sslot) {
+  inline void bury_resp_msgbuf_server(SSlot *sslot) {
     assert(sslot != nullptr);
 
     // Free the response MsgBuffer iff it is not preallocated
@@ -165,25 +170,12 @@ class Rpc {
   }
 
   /**
-   * @brief Bury a client session slot's TX MsgBuffer containing the request.
+   * @brief Bury a server sslot's request MsgBuffer.
+   *
    * This does not fully validate the MsgBuffer, since we don't want to
-   * conditionally bury only initialized MsgBuffers.
-   *
-   * Since request MsgBuffer memory is owned by the user, we don't free it here.
+   * conditinally bury only initialized MsgBuffers.
    */
-  static inline void bury_tx_msgbuf_client(SSlot *sslot) {
-    assert(sslot != nullptr);
-    sslot->tx_msgbuf = nullptr;
-  }
-
-  /**
-   * @brief Free the session slot's request MsgBuffer if it is dynamic, and
-   * NULL-ify it in any case. This does not fully validate the MsgBuffer, since
-   * we don't want to conditinally bury only initialized MsgBuffers.
-   *
-   * This is thread-safe, as \p free_msg_buffer() is thread-safe.
-   */
-  inline void bury_req_msgbuf(SSlot *sslot) {
+  inline void bury_req_msgbuf_server(SSlot *sslot) {
     assert(sslot != nullptr);
     assert(sslot->session->is_server());
 
@@ -196,17 +188,6 @@ class Rpc {
     }
 
     req_msgbuf.buf = nullptr;
-  }
-
-  /**
-   * @brief Bury a session slot's request MsgBuffer without freeing possibly
-   * dynamically allocated memory. This is used for burying fake request
-   * MsgBuffers.
-   */
-  static inline void bury_rx_msgbuf_nofree(SSlot *sslot) {
-    assert(sslot != nullptr);
-    assert(!sslot->server_info.req_msgbuf.is_dynamic());  // It's fake
-    sslot->server_info.req_msgbuf.buf = nullptr;
   }
 
   //
@@ -541,7 +522,7 @@ class Rpc {
   }
 
   /// Copy the data from \p pkt to \p msgbuf
-  inline void copy_to_msgbuf(MsgBuffer *msgbuf, const uint8_t *pkt) {
+  inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, const uint8_t *pkt) {
     const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
     size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
