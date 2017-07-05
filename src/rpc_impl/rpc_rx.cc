@@ -108,6 +108,8 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
       if (sslot->tx_msgbuf != nullptr) {
         // The response is available, so resend it
         assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
+        assert(sslot->tx_msgbuf->is_resp());
+        assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
         erpc_dprintf("%s: Re-sending response.\n", issue_msg);
         enqueue_pkt_tx_burst_st(sslot, 0, std::min(sslot->tx_msgbuf->data_size,
@@ -132,7 +134,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   // Update sslot tracking
   sslot->cur_req_num = pkthdr->req_num;
   sslot->server_info.req_rcvd = 1;
-  bury_tx_msgbuf_server(sslot);  // Bury the previous possibly-dynamic response
+
+  // Bury the previous, possibly dynamic response (sslot->tx_msgbuf).
+  // This marks the response for cur_req_num as unavailable
+  bury_resp_msgbuf_server(sslot);
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   if (unlikely(!req_func.is_registered())) {
@@ -148,11 +153,11 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->server_info.req_type = pkthdr->req_type;
 
   if (small_rpc_likely(!req_func.is_background())) {
-    // For foreground request handlers, a "fake" request MsgBuffer suffices --
-    // it's valid for the duration of req_func().
+    // For foreground request handlers, a "fake" static request MsgBuffer
+    // suffices -- it's valid for the duration of req_func().
     req_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
-    bury_rx_msgbuf_nofree(sslot);
+    req_msgbuf.buf = nullptr;  // Equivalent to bury()
     return;
   } else {
     // For background request handlers, we need a RX ring--independent copy of
@@ -214,9 +219,8 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->client_info.resp_rcvd = 1;
   bump_credits(sslot->session);
 
-  // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory.
-  // This also records that the full response has been received.
-  bury_tx_msgbuf_client(sslot);
+  // Bury request MsgBuffer and mark response as received
+  sslot->tx_msgbuf = nullptr;  // Equivalent to bury()
 
   // Copy the header and data
   memcpy(reinterpret_cast<char *>(resp_msgbuf->get_pkthdr_0()),
@@ -296,6 +300,8 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // If we're here, this is a past RFR packet for this request. Resend resp.
     assert(pkthdr->req_num == sslot->cur_req_num &&
            pkthdr->pkt_num < sslot->server_info.rfr_rcvd + 1);
+    assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
+
     erpc_dprintf("%s: Re-sending response.\n", issue_msg);
 
     // Send the response packet with index = pkthdr->pkt_num (same as below)
@@ -369,6 +375,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     if (sslot->tx_msgbuf != nullptr) {
       // The response is available, so resend it
       assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
+      assert(sslot->tx_msgbuf->is_resp());
+      assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
       erpc_dprintf("%s: Re-sending response.\n", issue_msg);
       enqueue_pkt_tx_burst_st(
@@ -389,7 +397,10 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     // Update sslot tracking
     sslot->cur_req_num = pkthdr->req_num;
     sslot->server_info.req_rcvd = 1;
-    bury_tx_msgbuf_server(sslot);  // Bury previous possibly-dynamic response
+
+    // Bury the previous, possibly dynamic response.
+    // This marks the response for cur_req_num as unavailable
+    bury_resp_msgbuf_server(sslot);
 
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(req_msgbuf.buf != nullptr);
@@ -408,7 +419,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     send_credit_return_now_st(sslot->session, pkthdr);
   }
 
-  copy_to_msgbuf(&req_msgbuf, pkt);  // Copy data (header 0 was copied earlier)
+  copy_data_to_msgbuf(&req_msgbuf, pkt);  // Header 0 was copied earlier
 
   // Invoke the request handler iff we have all the request packets
   if (sslot->server_info.req_rcvd != req_msgbuf.num_pkts) {
@@ -431,7 +442,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   // rx_msgbuf here is independent of the RX ring, so we never need a copy
   if (!req_func.is_background()) {
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
-    bury_req_msgbuf(sslot);
+    bury_req_msgbuf_server(sslot);
   } else {
     submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kReq);
   }
@@ -487,9 +498,11 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   // Allocate or locate the response MsgBuffer
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
   if (pkthdr->pkt_num == 0) {
-    // This is the first packet received for this response
+    // This is the first packet received for this response. Resize the
+    // client-owned response MsgBuffer. eRPC owns this MsgBuffer until the
+    // continuation is invoked.
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-    *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;  // Copy packet header XXX
+    *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;  // Copy packet header
 
     sslot->client_info.resp_rcvd = 1;
   } else {
@@ -518,16 +531,13 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
     sslot->session->client_info.credits -= now_sending;
   }
 
-  copy_to_msgbuf(sslot->client_info.resp_msgbuf, pkt);  // Copy only data
+  copy_data_to_msgbuf(resp_msgbuf, pkt);  // Header 0 was copied earlier
 
   // Invoke the continuation iff we have all the response packets
-  if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) {
-    return;
-  }
+  if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) return;
 
-  // Bury the request MsgBuffer (tx_msgbuf) without freeing user-owned memory
-  // This also records that the full response has been received.
-  bury_tx_msgbuf_client(sslot);
+  // Bury request MsgBuffer and mark response as received
+  sslot->tx_msgbuf = nullptr;  // Equivalent to bury()
 
   if (small_rpc_likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
