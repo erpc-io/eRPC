@@ -81,12 +81,15 @@ class IBTransport : public Transport {
 
   // ib_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
+  void tx_flush();
+  void poll_send_cq_for_flush(bool first);
   size_t rx_burst();
   void post_recvs(size_t num_recvs);
 
-  /// Get the current SEND signaling flag, and poll the send CQ if we need to.
+  /// Get the current SEND signaling flag, and poll the send CQ if we need to
   inline int get_signaled_flag() {
     int flag = (nb_pending == 0) ? IBV_SEND_SIGNALED : 0;
+
     if (nb_pending < kUnsigBatch - 1) {
       nb_pending++;
     } else {
@@ -95,11 +98,12 @@ class IBTransport : public Transport {
         // Do nothing while we have zero completions and no poll_cq errors
       }
 
-      // XXX: Don't exit!
       if (unlikely(wc.status != 0)) {
-        fprintf(stderr, "Bad SEND wc status %d\n", wc.status);
+        fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n",
+                wc.status);
         exit(-1);
       }
+
       nb_pending = 0;
     }
 
@@ -182,6 +186,7 @@ class IBTransport : public Transport {
   int device_id = -1;       ///< Physical device ID resolved from phy_port
   uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
   uint16_t port_lid = 0;    ///< InfiniBand LID of phy_port. 0 is invalid.
+  struct ibv_ah *self_ah;   ///< The address handle of this node, used for flush
   struct ibv_pd *pd = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
@@ -190,7 +195,7 @@ class IBTransport : public Transport {
 
   // SEND
   size_t nb_pending = 0;                      ///< For selective signalling
-  struct ibv_send_wr send_wr[kPostlist + 1];  // +1 for blind ->next */
+  struct ibv_send_wr send_wr[kPostlist + 1];  // +1 for blind ->next
   struct ibv_sge send_sgl[kPostlist][2];      // 2 SGE/wr for header & payload
 
   // RECV

@@ -33,7 +33,7 @@ void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
   init_sends();
 }
 
-// The transport destructore is called after \p huge_alloc has already been
+// The transport destructor is called after \p huge_alloc has already been
 // destroyed by \p Rpc. Deleting \p huge_alloc deregisters and frees all SHM
 // memory regions.
 //
@@ -54,6 +54,11 @@ IBTransport::~IBTransport() {
 
   if (ibv_destroy_cq(recv_cq)) {
     fprintf(stderr, "eRPC IBTransport: Failed to destroy recv CQ.");
+    exit(-1);
+  }
+
+  if (ibv_destroy_ah(self_ah)) {
+    fprintf(stderr, "eRPC IBTransport: Failed to destroy self address handle.");
     exit(-1);
   }
 
@@ -189,6 +194,20 @@ void IBTransport::init_infiniband_structs() {
     throw std::runtime_error("eRPC IBTransport: Failed to create SEND CQ");
   }
 
+  // Create self address handle
+  struct ibv_ah_attr ah_attr;
+  memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
+  ah_attr.is_global = 0;
+  ah_attr.dlid = port_lid;
+  ah_attr.sl = 0;
+  ah_attr.src_path_bits = 0;
+
+  ah_attr.port_num = dev_port_id;  // Local port
+  self_ah = ibv_create_ah(pd, &ah_attr);
+  if (self_ah == nullptr) {
+    throw std::runtime_error("eRPC IBTransport: Failed to create self AH");
+  }
+
   // Initialize QP creation attributes
   struct ibv_qp_init_attr create_attr;
   memset(static_cast<void *>(&create_attr), 0, sizeof(struct ibv_qp_init_attr));
@@ -316,6 +335,10 @@ void IBTransport::init_sends() {
     send_wr[i].opcode = IBV_WR_SEND_WITH_IMM;
     send_wr[i].sg_list = &send_sgl[i][0];
   }
+
+  // This serves as a sentinel: If the gather address is non-zero, a SEND work
+  // request has been posted.
+  send_sgl[0][0].addr = 0;
 }
 
 }  // End ERpc

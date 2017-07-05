@@ -49,9 +49,8 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
       wr.num_sge = 1;
     } else {
-      // This is not the first packet, so we need 2 SGEs. The offset_to_pkt_num
-      // function is expensive, but it's OK because we're dealing with a
-      // multi-pkt message.
+      // This is not the first packet, so we need 2 SGEs. The offset-to-pkt_num
+      // computation involes a division, but it's OK because it's a large msg.
       size_t pkt_num = (item.offset + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
@@ -82,14 +81,78 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
   struct ibv_send_wr* bad_wr;
 
-  // Handle failure. XXX: Don't exit.
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
   if (unlikely(ret != 0)) {
-    fprintf(stderr, "ibv_post_send failed. ret = %d\n", ret);
+    fprintf(stderr, "eRPC: Fatal error. ibv_post_send failed. ret = %d\n", ret);
     exit(-1);
   }
 
   send_wr[num_pkts - 1].next = &send_wr[num_pkts];  // Restore chain; safe
+}
+
+// This is a slower polling function than the one used in tx_burst: it prints
+// a warning message when the number of polling attempts gets too high. This
+// overhead is fine because the send queue is flushed only on packet loss or
+// reordering.
+void IBTransport::poll_send_cq_for_flush(bool first) {
+  struct ibv_wc wc;
+  size_t num_tries = 0;
+  while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
+    num_tries++;
+    if (num_tries == 1000000000) {
+      fprintf(stderr,
+              "eRPC: Warning. tx_flush stuck polling for %s signaled wr.\n",
+              first ? "first" : "second");
+      num_tries = 0;
+    }
+  }
+
+  if (unlikely(wc.status != 0)) {
+    fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n", wc.status);
+    exit(-1);
+  }
+}
+
+void IBTransport::tx_flush() {
+  // Check the sentinel: addr is non-zero if any work request has been posted
+  if (unlikely(send_sgl[0][0].addr == 0)) {
+    fprintf(stderr,
+            "eRPC: Warning. tx_flush called, but no SEND request in queue.\n");
+    return;
+  }
+
+  // If we are here, we have posted a SEND work request. The selective signaling
+  // logic guarantees that there is *exactly one* *singled* SEND work request.
+  nb_pending = 0;                // Reset selective sigaling logic
+  poll_send_cq_for_flush(true);  // Poll the one existing signaled WQE
+
+  // Use send_wr[0] to post the second signaled flush WQE
+  struct ibv_send_wr& wr = send_wr[0];
+  assert(wr.next == &send_wr[1]);  // +1 is valid
+  assert(wr.wr.ud.remote_qkey == kQKey);
+  assert(wr.opcode == IBV_WR_SEND_WITH_IMM);
+  assert(wr.sg_list == send_sgl[0]);
+
+  wr.next = nullptr;  // Break the chain
+  wr.send_flags = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
+  wr.num_sge = 0;           // Header-only, modify-able
+  wr.wr.ud.remote_qpn = 0;  // Invalid QPN, which will cause the drop
+  wr.wr.ud.ah = self_ah;    // Send to self
+
+  struct ibv_send_wr* bad_wr;
+  int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
+  if (unlikely(ret != 0)) {
+    fprintf(stderr,
+            "eRPC: Fatal error. ibv_post_send failed for flush WQE. ret = %d\n",
+            ret);
+    exit(-1);
+  }
+
+  wr.next = &send_wr[1];          // Restore the chain
+  poll_send_cq_for_flush(false);  // Poll the signaled WQE posted above
+
+  // The send queue doesn't have a work request now, so set the sentinel again
+  send_sgl[0][0].addr = 0;
 }
 
 size_t IBTransport::rx_burst() {
@@ -99,7 +162,8 @@ size_t IBTransport::rx_burst() {
   if (kDatapathChecks) {
     for (int i = 0; i < new_comps; i++) {
       if (unlikely(recv_wc[i].status != 0)) {
-        fprintf(stderr, "Bad wc status %d\n", recv_wc[i].status);
+        fprintf(stderr, "eRPC: Fatal error. Bad wc status %d\n",
+                recv_wc[i].status);
         exit(-1);
       }
     }
