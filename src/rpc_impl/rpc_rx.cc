@@ -114,6 +114,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
         erpc_dprintf("%s: Re-sending response.\n", issue_msg);
         enqueue_pkt_tx_burst_st(sslot, 0, std::min(sslot->tx_msgbuf->data_size,
                                                    TTr::kMaxDataPerPkt));
+
+        // Release all transport-owned buffers before re-entering event loop
+        if (tx_batch_i > 0) do_tx_burst_st();
+        transport->tx_flush();
         return;
       } else {
         // The response is not available yet, client will have to timeout again
@@ -304,12 +308,18 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     erpc_dprintf("%s: Re-sending response.\n", issue_msg);
 
-    // Send the response packet with index = pkthdr->pkt_num (same as below)
+    // Re-send the response packet with index = pkthdr->pkt_num (same as below)
     size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
     assert(offset < sslot->tx_msgbuf->data_size);
     size_t data_bytes =
         std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
+
     enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+
+    // Release all transport-owned buffers before re-entering event loop
+    if (tx_batch_i > 0) do_tx_burst_st();
+    transport->tx_flush();
+
     return;
   }
 
@@ -367,6 +377,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     if (pkthdr->pkt_num != num_pkts_in_req - 1) {
       // This is not the last packet in the request => send a credit return
       erpc_dprintf("%s: Re-sending credit return.\n", issue_msg);
+
+      // We don't need to flush the transport's send queue here
       send_credit_return_now_st(sslot->session, pkthdr);
       return;
     }
@@ -381,6 +393,10 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
       erpc_dprintf("%s: Re-sending response.\n", issue_msg);
       enqueue_pkt_tx_burst_st(
           sslot, 0, std::min(sslot->tx_msgbuf->data_size, TTr::kMaxDataPerPkt));
+
+      // Release all transport-owned buffers before re-entering event loop
+      if (tx_batch_i > 0) do_tx_burst_st();
+      transport->tx_flush();
     } else {
       // The response is not available yet, client will have to timeout again
       erpc_dprintf("%s: Dropping because response not available yet.\n",
