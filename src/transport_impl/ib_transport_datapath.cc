@@ -149,10 +149,10 @@ void IBTransport::tx_flush() {
     exit(-1);
   }
 
-  wr.next = &send_wr[1];          // Restore the chain
+  wr.next = &send_wr[1];  // Restore the chain
 
   poll_send_cq_for_flush(false);  // Poll the signaled WQE posted above
-  nb_tx = 0;  // Reset signaling logic
+  nb_tx = 0;                      // Reset signaling logic
 }
 
 size_t IBTransport::rx_burst() {
