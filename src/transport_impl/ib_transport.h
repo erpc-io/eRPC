@@ -88,25 +88,35 @@ class IBTransport : public Transport {
 
   /// Get the current SEND signaling flag, and poll the send CQ if we need to
   inline int get_signaled_flag() {
-    int flag = (nb_pending == 0) ? IBV_SEND_SIGNALED : 0;
+    // If kUnsigBatch is 4, the sequence of signaling and polling looks like so:
+    // * nb_tx = 0: no poll, signaled
+    // * nb_tx = 1: no poll, unsignaled
+    // * nb_tx = 2: no poll, unsignaled
+    // * nb_tx = 3: no poll, unsignaled
+    // * nb_tx = 4: poll, signaled
+    static_assert(is_power_of_two(kUnsigBatch), "");
 
-    if (nb_pending < kUnsigBatch - 1) {
-      nb_pending++;
+    int flag;
+    if ((nb_tx & (kUnsigBatch - 1)) == 0) {
+      flag = IBV_SEND_SIGNALED;
+
+      if (likely(nb_tx != 0)) {
+        struct ibv_wc wc;
+        while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
+          // Do nothing while we have no CQE or poll_cq error
+        }
+
+        if (unlikely(wc.status != 0)) {
+          fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n",
+                  wc.status);
+          exit(-1);
+        }
+      }
     } else {
-      struct ibv_wc wc;
-      while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
-        // Do nothing while we have zero completions and no poll_cq errors
-      }
-
-      if (unlikely(wc.status != 0)) {
-        fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n",
-                wc.status);
-        exit(-1);
-      }
-
-      nb_pending = 0;
+      flag = 0;
     }
 
+    nb_tx++;
     return flag;
   }
 
@@ -194,9 +204,9 @@ class IBTransport : public Transport {
   bool use_fast_recv;  ///< True iff fast RECVs are enabled
 
   // SEND
-  size_t nb_pending = 0;                      ///< For selective signalling
-  struct ibv_send_wr send_wr[kPostlist + 1];  // +1 for blind ->next
-  struct ibv_sge send_sgl[kPostlist][2];      // 2 SGE/wr for header & payload
+  size_t nb_tx = 0;  /// Total number of packets sent, reset to 0 on tx_flush()
+  struct ibv_send_wr send_wr[kPostlist + 1];  /// +1 for unconditional ->next
+  struct ibv_sge send_sgl[kPostlist][2];      ///< SGEs for header & payload
 
   // RECV
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer

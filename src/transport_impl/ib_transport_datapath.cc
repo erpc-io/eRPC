@@ -80,8 +80,9 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
   send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains
 
   struct ibv_send_wr* bad_wr;
-
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
+
+  assert(ret == 0);
   if (unlikely(ret != 0)) {
     fprintf(stderr, "eRPC: Fatal error. ibv_post_send failed. ret = %d\n", ret);
     exit(-1);
@@ -114,16 +115,14 @@ void IBTransport::poll_send_cq_for_flush(bool first) {
 }
 
 void IBTransport::tx_flush() {
-  // Check the sentinel: addr is non-zero if any work request has been posted
-  if (unlikely(send_sgl[0][0].addr == 0)) {
+  if (unlikely(nb_tx == 0)) {
     fprintf(stderr,
             "eRPC: Warning. tx_flush called, but no SEND request in queue.\n");
     return;
   }
 
   // If we are here, we have posted a SEND work request. The selective signaling
-  // logic guarantees that there is *exactly one* *singled* SEND work request.
-  nb_pending = 0;                // Reset selective sigaling logic
+  // logic guarantees that there is *exactly one* *signaled* SEND work request.
   poll_send_cq_for_flush(true);  // Poll the one existing signaled WQE
 
   // Use send_wr[0] to post the second signaled flush WQE
@@ -141,6 +140,8 @@ void IBTransport::tx_flush() {
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
+
+  assert(ret == 0);
   if (unlikely(ret != 0)) {
     fprintf(stderr,
             "eRPC: Fatal error. ibv_post_send failed for flush WQE. ret = %d\n",
@@ -149,10 +150,9 @@ void IBTransport::tx_flush() {
   }
 
   wr.next = &send_wr[1];          // Restore the chain
-  poll_send_cq_for_flush(false);  // Poll the signaled WQE posted above
 
-  // The send queue doesn't have a work request now, so set the sentinel again
-  send_sgl[0][0].addr = 0;
+  poll_send_cq_for_flush(false);  // Poll the signaled WQE posted above
+  nb_tx = 0;  // Reset signaling logic
 }
 
 size_t IBTransport::rx_burst() {

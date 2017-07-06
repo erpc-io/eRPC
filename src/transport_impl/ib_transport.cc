@@ -335,10 +335,6 @@ void IBTransport::init_sends() {
     send_wr[i].opcode = IBV_WR_SEND_WITH_IMM;
     send_wr[i].sg_list = &send_sgl[i][0];
   }
-
-  // This serves as a sentinel: If the gather address is non-zero, a SEND work
-  // request has been posted.
-  send_sgl[0][0].addr = 0;
 }
 
 }  // End ERpc
