@@ -65,10 +65,11 @@ option(DEBUG "Enable debugging" ON)
 if(DEBUG)
   MESSAGE(STATUS "Debugging is enabled (to disable, run `cmake . -DDEBUG=OFF`).")
   add_definitions(-g)
+  add_definitions(-O2)
 else(DEBUG)
   MESSAGE(STATUS "Debugging is disabled (to enable, run `cmake . -DDEBUG=ON`).")
   add_definitions(-DNDEBUG)
-  add_definitions(-O3)
+  add_definitions(-O2)
 endif(DEBUG)
 
 # Fault injection (packet losses, machine failure)
@@ -157,7 +158,7 @@ set(OTHER_TESTS
 # The apps to compile
 # Available apps: small_rpc_tput, large_rpc_tput
 set(APPS
-  large_rpc_tput)
+  small_rpc_tput)
 
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling ERPC as a library")
