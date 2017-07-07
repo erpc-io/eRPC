@@ -61,8 +61,6 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 /// Return the control net IP address of the machine with index server_i
 static std::string get_hostname_for_machine(size_t server_i) {
   std::ostringstream ret;
-  // ret << "akaliaNode-" << std::to_string(server_i + 1)
-  //    << ".RDMA.fawn.apt.emulab.net"
   ret << "3.1.8." << std::to_string(server_i + 1);
   return ret.str();
 }
