@@ -263,7 +263,8 @@ void IBTransport::init_infiniband_structs() {
 
   int probe_ret = ibv_post_recv(qp, nullptr, &bad_wr);
   if (probe_ret != kModdedProbeRet) {
-    erpc_dprintf_noargs("eRPC IBTransport: No driver support for fast RECV.\n");
+    fprintf(stderr,
+            "eRPC IBTransport: Warning. No driver support for fast RECVs.\n");
     use_fast_recv = false;
   } else {
     erpc_dprintf_noargs("eRPC IBTransport: Driver supports fast RECVs.\n");
