@@ -56,13 +56,11 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 // Return the control net IP address of the machine with index server_i
 static std::string get_hostname_for_machine(size_t server_i) {
   std::ostringstream ret;
-  // ret << "akaliaNode-" << std::to_string(server_i + 1)
-  //    << ".RDMA.fawn.apt.emulab.net"
   ret << "3.1.8." << std::to_string(server_i + 1);
   return ret.str();
 }
 
-// Request tag, which doubles up as the request descriptor in req_vec
+// Request tag, which doubles up as the request descriptor for the request queue
 union tag_t {
   struct {
     uint64_t session_index : 32;  // Index into context's session_num array
@@ -99,11 +97,8 @@ class AppContext {
 
   std::vector<tag_t> req_vec;  // Request queue
 
-  ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];  // MsgBuffers for requests
-
-  // The response MsgBuffer created by eRPC is copied to this MsgBuffer. This
-  // mimics an application copying the response to app-owned memory.
-  ERpc::MsgBuffer resp_dest_msgbuf[kMaxConcurrency];
+  ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];
+  ERpc::MsgBuffer resp_msgbuf[kMaxConcurrency];
 };
 
 // A basic session management handler that expects successful responses
@@ -157,7 +152,8 @@ void send_reqs(AppContext *c) {
 
     int ret =
         c->rpc->enqueue_request(c->session_num_vec[session_index], kAppReqType,
-                                &req_msgbuf, app_cont_func, c->req_vec[i]._tag);
+                                &req_msgbuf, &c->resp_msgbuf[msgbuf_index],
+                                app_cont_func, c->req_vec[i]._tag);
     assert(ret == 0 || ret == -EBUSY);
 
     if (ret == -EBUSY) {
@@ -215,19 +211,23 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     exit(-1);
   }
 
-  if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
-    fprintf(stderr, "Invalid response data.\n");
-    exit(-1);
-  }
-
-  auto *c = static_cast<AppContext *>(_context);
   if (kAppMemset) {
-    // Copy response to application's response destination
-    memcpy(c->resp_dest_msgbuf[msgbuf_index].buf, resp_msgbuf->buf,
-           FLAGS_resp_size);
+    // Check all response cachelines (checking every byte is slow)
+    for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
+      if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
+        fprintf(stderr, "Invalid response data at offset %zu.\n", i);
+        exit(-1);
+      }
+    }
+  } else {
+    if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
+      fprintf(stderr, "Invalid response data at offset 0.\n");
+      exit(-1);
+    }
   }
 
   // Create a new request clocking this response, and put in request queue
+  auto *c = static_cast<AppContext *>(_context);
   if (kAppMemset) {
     memset(c->req_msgbuf[msgbuf_index].buf, kAppDataByte, FLAGS_req_size);
   } else {
@@ -258,6 +258,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
     printf("\n");
 
+    // Do an IPC measurement if we're running one thread
     if (FLAGS_num_threads == 1) {
       float real_time, proc_time, ipc;
       long long ins;
@@ -318,19 +319,19 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 
   while (c.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
     rpc.run_event_loop(200);  // 200 milliseconds
-
-    if (ctrl_c_pressed == 1) {
-      return;
-    }
+    if (ctrl_c_pressed == 1) return;
   }
 
-  fprintf(stderr, "Thread %zu: All sessions connected. Running event loop.\n",
-          thread_id);
-  clock_gettime(CLOCK_REALTIME, &c.tput_t0);
+  fprintf(stderr, "Thread %zu: All sessions connected.\n", thread_id);
 
-  // Generate the initial requests
   for (size_t msgbuf_index = 0; msgbuf_index < FLAGS_concurrency;
        msgbuf_index++) {
+    // Allocate request and response MsgBuffers
+    c.resp_msgbuf[msgbuf_index] = rpc.alloc_msg_buffer(FLAGS_resp_size);
+    if (c.resp_msgbuf[msgbuf_index].buf == nullptr) {
+      throw std::runtime_error("Failed to pre-allocate response MsgBuffer.");
+    }
+
     auto &req_msgbuf = c.req_msgbuf[msgbuf_index];
     req_msgbuf = rpc.alloc_msg_buffer(FLAGS_req_size);
     if (req_msgbuf.buf == nullptr) {
@@ -345,12 +346,6 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
 
     c.req_vec.push_back(tag_t(get_rand_session_index(&c), msgbuf_index));
-
-    // Allocate response destination buffers
-    c.resp_dest_msgbuf[msgbuf_index] = rpc.alloc_msg_buffer(FLAGS_resp_size);
-    if (c.resp_dest_msgbuf[msgbuf_index].buf == nullptr) {
-      throw std::runtime_error("Failed to pre-allocate resp MsgBuffer.");
-    }
   }
 
   // Do PAPI measurement if we're running one thread
@@ -363,6 +358,8 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
       exit(-1);
     }
   }
+
+  clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
   // Send queued requests
   send_reqs(&c);
