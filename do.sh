@@ -7,8 +7,7 @@ for i in $(ipcs -m | awk '{ print $1; }'); do
     fi
 done
 
-# Install modded driver - this is not strictly needed
+# Install modded driver - this is not a requirement
 (cd ~/libmlx4-1.2.1mlnx1/ && ./update_driver.sh)
 
-
-sudo ./build/$app_name $(cat apps/$app_name/config) --machine_id $1
+sudo taskset -c 0 ./build/$app_name $(cat apps/$app_name/config) --machine_id $1
