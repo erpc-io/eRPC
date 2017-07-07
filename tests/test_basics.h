@@ -54,7 +54,7 @@ class ReqFuncRegInfo {
 enum class ConnectServers : bool { kTrue, kFalse };
 
 /// Pick a random non-zero message size smaller than \p max_msg_size, with an
-/// approximately 20% chance of the message fitting in one packet. Other
+/// approximately X% chance of the message fitting in one packet. Other
 /// messages have a 80% chance of fitting in 10 packets. This reduces test
 /// running time.
 size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
@@ -62,7 +62,8 @@ size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
   assert(fast_rand != nullptr);
   assert(max_msg_size > max_data_per_pkt * 10);
 
-  if (fast_rand->next_u32() % 100 < 20) {
+  size_t X = 50;
+  if (fast_rand->next_u32() % 100 < X) {
     // Choose a single-packet message
     uint32_t sample = fast_rand->next_u32();
     return (sample % max_data_per_pkt) + 1;

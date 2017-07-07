@@ -24,7 +24,7 @@ namespace ERpc {
 // Debug defines
 static constexpr bool kVerbose = false;  ///< Debug printing for non-datapath
 static constexpr bool kDatapathVerbose = false;  ///< Debug printing in datapath
-static constexpr bool kDatapathStats = true;  ///< Collect stats on the datapath
+static constexpr bool kDatapathStats = true;  ///< Collect datapath stats
 
 /// Datapath checks that can be disabled for maximum performance
 static constexpr bool kDatapathChecks = true;
