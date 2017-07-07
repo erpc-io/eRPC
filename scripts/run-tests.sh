@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # A convenience wrapper around ctest
 
 # Remove SHM regions
