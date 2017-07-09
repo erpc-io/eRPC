@@ -49,3 +49,6 @@ CTestTestfile.cmake
 
 # gdb
 .gdb_history
+
+# Mac
+.DS_Store
