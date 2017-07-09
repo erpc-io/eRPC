@@ -11,7 +11,7 @@
 #
 
 # The prefix of node names to find
-nodename_prefix="akalianode"
+nodename_prefix="akalianode-"
 
 #
 # Part 1: Print nodes connected to each switch
@@ -33,7 +33,7 @@ do
   # node name.)
 	if [[ $(echo $line | grep $nodename_prefix | grep lid) ]]; then
 		# Grep out the node and append it to this switch's list of nodes
-		node=`echo $line | grep -o "$nodename_prefix-[0-9]\+"`
+		node=`echo $line | grep -o "$nodename_prefix[0-9]\+"`
 		switch_map[$switch_i]=$node" "${switch_map[$switch_i]}
 		total_nodes=`expr $total_nodes + 1`
 	fi
@@ -59,11 +59,12 @@ echo ""
 
 
 #
-# Part 2: For a subset of nodes in $apt_nodes, print the number of nodes
+# Part 2: For a subset of nodes in apt_nodes, print the number of nodes
 #         connected to each switch. This is useful to check if a particular
-#         switch is overloaded in this node selection.
+#         switch is overloaded in this node selection. apt_nodes below can
+#         be replaced with any subset of {1, ..., $total_nodes}
 #
-apt_nodes=`seq -s' ' 1 8`
+apt_nodes=`seq -s' ' 1 $total_nodes`
 total_nodes=0
 
 for switch_i in `seq 1 10`; do
@@ -73,7 +74,7 @@ done
 echo "Per-switch node count histogram for nodes {$apt_nodes}"
 for node_i in $apt_nodes; do
 	for switch_i in `seq 1 10`; do
-		if [[ $(echo ${switch_map[$switch_i]} | grep -w "${nodename_prefix}-$node_i") ]]; then
+		if [[ $(echo ${switch_map[$switch_i]} | grep -w "${nodename_prefix}$node_i") ]]; then
 			switch_count[$switch_i]=`expr ${switch_count[$switch_i]} + 1`
 			total_nodes=`expr $total_nodes + 1`
 		fi
