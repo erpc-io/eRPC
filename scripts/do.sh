@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run an eRPC app
 
-app_name="large_rpc_tput"
+app_name="small_rpc_tput"
 
 # Drop SHM
 for i in $(ipcs -m | awk '{ print $1; }'); do
