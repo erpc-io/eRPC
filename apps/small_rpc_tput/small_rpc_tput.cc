@@ -2,6 +2,7 @@
 #include <papi.h>
 #include <signal.h>
 #include <cstring>
+#include "../apps_common.h"
 #include "rpc.h"
 #include "util/misc.h"
 
@@ -77,6 +78,7 @@ class BatchContext {
 /// Per-thread application context
 class AppContext {
  public:
+  ERpc::TmpStat *tmp_stat = nullptr;
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
 
   /// Number of slots in session_arr, including an unused one for this thread
@@ -95,6 +97,11 @@ class AppContext {
   size_t stat_req_rx_tot = 0;   ///< Total requests received (all batches)
 
   std::array<BatchContext, kMaxConcurrency> batch_arr;  ///< Per-batch context
+
+  ~AppContext() {
+    if (tmp_stat != nullptr) delete tmp_stat;
+    if (session_arr != nullptr) delete session_arr;
+  }
 };
 
 /// A basic session management handler that expects successful responses
@@ -128,7 +135,7 @@ size_t get_rand_session_index(AppContext *c) {
 
 void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
-// Try to send a request for batch_i. If the request is successfully sent,
+// Try to send requests for batch_i. If requests are successfully sent,
 // increment the batch's num_reqs_sent.
 void send_reqs(AppContext *c, size_t batch_i) {
   assert(c != nullptr);
@@ -139,24 +146,20 @@ void send_reqs(AppContext *c, size_t batch_i) {
 
   size_t initial_num_reqs_sent = bc.num_reqs_sent;
   for (size_t i = 0; i < FLAGS_batch_size - initial_num_reqs_sent; i++) {
-    // Compute a random session to send the request on
     size_t rand_session_index = get_rand_session_index(c);
     size_t msgbuf_index = initial_num_reqs_sent + i;
-
-    bc.req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;  // Touch req MsgBuffer
-
     if (kAppVerbose) {
       printf("Sending request for batch %zu, msgbuf_index = %zu.\n", batch_i,
              msgbuf_index);
     }
 
+    bc.req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;  // Touch req MsgBuffer
     tag_t tag(batch_i, msgbuf_index);
     int ret = c->rpc->enqueue_request(c->session_arr[rand_session_index],
                                       kAppReqType, &bc.req_msgbuf[msgbuf_index],
                                       &bc.resp_msgbuf[msgbuf_index],
                                       app_cont_func, tag._tag);
     assert(ret == 0 || ret == -EBUSY);
-
     if (ret == -EBUSY) {
       return;
     } else {
@@ -190,7 +193,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
-  // Touch resp MsgBuffer
+  // Touch (and check) resp MsgBuffer
   if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
     fprintf(stderr, "Invalid response.\n");
     exit(-1);
@@ -217,7 +220,8 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     send_reqs(c, tag.batch_i);
   }
 
-  // Try to send more requests for stagnated batches
+  // Try to send more requests for stagnated batches. This happens when we
+  // are unable to send requests for a batch because a session is clogged.
   for (size_t batch_j = 0; batch_j < FLAGS_concurrency; batch_j++) {
     if (batch_j == tag.batch_i) continue;
 
@@ -233,10 +237,12 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   if (c->stat_resp_rx_tot == 1000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
+    c->tmp_stat->write(c->stat_resp_rx_tot / (seconds * 1000000));
+
     printf(
         "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
         "Responses received = %zu, requests received = %zu.\n",
-        c->thread_id, c->stat_resp_rx_tot / seconds,
+        c->thread_id, c->stat_resp_rx_tot / (seconds * 1000000),
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
         c->stat_req_rx_tot);
 
@@ -271,6 +277,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 /// The function executed by each thread in the cluster
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext context;
+  context.tmp_stat = new ERpc::TmpStat("small_rpc_tput");
   context.thread_id = thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&context),
@@ -347,8 +354,6 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     rpc.run_event_loop(1000);  // 1 second
     if (ctrl_c_pressed == 1) break;
   }
-
-  delete context.session_arr;
 }
 
 int main(int argc, char **argv) {
