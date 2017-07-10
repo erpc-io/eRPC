@@ -23,9 +23,7 @@ class TmpStat {
     output_file.close();
   }
 
-  void write(double stat) { output_file << stat << std::endl; }
-
-  void write(size_t stat) { output_file << stat << std::endl; }
+  void write(std::string stat) { output_file << stat << std::endl; }
 
  private:
   std::ofstream output_file;

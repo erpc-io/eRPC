@@ -237,7 +237,8 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   if (c->stat_resp_rx_tot == 1000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
-    c->tmp_stat->write(c->stat_resp_rx_tot / (seconds * 1000000));
+    c->tmp_stat->write(
+        std::to_string(c->stat_resp_rx_tot / (seconds * 1000000)));
 
     printf(
         "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
