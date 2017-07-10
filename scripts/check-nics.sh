@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # Execute some command on all nodes in $autorun_nodes
 
 # Request autorun to generate the list of nodes so that we can run a script
