@@ -12,32 +12,24 @@ static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;
-static constexpr uint8_t kAppDataByte = 3;   // Data transferred in req & resp
-static constexpr size_t kAppTestMs = 50000;  // Test duration in milliseconds
+static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
 static constexpr size_t kAppMaxBatchSize = 32;
 static constexpr size_t kMaxConcurrency = 32;
 
-DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
-DEFINE_uint64(machine_id, ERpc::kMaxNumMachines, "The ID of this machine");
-DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
-DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
-DEFINE_uint64(msg_size, 0, "Request and response size");
 DEFINE_uint64(batch_size, 0, "Request batch size");
+DEFINE_uint64(msg_size, 0, "Request and response size");
+DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
+DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 
 static bool validate_batch_size(const char *, uint64_t batch_size) {
   return batch_size <= kAppMaxBatchSize;
 }
 
-static bool validate_machine_id(const char *, uint64_t machine_id) {
-  return machine_id < ERpc::kMaxNumMachines;
-}
-
 static bool validate_concurrency(const char *, uint64_t concurrency) {
   return concurrency <= kMaxConcurrency;
 }
 
-DEFINE_validator(machine_id, &validate_machine_id);
 DEFINE_validator(batch_size, &validate_batch_size);
 DEFINE_validator(concurrency, &validate_concurrency);
 
@@ -237,9 +229,6 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   if (c->stat_resp_rx_tot == 1000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
-    c->tmp_stat->write(
-        std::to_string(c->stat_resp_rx_tot / (seconds * 1000000)));
-
     printf(
         "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
         "Responses received = %zu, requests received = %zu.\n",
@@ -253,8 +242,9 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
     printf("\n");
 
+    float ipc = -1.0;
     if (FLAGS_num_threads == 1) {
-      float real_time, proc_time, ipc;
+      float real_time, proc_time;
       long long ins;
       int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
       if (ret < PAPI_OK) {
@@ -264,6 +254,11 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         printf("IPC = %.3f.\n", ipc);
       }
     }
+
+    // Stats: throughput ipc
+    c->tmp_stat->write(
+        std::to_string(c->stat_resp_rx_tot / (seconds * 1000000)) + " " +
+        std::to_string(ipc));
 
     c->rpc->reset_dpath_stats_st();
     c->stat_resp_rx_tot = 0;
@@ -351,7 +346,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     send_reqs(&context, i);
   }
 
-  for (size_t i = 0; i < kAppTestMs; i += 1000) {
+  for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(1000);  // 1 second
     if (ctrl_c_pressed == 1) break;
   }
@@ -361,8 +356,7 @@ int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
-  // g++-5 shows an unused variable warning for validators
-  _unused(machine_id_validator_registered);
+  // Work around g++-5's unused variable warning for validators
   _unused(batch_size_validator_registered);
   _unused(concurrency_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
