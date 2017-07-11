@@ -26,6 +26,10 @@ namespace ERpc {
 #define optlevel_large_rpc_supported \
   (small_rpc_optlevel != small_rpc_optlevel_extreme)
 
+static bool large_rpc_supported() {
+   return (small_rpc_optlevel != small_rpc_optlevel_extreme);
+}
+
 #if small_rpc_optlevel == small_rpc_optlevel_none
 #define small_rpc_likely(x) (x)
 #define small_rpc_unlikely(x) (x)
