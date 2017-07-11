@@ -43,8 +43,10 @@ class TmpStat {
  public:
   TmpStat() {}
 
-  TmpStat(std::string stat_name) {
-    output_file = std::ofstream(std::string("/tmp/") + stat_name);
+  TmpStat(std::string app_name) {
+    // Add your app name here
+    assert(app_name == "small_rpc_tput" || app_name == "large_rpc_tput");
+    output_file = std::ofstream(std::string("/tmp/") + app_name + "_stats");
   }
 
   ~TmpStat() {

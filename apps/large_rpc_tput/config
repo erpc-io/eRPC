@@ -1,3 +1,4 @@
+--test_ms 20000
 --req_size 32
 --resp_size 1000000
 --num_bg_threads 0

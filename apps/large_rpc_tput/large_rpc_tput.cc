@@ -5,15 +5,16 @@
  * response RX and TX bandwidth. For this measurement to be useful, request
  * size should be small and response size large.
  *
- * Requests are described by a MsgBuffer index and a session index, and are
- * queued into req_vec until they can be transmitted. Before queueing a request
- * descriptor, the MsgBuffer for the request must be filled with request data.
+ * A request is described by its MsgBuffer index and session index, and is
+ * queued into req_vec until it can be transmitted. Before queueing a request
+ * descriptor, it's request MsgBuffer must be filled with request data.
  */
 
 #include <gflags/gflags.h>
 #include <papi.h>
 #include <signal.h>
 #include <cstring>
+#include "../apps_common.h"
 #include "rpc.h"
 #include "util/misc.h"
 
@@ -27,27 +28,19 @@ static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;
-static constexpr uint8_t kAppDataByte = 3;   // Data transferred in req & resp
-static constexpr size_t kAppTestMs = 50000;  // Test duration in milliseconds
+static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
 static constexpr size_t kMaxConcurrency = 32;
 
-DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
-DEFINE_uint64(machine_id, ERpc::kMaxNumMachines, "The ID of this machine");
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(req_size, 0, "Request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 
-static bool validate_machine_id(const char *, uint64_t machine_id) {
-  return machine_id < ERpc::kMaxNumMachines;
-}
-
 static bool validate_concurrency(const char *, uint64_t concurrency) {
   return concurrency <= kMaxConcurrency;
 }
 
-DEFINE_validator(machine_id, &validate_machine_id);
 DEFINE_validator(concurrency, &validate_concurrency);
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
@@ -80,6 +73,7 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 // Per-thread application context
 class AppContext {
  public:
+  ERpc::TmpStat *tmp_stat = nullptr;
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
 
   std::vector<int> session_num_vec;
@@ -99,20 +93,45 @@ class AppContext {
 
   ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];
   ERpc::MsgBuffer resp_msgbuf[kMaxConcurrency];
+
+  ~AppContext() {
+    if (tmp_stat != nullptr) delete tmp_stat;
+  }
 };
 
 // A basic session management handler that expects successful responses
-void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
+void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
                       ERpc::SmErrType sm_err_type, void *_context) {
-  _unused(sm_event_type);
-  _unused(sm_err_type);
+  assert(_context != nullptr);
 
-  auto *context = static_cast<AppContext *>(_context);
-  context->num_sm_resps++;
+  auto *c = static_cast<AppContext *>(_context);
+  c->num_sm_resps++;
 
-  assert(sm_err_type == ERpc::SmErrType::kNoError);
-  assert(sm_event_type == ERpc::SmEventType::kConnected ||
-         sm_event_type == ERpc::SmEventType::kDisconnected);
+  if (sm_err_type != ERpc::SmErrType::kNoError) {
+    throw std::runtime_error("Received SM response with error.");
+  }
+
+  if (!(sm_event_type == ERpc::SmEventType::kConnected ||
+        sm_event_type == ERpc::SmEventType::kDisconnected)) {
+    throw std::runtime_error("Received unexpected SM event.");
+  }
+
+  // The callback gives us the ERpc session number - get the index in vector
+  size_t session_index = c->session_num_vec.size();
+  for (size_t i = 0; i < c->session_num_vec.size(); i++) {
+    if (c->session_num_vec[i] == session_num) {
+      session_index = i;
+    }
+  }
+
+  if (session_index == c->session_num_vec.size()) {
+    throw std::runtime_error("SM callback for invalid session number.");
+  }
+
+  fprintf(stderr, "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s\n",
+          c->rpc->get_rpc_id(), session_num, session_index,
+          sm_event_type == ERpc::SmEventType::kConnected ? "connected"
+                                                         : "disconncted");
 }
 
 size_t get_rand_session_index(AppContext *c) {
@@ -146,14 +165,13 @@ void send_reqs(AppContext *c) {
     assert(req_msgbuf.get_data_size() == FLAGS_req_size);
 
     if (kAppVerbose) {
-      printf("Sending request for session %zu, msgbuf_index = %zu.\n",
+      printf("large_rpc_tput: Sending req for session %zu, msgbuf_index %zu.\n",
              session_index, msgbuf_index);
     }
 
-    int ret =
-        c->rpc->enqueue_request(c->session_num_vec[session_index], kAppReqType,
-                                &req_msgbuf, &c->resp_msgbuf[msgbuf_index],
-                                app_cont_func, c->req_vec[i]._tag);
+    int ret = c->rpc->enqueue_request(
+        c->session_num_vec[session_index], kAppReqType, &req_msgbuf,
+        &c->resp_msgbuf[msgbuf_index], app_cont_func, c->req_vec[i]._tag);
     assert(ret == 0 || ret == -EBUSY);
 
     if (ret == -EBUSY) {
@@ -201,13 +219,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   size_t msgbuf_index = static_cast<tag_t>(_tag).msgbuf_index;
   size_t session_index = static_cast<tag_t>(_tag).session_index;
   if (kAppVerbose) {
-    printf("Received response for msgbuf %zu, session %zu.\n", msgbuf_index,
-           session_index);
+    printf("large_rpc_tput: Received response for msgbuf %zu, session %zu.\n",
+           msgbuf_index, session_index);
   }
 
   // Check the response
   if (unlikely(resp_msgbuf->get_data_size() != FLAGS_resp_size)) {
-    fprintf(stderr, "Invalid response size.\n");
+    fprintf(stderr, "large_rpc_tput: Error. Invalid response size.\n");
     exit(-1);
   }
 
@@ -215,13 +233,15 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     // Check all response cachelines (checking every byte is slow)
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
       if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
-        fprintf(stderr, "Invalid response data at offset %zu.\n", i);
+        fprintf(stderr,
+                "large_rpc_tput: Error. Invalid resp data at offset %zu.\n", i);
         exit(-1);
       }
     }
   } else {
     if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
-      fprintf(stderr, "Invalid response data at offset 0.\n");
+      fprintf(stderr,
+              "large_rpc_tput: Error. Invalid response data at offset 0.\n");
       exit(-1);
     }
   }
@@ -246,30 +266,34 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   if (c->stat_resp_rx_bytes_tot == 500000000) {
     double ns = ERpc::ns_since(c->tput_t0);
     printf(
-        "Thread %zu: Response tput: RX %.3f GB/s, TX %.3f GB/s. "
-        "Response bytes: RX %.3f MB, TX = %.3f MB.\n",
+        "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
+        "TX %.3f GB/s. Response bytes: RX %.3f MB, TX = %.3f MB.\n",
         c->thread_id, c->stat_resp_rx_bytes_tot / ns,
         c->stat_resp_tx_bytes_tot / ns, c->stat_resp_rx_bytes_tot / 1000000.0,
         c->stat_resp_tx_bytes_tot / 1000000.0);
 
-    printf("Tput per session: ");
+    printf("large_rpc_tput: Tput per session: ");
     for (size_t i = 0; i < c->session_num_vec.size(); i++) {
       printf("%zu: %.2f, ", i, c->stat_resp_rx_bytes[i] / ns);
     }
     printf("\n");
 
-    // Do an IPC measurement if we're running one thread
+    float ipc = -1.0;
     if (FLAGS_num_threads == 1) {
-      float real_time, proc_time, ipc;
+      float real_time, proc_time;
       long long ins;
       int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
       if (ret < PAPI_OK) {
-        fprintf(stderr, "PAPI IPC failed.\n");
+        fprintf(stderr, "large_rpc_tput: Error. PAPI IPC failed.\n");
         exit(-1);
       } else {
-        printf("IPC = %.3f.\n", ipc);
+        printf("large_rpc_tput: IPC = %.3f.\n", ipc);
       }
     }
+
+    // Stats: throughput ipc
+    c->tmp_stat->write(std::to_string(c->stat_resp_rx_bytes_tot / ns) + " " +
+                       std::to_string(ipc));
 
     c->rpc->reset_dpath_stats_st();
     std::fill(c->stat_resp_rx_bytes.begin(), c->stat_resp_rx_bytes.end(), 0);
@@ -285,6 +309,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 // The function executed by each thread in the cluster
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext c;
+  c.tmp_stat = new ERpc::TmpStat("large_rpc_tput");
   c.thread_id = thread_id;
   c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
@@ -317,12 +342,15 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
   }
 
+  fprintf(stderr, "large_rpc_tput: Thread %zu: Creating sessions.\n",
+          thread_id);
   while (c.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
     rpc.run_event_loop(200);  // 200 milliseconds
     if (ctrl_c_pressed == 1) return;
   }
 
-  fprintf(stderr, "Thread %zu: All sessions connected.\n", thread_id);
+  fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
+          thread_id);
 
   for (size_t msgbuf_index = 0; msgbuf_index < FLAGS_concurrency;
        msgbuf_index++) {
@@ -354,7 +382,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     long long ins;
     int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
     if (ret < PAPI_OK) {
-      fprintf(stderr, "PAPI initialization failed.\n");
+      fprintf(stderr, "large_rpc_tput: Error. PAPI initialization failed.\n");
       exit(-1);
     }
   }
@@ -364,18 +392,24 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   // Send queued requests
   send_reqs(&c);
 
-  for (size_t i = 0; i < kAppTestMs; i += 1000) {
+  for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(1000);  // 1 second
     if (ctrl_c_pressed == 1) break;
   }
+
+  // We don't disconnect sessions
 }
 
 int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
-  // g++-5 shows an unused variable warning for validators
-  _unused(machine_id_validator_registered);
+  if (!ERpc::large_rpc_supported()) {
+    throw std::runtime_error(
+        "Current eRPC optlevel does not allow large RPCs.");
+  }
+
+  // Work around g++-5's unused variable warning for validators
   _unused(concurrency_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 

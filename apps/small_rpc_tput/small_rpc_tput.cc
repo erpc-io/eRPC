@@ -272,19 +272,19 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
 /// The function executed by each thread in the cluster
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
-  AppContext context;
-  context.tmp_stat = new ERpc::TmpStat("small_rpc_tput");
-  context.thread_id = thread_id;
+  AppContext c;
+  c.tmp_stat = new ERpc::TmpStat("small_rpc_tput");
+  c.thread_id = thread_id;
 
-  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&context),
+  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id),
                                    basic_sm_handler, kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
-  context.rpc = &rpc;
+  c.rpc = &rpc;
 
   // Pre-allocate request and response MsgBuffers for each batch
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    BatchContext &bc = context.batch_arr[i];
+    BatchContext &bc = c.batch_arr[i];
     for (size_t j = 0; j < FLAGS_batch_size; j++) {
       bc.req_msgbuf[j] = rpc.alloc_msg_buffer(FLAGS_msg_size);
       assert(bc.req_msgbuf[j].buf != nullptr);
@@ -294,13 +294,13 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
   }
 
-  context.num_sessions = FLAGS_num_machines * FLAGS_num_threads;
-  context.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
+  c.num_sessions = FLAGS_num_machines * FLAGS_num_threads;
+  c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
   // Allocate session array
-  context.session_arr = new int[FLAGS_num_machines * FLAGS_num_threads];
+  c.session_arr = new int[FLAGS_num_machines * FLAGS_num_threads];
   for (size_t i = 0; i < FLAGS_num_machines * FLAGS_num_threads; i++) {
-    context.session_arr[i] = -1;
+    c.session_arr[i] = -1;
   }
 
   // Initiate connection for sessions
@@ -310,26 +310,26 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
       size_t session_index = (m_i * FLAGS_num_threads) + t_i;
       // Do not create a session to self
-      if (session_index == context.self_session_index) continue;
+      if (session_index == c.self_session_index) continue;
 
-      context.session_arr[session_index] =
+      c.session_arr[session_index] =
           rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
-      assert(context.session_arr[session_index] >= 0);
+      assert(c.session_arr[session_index] >= 0);
     }
   }
 
-  while (context.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
+  while (c.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
     rpc.run_event_loop(200);  // 200 milliseconds
 
     if (ctrl_c_pressed == 1) {
-      delete context.session_arr;
+      delete c.session_arr;
       return;
     }
   }
 
   fprintf(stderr, "Thread %zu: All sessions connected. Running event loop.\n",
           thread_id);
-  clock_gettime(CLOCK_REALTIME, &context.tput_t0);
+  clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
   // Do PAPI measurement if we're running one thread
   if (FLAGS_num_threads == 1) {
@@ -343,7 +343,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   }
 
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    send_reqs(&context, i);
+    send_reqs(&c, i);
   }
 
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
