@@ -44,7 +44,7 @@ for filename in $tmpdir/*; do
   # Ignore files with less than 12 lines
   lines_in_file=`cat $filename | wc -l`
   if [ $lines_in_file -le 12 ]; then
-    blue "Ignoring $filename. Too short."
+    blue "Ignoring $filename. Too short ($lines_in_file lines), 12 required."
     continue;
   fi
 
