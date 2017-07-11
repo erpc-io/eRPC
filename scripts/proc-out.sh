@@ -17,34 +17,34 @@ for node in $autorun_nodes; do
 	# We don't have the node name to machine ID mapping here, so just use index
   target_filename=$autorun_app"_"$node_index
 
-	echo "Fetching $tmpdir/$target_filename from $node."
+	echo "proc-out: Fetching $tmpdir/$target_filename from $node."
   scp $node:/tmp/$autorun_app $tmpdir/$target_filename \
 		1>/dev/null 2>/dev/null &
 
   ((node_index+=1))
 done
 wait
-echo "Finished fetching files."
+echo "proc-out: Finished fetching files."
 
 num_columns=`cat $tmpdir/* | head -1 | wc -w`
-echo "Detected $num_columns columns"
+echo "proc-out: Detected $num_columns columns"
 
 # Process the accumulated output files. This assumes that the files have
 # space-separated numbers in columns.
 
-tot_rows="0"
+tot_rows="0" # Total rows processed, for rolling average
 avg[0]="" # Per-column average
 for col in `seq 1 $num_columns`; do
   avg[$col]="0.0"
 done
 
 for filename in $tmpdir/*; do
-  echo "Processing file $filename. Total rows processed = $tot_rows"
+  echo "proc-out: Processing file $filename."
 
   # Ignore files with less than 12 lines
   lines_in_file=`cat $filename | wc -l`
   if [ $lines_in_file -le 12 ]; then
-    blue "Ignoring $filename. Too short ($lines_in_file lines), 12 required."
+    blue "proc-out: Ignoring $filename. Too short ($lines_in_file lines), 12 required."
     continue;
   fi
 
@@ -61,12 +61,12 @@ for filename in $tmpdir/*; do
     cur_sum=`echo "scale=3; $file_avg * $remaining_rows" | bc -l`
     #echo "cur_sum = $cur_sum"
     avg[$col]=`echo "scale=3; ($prev_sum + $cur_sum) / ($tot_rows + $remaining_rows)" | bc -l`
-    echo "Column $col average for $filename = $file_avg. Current running average = ${avg[$col]}"
+    echo "proc-out: Column $col average for $filename = $file_avg. Current running average = ${avg[$col]}"
   done
 
   ((tot_rows+=$remaining_rows))
 done
 
 for col in `seq 1 $num_columns`; do
-  blue "Final column $col average = ${avg[$col]}"
+  blue "proc-out: Final column $col average = ${avg[$col]}"
 done
