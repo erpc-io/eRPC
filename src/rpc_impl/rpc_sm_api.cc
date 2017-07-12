@@ -11,7 +11,7 @@ namespace ERpc {
 // This function is not on the critical path and is exposed to the user,
 // so the args checking is always enabled.
 template <class TTr>
-int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
+int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
                                 uint8_t rem_phy_port) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
@@ -30,14 +30,13 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
   }
 
   // Check remote hostname
-  if (rem_hostname == nullptr || strlen(rem_hostname) > kMaxHostnameLen) {
+  if (rem_hostname.length() == 0 || rem_hostname.length() > kMaxHostnameLen) {
     erpc_dprintf("%s: Invalid remote hostname.\n", issue_msg);
     return -EINVAL;
   }
 
   // Creating a session to one's own Rpc as the client is not allowed
-  if (strcmp(rem_hostname, nexus->hostname.c_str()) == 0 &&
-      rem_rpc_id == rpc_id) {
+  if (rem_hostname == nexus->hostname && rem_rpc_id == rpc_id) {
     erpc_dprintf("%s: Remote Rpc is same as local.\n", issue_msg);
     return -EINVAL;
   }
@@ -92,7 +91,7 @@ int Rpc<TTr>::create_session_st(const char *rem_hostname, uint8_t rem_rpc_id,
 
   SessionEndpoint &server_endpoint = session->server;
   server_endpoint.transport_type = transport->transport_type;
-  strcpy(server_endpoint.hostname, rem_hostname);
+  strcpy(server_endpoint.hostname, rem_hostname.c_str());
   server_endpoint.phy_port = rem_phy_port;
   server_endpoint.rpc_id = rem_rpc_id;
   // server_endpoint.session_num = ??

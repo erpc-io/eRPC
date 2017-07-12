@@ -205,9 +205,9 @@ class Rpc {
    * A callback of type \p kConnected or \p kConnectFailed will be invoked if
    * this call is successful.
    */
-  int create_session(const char *_rem_hostname, uint8_t rem_rpc_id,
+  int create_session(std::string rem_hostname, uint8_t rem_rpc_id,
                      uint8_t rem_phy_port = 0) {
-    return create_session_st(_rem_hostname, rem_rpc_id, rem_phy_port);
+    return create_session_st(rem_hostname, rem_rpc_id, rem_phy_port);
   }
 
   /**
@@ -231,7 +231,7 @@ class Rpc {
   size_t num_active_sessions() { return num_active_sessions_st(); }
 
  private:
-  int create_session_st(const char *_rem_hostname, uint8_t rem_rpc_id,
+  int create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
                         uint8_t rem_phy_port = 0);
   int destroy_session_st(int session_num);
   size_t num_active_sessions_st();
