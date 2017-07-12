@@ -127,14 +127,22 @@ void IBTransport::tx_flush() {
 
   // Use send_wr[0] to post the second signaled flush WQE
   struct ibv_send_wr& wr = send_wr[0];
+  struct ibv_sge* sgl = send_sgl[0];
+
   assert(wr.next == &send_wr[1]);  // +1 is valid
   assert(wr.wr.ud.remote_qkey == kQKey);
   assert(wr.opcode == IBV_WR_SEND_WITH_IMM);
   assert(wr.sg_list == send_sgl[0]);
 
+  // We could use a header-only SEND, but the optimized inline-copy function in
+  // the modded driver expects WQEs with exactly one SGE.
+  char flush_inline_buf[1];
+  sgl[0].addr = reinterpret_cast<uint64_t>(flush_inline_buf);
+  sgl[0].length = 1;
+
   wr.next = nullptr;  // Break the chain
   wr.send_flags = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
-  wr.num_sge = 0;           // Header-only, modify-able
+  wr.num_sge = 1;
   wr.wr.ud.remote_qpn = 0;  // Invalid QPN, which will cause the drop
   wr.wr.ud.ah = self_ah;    // Send to self
 
