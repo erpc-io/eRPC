@@ -689,14 +689,10 @@ class Rpc {
   inline size_t get_etid() const { return tls_registry->get_etid(); }
 
   /// Busy-sleep for \p ns nanoseconds
-  void nano_sleep(size_t ns) {
-    size_t start = rdtsc();
-    size_t end = start;
-    size_t upp = static_cast<size_t>(nexus->freq_ghz * ns);
-    while (end - start < upp) {
-      end = rdtsc();
-    }
-  }
+  void nano_sleep(size_t ns);
+
+  /// Return the number of milliseconds elapsed since this Rpc was created
+  double sec_since_creation();
 
   //
   // Misc private functions
@@ -765,6 +761,7 @@ class Rpc {
   const sm_handler_t sm_handler;
   const uint8_t phy_port;  ///< Zero-based physical port specified by app
   const size_t numa_node;
+  const uint64_t creation_tsc;  ///< Timestamp of creation of this Rpc endpoint
 
   // Derived consts
   const bool multi_threaded;  ///< True iff there are background threads

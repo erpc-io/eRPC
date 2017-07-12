@@ -19,6 +19,7 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
       sm_handler(sm_handler),
       phy_port(phy_port),
       numa_node(numa_node),
+      creation_tsc(rdtsc()),
       multi_threaded(nexus->num_bg_threads > 0),
       pkt_loss_epoch_cycles(kPktLossEpochMs * 1000000 * nexus->freq_ghz),
       req_func_arr(nexus->req_func_arr) {
@@ -119,4 +120,20 @@ Rpc<TTr>::~Rpc() {
 
   nexus->unregister_hook(&nexus_hook);
 }
+
+template <class TTr>
+void Rpc<TTr>::nano_sleep(size_t ns) {
+  size_t start = rdtsc();
+  size_t end = start;
+  size_t upp = static_cast<size_t>(nexus->freq_ghz * ns);
+  while (end - start < upp) {
+    end = rdtsc();
+  }
+}
+
+template <class TTr>
+double Rpc<TTr>::sec_since_creation() {
+  return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
+}
+
 }  // End ERpc
