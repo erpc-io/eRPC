@@ -27,7 +27,7 @@ namespace ERpc {
   (small_rpc_optlevel != small_rpc_optlevel_extreme)
 
 static bool large_rpc_supported() {
-   return (small_rpc_optlevel != small_rpc_optlevel_extreme);
+  return (small_rpc_optlevel != small_rpc_optlevel_extreme);
 }
 
 #if small_rpc_optlevel == small_rpc_optlevel_none

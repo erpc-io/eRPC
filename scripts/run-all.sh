@@ -29,7 +29,7 @@ for node in $autorun_nodes; do
     source scripts/utils.sh; \
     drop_shm; \
     sudo nohup ./build/$autorun_app $app_args --machine_id $server_id \
-    > /dev/null 2> /dev/null < /dev/null &" &
+    > $autorun_out_file 2> $autorun_err_file < /dev/null &" &
 
 	server_id=`expr $server_id + 1`
 done

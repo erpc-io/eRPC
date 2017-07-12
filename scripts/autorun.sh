@@ -75,12 +75,17 @@ function get_from_config() {
   echo $config_param
 }
 
+# autorun_app must be defined
+check_env "autorun_app"
+
 # Variables set by the human user
 autorun_erpc_home="/users/akalia/eRPC"
-autorun_app="small_rpc_tput"	# The app to run
-autorun_autorun_down_node_list=""	# List of down nodes
+autorun_autorun_down_node_list=""	# List of down nodes. XXX: This doesn't work because we infer autorun_num_nodes from app config.
 
 # Variables exported by this script
+autorun_out_file="/tmp/${autorun_app}_out"
+autorun_err_file="/tmp/${autorun_app}_err"
+autorun_stat_file="/tmp/${autorun_app}_stats"
 autorun_test_ms=`get_from_config "test_ms"`
 autorun_num_nodes=`get_from_config "num_machines"`
 autorun_cluster=`get_cluster`

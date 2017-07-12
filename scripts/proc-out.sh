@@ -8,17 +8,17 @@ autorun_gen_nodes=1
 overwrite_nodemap=0
 source $(dirname $0)/autorun.sh
 
-tmpdir=/tmp/proc_$autorun_app
+tmpdir=/tmp/${autorun_app}_proc
 rm -rf $tmpdir
 mkdir $tmpdir
 
 node_index=0
 for node in $autorun_nodes; do
 	# We don't have the node name to machine ID mapping here, so just use index
-  target_filename=$autorun_app"_"$node_index
+  target_filename=$autorun_stat_file"_"$node_index
 
 	echo "proc-out: Fetching $tmpdir/$target_filename from $node."
-  scp $node:/tmp/$autorun_app $tmpdir/$target_filename \
+  scp $node:$autorun_stat_file $tmpdir/$target_filename \
 		1>/dev/null 2>/dev/null &
 
   ((node_index+=1))

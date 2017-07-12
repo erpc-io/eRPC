@@ -17,7 +17,15 @@ function drop_shm() {
 	done
 }
 
-# Check if a file exists. If it does not, exit.
+# Check if an environment variable is set. If it is not, exit.
+function check_env() {
+  if [ -z "$1" ]; then
+    echo "utils: Environment variable $1 not set. Exiting."
+    exit
+  fi
+}
+
+# Check if a file ($1) exists. If it does not, exit.
 function assert_file_exists() {
   if [ ! -f $1 ]; then
     echo "utils: File $1 not found! Exiting."
