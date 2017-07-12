@@ -3,8 +3,8 @@ project(eRPC)
 
 # Pick a compiler
 #set(CMAKE_CXX_COMPILER clang++-6.0)
-#set(CMAKE_CXX_COMPILER g++)
-set(CMAKE_CXX_COMPILER g++-8)
+#set(CMAKE_CXX_COMPILER g++-8)
+set(CMAKE_CXX_COMPILER g++)
 
 add_definitions(-std=c++11)
 

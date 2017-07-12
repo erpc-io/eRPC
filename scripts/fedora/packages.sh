@@ -9,7 +9,8 @@
 ### Required packages
 ###
 
-sudo dnf -y install gcc-c++ cmake numactl-devel numactl bc gflags-devel
+sudo dnf -y install gcc-c++ cmake numactl-devel numactl bc gflags-devel \
+  boost-devel
 
 # GTest is special for some reason
 sudo dnf -y install gtest gtest-devel
