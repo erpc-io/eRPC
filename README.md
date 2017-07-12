@@ -89,6 +89,15 @@
      * The Rpc thread frees SM packets in `handle_session_management_st()`.
 
 ## Compile-time optimization notes:
+ * Optimizations for `small_rpc_tput`:
+   * Each of these optimizations can help a fair bit (5-10%) individually, but
+     the benefits do not stack.
+   * Set optlevel to extreme.
+   * Disable datapath checks and datapath stats.
+   * Use O2 intead of O3. Try profile-guided optimization.
+   * Use power-of-two number of sessions and avoid Lemire's trick in app.
+   * In the continuation function, reduce frequency of scanning for stagnated
+     batches.
  * Setting `small_rpc_optlevel` to `small_rpc_optlevel_extreme` will disable
    support for large messages and background threads.
  * Setting `FAULT_INJECTION` to off will disable support to inject eRPC faults
