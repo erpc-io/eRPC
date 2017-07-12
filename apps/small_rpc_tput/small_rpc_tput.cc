@@ -305,7 +305,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 
   // Initiate connection for sessions
   for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
-    const char *hostname = get_hostname_for_machine(m_i).c_str();
+    std::string hostname = get_hostname_for_machine(m_i);
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
       size_t session_index = (m_i * FLAGS_num_threads) + t_i;

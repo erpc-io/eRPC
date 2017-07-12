@@ -342,8 +342,8 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
       // Do not create a session to self
       if (session_index == c.self_session_index) continue;
 
-      c.session_num_vec[session_index] = rpc.create_session(
-          hostname.c_str(), static_cast<uint8_t>(t_i), kAppPhyPort);
+      c.session_num_vec[session_index] =
+          rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
       assert(c.session_num_vec[session_index] >= 0);
     }
   }
@@ -418,7 +418,7 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name.c_str(), kAppNexusUdpPort,
+  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
                                        FLAGS_num_bg_threads);
   nexus.register_req_func(
       kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
