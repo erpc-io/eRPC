@@ -8,17 +8,16 @@ autorun_gen_nodes=1
 overwrite_nodemap=0
 source $(dirname $0)/autorun.sh
 
-tmpdir=/tmp/${autorun_app}_proc
+# Temporary directory for storing scp-ed files
+tmpdir="/tmp/${autorun_app}_proc"
 rm -rf $tmpdir
 mkdir $tmpdir
 
 node_index=0
 for node in $autorun_nodes; do
-	# We don't have the node name to machine ID mapping here, so just use index
-  target_filename=$autorun_stat_file"_"$node_index
-
-	echo "proc-out: Fetching $tmpdir/$target_filename from $node."
-  scp $node:$autorun_stat_file $tmpdir/$target_filename \
+  # Keeping destination file name = node name helps in debugging.
+	echo "proc-out: Fetching $autorun_stat_file from $node to $tmpdir/$node"
+  scp $node:$autorun_stat_file $tmpdir/$node \
 		1>/dev/null 2>/dev/null &
 
   ((node_index+=1))
@@ -48,18 +47,14 @@ for filename in $tmpdir/*; do
     continue;
   fi
 
-  # Cut out the first 6 and last 6 lines
-  awk -v nr="$(wc -l < $filename)" 'NR > 6 && NR < (nr - 6)' $filename > $tmpdir/compute_temp
-
-  remaining_rows=`cat $tmpdir/compute_temp | wc -l`
+  # Cut out the first 6 and last 6 lines into compute_temp - use this for stats
+  awk -v nr="$(wc -l < $filename)" 'NR > 6 && NR < (nr - 6)' $filename > proc_out_tmp
+  remaining_rows=`cat proc_out_tmp | wc -l`
 
   for col in `seq 1 $num_columns`; do
-    file_avg=`awk -v col=$col '{ total += $col } END { printf "%.3f", total / NR  }' $filename`
-    #echo "file_avg = $file_avg"
+    file_avg=`awk -v col=$col '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
     prev_sum=`echo "scale=3; ${avg[$col]} * $tot_rows" | bc -l`
-    #echo "prev_sum = $prev_sum"
     cur_sum=`echo "scale=3; $file_avg * $remaining_rows" | bc -l`
-    #echo "cur_sum = $cur_sum"
     avg[$col]=`echo "scale=3; ($prev_sum + $cur_sum) / ($tot_rows + $remaining_rows)" | bc -l`
     echo "proc-out: Column $col average for $filename = $file_avg. Current running average = ${avg[$col]}"
   done
@@ -70,3 +65,5 @@ done
 for col in `seq 1 $num_columns`; do
   blue "proc-out: Final column $col average = ${avg[$col]}"
 done
+
+rm -f proc_out_tmp
