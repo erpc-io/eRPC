@@ -49,7 +49,8 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 // Return the control net IP address of the machine with index server_i
 static std::string get_hostname_for_machine(size_t server_i) {
   std::ostringstream ret;
-  ret << "3.1.8." << std::to_string(server_i + 1);
+  ret << std::string("akalianode-") << std::to_string(server_i + 1)
+      << std::string(".RDMA.fawn.apt.emulab.net");
   return ret.str();
 }
 
@@ -128,10 +129,13 @@ void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
     throw std::runtime_error("SM callback for invalid session number.");
   }
 
-  fprintf(stderr, "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s\n",
+  fprintf(stderr,
+          "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s. "
+          "Time elapsed = %.3f s.\n",
           c->rpc->get_rpc_id(), session_num, session_index,
           sm_event_type == ERpc::SmEventType::kConnected ? "connected"
-                                                         : "disconncted");
+                                                         : "disconncted",
+          c->rpc->sec_since_creation());
 }
 
 size_t get_rand_session_index(AppContext *c) {
@@ -328,22 +332,22 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   std::fill(c.stat_resp_rx_bytes.begin(), c.stat_resp_rx_bytes.end(), 0);
 
   // Initiate connection for sessions
+  fprintf(stderr, "large_rpc_tput: Thread %zu: Creating sessions.\n",
+          thread_id);
   for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
-    const char *hostname = get_hostname_for_machine(m_i).c_str();
+    std::string hostname = get_hostname_for_machine(m_i);
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
       size_t session_index = (m_i * FLAGS_num_threads) + t_i;
       // Do not create a session to self
       if (session_index == c.self_session_index) continue;
 
-      c.session_num_vec[session_index] =
-          rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
+      c.session_num_vec[session_index] = rpc.create_session(
+          hostname.c_str(), static_cast<uint8_t>(t_i), kAppPhyPort);
       assert(c.session_num_vec[session_index] >= 0);
     }
   }
 
-  fprintf(stderr, "large_rpc_tput: Thread %zu: Creating sessions.\n",
-          thread_id);
   while (c.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
     rpc.run_event_loop(200);  // 200 milliseconds
     if (ctrl_c_pressed == 1) return;
