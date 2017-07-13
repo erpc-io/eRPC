@@ -18,39 +18,38 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
 
   // Check that the caller is the creator thread
   if (!in_creator()) {
-    erpc_dprintf("%s: Caller thread is not the creator thread.\n", issue_msg);
+    LOG_WARN("%s: Caller thread is not the creator thread.\n", issue_msg);
     return -EPERM;
   }
 
   // Check remote fabric port
   if (rem_phy_port >= kMaxPhyPorts) {
-    erpc_dprintf("%s: Invalid remote fabric port %u.\n", issue_msg,
-                 rem_phy_port);
+    LOG_WARN("%s: Invalid remote fabric port %u.\n", issue_msg, rem_phy_port);
     return -EINVAL;
   }
 
   // Check remote hostname
   if (rem_hostname.length() == 0 || rem_hostname.length() > kMaxHostnameLen) {
-    erpc_dprintf("%s: Invalid remote hostname.\n", issue_msg);
+    LOG_WARN("%s: Invalid remote hostname.\n", issue_msg);
     return -EINVAL;
   }
 
   // Creating a session to one's own Rpc as the client is not allowed
   if (rem_hostname == nexus->hostname && rem_rpc_id == rpc_id) {
-    erpc_dprintf("%s: Remote Rpc is same as local.\n", issue_msg);
+    LOG_WARN("%s: Remote Rpc is same as local.\n", issue_msg);
     return -EINVAL;
   }
 
   // Ensure bounded session_vec size
   if (session_vec.size() >= kMaxSessionsPerThread) {
-    erpc_dprintf("%s: Session limit (%zu) reached.\n", issue_msg,
-                 kMaxSessionsPerThread);
+    LOG_WARN("%s: Session limit (%zu) reached.\n", issue_msg,
+             kMaxSessionsPerThread);
     return -ENOMEM;
   }
 
   // Ensure that we have RECV credits for this session
   if (!have_recvs()) {
-    erpc_dprintf("%s: RECVs exhausted.\n", issue_msg);
+    LOG_WARN("%s: RECVs exhausted.\n", issue_msg);
     return -ENOMEM;
   }
 
@@ -71,7 +70,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
         free_msg_buffer(resp_msgbuf_j);
       }
 
-      erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
+      LOG_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
       return -ENOMEM;
     }
   }
@@ -117,36 +116,36 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
 
   // Check that the caller is the creator thread
   if (!in_creator()) {
-    erpc_dprintf("%s: Caller thread is not creator.\n", issue_msg);
+    LOG_WARN("%s: Caller thread is not creator.\n", issue_msg);
     return -EPERM;
   }
 
   if (!is_usr_session_num_in_range(session_num)) {
-    erpc_dprintf("%s: Invalid session number.\n", issue_msg);
+    LOG_WARN("%s: Invalid session number.\n", issue_msg);
     return -EINVAL;
   }
 
   Session *session = session_vec[static_cast<size_t>(session_num)];
   if (session == nullptr) {
-    erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
+    LOG_WARN("%s: Session already destroyed.\n", issue_msg);
     return -EPERM;
   }
 
   if (session->client_info.sm_api_req_pending) {
-    erpc_dprintf("%s: A session management API request is already pending.\n",
-                 issue_msg);
+    LOG_WARN("%s: A session management API request is already pending.\n",
+             issue_msg);
     return -EBUSY;
   }
 
   if (!session->is_client()) {
-    erpc_dprintf("%s: User cannot destroy server session.\n", issue_msg);
+    LOG_WARN("%s: User cannot destroy server session.\n", issue_msg);
     return -EINVAL;
   }
 
   // A session can be destroyed only when all its sslots are free
   if (session->client_info.sslot_free_vec.size() !=
       Session::kSessionReqWindow) {
-    erpc_dprintf("%s: Session has pending RPC requests.\n", issue_msg);
+    LOG_WARN("%s: Session has pending RPC requests.\n", issue_msg);
     return -EBUSY;
   }
 
@@ -163,14 +162,14 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   switch (session->state) {
     case SessionState::kConnectInProgress:
       // Can't disconnect right now. User needs to wait.
-      erpc_dprintf("%s: Session connection in progress.\n", issue_msg);
+      LOG_WARN("%s: Session connection in progress.\n", issue_msg);
       return -EPERM;
 
     case SessionState::kConnected:
       session->state = SessionState::kDisconnectInProgress;
       free_recvs();  // Don't wait for the disconnect response to reclaim RECVs
 
-      erpc_dprintf(
+      LOG_INFO(
           "eRPC Rpc %u: Sending disconnect request for session %u "
           "to [%s, %u].\n",
           rpc_id, session->local_session_num, session->server.hostname,
@@ -182,11 +181,11 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       return 0;
 
     case SessionState::kDisconnectInProgress:
-      erpc_dprintf("%s: Session disconnection in progress.\n", issue_msg);
+      LOG_WARN("%s: Session disconnection in progress.\n", issue_msg);
       return -EALREADY;
 
     case SessionState::kDisconnected:
-      erpc_dprintf("%s: Session already destroyed.\n", issue_msg);
+      LOG_WARN("%s: Session already destroyed.\n", issue_msg);
       return -ESHUTDOWN;
   }
 

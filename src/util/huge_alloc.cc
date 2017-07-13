@@ -1,5 +1,6 @@
 #include "huge_alloc.h"
 #include <iostream>
+#include "util/logger.h"
 
 namespace ERpc {
 
@@ -121,7 +122,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
 
         case ENOMEM:
           // Out of memory - this is OK
-          erpc_dprintf(
+          LOG_WARN(
               "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB\n",
               size / MB(1));
           return false;

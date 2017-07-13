@@ -44,7 +44,7 @@ void Rpc<TTr>::handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   session->state = SessionState::kDisconnected;
   free_recvs();
 
-  erpc_dprintf("%s. None. Sending response.\n", issue_msg);
+  LOG_INFO("%s. None. Sending response.\n", issue_msg);
   enqueue_sm_resp_st(wi, SmErrType::kNoError);
 
   bury_session_st(session);  // Free session resources + NULL in session_vec
@@ -80,11 +80,11 @@ void Rpc<TTr>::handle_disconnect_resp_st(SmPkt *sm_pkt) {
   session->state = SessionState::kDisconnected;
 
   if (!session->client_info.sm_callbacks_disabled) {
-    erpc_dprintf("%s: None. Session disconnected.\n", issue_msg);
+    LOG_INFO("%s: None. Session disconnected.\n", issue_msg);
     sm_handler(session->local_session_num, SmEventType::kDisconnected,
                SmErrType::kNoError, context);
   } else {
-    erpc_dprintf(
+    LOG_INFO(
         "%s: None. Session disconnected. Not invoking disconnect "
         "callback because session was never connected successfully.",
         issue_msg);

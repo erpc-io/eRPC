@@ -15,20 +15,21 @@ namespace ERpc {
 
 // Log levels
 #define LOG_LEVEL_OFF 1000
-#define LOG_LEVEL_ERROR 500
-#define LOG_LEVEL_WARN 400
+#define LOG_LEVEL_ERROR 500  // Only fatal conditions
+#define LOG_LEVEL_WARN 400   // Conditions from which it is possible to recover
 #define LOG_LEVEL_INFO 300   // Reasonable to print (e.g., management packets)
 #define LOG_LEVEL_DEBUG 200  // Too frequent to print (e.g., reordered packets)
 #define LOG_LEVEL_TRACE 100  // Extremely frequent (e.g., all datapath packets)
 
 #define LOG_OUTPUT_STREAM stdout
 
-// Set compile options automatically if LOG_LEVEL is not defined
+// If LOG_LEVEL is not defined, default to LOG_LEVEL_INFO in debug mode, and
+// LOG_LEVEL_WARN in non-debug mode.
 #ifndef LOG_LEVEL
 #ifndef NDEBUG
-#define LOG_LEVEL LOG_LEVEL_DEBUG
-#else
 #define LOG_LEVEL LOG_LEVEL_INFO
+#else
+#define LOG_LEVEL LOG_LEVEL_WARN
 #endif
 #endif
 

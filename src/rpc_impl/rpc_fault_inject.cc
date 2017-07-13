@@ -48,7 +48,7 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   assert(session != nullptr);
   assert(session->is_client() && session->is_connected());
 
-  erpc_dprintf(
+  LOG_WARN(
       "eRPC Rpc %u: Sending reset-remote-peer fault for session %u "
       "to [%s, %u].\n",
       rpc_id, session->local_session_num, session->server.hostname,

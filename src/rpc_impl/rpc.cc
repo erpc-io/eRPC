@@ -77,8 +77,8 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
     assert(nexus_hook.bg_req_list_arr[i] != nullptr);
   }
 
-  erpc_dprintf("eRPC Rpc: Created with ID = %u, ERpc TID = %zu.\n", rpc_id,
-               creator_etid);
+  LOG_INFO("eRPC Rpc: Created with ID = %u, ERpc TID = %zu.\n", rpc_id,
+           creator_etid);
 
   prev_epoch_ts = rdtsc();  // Assign epoch timestamp as late as possible
 }
@@ -87,8 +87,8 @@ template <class TTr>
 Rpc<TTr>::~Rpc() {
   // Rpc can only be destroyed from the creator thread
   if (unlikely(!in_creator())) {
-    erpc_dprintf("eRPC Rpc %u: Error. Cannot destroy from background thread.\n",
-                 rpc_id);
+    LOG_ERROR("eRPC Rpc %u: Error. Cannot destroy from background thread.\n",
+              rpc_id);
     exit(-1);
   }
 
@@ -96,8 +96,8 @@ Rpc<TTr>::~Rpc() {
   // handler). However, event loop entrance tracking is enabled only in
   // kDatapathChecks mode
   if (kDatapathChecks && in_event_loop) {
-    erpc_dprintf("eRPC Rpc %u: Error. Cannot destroy when inside event loop.\n",
-                 rpc_id);
+    LOG_ERROR("eRPC Rpc %u: Error. Cannot destroy when inside event loop.\n",
+              rpc_id);
     exit(-1);
   }
 
@@ -108,7 +108,7 @@ Rpc<TTr>::~Rpc() {
     }
   }
 
-  erpc_dprintf("eRPC Rpc: Destroying Rpc ID %u.\n", rpc_id);
+  LOG_INFO("eRPC Rpc: Destroying Rpc ID %u.\n", rpc_id);
 
   // First delete the hugepage allocator. This deregisters and deletes the
   // SHM regions. Deregistration is done using \p transport's deregistration

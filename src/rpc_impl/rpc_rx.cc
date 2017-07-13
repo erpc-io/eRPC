@@ -21,7 +21,7 @@ void Rpc<TTr>::process_comps_st() {
 
     Session *session = session_vec[session_num];
     if (unlikely(session == nullptr)) {
-      erpc_dprintf(
+      LOG_WARN(
           "eRPC Rpc %u: Warning: Received packet %s for buried session. "
           "Dropping packet.\n",
           rpc_id, pkthdr->to_string().c_str());
@@ -29,7 +29,7 @@ void Rpc<TTr>::process_comps_st() {
     }
 
     if (unlikely(!session->is_connected())) {
-      erpc_dprintf(
+      LOG_WARN(
           "eRPC Rpc %u: Warning: Received packet %s for unconnected "
           "session (state is %s). Dropping packet.\n",
           rpc_id, pkthdr->to_string().c_str(),
@@ -38,8 +38,8 @@ void Rpc<TTr>::process_comps_st() {
     }
 
     // If we are here, we have a valid packet for a connected session
-    dpath_dprintf("eRPC Rpc %u: Received packet %s.\n", rpc_id,
-                  pkthdr->to_string().c_str());
+    LOG_TRACE("eRPC Rpc %u: Received packet %s.\n", rpc_id,
+              pkthdr->to_string().c_str());
 
     // Locate the session slot
     size_t sslot_i = pkthdr->req_num % Session::kSessionReqWindow;  // Bit shift
@@ -99,7 +99,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
 
     if (pkthdr->req_num < sslot->cur_req_num) {
       // This is a massively-delayed retransmission of an old request
-      erpc_dprintf("%s: Dropping.\n", issue_msg);
+      LOG_DEBUG("%s: Dropping.\n", issue_msg);
       return;
     } else {
       // This is a retransmission for the currently active request
@@ -111,7 +111,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
         assert(sslot->tx_msgbuf->is_resp());
         assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
-        erpc_dprintf("%s: Re-sending response.\n", issue_msg);
+        LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
         enqueue_pkt_tx_burst_st(sslot, 0, std::min(sslot->tx_msgbuf->data_size,
                                                    TTr::kMaxDataPerPkt));
 
@@ -121,8 +121,8 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
         return;
       } else {
         // The response is not available yet, client will have to timeout again
-        erpc_dprintf("%s: Dropping because response not available yet.\n",
-                     issue_msg);
+        LOG_DEBUG("%s: Dropping because response not available yet.\n",
+                  issue_msg);
         return;
       }
     }
@@ -145,7 +145,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   if (unlikely(!req_func.is_registered())) {
-    erpc_dprintf(
+    LOG_WARN(
         "eRPC Rpc %u: Warning: Received packet for unknown request type %zu. "
         "Dropping packet.\n",
         rpc_id, pkthdr->req_type);
@@ -202,7 +202,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   }
 
   if (unlikely(!in_order)) {
-    erpc_dprintf(
+    LOG_DEBUG(
         "eRPC Rpc %u: Received out-of-order response for session %u. "
         "Request num: %zu (pkt), %zu (sslot). Dropping.\n",
         rpc_id, sslot->session->local_session_num, pkthdr->req_num,
@@ -259,7 +259,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   in_order &= (pkthdr->pkt_num < sslot->client_info.req_sent);
 
   if (unlikely(!in_order)) {
-    erpc_dprintf(
+    LOG_DEBUG(
         "eRPC Rpc %u: Received out-of-order explicit CR for session %u. "
         "Pkt = %zu/%zu. cur_req_num = %zu, expl_cr_rcvd = %zu. Dropping.\n",
         rpc_id, sslot->session->local_session_num, pkthdr->req_num,
@@ -291,13 +291,13 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     if (pkthdr->req_num < sslot->cur_req_num) {
       // Reject RFR for old requests
-      erpc_dprintf("%s: Dropping.\n", issue_msg);
+      LOG_DEBUG("%s: Dropping.\n", issue_msg);
       return;
     }
 
     if (pkthdr->pkt_num > sslot->server_info.rfr_rcvd + 1) {
       // Reject future packets
-      erpc_dprintf("%s: Dropping.\n", issue_msg);
+      LOG_DEBUG("%s: Dropping.\n", issue_msg);
       return;
     }
 
@@ -306,7 +306,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
            pkthdr->pkt_num < sslot->server_info.rfr_rcvd + 1);
     assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
-    erpc_dprintf("%s: Re-sending response.\n", issue_msg);
+    LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
 
     // Re-send the response packet with index = pkthdr->pkt_num (same as below)
     size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
@@ -363,7 +363,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     // Only past packets belonging to this request are not dropped
     if ((pkthdr->req_num != sslot->cur_req_num) ||
         (pkthdr->pkt_num > sslot->server_info.req_rcvd)) {
-      erpc_dprintf("%s: Dropping.\n", issue_msg);
+      LOG_DEBUG("%s: Dropping.\n", issue_msg);
       return;
     }
 
@@ -376,7 +376,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
 
     if (pkthdr->pkt_num != num_pkts_in_req - 1) {
       // This is not the last packet in the request => send a credit return
-      erpc_dprintf("%s: Re-sending credit return.\n", issue_msg);
+      LOG_DEBUG("%s: Re-sending credit return.\n", issue_msg);
 
       // We don't need to flush the transport's send queue here
       send_credit_return_now_st(sslot->session, pkthdr);
@@ -390,7 +390,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
       assert(sslot->tx_msgbuf->is_resp());
       assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
-      erpc_dprintf("%s: Re-sending response.\n", issue_msg);
+      LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
       enqueue_pkt_tx_burst_st(
           sslot, 0, std::min(sslot->tx_msgbuf->data_size, TTr::kMaxDataPerPkt));
 
@@ -399,8 +399,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
       transport->tx_flush();
     } else {
       // The response is not available yet, client will have to timeout again
-      erpc_dprintf("%s: Dropping because response not available yet.\n",
-                   issue_msg);
+      LOG_DEBUG("%s: Dropping because response not available yet.\n",
+                issue_msg);
     }
     return;
   }
@@ -444,7 +444,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   if (unlikely(!req_func.is_registered())) {
-    erpc_dprintf(
+    LOG_WARN(
         "eRPC Rpc %u: Warning: Received packet for unknown request type %zu. "
         "Dropping packet.\n",
         rpc_id, pkthdr->req_type);
@@ -501,7 +501,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   }
 
   if (unlikely(!in_order)) {
-    erpc_dprintf(
+    LOG_DEBUG(
         "eRPC Rpc %u: Received out-of-order response for session %u. "
         "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
         rpc_id, sslot->session->local_session_num, pkthdr->req_num,

@@ -17,8 +17,8 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port)
   init_infiniband_structs();
   init_mem_reg_funcs();
 
-  erpc_dprintf("eRPC IBTransport: Created for ID %u. Device %s, port %d.\n",
-               rpc_id, ib_ctx->device->name, dev_port_id);
+  LOG_INFO("eRPC IBTransport: Created for ID %u. Device %s, port %d.\n", rpc_id,
+           ib_ctx->device->name, dev_port_id);
 }
 
 void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
@@ -39,7 +39,7 @@ void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 //
 // We only need to clean up non-hugepage structures.
 IBTransport::~IBTransport() {
-  erpc_dprintf("eRPC IBTransport: Destroying transport for ID %u\n", rpc_id);
+  LOG_INFO("eRPC IBTransport: Destroying transport for ID %u\n", rpc_id);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
   if (ibv_destroy_qp(qp)) {
@@ -263,11 +263,10 @@ void IBTransport::init_infiniband_structs() {
 
   int probe_ret = ibv_post_recv(qp, nullptr, &bad_wr);
   if (probe_ret != kModdedProbeRet) {
-    fprintf(stderr,
-            "eRPC IBTransport: Warning. No driver support for fast RECVs.\n");
+    LOG_WARN("eRPC IBTransport: Warning. No driver support for fast RECVs.\n");
     use_fast_recv = false;
   } else {
-    erpc_dprintf_noargs("eRPC IBTransport: Driver supports fast RECVs.\n");
+    LOG_INFO("eRPC IBTransport: Driver supports fast RECVs.\n");
     use_fast_recv = true;
   }
 }

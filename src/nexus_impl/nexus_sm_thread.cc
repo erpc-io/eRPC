@@ -37,7 +37,7 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
   assert(epeer_data->work_item_vec.size() > 0);
 
   epeer_data->connected = true;
-  erpc_dprintf(
+  LOG_INFO(
       "eRPC Nexus: ENet socket connected to %s. Transmitting "
       "%zu queued SM requests.\n",
       epeer_data->rem_hostname.c_str(), epeer_data->work_item_vec.size());
@@ -72,9 +72,8 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
   if (!epeer_data->connected) {
     // This peer didn't connect successfully, so try again. Carry over the
     // ENet peer data from the previous peer to the new peer.
-    erpc_dprintf(
-        "eRPC Nexus: ENet failed to connect peer to %s. Reconnecting.\n",
-        hostname.c_str());
+    LOG_INFO("eRPC Nexus: ENet failed to connect peer to %s. Reconnecting.\n",
+             hostname.c_str());
 
     ENetAddress rem_address;
     rem_address.port = ctx->mgmt_udp_port;
@@ -93,7 +92,7 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
 
     new_epeer->data = epeer->data;
   } else {
-    erpc_dprintf(
+    LOG_INFO(
         "eRPC Nexus: ENet socket disconnected from %s. Not reconnecting.\n",
         hostname.c_str());
 
@@ -130,9 +129,14 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   enet_packet_destroy(event->packet);
   assert(sm_pkt_type_is_valid(sm_pkt->pkt_type));
 
+  LOG_INFO("eRPC Nexus: Received SM packet (type %s, sender %s).\n",
+           sm_pkt_type_str(sm_pkt->pkt_type).c_str(),  // XXX: Bad idea
+           sm_pkt_type_is_req(sm_pkt->pkt_type) ? sm_pkt->client.hostname
+                                                : sm_pkt->server.hostname);
+
   // Handle reset peer request here, since it's not passed to any Rpc
   if (sm_pkt->pkt_type == SmPktType::kFaultResetPeerReq) {
-    erpc_dprintf(
+    LOG_WARN(
         "eRPC Nexus: Received reset-remote-peer fault from Rpc [%s, %u]. "
         "Forcefully resetting ENet peer.\n",
         sm_pkt->client.hostname, sm_pkt->client.rpc_id);
@@ -155,7 +159,7 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
       // We don't handle this error for fault-injection session management reqs
       assert(sm_pkt_type_req_has_resp(sm_pkt->pkt_type));
 
-      erpc_dprintf(
+      LOG_WARN(
           "eRPC Nexus: Received session management request for invalid "
           "Rpc %u from Rpc [%s, %u]. Sending response.\n",
           target_rpc_id, sm_pkt->client.hostname, sm_pkt->client.rpc_id);
@@ -167,7 +171,7 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
       SmWorkItem temp_wi(kInvalidRpcId, sm_pkt, epeer);
       sm_thread_tx_and_free(temp_wi);  // This frees sm_pkt
     } else {
-      erpc_dprintf(
+      LOG_WARN(
           "eRPC Nexus: Received session management response for invalid "
           "Rpc %u from Rpc [%s, %u]. Ignoring.\n",
           target_rpc_id, sm_pkt->client.hostname, sm_pkt->client.rpc_id);
@@ -291,7 +295,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
 
         // Reduce ENet peer timeout. This needs more work (e.g., what values
         // can we safely use without false positives?)
-        enet_peer_timeout(wi.epeer, 1, 1, 100);
+        // enet_peer_timeout(wi.epeer, 1, 1, 500);
 
         // Add the peer to mappings to avoid creating a duplicate peer
         ctx->name_map[rem_hostname] = wi.epeer;
@@ -342,7 +346,7 @@ void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
     sm_thread_rx(ctx);
   }
 
-  erpc_dprintf_noargs("eRPC Nexus: Session management thread exiting.\n");
+  LOG_INFO("eRPC Nexus: Session management thread exiting.\n");
 
   // ENet cleanup
   enet_host_destroy(ctx->enet_host);

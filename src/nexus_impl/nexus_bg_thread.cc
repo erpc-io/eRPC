@@ -14,8 +14,8 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *ctx) {
   // The BgWorkItem request list can be indexed using the background thread's
   // index in the Nexus, or its ERpc TID.
   assert(ctx->bg_thread_index == ctx->tls_registry->get_etid());
-  erpc_dprintf("eRPC Nexus: Background thread %zu running. Tiny TID = %zu.\n",
-               ctx->bg_thread_index, ctx->tls_registry->get_etid());
+  LOG_INFO("eRPC Nexus: Background thread %zu running. Tiny TID = %zu.\n",
+           ctx->bg_thread_index, ctx->tls_registry->get_etid());
 
   while (*ctx->kill_switch == false) {
     if (ctx->bg_req_list.size == 0) {
@@ -34,7 +34,7 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *ctx) {
       Rpc<TTr>::debug_check_bg_rx_msgbuf(wi.sslot, wi.wi_type);
       assert(wi.sslot->tx_msgbuf == nullptr);
 
-      dpath_dprintf(
+      LOG_TRACE(
           "eRPC Background: Background thread %zu running %s for Rpc %u."
           "Request number = %zu.\n",
           ctx->bg_thread_index,
@@ -61,8 +61,8 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx *ctx) {
     ctx->bg_req_list.unlock();
   }
 
-  erpc_dprintf("eRPC Nexus: Background thread %zu exiting.\n",
-               ctx->bg_thread_index);
+  LOG_INFO("eRPC Nexus: Background thread %zu exiting.\n",
+           ctx->bg_thread_index);
   return;
 }
 

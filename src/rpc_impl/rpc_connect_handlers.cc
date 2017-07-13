@@ -28,29 +28,29 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   // Check that the transport matches
   Transport::TransportType pkt_tr_type = sm_pkt->server.transport_type;
   if (pkt_tr_type != transport->transport_type) {
-    erpc_dprintf("%s: Invalid transport %s. Sending response.\n", issue_msg,
-                 Transport::get_transport_name(pkt_tr_type).c_str());
+    LOG_WARN("%s: Invalid transport %s. Sending response.\n", issue_msg,
+             Transport::get_transport_name(pkt_tr_type).c_str());
     enqueue_sm_resp_st(wi, SmErrType::kInvalidTransport);
     return;
   }
 
   // Check if the requested physical port is correct
   if (sm_pkt->server.phy_port != phy_port) {
-    erpc_dprintf("%s: Invalid server port %u. Sending response.\n", issue_msg,
-                 sm_pkt->server.phy_port);
+    LOG_WARN("%s: Invalid server port %u. Sending response.\n", issue_msg,
+             sm_pkt->server.phy_port);
     enqueue_sm_resp_st(wi, SmErrType::kInvalidRemotePort);
     return;
   }
 
   // Check if we are allowed to create another session
   if (!have_recvs()) {
-    erpc_dprintf("%s: RECVs exhausted. Sending response.\n", issue_msg);
+    LOG_WARN("%s: RECVs exhausted. Sending response.\n", issue_msg);
     enqueue_sm_resp_st(wi, SmErrType::kRecvsExhausted);
   }
 
   if (session_vec.size() == kMaxSessionsPerThread) {
-    erpc_dprintf("%s: Reached session limit %zu. Sending response.\n",
-                 issue_msg, kMaxSessionsPerThread);
+    LOG_WARN("%s: Reached session limit %zu. Sending response.\n", issue_msg,
+             kMaxSessionsPerThread);
     enqueue_sm_resp_st(wi, SmErrType::kTooManySessions);
     return;
   }
@@ -58,13 +58,12 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   // Try to resolve the client's routing info into the packet. If session
   // creation succeeds, we'll copy it to the server's session endpoint.
   Transport::RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
-  erpc_dprintf("eRPC Rpc %u: Resolving client's routing info %s.\n", rpc_id,
-               TTr::routing_info_str(client_rinfo).c_str());
 
   bool resolve_success = transport->resolve_remote_routing_info(client_rinfo);
   if (!resolve_success) {
-    erpc_dprintf("%s: Unable to resolve routing info %s. Sending response.\n",
-                 issue_msg, TTr::routing_info_str(client_rinfo).c_str());
+    std::string routing_info_str = TTr::routing_info_str(client_rinfo);
+    LOG_WARN("%s: Unable to resolve routing info %s. Sending response.\n",
+             issue_msg, routing_info_str.c_str());
     enqueue_sm_resp_st(wi, SmErrType::kRoutingResolutionFailure);
     return;
   }
@@ -83,7 +82,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
         free_msg_buffer(msgbuf_j);
       }
 
-      erpc_dprintf("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
+      LOG_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
       enqueue_sm_resp_st(wi, SmErrType::kOutOfMemory);
       return;
     }
@@ -104,7 +103,7 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
   alloc_recvs();
   session_vec.push_back(session);  // Add to list of all sessions
 
-  erpc_dprintf("%s: None. Sending response.\n", issue_msg);
+  LOG_INFO("%s: None. Sending response.\n", issue_msg);
   enqueue_sm_resp_st(wi, SmErrType::kNoError);
   return;
 }
@@ -143,8 +142,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   // Handle special error cases for which we retry the connect request
   if (sm_pkt->err_type == SmErrType::kInvalidRemoteRpcId) {
     if (retry_connect_on_invalid_rpc_id) {
-      erpc_dprintf("eRPC Rpc %u: Retrying connection for session %u.\n", rpc_id,
-                   session_num);
+      LOG_WARN("%s: Invalid remote Rpc ID. Retrying.\n", issue_msg);
       enqueue_sm_req_st(session, SmPktType::kConnectReq);
       return;
     }
@@ -156,8 +154,8 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   // If the connect response has an error, the server has not allocated a
   // session object. Mark the session as disconnected and invoke callback.
   if (sm_pkt->err_type != SmErrType::kNoError) {
-    erpc_dprintf("%s: Error %s.\n", issue_msg,
-                 sm_err_type_str(sm_pkt->err_type).c_str());
+    LOG_WARN("%s: Error %s.\n", issue_msg,
+             sm_err_type_str(sm_pkt->err_type).c_str());
 
     session->state = SessionState::kDisconnected;
     free_recvs();  // Free before calling handler, which might want a reconnect
@@ -173,9 +171,6 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   // Try to resolve the server's routing information into the packet. If this
   // fails, invoke kConnectFailed callback.
   Transport::RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
-  erpc_dprintf("eRPC Rpc %u: Resolving server's routing info %s.\n", rpc_id,
-               TTr::routing_info_str(srv_routing_info).c_str());
-
   bool resolve_success;
   if (kFaultInjection && faults.fail_resolve_server_rinfo) {
     resolve_success = false;  // Inject fault
@@ -184,8 +179,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   }
 
   if (!resolve_success) {
-    erpc_dprintf("%s: Client failed to resolve server routing info.\n",
-                 issue_msg);
+    LOG_WARN("%s: Client failed to resolve server routing info.\n", issue_msg);
 
     // The server has allocated a Session, so try to free server resources by
     // disconnecting. The user will only get the kConnectFailed callback, i.e.,
@@ -199,9 +193,9 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
     session->state = SessionState::kDisconnectInProgress;
     free_recvs();  // Free before calling handler, which might want a reconnect
 
-    erpc_dprintf(
+    LOG_WARN(
         "eRPC Rpc %u: Sending callback-less disconnect request for "
-        "session %u, and invoking kConnectFailed callback\n",
+        "session %u, and invoking kConnectFailed callback.\n",
         rpc_id, session->local_session_num);
 
     // Enqueue a session management work request
@@ -219,7 +213,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   session->remote_session_num = session->server.session_num;
   session->state = SessionState::kConnected;
 
-  erpc_dprintf("%s: None. Session connected.\n", issue_msg);
+  LOG_INFO("%s: None. Session connected.\n", issue_msg);
   sm_handler(session->local_session_num, SmEventType::kConnected,
              SmErrType::kNoError, context);
 }

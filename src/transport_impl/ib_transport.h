@@ -3,6 +3,7 @@
 
 #include <infiniband/verbs.h>
 #include "transport.h"
+#include "util/logger.h"
 
 namespace ERpc {
 
@@ -149,8 +150,8 @@ class IBTransport : public Transport {
           "eRPC IBTransport: Failed to register memory region");
     }
 
-    erpc_dprintf("eRPC IBTransport: Registered %zu MB (lkey = %u)\n",
-                 size / MB(1), mr->lkey);
+    LOG_INFO("eRPC IBTransport: Registered %zu MB (lkey = %u)\n", size / MB(1),
+             mr->lkey);
     return MemRegInfo(mr, mr->lkey);
   }
 
@@ -173,8 +174,8 @@ class IBTransport : public Transport {
       return;
     }
 
-    erpc_dprintf("eRPC IBTransport: Deregistered %zu MB (lkey = %u)\n",
-                 size / MB(1), lkey);
+    LOG_INFO("eRPC IBTransport: Deregistered %zu MB (lkey = %u)\n",
+             size / MB(1), lkey);
   }
 
   /// Initialize the memory registration and deregistration functions

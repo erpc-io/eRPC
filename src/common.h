@@ -21,44 +21,6 @@
 
 namespace ERpc {
 
-// Debug defines
-static constexpr bool kVerbose = false;  ///< Debug printing for non-datapath
-static constexpr bool kDatapathVerbose = false;  ///< Debug printing in datapath
-
-/// Low-frequency debug message printing (e.g., session management messages)
-#define erpc_dprintf(fmt, ...)           \
-  do {                                   \
-    if (kVerbose) {                      \
-      fprintf(stderr, fmt, __VA_ARGS__); \
-      fflush(stderr);                    \
-    }                                    \
-  } while (0)
-
-#define erpc_dprintf_noargs(fmt) \
-  do {                           \
-    if (kVerbose) {              \
-      fprintf(stderr, fmt);      \
-      fflush(stderr);            \
-    }                            \
-  } while (0)
-
-/// High-frequency debug message printing (e.g., fabric RX and TX)
-#define dpath_dprintf(fmt, ...)          \
-  do {                                   \
-    if (kDatapathVerbose) {              \
-      fprintf(stderr, fmt, __VA_ARGS__); \
-      fflush(stderr);                    \
-    }                                    \
-  } while (0)
-
-#define dpath_dprintf_noargs(fmt) \
-  do {                            \
-    if (kDatapathVerbose) {       \
-      fprintf(stderr, fmt);       \
-      fflush(stderr);             \
-    }                             \
-  } while (0)
-
 #define _unused(x) ((void)(x))  // Make production build happy
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)

@@ -14,6 +14,7 @@
 #include "transport_impl/ib_transport.h"
 #include "util/buffer.h"
 #include "util/huge_alloc.h"
+#include "util/logger.h"
 #include "util/mt_list.h"
 #include "util/rand.h"
 #include "util/timer.h"
@@ -418,7 +419,7 @@ class Rpc {
       item.drop = ((fast_rand.next_u32() % 100) < faults.pkt_drop_prob * 100);
 
       if (item.drop) {
-        erpc_dprintf(
+        LOG_DEBUG(
             "eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
             tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
       }
@@ -426,9 +427,8 @@ class Rpc {
       assert(!item.drop);
     }
 
-    dpath_dprintf(
-        "eRPC Rpc %u: Sending packet %s.\n", rpc_id,
-        tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
+    LOG_TRACE("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
+              tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -454,15 +454,15 @@ class Rpc {
       item.drop = ((fast_rand.next_u32() % 100) < faults.pkt_drop_prob * 100);
 
       if (item.drop) {
-        erpc_dprintf("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
-                     tx_msgbuf->get_pkthdr_str(0).c_str());
+        LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
+                  tx_msgbuf->get_pkthdr_str(0).c_str());
       }
     } else {
       assert(!item.drop);
     }
 
-    dpath_dprintf("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
-                  tx_msgbuf->get_pkthdr_str().c_str());
+    LOG_TRACE("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
+              tx_msgbuf->get_pkthdr_str().c_str());
 
     tx_batch_i++;
     do_tx_burst_st();

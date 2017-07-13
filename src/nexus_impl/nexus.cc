@@ -14,11 +14,6 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
       hostname(hostname),
       num_bg_threads(num_bg_threads) {
   // Print warning messages if low-performance settings are enabled
-  if (kDatapathVerbose) {
-    fprintf(stderr,
-            "eRPC Nexus: Verbose datapath enabled. Performance will be low.\n");
-  }
-
   if (kDatapathChecks) {
     fprintf(stderr,
             "eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
@@ -42,8 +37,7 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   kill_switch = false;
 
   // Launch background threads
-  erpc_dprintf("eRPC Nexus: Launching %zu background threads.\n",
-               num_bg_threads);
+  LOG_INFO("eRPC Nexus: Launching %zu background threads.\n", num_bg_threads);
   for (size_t i = 0; i < num_bg_threads; i++) {
     assert(tls_registry.cur_etid == i);
 
@@ -67,18 +61,18 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
 
-  erpc_dprintf("eRPC Nexus: Launching session management thread on core %zu.\n",
-               kNexusSmThreadCore);
+  LOG_INFO("eRPC Nexus: Launching session management thread on core %zu.\n",
+           kNexusSmThreadCore);
   sm_thread = std::thread(sm_thread_func, &sm_thread_ctx);
   bind_to_core(sm_thread, kNexusSmThreadCore);
 
-  erpc_dprintf("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
-               mgmt_udp_port, hostname.c_str());
+  LOG_INFO("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
+           mgmt_udp_port, hostname.c_str());
 }
 
 template <class TTr>
 Nexus<TTr>::~Nexus() {
-  erpc_dprintf_noargs("eRPC Nexus: Destroying Nexus.\n");
+  LOG_INFO("eRPC Nexus: Destroying Nexus.\n");
 
   // Signal background and session management threads to kill themselves
   kill_switch = true;
@@ -131,7 +125,7 @@ void Nexus<TTr>::unregister_hook(Hook *hook) {
   uint8_t rpc_id = hook->rpc_id;
   assert(rpc_id <= kMaxRpcId);
   assert(reg_hooks_arr[rpc_id] == hook);
-  erpc_dprintf("eRPC Nexus: Deregistering Rpc %u.\n", rpc_id);
+  LOG_INFO("eRPC Nexus: Deregistering Rpc %u.\n", rpc_id);
 
   nexus_lock.lock();
   reg_hooks_arr[rpc_id] = nullptr;
@@ -147,7 +141,7 @@ int Nexus<TTr>::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
 
   // If any Rpc is already registered, the user cannot register new Ops
   if (!req_func_registration_allowed) {
-    erpc_dprintf("%s: Registration not allowed anymore.\n", issue_msg);
+    LOG_WARN("%s: Registration not allowed anymore.\n", issue_msg);
     return -EPERM;
   }
 
@@ -155,20 +149,20 @@ int Nexus<TTr>::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
 
   // Check if this request type is already registered
   if (req_func_arr[req_type].is_registered()) {
-    erpc_dprintf("%s: A handler for this request type already exists.\n",
-                 issue_msg);
+    LOG_WARN("%s: A handler for this request type already exists.\n",
+             issue_msg);
     return -EEXIST;
   }
 
   // Check if the application's Ops is valid
   if (app_req_func.req_func == nullptr) {
-    erpc_dprintf("%s: Invalid handler.\n", issue_msg);
+    LOG_WARN("%s: Invalid handler.\n", issue_msg);
     return -EINVAL;
   }
 
   // If the request handler runs in the background, we must have bg threads
   if (app_req_func.is_background() && num_bg_threads == 0) {
-    erpc_dprintf("%s: Background threads not available.\n", issue_msg);
+    LOG_WARN("%s: Background threads not available.\n", issue_msg);
     return -EPERM;
   }
 
@@ -190,7 +184,7 @@ double Nexus<TTr>::get_freq_ghz() {
   }
 
   if (sum != 13580802877818827968ull) {
-    erpc_dprintf_noargs("eRPC: FATAL. Failed in rdtsc frequency measurement.");
+    LOG_ERROR("eRPC: FATAL. Failed in rdtsc frequency measurement.");
     assert(false);
     exit(-1);
   }
@@ -205,8 +199,6 @@ double Nexus<TTr>::get_freq_ghz() {
 
   // Less than 500 MHz and greater than 5.0 GHz is abnormal
   if (_freq_ghz < 0.5 || _freq_ghz > 5.0) {
-    erpc_dprintf("eRPC Nexus: FATAL. Abnormal CPU frequency %.4f GHz\n",
-                 _freq_ghz);
     throw std::runtime_error("eRPC Nexus: get_freq_ghz() failed.");
   }
 
