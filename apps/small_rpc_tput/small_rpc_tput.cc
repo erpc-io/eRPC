@@ -331,7 +331,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
           thread_id);
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
-  // Do PAPI measurement if we're running one thread
+  // Initialize PAPI measurement if we're running one thread
   if (FLAGS_num_threads == 1) {
     float real_time, proc_time, ipc;
     long long ins;

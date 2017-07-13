@@ -49,8 +49,9 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 // Return the control net IP address of the machine with index server_i
 static std::string get_hostname_for_machine(size_t server_i) {
   std::ostringstream ret;
-  ret << std::string("akalianode-") << std::to_string(server_i + 1)
-      << std::string(".RDMA.fawn.apt.emulab.net");
+  ret << "3.1.8." << std::to_string(server_i + 1);
+  // ret << std::string("akalianode-") << std::to_string(server_i + 1)
+  //    << std::string(".RDMA.fawn.apt.emulab.net");
   return ret.str();
 }
 
@@ -380,7 +381,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     c.req_vec.push_back(tag_t(get_rand_session_index(&c), msgbuf_index));
   }
 
-  // Do PAPI measurement if we're running one thread
+  // Initialize PAPI measurement if we're running one thread
   if (FLAGS_num_threads == 1) {
     float real_time, proc_time, ipc;
     long long ins;
