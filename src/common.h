@@ -24,10 +24,6 @@ namespace ERpc {
 // Debug defines
 static constexpr bool kVerbose = false;  ///< Debug printing for non-datapath
 static constexpr bool kDatapathVerbose = false;  ///< Debug printing in datapath
-static constexpr bool kDatapathStats = true;  ///< Collect datapath stats
-
-/// Datapath checks that can be disabled for maximum performance
-static constexpr bool kDatapathChecks = true;
 
 /// Low-frequency debug message printing (e.g., session management messages)
 #define erpc_dprintf(fmt, ...)           \
@@ -66,15 +62,6 @@ static constexpr bool kDatapathChecks = true;
 #define _unused(x) ((void)(x))  // Make production build happy
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
-
-/// Collect datapath if enabled
-static inline constexpr void dpath_stat_inc(size_t &stat, size_t val) {
-  if (!kDatapathStats) {
-    return;
-  } else {
-    stat += val;
-  }
-}
 
 #define KB(x) (static_cast<size_t>(x) << 10)
 #define KB_(x) (KB(x) - 1)

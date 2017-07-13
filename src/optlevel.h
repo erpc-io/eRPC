@@ -6,12 +6,15 @@
 #define OPTLEVEL_H
 
 #include <assert.h>
+#include <stdlib.h>
 
 namespace ERpc {
 
-// Optimizations for small RPCs
+// Tweak these options for small Rpc performance
+#define small_rpc_optlevel (small_rpc_optlevel_likely)
+static constexpr bool kDatapathStats = true;   ///< Collect datapath stats
+static constexpr bool kDatapathChecks = true;  ///< Extra datapath checks
 
-/// No optimization for small messages and foreground request handlers
 ///@{
 /// Optimization level for small RPCs and foreground request handlers
 /// 0 (none): No optimization
@@ -20,15 +23,10 @@ namespace ERpc {
 #define small_rpc_optlevel_none (0)
 #define small_rpc_optlevel_likely (1)
 #define small_rpc_optlevel_extreme (2)
-#define small_rpc_optlevel (small_rpc_optlevel_likely)
 ///@}
 
 #define optlevel_large_rpc_supported \
   (small_rpc_optlevel != small_rpc_optlevel_extreme)
-
-static bool large_rpc_supported() {
-  return (small_rpc_optlevel != small_rpc_optlevel_extreme);
-}
 
 #if small_rpc_optlevel == small_rpc_optlevel_none
 #define small_rpc_likely(x) (x)
@@ -50,6 +48,20 @@ static constexpr bool small_rpc_unlikely(bool x) {
 #else
 static_assert(false, "");  // Invalid value of small_rpc_optlevel
 #endif
+
+/// Return true iff large Rpcs are supported
+static constexpr bool large_rpc_supported() {
+  return (small_rpc_optlevel != small_rpc_optlevel_extreme);
+}
+
+/// Collect datapath if enabled
+static inline constexpr void dpath_stat_inc(size_t &stat, size_t val) {
+  if (!kDatapathStats) {
+    return;
+  } else {
+    stat += val;
+  }
+}
 
 /// Fault injection code that can be disabled for non-tests
 #ifdef FAULT_INJECTION
