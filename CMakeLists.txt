@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 project(eRPC)
 
+if(NOT DEFINED ENV{autorun_app})
+  MESSAGE(FATAL_ERROR "Please set autorun_app")
+endif()
+
 set(CMAKE_CXX_COMPILER g++-7)
 set(CMAKE_C_LINK_EXECUTABLE g++-7)
 
@@ -157,8 +161,7 @@ set(OTHER_TESTS
 
 # The apps to compile
 # Available apps: small_rpc_tput, large_rpc_tput
-set(APPS
-  small_rpc_tput)
+set(APPS $ENV{autorun_app})
 
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling ERPC as a library")
