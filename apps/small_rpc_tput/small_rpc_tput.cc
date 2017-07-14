@@ -229,18 +229,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   if (c->stat_resp_rx_tot == 1000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
-    printf(
-        "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
-        "Responses received = %zu, requests received = %zu.\n",
-        c->thread_id, c->stat_resp_rx_tot / (seconds * 1000000),
-        c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
-        c->stat_req_rx_tot);
 
+    // Min/max responses for a concurrent batch, to check for stagnated batches.
+    size_t max_resps = 0, min_resps = std::numeric_limits<size_t>::max();
     for (size_t i = 0; i < FLAGS_concurrency; i++) {
-      printf("%zu, ", c->stat_resp_rx[i]);
-      c->stat_resp_rx[i] = 0;
+      min_resps = std::min(min_resps, c->stat_resp_rx[i]);
+      max_resps = std::max(max_resps, c->stat_resp_rx[i]);
     }
-    printf("\n");
 
     float ipc = -1.0;
     if (FLAGS_num_threads == 1) {
@@ -250,10 +245,16 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       if (ret < PAPI_OK) {
         fprintf(stderr, "PAPI IPC failed.\n");
         exit(-1);
-      } else {
-        printf("IPC = %.3f.\n", ipc);
       }
     }
+
+    printf(
+        "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
+        "Resps RX = %zu, requests RX = %zu. "
+        "Resps/concurrent batch: min %zu, max %zu. IPC = %.2f.\n",
+        c->thread_id, c->stat_resp_rx_tot / (seconds * 1000000),
+        c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
+        c->stat_req_rx_tot, min_resps, max_resps, ipc);
 
     // Stats: throughput ipc
     c->tmp_stat->write(
