@@ -15,13 +15,11 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
       num_bg_threads(num_bg_threads) {
   // Print warning messages if low-performance settings are enabled
   if (kDatapathChecks) {
-    fprintf(stderr,
-            "eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
+    LOG_WARN("eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
   }
 
   if (kFaultInjection) {
-    fprintf(stderr,
-            "eRPC Nexus: Fault injection enabled. Performance will be low.\n");
+    LOG_WARN("eRPC Nexus: Fault injection enabled. Performance will be low.\n");
   }
 
   if (num_bg_threads > kMaxBgThreads) {
