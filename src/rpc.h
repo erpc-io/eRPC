@@ -691,6 +691,9 @@ class Rpc {
   /// Busy-sleep for \p ns nanoseconds
   void nano_sleep(size_t ns);
 
+  /// Return RDTSC frequency in GHz
+  inline double get_freq_ghz() const { return nexus->freq_ghz; }
+
   /// Return the number of milliseconds elapsed since this Rpc was created
   double sec_since_creation();
 

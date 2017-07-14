@@ -16,6 +16,7 @@
 #include <cstring>
 #include "../apps_common.h"
 #include "rpc.h"
+#include "util/latency.h"
 #include "util/misc.h"
 
 static constexpr bool kAppVerbose = false;
@@ -75,8 +76,9 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 // Per-thread application context
 class AppContext {
  public:
-  ERpc::TmpStat *tmp_stat = nullptr;
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
+  ERpc::TmpStat *tmp_stat = nullptr;
+  ERpc::Latency latency;
 
   std::vector<int> session_num_vec;
 
@@ -93,6 +95,7 @@ class AppContext {
 
   std::vector<tag_t> req_vec;  // Request queue
 
+  uint64_t req_ts[kMaxConcurrency];  // Per-request timestamps
   ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];
   ERpc::MsgBuffer resp_msgbuf[kMaxConcurrency];
 
@@ -174,6 +177,7 @@ void send_reqs(AppContext *c) {
              session_index, msgbuf_index);
     }
 
+    c->req_ts[msgbuf_index] = ERpc::rdtsc();
     int ret = c->rpc->enqueue_request(
         c->session_num_vec[session_index], kAppReqType, &req_msgbuf,
         &c->resp_msgbuf[msgbuf_index], app_cont_func, c->req_vec[i]._tag);
@@ -228,6 +232,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
            msgbuf_index, session_index);
   }
 
+  // Measure latency. 1 us granularity is sufficient for large RPC latency.
+  auto *c = static_cast<AppContext *>(_context);
+  double usec = ERpc::to_usec(ERpc::rdtsc() - c->req_ts[msgbuf_index],
+                              c->rpc->get_freq_ghz());
+  assert(usec >= 0);
+  c->latency.update(static_cast<size_t>(usec));
+
   // Check the response
   if (unlikely(resp_msgbuf->get_data_size() != FLAGS_resp_size)) {
     throw std::runtime_error("Invalid response size.\n");
@@ -247,7 +258,6 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 
   // Create a new request clocking this response, and put in request queue
-  auto *c = static_cast<AppContext *>(_context);
   if (kAppMemset) {
     memset(c->req_msgbuf[msgbuf_index].buf, kAppDataByte, FLAGS_req_size);
   } else {
@@ -265,34 +275,38 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   if (c->stat_resp_rx_bytes_tot == 500000000) {
     double ns = ERpc::ns_since(c->tput_t0);
-    printf(
-        "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
-        "TX %.3f GB/s. Response bytes: RX %.3f MB, TX = %.3f MB.\n",
-        c->thread_id, c->stat_resp_rx_bytes_tot / ns,
-        c->stat_resp_tx_bytes_tot / ns, c->stat_resp_rx_bytes_tot / 1000000.0,
-        c->stat_resp_tx_bytes_tot / 1000000.0);
+    double session_max_tput = 0;
+    double session_min_tput = std::numeric_limits<double>::max();
 
-    printf("large_rpc_tput: Tput per session: ");
     for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-      printf("%zu: %.2f, ", i, c->stat_resp_rx_bytes[i] / ns);
+      session_max_tput =
+          std::max(c->stat_resp_rx_bytes[i] / ns, session_max_tput);
+      session_min_tput =
+          std::min(c->stat_resp_rx_bytes[i] / ns, session_min_tput);
     }
-    printf("\n");
 
     float ipc = -1.0;
     if (FLAGS_num_threads == 1) {
       float real_time, proc_time;
       long long ins;
       int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-      if (ret < PAPI_OK) {
-        throw std::runtime_error("PAPI measurement failed.");
-      } else {
-        printf("large_rpc_tput: IPC = %.3f.\n", ipc);
-      }
+      if (ret < PAPI_OK) throw std::runtime_error("PAPI measurement failed.");
     }
 
-    // Stats: throughput ipc
+    printf(
+        "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
+        "TX %.3f GB/s. Response bytes: RX %.3f MB, TX = %.3f MB. "
+        "Max,min session tput = %.3f GB/s, %.3f GB/s. IPC = %.3f.\n",
+        c->thread_id, c->stat_resp_rx_bytes_tot / ns,
+        c->stat_resp_tx_bytes_tot / ns, c->stat_resp_rx_bytes_tot / 1000000.0,
+        c->stat_resp_tx_bytes_tot / 1000000.0, session_max_tput,
+        session_min_tput, ipc);
+
+    // Stats: throughput ipc avg_latency 99%_latency
     c->tmp_stat->write(std::to_string(c->stat_resp_rx_bytes_tot / ns) + " " +
-                       std::to_string(ipc));
+                       std::to_string(ipc) + " " +
+                       std::to_string(c->latency.avg()) + " " +
+                       std::to_string(c->latency.perc(.99)));
 
     c->rpc->reset_dpath_stats_st();
     std::fill(c->stat_resp_rx_bytes.begin(), c->stat_resp_rx_bytes.end(), 0);
