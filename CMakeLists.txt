@@ -37,6 +37,7 @@ set(COMPILE_ERPC_LIB ON)
 # Options exposed to the user
 option(PERF "Compile for performance" OFF)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
+set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/debug/trace)") 
 
 # Parse the user-exposed options
 if(PERF)
@@ -51,6 +52,7 @@ else(PERF)
   SET(FAULT_INJECTION ON)
 endif(PERF)
 
+# Profile-guided optimization
 if(PGO STREQUAL "generate")
   MESSAGE(STATUS "Profile-guided optimization (generate mode) is enabled. Performance will be low.")
   add_definitions(-fprofile-generate)
@@ -62,6 +64,30 @@ elseif(PGO STREQUAL "use")
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-use -fprofile-correction")
 elseif(PGO STREQUAL "none")
   MESSAGE(STATUS "Profile-guided optimization is disabled.")
+endif()
+
+# Logging level
+if(LOG_LEVEL STREQUAL "none")
+  MESSAGE(STATUS "Logging level = none.")
+  add_definitions(-DLOG_LEVEL=0)
+elseif(LOG_LEVEL STREQUAL "error")
+  MESSAGE(STATUS "Logging level = error.")
+  add_definitions(-DLOG_LEVEL=1)
+elseif(LOG_LEVEL STREQUAL "warn")
+  MESSAGE(STATUS "Logging level = warn.")
+  add_definitions(-DLOG_LEVEL=2)
+elseif(LOG_LEVEL STREQUAL "info")
+  MESSAGE(STATUS "Logging level = info.")
+  add_definitions(-DLOG_LEVEL=3)
+elseif(LOG_LEVEL STREQUAL "debug")
+  MESSAGE(STATUS "Logging level = debug. Warning: Performance will be low.")
+  add_definitions(-DLOG_LEVEL=4)
+elseif(LOG_LEVEL STREQUAL "trace")
+  MESSAGE(STATUS "Logging level = trace. Warning: Performance will be low.")
+  add_definitions(-DLOG_LEVEL=5)
+else()
+  MESSAGE(STATUS "No logging level specified. Using warning level.")
+  add_definitions(-DLOG_LEVEL=2)
 endif()
 
 # Debug mode
