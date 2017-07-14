@@ -43,10 +43,25 @@ class TmpStat {
  public:
   TmpStat() {}
 
-  TmpStat(std::string app_name) {
-    // Add your app name here
-    assert(app_name == "small_rpc_tput" || app_name == "large_rpc_tput");
+  bool contains_newline(std::string line) {
+    for (size_t i = 0; i < line.length(); i++) {
+      if (line[i] == '\n') return true;
+    }
+
+    return false;
+  }
+
+  TmpStat(std::string app_name, std::string header) {
+    if (app_name != "small_rpc_tput" && app_name != "large_rpc_tput") {
+      throw std::runtime_error("Invalid app.");
+    }
+
+    if (contains_newline(header)) {
+      throw std::runtime_error("Stats header contains newline.");
+    }
+
     output_file = std::ofstream(std::string("/tmp/") + app_name + "_stats");
+    output_file << header << std::endl;
   }
 
   ~TmpStat() {
