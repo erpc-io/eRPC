@@ -198,7 +198,7 @@ TEST(MultiLargeRpcOneSession, Background) {
 }
 
 TEST(MultiLargeRpcMultiSession, Foreground) {
-  assert(!kDatapathVerbose);
+  assert(ERpc::is_log_level_reasonable());
   config_num_iters = 2;
   config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
@@ -207,7 +207,7 @@ TEST(MultiLargeRpcMultiSession, Foreground) {
 }
 
 TEST(MultiLargeRpcMultiSession, Background) {
-  assert(!kDatapathVerbose);
+  assert(ERpc::is_log_level_reasonable());
   config_num_iters = 2;
   config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
@@ -216,7 +216,7 @@ TEST(MultiLargeRpcMultiSession, Background) {
 }
 
 TEST(DISABLED_MemoryLeak, Foreground) {
-  assert(!kDatapathVerbose);
+  assert(ERpc::is_log_level_reasonable());
   config_num_iters = 50;
   config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;
@@ -225,7 +225,7 @@ TEST(DISABLED_MemoryLeak, Foreground) {
 }
 
 TEST(DISABLED_MemoryLeak, Background) {
-  assert(!kDatapathVerbose);
+  assert(ERpc::is_log_level_reasonable());
   config_num_iters = 50;
   config_num_sessions = 4;
   config_rpcs_per_session = Session::kSessionReqWindow;

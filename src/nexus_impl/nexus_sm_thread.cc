@@ -130,7 +130,7 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
   assert(sm_pkt_type_is_valid(sm_pkt->pkt_type));
 
   LOG_INFO("eRPC Nexus: Received SM packet (type %s, sender %s).\n",
-           sm_pkt_type_str(sm_pkt->pkt_type).c_str(),  // XXX: Bad idea
+           sm_pkt_type_str(sm_pkt->pkt_type).c_str(),
            sm_pkt_type_is_req(sm_pkt->pkt_type) ? sm_pkt->client.hostname
                                                 : sm_pkt->server.hostname);
 
