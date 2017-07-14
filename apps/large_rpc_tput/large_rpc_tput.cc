@@ -230,24 +230,19 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   // Check the response
   if (unlikely(resp_msgbuf->get_data_size() != FLAGS_resp_size)) {
-    fprintf(stderr, "large_rpc_tput: Error. Invalid response size.\n");
-    exit(-1);
+    throw std::runtime_error("Invalid response size.\n");
   }
 
   if (kAppMemset) {
     // Check all response cachelines (checking every byte is slow)
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
       if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
-        fprintf(stderr,
-                "large_rpc_tput: Error. Invalid resp data at offset %zu.\n", i);
-        exit(-1);
+        throw std::runtime_error("Invalid response data.");
       }
     }
   } else {
     if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
-      fprintf(stderr,
-              "large_rpc_tput: Error. Invalid response data at offset 0.\n");
-      exit(-1);
+      throw std::runtime_error("Invalid response data.");
     }
   }
 
@@ -289,8 +284,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       long long ins;
       int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
       if (ret < PAPI_OK) {
-        fprintf(stderr, "large_rpc_tput: Error. PAPI IPC failed.\n");
-        exit(-1);
+        throw std::runtime_error("PAPI measurement failed.");
       } else {
         printf("large_rpc_tput: IPC = %.3f.\n", ipc);
       }
@@ -386,10 +380,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     float real_time, proc_time, ipc;
     long long ins;
     int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-    if (ret < PAPI_OK) {
-      fprintf(stderr, "large_rpc_tput: Error. PAPI initialization failed.\n");
-      exit(-1);
-    }
+    if (ret < PAPI_OK) throw std::runtime_error("PAPI initialization failed.");
   }
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
