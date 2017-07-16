@@ -257,21 +257,9 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
   }
 
-  // Create a new request clocking this response, and put in request queue
-  if (kAppMemset) {
-    memset(c->req_msgbuf[msgbuf_index].buf, kAppDataByte, FLAGS_req_size);
-  } else {
-    c->req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;
-  }
-
-  c->req_vec.push_back(tag_t(get_rand_session_index(c), msgbuf_index));
-
-  // Try to send the queued requests. The request buffer for these requests is
-  // already filled.
-  send_reqs(c);
-
   c->stat_resp_rx_bytes_tot += FLAGS_resp_size;
   c->stat_resp_rx_bytes[session_index] += FLAGS_resp_size;
+  c->rpc->release_response(resp_handle);
 
   if (c->stat_resp_rx_bytes_tot == 500000000) {
     double ns = ERpc::ns_since(c->tput_t0);
@@ -316,7 +304,18 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
 
-  c->rpc->release_response(resp_handle);
+  // Create a new request clocking this response, and put in request queue
+  if (kAppMemset) {
+    memset(c->req_msgbuf[msgbuf_index].buf, kAppDataByte, FLAGS_req_size);
+  } else {
+    c->req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;
+  }
+
+  c->req_vec.push_back(tag_t(get_rand_session_index(c), msgbuf_index));
+
+  // Try to send the queued requests. The request buffer for these requests is
+  // already filled.
+  send_reqs(c);
 }
 
 // The function executed by each thread in the cluster
