@@ -163,8 +163,8 @@ void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 // be sent are req-queued into req_vec.
 void send_reqs(AppContext *c) {
   assert(c != nullptr);
-
   size_t write_index = 0;
+
   for (size_t i = 0; i < c->req_vec.size(); i++) {
     size_t msgbuf_index = c->req_vec[i].msgbuf_index;
     size_t session_index = c->req_vec[i].session_index;
@@ -177,6 +177,8 @@ void send_reqs(AppContext *c) {
              session_index, msgbuf_index);
     }
 
+    // Timestamp before trying enqueue_request(). If enqueue_request() fails,
+    // we'll timestamp again on the next try.
     c->req_ts[msgbuf_index] = ERpc::rdtsc();
     int ret = c->rpc->enqueue_request(
         c->session_num_vec[session_index], kAppReqType, &req_msgbuf,
@@ -186,6 +188,7 @@ void send_reqs(AppContext *c) {
     if (ret == -EBUSY) {
       c->req_vec[write_index] = c->req_vec[i];
       write_index++;
+      // Try other requests
     }
   }
 
@@ -267,6 +270,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double session_min_tput = std::numeric_limits<double>::max();
 
     for (size_t i = 0; i < c->session_num_vec.size(); i++) {
+      if (i == c->self_session_index) continue;
       session_max_tput =
           std::max(c->stat_resp_rx_bytes[i] / ns, session_max_tput);
       session_min_tput =
@@ -290,16 +294,17 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         c->stat_resp_tx_bytes_tot / 1000000.0, session_max_tput,
         session_min_tput, ipc);
 
-    // Stats: throughput ipc avg_latency 99%_latency
+    // Stats: rx_GBps tx_GBps avg_us 99_us
     c->tmp_stat->write(std::to_string(c->stat_resp_rx_bytes_tot / ns) + " " +
-                       std::to_string(ipc) + " " +
+                       std::to_string(c->stat_resp_tx_bytes_tot / ns) + " " +
                        std::to_string(c->latency.avg()) + " " +
                        std::to_string(c->latency.perc(.99)));
 
-    c->rpc->reset_dpath_stats_st();
+    c->latency.reset();
     std::fill(c->stat_resp_rx_bytes.begin(), c->stat_resp_rx_bytes.end(), 0);
     c->stat_resp_rx_bytes_tot = 0;
     c->stat_resp_tx_bytes_tot = 0;
+    c->rpc->reset_dpath_stats_st();
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
@@ -322,7 +327,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext c;
   c.tmp_stat =
-      new ERpc::TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_ms 99_ms");
+      new ERpc::TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
   c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
