@@ -50,13 +50,15 @@ echo "Nodes under each switch:"
 # Actually print the nodes
 for i in `seq 1 10`; do
 	num_nodes=`echo ${switch_map[$i]} | wc -w`
-	echo "Switch $i ($num_nodes nodes): ${switch_map[$i]}"
+
+  # This assumes that node names are of the form <prefix>-<number>, e.g., akalianode-1
+	sorted_nodes=`echo ${switch_map[$i]} | xargs -n 1 | sort -t '-' -k 2 -g | tr '\n' ' '`
+	echo "Switch $i ($num_nodes nodes): $sorted_nodes"
 done
 
 # To check that we detected all nodes, print the number of nodes parsed
 echo "Total nodes under all switches = $total_nodes"
 echo ""
-
 
 #
 # Part 2: For a subset of nodes in apt_nodes, print the number of nodes
