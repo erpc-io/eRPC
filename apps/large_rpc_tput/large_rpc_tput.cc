@@ -301,6 +301,10 @@ void setup_profile() {
   }
 
   if (FLAGS_profile == "timely_small") {
+    printf(
+        "main: timely_small profile overrides req_size, resp_size, and "
+        "num_threads flags");
+    // timely_small should ideally use 1 thread per machine, but >1 works too
     FLAGS_req_size = 16 * 1024;  // 16 KB
     FLAGS_resp_size = 32;
     connect_sessions_func = connect_sessions_func_timely_small;
