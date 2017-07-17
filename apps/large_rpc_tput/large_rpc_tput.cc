@@ -106,6 +106,8 @@ void send_reqs(AppContext *c) {
       c->req_vec[write_index] = c->req_vec[i];
       write_index++;
       // Try other requests
+    } else {
+      c->stat_tx_bytes_tot += FLAGS_req_size;
     }
   }
 
@@ -134,7 +136,9 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
     resp_msgbuf.buf[0] = resp_byte;
   }
 
-  c->stat_resp_tx_bytes_tot += FLAGS_resp_size;
+  c->stat_rx_bytes_tot += FLAGS_req_size;
+  c->stat_tx_bytes_tot += FLAGS_resp_size;
+
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -177,45 +181,31 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
   }
 
-  c->stat_resp_rx_bytes_tot += FLAGS_resp_size;
-  c->stat_resp_rx_bytes[session_idx] += FLAGS_resp_size;
+  c->stat_rx_bytes_tot += FLAGS_resp_size;
   c->rpc->release_response(resp_handle);
 
-  if (c->stat_resp_rx_bytes_tot == 500000000) {
-    double ns = ERpc::ns_since(c->tput_t0);
-    double session_max_tput = 0;
-    double session_min_tput = std::numeric_limits<double>::max();
-
-    for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-      if (i == c->self_session_idx) continue;
-      session_max_tput =
-          std::max(c->stat_resp_rx_bytes[i] / ns, session_max_tput);
-      session_min_tput =
-          std::min(c->stat_resp_rx_bytes[i] / ns, session_min_tput);
-    }
-
+  if (c->stat_rx_bytes_tot >= 500000000 || c->stat_tx_bytes_tot >= 500000000) {
     float ipc = -1.0;
     if (FLAGS_num_threads == 1) ipc = papi_get_ipc();
 
+    double ns = ERpc::ns_since(c->tput_t0);
+    double rx_GBps = c->stat_rx_bytes_tot / ns;
+    double tx_GBps = c->stat_tx_bytes_tot / ns;
+
     printf(
         "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
-        "TX %.3f GB/s. Response bytes: RX %.3f MB, TX = %.3f MB. "
-        "Max,min session tput = %.3f GB/s, %.3f GB/s. IPC = %.3f.\n",
-        c->thread_id, c->stat_resp_rx_bytes_tot / ns,
-        c->stat_resp_tx_bytes_tot / ns, c->stat_resp_rx_bytes_tot / 1000000.0,
-        c->stat_resp_tx_bytes_tot / 1000000.0, session_max_tput,
-        session_min_tput, ipc);
+        "TX %.3f GB/s. Response bytes: RX %.3f MB, TX = %.3f MB. IPC = %.3f.\n",
+        c->thread_id, rx_GBps, tx_GBps, c->stat_rx_bytes_tot / 1000000.0,
+        c->stat_tx_bytes_tot / 1000000.0, ipc);
 
     // Stats: rx_GBps tx_GBps avg_us 99_us
-    c->tmp_stat->write(std::to_string(c->stat_resp_rx_bytes_tot / ns) + " " +
-                       std::to_string(c->stat_resp_tx_bytes_tot / ns) + " " +
-                       std::to_string(c->latency.avg()) + " " +
+    c->tmp_stat->write(std::to_string(rx_GBps) + " " + std::to_string(tx_GBps) +
+                       " " + std::to_string(c->latency.avg()) + " " +
                        std::to_string(c->latency.perc(.99)));
 
     c->latency.reset();
-    std::fill(c->stat_resp_rx_bytes.begin(), c->stat_resp_rx_bytes.end(), 0);
-    c->stat_resp_rx_bytes_tot = 0;
-    c->stat_resp_tx_bytes_tot = 0;
+    c->stat_rx_bytes_tot = 0;
+    c->stat_tx_bytes_tot = 0;
     c->rpc->reset_dpath_stats_st();
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);

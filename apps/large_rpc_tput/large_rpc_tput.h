@@ -70,9 +70,8 @@ class AppContext {
   struct timespec tput_t0;  // Start time for throughput measurement
   ERpc::FastRand fastrand;
 
-  size_t stat_resp_rx_bytes_tot = 0;       // Total response bytes received
-  size_t stat_resp_tx_bytes_tot = 0;       // Total response bytes transmitted
-  std::vector<size_t> stat_resp_rx_bytes;  // Resp bytes received on a session
+  size_t stat_rx_bytes_tot = 0;  // Total bytes received
+  size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
 
   std::vector<tag_t> req_vec;  // Request queue
 

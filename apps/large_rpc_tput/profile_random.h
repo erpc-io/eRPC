@@ -24,9 +24,6 @@ void connect_sessions_func_random(AppContext *c) {
   c->session_num_vec.resize(num_sessions);
   std::fill(c->session_num_vec.begin(), c->session_num_vec.end(), -1);
 
-  c->stat_resp_rx_bytes.resize(num_sessions);
-  std::fill(c->stat_resp_rx_bytes.begin(), c->stat_resp_rx_bytes.end(), 0);
-
   // Initiate connection for sessions
   fprintf(stderr,
           "large_rpc_tput: Thread %zu: Creating %zu sessions. "
