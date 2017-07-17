@@ -62,8 +62,9 @@ class AppContext {
 
   std::vector<int> session_num_vec;
 
-  // The entry in session_arr for this thread, so we don't send reqs to ourself
-  size_t self_session_idx;
+  // Index in session_num_vec that represents a self connection, *if it exists*
+  size_t self_session_idx = std::numeric_limits<size_t>::max();
+
   size_t thread_id;         // The ID of the thread that owns this context
   size_t num_sm_resps = 0;  // Number of SM responses
   struct timespec tput_t0;  // Start time for throughput measurement
@@ -91,6 +92,28 @@ static std::string get_hostname_for_machine(size_t server_i) {
   // ret << std::string("akalianode-") << std::to_string(server_i + 1)
   //    << std::string(".RDMA.fawn.apt.emulab.net");
   return ret.str();
+}
+
+// Allocate request and response MsgBuffers
+void alloc_req_resp_msg_buffers(AppContext *c) {
+  assert(c != nullptr);
+  assert(c->rpc != nullptr);
+
+  for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
+    c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
+    if (c->resp_msgbuf[msgbuf_idx].buf == nullptr) {
+      throw std::runtime_error("Failed to pre-allocate response MsgBuffer.");
+    }
+
+    auto &req_msgbuf = c->req_msgbuf[msgbuf_idx];
+    req_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_req_size);
+    if (req_msgbuf.buf == nullptr) {
+      throw std::runtime_error("Failed to pre-allocate req MsgBuffer.");
+    }
+
+    // Fill the request regardless of kAppMemset. This is a one-time thing.
+    memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
+  }
 }
 
 #endif

@@ -241,46 +241,37 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   c.tmp_stat =
       new ERpc::TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
-  c.self_session_idx = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id), sm_handler,
                                    kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
+
+  // Create sessions. Some threads may not create any sessions, and therefore
+  // not run the event loop required for other threads to connect them. This
+  // is OK because all threads will run the event loop below.
   connect_sessions_func(&c);
 
-  fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
-          thread_id);
+  if (c.session_num_vec.size() > 0) {
+    fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
+            thread_id);
+  } else {
+    fprintf(stderr, "large_rpc_tput: Thread %zu: No sessions created.\n",
+            thread_id);
+  }
 
   // Regardless of the profile and thread role, all threads allocate request
   // and response MsgBuffers. Some threads may not send requests.
-  for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
-    // Allocate request and response MsgBuffers
-    c.resp_msgbuf[msgbuf_idx] = rpc.alloc_msg_buffer(FLAGS_resp_size);
-    if (c.resp_msgbuf[msgbuf_idx].buf == nullptr) {
-      throw std::runtime_error("Failed to pre-allocate response MsgBuffer.");
-    }
-
-    auto &req_msgbuf = c.req_msgbuf[msgbuf_idx];
-    req_msgbuf = rpc.alloc_msg_buffer(FLAGS_req_size);
-    if (req_msgbuf.buf == nullptr) {
-      throw std::runtime_error("Failed to pre-allocate req MsgBuffer.");
-    }
-
-    // Fill the request
-    if (kAppMemset) {
-      memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
-    } else {
-      req_msgbuf.buf[0] = kAppDataByte;
-    }
-  }
+  alloc_req_resp_msg_buffers(&c);
 
   if (FLAGS_num_threads == 1) papi_init();  // No IPC for multi-thread
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
-  // Send request
+  // Send requests. For some profiles, machine 0 does not send requests.
+  // In these cases, by not injecting any requests now, we ensure that machine 0
+  // *never* sends requests.
   bool _send_reqs = true;
   if (FLAGS_machine_id == 0) {
     if (FLAGS_profile == "timely_small") {
@@ -289,6 +280,10 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   }
 
   if (_send_reqs) {
+    if (c.session_num_vec.size() == 0) {
+      throw std::runtime_error("Cannot send requests without sessions.");
+    }
+
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
       c.req_vec.push_back(tag_t(get_session_idx_func(&c), msgbuf_idx));
     }

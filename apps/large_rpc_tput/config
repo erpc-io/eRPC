@@ -5,4 +5,4 @@
 --num_machines 2
 --num_threads 1
 --concurrency 1
---profile random
+--profile timely_small

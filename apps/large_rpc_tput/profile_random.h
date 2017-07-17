@@ -17,6 +17,8 @@ size_t get_session_idx_func_random(AppContext *c) {
 }
 
 void connect_sessions_func_random(AppContext *c) {
+  c->self_session_idx = FLAGS_machine_id * FLAGS_num_threads + c->thread_id;
+
   // Allocate per-session info
   size_t num_sessions = FLAGS_num_machines * FLAGS_num_threads;
   c->session_num_vec.resize(num_sessions);
@@ -26,7 +28,9 @@ void connect_sessions_func_random(AppContext *c) {
   std::fill(c->stat_resp_rx_bytes.begin(), c->stat_resp_rx_bytes.end(), 0);
 
   // Initiate connection for sessions
-  fprintf(stderr, "large_rpc_tput: Thread %zu: Creating %zu sessions.\n",
+  fprintf(stderr,
+          "large_rpc_tput: Thread %zu: Creating %zu sessions. "
+          "Profile = 'random'.",
           c->thread_id, num_sessions);
   for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
     std::string hostname = get_hostname_for_machine(m_i);
@@ -38,7 +42,10 @@ void connect_sessions_func_random(AppContext *c) {
 
       c->session_num_vec[session_idx] = c->rpc->create_session(
           hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
-      assert(c->session_num_vec[session_idx] >= 0);
+
+      if (c->session_num_vec[session_idx] < 0) {
+        throw std::runtime_error("Failed to create session.");
+      }
     }
   }
 
