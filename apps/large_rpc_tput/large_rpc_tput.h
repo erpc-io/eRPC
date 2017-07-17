@@ -81,20 +81,13 @@ class AppContext {
   }
 };
 
-// The session index selection function for the "random" profile
-size_t get_session_index_func_random(AppContext *c) {
-  assert(c != nullptr);
-  size_t num_sessions = c->session_num_vec.size();
-
-  // Use Lemire's trick to compute random numbers modulo c->num_sessions
-  uint32_t x = c->fastrand.next_u32();
-  size_t rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
-  while (rand_session_index == c->self_session_index) {
-    x = c->fastrand.next_u32();
-    rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
-  }
-
-  return rand_session_index;
+// Return the control net IP address of the machine with index server_i
+static std::string get_hostname_for_machine(size_t server_i) {
+  std::ostringstream ret;
+  ret << "3.1.8." << std::to_string(server_i + 1);
+  // ret << std::string("akalianode-") << std::to_string(server_i + 1)
+  //    << std::string(".RDMA.fawn.apt.emulab.net");
+  return ret.str();
 }
 
 #endif

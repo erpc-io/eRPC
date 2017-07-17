@@ -21,6 +21,7 @@
 #include "large_rpc_tput.h"
 #include <signal.h>
 #include <cstring>
+#include "profile_random.h"
 
 static constexpr bool kAppVerbose = false;
 
@@ -38,15 +39,6 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 class AppContext;  // Forward declaration
 std::function<size_t(AppContext *)> get_session_index_func = nullptr;
 std::function<size_t(AppContext *)> connect_sessions_func = nullptr;
-
-// Return the control net IP address of the machine with index server_i
-static std::string get_hostname_for_machine(size_t server_i) {
-  std::ostringstream ret;
-  ret << "3.1.8." << std::to_string(server_i + 1);
-  // ret << std::string("akalianode-") << std::to_string(server_i + 1)
-  //    << std::string(".RDMA.fawn.apt.emulab.net");
-  return ret.str();
-}
 
 // A basic session management handler that expects successful responses
 void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
