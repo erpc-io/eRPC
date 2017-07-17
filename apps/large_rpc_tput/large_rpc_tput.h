@@ -16,6 +16,10 @@ static constexpr size_t kAppReqType = 1;
 static constexpr uint8_t kAppDataByte = 3;     // Data transferred in req & resp
 static constexpr size_t kMaxConcurrency = 32;  // Outstanding reqs per thread
 
+// Globals
+volatile sig_atomic_t ctrl_c_pressed = 0;
+void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
+
 // Flags
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");

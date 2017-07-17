@@ -29,16 +29,9 @@ static constexpr bool kAppVerbose = false;
 // only the first data byte is touched.
 static constexpr bool kAppMemset = true;
 
-// Globals
-volatile sig_atomic_t ctrl_c_pressed = 0;
-void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
-
 // Profile controls
-
-// The profile-dependent function to get the session index for a request
-class AppContext;  // Forward declaration
 std::function<size_t(AppContext *)> get_session_index_func = nullptr;
-std::function<size_t(AppContext *)> connect_sessions_func = nullptr;
+std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
 // A basic session management handler that expects successful responses
 void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
@@ -259,36 +252,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
                                    kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
-
-  // Allocate per-session info
-  size_t num_sessions = FLAGS_num_machines * FLAGS_num_threads;
-  c.session_num_vec.resize(num_sessions);
-  std::fill(c.session_num_vec.begin(), c.session_num_vec.end(), -1);
-
-  c.stat_resp_rx_bytes.resize(num_sessions);
-  std::fill(c.stat_resp_rx_bytes.begin(), c.stat_resp_rx_bytes.end(), 0);
-
-  // Initiate connection for sessions
-  fprintf(stderr, "large_rpc_tput: Thread %zu: Creating sessions.\n",
-          thread_id);
-  for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
-    std::string hostname = get_hostname_for_machine(m_i);
-
-    for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      size_t session_index = (m_i * FLAGS_num_threads) + t_i;
-      // Do not create a session to self
-      if (session_index == c.self_session_index) continue;
-
-      c.session_num_vec[session_index] =
-          rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
-      assert(c.session_num_vec[session_index] >= 0);
-    }
-  }
-
-  while (c.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
-    rpc.run_event_loop(200);  // 200 milliseconds
-    if (ctrl_c_pressed == 1) return;
-  }
+  connect_sessions_func(&c);
 
   fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
           thread_id);
@@ -341,6 +305,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 // Use the supplied profile set up globals and possibly modify other flags
 void setup_profile() {
   if (FLAGS_profile == "random") {
+    connect_sessions_func = connect_sessions_func_random;
     get_session_index_func = get_session_index_func_random;
     return;
   }
@@ -368,8 +333,12 @@ int main(int argc, char **argv) {
   // Parse args
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   setup_profile();
-  assert(get_session_index_func != nullptr);
-  assert(connect_sessions_func != nullptr);
+  if (get_session_index_func == nullptr) {
+    throw std::runtime_error("Profile must set session index getter.");
+  }
+  if (connect_sessions_func == nullptr) {
+    throw std::runtime_error("Profile must set connect sessions function.");
+  }
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
