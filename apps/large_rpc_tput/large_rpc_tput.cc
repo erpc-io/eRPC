@@ -43,11 +43,33 @@ static constexpr size_t kMaxConcurrency = 32;  // Outstanding reqs per thread
 // Globals
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
-bool machine_0_rx_only = false;
+
+// Profile controls
 
 // The profile-dependent function to get the session index for a request
 class AppContext;  // Forward declaration
 std::function<size_t(AppContext *)> get_session_index_profile = nullptr;
+
+// The inter-thread connectivity. (Note: Threads never self-connect.)
+//   o kPeer: Each thread connects to only its peer threads
+//   o kAll: Each thread connects to all threads
+enum class ThreadConnectivity {
+  kInvalid,
+  kPeer,
+  kAll
+} thread_connectivity = ThreadConnectivity::kInvalid;
+
+enum class ExperimentProfile {
+  kInvalid,
+  kRandom,
+  kTimelySmall
+} experiment_profile = ExperimentProfile::kInvalid;
+
+enum class MachineZeroOnlyResponder {
+  kInvalid,
+  kTrue,
+  kFalse
+} machine_zero_only_responder = MachineZeroOnlyResponder::kInvalid;
 
 // Flags
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
@@ -441,11 +463,17 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 // Use the supplied profile set up globals and possibly modify other flags
 void set_up_profile() {
   if (FLAGS_profile == "random") {
+    experiment_profile = ExperimentProfile::kRandom;
+    thread_connectivity = ThreadConnectivity::kAll;
+    machine_zero_only_responder = MachineZeroOnlyResponder::kFalse;
     get_session_index_profile = get_session_index_profile_random;
     return;
   }
 
   if (FLAGS_profile == "timely_small") {
+    experiment_profile = ExperimentProfile::kTimelySmall;
+    thread_connectivity = ThreadConnectivity::kPeer;
+    machine_zero_only_responder = MachineZeroOnlyResponder::kTrue;
     FLAGS_req_size = 64 * 1024;
     FLAGS_resp_size = 32;
     return;
@@ -468,6 +496,9 @@ int main(int argc, char **argv) {
   // Parse args
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   set_up_profile();
+  assert(experiment_profile != ExperimentProfile::kInvalid);
+  assert(thread_connectivity != ThreadConnectivity::kInvalid);
+  assert(machine_zero_only_responder != MachineZeroOnlyResponder::kInvalid);
   assert(get_session_index_profile != nullptr);
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
