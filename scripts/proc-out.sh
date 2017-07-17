@@ -48,42 +48,46 @@ done
 num_columns=`echo $header_line | wc -w`
 echo "proc-out: Detected $num_columns columns"
 
-avg[1]="" # Map for per-column averages, indexed from 1
+# Sum of per-file average for each column. Averaging rows is incorrect.
+col_sum_of_avgs[1]=""
 for col in `seq 1 $num_columns`; do
-  avg[$col]="0.0"
+  col_sum_of_avgs[$col]="0.0"
 done
 
-# Process the accumulated output files. This assumes that the files have
-# space-separated numbers in columns.
-
-tot_rows="0" # Total rows processed, for rolling average
+# Process the fetched stats files
+processed_files="0"
+ignored_files="0"
 for filename in $tmpdir/*; do
   echo "proc-out: Processing file $filename."
 
-  # Ignore files with less than 12 lines
+  # Ignore files with less than 12 lines. This takes care of empty files.
   lines_in_file=`cat $filename | wc -l`
   if [ $lines_in_file -le 12 ]; then
     blue "proc-out: Ignoring $filename. Too short ($lines_in_file lines), 12 required."
+    ((ignored_files+=1))
     continue;
   fi
 
-  # Cut out the first 6 and last 6 lines into compute_temp - use this for stats
+  # Strip out first 6 and last 6 lines, and save rest for processing to tmp file
   awk -v nr="$(wc -l < $filename)" 'NR > 6 && NR < (nr - 6)' $filename > proc_out_tmp
   remaining_rows=`cat proc_out_tmp | wc -l`
 
+  file_avg_str=""  # Average of each column for this file
   for col in `seq 1 $num_columns`; do
     file_avg=`awk -v col=$col '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
-    prev_sum=`echo "scale=3; ${avg[$col]} * $tot_rows" | bc -l`
-    cur_sum=`echo "scale=3; $file_avg * $remaining_rows" | bc -l`
-    avg[$col]=`echo "scale=3; ($prev_sum + $cur_sum) / ($tot_rows + $remaining_rows)" | bc -l`
-    echo "proc-out: Column ${col_name[$col]} average for $filename = $file_avg. Current running average = ${avg[$col]}"
+    col_sum_of_avgs[$col]=`echo "scale=3; ${col_sum_of_avgs[$col]} + $file_avg" | bc -l`
+    file_avg_str=`echo $file_avg_str ${col_name[$col]}:$file_avg, `
   done
 
-  ((tot_rows+=$remaining_rows))
+  echo "proc-out: Column averages for $filename = $file_avg_str"
+  ((processed_files+=1))
 done
 
 for col in `seq 1 $num_columns`; do
-  blue "proc-out: Final column ${col_name[$col]} average = ${avg[$col]}"
+  col_avg=`echo "scale=3; ${col_sum_of_avgs[$col]} / $processed_files" | bc -l`
+  blue "proc-out: Final column ${col_name[$col]} average = $col_avg"
 done
+
+blue "proc-out: Processed files = $processed_files, ignored files = $ignored_files"
 
 rm -f proc_out_tmp
