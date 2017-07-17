@@ -8,6 +8,14 @@
  * A request is described by its MsgBuffer index and session index, and is
  * queued into req_vec until it can be transmitted. Before queueing a request
  * descriptor, it's request MsgBuffer must be filled with request data.
+ *
+ * The experiment configuration is controlled by the "profile" flag. The profile
+ * setting can override other flags such as request and response size. The
+ * available profiles are:
+ *   o random: Each thread sends requests and responses to randomly chosen
+ *     threads, excluding itself.
+ *   o timely_small: The small-scale experiment in TIMELY
+ *     (SIGCOMM 15, Section 6.1).
  */
 
 #include <gflags/gflags.h>
@@ -29,23 +37,35 @@ static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;
-static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
-static constexpr size_t kMaxConcurrency = 32;
+static constexpr uint8_t kAppDataByte = 3;     // Data transferred in req & resp
+static constexpr size_t kMaxConcurrency = 32;  // Outstanding reqs per thread
 
+// Globals
+volatile sig_atomic_t ctrl_c_pressed = 0;
+void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
+bool machine_0_rx_only = false;
+
+// The profile-dependent function to get the session index for a request
+class AppContext;  // Forward declaration
+std::function<size_t(AppContext *)> get_session_index_profile = nullptr;
+
+// Flags
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(req_size, 0, "Request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
+DEFINE_string(profile, "", "Experiment profile to use");
 
 static bool validate_concurrency(const char *, uint64_t concurrency) {
   return concurrency <= kMaxConcurrency;
 }
-
 DEFINE_validator(concurrency, &validate_concurrency);
 
-volatile sig_atomic_t ctrl_c_pressed = 0;
-void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
+static bool validate_profile(const char *, const std::string &profile) {
+  return profile == "random" || profile == "timely_small";
+}
+DEFINE_validator(profile, &validate_profile);
 
 // Return the control net IP address of the machine with index server_i
 static std::string get_hostname_for_machine(size_t server_i) {
@@ -105,8 +125,8 @@ class AppContext {
 };
 
 // A basic session management handler that expects successful responses
-void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
-                      ERpc::SmErrType sm_err_type, void *_context) {
+void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
+                ERpc::SmErrType sm_err_type, void *_context) {
   assert(_context != nullptr);
 
   auto *c = static_cast<AppContext *>(_context);
@@ -142,7 +162,8 @@ void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
           c->rpc->sec_since_creation());
 }
 
-size_t get_rand_session_index(AppContext *c) {
+// The session index selection function for the "random" profile
+size_t get_session_index_profile_random(AppContext *c) {
   assert(c != nullptr);
   size_t num_sessions = c->session_num_vec.size();
 
@@ -173,8 +194,10 @@ void send_reqs(AppContext *c) {
     assert(req_msgbuf.get_data_size() == FLAGS_req_size);
 
     if (kAppVerbose) {
-      printf("large_rpc_tput: Sending req for session %zu, msgbuf_index %zu.\n",
-             session_index, msgbuf_index);
+      printf(
+          "large_rpc_tput: Trying to send request for session index %zu, "
+          "msgbuf_index %zu.\n",
+          session_index, msgbuf_index);
     }
 
     // Timestamp before trying enqueue_request(). If enqueue_request() fails,
@@ -316,7 +339,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;
   }
 
-  c->req_vec.push_back(tag_t(get_rand_session_index(c), msgbuf_index));
+  c->req_vec.push_back(tag_t(get_session_index_profile(c), msgbuf_index));
 
   // Try to send the queued requests. The request buffer for these requests is
   // already filled.
@@ -332,8 +355,8 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
-                                   static_cast<uint8_t>(thread_id),
-                                   basic_sm_handler, kAppPhyPort, kAppNumaNode);
+                                   static_cast<uint8_t>(thread_id), sm_handler,
+                                   kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 
@@ -391,7 +414,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
       req_msgbuf.buf[0] = kAppDataByte;
     }
 
-    c.req_vec.push_back(tag_t(get_rand_session_index(&c), msgbuf_index));
+    c.req_vec.push_back(tag_t(get_session_index_profile(&c), msgbuf_index));
   }
 
   // Initialize PAPI measurement if we're running one thread
@@ -415,6 +438,20 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   // We don't disconnect sessions
 }
 
+// Use the supplied profile set up globals and possibly modify other flags
+void set_up_profile() {
+  if (FLAGS_profile == "random") {
+    get_session_index_profile = get_session_index_profile_random;
+    return;
+  }
+
+  if (FLAGS_profile == "timely_small") {
+    FLAGS_req_size = 64 * 1024;
+    FLAGS_resp_size = 32;
+    return;
+  }
+}
+
 int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
@@ -426,7 +463,12 @@ int main(int argc, char **argv) {
 
   // Work around g++-5's unused variable warning for validators
   _unused(concurrency_validator_registered);
+  _unused(profile_validator_registered);
+
+  // Parse args
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  set_up_profile();
+  assert(get_session_index_profile != nullptr);
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
