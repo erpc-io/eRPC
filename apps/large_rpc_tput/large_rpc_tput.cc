@@ -22,6 +22,7 @@
 #include <signal.h>
 #include <cstring>
 #include "profile_random.h"
+#include "profile_timely_small.h"
 
 static constexpr bool kAppVerbose = false;
 
@@ -30,7 +31,7 @@ static constexpr bool kAppVerbose = false;
 static constexpr bool kAppMemset = true;
 
 // Profile controls
-std::function<size_t(AppContext *)> get_session_index_func = nullptr;
+std::function<size_t(AppContext *)> get_session_idx_func = nullptr;
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
 // A basic session management handler that expects successful responses
@@ -51,21 +52,21 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
   }
 
   // The callback gives us the ERpc session number - get the index in vector
-  size_t session_index = c->session_num_vec.size();
+  size_t session_idx = c->session_num_vec.size();
   for (size_t i = 0; i < c->session_num_vec.size(); i++) {
     if (c->session_num_vec[i] == session_num) {
-      session_index = i;
+      session_idx = i;
     }
   }
 
-  if (session_index == c->session_num_vec.size()) {
+  if (session_idx == c->session_num_vec.size()) {
     throw std::runtime_error("SM callback for invalid session number.");
   }
 
   fprintf(stderr,
           "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s. "
           "Time elapsed = %.3f s.\n",
-          c->rpc->get_rpc_id(), session_num, session_index,
+          c->rpc->get_rpc_id(), session_num, session_idx,
           sm_event_type == ERpc::SmEventType::kConnected ? "connected"
                                                          : "disconncted",
           c->rpc->sec_since_creation());
@@ -80,25 +81,25 @@ void send_reqs(AppContext *c) {
   size_t write_index = 0;
 
   for (size_t i = 0; i < c->req_vec.size(); i++) {
-    size_t msgbuf_index = c->req_vec[i].msgbuf_index;
-    size_t session_index = c->req_vec[i].session_index;
+    size_t msgbuf_idx = c->req_vec[i].msgbuf_idx;
+    size_t session_idx = c->req_vec[i].session_idx;
 
-    ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_index];
+    ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
     assert(req_msgbuf.get_data_size() == FLAGS_req_size);
 
     if (kAppVerbose) {
       printf(
           "large_rpc_tput: Trying to send request for session index %zu, "
-          "msgbuf_index %zu.\n",
-          session_index, msgbuf_index);
+          "msgbuf_idx %zu.\n",
+          session_idx, msgbuf_idx);
     }
 
     // Timestamp before trying enqueue_request(). If enqueue_request() fails,
     // we'll timestamp again on the next try.
-    c->req_ts[msgbuf_index] = ERpc::rdtsc();
+    c->req_ts[msgbuf_idx] = ERpc::rdtsc();
     int ret = c->rpc->enqueue_request(
-        c->session_num_vec[session_index], kAppReqType, &req_msgbuf,
-        &c->resp_msgbuf[msgbuf_index], app_cont_func, c->req_vec[i]._tag);
+        c->session_num_vec[session_idx], kAppReqType, &req_msgbuf,
+        &c->resp_msgbuf[msgbuf_idx], app_cont_func, c->req_vec[i]._tag);
     assert(ret == 0 || ret == -EBUSY);
 
     if (ret == -EBUSY) {
@@ -144,16 +145,16 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
-  size_t msgbuf_index = static_cast<tag_t>(_tag).msgbuf_index;
-  size_t session_index = static_cast<tag_t>(_tag).session_index;
+  size_t msgbuf_idx = static_cast<tag_t>(_tag).msgbuf_idx;
+  size_t session_idx = static_cast<tag_t>(_tag).session_idx;
   if (kAppVerbose) {
     printf("large_rpc_tput: Received response for msgbuf %zu, session %zu.\n",
-           msgbuf_index, session_index);
+           msgbuf_idx, session_idx);
   }
 
   // Measure latency. 1 us granularity is sufficient for large RPC latency.
   auto *c = static_cast<AppContext *>(_context);
-  double usec = ERpc::to_usec(ERpc::rdtsc() - c->req_ts[msgbuf_index],
+  double usec = ERpc::to_usec(ERpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
   assert(usec >= 0);
   c->latency.update(static_cast<size_t>(usec));
@@ -177,7 +178,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 
   c->stat_resp_rx_bytes_tot += FLAGS_resp_size;
-  c->stat_resp_rx_bytes[session_index] += FLAGS_resp_size;
+  c->stat_resp_rx_bytes[session_idx] += FLAGS_resp_size;
   c->rpc->release_response(resp_handle);
 
   if (c->stat_resp_rx_bytes_tot == 500000000) {
@@ -186,7 +187,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double session_min_tput = std::numeric_limits<double>::max();
 
     for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-      if (i == c->self_session_index) continue;
+      if (i == c->self_session_idx) continue;
       session_max_tput =
           std::max(c->stat_resp_rx_bytes[i] / ns, session_max_tput);
       session_min_tput =
@@ -227,12 +228,12 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   // Create a new request clocking this response, and put in request queue
   if (kAppMemset) {
-    memset(c->req_msgbuf[msgbuf_index].buf, kAppDataByte, FLAGS_req_size);
+    memset(c->req_msgbuf[msgbuf_idx].buf, kAppDataByte, FLAGS_req_size);
   } else {
-    c->req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;
+    c->req_msgbuf[msgbuf_idx].buf[0] = kAppDataByte;
   }
 
-  c->req_vec.push_back(tag_t(get_session_index_func(c), msgbuf_index));
+  c->req_vec.push_back(tag_t(get_session_idx_func(c), msgbuf_idx));
 
   // Try to send the queued requests. The request buffer for these requests is
   // already filled.
@@ -245,7 +246,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   c.tmp_stat =
       new ERpc::TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
-  c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
+  c.self_session_idx = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id), sm_handler,
@@ -257,15 +258,16 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
           thread_id);
 
-  for (size_t msgbuf_index = 0; msgbuf_index < FLAGS_concurrency;
-       msgbuf_index++) {
+  // Regardless of the profile and thread role, all threads allocate request
+  // and response MsgBuffers
+  for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
     // Allocate request and response MsgBuffers
-    c.resp_msgbuf[msgbuf_index] = rpc.alloc_msg_buffer(FLAGS_resp_size);
-    if (c.resp_msgbuf[msgbuf_index].buf == nullptr) {
+    c.resp_msgbuf[msgbuf_idx] = rpc.alloc_msg_buffer(FLAGS_resp_size);
+    if (c.resp_msgbuf[msgbuf_idx].buf == nullptr) {
       throw std::runtime_error("Failed to pre-allocate response MsgBuffer.");
     }
 
-    auto &req_msgbuf = c.req_msgbuf[msgbuf_index];
+    auto &req_msgbuf = c.req_msgbuf[msgbuf_idx];
     req_msgbuf = rpc.alloc_msg_buffer(FLAGS_req_size);
     if (req_msgbuf.buf == nullptr) {
       throw std::runtime_error("Failed to pre-allocate req MsgBuffer.");
@@ -278,7 +280,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
       req_msgbuf.buf[0] = kAppDataByte;
     }
 
-    c.req_vec.push_back(tag_t(get_session_index_func(&c), msgbuf_index));
+    c.req_vec.push_back(tag_t(get_session_idx_func(&c), msgbuf_idx));
   }
 
   // Initialize PAPI measurement if we're running one thread
@@ -306,13 +308,15 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 void setup_profile() {
   if (FLAGS_profile == "random") {
     connect_sessions_func = connect_sessions_func_random;
-    get_session_index_func = get_session_index_func_random;
+    get_session_idx_func = get_session_idx_func_random;
     return;
   }
 
   if (FLAGS_profile == "timely_small") {
     FLAGS_req_size = 64 * 1024;
     FLAGS_resp_size = 32;
+    connect_sessions_func = connect_sessions_func_timely_small;
+    get_session_idx_func = get_session_idx_func_timely_small;
     return;
   }
 }
@@ -333,7 +337,7 @@ int main(int argc, char **argv) {
   // Parse args
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   setup_profile();
-  if (get_session_index_func == nullptr) {
+  if (get_session_idx_func == nullptr) {
     throw std::runtime_error("Profile must set session index getter.");
   }
   if (connect_sessions_func == nullptr) {

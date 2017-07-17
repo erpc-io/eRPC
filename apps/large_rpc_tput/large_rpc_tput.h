@@ -41,14 +41,14 @@ DEFINE_validator(profile, &validate_profile);
 // Request tag, which doubles up as the request descriptor for the request queue
 union tag_t {
   struct {
-    uint64_t session_index : 32;  // Index into context's session_num array
-    uint64_t msgbuf_index : 32;   // Index into context's req_msgbuf array
+    uint64_t session_idx : 32;  // Index into context's session_num array
+    uint64_t msgbuf_idx : 32;   // Index into context's req_msgbuf array
   };
 
   size_t _tag;
 
-  tag_t(uint64_t session_index, uint64_t msgbuf_index)
-      : session_index(session_index), msgbuf_index(msgbuf_index) {}
+  tag_t(uint64_t session_idx, uint64_t msgbuf_idx)
+      : session_idx(session_idx), msgbuf_idx(msgbuf_idx) {}
   tag_t(size_t _tag) : _tag(_tag) {}
   tag_t() : _tag(0) {}
 };
@@ -64,7 +64,7 @@ class AppContext {
   std::vector<int> session_num_vec;
 
   // The entry in session_arr for this thread, so we don't send reqs to ourself
-  size_t self_session_index;
+  size_t self_session_idx;
   size_t thread_id;         // The ID of the thread that owns this context
   size_t num_sm_resps = 0;  // Number of SM responses
   struct timespec tput_t0;  // Start time for throughput measurement
