@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+source $(dirname $0)/utils.sh
 
 #
 # Usage: ./ibnet_proc.sh < ibnet_out
@@ -10,8 +11,12 @@
 #    of nodes connected to each switch
 #
 
-# The prefix of node names to find
-nodename_prefix="akalianode-"
+nodename_prefix="akalianode-" # The prefix of node names to find
+
+# Save the node-to-switch mapping to a unique file based on the reboot name
+reboot_uniq_str=`uptime -s | tr ' ' '-'`
+node_to_switch_map_file=`echo /tmp/node_to_switch_map_$reboot_uniq_str`
+rm -f $node_to_switch_map_file
 
 #
 # Part 1: Print nodes connected to each switch
@@ -35,7 +40,8 @@ do
 		# Grep out the node and append it to this switch's list of nodes
 		node=`echo $line | grep -o "$nodename_prefix[0-9]\+"`
 		switch_map[$switch_i]=$node" "${switch_map[$switch_i]}
-		total_nodes=`expr $total_nodes + 1`
+    echo "$node $switch_i" >> $node_to_switch_map_file
+    ((total_nodes+=1))
 	fi
 
 	# No need to process per-node info. The per-node information blocks are are
@@ -45,8 +51,12 @@ do
 	fi
 done
 
+# Sort the node-to-switch map file by node name in place. This assumes that
+# node names are of the form <prefix>-<number>, e.g., akalianode-1
+sort -t '-' -k 2 -g $node_to_switch_map_file -o $node_to_switch_map_file
+
 echo ""
-echo "Nodes under each switch:"
+blue "Nodes under each switch:"
 # Actually print the nodes
 for i in `seq 1 10`; do
 	num_nodes=`echo ${switch_map[$i]} | wc -w`
@@ -73,7 +83,7 @@ for switch_i in `seq 1 10`; do
   switch_count[$switch_i]="0"
 done
 
-echo "Per-switch node count histogram for nodes {$apt_nodes}"
+blue "Per-switch node count histogram for nodes {$apt_nodes}"
 for node_i in $apt_nodes; do
 	for switch_i in `seq 1 10`; do
 		if [[ $(echo ${switch_map[$switch_i]} | grep -w "${nodename_prefix}$node_i") ]]; then
@@ -88,5 +98,5 @@ for i in `seq 1 10`; do
 done
 
 apt_nodes_size=`echo $apt_nodes | wc -w`
-echo "$total_nodes of $apt_nodes_size in apt_nodes are accounted for"
-
+blue "$total_nodes of $apt_nodes_size in apt_nodes are accounted for"
+blue "Node to switch map is available in $node_to_switch_map_file"
