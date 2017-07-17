@@ -184,24 +184,28 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_rx_bytes_tot += FLAGS_resp_size;
   c->rpc->release_response(resp_handle);
 
-  if (c->stat_rx_bytes_tot >= 500000000 || c->stat_tx_bytes_tot >= 500000000) {
+  if (c->stat_rx_bytes_tot >= 50000000 || c->stat_tx_bytes_tot >= 50000000) {
     float ipc = -1.0;
     if (FLAGS_num_threads == 1) ipc = papi_get_ipc();
 
     double ns = ERpc::ns_since(c->tput_t0);
     double rx_GBps = c->stat_rx_bytes_tot / ns;
     double tx_GBps = c->stat_tx_bytes_tot / ns;
+    double avg_us = c->latency.avg();
+    double _99_us = c->latency.perc(.99);
 
     printf(
         "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
-        "TX %.3f GB/s. Response bytes: RX %.3f MB, TX = %.3f MB. IPC = %.3f.\n",
-        c->thread_id, rx_GBps, tx_GBps, c->stat_rx_bytes_tot / 1000000.0,
-        c->stat_tx_bytes_tot / 1000000.0, ipc);
+        "TX %.3f GB/s, avg latency = %.1f us, 99%% latency = %.1f us. "
+        "RX = %.3f MB, TX = %.3f MB. IPC = %.3f.\n",
+        c->thread_id, rx_GBps, tx_GBps, avg_us, _99_us,
+        c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
+        ipc);
 
     // Stats: rx_GBps tx_GBps avg_us 99_us
     c->tmp_stat->write(std::to_string(rx_GBps) + " " + std::to_string(tx_GBps) +
-                       " " + std::to_string(c->latency.avg()) + " " +
-                       std::to_string(c->latency.perc(.99)));
+                       " " + std::to_string(avg_us) + " " +
+                       std::to_string(_99_us));
 
     c->latency.reset();
     c->stat_rx_bytes_tot = 0;
@@ -297,7 +301,7 @@ void setup_profile() {
   }
 
   if (FLAGS_profile == "timely_small") {
-    FLAGS_req_size = 64 * 1024;
+    FLAGS_req_size = 16 * 1024;  // 16 KB
     FLAGS_resp_size = 32;
     connect_sessions_func = connect_sessions_func_timely_small;
     get_session_idx_func = get_session_idx_func_timely_small;
