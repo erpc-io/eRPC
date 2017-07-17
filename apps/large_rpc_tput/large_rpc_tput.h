@@ -2,7 +2,6 @@
 #define LARGE_RPC_TPUT_H
 
 #include <gflags/gflags.h>
-#include <papi.h>
 #include <signal.h>
 #include "../apps_common.h"
 #include "rpc.h"

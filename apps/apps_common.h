@@ -6,6 +6,7 @@
 #define APPS_COMMON_H
 
 #include <gflags/gflags.h>
+#include <papi.h>
 #include <fstream>
 #include "rpc.h"
 
@@ -35,6 +36,21 @@ void avoid_gcc5_unused_warning() {
   _unused(test_ms_validator_registered);
   _unused(num_machines_validator_registered);
   _unused(machine_id_validator_registered);
+}
+
+void papi_init() {
+  float real_time, proc_time, ipc;
+  long long ins;
+  int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
+  if (ret < PAPI_OK) throw std::runtime_error("PAPI initialization failed.");
+}
+
+float papi_get_ipc() {
+  float real_time, proc_time, ipc;
+  long long ins;
+  int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
+  if (ret < PAPI_OK) throw std::runtime_error("PAPI measurement failed.");
+  return ipc;
 }
 
 namespace ERpc {

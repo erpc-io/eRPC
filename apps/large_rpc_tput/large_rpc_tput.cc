@@ -195,12 +195,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
 
     float ipc = -1.0;
-    if (FLAGS_num_threads == 1) {
-      float real_time, proc_time;
-      long long ins;
-      int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-      if (ret < PAPI_OK) throw std::runtime_error("PAPI measurement failed.");
-    }
+    if (FLAGS_num_threads == 1) ipc = papi_get_ipc();
 
     printf(
         "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
@@ -259,7 +254,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
           thread_id);
 
   // Regardless of the profile and thread role, all threads allocate request
-  // and response MsgBuffers
+  // and response MsgBuffers. Some threads may not send requests.
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
     // Allocate request and response MsgBuffers
     c.resp_msgbuf[msgbuf_idx] = rpc.alloc_msg_buffer(FLAGS_resp_size);
@@ -273,28 +268,32 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
       throw std::runtime_error("Failed to pre-allocate req MsgBuffer.");
     }
 
-    // Fill request and enqueue it
+    // Fill the request
     if (kAppMemset) {
       memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
     } else {
       req_msgbuf.buf[0] = kAppDataByte;
     }
-
-    c.req_vec.push_back(tag_t(get_session_idx_func(&c), msgbuf_idx));
   }
 
-  // Initialize PAPI measurement if we're running one thread
-  if (FLAGS_num_threads == 1) {
-    float real_time, proc_time, ipc;
-    long long ins;
-    int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-    if (ret < PAPI_OK) throw std::runtime_error("PAPI initialization failed.");
-  }
+  if (FLAGS_num_threads == 1) papi_init();  // No IPC for multi-thread
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
-  // Send queued requests
-  send_reqs(&c);
+  // Send request
+  bool _send_reqs = true;
+  if (FLAGS_machine_id == 0) {
+    if (FLAGS_profile == "timely_small") {
+      _send_reqs = false;
+    }
+  }
+
+  if (_send_reqs) {
+    for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
+      c.req_vec.push_back(tag_t(get_session_idx_func(&c), msgbuf_idx));
+    }
+    send_reqs(&c);
+  }
 
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(1000);  // 1 second
