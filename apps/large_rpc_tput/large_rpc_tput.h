@@ -33,7 +33,8 @@ static bool validate_concurrency(const char *, uint64_t concurrency) {
 DEFINE_validator(concurrency, &validate_concurrency);
 
 static bool validate_profile(const char *, const std::string &profile) {
-  return profile == "random" || profile == "timely_small";
+  return profile == "random" || profile == "timely_small" ||
+         profile == "victim";
 }
 DEFINE_validator(profile, &validate_profile);
 

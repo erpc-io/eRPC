@@ -14,8 +14,11 @@
  * available profiles are:
  *   o random: Each thread sends requests and responses to randomly chosen
  *     threads, excluding itself.
- *   o timely_small: The small-scale experiment in TIMELY
+ *   o timely_small: The small-scale incast experiment in TIMELY
  *     (SIGCOMM 15, Section 6.1).
+ *   o victim: With N machines {0, ..., N - 1}, where N >= 3, machines 1 through
+ *     (N - 1) incast to machine 0. In addition, machines (N - 2) and (N - 1)
+ *     send data to each other.
  */
 
 #include "large_rpc_tput.h"
@@ -23,6 +26,7 @@
 #include <cstring>
 #include "profile_random.h"
 #include "profile_timely_small.h"
+#include "profile_victim.h"
 
 static constexpr bool kAppVerbose = false;
 
@@ -31,7 +35,8 @@ static constexpr bool kAppVerbose = false;
 static constexpr bool kAppMemset = true;
 
 // Profile controls
-std::function<size_t(AppContext *)> get_session_idx_func = nullptr;
+std::function<size_t(AppContext *, size_t resp_session_idx)>
+    get_session_idx_func = nullptr;
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
 // A basic session management handler that expects successful responses
@@ -222,7 +227,8 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->req_msgbuf[msgbuf_idx].buf[0] = kAppDataByte;
   }
 
-  c->req_vec.push_back(tag_t(get_session_idx_func(c), msgbuf_idx));
+  // For some profiles, the session_idx argument will be ignored
+  c->req_vec.push_back(tag_t(get_session_idx_func(c, session_idx), msgbuf_idx));
 
   // Try to send the queued requests. The request buffer for these requests is
   // already filled.
@@ -268,7 +274,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   // *never* sends requests.
   bool _send_reqs = true;
   if (FLAGS_machine_id == 0) {
-    if (FLAGS_profile == "timely_small") {
+    if (FLAGS_profile == "timely_small" || FLAGS_profile == "victim") {
       _send_reqs = false;
     }
   }
@@ -279,7 +285,9 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
 
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
-      c.req_vec.push_back(tag_t(get_session_idx_func(&c), msgbuf_idx));
+      size_t session_idx =
+          get_session_idx_func(&c, std::numeric_limits<size_t>::max());
+      c.req_vec.push_back(tag_t(session_idx, msgbuf_idx));
     }
     send_reqs(&c);
   }
@@ -309,6 +317,21 @@ void setup_profile() {
     FLAGS_resp_size = 32;
     connect_sessions_func = connect_sessions_func_timely_small;
     get_session_idx_func = get_session_idx_func_timely_small;
+    return;
+  }
+
+  if (FLAGS_profile == "victim") {
+    ERpc::runtime_assert(FLAGS_num_machines >= 3,
+                         "victim profile needs 3 or more machines.");
+    printf(
+        "main: victim profile overrides req_size, resp_size, num_threads, "
+        "and concurrency flags");
+    // victim profile should ideally use 1 thread per machine, but >1 works too
+    FLAGS_req_size = 16 * 1024;  // 16 KB
+    FLAGS_resp_size = 32;
+    FLAGS_concurrency = 2;
+    connect_sessions_func = connect_sessions_func_victim;
+    get_session_idx_func = get_session_idx_func_victim;
     return;
   }
 }
