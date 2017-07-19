@@ -3,8 +3,7 @@
 
 #include "large_rpc_tput.h"
 
-size_t get_session_idx_func_random(AppContext *c) {
-  assert(c != nullptr);
+size_t get_session_idx_func_random(AppContext *c, size_t) {
   size_t session_vec_size = c->session_num_vec.size();
 
   // We don't need Lemire's trick bc messages are large

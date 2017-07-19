@@ -4,10 +4,14 @@
 #include "large_rpc_tput.h"
 
 // All threads create one session to machine 0
-size_t get_session_idx_func_timely_small(AppContext *) { return 0; }
+size_t get_session_idx_func_timely_small(AppContext *, size_t) {
+  ERpc::runtime_assert(FLAGS_machine_id != 0, "Machine 0 cannot send reqs.");
+  return 0;
+}
 
 void connect_sessions_func_timely_small(AppContext *c) {
-  assert(c->self_session_idx == std::numeric_limits<size_t>::max());
+  ERpc::runtime_assert(
+      c->self_session_idx == std::numeric_limits<size_t>::max(), "");
 
   if (FLAGS_machine_id == 0) return;
 
