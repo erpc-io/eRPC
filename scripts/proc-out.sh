@@ -57,7 +57,7 @@ done
 # Process the fetched stats files
 processed_files="0"
 ignored_files="0"
-for filename in $tmpdir/*; do
+for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
   echo "proc-out: Processing file $filename."
 
   # Ignore files with less than 12 lines. This takes care of empty files.
