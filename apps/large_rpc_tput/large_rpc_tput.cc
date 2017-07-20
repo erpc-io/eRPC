@@ -32,7 +32,7 @@ static constexpr bool kAppVerbose = false;
 
 // If true, we memset() request and respose buffers to kAppDataByte. If false,
 // only the first data byte is touched.
-static constexpr bool kAppMemset = true;
+static constexpr bool kAppMemset = false;
 
 // Profile controls
 std::function<size_t(AppContext *, size_t resp_session_idx)>
@@ -112,6 +112,7 @@ void send_reqs(AppContext *c) {
       write_index++;
       // Try other requests
     } else {
+      c->stat_req_vec[session_idx]++;
       c->stat_tx_bytes_tot += FLAGS_req_size;
     }
   }
@@ -199,13 +200,19 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double avg_us = c->latency.avg();
     double _99_us = c->latency.perc(.99);
 
+    std::string session_req_count_str;
+    for (size_t session_req_count : c->stat_req_vec) {
+      session_req_count_str += std::to_string(session_req_count);
+      session_req_count_str += " ";
+    }
+
     printf(
         "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
         "TX %.3f GB/s, avg latency = %.1f us, 99%% latency = %.1f us. "
-        "RX = %.3f MB, TX = %.3f MB. IPC = %.3f.\n",
+        "RX = %.3f MB, TX = %.3f MB. IPC = %.3f. Requests on sessions = %s.\n",
         c->thread_id, rx_GBps, tx_GBps, avg_us, _99_us,
         c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
-        ipc);
+        ipc, session_req_count_str.c_str());
 
     // Stats: rx_GBps tx_GBps avg_us 99_us
     c->tmp_stat->write(std::to_string(rx_GBps) + " " + std::to_string(tx_GBps) +
@@ -216,6 +223,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->stat_rx_bytes_tot = 0;
     c->stat_tx_bytes_tot = 0;
     c->rpc->reset_dpath_stats_st();
+    std::fill(c->stat_req_vec.begin(), c->stat_req_vec.end(), 0);
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
@@ -256,6 +264,8 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   if (c.session_num_vec.size() > 0) {
     fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
             thread_id);
+    c.stat_req_vec.resize(c.session_num_vec.size());
+    std::fill(c.stat_req_vec.begin(), c.stat_req_vec.end(), 0);
   } else {
     fprintf(stderr, "large_rpc_tput: Thread %zu: No sessions created.\n",
             thread_id);
@@ -309,12 +319,6 @@ void setup_profile() {
   }
 
   if (FLAGS_profile == "timely_small") {
-    printf(
-        "main: timely_small profile overrides req_size, resp_size, and "
-        "num_threads flags");
-    // timely_small should ideally use 1 thread per machine, but >1 works too
-    FLAGS_req_size = 16 * 1024;  // 16 KB
-    FLAGS_resp_size = 32;
     connect_sessions_func = connect_sessions_func_timely_small;
     get_session_idx_func = get_session_idx_func_timely_small;
     return;
@@ -323,13 +327,8 @@ void setup_profile() {
   if (FLAGS_profile == "victim") {
     ERpc::runtime_assert(FLAGS_num_machines >= 3,
                          "victim profile needs 3 or more machines.");
-    printf(
-        "main: victim profile overrides req_size, resp_size, num_threads, "
-        "and concurrency flags");
-    // victim profile should ideally use 1 thread per machine, but >1 works too
-    FLAGS_req_size = 16 * 1024;  // 16 KB
-    FLAGS_resp_size = 32;
-    FLAGS_concurrency = 2;
+    ERpc::runtime_assert(FLAGS_concurrency >= 2,
+                         "victim profile needs concurrency >= 2.");
     connect_sessions_func = connect_sessions_func_victim;
     get_session_idx_func = get_session_idx_func_victim;
     return;

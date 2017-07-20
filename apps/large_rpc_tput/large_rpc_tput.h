@@ -74,6 +74,7 @@ class AppContext {
   size_t stat_rx_bytes_tot = 0;  // Total bytes received
   size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
 
+  std::vector<size_t> stat_req_vec;  // Number of requests sent on a session
   std::vector<tag_t> req_vec;  // Request queue
 
   uint64_t req_ts[kMaxConcurrency];  // Per-request timestamps
