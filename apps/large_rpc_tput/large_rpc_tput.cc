@@ -211,8 +211,8 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         "TX %.3f GB/s, avg latency = %.1f us, 99%% latency = %.1f us. "
         "RX = %.3f MB, TX = %.3f MB. IPC = %.3f. Requests on sessions = %s.\n",
         c->thread_id, rx_GBps, tx_GBps, avg_us, _99_us,
-        c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
-        ipc, session_req_count_str.c_str());
+        c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0, ipc,
+        session_req_count_str.c_str());
 
     // Stats: rx_GBps tx_GBps avg_us 99_us
     c->tmp_stat->write(std::to_string(rx_GBps) + " " + std::to_string(tx_GBps) +
