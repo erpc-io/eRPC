@@ -53,6 +53,27 @@ float papi_get_ipc() {
   return ipc;
 }
 
+// Return the control net IP address of the machine with index server_i,
+// from the autorun nodes file.
+static std::string get_hostname_for_machine(size_t server_i) {
+  std::string autorun_node_file =
+      "/users/akalia/eRPC/scripts/autorun_node_file";
+  std::ifstream in(autorun_node_file.c_str());
+
+  std::string s;
+  s.reserve(100);  // For performance
+
+  for (size_t i = 0; i < server_i; i++) {
+    std::getline(in, s);
+    ERpc::rt_assert(!s.empty(), "Insufficient node names in autorun node file");
+  }
+
+  std::getline(in, s);
+  ERpc::rt_assert(!s.empty(), "Insufficient node names in autorun node file");
+
+  return s;
+}
+
 namespace ERpc {
 // A utility class to write stats to /tmp/
 class TmpStat {
