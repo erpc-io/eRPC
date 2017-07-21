@@ -51,13 +51,6 @@ union tag_t {
 
 static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
-/// Return the control net IP address of the machine with index server_i
-static std::string get_hostname_for_machine(size_t server_i) {
-  std::ostringstream ret;
-  ret << "3.1.8." << std::to_string(server_i + 1);
-  return ret.str();
-}
-
 /// Per-batch context
 class BatchContext {
  public:
@@ -274,7 +267,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 /// The function executed by each thread in the cluster
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext c;
-  c.tmp_stat = new ERpc::TmpStat("small_rpc_tput");
+  c.tmp_stat = new ERpc::TmpStat("small_rpc_tput", "Mrps IPC");
   c.thread_id = thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),

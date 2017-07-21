@@ -86,15 +86,6 @@ class AppContext {
   }
 };
 
-// Return the control net IP address of the machine with index server_i
-static std::string get_hostname_for_machine(size_t server_i) {
-  std::ostringstream ret;
-  ret << "3.1.8." << std::to_string(server_i + 1);
-  // ret << std::string("akalianode-") << std::to_string(server_i + 1)
-  //    << std::string(".RDMA.fawn.apt.emulab.net");
-  return ret.str();
-}
-
 // Allocate request and response MsgBuffers
 void alloc_req_resp_msg_buffers(AppContext *c) {
   assert(c != nullptr);
