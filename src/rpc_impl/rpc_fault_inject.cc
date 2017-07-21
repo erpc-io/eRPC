@@ -12,10 +12,7 @@ void Rpc<TTr>::fault_inject_check_ok() const {
     throw std::runtime_error("eRPC Rpc: Fault injection is disabled.");
   }
 
-  if (!in_creator()) {
-    throw std::runtime_error(
-        "eRPC Rpc: Non-creator threads cannot inject faults.");
-  }
+  rt_assert(in_creator(), "eRPC Rpc: Non-creator threads can't inject faults.");
 }
 
 template <class TTr>

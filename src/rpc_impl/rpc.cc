@@ -24,30 +24,15 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
       pkt_loss_epoch_cycles(kPktLossEpochMs * 1000000 * nexus->freq_ghz),
       req_func_arr(nexus->req_func_arr) {
   // Ensure that we're running as root
-  if (getuid()) {
-    throw std::runtime_error("eRPC Rpc: You need to be root to use eRPC");
-    return;
-  }
+  rt_assert(!getuid(), "eRPC Rpc: You need to be root to use eRPC");
 
-  if (nexus == nullptr) {
-    throw std::invalid_argument("eRPC Rpc: Invalid nexus");
-    return;
-  }
+  rt_assert(nexus != nullptr, "eRPC Rpc: Invalid nexus");
 
-  if (rpc_id == kInvalidRpcId || nexus->rpc_id_exists(rpc_id)) {
-    throw std::invalid_argument("eRPC Rpc: Invalid rpc_id");
-    return;
-  }
+  rt_assert(rpc_id != kInvalidRpcId && !nexus->rpc_id_exists(rpc_id),
+            "eRPC Rpc: Invalid rpc_id");
 
-  if (phy_port >= kMaxPhyPorts) {
-    throw std::invalid_argument("eRPC Rpc: Invalid physical port");
-    return;
-  }
-
-  if (numa_node >= kMaxNumaNodes) {
-    throw std::invalid_argument("eRPC Rpc: Invalid NUMA node");
-    return;
-  }
+  rt_assert(phy_port < kMaxPhyPorts, "eRPC Rpc: Invalid physical port");
+  rt_assert(numa_node < kMaxNumaNodes, "eRPC Rpc: Invalid NUMA node");
 
   tls_registry = &nexus->tls_registry;
   tls_registry->init();  // Initialize thread-local variables for this thread

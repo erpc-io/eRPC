@@ -67,7 +67,7 @@ static std::string trim_hostname(std::string hostname) {
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
-static void runtime_assert(bool condition, std::string throw_str) {
+static inline void rt_assert(bool condition, std::string throw_str) {
   if (unlikely(!condition)) throw std::runtime_error(throw_str);
 }
 

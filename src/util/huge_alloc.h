@@ -92,9 +92,7 @@ class HugeAlloc {
    * hugepage reservation failure is catastrophic
    */
   inline Buffer alloc(size_t size) {
-    if (unlikely(size > kMaxClassSize)) {
-      throw std::runtime_error("eRPC HugeAlloc: Allocation size too large");
-    }
+    assert(size <= kMaxClassSize);
 
     size_t size_class = get_class(size);
     assert(size_class < kNumClasses);

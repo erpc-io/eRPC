@@ -145,10 +145,7 @@ class IBTransport : public Transport {
   static MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
                                        size_t size) {
     struct ibv_mr *mr = ibv_reg_mr(pd, buf, size, IBV_ACCESS_LOCAL_WRITE);
-    if (mr == nullptr) {
-      throw std::runtime_error(
-          "eRPC IBTransport: Failed to register memory region");
-    }
+    rt_assert(mr != nullptr, "eRPC IBTransport: Failed to register mr.");
 
     LOG_INFO("eRPC IBTransport: Registered %zu MB (lkey = %u)\n", size / MB(1),
              mr->lkey);

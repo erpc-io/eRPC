@@ -9,7 +9,7 @@ bool machine_in_victim_pair() {
 }
 
 size_t get_session_idx_func_victim(AppContext *, size_t resp_session_idx) {
-  ERpc::runtime_assert(FLAGS_machine_id != 0, "Machine 0 cannot send reqs.");
+  ERpc::rt_assert(FLAGS_machine_id != 0, "Machine 0 cannot send reqs.");
 
   // During initialization, alternate between machine 0 and the other victim
   static size_t initial_call_index = 0;
@@ -56,11 +56,11 @@ void connect_sessions_func_victim(AppContext *c) {
 
     c->session_num_vec[0] = c->rpc->create_session(
         hostname_0, static_cast<uint8_t>(c->thread_id), kAppPhyPort);
-    ERpc::runtime_assert(c->session_num_vec[0] >= 0, "create_session failed.");
+    ERpc::rt_assert(c->session_num_vec[0] >= 0, "create_session failed.");
 
     c->session_num_vec[1] = c->rpc->create_session(
         hostname_other, static_cast<uint8_t>(c->thread_id), kAppPhyPort);
-    ERpc::runtime_assert(c->session_num_vec[1] >= 0, "create_session failed.");
+    ERpc::rt_assert(c->session_num_vec[1] >= 0, "create_session failed.");
 
     while (c->num_sm_resps != 2) {
       c->rpc->run_event_loop(200);  // 200 milliseconds

@@ -139,20 +139,14 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   }
 
   uint8_t *shm_buf = static_cast<uint8_t *>(shmat(shm_id, nullptr, 0));
-  if (shm_buf == nullptr) {
-    xmsg << "eRPC HugeAlloc: SHM malloc error: shmat() failed for key "
-         << std::to_string(shm_key);
-    throw std::runtime_error(xmsg.str());
-  }
+  rt_assert(shm_buf != nullptr,
+            "eRPC HugeAlloc: shmat() failed. Key = " + std::to_string(shm_key));
 
   // Bind the buffer to the NUMA node
   const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node));
   long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
-  if (ret != 0) {
-    xmsg << "eRPC HugeAlloc: SHM malloc error. mbind() failed for key "
-         << shm_key;
-    throw std::runtime_error(xmsg.str());
-  }
+  rt_assert(ret == 0,
+            "eRPC HugeAlloc: mbind() failed. Key " + std::to_string(shm_key));
 
   // If we are here, the allocation succeeded.
   memset(shm_buf, 0, size);

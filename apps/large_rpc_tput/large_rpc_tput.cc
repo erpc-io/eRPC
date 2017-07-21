@@ -325,10 +325,10 @@ void setup_profile() {
   }
 
   if (FLAGS_profile == "victim") {
-    ERpc::runtime_assert(FLAGS_num_machines >= 3,
-                         "victim profile needs 3 or more machines.");
-    ERpc::runtime_assert(FLAGS_concurrency >= 2,
-                         "victim profile needs concurrency >= 2.");
+    ERpc::rt_assert(FLAGS_num_machines >= 3,
+                    "victim profile needs 3 or more machines.");
+    ERpc::rt_assert(FLAGS_concurrency >= 2,
+                    "victim profile needs concurrency >= 2.");
     connect_sessions_func = connect_sessions_func_victim;
     get_session_idx_func = get_session_idx_func_victim;
     return;

@@ -110,21 +110,16 @@ void IBTransport::resolve_phy_port() {
   // Get the device list
   int num_devices = 0;
   struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
-  if (dev_list == nullptr) {
-    throw std::runtime_error(
-        "eRPC IBTransport: Failed to get InfiniBand device list");
-  }
+  rt_assert(dev_list != nullptr,
+            "eRPC IBTransport: Failed to get InfiniBand device list");
 
   // Traverse the device list
   int ports_to_discover = phy_port;
 
   for (int dev_i = 0; dev_i < num_devices; dev_i++) {
     ib_ctx = ibv_open_device(dev_list[dev_i]);
-    if (ib_ctx == nullptr) {
-      xmsg << "eRPC IBTransport: Failed to open InfiniBand device "
-           << std::to_string(dev_i);
-      throw std::runtime_error(xmsg.str());
-    }
+    rt_assert(ib_ctx != nullptr,
+              "eRPC IBTransport: Failed to open dev " + std::to_string(dev_i));
 
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
@@ -179,20 +174,13 @@ void IBTransport::init_infiniband_structs() {
 
   // Create protection domain, send CQ, and recv CQ
   pd = ibv_alloc_pd(ib_ctx);
-  if (pd == nullptr) {
-    throw std::runtime_error(
-        "eRPC IBTransport: Failed to create protection domain");
-  }
+  rt_assert(pd != nullptr, "eRPC IBTransport: Failed to allocate PD");
 
   send_cq = ibv_create_cq(ib_ctx, kSendQueueDepth, nullptr, nullptr, 0);
-  if (send_cq == nullptr) {
-    throw std::runtime_error("eRPC IBTransport: Failed to create SEND CQ");
-  }
+  rt_assert(send_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
 
   recv_cq = ibv_create_cq(ib_ctx, kRecvQueueDepth, nullptr, nullptr, 0);
-  if (recv_cq == nullptr) {
-    throw std::runtime_error("eRPC IBTransport: Failed to create SEND CQ");
-  }
+  rt_assert(recv_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
 
   // Create self address handle
   struct ibv_ah_attr ah_attr;
@@ -204,9 +192,7 @@ void IBTransport::init_infiniband_structs() {
 
   ah_attr.port_num = dev_port_id;  // Local port
   self_ah = ibv_create_ah(pd, &ah_attr);
-  if (self_ah == nullptr) {
-    throw std::runtime_error("eRPC IBTransport: Failed to create self AH");
-  }
+  rt_assert(self_ah != nullptr, "eRPC IBTransport: Failed to create self AH.");
 
   // Initialize QP creation attributes
   struct ibv_qp_init_attr create_attr;
@@ -222,9 +208,7 @@ void IBTransport::init_infiniband_structs() {
   create_attr.cap.max_inline_data = kMaxInline;
 
   qp = ibv_create_qp(pd, &create_attr);
-  if (qp == nullptr) {
-    throw std::runtime_error("eRPC IBTransport: Failed to create QP");
-  }
+  rt_assert(qp != nullptr, "eRPC IBTransport: Failed to create QP");
 
   // Transition QP to INIT state
   struct ibv_qp_attr init_attr;
@@ -322,9 +306,8 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
   recv_wr[kRecvQueueDepth - 1].next = nullptr;  // Breaker of chains
 
   int ret = ibv_post_recv(qp, &recv_wr[0], &bad_wr);
-  if (ret != 0) {
-    throw std::runtime_error("eRPC IBTransport: Failed to fill RECV queue.\n");
-  }
+  rt_assert(ret == 0, "eRPC IBTransport: Failed to fill RECV queue.");
+
   recv_wr[kRecvQueueDepth - 1].next = &recv_wr[0];  // Restore circularity
 }
 

@@ -77,11 +77,10 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
 
     ENetAddress rem_address;
     rem_address.port = ctx->mgmt_udp_port;
-    if (enet_address_set_host(&rem_address, epeer_data->rem_hostname.c_str()) !=
-        0) {
-      throw std::runtime_error("eRPC Nexus: ENet failed to resolve address " +
-                               epeer_data->rem_hostname);
-    }
+    int ret =
+        enet_address_set_host(&rem_address, epeer_data->rem_hostname.c_str());
+    rt_assert(ret == 0,
+              "eRPC Nexus: ENet failed to resolve " + epeer_data->rem_hostname);
 
     ENetPeer *new_epeer =
         enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
@@ -236,14 +235,11 @@ void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
   // Create the packet to send
   ENetPacket *enet_pkt =
       enet_packet_create(sm_pkt, sizeof(SmPkt), ENET_PACKET_FLAG_RELIABLE);
-  if (enet_pkt == nullptr) {
-    throw std::runtime_error("eRPC Nexus: Failed to create ENet packet.");
-  }
+  rt_assert(enet_pkt != nullptr, "eRPC Nexus: Failed to create ENet packet.");
   delete sm_pkt;
 
-  if (enet_peer_send(wi.epeer, 0, enet_pkt) != 0) {
-    throw std::runtime_error("eRPC Nexus: Failed to send ENet packet.");
-  }
+  rt_assert(enet_peer_send(wi.epeer, 0, enet_pkt) == 0,
+            "eRPC Nexus: Failed to send ENet packet.");
 }
 
 template <class TTr>
@@ -288,10 +284,8 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
 
         wi.epeer =
             enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
-        if (wi.epeer == nullptr) {
-          throw std::runtime_error("eRPC Nexus: Failed to connect ENet to " +
-                                   rem_hostname);
-        }
+        rt_assert(wi.epeer != nullptr,
+                  "eRPC Nexus: Failed to connect ENet to " + rem_hostname);
 
         // Reduce ENet peer timeout. This needs more work (e.g., what values
         // can we safely use without false positives?)
@@ -325,9 +319,7 @@ void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
   assert(ctx != nullptr);
 
   // Create an ENet socket that remote nodes can connect to
-  if (enet_initialize() != 0) {
-    throw std::runtime_error("eRPC Nexus: Failed to initialize ENet.");
-  }
+  rt_assert(enet_initialize() == 0, "eRPC Nexus: Failed to initialize ENet.");
 
   ENetAddress address;
   enet_address_set_host(&address, "localhost");
@@ -336,9 +328,7 @@ void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
 
   ctx->enet_host =
       enet_host_create(&address, kMaxNumMachines, kENetChannels, 0, 0);
-  if (ctx->enet_host == nullptr) {
-    throw std::runtime_error("eRPC Nexus: Failed to create ENet host.");
-  }
+  rt_assert(ctx->enet_host != nullptr, "eRPC Nexus: enet_host_create failed.");
 
   // This is not a busy loop, since sm_thread_rx() blocks for several ms
   while (*ctx->kill_switch == false) {

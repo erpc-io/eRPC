@@ -22,14 +22,12 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
     LOG_WARN("eRPC Nexus: Fault injection enabled. Performance will be low.\n");
   }
 
-  if (num_bg_threads > kMaxBgThreads) {
-    throw std::runtime_error("eRPC Nexus: Too many background threads.");
-  }
+  rt_assert(num_bg_threads <= kMaxBgThreads,
+            "eRPC Nexus: Too many background threads.");
 
-  if (small_rpc_optlevel == small_rpc_optlevel_extreme && num_bg_threads > 0) {
-    throw std::runtime_error(
-        "eRPC Nexus: Background threads not supported with "
-        "small_rpc_optlevel_extreme.");
+  if (small_rpc_optlevel == small_rpc_optlevel_extreme) {
+    rt_assert(num_bg_threads == 0,
+              "eRPC Nexus: Background threads not supported in extreme mode.");
   }
 
   kill_switch = false;
@@ -196,9 +194,8 @@ double Nexus<TTr>::get_freq_ghz() {
   double _freq_ghz = rdtsc_cycles / clock_ns;
 
   // Less than 500 MHz and greater than 5.0 GHz is abnormal
-  if (_freq_ghz < 0.5 || _freq_ghz > 5.0) {
-    throw std::runtime_error("eRPC Nexus: get_freq_ghz() failed.");
-  }
+  rt_assert(_freq_ghz >= 0.5 && _freq_ghz <= 5.0,
+            "eRPC Nexus: Invalid frequency.");
 
   return _freq_ghz;
 }
