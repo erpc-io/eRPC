@@ -19,7 +19,7 @@ add_definitions(-Wno-unused-function)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet gflags papi)
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet gflags papi craft)
 
 # Testing
 enable_testing()
@@ -188,7 +188,7 @@ set(OTHER_TESTS
   test_fixed_vector)
 
 # The apps to compile
-# Available apps: small_rpc_tput, large_rpc_tput
+# Available apps: small_rpc_tput, large_rpc_tput, consensus
 set(APPS $ENV{autorun_app})
 
 if(COMPILE_ERPC_LIB)

@@ -104,6 +104,7 @@
    at runtime.
 
 ## Short-term TODOs
+ * In willemt/raft, remove fprofile-arcs and ftest-coverage. Add install target.
  * In IBTransport, check if MLX environment vars are set. Do it in constructor.
  * Try using union for `server_info` and `client_info` in sslot. This causes
    C++ issues bc of non-trivial destructor in anonymous union.
