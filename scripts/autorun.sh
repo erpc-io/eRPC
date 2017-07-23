@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Requirement: A file named autorun_node_file in this script's directory
+# that contains newline-separated, DNS-resolvable node names.
 source $(dirname $0)/utils.sh
 
 # Get the config parameter specified in $1 for app = $autorun_app
@@ -23,7 +25,6 @@ check_env "autorun_app"
 
 # Variables set by the human user
 autorun_erpc_home="/users/akalia/eRPC"
-autorun_autorun_down_node_list=""	# List of down nodes. XXX: This doesn't work because we infer autorun_num_nodes from app config.
 
 # Variables exported by this script
 autorun_out_file="/tmp/${autorun_app}_out"
