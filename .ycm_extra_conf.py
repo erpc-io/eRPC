@@ -38,6 +38,7 @@ flags = [
     'c++',
     '-DFAULT_INJECTION',
     '-I/users/akalia/eRPC/src',
+    '-I/users/akalia/eRPC/third_party',
     '-Wall',
     '-Werror',
     '-Wextra',
