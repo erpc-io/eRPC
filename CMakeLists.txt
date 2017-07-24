@@ -24,9 +24,11 @@ set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet gflags papi craft)
 # Testing
 enable_testing()
 find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIRS})
 
+include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/thirdy_party)
+
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
@@ -123,15 +125,9 @@ else(LTO)
 endif(LTO)
 
 set(SOURCES
-  src/common.h
   src/nexus_impl/nexus.cc
   src/nexus_impl/nexus_bg_thread.cc
   src/nexus_impl/nexus_sm_thread.cc
-  src/nexus.h
-  src/msg_buffer.h
-  src/ops.h
-  src/pkthdr.h
-  src/rpc.h
   src/rpc_impl/rpc.cc
   src/rpc_impl/rpc_bg_queues.cc
   src/rpc_impl/rpc_send_rfr.cc
@@ -148,26 +144,12 @@ set(SOURCES
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/session.cc
-  src/session.h
   src/transport.cc
-  src/transport.h
   src/transport_impl/ib_transport.cc
   src/transport_impl/ib_transport_datapath.cc
-  src/transport_impl/ib_transport.h
-  src/util/barrier.h
-  src/util/buffer.h
   src/util/huge_alloc.cc
-  src/util/huge_alloc.h
-  src/util/latency.h
-  src/util/logger.h
-  src/util/misc.h
-  src/util/mt_list.h
-  src/util/math_utils.h
-  src/util/rand.h
-  src/util/tls_registry.h
   src/util/tls_registry.cc
-  src/util/timer.h
-  tests/test_basics.h)
+  third_party/cityhash/city_mod.cc)
 
 # The tests to run using ctest
 set(CTEST_TESTS
