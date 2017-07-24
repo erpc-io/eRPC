@@ -231,6 +231,13 @@ class Rpc {
   /// can be called only from the creator thread.
   size_t num_active_sessions() { return num_active_sessions_st(); }
 
+  /// Return true iff this sess
+  bool is_connected(int session_num) {
+    assert(session_num >= 0 &&
+           static_cast<size_t>(session_num) < session_vec.size());
+    return session_vec[static_cast<size_t>(session_num)] != nullptr;
+  }
+
  private:
   int create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
                         uint8_t rem_phy_port = 0);
