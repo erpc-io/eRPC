@@ -4,164 +4,10 @@
  * found in the LICENSE file.
  */
 
-extern "C" {
-#include <raft/raft.h>
-}
-
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <tpl.h>
-#include <set>
-
-#include "../apps_common.h"
-#include "cityhash/city.h"
-#include "rpc.h"
-
-static constexpr bool kAppVerbose = true;
-
-static constexpr size_t kAppNexusUdpPort = 31851;
-static constexpr size_t kAppPhyPort = 0;
-static constexpr size_t kAppNumaNode = 0;
-static constexpr size_t kRaftBuflen = 512;
-static constexpr size_t kIPStrLen = 12;
-
-// We run FLAGS_num_machines in the cluster, of which the first
-// FLAGS_num_raft_servers are Raft servers, and the remaining machines are Raft
-// clients.
-DEFINE_uint64(num_raft_servers, 0,
-              "Number of Raft servers (i.e., non-client machines)");
-static bool validate_num_raft_servers(const char*, uint64_t num_raft_servers) {
-  return num_raft_servers > 0 && num_raft_servers % 2 == 1;
-}
-DEFINE_validator(num_raft_servers, &validate_num_raft_servers);
-
-// Return true iff this machine is a Raft server
-bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
-
-enum class HandshakeState { kHandshakeFailure, kHandshakeSuccess };
-
-enum class PeerMessageType : int {
-  // Handshake is a special non-raft message type. We send a handshake so that
-  // we can identify ourselves to our peers.
-  kHandshake,
-  // Successful responses mean we can start the Raft periodic callback.
-  kHandshareResp,
-  // Tell leader we want to leave the cluster. When instance is ctrl-c'd we have
-  // to gracefuly disconnect.
-  kLeave,
-  // Receiving a leave response means we can shutdown.
-  kLeaveResp,
-  kRequestVote,
-  kRequestVoteResp,
-  kAppendEntries,
-  kAppendEntriesResp,
-};
-
-// Peer protocol handshake, sent after connecting so that peer can identify us
-struct msg_handshake_t {
-  int node_id;
-};
-
-struct msg_handshake_response_t {
-  int success;
-  // My Raft node ID. Sometimes we don't know who we did the handshake with.
-  int node_id;
-  char leader_host[kIPStrLen];
-};
-
-// Add/remove Raft peer
-struct entry_cfg_change_t {
-  int node_id;
-  char host[kIPStrLen];
-};
-
-struct msg_t {
-  int type;
-  union {
-    msg_handshake_t hs;
-    msg_handshake_response_t hsr;
-    msg_requestvote_t rv;
-    msg_requestvote_response_t rvr;
-    msg_appendentries_t ae;
-    msg_appendentries_response_t aer;
-  };
-  int padding[100];  // XXX: Why do we need this?
-};
-
-struct peer_connection_t {
-  int session_num;    // ERpc session number
-  tpl_gather_t* gt;   // Gather TPL message
-  raft_node_t* node;  // Peer's Raft node index
-
-  // Number of entries currently expected. This counts down as we consume
-  // entries.
-  int n_expected_entries;
-
-  // Remember most recent append entries msg. We refer to this msg when we
-  // finish reading the log entries.
-  // Used in tandem with n_expected_entries.
-  msg_t ae;
-};
-
-struct log_entry_t {
-  std::vector<uint8_t> data;
-  log_entry_t* next;
-};
-
-struct server_t {
-  int node_id = -1;  // This server's node ID
-  raft_server_t* raft = nullptr;
-
-  // Persistent set of tickets that have been issued.
-  std::set<unsigned int> tickets;
-
-  // Persistent state for voted_for and term
-  struct {
-    int term;
-    int voted_for;
-  } state;
-
-  // Persistent entries that have been appended to our log
-  // For each log entry we store two things next to each other:
-  // * TPL serialized raft_entry_t
-  // * raft_entry_data_t
-  log_entry_t log_head;
-
-  std::vector<peer_connection_t> peer_conn_vec;
-
-  // ERpc members
-  ERpc::Rpc<ERpc::IBTransport>* rpc;
-  ERpc::FastRand fast_rand;
-  size_t num_sm_resps = 0;
-};
-
-static peer_connection_t* __new_connection(server_t* sv);
-static void __connect_to_peer(peer_connection_t* conn);
-static void __connection_set_peer(peer_connection_t* conn, char* host);
-static void __connect_to_peer_at_host(peer_connection_t* conn, char* host);
-static void __start_raft_periodic_timer(server_t* sv);
-static int __send_handshake_response(peer_connection_t* conn,
-                                     HandshakeState success,
-                                     raft_node_t* leader);
-static int __send_leave_response(peer_connection_t* conn);
+#include "consensus.h"
 
 server_t server;
-server_t* sv = &server;
-
-// Serialize a peer message using TPL
-static size_t __peer_msg_serialize(tpl_node* tn, uv_buf_t* buf, char* data) {
-  size_t sz;
-  tpl_pack(tn, 0);                 // Pack all elements
-  tpl_dump(tn, TPL_GETSIZE, &sz);  // sz gets size of the serialized buffer
-
-  // Serialize into @data
-  tpl_dump(tn, TPL_MEM | TPL_PREALLOCD, data, kRaftBuflen);
-  tpl_free(tn);
-  buf->len = sz;
-  buf->base = data;
-  return sz;
-}
+server_t *sv = &server;
 
 // Check if the ticket has already been issued.
 // Return 0 if not unique; otherwise 1.
@@ -180,32 +26,47 @@ static unsigned int __generate_ticket() {
   return ticket;
 }
 
-/** Raft callback for sending request vote message */
-static int __raft_send_requestvote(raft_server_t*, void*, raft_node_t* node,
-                                   msg_requestvote_t* m) {
-  peer_connection_t* conn =
-      static_cast<peer_connection_t*>(raft_node_get_udata(node));
+// Raft callback for sending request vote message
+static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
+                                   msg_requestvote_t *m) {
+  assert(node != nullptr);
+  auto *conn = static_cast<peer_connection_t *>(raft_node_get_udata(node));
+  assert(conn != nullptr);
+  assert(conn->session_num >= 0);
+  assert(conn->node != nullptr);
 
   if (!sv->rpc->is_connected(conn->session_num)) return 0;
 
-  uv_buf_t bufs[1];
-  char buf[kRaftBuflen];
-  msg_t msg = {};
-  msg.type = static_cast<int>(PeerMessageType::kRequestVote);
-  msg.rv = *m;  // XXX: This makes a copy of the msg_requestvote_t
+  req_info_t *req_info = new req_info_t();  // XXX: Optimize with pool
+  req_info->req_msgbuf =
+      sv->rpc->alloc_msg_buffer(sizeof(int) + sizeof(msg_requestvote_t));
 
-  tpl_node* tn = tpl_map("S(I$(IIII))", &msg);
-  __peer_msg_send(conn->stream, tn, bufs, buf);
+  uint8_t *buf = req_info->req_msgbuf.buf;
+  assert(buf != nullptr);
+
+  auto *msg_type = reinterpret_cast<int *>(buf);
+  *msg_type = static_cast<int>(PeerMessageType::kRequestVote);
+
+  auto *msg_requestvote =
+      reinterpret_cast<msg_requestvote_t *>(buf + sizeof(int));
+  *msg_requestvote = *m;
+
+  size_t req_tag = reinterpret_cast<size_t>(buf);
+  int ret =
+      sv->rpc->enqueue_request(conn->session_num, kAppReqType,
+                               &req_info->req_msgbuf, app_cont_func, req_tag);
+  assert(ret == 0);
+
   return 0;
 }
 
 // Raft callback for saving term field to persistent storage
-static int __raft_persist_term(raft_server_t*, void*, const int) {
+static int __raft_persist_term(raft_server_t *, void *, const int) {
   // Ignored: We don't do crash recovery.
 }
 
 // Raft callback for saving voted_for field to persistent storage.
-static int __raft_persist_vote(raft_server_t*, void*, const int) {
+static int __raft_persist_vote(raft_server_t *, void *, const int) {
   // Ignored: We don't do crash recovery.
 }
 
@@ -224,10 +85,10 @@ raft_cbs_t raft_funcs = {
 
 // ERpc sessiom management handler
 void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
-                ERpc::SmErrType sm_err_type, void* _context) {
+                ERpc::SmErrType sm_err_type, void *_context) {
   assert(_context != nullptr);
 
-  auto* c = static_cast<server_t*>(_context);
+  auto *c = static_cast<server_t *>(_context);
   c->num_sm_resps++;
 
   if (sm_err_type != ERpc::SmErrType::kNoError) {
@@ -260,19 +121,13 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
           c->rpc->sec_since_creation());
 }
 
-// Generate a deterministic, random-ish node ID from a machine's hostname
-int get_raft_node_id_from_hostname(std::string hostname) {
-  uint32_t hash = CityHash32(hostname.c_str(), hostname.length());
-  return static_cast<int>(hash);
-}
-
 int main() {
   // Initialize eRPC
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
 
   sv->rpc =
-      new ERpc::Rpc<ERpc::IBTransport>(&nexus, static_cast<void*>(sv),
+      new ERpc::Rpc<ERpc::IBTransport>(&nexus, static_cast<void *>(sv),
                                        0,  // Thread ID
                                        sm_handler, kAppPhyPort, kAppNumaNode);
   sv->rpc->retry_connect_on_invalid_rpc_id = true;
@@ -313,12 +168,21 @@ int main() {
         // Add self. user_data = nullptr, peer_is_self = 1
         raft_add_node(sv->raft, nullptr, sv->node_id, 1);
       } else {
-        std::string hostname = get_hostname_for_machine(i);
-        int node_id = get_raft_node_id_from_hostname(hostname);
-        raft_add_node(sv->raft, nullptr, node_id, 0);  // peer_is_self = 0
+        std::string peer_hostname = get_hostname_for_machine(i);
+        int peer_node_id = get_raft_node_id_from_hostname(peer_hostname);
+        raft_add_node(sv->raft, nullptr, peer_node_id, 0);  // peer_is_self = 0
+
+        // Link the node to the peer connection
+        raft_node_t *node = raft_get_node(sv->raft, peer_node_id);
+        ERpc::rt_assert(node != nullptr, "Could not find added Raft node.");
+
+        peer_connection_t &peer_conn = sv->peer_conn_vec[i];
+        peer_conn.node = node;
+        raft_node_set_udata(node, static_cast<void *>(&peer_conn));
       }
     }
   } else {
+    // Raft client
   }
 
   if (FLAGS_machine_id == 0) raft_become_leader(sv->raft);
