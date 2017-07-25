@@ -18,7 +18,6 @@ static constexpr bool kAppVerbose = true;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
-static constexpr uint8_t kAppReqType = 1;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kRaftBuflen = 512;
 static constexpr size_t kIPStrLen = 12;
@@ -38,21 +37,9 @@ bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
 
 enum class HandshakeState { kHandshakeFailure, kHandshakeSuccess };
 
-enum class PeerMessageType : int {
-  // Handshake is a special non-raft message type. We send a handshake so that
-  // we can identify ourselves to our peers.
-  kHandshake,
-  // Successful responses mean we can start the Raft periodic callback.
-  kHandshareResp,
-  // Tell leader we want to leave the cluster. When instance is ctrl-c'd we have
-  // to gracefuly disconnect.
-  kLeave,
-  // Receiving a leave response means we can shutdown.
-  kLeaveResp,
-  kRequestVote,
-  kRequestVoteResp,
+enum class ReqType : uint8_t {
+  kRequestVote = 3,
   kAppendEntries,
-  kAppendEntriesResp,
 };
 
 // Peer protocol handshake, sent after connecting so that peer can identify us
@@ -148,5 +135,9 @@ int get_raft_node_id_from_hostname(std::string hostname) {
   uint32_t hash = CityHash32(hostname.c_str(), hostname.length());
   return static_cast<int>(hash);
 }
+
+// Globals
+server_t server;
+server_t* sv = &server;
 
 #endif
