@@ -1,14 +1,14 @@
 /**
- * @file request_vote.h
- * @brief Handlers for request vote RPC
+ * @file requestvote.h
+ * @brief Handlers for requestvote RPC
  */
 
 #include "consensus.h"
 
-#ifndef REQUEST_VOTE_H
-#define REQUEST_VOTE_H
+#ifndef REQUESTVOTE_H
+#define REQUESTVOTE_H
 
-// The request vote request send via eRPC
+// The requestvote request send via eRPC
 struct erpc_requestvote_t {
   int node_id;
   msg_requestvote_t rv;
@@ -23,7 +23,8 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
   auto *req = reinterpret_cast<erpc_requestvote_t *>(req_msgbuf->buf);
 
   if (kAppVerbose) {
-    printf("consensus: Received request vote from node %d.\n", req->node_id);
+    printf("consensus: Received requestvote request from node %d.\n",
+           req->node_id);
   }
 
   // This does a linear search, which is OK for a small number of Raft servers
@@ -35,8 +36,7 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
   req_handle->prealloc_used = true;
 
   int e = raft_recv_requestvote(
-      sv->raft, requester_node,
-      reinterpret_cast<msg_requestvote_t *>(req_msgbuf->buf),
+      sv->raft, requester_node, &req->rv,
       reinterpret_cast<msg_requestvote_response_t *>(
           req_handle->pre_resp_msgbuf.buf));
   assert(e == 0);
@@ -46,7 +46,7 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
 
 void requestvote_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
 
-// Raft callback for sending request vote message
+// Raft callback for sending requestvote request
 static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
                                    msg_requestvote_t *m) {
   assert(node != nullptr);
@@ -54,14 +54,14 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   assert(conn != nullptr);
   assert(conn->session_num >= 0);
 
-  if (kAppVerbose) {
-    printf("consensus: Sending request vote to node %d.\n",
-           raft_node_get_id(node));
+  if (!sv->rpc->is_connected(conn->session_num)) {
+    printf("consensus: Cannot send requestvote request (disconnected).\n");
+    return 0;
   }
 
-  if (!sv->rpc->is_connected(conn->session_num)) {
-    printf("consensus: Cannot send request vote (disconnected).\n");
-    return 0;
+  if (kAppVerbose) {
+    printf("consensus: Sending requestvote request to node %d.\n",
+           raft_node_get_id(node));
   }
 
   auto *req_info = new req_info_t();  // XXX: Optimize with pool
@@ -98,7 +98,7 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
          sizeof(msg_requestvote_response_t));
 
   if (kAppVerbose) {
-    printf("consensus: Received request vote reply from node %d.\n",
+    printf("consensus: Received requestvote reply from node %d.\n",
            raft_node_get_id(req_info->node));
   }
 

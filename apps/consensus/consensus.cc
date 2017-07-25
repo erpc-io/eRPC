@@ -5,7 +5,8 @@
  */
 
 #include "consensus.h"
-#include "request_vote.h"
+#include "requestvote.h"
+#include "appendentries.h"
 
 // Check if the ticket has already been issued.
 // Return 0 if not unique; otherwise 1.
