@@ -1,20 +1,14 @@
 /**
- * @file request_vote.h
- * @brief Handlers for request vote RPC
+ * @file request_appendentries.h
+ * @brief Handlers for append entries RPC
  */
 
 #include "consensus.h"
 
-#ifndef REQUEST_VOTE_H
-#define REQUEST_VOTE_H
+#ifndef REQUEST_APPENDENTRIES_H
+#define REQUEST_APPENDENTRIES_H
 
-// The request vote request send via eRPC
-struct erpc_requestvote_t {
-  int node_id;
-  msg_requestvote_t rv;
-};
-
-void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
+void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
   assert(req_handle != nullptr);
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
@@ -44,52 +38,72 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
   sv->rpc->enqueue_response(req_handle);
 }
 
-void requestvote_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
+void appendentries_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
 
-// Raft callback for sending request vote message
-static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
-                                   msg_requestvote_t *m) {
+// Raft callback for sending appendentries message
+static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
+                                     msg_appendentries_t *m) {
   assert(node != nullptr);
   auto *conn = static_cast<peer_connection_t *>(raft_node_get_udata(node));
   assert(conn != nullptr);
   assert(conn->session_num >= 0);
 
   if (kAppVerbose) {
-    printf("consensus: Sending request vote to node %d.\n",
+    printf("consensus: Sending appendentries to node %d.\n",
            raft_node_get_id(node));
   }
 
   if (!sv->rpc->is_connected(conn->session_num)) {
-    printf("consensus: Cannot send request vote (disconnected).\n");
+    printf("consensus: Cannot send appendentries (disconnected).\n");
     return 0;
   }
 
+  assert(m->n_entries == 0 || m->n_entries == 1);  // ticketd uses only entry 0
+
+  // XXX: Handle the case where n_entries == 0
+
+  // The appendentries request contains the header, and one {size, buf}
+  size_t req_size = sizeof(msg_appendentries_t) + sizeof(size_t) +
+                    static_cast<size_t>(m->entries[0].data.len);
+
   auto *req_info = new req_info_t();  // XXX: Optimize with pool
-  req_info->req_msgbuf = sv->rpc->alloc_msg_buffer(sizeof(erpc_requestvote_t));
+  req_info->req_msgbuf = sv->rpc->alloc_msg_buffer(req_size);
   ERpc::rt_assert(req_info->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
 
   req_info->resp_msgbuf =
-      sv->rpc->alloc_msg_buffer(sizeof(msg_requestvote_response_t));
+      sv->rpc->alloc_msg_buffer(sizeof(msg_appendentries_response_t));
   ERpc::rt_assert(req_info->resp_msgbuf.buf != nullptr,
                   "Failed to allocate response MsgBuffer");
 
   req_info->node = node;
 
-  auto *erpc_requestvote =
-      reinterpret_cast<erpc_requestvote_t *>(req_info->req_msgbuf.buf);
-  erpc_requestvote->node_id = sv->node_id;
-  erpc_requestvote->rv = *m;
+  uint8_t *_buf = req_info->req_msgbuf.buf;
+
+  // Header
+  auto *msg_appendentries = reinterpret_cast<msg_appendentries_t *>(_buf);
+  *msg_appendentries = *m;
+  _buf += sizeof(msg_appendentries_t);
+
+  // Size
+  auto *data_len = reinterpret_cast<size_t *>(_buf);
+  *data_len = static_cast<size_t>(m->entries[0].data.len);
+  _buf += sizeof(size_t);
+
+  // Data
+  memcpy(_buf, m->entries[0].data.buf, *data_len);
 
   size_t req_tag = reinterpret_cast<size_t>(req_info);
   int ret = sv->rpc->enqueue_request(
-      conn->session_num, static_cast<uint8_t>(ReqType::kRequestVote),
-      &req_info->req_msgbuf, &req_info->resp_msgbuf, requestvote_cont, req_tag);
+      conn->session_num, static_cast<uint8_t>(ReqType::kAppendEntries),
+      &req_info->req_msgbuf, &req_info->resp_msgbuf, appendentries_cont,
+      req_tag);
   assert(ret == 0);
 
   return 0;
 }
 
+// Continuation for request vote RPC
 void requestvote_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
   assert(resp_handle != nullptr);
 
