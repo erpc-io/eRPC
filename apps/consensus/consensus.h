@@ -87,8 +87,9 @@ struct msg_t {
 };
 
 struct peer_connection_t {
-  int session_num = -1;         // ERpc session number
-  raft_node_t* node = nullptr;  // Peer's Raft node
+  int session_num = -1;  // ERpc session number
+  size_t session_idx = std::numeric_limits<size_t>::max();  // Index in vector
+  raft_node_t* node = nullptr;                              // Peer's Raft node
 
   // Number of entries currently expected. This counts down as we consume
   // entries.
@@ -106,10 +107,9 @@ struct log_entry_t {
 };
 
 struct req_info_t {
+  raft_node_t* node;  // The Raft node to which this request was sent
   ERpc::MsgBuffer req_msgbuf;
-
-  req_info_t() {}
-  req_info_t(ERpc::MsgBuffer req_msgbuf) : req_msgbuf(req_msgbuf) {}
+  ERpc::MsgBuffer resp_msgbuf;
 };
 
 struct server_t {
