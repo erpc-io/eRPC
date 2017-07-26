@@ -148,7 +148,11 @@ void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
       ERpc::ReqFunc(appendentries_handler, ERpc::ReqFuncType::kForeground));
 }
 
-int main() {
+int main(int argc, char **argv) {
+  // Work around g++-5's unused variable warning for validators
+  _unused(num_raft_servers_validator_registered);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
   // Initialize eRPC
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
