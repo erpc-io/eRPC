@@ -65,6 +65,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   Session *session = session_vec[static_cast<size_t>(session_num)];
   if (!kDatapathChecks) {
+    // We never disconnect a session without notifying the eRPC user, so
+    // returning an error is not strictly required.
     assert(session != nullptr && session->is_client() &&
            session->is_connected());
   } else {
