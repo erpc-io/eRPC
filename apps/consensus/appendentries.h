@@ -135,7 +135,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 }
 
 // Continuation for request vote RPC
-void requestvote_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
+void appendentries_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
   assert(resp_handle != nullptr);
 
   auto *req_info = reinterpret_cast<req_info_t *>(tag);

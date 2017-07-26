@@ -84,17 +84,20 @@ void __raft_log(raft_server_t *, raft_node_t *, void *, const char *buf) {
   printf("raft: %s\n", buf);
 }
 
-raft_cbs_t raft_funcs = {
-    .send_requestvote = __raft_send_requestvote,
-    .send_appendentries = __raft_send_appendentries,
-    .applylog = __raft_applylog,
-    .persist_vote = __raft_persist_vote,
-    .persist_term = __raft_persist_term,
-    .log_offer = __raft_logentry_offer,
-    .log_poll = __raft_logentry_poll,
-    .log_pop = __raft_logentry_pop,
-    .node_has_sufficient_logs = __raft_node_has_sufficient_logs,
-    .log = __raft_log,
+void set_raft_callbacks() {
+  raft_cbs_t raft_funcs;
+  raft_funcs.send_requestvote = __raft_send_requestvote;
+  raft_funcs.send_appendentries = __raft_send_appendentries;
+  raft_funcs.applylog = __raft_applylog;
+  raft_funcs.persist_vote = __raft_persist_vote;
+  raft_funcs.persist_term = __raft_persist_term;
+  raft_funcs.log_offer = __raft_logentry_offer;
+  raft_funcs.log_poll = __raft_logentry_poll;
+  raft_funcs.log_pop = __raft_logentry_pop;
+  raft_funcs.node_has_sufficient_logs = __raft_node_has_sufficient_logs;
+  raft_funcs.log = __raft_log;
+
+  raft_set_callbacks(sv->raft, &raft_funcs, sv);
 };
 
 // ERpc sessiom management handler
@@ -135,15 +138,25 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
           c->rpc->sec_since_creation());
 }
 
+void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
+  nexus->register_req_func(
+      static_cast<uint8_t>(ReqType::kRequestVote),
+      ERpc::ReqFunc(requestvote_handler, ERpc::ReqFuncType::kForeground));
+
+  nexus->register_req_func(
+      static_cast<uint8_t>(ReqType::kAppendEntries),
+      ERpc::ReqFunc(appendentries_handler, ERpc::ReqFuncType::kForeground));
+}
+
 int main() {
   // Initialize eRPC
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
+  register_erpc_req_handlers(&nexus);
 
-  sv->tsc = ERpc::rdtsc();
+  // Thread ID = 0
   sv->rpc =
-      new ERpc::Rpc<ERpc::IBTransport>(&nexus, static_cast<void *>(sv),
-                                       0,  // Thread ID
+      new ERpc::Rpc<ERpc::IBTransport>(&nexus, static_cast<void *>(sv), 0,
                                        sm_handler, kAppPhyPort, kAppNumaNode);
   sv->rpc->retry_connect_on_invalid_rpc_id = true;
 
@@ -175,8 +188,9 @@ int main() {
 
   if (is_raft_server()) {
     // Initialize Raft
+    sv->tsc = ERpc::rdtsc();
     sv->raft = raft_new();
-    raft_set_callbacks(sv->raft, &raft_funcs, sv);
+    set_raft_callbacks();
 
     sv->node_id = get_raft_node_id_from_hostname(machine_name);
 
