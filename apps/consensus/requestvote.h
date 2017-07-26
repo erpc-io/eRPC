@@ -21,10 +21,12 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
   assert(req_msgbuf->get_data_size() == sizeof(erpc_requestvote_t));
 
   auto *req = reinterpret_cast<erpc_requestvote_t *>(req_msgbuf->buf);
+  assert(node_id_to_name_map.count(req->node_id) != 0);
 
   if (kAppVerbose) {
-    printf("consensus: Received requestvote request from node %d [%s].\n",
-           req->node_id, ERpc::get_formatted_time().c_str());
+    printf("consensus: Received requestvote request from %s [%s].\n",
+           node_id_to_name_map[req->node_id].c_str(),
+           ERpc::get_formatted_time().c_str());
   }
 
   // This does a linear search, which is OK for a small number of Raft servers
@@ -59,8 +61,9 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   }
 
   if (kAppVerbose) {
-    printf("consensus: Sending requestvote request to node %d [%s].\n",
-           raft_node_get_id(node), ERpc::get_formatted_time().c_str());
+    printf("consensus: Sending requestvote request to node %s [%s].\n",
+           node_id_to_name_map[raft_node_get_id(node)].c_str(),
+           ERpc::get_formatted_time().c_str());
   }
 
   auto *req_info = new req_info_t();  // XXX: Optimize with pool
@@ -84,8 +87,13 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   int ret = sv->rpc->enqueue_request(
       conn->session_num, static_cast<uint8_t>(ReqType::kRequestVote),
       &req_info->req_msgbuf, &req_info->resp_msgbuf, requestvote_cont, req_tag);
-  assert(ret == 0);
 
+  assert(ret == 0 || ret == -EBUSY);  // We checked is_connected above
+  if (ret == -EBUSY) sv->stat_requestvote_req_fail++;
+
+  // If we failed to send a request, pretend as if we sent it. Raft will retry
+  // when it times out. A large timeout is OK, since we don't care much about
+  // perf for requestvote Rpcs.
   return 0;
 }
 
@@ -97,8 +105,8 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
          sizeof(msg_requestvote_response_t));
 
   if (kAppVerbose) {
-    printf("consensus: Received requestvote response from node %d [%s].\n",
-           raft_node_get_id(req_info->node),
+    printf("consensus: Received requestvote response from node %s [%s].\n",
+           node_id_to_name_map[raft_node_get_id(req_info->node)].c_str(),
            ERpc::get_formatted_time().c_str());
   }
 

@@ -29,8 +29,9 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
   bool is_keepalive = req->ae.n_entries == 0;
 
   if (kAppVerbose) {
-    printf("consensus: Received appendentries (%s) req from node %d [%s].\n",
-           is_keepalive ? "keepalive" : "non-keepalive", req->node_id,
+    printf("consensus: Received appendentries (%s) req from node %s [%s].\n",
+           is_keepalive ? "keepalive" : "non-keepalive",
+           node_id_to_name_map[req->node_id].c_str(),
            ERpc::get_formatted_time().c_str());
   }
 
@@ -68,14 +69,17 @@ void appendentries_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
 // Raft callback for sending appendentries message
 static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
                                      msg_appendentries_t *m) {
-  assert(node != nullptr);
+  assert(node != nullptr && m != nullptr);
   auto *conn = static_cast<peer_connection_t *>(raft_node_get_udata(node));
   assert(conn != nullptr);
   assert(conn->session_num >= 0);
 
+  bool is_keepalive = m->n_entries > 0;
   if (kAppVerbose) {
-    printf("consensus: Sending appendentries to node %d [%s].\n",
-           raft_node_get_id(node), ERpc::get_formatted_time().c_str());
+    printf("consensus: Sending appendentries (%s) to node %s [%s].\n",
+           is_keepalive ? "keepalive" : "non-keepalive",
+           node_id_to_name_map[raft_node_get_id(node)].c_str(),
+           ERpc::get_formatted_time().c_str());
   }
 
   if (!sv->rpc->is_connected(conn->session_num)) {
@@ -129,8 +133,12 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
       conn->session_num, static_cast<uint8_t>(ReqType::kAppendEntries),
       &req_info->req_msgbuf, &req_info->resp_msgbuf, appendentries_cont,
       req_tag);
-  assert(ret == 0);
+  assert(ret == 0 || ret == -EBUSY);  // We checked is_connected above
+  if (ret == -EBUSY) sv->stat_appendentries_req_fail++;
 
+  // If we failed to send a request, pretend as if we sent it. Raft will retry
+  // when it times out, but this must be *extremely* rare since we care about
+  // perf of appendentries Rpcs.
   return 0;
 }
 
@@ -143,8 +151,8 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
          sizeof(msg_appendentries_response_t));
 
   if (kAppVerbose) {
-    printf("consensus: Received appendentries response from node %d [%s].\n",
-           raft_node_get_id(req_info->node),
+    printf("consensus: Received appendentries response from node %s [%s].\n",
+           node_id_to_name_map[raft_node_get_id(req_info->node)].c_str(),
            ERpc::get_formatted_time().c_str());
   }
 

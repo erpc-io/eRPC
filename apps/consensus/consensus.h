@@ -76,16 +76,8 @@ struct msg_t {
 struct peer_connection_t {
   int session_num = -1;  // ERpc session number
   size_t session_idx = std::numeric_limits<size_t>::max();  // Index in vector
-  raft_node_t* node = nullptr;                              // Peer's Raft node
 
-  // Number of entries currently expected. This counts down as we consume
-  // entries.
-  int n_expected_entries;
-
-  // Remember most recent append entries msg. We refer to this msg when we
-  // finish reading the log entries.
-  // Used in tandem with n_expected_entries.
-  msg_t ae;
+  raft_node_t* node = nullptr;  // Peer's Raft node, valid only for Raft servers
 };
 
 struct req_info_t {
@@ -102,12 +94,16 @@ struct server_t {
   // Set of tickets that have been issued.
   std::set<unsigned int> tickets;
 
-  std::vector<peer_connection_t> peer_conn_vec;
+  std::vector<peer_connection_t> conn_vec;
 
   // ERpc-related members
   ERpc::Rpc<ERpc::IBTransport>* rpc;
   ERpc::FastRand fast_rand;
   size_t num_sm_resps = 0;
+
+  // Stats
+  size_t stat_requestvote_req_fail = 0;    // Failed to send requestvote request
+  size_t stat_appendentries_req_fail = 0;  // Failed to send appendentries req
 };
 
 // Generate a deterministic, random-ish node ID from a machine's hostname
@@ -119,6 +115,7 @@ int get_raft_node_id_from_hostname(std::string hostname) {
 // Globals
 server_t server;
 server_t* sv = &server;
+std::unordered_map<int, std::string> node_id_to_name_map;
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }

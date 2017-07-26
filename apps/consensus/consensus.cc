@@ -59,15 +59,15 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
     throw std::runtime_error("Received unexpected SM event.");
   }
 
-  // The callback gives us the ERpc session number - get the index in vector
-  size_t session_idx = c->peer_conn_vec.size();
-  for (size_t i = 0; i < c->peer_conn_vec.size(); i++) {
-    if (c->peer_conn_vec[i].session_num == session_num) {
+  // The callback gives us the ERpc session number - get the index in conn_vec
+  size_t session_idx = c->conn_vec.size();
+  for (size_t i = 0; i < c->conn_vec.size(); i++) {
+    if (c->conn_vec[i].session_num == session_num) {
       session_idx = i;
     }
   }
 
-  if (session_idx == c->peer_conn_vec.size()) {
+  if (session_idx == c->conn_vec.size()) {
     throw std::runtime_error("SM callback for invalid session number.");
   }
 
@@ -95,8 +95,45 @@ int main(int argc, char **argv) {
   _unused(num_raft_servers_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  // Initialize eRPC
+  sv->conn_vec.resize(FLAGS_num_raft_servers);  // Both clients and servers
+
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
+
+  // Initialize Raft at servers. This must be done before running the eRPC event
+  // loop, including running it for session management.
+  if (is_raft_server()) {
+    sv->tsc = ERpc::rdtsc();
+    sv->raft = raft_new();
+    assert(sv->raft != nullptr);
+    set_raft_callbacks();
+
+    sv->node_id = get_raft_node_id_from_hostname(machine_name);
+    printf("consensus: Created Raft node with ID = %d.\n", sv->node_id);
+
+    for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
+      std::string node_i_hostname = get_hostname_for_machine(i);
+      int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
+      node_id_to_name_map[node_i_id] = ERpc::trim_hostname(node_i_hostname);
+
+      if (i == FLAGS_machine_id) {
+        // Add self. user_data = nullptr, peer_is_self = 1
+        raft_add_node(sv->raft, nullptr, sv->node_id, 1);
+      } else {
+        raft_add_node(sv->raft, nullptr, node_i_id, 0);  // peer_is_self = 0
+
+        // Link the Raft node to its peer connection struct, which will be
+        // filled later when we create the sessions.
+        raft_node_t *node = raft_get_node(sv->raft, node_i_id);
+        ERpc::rt_assert(node != nullptr, "Could not find added Raft node.");
+
+        peer_connection_t &peer_conn = sv->conn_vec[i];
+        peer_conn.node = node;
+        raft_node_set_udata(node, static_cast<void *>(&peer_conn));
+      }
+    }
+  }
+
+  // Initialize eRPC
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
   register_erpc_req_handlers(&nexus);
 
@@ -108,7 +145,6 @@ int main(int argc, char **argv) {
 
   // Raft client: Create session to each Raft server.
   // Raft server: Create session to each Raft server, excluding self.
-  sv->peer_conn_vec.resize(FLAGS_num_raft_servers);
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     if (is_raft_server() && i == FLAGS_machine_id) continue;
 
@@ -117,11 +153,11 @@ int main(int argc, char **argv) {
     printf("consensus: Creating session to %s, index = %zu.\n",
            hostname.c_str(), i);
 
-    sv->peer_conn_vec[i].session_idx = i;
-    sv->peer_conn_vec[i].session_num =
+    sv->conn_vec[i].session_idx = i;
+    sv->conn_vec[i].session_num =
         sv->rpc->create_session(hostname, 0, kAppPhyPort);
 
-    ERpc::rt_assert(sv->peer_conn_vec[i].session_num >= 0,
+    ERpc::rt_assert(sv->conn_vec[i].session_num >= 0,
                     "Failed to create session");
   }
 
@@ -130,36 +166,6 @@ int main(int argc, char **argv) {
 
   while (sv->num_sm_resps != num_sm_resps_expected) {
     sv->rpc->run_event_loop(200);  // 200 ms
-  }
-
-  if (is_raft_server()) {
-    // Initialize Raft
-    sv->tsc = ERpc::rdtsc();
-    sv->raft = raft_new();
-    set_raft_callbacks();
-
-    sv->node_id = get_raft_node_id_from_hostname(machine_name);
-
-    for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-      if (i == FLAGS_machine_id) {
-        // Add self. user_data = nullptr, peer_is_self = 1
-        raft_add_node(sv->raft, nullptr, sv->node_id, 1);
-      } else {
-        std::string peer_hostname = get_hostname_for_machine(i);
-        int peer_node_id = get_raft_node_id_from_hostname(peer_hostname);
-        raft_add_node(sv->raft, nullptr, peer_node_id, 0);  // peer_is_self = 0
-
-        // Link the node to the peer connection
-        raft_node_t *node = raft_get_node(sv->raft, peer_node_id);
-        ERpc::rt_assert(node != nullptr, "Could not find added Raft node.");
-
-        peer_connection_t &peer_conn = sv->peer_conn_vec[i];
-        peer_conn.node = node;
-        raft_node_set_udata(node, static_cast<void *>(&peer_conn));
-      }
-    }
-  } else {
-    // Raft client
   }
 
   if (FLAGS_machine_id == 0) raft_become_leader(sv->raft);
