@@ -26,7 +26,7 @@ static unsigned int __generate_ticket() {
 }
 
 // Raft callback for applying an entry to the finite state machine
-static int __raft_applylog(raft_server_t *, void *, raft_entry_t *ety) {
+static int __raft_applylog(raft_server_t *, void *, raft_entry_t *ety, int) {
   assert(!raft_entry_is_cfg_change(ety));
   assert(ety->data.len == sizeof(int));
 
@@ -73,9 +73,10 @@ static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *, int) {
 
 // Non-voting node now has enough logs to be able to vote. Append a finalization
 // cfg log entry.
-static void __raft_node_has_sufficient_logs(raft_server_t *, void *,
-                                            raft_node_t *) {
+static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
+                                           raft_node_t *) {
   assert(false);  // Ignored
+  return 0;
 }
 
 // Raft callback for displaying debugging information
@@ -139,6 +140,7 @@ int main() {
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
 
+  sv->tsc = ERpc::rdtsc();
   sv->rpc =
       new ERpc::Rpc<ERpc::IBTransport>(&nexus, static_cast<void *>(sv),
                                        0,  // Thread ID
@@ -202,7 +204,10 @@ int main() {
 
   if (FLAGS_machine_id == 0) raft_become_leader(sv->raft);
 
-  __start_raft_periodic_timer(sv);
+  while (ctrl_c_pressed == 0) {
+    call_raft_periodic();
+    sv->rpc->run_event_loop(0);  // Run once
+  }
 
-  uv_run(&sv->peer_loop, UV_RUN_DEFAULT);
+  delete sv->rpc;  // Free up hugepages
 }

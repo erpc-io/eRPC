@@ -97,6 +97,7 @@ struct req_info_t {
 struct server_t {
   int node_id = -1;  // This server's node ID
   raft_server_t* raft = nullptr;
+  size_t tsc;  // rdtsc timestamp
 
   // Set of tickets that have been issued.
   std::set<unsigned int> tickets;
@@ -109,16 +110,6 @@ struct server_t {
   size_t num_sm_resps = 0;
 };
 
-static peer_connection_t* __new_connection(server_t* sv);
-static void __connect_to_peer(peer_connection_t* conn);
-static void __connection_set_peer(peer_connection_t* conn, char* host);
-static void __connect_to_peer_at_host(peer_connection_t* conn, char* host);
-static void __start_raft_periodic_timer(server_t* sv);
-static int __send_handshake_response(peer_connection_t* conn,
-                                     HandshakeState success,
-                                     raft_node_t* leader);
-static int __send_leave_response(peer_connection_t* conn);
-
 // Generate a deterministic, random-ish node ID from a machine's hostname
 int get_raft_node_id_from_hostname(std::string hostname) {
   uint32_t hash = CityHash32(hostname.c_str(), hostname.length());
@@ -128,5 +119,22 @@ int get_raft_node_id_from_hostname(std::string hostname) {
 // Globals
 server_t server;
 server_t* sv = &server;
+
+volatile sig_atomic_t ctrl_c_pressed = 0;
+void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
+
+inline void call_raft_periodic() {
+  size_t cur_tsc = ERpc::rdtsc();
+
+  double msec_since_last_nonzero =
+      ERpc::to_msec(cur_tsc - sv->tsc, sv->rpc->get_freq_ghz());
+
+  if (msec_since_last_nonzero < 1.0) {
+    raft_periodic(sv->raft, 0);
+  } else {
+    sv->tsc = cur_tsc;
+    raft_periodic(sv->raft, 1);
+  }
+}
 
 #endif
