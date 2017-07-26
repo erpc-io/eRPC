@@ -32,7 +32,8 @@ static int __raft_applylog(raft_server_t *, void *, raft_entry_t *ety, int) {
 
   unsigned int *ticket = static_cast<unsigned int *>(ety->data.buf);
   if (kAppVerbose) {
-    printf("consensus: Adding ticket %d.\n", *ticket);
+    printf("consensus: Adding ticket %d [%s].\n", *ticket,
+           ERpc::get_formatted_time().c_str());
   }
 
   sv->tickets.insert(*ticket);
@@ -81,7 +82,7 @@ static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
 
 // Raft callback for displaying debugging information
 void __raft_log(raft_server_t *, raft_node_t *, void *, const char *buf) {
-  printf("raft: %s\n", buf);
+  printf("raft: %s [%s].\n", buf, ERpc::get_formatted_time().c_str());
 }
 
 void set_raft_callbacks() {
@@ -130,7 +131,7 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
   }
 
   fprintf(stderr,
-          "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s. "
+          "consensus: Rpc %u: Session number %d (index %zu) %s. "
           "Time elapsed = %.3f s.\n",
           c->rpc->get_rpc_id(), session_num, session_idx,
           sm_event_type == ERpc::SmEventType::kConnected ? "connected"

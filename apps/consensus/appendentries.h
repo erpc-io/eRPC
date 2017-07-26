@@ -13,8 +13,7 @@ struct erpc_appendentries_t {
   int node_id;
   msg_appendentries_t ae;
 
-  // Valid iff ae->n_entries > 0. buf field is always invalid. Even keepalive
-  // appenentries contain this field (for struct packing reasons).
+  // Even keepalive appendentries contain this field (for packing reasons).
   msg_entry_t msg_entry;
   // If ae.n_entries > 0, there is a buffer here.
 };
@@ -30,8 +29,9 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
   bool is_keepalive = req->ae.n_entries == 0;
 
   if (kAppVerbose) {
-    printf("consensus: Received appendentries request (%s) from node %d.\n",
-           is_keepalive ? "keepalive" : "non-keepalive", req->node_id);
+    printf("consensus: Received appendentries (%s) req from node %d [%s].\n",
+           is_keepalive ? "keepalive" : "non-keepalive", req->node_id,
+           ERpc::get_formatted_time().c_str());
   }
 
   assert(req->ae.entries == nullptr);
@@ -74,8 +74,8 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   assert(conn->session_num >= 0);
 
   if (kAppVerbose) {
-    printf("consensus: Sending appendentries to node %d.\n",
-           raft_node_get_id(node));
+    printf("consensus: Sending appendentries to node %d [%s].\n",
+           raft_node_get_id(node), ERpc::get_formatted_time().c_str());
   }
 
   if (!sv->rpc->is_connected(conn->session_num)) {
@@ -86,10 +86,10 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   assert(m->n_entries == 0 || m->n_entries == 1);  // ticketd uses <= 1
 
   // Compute the request size. Keepalive appendentries requests do not have
-  // a buffer.
-  size_t req_size = sizeof(size_t) + sizeof(msg_appendentries_t);
+  // a buffer, but they have an unused msg_entry_t.
+  size_t req_size = sizeof(erpc_appendentries_t);
   if (m->n_entries > 0) {
-    req_size += sizeof(size_t) + static_cast<size_t>(m->entries[0].data.len);
+    req_size += static_cast<size_t>(m->entries[0].data.len);
   }
 
   // Fill in request info (the tag)
@@ -143,8 +143,9 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
          sizeof(msg_appendentries_response_t));
 
   if (kAppVerbose) {
-    printf("consensus: Received appendentries response from node %d.\n",
-           raft_node_get_id(req_info->node));
+    printf("consensus: Received appendentries response from node %d [%s].\n",
+           raft_node_get_id(req_info->node),
+           ERpc::get_formatted_time().c_str());
   }
 
   auto *msg_appendentries_response =

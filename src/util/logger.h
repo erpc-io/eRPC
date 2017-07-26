@@ -33,7 +33,7 @@ namespace ERpc {
 #endif
 #endif
 
-void output_log_header(int level);
+static void output_log_header(int level);
 
 #if LOG_LEVEL >= LOG_LEVEL_ERROR
 #define LOG_ERROR(...)                     \
@@ -80,8 +80,7 @@ void output_log_header(int level);
 #define LOG_TRACE(...) ((void)0)
 #endif
 
-// Output log message header
-inline void output_log_header(int level) {
+static std::string get_formatted_time() {
   const boost::posix_time::ptime now =
       boost::posix_time::microsec_clock::local_time();
   const boost::posix_time::time_duration td = now.time_of_day();
@@ -91,6 +90,16 @@ inline void output_log_header(int level) {
   const long milliseconds =
       td.total_milliseconds() -
       ((td.hours() * 3600 + minutes * 60 + seconds) * 1000);
+
+  char buf[100];
+  sprintf(buf, "%02ld:%02ld.%03ld", minutes, seconds, milliseconds);
+
+  return std::string(buf);
+}
+
+// Output log message header
+static void output_log_header(int level) {
+  std::string formatted_time = get_formatted_time();
 
   const char *type;
   switch (level) {
@@ -113,8 +122,7 @@ inline void output_log_header(int level) {
       type = "UNKWN";
   }
 
-  fprintf(LOG_OUTPUT_STREAM, "%02ld:%02ld.%03ld %s: ", minutes, seconds,
-          milliseconds, type);
+  fprintf(LOG_OUTPUT_STREAM, "%s %s: ", formatted_time.c_str(), type);
 }
 
 /// Return true iff DEBUG and TRACE mode logging is disabled. These modes can

@@ -23,8 +23,8 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
   auto *req = reinterpret_cast<erpc_requestvote_t *>(req_msgbuf->buf);
 
   if (kAppVerbose) {
-    printf("consensus: Received requestvote request from node %d.\n",
-           req->node_id);
+    printf("consensus: Received requestvote request from node %d [%s].\n",
+           req->node_id, ERpc::get_formatted_time().c_str());
   }
 
   // This does a linear search, which is OK for a small number of Raft servers
@@ -59,8 +59,8 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   }
 
   if (kAppVerbose) {
-    printf("consensus: Sending requestvote request to node %d.\n",
-           raft_node_get_id(node));
+    printf("consensus: Sending requestvote request to node %d [%s].\n",
+           raft_node_get_id(node), ERpc::get_formatted_time().c_str());
   }
 
   auto *req_info = new req_info_t();  // XXX: Optimize with pool
@@ -97,8 +97,9 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
          sizeof(msg_requestvote_response_t));
 
   if (kAppVerbose) {
-    printf("consensus: Received requestvote response from node %d.\n",
-           raft_node_get_id(req_info->node));
+    printf("consensus: Received requestvote response from node %d [%s].\n",
+           raft_node_get_id(req_info->node),
+           ERpc::get_formatted_time().c_str());
   }
 
   auto *msg_requestvote_resp =
