@@ -30,9 +30,8 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
   bool is_keepalive = req->ae.n_entries == 0;
 
   if (kAppVerbose) {
-    printf(
-        "consensus: Received appendentries request (%s) from node %d.\n",
-        is_keepalive ? "keepalive" : "non-keepalive", req->node_id);
+    printf("consensus: Received appendentries request (%s) from node %d.\n",
+           is_keepalive ? "keepalive" : "non-keepalive", req->node_id);
   }
 
   assert(req->ae.entries == nullptr);
@@ -55,10 +54,10 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
                              sizeof(msg_appendentries_response_t));
   req_handle->prealloc_used = true;
 
-  int e = raft_recv_appendentries(
-    sv->raft, requester_node, &req->ae,
-    reinterpret_cast<msg_appendentries_response_t *>(
-        req_handle->pre_resp_msgbuf.buf));
+  int e =
+      raft_recv_appendentries(sv->raft, requester_node, &req->ae,
+                              reinterpret_cast<msg_appendentries_response_t *>(
+                                  req_handle->pre_resp_msgbuf.buf));
   assert(e == 0);
 
   sv->rpc->enqueue_response(req_handle);
@@ -112,7 +111,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
   // Header
   erpc_appendentries->node_id = sv->node_id;
-  erpc_appendentries->ae = *m; // ticketd copies all fields one-by-one
+  erpc_appendentries->ae = *m;  // ticketd copies all fields one-by-one
   erpc_appendentries->ae.entries = nullptr;
 
   if (m->n_entries > 0) {
@@ -141,22 +140,20 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
 
   auto *req_info = reinterpret_cast<req_info_t *>(tag);
   assert(req_info->resp_msgbuf.get_data_size() ==
-         sizeof(msg_requestvote_response_t));
+         sizeof(msg_appendentries_response_t));
 
   if (kAppVerbose) {
-    printf("consensus: Received request vote reply from node %d.\n",
+    printf("consensus: Received appendentries response from node %d.\n",
            raft_node_get_id(req_info->node));
   }
 
-  uint8_t *buf = req_info->resp_msgbuf.buf;
-  assert(buf != nullptr);
+  auto *msg_appendentries_response =
+      reinterpret_cast<msg_appendentries_response_t *>(
+          req_info->resp_msgbuf.buf);
 
-  auto *msg_requestvote_resp =
-      reinterpret_cast<msg_requestvote_response_t *>(buf);
-
-  int e = raft_recv_requestvote_response(sv->raft, req_info->node,
-                                         msg_requestvote_resp);
-  assert(e == 0);  // XXX: Doc says: Shutdown if e != 0
+  int e = raft_recv_appendentries_response(sv->raft, req_info->node,
+                                           msg_appendentries_response);
+  assert(e == 0);
 
   sv->rpc->free_msg_buffer(req_info->req_msgbuf);
   sv->rpc->free_msg_buffer(req_info->resp_msgbuf);

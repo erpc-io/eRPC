@@ -55,3 +55,4 @@ CTestTestfile.cmake
 
 # Common temp files
 ibnet_out
+apps/consensus/ticket_orig.cc

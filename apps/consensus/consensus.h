@@ -88,11 +88,6 @@ struct peer_connection_t {
   msg_t ae;
 };
 
-struct log_entry_t {
-  std::vector<uint8_t> data;
-  log_entry_t* next;
-};
-
 struct req_info_t {
   raft_node_t* node;  // The Raft node to which this request was sent
   ERpc::MsgBuffer req_msgbuf;
@@ -105,12 +100,6 @@ struct server_t {
 
   // Set of tickets that have been issued.
   std::set<unsigned int> tickets;
-
-  // Entries that have been appended to our log
-  // For each log entry we store two things next to each other:
-  // * TPL serialized raft_entry_t
-  // * raft_entry_data_t
-  log_entry_t log_head;
 
   std::vector<peer_connection_t> peer_conn_vec;
 

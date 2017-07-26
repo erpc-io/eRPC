@@ -35,10 +35,9 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *) {
                              sizeof(msg_requestvote_response_t));
   req_handle->prealloc_used = true;
 
-  int e = raft_recv_requestvote(
-      sv->raft, requester_node, &req->rv,
-      reinterpret_cast<msg_requestvote_response_t *>(
-          req_handle->pre_resp_msgbuf.buf));
+  int e = raft_recv_requestvote(sv->raft, requester_node, &req->rv,
+                                reinterpret_cast<msg_requestvote_response_t *>(
+                                    req_handle->pre_resp_msgbuf.buf));
   assert(e == 0);
 
   sv->rpc->enqueue_response(req_handle);
@@ -98,15 +97,12 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
          sizeof(msg_requestvote_response_t));
 
   if (kAppVerbose) {
-    printf("consensus: Received requestvote reply from node %d.\n",
+    printf("consensus: Received requestvote response from node %d.\n",
            raft_node_get_id(req_info->node));
   }
 
-  uint8_t *buf = req_info->resp_msgbuf.buf;
-  assert(buf != nullptr);
-
   auto *msg_requestvote_resp =
-      reinterpret_cast<msg_requestvote_response_t *>(buf);
+      reinterpret_cast<msg_requestvote_response_t *>(req_info->resp_msgbuf.buf);
 
   int e = raft_recv_requestvote_response(sv->raft, req_info->node,
                                          msg_requestvote_resp);
