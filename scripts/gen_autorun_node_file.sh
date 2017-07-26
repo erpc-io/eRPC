@@ -11,10 +11,9 @@ fi
 function gen_apt() {
   nodes=`seq 1 $1`
   for node_i in $nodes; do
-    echo $node_i
-    #echo akalianode-$node_i.RDMA.fawn.apt.emulab.net >> autorun_node_file
+    echo akalianode-$node_i.RDMA.fawn.apt.emulab.net >> autorun_node_file
   done
 }
 
 rm -f autorun_node_file
-gen_apt
+gen_apt $1

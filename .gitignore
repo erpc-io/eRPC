@@ -56,3 +56,4 @@ CTestTestfile.cmake
 # Common temp files
 ibnet_out
 apps/consensus/ticket_orig.cc
+scripts/autorun_node_file
