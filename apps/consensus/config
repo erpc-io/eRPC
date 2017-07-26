@@ -1,0 +1,5 @@
+--test_ms 20000
+--num_machines 4
+--num_raft_servers 3
+--num_threads 1
+--concurrency 8

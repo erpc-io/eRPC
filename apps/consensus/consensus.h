@@ -32,7 +32,7 @@ static bool validate_num_raft_servers(const char*, uint64_t num_raft_servers) {
 }
 DEFINE_validator(num_raft_servers, &validate_num_raft_servers);
 
-// Return true iff this machine is a Raft server
+// Return true iff this machine is a Raft server (leader or follower)
 bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
 
 enum class HandshakeState { kHandshakeFailure, kHandshakeSuccess };
