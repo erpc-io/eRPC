@@ -86,9 +86,10 @@ struct peer_connection_t {
 };
 
 struct req_info_t {
-  raft_node_t *node;  // The Raft node to which this request was sent
   ERpc::MsgBuffer req_msgbuf;
   ERpc::MsgBuffer resp_msgbuf;
+
+  raft_node_t *node;  // The Raft node to which req was sent (for servers only)
 };
 
 // Context for both servers and clients
@@ -108,6 +109,11 @@ class AppContext {
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;
+
+  struct {
+    size_t thread_id;
+    size_t leader_idx;  // Client's view of the leader node's index in conn_vec
+  } client;
 
   std::vector<peer_connection_t> conn_vec;
 

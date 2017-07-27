@@ -89,10 +89,9 @@ int main(int argc, char **argv) {
                                        sm_handler, kAppPhyPort, kAppNumaNode);
   c.rpc->retry_connect_on_invalid_rpc_id = true;
 
-  // Raft client: Create session to each Raft server.
   // Raft server: Create session to each Raft server, excluding self.
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    if (is_raft_server() && i == FLAGS_machine_id) continue;
+    if (i == FLAGS_machine_id) continue;
 
     std::string hostname = get_hostname_for_machine(i);
 
@@ -101,14 +100,10 @@ int main(int argc, char **argv) {
 
     c.conn_vec[i].session_idx = i;
     c.conn_vec[i].session_num = c.rpc->create_session(hostname, 0, kAppPhyPort);
-
-    ERpc::rt_assert(c.conn_vec[i].session_num >= 0, "Failed to create session");
+    assert(c.conn_vec[i].session_num >= 0);
   }
 
-  size_t num_sm_resps_expected =
-      is_raft_server() ? FLAGS_num_raft_servers - 1 : FLAGS_num_raft_servers;
-
-  while (c.num_sm_resps != num_sm_resps_expected) {
+  while (c.num_sm_resps != FLAGS_num_raft_servers - 1) {
     c.rpc->run_event_loop(200);  // 200 ms
   }
 
