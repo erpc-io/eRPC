@@ -38,9 +38,11 @@ bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
 
 enum class HandshakeState { kHandshakeFailure, kHandshakeSuccess };
 
+/// The eRPC request types
 enum class ReqType : uint8_t {
-  kRequestVote = 3,
-  kAppendEntries,
+  kRequestVote = 3,  // Raft requestvote RPC
+  kAppendEntries,    // Raft appendentries RPC
+  kGetTicket         // Client-to-server Rpc
 };
 
 // Peer protocol handshake, sent after connecting so that peer can identify us
