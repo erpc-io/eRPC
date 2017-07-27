@@ -7,6 +7,7 @@
 #include "consensus.h"
 #include "appendentries.h"
 #include "callbacks.h"
+#include "client.h"
 #include "requestvote.h"
 
 // Check if the ticket has already been issued.
@@ -28,6 +29,40 @@ static unsigned int __generate_ticket(AppContext *c) {
   return ticket;
 }
 
+// appendentries request: node ID, msg_appendentries_t, [{size, buf}]
+void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+  assert(req_handle != nullptr && _context != nullptr);
+  auto *c = static_cast<AppContext *>(_context);
+  assert(c->check_magic());
+
+  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  assert(req_msgbuf->get_data_size() == sizeof(erpc_client_req_t));
+
+  auto *req = reinterpret_cast<erpc_client_req_t *>(req_msgbuf->buf);
+
+  // Create a log entry
+  unsigned int ticket = __generate_ticket(c);
+  msg_entry_t entry = {};
+  entry.id = c->fast_rand.next_u32();
+  entry.data.buf = static_cast<void *>(&ticket);
+  entry.data.len = sizeof(ticket);
+
+  if (kAppVerbose) {
+    printf(
+        "consensus: Received client request from client thread %zu. "
+        "Assigned ticket = %u [%s].\n",
+        req->thread_id, ticket, ERpc::get_formatted_time().c_str());
+  }
+
+  auto *msg_entry_response = new msg_entry_response_t();  // XXX: Pool
+
+  c->server.client_req_vec.push_back(
+      client_req_info_t(req_handle, msg_entry_response, ticket));
+
+  int e = raft_recv_entry(c->server.raft, &entry, msg_entry_response);
+  assert(e == 0);
+}
+
 void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kRequestVote),
@@ -36,6 +71,10 @@ void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kAppendEntries),
       ERpc::ReqFunc(appendentries_handler, ERpc::ReqFuncType::kForeground));
+
+  nexus->register_req_func(
+      static_cast<uint8_t>(ReqType::kGetTicket),
+      ERpc::ReqFunc(client_req_handler, ERpc::ReqFuncType::kForeground));
 }
 
 int main(int argc, char **argv) {
@@ -49,9 +88,17 @@ int main(int argc, char **argv) {
     peer_conn.c = &c;
   }
 
-  assert(is_raft_server());  // Handler clients before this point; pass them c
-
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
+  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
+
+  if (!is_raft_server()) {
+    // Run client
+    auto client_thread = std::thread(client_func, 0, &nexus, &c);
+    client_thread.join();
+    return 0;
+  }
+
+  assert(is_raft_server());  // Handler clients before this point; pass them c
 
   // Initialize Raft at servers. This must be done before running the eRPC event
   // loop, including running it for session management.
@@ -80,7 +127,6 @@ int main(int argc, char **argv) {
   }
 
   // Initialize eRPC
-  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
   register_erpc_req_handlers(&nexus);
 
   // Thread ID = 0
@@ -112,7 +158,39 @@ int main(int argc, char **argv) {
   while (ctrl_c_pressed == 0) {
     call_raft_periodic(&c);
     c.rpc->run_event_loop(0);  // Run once
+
+    size_t write_index = 0;
+    for (auto &client_req_info : c.server.client_req_vec) {
+      int commit_status = raft_msg_entry_response_committed(
+          c.server.raft, client_req_info.msg_entry_response);
+      assert(commit_status == 0 || commit_status == 1);
+
+      if (commit_status == 0) {
+        // Not committed yet
+        c.server.client_req_vec[write_index] = client_req_info;
+        write_index++;
+      } else {
+        // Committed: Send a response
+        ERpc::ReqHandle *req_handle = client_req_info.req_handle;
+        c.rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                 sizeof(erpc_client_resp_t));
+        req_handle->prealloc_used = true;
+
+        auto *client_resp = reinterpret_cast<erpc_client_resp_t *>(
+            req_handle->pre_resp_msgbuf.buf);
+        client_resp->resp_type = ClientRespType::kSuccess;
+        client_resp->ticket = client_req_info.ticket;
+
+        if (kAppVerbose) {
+          printf("consensus: Replying to client with ticket = %u.",
+                 client_resp->ticket);
+        }
+
+        c.rpc->enqueue_response(req_handle);
+      }
+    }
+    c.server.client_req_vec.resize(write_index);
   }
 
-  delete c.rpc;  // Free up hugepages
+  delete c.rpc;
 }

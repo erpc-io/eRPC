@@ -85,11 +85,24 @@ struct peer_connection_t {
   AppContext *c;  // Back link to AppContext
 };
 
+// Info about an eRPC request
 struct req_info_t {
   ERpc::MsgBuffer req_msgbuf;
   ERpc::MsgBuffer resp_msgbuf;
 
   raft_node_t *node;  // The Raft node to which req was sent (for servers only)
+};
+
+// Info about a client request at leader
+struct client_req_info_t {
+  ERpc::ReqHandle *req_handle;
+  msg_entry_response_t *msg_entry_response;
+  unsigned int ticket;
+
+  client_req_info_t(ERpc::ReqHandle *r, msg_entry_response_t *m, unsigned int t)
+      : req_handle(r), msg_entry_response(m), ticket(t) {}
+
+  client_req_info_t() {}
 };
 
 // Context for both servers and clients
@@ -101,6 +114,7 @@ class AppContext {
     int node_id = -1;  // This server's Raft node ID
     raft_server_t *raft = nullptr;
     size_t raft_periodic_tsc;  // rdtsc timestamp
+    std::vector<client_req_info_t> client_req_vec;
 
     // Set of tickets that have been issued.
     std::set<unsigned int> tickets;

@@ -75,13 +75,12 @@ void send_req_one(AppContext *c) {
   size_t req_tag = reinterpret_cast<size_t>(req_info);
   peer_connection_t &conn = c->conn_vec[c->client.leader_idx];
   int ret = c->rpc->enqueue_request(
-      conn.session_num, static_cast<uint8_t>(ReqType::kRequestVote),
+      conn.session_num, static_cast<uint8_t>(ReqType::kGetTicket),
       &req_info->req_msgbuf, &req_info->resp_msgbuf, client_cont, req_tag);
   assert(ret == 0);
 }
 
-void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
-                      size_t tag) {
+void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
@@ -114,6 +113,8 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
   delete req_info;  // Free allocated memory, XXX: Remove when we use pool
 
   c->rpc->release_response(resp_handle);
+
+  send_req_one(c);
 }
 
 void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
@@ -143,16 +144,19 @@ void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
     assert(c->conn_vec[i].session_num >= 0);
   }
 
-  while (c->num_sm_resps != FLAGS_num_raft_servers - 1) {
+  while (c->num_sm_resps != FLAGS_num_raft_servers) {
     c->rpc->run_event_loop(200);  // 200 ms
   }
 
-  printf("consensus: Client %zu connected to all servers.\n", thread_id);
+  printf("consensus: Client %zu connected to all servers. Sending requests.\n",
+         thread_id);
 
   send_req_one(c);
   while (ctrl_c_pressed == 0) {
     c->rpc->run_event_loop(200);  // 200 milliseconds
   }
+
+  delete c->rpc;
 }
 
 #endif
