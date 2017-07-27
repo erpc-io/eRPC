@@ -19,8 +19,10 @@ struct erpc_appendentries_t {
 };
 
 // appendentries request: node ID, msg_appendentries_t, [{size, buf}]
-void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
-  assert(req_handle != nullptr);
+void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
+  assert(req_handle != nullptr && _context != nullptr);
+  auto *c = static_cast<AppContext *>(_context);
+  assert(c->check_magic());
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   uint8_t *buf = req_msgbuf->buf;
@@ -39,7 +41,7 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
   req->ae.entries = &req->msg_entry;
 
   // This does a linear search, which is OK for a small number of Raft servers
-  raft_node_t *requester_node = raft_get_node(sv->raft, req->node_id);
+  raft_node_t *requester_node = raft_get_node(c->server.raft, req->node_id);
   assert(requester_node != nullptr);
 
   if (is_keepalive) {
@@ -51,17 +53,17 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *) {
     req->msg_entry.data.buf = buf + sizeof(erpc_appendentries_t);
   }
 
-  sv->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                             sizeof(msg_appendentries_response_t));
+  c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                            sizeof(msg_appendentries_response_t));
   req_handle->prealloc_used = true;
 
   int e =
-      raft_recv_appendentries(sv->raft, requester_node, &req->ae,
+      raft_recv_appendentries(c->server.raft, requester_node, &req->ae,
                               reinterpret_cast<msg_appendentries_response_t *>(
                                   req_handle->pre_resp_msgbuf.buf));
   assert(e == 0);
 
-  sv->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle);
 }
 
 void appendentries_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
@@ -70,9 +72,12 @@ void appendentries_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
 static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
                                      msg_appendentries_t *m) {
   assert(node != nullptr && m != nullptr);
+
   auto *conn = static_cast<peer_connection_t *>(raft_node_get_udata(node));
-  assert(conn != nullptr);
-  assert(conn->session_num >= 0);
+  assert(conn != nullptr && conn->session_num >= 0 && conn->c != nullptr);
+
+  AppContext *c = conn->c;
+  assert(c->check_magic());
 
   bool is_keepalive = m->n_entries > 0;
   if (kAppVerbose) {
@@ -82,7 +87,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
            ERpc::get_formatted_time().c_str());
   }
 
-  if (!sv->rpc->is_connected(conn->session_num)) {
+  if (!c->rpc->is_connected(conn->session_num)) {
     printf("consensus: Cannot send appendentries (disconnected).\n");
     return 0;
   }
@@ -98,12 +103,12 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
   // Fill in request info (the tag)
   auto *req_info = new req_info_t();  // XXX: Optimize with pool
-  req_info->req_msgbuf = sv->rpc->alloc_msg_buffer(req_size);
+  req_info->req_msgbuf = c->rpc->alloc_msg_buffer(req_size);
   ERpc::rt_assert(req_info->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
 
   req_info->resp_msgbuf =
-      sv->rpc->alloc_msg_buffer(sizeof(msg_appendentries_response_t));
+      c->rpc->alloc_msg_buffer(sizeof(msg_appendentries_response_t));
   ERpc::rt_assert(req_info->resp_msgbuf.buf != nullptr,
                   "Failed to allocate response MsgBuffer");
 
@@ -114,7 +119,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
       reinterpret_cast<erpc_appendentries_t *>(req_info->req_msgbuf.buf);
 
   // Header
-  erpc_appendentries->node_id = sv->node_id;
+  erpc_appendentries->node_id = c->server.node_id;
   erpc_appendentries->ae = *m;  // ticketd copies all fields one-by-one
   erpc_appendentries->ae.entries = nullptr;
 
@@ -129,12 +134,12 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   }
 
   size_t req_tag = reinterpret_cast<size_t>(req_info);
-  int ret = sv->rpc->enqueue_request(
+  int ret = c->rpc->enqueue_request(
       conn->session_num, static_cast<uint8_t>(ReqType::kAppendEntries),
       &req_info->req_msgbuf, &req_info->resp_msgbuf, appendentries_cont,
       req_tag);
   assert(ret == 0 || ret == -EBUSY);  // We checked is_connected above
-  if (ret == -EBUSY) sv->stat_appendentries_req_fail++;
+  if (ret == -EBUSY) c->server.stat_appendentries_enq_fail++;
 
   // If we failed to send a request, pretend as if we sent it. Raft will retry
   // when it times out, but this must be *extremely* rare since we care about
@@ -143,8 +148,11 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 }
 
 // Continuation for request vote RPC
-void appendentries_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
-  assert(resp_handle != nullptr);
+void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
+                        size_t tag) {
+  assert(resp_handle != nullptr && _context != nullptr);
+  auto *c = static_cast<AppContext *>(_context);
+  assert(c->check_magic());
 
   auto *req_info = reinterpret_cast<req_info_t *>(tag);
   assert(req_info->resp_msgbuf.get_data_size() ==
@@ -160,15 +168,15 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *, size_t tag) {
       reinterpret_cast<msg_appendentries_response_t *>(
           req_info->resp_msgbuf.buf);
 
-  int e = raft_recv_appendentries_response(sv->raft, req_info->node,
+  int e = raft_recv_appendentries_response(c->server.raft, req_info->node,
                                            msg_appendentries_response);
   assert(e == 0);
 
-  sv->rpc->free_msg_buffer(req_info->req_msgbuf);
-  sv->rpc->free_msg_buffer(req_info->resp_msgbuf);
+  c->rpc->free_msg_buffer(req_info->req_msgbuf);
+  c->rpc->free_msg_buffer(req_info->resp_msgbuf);
   delete req_info;  // Free allocated memory, XXX: Remove when we use pool
 
-  sv->rpc->release_response(resp_handle);
+  c->rpc->release_response(resp_handle);
 }
 
 #endif

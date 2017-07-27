@@ -104,6 +104,8 @@
    at runtime.
 
 ## Short-term TODOs
+ * Stack: Work on replacing global sv with context c. Check AppContext magic
+   everywhere. Set libcraft node udata while creating node.
  * Clone willemt/raft, remove fprofile-arcs and ftest-coverage, add -g, march=native.
    Add install script.
  * In IBTransport, check if MLX environment vars are set. Do it in constructor.
