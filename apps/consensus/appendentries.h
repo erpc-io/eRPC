@@ -61,6 +61,7 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
       raft_recv_appendentries(c->server.raft, requester_node, &req->ae,
                               reinterpret_cast<msg_appendentries_response_t *>(
                                   req_handle->pre_resp_msgbuf.buf));
+  _unused(e);
   assert(e == 0);
 
   c->rpc->enqueue_response(req_handle);
@@ -170,6 +171,7 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
 
   int e = raft_recv_appendentries_response(c->server.raft, req_info->node,
                                            msg_appendentries_response);
+  _unused(e);
   assert(e == 0);
 
   c->rpc->free_msg_buffer(req_info->req_msgbuf);

@@ -53,6 +53,7 @@ void client_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
 
 void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
+  c->client.req_tsc = ERpc::rdtsc();
 
   auto *req_info = new req_info_t();  // XXX: Optimize with pool
   req_info->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(erpc_client_req_t));
@@ -78,12 +79,26 @@ void send_req_one(AppContext *c) {
       conn.session_num, static_cast<uint8_t>(ReqType::kGetTicket),
       &req_info->req_msgbuf, &req_info->resp_msgbuf, client_cont, req_tag);
   assert(ret == 0);
+  _unused(ret);
 }
 
 void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
+
+  // Measure latency
+  double us = ERpc::to_usec(ERpc::rdtsc() - c->client.req_tsc,
+                             c->rpc->get_freq_ghz());
+  c->client.latency.update(static_cast<size_t>(us));
+  c->client.num_resps++;
+
+  if (c->client.num_resps == 1000) {
+    printf("consensus: Client latency = %.2f us avg, %zu 99 perc.\n",
+           c->client.latency.avg(), c->client.latency.perc(.99));
+    c->client.num_resps = 0;
+    c->client.latency.reset();
+  }
 
   auto *req_info = reinterpret_cast<req_info_t *>(tag);
   assert(req_info->resp_msgbuf.get_data_size() == sizeof(erpc_client_resp_t));

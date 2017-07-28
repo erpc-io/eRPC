@@ -43,6 +43,7 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *_context) {
                                 reinterpret_cast<msg_requestvote_response_t *>(
                                     req_handle->pre_resp_msgbuf.buf));
   assert(e == 0);
+  _unused(e);
 
   c->rpc->enqueue_response(req_handle);
 }
@@ -124,6 +125,7 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
   int e = raft_recv_requestvote_response(c->server.raft, req_info->node,
                                          msg_requestvote_resp);
   assert(e == 0);  // XXX: Doc says: Shutdown if e != 0
+  _unused(e);
 
   c->rpc->free_msg_buffer(req_info->req_msgbuf);
   c->rpc->free_msg_buffer(req_info->resp_msgbuf);

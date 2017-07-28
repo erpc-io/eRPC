@@ -45,6 +45,7 @@ static int __raft_persist_term(raft_server_t *, void *, const int) {
 // Raft callback for appending an item to the log
 static int __raft_logentry_offer(raft_server_t *, void *, raft_entry_t *ety,
                                  int) {
+  _unused(ety);
   assert(!raft_entry_is_cfg_change(ety));
   return 0;  // Ignored
 }

@@ -13,8 +13,9 @@ extern "C" {
 #include "../apps_common.h"
 #include "cityhash/city.h"
 #include "rpc.h"
+#include "util/latency.h"
 
-static constexpr bool kAppVerbose = true;
+static constexpr bool kAppVerbose = false;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
@@ -127,6 +128,9 @@ class AppContext {
   struct {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
+    size_t req_tsc;  // Request issue time
+    size_t num_resps = 0;
+    ERpc::Latency latency;
   } client;
 
   std::vector<peer_connection_t> conn_vec;

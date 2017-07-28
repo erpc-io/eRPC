@@ -53,6 +53,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   int e = raft_recv_entry(c->server.raft, &entry, msg_entry_response);
   assert(e == 0);
+  _unused(e);
 }
 
 void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
