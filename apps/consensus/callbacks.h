@@ -72,7 +72,11 @@ static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
 
 // Raft callback for displaying debugging information
 void __raft_log(raft_server_t *, raft_node_t *, void *, const char *buf) {
-  printf("raft: %s [%s].\n", buf, ERpc::get_formatted_time().c_str());
+  _unused(buf);
+
+  if (kAppVerbose) {
+    //printf("raft: %s [%s].\n", buf, ERpc::get_formatted_time().c_str());
+  }
 }
 
 void set_raft_callbacks(AppContext *c) {
