@@ -10,22 +10,14 @@
 #include "client.h"
 #include "requestvote.h"
 
-// Check if the ticket has already been issued.
-// Return 0 if not unique; otherwise 1.
-static int __check_if_ticket_exists(AppContext *c, const unsigned int ticket) {
-  assert(c != nullptr && c->check_magic());
-  if (c->server.tickets.count(ticket) == 0) return 1;
-  return 0;
-}
-
 // Generate a ticket that's unique at this node
-static unsigned int __generate_ticket(AppContext *c) {
+static unsigned int generate_ticket(AppContext *c) {
   assert(c != nullptr && c->check_magic());
-  unsigned int ticket;
+  unsigned int ticket = c->fast_rand.next_u32();
 
-  do {
+  while (c->server.tickets.count(ticket) > 0) {
     ticket = c->fast_rand.next_u32();
-  } while (__check_if_ticket_exists(c, ticket));
+  }
   return ticket;
 }
 
@@ -41,7 +33,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   auto *req = reinterpret_cast<erpc_client_req_t *>(req_msgbuf->buf);
 
   // Create a log entry
-  unsigned int ticket = __generate_ticket(c);
+  unsigned int ticket = generate_ticket(c);
   msg_entry_t entry = {};
   entry.id = c->fast_rand.next_u32();
   entry.data.buf = static_cast<void *>(&ticket);
@@ -182,7 +174,7 @@ int main(int argc, char **argv) {
         client_resp->ticket = client_req_info.ticket;
 
         if (kAppVerbose) {
-          printf("consensus: Replying to client with ticket = %u.",
+          printf("consensus: Replying to client with ticket = %u.\n",
                  client_resp->ticket);
         }
 

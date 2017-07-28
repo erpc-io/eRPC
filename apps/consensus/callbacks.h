@@ -24,7 +24,7 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 
   unsigned int *ticket = static_cast<unsigned int *>(ety->data.buf);
   if (kAppVerbose) {
-    printf("consensus: Adding ticket %d [%s].\n", *ticket,
+    printf("consensus: Adding ticket %u [%s].\n", *ticket,
            ERpc::get_formatted_time().c_str());
   }
 

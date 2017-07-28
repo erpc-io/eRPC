@@ -86,10 +86,8 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   assert(c->check_magic());
 
   auto *req_info = reinterpret_cast<req_info_t *>(tag);
-  assert(req_info->resp_msgbuf.get_data_size() ==
-         sizeof(msg_requestvote_response_t));
-
   assert(req_info->resp_msgbuf.get_data_size() == sizeof(erpc_client_resp_t));
+
   auto *client_resp =
       reinterpret_cast<erpc_client_resp_t *>(req_info->resp_msgbuf.buf);
 
