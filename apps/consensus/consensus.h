@@ -90,7 +90,6 @@ struct peer_connection_t {
 struct req_info_t {
   ERpc::MsgBuffer req_msgbuf;
   ERpc::MsgBuffer resp_msgbuf;
-
   raft_node_t *node;  // The Raft node to which req was sent (for servers only)
 };
 
@@ -98,12 +97,7 @@ struct req_info_t {
 struct client_req_info_t {
   ERpc::ReqHandle *req_handle;
   msg_entry_response_t *msg_entry_response;
-  unsigned int ticket;
-
-  client_req_info_t(ERpc::ReqHandle *r, msg_entry_response_t *m, unsigned int t)
-      : req_handle(r), msg_entry_response(m), ticket(t) {}
-
-  client_req_info_t() {}
+  unsigned int *ticket;
 };
 
 // Context for both servers and clients
@@ -128,7 +122,7 @@ class AppContext {
   struct {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
-    size_t req_tsc;  // Request issue time
+    size_t req_tsc;     // Request issue time
     size_t num_resps = 0;
     ERpc::Latency latency;
   } client;
