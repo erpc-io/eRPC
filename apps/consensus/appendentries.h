@@ -10,12 +10,10 @@
 
 // The appendentries request send via eRPC
 struct erpc_appendentries_t {
-  int node_id;
+  int node_id;  // Node ID of the sender
   msg_appendentries_t ae;
-
-  // Even keepalive appendentries contain this field (for packing reasons).
-  msg_entry_t msg_entry;
-  // If ae.n_entries > 0, there is a buffer here.
+  // If ae.n_entries > 0, the msg_entry_t structs are serialized here. Each
+  // struct's buf is placed immediately after the struct.
 };
 
 // appendentries request: node ID, msg_appendentries_t, [{size, buf}]
@@ -28,17 +26,17 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   uint8_t *buf = req_msgbuf->buf;
 
   auto *req = reinterpret_cast<erpc_appendentries_t *>(buf);
-  bool is_keepalive = req->ae.n_entries == 0;
+  assert(req->ae.entries == nullptr);
+  req->ae.entries =
+      reinterpret_cast<msg_entry_t *>(buf + sizeof(erpc_appendentries_t));
 
+  bool is_keepalive = (req->ae.n_entries == 0);
   if (kAppVerbose) {
     printf("consensus: Received appendentries (%s) req from node %s [%s].\n",
            is_keepalive ? "keepalive" : "non-keepalive",
            node_id_to_name_map[req->node_id].c_str(),
            ERpc::get_formatted_time().c_str());
   }
-
-  assert(req->ae.entries == nullptr);
-  req->ae.entries = &req->msg_entry;
 
   // This does a linear search, which is OK for a small number of Raft servers
   raft_node_t *requester_node = raft_get_node(c->server.raft, req->node_id);
@@ -47,20 +45,27 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   if (is_keepalive) {
     assert(req_msgbuf->get_data_size() == sizeof(erpc_appendentries_t));
   } else {
-    assert(req_msgbuf->get_data_size() ==
-           sizeof(erpc_appendentries_t) + req->msg_entry.data.len);
-    assert(req->msg_entry.data.buf == nullptr);
-    req->msg_entry.data.buf = buf + sizeof(erpc_appendentries_t);
+    buf += sizeof(erpc_appendentries_t);
+
+    for (size_t i = 0; i < static_cast<size_t>(req->ae.n_entries); i++) {
+      auto *msg_entry = reinterpret_cast<msg_entry_t *>(buf);
+      assert(msg_entry->data.buf == nullptr);
+
+      msg_entry->data.buf = buf + sizeof(msg_entry_t);
+      buf += sizeof(msg_entry_t) + msg_entry->data.len;
+    }
+
+    assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());
   }
 
   c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                             sizeof(msg_appendentries_response_t));
   req_handle->prealloc_used = true;
 
+  auto *mar = reinterpret_cast<msg_appendentries_response_t *>(
+      req_handle->pre_resp_msgbuf.buf);
   int e =
-      raft_recv_appendentries(c->server.raft, requester_node, &req->ae,
-                              reinterpret_cast<msg_appendentries_response_t *>(
-                                  req_handle->pre_resp_msgbuf.buf));
+      raft_recv_appendentries(c->server.raft, requester_node, &req->ae, mar);
   _unused(e);
   assert(e == 0);
 
@@ -80,7 +85,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   AppContext *c = conn->c;
   assert(c->check_magic());
 
-  bool is_keepalive = m->n_entries > 0;
+  bool is_keepalive = m->n_entries == 0;
   if (kAppVerbose) {
     printf("consensus: Sending appendentries (%s) to node %s [%s].\n",
            is_keepalive ? "keepalive" : "non-keepalive",
@@ -93,14 +98,16 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
     return 0;
   }
 
-  assert(m->n_entries == 0 || m->n_entries == 1);  // ticketd uses <= 1
-
   // Compute the request size. Keepalive appendentries requests do not have
   // a buffer, but they have an unused msg_entry_t.
   size_t req_size = sizeof(erpc_appendentries_t);
-  if (m->n_entries > 0) {
-    req_size += static_cast<size_t>(m->entries[0].data.len);
+  for (size_t i = 0; i < static_cast<size_t>(m->n_entries); i++) {
+    req_size +=
+        sizeof(msg_entry_t) + static_cast<size_t>(m->entries[i].data.len);
   }
+
+  ERpc::rt_assert(req_size <= c->rpc->get_max_msg_size(),
+                  "appendentries request too large for eRPC");
 
   // Fill in request info (the tag)
   auto *req_info = new req_info_t();  // XXX: Optimize with pool
@@ -115,24 +122,29 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
   req_info->node = node;
 
-  // Fill in the request
+  // Fill in the header
   auto *erpc_appendentries =
       reinterpret_cast<erpc_appendentries_t *>(req_info->req_msgbuf.buf);
 
-  // Header
   erpc_appendentries->node_id = c->server.node_id;
-  erpc_appendentries->ae = *m;  // ticketd copies all fields one-by-one
-  erpc_appendentries->ae.entries = nullptr;
+  erpc_appendentries->ae = *m;
+  erpc_appendentries->ae.entries = nullptr;  // Was local pointer
 
-  if (m->n_entries > 0) {
-    // msg_entry_t
-    erpc_appendentries->msg_entry = m->entries[0];
-    erpc_appendentries->msg_entry.data.buf = nullptr;
+  // Serialize each entry
+  uint8_t *buf = req_info->req_msgbuf.buf + sizeof(erpc_appendentries_t);
+  for (size_t i = 0; i < static_cast<size_t>(m->n_entries); i++) {
+    auto *msg_entry = reinterpret_cast<msg_entry_t *>(buf);
+    *msg_entry = m->entries[i];
+    msg_entry->data.buf = nullptr;  // Was local pointer
+    buf += sizeof(msg_entry_t);
 
-    // Data
-    memcpy(req_info->req_msgbuf.buf + sizeof(erpc_appendentries_t),
-           m->entries[0].data.buf, m->entries[0].data.len);
+    assert(m->entries[i].data.len > 0);
+    memcpy(buf, m->entries[i].data.buf,
+           static_cast<size_t>(m->entries[i].data.len));
+    buf += static_cast<size_t>(m->entries[i].data.len);
   }
+  assert(buf ==
+         req_info->req_msgbuf.buf + req_info->req_msgbuf.get_data_size());
 
   size_t req_tag = reinterpret_cast<size_t>(req_info);
   int ret = c->rpc->enqueue_request(

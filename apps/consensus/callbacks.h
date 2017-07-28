@@ -76,7 +76,7 @@ void __raft_log(raft_server_t *, raft_node_t *, void *, const char *buf) {
   _unused(buf);
 
   if (kAppVerbose) {
-    //printf("raft: %s [%s].\n", buf, ERpc::get_formatted_time().c_str());
+    printf("raft: %s [%s].\n", buf, ERpc::get_formatted_time().c_str());
   }
 }
 
