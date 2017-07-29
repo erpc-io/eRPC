@@ -26,11 +26,13 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   uint8_t *buf = req_msgbuf->buf;
 
   auto *req = reinterpret_cast<erpc_appendentries_t *>(buf);
-  assert(req->ae.entries == nullptr);
-  req->ae.entries =
-      reinterpret_cast<msg_entry_t *>(buf + sizeof(erpc_appendentries_t));
 
-  bool is_keepalive = (req->ae.n_entries == 0);
+  // Copy over the appendentries message + copy buffers to malloc-ed memory
+  msg_appendentries_t ae = req->ae;
+  assert(ae.entries == nullptr);
+  size_t n_entries = static_cast<size_t>(ae.n_entries);
+
+  bool is_keepalive = (n_entries == 0);
   if (kAppVerbose) {
     printf("consensus: Received appendentries (%s) req from node %s [%s].\n",
            is_keepalive ? "keepalive" : "non-keepalive",
@@ -38,21 +40,25 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
            ERpc::get_formatted_time().c_str());
   }
 
-  // This does a linear search, which is OK for a small number of Raft servers
-  raft_node_t *requester_node = raft_get_node(c->server.raft, req->node_id);
-  assert(requester_node != nullptr);
-
   if (is_keepalive) {
     assert(req_msgbuf->get_data_size() == sizeof(erpc_appendentries_t));
   } else {
     buf += sizeof(erpc_appendentries_t);
+    ae.entries = new msg_entry_t[n_entries];  // Freed below
 
-    for (size_t i = 0; i < static_cast<size_t>(req->ae.n_entries); i++) {
-      auto *msg_entry = reinterpret_cast<msg_entry_t *>(buf);
-      assert(msg_entry->data.buf == nullptr);
+    // Invariant: buf points to a msg_entry_t, followed by its buffer
+    for (size_t i = 0; i < n_entries; i++) {
+      // Allocate dynamic memory for each appendentry
+      ae.entries[i] = *(reinterpret_cast<msg_entry_t *>(buf));
+      assert(ae.entries[i].data.buf == nullptr);
 
-      msg_entry->data.buf = buf + sizeof(msg_entry_t);
-      buf += sizeof(msg_entry_t) + msg_entry->data.len;
+      size_t data_len = ae.entries[i].data.len;
+      ae.entries[i].data.buf = malloc(data_len);
+      assert(ae.entries[i].data.buf != nullptr);
+
+      memcpy(ae.entries[i].data.buf, buf + sizeof(msg_entry_t), data_len);
+
+      buf += (sizeof(msg_entry_t) + data_len);
     }
 
     assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());
@@ -62,13 +68,20 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
                             sizeof(msg_appendentries_response_t));
   req_handle->prealloc_used = true;
 
+  // This does a linear search, which is OK for a small number of Raft servers
+  raft_node_t *requester_node = raft_get_node(c->server.raft, req->node_id);
+  assert(requester_node != nullptr);
+
+  // The appendentries request and response structs need to valid only for
+  // raft_recv_appendentries. The actual bufs in the appendentries request
+  // need to be long-lived.
   auto *mar = reinterpret_cast<msg_appendentries_response_t *>(
       req_handle->pre_resp_msgbuf.buf);
-  int e =
-      raft_recv_appendentries(c->server.raft, requester_node, &req->ae, mar);
+  int e = raft_recv_appendentries(c->server.raft, requester_node, &ae, mar);
   _unused(e);
   assert(e == 0);
 
+  if (ae.entries != nullptr) delete ae.entries;  // Only for non-keepalives
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -160,7 +173,6 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   return 0;
 }
 
-// Continuation for request vote RPC
 void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
                         size_t tag) {
   assert(resp_handle != nullptr && _context != nullptr);

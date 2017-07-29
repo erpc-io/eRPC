@@ -8,6 +8,7 @@ extern "C" {
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <deque>
 #include <set>
 
 #include "../apps_common.h"
@@ -97,7 +98,8 @@ struct req_info_t {
 struct client_req_info_t {
   ERpc::ReqHandle *req_handle;
   msg_entry_response_t *msg_entry_response;
-  unsigned int *ticket;
+  unsigned int *ticket_buf;  // Pointer to malloc-ed memory, not &ticket
+  unsigned int ticket;
 };
 
 // Context for both servers and clients
@@ -108,11 +110,11 @@ class AppContext {
   struct {
     int node_id = -1;  // This server's Raft node ID
     raft_server_t *raft = nullptr;
-    size_t raft_periodic_tsc;  // rdtsc timestamp
+    std::deque<raft_entry_t> raft_log;  // The Raft log
+    size_t raft_periodic_tsc;           // rdtsc timestamp
     std::vector<client_req_info_t> client_req_vec;
 
-    // Set of tickets that have been issued.
-    std::set<unsigned int> tickets;
+    std::set<unsigned int> tickets;  // Set of tickets issued
 
     // Stats
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req

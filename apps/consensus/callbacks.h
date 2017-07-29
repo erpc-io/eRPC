@@ -17,7 +17,11 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            int) {
   assert(udata != nullptr && ety != nullptr);
   assert(!raft_entry_is_cfg_change(ety));
-  assert(ety->data.len == sizeof(int));
+
+  // We're applying an entry to the application's state machine, so we're sure
+  // about its length. Other callbacks can be invoked for non-application log
+  // entries.
+  assert(ety->data.len == sizeof(unsigned int));
 
   auto *c = static_cast<AppContext *>(udata);
   assert(c->check_magic());
@@ -43,24 +47,49 @@ static int __raft_persist_term(raft_server_t *, void *, const int) {
 }
 
 // Raft callback for appending an item to the log
-static int __raft_logentry_offer(raft_server_t *, void *, raft_entry_t *ety,
-                                 int) {
+static int __raft_logentry_offer(raft_server_t *, void *udata,
+                                 raft_entry_t *ety, int) {
+  assert(udata != nullptr && ety != nullptr);
   _unused(ety);
   assert(!raft_entry_is_cfg_change(ety));
+
+  auto *c = static_cast<AppContext *>(udata);
+  assert(c->check_magic());
+
+  c->server.raft_log.push_back(*ety);
+
   return 0;  // Ignored
 }
 
 // Raft callback for deleting the most recent entry from the log. This happens
 // when an invalid leader finds a valid leader and has to delete superseded
 // log entries.
-static int __raft_logentry_pop(raft_server_t *, void *, raft_entry_t *, int) {
-  return 0;  // Ignored
+static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
+                               int) {
+  assert(udata != nullptr);
+  auto *c = static_cast<AppContext *>(udata);
+  assert(c->check_magic());
+
+  raft_entry_t &entry = c->server.raft_log.back();
+  if (entry.data.buf != nullptr) free(entry.data.buf);
+
+  c->server.raft_log.pop_back();
+  return 0;
 }
 
 // Raft callback for removing the first entry from the log. This is provided to
 // support log compaction in the future.
-static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *, int) {
-  return 0;  // Ignored
+static int __raft_logentry_poll(raft_server_t *, void *udata, raft_entry_t *,
+                                int) {
+  assert(udata != nullptr);
+  auto *c = static_cast<AppContext *>(udata);
+  assert(c->check_magic());
+
+  raft_entry_t &entry = c->server.raft_log.front();
+  if (entry.data.buf != nullptr) free(entry.data.buf);
+
+  c->server.raft_log.pop_front();
+  return 0;
 }
 
 // Non-voting node now has enough logs to be able to vote. Append a finalization

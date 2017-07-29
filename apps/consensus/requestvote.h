@@ -39,6 +39,8 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *_context) {
                             sizeof(msg_requestvote_response_t));
   req_handle->prealloc_used = true;
 
+  // req->rv is valid only for the duration of this handler, which is OK because
+  // msg_requestvote_t does not contain any dynamically allocated members.
   int e = raft_recv_requestvote(c->server.raft, requester_node, &req->rv,
                                 reinterpret_cast<msg_requestvote_response_t *>(
                                     req_handle->pre_resp_msgbuf.buf));
