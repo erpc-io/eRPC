@@ -4,9 +4,11 @@
 #include <cstring>
 #include "../apps_common.h"
 #include "rpc.h"
+#include "util/latency.h"
 #include "util/misc.h"
 
 static constexpr bool kAppVerbose = false;
+static constexpr size_t kAppMeasureLatency = false;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
@@ -51,37 +53,39 @@ union tag_t {
 
 static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
-/// Per-batch context
+// Per-batch context
 class BatchContext {
  public:
-  size_t num_reqs_sent = 0;   ///< Number of requests sent
-  size_t num_resps_rcvd = 0;  ///< Number of responses received
+  size_t num_reqs_sent = 0;          // Number of requests sent
+  size_t num_resps_rcvd = 0;         // Number of responses received
+  size_t req_tsc[kAppMaxBatchSize];  // Timestamp when request was issued
   ERpc::MsgBuffer req_msgbuf[kAppMaxBatchSize];
   ERpc::MsgBuffer resp_msgbuf[kAppMaxBatchSize];
 };
 
-/// Per-thread application context
+// Per-thread application context
 class AppContext {
  public:
   ERpc::TmpStat *tmp_stat = nullptr;
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
-
-  /// Number of slots in session_arr, including an unused one for this thread
-  size_t num_sessions;
-  int *session_arr = nullptr;  ///< Sessions created as client
-
-  /// The entry in session_arr for this thread, so we don't send reqs to ourself
-  size_t self_session_index;
-  size_t thread_id;         ///< The ID of the thread that owns this context
-  size_t num_sm_resps = 0;  ///< Number of SM responses
-  struct timespec tput_t0;  ///< Start time for throughput measurement
   ERpc::FastRand fastrand;
 
-  size_t stat_resp_rx[kMaxConcurrency] = {0};  ///< Resps received for batch i
-  size_t stat_resp_rx_tot = 0;  ///< Total responses received (all batches)
-  size_t stat_req_rx_tot = 0;   ///< Total requests received (all batches)
+  // Number of slots in session_arr, including an unused one for this thread
+  size_t num_sessions;
+  int *session_arr = nullptr;  // Sessions created as client
 
-  std::array<BatchContext, kMaxConcurrency> batch_arr;  ///< Per-batch context
+  // The entry in session_arr for this thread, so we don't send reqs to ourself
+  size_t self_session_index;
+  size_t thread_id;         // The ID of the thread that owns this context
+  size_t num_sm_resps = 0;  // Number of SM responses
+  struct timespec tput_t0;  // Start time for throughput measurement
+
+  size_t stat_resp_rx[kMaxConcurrency] = {0};  // Resps received for batch i
+  size_t stat_resp_rx_tot = 0;  // Total responses received (all batches)
+  size_t stat_req_rx_tot = 0;   // Total requests received (all batches)
+
+  std::array<BatchContext, kMaxConcurrency> batch_arr;  // Per-batch context
+  ERpc::Latency latency;  // Cold if latency measurement disabled
 
   ~AppContext() {
     if (tmp_stat != nullptr) delete tmp_stat;
@@ -89,7 +93,7 @@ class AppContext {
   }
 };
 
-/// A basic session management handler that expects successful responses
+// A basic session management handler that expects successful responses
 void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
                       ERpc::SmErrType sm_err_type, void *_context) {
   _unused(sm_event_type);
@@ -139,6 +143,8 @@ void send_reqs(AppContext *c, size_t batch_i) {
     }
 
     bc.req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;  // Touch req MsgBuffer
+
+    if (kAppMeasureLatency) bc.req_tsc[msgbuf_index] = ERpc::rdtsc();
     tag_t tag(batch_i, msgbuf_index);
     int ret = c->rpc->enqueue_request(c->session_arr[rand_session_index],
                                       kAppReqType, &bc.req_msgbuf[msgbuf_index],
@@ -194,6 +200,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   BatchContext &bc = c->batch_arr[tag.batch_i];
   bc.num_resps_rcvd++;
 
+  if (kAppMeasureLatency) {
+    size_t req_tsc = bc.req_tsc[tag.msgbuf_i];
+    double req_lat_us =
+        ERpc::to_usec(ERpc::rdtsc() - req_tsc, c->rpc->get_freq_ghz());
+    c->latency.update(static_cast<size_t>(req_lat_us * 10));
+  }
+
   if (bc.num_resps_rcvd == FLAGS_batch_size) {
     // If we have a full batch, reset batch progress and send more requests
     assert(bc.num_reqs_sent == FLAGS_batch_size);
@@ -244,10 +257,12 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     printf(
         "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
-        "Resps/concurrent batch: min %zu, max %zu. IPC = %.2f.\n",
+        "Resps/concurrent batch: min %zu, max %zu. IPC = %.2f. "
+        "Latency: %.2f us avg, %.2f us 99 perc.\n",
         c->thread_id, c->stat_resp_rx_tot / (seconds * 1000000),
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
-        c->stat_req_rx_tot, min_resps, max_resps, ipc);
+        c->stat_req_rx_tot, min_resps, max_resps, ipc, c->latency.avg() / 10.0,
+        c->latency.perc(.99) / 10.0);
 
     // Stats: throughput ipc
     c->tmp_stat->write(
@@ -257,6 +272,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->rpc->reset_dpath_stats_st();
     c->stat_resp_rx_tot = 0;
     c->stat_req_rx_tot = 0;
+    c->latency.reset();
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
@@ -264,7 +280,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->rpc->release_response(resp_handle);
 }
 
-/// The function executed by each thread in the cluster
+// The function executed by each thread in the cluster
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext c;
   c.tmp_stat = new ERpc::TmpStat("small_rpc_tput", "Mrps IPC");
