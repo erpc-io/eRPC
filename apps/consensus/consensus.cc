@@ -21,6 +21,24 @@ static unsigned int generate_ticket(AppContext *c) {
   return ticket;
 }
 
+// Send a ticket response. This does not free any app-allocated memory.
+void send_ticket_response(AppContext *c, ERpc::ReqHandle *req_handle,
+                          ticket_resp_t *ticket_resp) {
+  if (kAppVerbose) {
+    printf("consensus: Sending reply to client = %s.\n",
+           ticket_resp->to_string().c_str());
+  }
+
+  auto *_ticket_resp =
+      reinterpret_cast<ticket_resp_t *>(req_handle->pre_resp_msgbuf.buf);
+  *_ticket_resp = *ticket_resp;
+
+  c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                            sizeof(ticket_resp_t));
+  req_handle->prealloc_used = true;
+  c->rpc->enqueue_response(req_handle);
+}
+
 // appendentries request: node ID, msg_appendentries_t, [{size, buf}]
 void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
@@ -44,14 +62,14 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   leader_sav.req_handle = req_handle;
   leader_sav.msg_entry_response = new msg_entry_response_t();  // Free on commit
 
-  // Raft will free ticket_buf using a log callback
+  // Raft will free ticket_buf using a log callback, so we need C-style malloc
   leader_sav.ticket_buf =
       static_cast<unsigned int *>(malloc(sizeof(unsigned int)));
   *leader_sav.ticket_buf = ticket;
   leader_sav.ticket = ticket;  // We need a copy that Raft won't free
   c->server.leader_saveinfo_vec.push_back(leader_sav);
 
-  // Receive a log entry. msg_entry can be stack-resident, but not its buf
+  // Receive a log entry. msg_entry can be stack-resident, but not its buf.
   msg_entry_t entry;
   entry.id = c->fast_rand.next_u32();
   entry.data.buf = static_cast<void *>(leader_sav.ticket_buf);
@@ -59,8 +77,26 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   int e =
       raft_recv_entry(c->server.raft, &entry, leader_sav.msg_entry_response);
-  assert(e == 0);
-  _unused(e);
+  if (e == 0) return;
+
+  // Send a response with the error
+  ticket_resp_t err_resp;
+  switch (e) {
+    case RAFT_ERR_NOT_LEADER:
+      err_resp.resp_type = TicketRespType::kFailTryAgain;
+      break;
+    case RAFT_ERR_SHUTDOWN:
+      throw std::runtime_error("RAFT_ERR_SHUTDOWN not handled");
+    case RAFT_ERR_ONE_VOTING_CHANGE_ONLY:
+      err_resp.resp_type = TicketRespType::kFailTryAgain;
+      break;
+  }
+  send_ticket_response(c, req_handle, &err_resp);
+
+  // Clean up
+  delete leader_sav.msg_entry_response;
+  free(leader_sav.ticket_buf);
+  c->server.leader_saveinfo_vec.pop_back();
 }
 
 void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
@@ -172,21 +208,11 @@ int main(int argc, char **argv) {
       } else {
         // Committed: Send a response
         ERpc::ReqHandle *req_handle = leader_sav.req_handle;
-        c.rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                 sizeof(ticket_resp_t));
-        req_handle->prealloc_used = true;
+        ticket_resp_t ticket_resp;
+        ticket_resp.resp_type = TicketRespType::kSuccess;
+        ticket_resp.ticket = leader_sav.ticket;
 
-        auto *ticket_resp =
-            reinterpret_cast<ticket_resp_t *>(req_handle->pre_resp_msgbuf.buf);
-        ticket_resp->resp_type = TicketRespType::kSuccess;
-        ticket_resp->ticket = leader_sav.ticket;
-
-        if (kAppVerbose) {
-          printf("consensus: Replying to client with ticket = %u.\n",
-                 ticket_resp->ticket);
-        }
-
-        c.rpc->enqueue_response(req_handle);
+        send_ticket_response(&c, req_handle, &ticket_resp);
         delete leader_sav.msg_entry_response;
       }
     }
