@@ -38,8 +38,6 @@ DEFINE_validator(num_raft_servers, &validate_num_raft_servers);
 // Return true iff this machine is a Raft server (leader or follower)
 bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
 
-enum class HandshakeState { kHandshakeFailure, kHandshakeSuccess };
-
 /// The eRPC request types
 enum class ReqType : uint8_t {
   kRequestVote = 3,  // Raft requestvote RPC
@@ -47,55 +45,24 @@ enum class ReqType : uint8_t {
   kGetTicket         // Client-to-server Rpc
 };
 
-// Peer protocol handshake, sent after connecting so that peer can identify us
-struct msg_handshake_t {
-  int node_id;
-};
-
-struct msg_handshake_response_t {
-  int success;
-  // My Raft node ID. Sometimes we don't know who we did the handshake with.
-  int node_id;
-  char leader_host[kIPStrLen];
-};
-
-// Add/remove Raft peer
-struct entry_cfg_change_t {
-  int node_id;
-  char host[kIPStrLen];
-};
-
-struct msg_t {
-  int type;
-  union {
-    msg_handshake_t hs;
-    msg_handshake_response_t hsr;
-    msg_requestvote_t rv;
-    msg_requestvote_response_t rvr;
-    msg_appendentries_t ae;
-    msg_appendentries_response_t aer;
-  };
-  int padding[100];  // XXX: Why do we need this?
-};
-
 class AppContext;  // Forward declaration
 
-struct peer_connection_t {
+// Peer-peer or client-peer connection
+struct connection_t {
   int session_num = -1;  // ERpc session number
   size_t session_idx = std::numeric_limits<size_t>::max();  // Index in vector
-
   AppContext *c;  // Back link to AppContext
 };
 
-// Info about an eRPC request
-struct req_info_t {
+// Tag for requests sent to Raft peers
+struct raft_req_tag_t {
   ERpc::MsgBuffer req_msgbuf;
   ERpc::MsgBuffer resp_msgbuf;
   raft_node_t *node;  // The Raft node to which req was sent (for servers only)
 };
 
-// Info about a client request at leader
-struct client_req_info_t {
+// Info about a client request saved at a leader for the nested Rpc
+struct leader_saveinfo_t {
   ERpc::ReqHandle *req_handle;
   msg_entry_response_t *msg_entry_response;
   unsigned int *ticket_buf;  // Pointer to malloc-ed memory, not &ticket
@@ -112,7 +79,7 @@ class AppContext {
     raft_server_t *raft = nullptr;
     std::deque<raft_entry_t> raft_log;  // The Raft log
     size_t raft_periodic_tsc;           // rdtsc timestamp
-    std::vector<client_req_info_t> client_req_vec;
+    std::vector<leader_saveinfo_t> leader_saveinfo_vec;
 
     std::set<unsigned int> tickets;  // Set of tickets issued
 
@@ -129,7 +96,7 @@ class AppContext {
     ERpc::Latency latency;
   } client;
 
-  std::vector<peer_connection_t> conn_vec;
+  std::vector<connection_t> conn_vec;
 
   // ERpc-related members
   ERpc::Rpc<ERpc::IBTransport> *rpc;

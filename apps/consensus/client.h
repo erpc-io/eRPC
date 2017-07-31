@@ -9,45 +9,44 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-enum class ClientRespType : size_t { kSuccess, kFailLeaderChanged };
+// Tag for ticket request sent by a client
+struct ticket_req_tag_t {
+  ERpc::MsgBuffer req_msgbuf;
+  ERpc::MsgBuffer resp_msgbuf;
+};
 
-static std::string client_resp_type_str(ClientRespType resp_type) {
-  switch (resp_type) {
-    case ClientRespType::kSuccess:
-      return "success";
-    case ClientRespType::kFailLeaderChanged:
-      return "failed (leader changed)";
-  }
-  return "Invalid";
-}
+enum class TicketRespType : size_t {
+  kSuccess,
+  kFailLeaderChanged,
+  kFailTryAgain
+};
 
-struct erpc_client_req_t {
+// The ticket request message
+struct ticket_req_t {
   size_t thread_id;
 };
 
-struct erpc_client_resp_t {
-  ClientRespType resp_type;
+// The ticket response message
+struct ticket_resp_t {
+  TicketRespType resp_type;
   union {
     unsigned int ticket;
     size_t leader_idx;  // Leader's index in client's conn_vec
   };
+
+  std::string to_string() const {
+    switch (resp_type) {
+      case TicketRespType::kSuccess:
+        return "success, ticket = " + std::to_string(ticket);
+      case TicketRespType::kFailLeaderChanged:
+        return "failed (leader changed), leader = " +
+               std::to_string(leader_idx);
+      case TicketRespType::kFailTryAgain:
+        return "failed (try again)";
+    }
+    return "Invalid";
+  }
 };
-
-// Request tag, which doubles up as the request descriptor for the request queue
-union client_req_tag_t {
-  struct {
-    uint64_t session_idx : 32;  // Index into context's session_num array
-    uint64_t msgbuf_idx : 32;   // Index into context's req_msgbuf array
-  };
-
-  size_t _tag;
-
-  client_req_tag_t(uint64_t session_idx, uint64_t msgbuf_idx)
-      : session_idx(session_idx), msgbuf_idx(msgbuf_idx) {}
-  client_req_tag_t(size_t _tag) : _tag(_tag) {}
-  client_req_tag_t() : _tag(0) {}
-};
-static_assert(sizeof(client_req_tag_t) == sizeof(size_t), "");
 
 void client_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
 
@@ -55,17 +54,17 @@ void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
   c->client.req_tsc = ERpc::rdtsc();
 
-  auto *req_info = new req_info_t();  // XXX: Optimize with pool
-  req_info->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(erpc_client_req_t));
-  ERpc::rt_assert(req_info->req_msgbuf.buf != nullptr,
+  auto *ticket_req_tag = new ticket_req_tag_t();  // XXX: Optimize with pool
+  ticket_req_tag->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_req_t));
+  ERpc::rt_assert(ticket_req_tag->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
 
-  req_info->resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(erpc_client_resp_t));
-  ERpc::rt_assert(req_info->resp_msgbuf.buf != nullptr,
+  ticket_req_tag->resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_resp_t));
+  ERpc::rt_assert(ticket_req_tag->resp_msgbuf.buf != nullptr,
                   "Failed to allocate response MsgBuffer");
 
   auto *erpc_client_req =
-      reinterpret_cast<erpc_client_req_t *>(req_info->req_msgbuf.buf);
+      reinterpret_cast<ticket_req_t *>(ticket_req_tag->req_msgbuf.buf);
   erpc_client_req->thread_id = c->client.thread_id;
 
   if (kAppVerbose) {
@@ -73,11 +72,11 @@ void send_req_one(AppContext *c) {
            c->client.leader_idx, ERpc::get_formatted_time().c_str());
   }
 
-  size_t req_tag = reinterpret_cast<size_t>(req_info);
-  peer_connection_t &conn = c->conn_vec[c->client.leader_idx];
+  connection_t &conn = c->conn_vec[c->client.leader_idx];
   int ret = c->rpc->enqueue_request(
       conn.session_num, static_cast<uint8_t>(ReqType::kGetTicket),
-      &req_info->req_msgbuf, &req_info->resp_msgbuf, client_cont, req_tag);
+      &ticket_req_tag->req_msgbuf, &ticket_req_tag->resp_msgbuf, client_cont,
+      reinterpret_cast<size_t>(ticket_req_tag));
   assert(ret == 0);
   _unused(ret);
 }
@@ -88,8 +87,8 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   assert(c->check_magic());
 
   // Measure latency
-  double us = ERpc::to_usec(ERpc::rdtsc() - c->client.req_tsc,
-                             c->rpc->get_freq_ghz());
+  double us =
+      ERpc::to_usec(ERpc::rdtsc() - c->client.req_tsc, c->rpc->get_freq_ghz());
   c->client.latency.update(static_cast<size_t>(us));
   c->client.num_resps++;
 
@@ -100,30 +99,27 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
     c->client.latency.reset();
   }
 
-  auto *req_info = reinterpret_cast<req_info_t *>(tag);
-  assert(req_info->resp_msgbuf.get_data_size() == sizeof(erpc_client_resp_t));
+  auto *ticket_req_tag = reinterpret_cast<ticket_req_tag_t *>(tag);
+  assert(ticket_req_tag->resp_msgbuf.get_data_size() == sizeof(ticket_resp_t));
 
   auto *client_resp =
-      reinterpret_cast<erpc_client_resp_t *>(req_info->resp_msgbuf.buf);
+      reinterpret_cast<ticket_resp_t *>(ticket_req_tag->resp_msgbuf.buf);
 
   if (kAppVerbose) {
-    printf("consensus: Client received resp. Type = %s, ticket = %s [%s].\n",
-           client_resp_type_str(client_resp->resp_type).c_str(),
-           client_resp->resp_type == ClientRespType::kSuccess
-               ? std::to_string(client_resp->ticket).c_str()
-               : "invalid",
+    printf("consensus: Client received resp %s [%s].\n",
+           client_resp->to_string().c_str(),
            ERpc::get_formatted_time().c_str());
   }
 
-  if (client_resp->resp_type == ClientRespType::kFailLeaderChanged) {
+  if (client_resp->resp_type == TicketRespType::kFailLeaderChanged) {
     printf("consensus: Client changing leader to index %zu.\n",
            client_resp->leader_idx);
     c->client.leader_idx = client_resp->leader_idx;
   }
 
-  c->rpc->free_msg_buffer(req_info->req_msgbuf);
-  c->rpc->free_msg_buffer(req_info->resp_msgbuf);
-  delete req_info;  // Free allocated memory, XXX: Remove when we use pool
+  c->rpc->free_msg_buffer(ticket_req_tag->req_msgbuf);
+  c->rpc->free_msg_buffer(ticket_req_tag->resp_msgbuf);
+  delete ticket_req_tag;  // Free allocated memory, XXX: Remove when we use pool
 
   c->rpc->release_response(resp_handle);
 
