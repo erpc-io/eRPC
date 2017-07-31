@@ -83,6 +83,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   ticket_resp_t err_resp;
   switch (e) {
     case RAFT_ERR_NOT_LEADER:
+      // XXX: Redirect to leader
       err_resp.resp_type = TicketRespType::kFailTryAgain;
       break;
     case RAFT_ERR_SHUTDOWN:
@@ -114,6 +115,8 @@ void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
 }
 
 int main(int argc, char **argv) {
+  signal(SIGINT, ctrl_c_handler);
+
   // Work around g++-5's unused variable warning for validators
   _unused(num_raft_servers_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -220,5 +223,6 @@ int main(int argc, char **argv) {
     c.server.leader_saveinfo_vec.resize(write_index);
   }
 
+  printf("consensus: Exiting.\n");
   delete c.rpc;
 }
