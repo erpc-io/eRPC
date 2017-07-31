@@ -71,6 +71,45 @@ struct leader_saveinfo_t {
   size_t recv_entry_tsc;  // Timestamp taken when client request is received
 };
 
+enum class TimeEntryType {
+  kTicketReq,
+  kSendAppendentries,
+  kAppendentriesResp,
+  kCommitted
+};
+
+class TimeEntry {
+ public:
+  TimeEntryType time_entry_type;
+  double usec_since_creation;
+
+  TimeEntry() {}
+  TimeEntry(TimeEntryType t, double us)
+      : time_entry_type(t), usec_since_creation(us) {}
+
+  std::string to_string() const {
+    std::string ret;
+
+    switch (time_entry_type) {
+      case TimeEntryType::kTicketReq:
+        ret = "ticket_req";
+        break;
+      case TimeEntryType::kSendAppendentries:
+        ret = "send_appendentries";
+        break;
+      case TimeEntryType::kAppendentriesResp:
+        ret = "appendentries_resp";
+        break;
+      case TimeEntryType::kCommitted:
+        ret = "committed";
+        break;
+    }
+
+    ret += ": " + std::to_string(usec_since_creation);
+    return ret;
+  }
+};
+
 // Context for both servers and clients
 class AppContext {
  public:
@@ -82,6 +121,7 @@ class AppContext {
     std::deque<raft_entry_t> raft_log;  // The Raft log
     size_t raft_periodic_tsc;           // rdtsc timestamp
     std::vector<leader_saveinfo_t> leader_saveinfo_vec;
+    std::vector<TimeEntry> time_entry_vec;
 
     std::set<unsigned int> tickets;       // Set of tickets issued
     ERpc::Latency commit_latency;         // Leader latency to commit an entry

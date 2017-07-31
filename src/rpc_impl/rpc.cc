@@ -121,4 +121,9 @@ double Rpc<TTr>::sec_since_creation() {
   return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
 }
 
+template <class TTr>
+double Rpc<TTr>::usec_since_creation() {
+  return to_usec(rdtsc() - creation_tsc, nexus->freq_ghz);
+}
+
 }  // End ERpc

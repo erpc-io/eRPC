@@ -98,6 +98,8 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
   AppContext *c = conn->c;
   assert(c->check_magic());
+  c->server.time_entry_vec.push_back(TimeEntry(
+      TimeEntryType::kSendAppendentries, c->rpc->usec_since_creation()));
 
   bool is_keepalive = m->n_entries == 0;
   if (kAppVerbose) {
@@ -179,6 +181,9 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
   assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
+
+  c->server.time_entry_vec.push_back(TimeEntry(
+      TimeEntryType::kAppendentriesResp, c->rpc->usec_since_creation()));
 
   auto *raft_req_tag = reinterpret_cast<raft_req_tag_t *>(tag);
   assert(raft_req_tag->resp_msgbuf.get_data_size() ==

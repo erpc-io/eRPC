@@ -701,8 +701,11 @@ class Rpc {
   /// Return RDTSC frequency in GHz
   inline double get_freq_ghz() const { return nexus->freq_ghz; }
 
-  /// Return the number of milliseconds elapsed since this Rpc was created
+  /// Return the number of seconds elapsed since this Rpc was created
   double sec_since_creation();
+
+  /// Return the number of microseconds elapsed since this Rpc was created
+  double usec_since_creation();
 
   //
   // Misc private functions

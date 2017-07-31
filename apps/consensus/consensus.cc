@@ -45,6 +45,8 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
+  c->server.time_entry_vec.push_back(
+      TimeEntry(TimeEntryType::kTicketReq, c->rpc->usec_since_creation()));
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(ticket_req_t));
@@ -139,14 +141,14 @@ int main(int argc, char **argv) {
     client_thread.join();
     return 0;
   }
-
-  assert(is_raft_server());  // Handler clients before this point; pass them c
+  assert(is_raft_server());  // Handle client before this point
 
   // Initialize Raft at servers. This must be done before running the eRPC event
   // loop, including running it for session management.
-  c.server.raft_periodic_tsc = ERpc::rdtsc();
   c.server.raft = raft_new();
   assert(c.server.raft != nullptr);
+  c.server.time_entry_vec.reserve(1000000);
+  c.server.raft_periodic_tsc = ERpc::rdtsc();
 
   set_raft_callbacks(&c);
 
@@ -228,6 +230,9 @@ int main(int argc, char **argv) {
         write_index++;
       } else {
         // Committed: Send a response
+        c.server.time_entry_vec.push_back(
+            TimeEntry(TimeEntryType::kCommitted, c.rpc->usec_since_creation()));
+
         ERpc::ReqHandle *req_handle = leader_sav.req_handle;
         double commit_latency = ERpc::to_usec(
             ERpc::rdtsc() - leader_sav.recv_entry_tsc, c.rpc->get_freq_ghz());
@@ -243,6 +248,14 @@ int main(int argc, char **argv) {
     }
 
     c.server.leader_saveinfo_vec.resize(write_index);
+  }
+
+  printf("consensus: Printing first 1000 of %zu time entries.\n",
+         c.server.time_entry_vec.size());
+
+  for (size_t i = 0; i < 1000; i++) {
+    printf("%s\n", c.server.time_entry_vec[i].to_string().c_str());
+    if (i + 1 == c.server.time_entry_vec.size()) break;
   }
 
   printf("consensus: Exiting.\n");
