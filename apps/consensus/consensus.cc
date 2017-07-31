@@ -25,8 +25,9 @@ static unsigned int generate_ticket(AppContext *c) {
 void send_ticket_response(AppContext *c, ERpc::ReqHandle *req_handle,
                           ticket_resp_t *ticket_resp) {
   if (kAppVerbose) {
-    printf("consensus: Sending reply to client = %s.\n",
-           ticket_resp->to_string().c_str());
+    printf("consensus: Sending reply to client: %s [%s].\n",
+           ticket_resp->to_string().c_str(),
+           ERpc::get_formatted_time().c_str());
   }
 
   auto *_ticket_resp =
@@ -67,6 +68,8 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
       static_cast<unsigned int *>(malloc(sizeof(unsigned int)));
   *leader_sav.ticket_buf = ticket;
   leader_sav.ticket = ticket;  // We need a copy that Raft won't free
+  leader_sav.recv_entry_tsc = ERpc::rdtsc();
+
   c->server.leader_saveinfo_vec.push_back(leader_sav);
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
@@ -194,7 +197,17 @@ int main(int argc, char **argv) {
 
   if (FLAGS_machine_id == 0) raft_become_leader(c.server.raft);
 
+  size_t loop_tsc = ERpc::rdtsc();
   while (ctrl_c_pressed == 0) {
+    if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
+      ERpc::Latency &latency = c.server.commit_latency;
+      printf("consensus: commit latency = %.2f us avg, %.2f us 99 perc.\n",
+             latency.avg() / 10.0, latency.perc(.99) / 10.0);
+
+      loop_tsc = ERpc::rdtsc();
+      c.server.commit_latency.reset();
+    }
+
     call_raft_periodic(&c);
     c.rpc->run_event_loop(0);  // Run once
 
@@ -211,11 +224,15 @@ int main(int argc, char **argv) {
       } else {
         // Committed: Send a response
         ERpc::ReqHandle *req_handle = leader_sav.req_handle;
+        double commit_latency = ERpc::to_usec(
+            ERpc::rdtsc() - leader_sav.recv_entry_tsc, c.rpc->get_freq_ghz());
+        c.server.commit_latency.update(commit_latency * 10);
+
         ticket_resp_t ticket_resp;
         ticket_resp.resp_type = TicketRespType::kSuccess;
         ticket_resp.ticket = leader_sav.ticket;
 
-        send_ticket_response(&c, req_handle, &ticket_resp);
+        send_ticket_response(&c, req_handle, &ticket_resp);  // Prints message
         delete leader_sav.msg_entry_response;
       }
     }

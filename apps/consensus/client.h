@@ -4,7 +4,6 @@
  */
 
 #include "consensus.h"
-#include "util/latency.h"
 
 #ifndef CLIENT_H
 #define CLIENT_H
@@ -89,14 +88,14 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   // Measure latency
   double us =
       ERpc::to_usec(ERpc::rdtsc() - c->client.req_tsc, c->rpc->get_freq_ghz());
-  c->client.latency.update(static_cast<size_t>(us));
+  c->client.req_latency.update(static_cast<size_t>(us));
   c->client.num_resps++;
 
   if (c->client.num_resps == 1000) {
     printf("consensus: Client latency = %.2f us avg, %zu 99 perc.\n",
-           c->client.latency.avg(), c->client.latency.perc(.99));
+           c->client.req_latency.avg(), c->client.req_latency.perc(.99));
     c->client.num_resps = 0;
-    c->client.latency.reset();
+    c->client.req_latency.reset();
   }
 
   auto *ticket_req_tag = reinterpret_cast<ticket_req_tag_t *>(tag);

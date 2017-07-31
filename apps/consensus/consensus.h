@@ -67,6 +67,7 @@ struct leader_saveinfo_t {
   msg_entry_response_t *msg_entry_response;
   unsigned int *ticket_buf;  // Pointer to malloc-ed memory, not &ticket
   unsigned int ticket;
+  size_t recv_entry_tsc;  // Timestamp taken when client request is received
 };
 
 // Context for both servers and clients
@@ -82,6 +83,7 @@ class AppContext {
     std::vector<leader_saveinfo_t> leader_saveinfo_vec;
 
     std::set<unsigned int> tickets;  // Set of tickets issued
+    ERpc::Latency commit_latency;    // Leader latency to commit to peers
 
     // Stats
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
@@ -93,7 +95,7 @@ class AppContext {
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
     size_t req_tsc;     // Request issue time
     size_t num_resps = 0;
-    ERpc::Latency latency;
+    ERpc::Latency req_latency;  // Request latency observed by client
   } client;
 
   std::vector<connection_t> conn_vec;
