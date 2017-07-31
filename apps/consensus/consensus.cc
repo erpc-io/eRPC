@@ -252,10 +252,9 @@ int main(int argc, char **argv) {
 
   printf("consensus: Printing first 1000 of %zu time entries.\n",
          c.server.time_entry_vec.size());
-
-  for (size_t i = 0; i < 1000; i++) {
+  size_t entries = std::min(c.server.time_entry_vec.size(), 1000ul);
+  for (size_t i = 0; i < entries; i++) {
     printf("%s\n", c.server.time_entry_vec[i].to_string().c_str());
-    if (i + 1 == c.server.time_entry_vec.size()) break;
   }
 
   printf("consensus: Exiting.\n");
