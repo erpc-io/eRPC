@@ -134,6 +134,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
                   "Failed to allocate response MsgBuffer");
 
   raft_req_tag->node = node;
+  raft_req_tag->req_tsc = ERpc::rdtsc();
 
   // Fill in the appendentries request header
   auto *erpc_appendentries =
@@ -182,6 +183,10 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
   auto *raft_req_tag = reinterpret_cast<raft_req_tag_t *>(tag);
   assert(raft_req_tag->resp_msgbuf.get_data_size() ==
          sizeof(msg_appendentries_response_t));
+
+  double req_us = ERpc::to_usec(ERpc::rdtsc() - raft_req_tag->req_tsc,
+                                c->rpc->get_freq_ghz());
+  c->server.appendentries_latency.update(req_us * 10);
 
   if (kAppVerbose) {
     printf("consensus: Received appendentries response from node %s [%s].\n",

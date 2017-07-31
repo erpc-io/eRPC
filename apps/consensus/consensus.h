@@ -59,6 +59,7 @@ struct raft_req_tag_t {
   ERpc::MsgBuffer req_msgbuf;
   ERpc::MsgBuffer resp_msgbuf;
   raft_node_t *node;  // The Raft node to which req was sent (for servers only)
+  size_t req_tsc;     // Timestamp taken when the peer request was sent
 };
 
 // Info about a client request saved at a leader for the nested Rpc
@@ -82,8 +83,9 @@ class AppContext {
     size_t raft_periodic_tsc;           // rdtsc timestamp
     std::vector<leader_saveinfo_t> leader_saveinfo_vec;
 
-    std::set<unsigned int> tickets;  // Set of tickets issued
-    ERpc::Latency commit_latency;    // Leader latency to commit to peers
+    std::set<unsigned int> tickets;       // Set of tickets issued
+    ERpc::Latency commit_latency;         // Leader latency to commit an entry
+    ERpc::Latency appendentries_latency;  // Latency of appendentries requests
 
     // Stats
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req

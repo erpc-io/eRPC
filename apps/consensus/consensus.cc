@@ -200,12 +200,17 @@ int main(int argc, char **argv) {
   size_t loop_tsc = ERpc::rdtsc();
   while (ctrl_c_pressed == 0) {
     if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
-      ERpc::Latency &latency = c.server.commit_latency;
-      printf("consensus: commit latency = %.2f us avg, %.2f us 99 perc.\n",
-             latency.avg() / 10.0, latency.perc(.99) / 10.0);
+      ERpc::Latency &commit_latency = c.server.commit_latency;
+      ERpc::Latency &ae_latency = c.server.appendentries_latency;
+      printf(
+          "consensus: leader commit latency = %.2f us avg, %.2f us 99 perc. "
+          "appendentries request latency = %.2f us avg, %.2f us 99 perc.\n",
+          commit_latency.avg() / 10.0, commit_latency.perc(.99) / 10.0,
+          ae_latency.avg() / 10.0, ae_latency.perc(.99) / 10.0);
 
       loop_tsc = ERpc::rdtsc();
-      c.server.commit_latency.reset();
+      commit_latency.reset();
+      ae_latency.reset();
     }
 
     call_raft_periodic(&c);
