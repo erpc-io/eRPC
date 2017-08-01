@@ -8,12 +8,6 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-// Tag for ticket request sent by a client
-struct ticket_req_tag_t {
-  ERpc::MsgBuffer req_msgbuf;
-  ERpc::MsgBuffer resp_msgbuf;
-};
-
 enum class TicketRespType : size_t {
   kSuccess,
   kFailLeaderChanged,
@@ -53,17 +47,8 @@ void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
   c->client.req_tsc = ERpc::rdtsc();
 
-  auto *ticket_req_tag = new ticket_req_tag_t();  // XXX: Optimize with pool
-  ticket_req_tag->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_req_t));
-  ERpc::rt_assert(ticket_req_tag->req_msgbuf.buf != nullptr,
-                  "Failed to allocate request MsgBuffer");
-
-  ticket_req_tag->resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_resp_t));
-  ERpc::rt_assert(ticket_req_tag->resp_msgbuf.buf != nullptr,
-                  "Failed to allocate response MsgBuffer");
-
   auto *erpc_client_req =
-      reinterpret_cast<ticket_req_t *>(ticket_req_tag->req_msgbuf.buf);
+      reinterpret_cast<ticket_req_t *>(c->client.req_msgbuf.buf);
   erpc_client_req->thread_id = c->client.thread_id;
 
   if (kAppVerbose) {
@@ -74,13 +59,12 @@ void send_req_one(AppContext *c) {
   connection_t &conn = c->conn_vec[c->client.leader_idx];
   int ret = c->rpc->enqueue_request(
       conn.session_num, static_cast<uint8_t>(ReqType::kGetTicket),
-      &ticket_req_tag->req_msgbuf, &ticket_req_tag->resp_msgbuf, client_cont,
-      reinterpret_cast<size_t>(ticket_req_tag));
+      &c->client.req_msgbuf, &c->client.resp_msgbuf, client_cont, 0);  // 0 tag
   assert(ret == 0);
   _unused(ret);
 }
 
-void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
+void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
@@ -100,11 +84,8 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
     c->client.req_latency.reset();
   }
 
-  auto *ticket_req_tag = reinterpret_cast<ticket_req_tag_t *>(tag);
-  assert(ticket_req_tag->resp_msgbuf.get_data_size() == sizeof(ticket_resp_t));
-
   auto *client_resp =
-      reinterpret_cast<ticket_resp_t *>(ticket_req_tag->resp_msgbuf.buf);
+      reinterpret_cast<ticket_resp_t *>(c->client.resp_msgbuf.buf);
 
   if (kAppVerbose) {
     printf("consensus: Client received resp %s [%s].\n",
@@ -117,10 +98,6 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
            client_resp->leader_idx);
     c->client.leader_idx = client_resp->leader_idx;
   }
-
-  c->rpc->free_msg_buffer(ticket_req_tag->req_msgbuf);
-  c->rpc->free_msg_buffer(ticket_req_tag->resp_msgbuf);
-  delete ticket_req_tag;  // Free allocated memory, XXX: Remove when we use pool
 
   c->rpc->release_response(resp_handle);
 
@@ -140,6 +117,13 @@ void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
       nexus, static_cast<void *>(c), static_cast<uint8_t>(thread_id),
       sm_handler, kAppPhyPort, kAppNumaNode);
   c->rpc->retry_connect_on_invalid_rpc_id = true;
+
+  // Pre-allocate MsgBuffers
+  c->client.req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_req_t));
+  assert(c->client.req_msgbuf.buf != nullptr);
+
+  c->client.resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_resp_t));
+  assert(c->client.resp_msgbuf.buf != nullptr);
 
   // Raft client: Create session to each Raft server
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {

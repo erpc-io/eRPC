@@ -86,7 +86,7 @@ class ExecutionTimer {
   }
 };
 
-// Comments descrive the common-case usage
+// Comments describe the common-case usage
 enum class TimeEntryType {
   kTicketReq,   // Ticket request received by leader
   kSendAeReq,   // Leader sends appendentry request
@@ -161,6 +161,8 @@ class AppContext {
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
     size_t req_tsc;     // Request issue time
     size_t num_resps = 0;
+    ERpc::MsgBuffer req_msgbuf;
+    ERpc::MsgBuffer resp_msgbuf;
     ERpc::Latency req_latency;  // Request latency observed by client
   } client;
 
