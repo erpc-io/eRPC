@@ -208,8 +208,8 @@ int main(int argc, char **argv) {
       ERpc::Latency &commit_latency = c.server.commit_latency;
       ERpc::Latency &ae_latency = c.server.appendentries_latency;
       printf(
-          "consensus: leader commit latency = {%.2f, %.2f, %2f} us "
-          "appendentries request latency = {%.2f, %.2f, %.2f} us 99 perc.\n",
+          "consensus: leader commit latency = {%.2f, %.2f, %2f} us. "
+          "appendentries request latency = {%.2f, %.2f, %.2f} us.\n",
           commit_latency.perc(.10) / 10.0, commit_latency.avg() / 10.0,
           commit_latency.perc(.99) / 10.0, ae_latency.perc(.10) / 10.0,
           ae_latency.avg() / 10.0, ae_latency.perc(.99) / 10.0);
