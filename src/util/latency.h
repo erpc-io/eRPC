@@ -1,20 +1,25 @@
 /**
  * @file latency.h
- * @brief Fast but approximate latency distribution measurement for latency
- * values up to 4000 microseconds (i.e., 4 ms). Adding a latency sample is
- * fast, but computing a statistic is slow.
- * @author MICA authors
+ * @author MICA authors, akalia
  */
 
 #ifndef LATENCY_H
 #define LATENCY_H
 
+#include <assert.h>
 #include <inttypes.h>
 #include <string.h>
 #include <algorithm>
 #include <cstdio>
+#include "util/timer.h"
 
 namespace ERpc {
+
+/*
+ * @brief Fast but approximate latency distribution measurement for latency
+ * values up to 4000 microseconds (i.e., 4 ms). Adding a latency sample is
+ * fast, but computing a statistic is slow.
+ */
 class Latency {
  public:
   Latency() { reset(); }
@@ -167,6 +172,43 @@ class Latency {
   // [3968, inf) us
   size_t bin5_;
 };
+
+/// Average latency measurement class using TSC timestamps
+class TscLatency {
+ public:
+  double freq_ghz = -1.0;  // Nominal TSC frequency
+  size_t stopwatch_start_cycles = 0;
+  size_t total_cycles = 0;
+  size_t num_samples = 0;
+  bool started = false;  // Debug-only
+
+  TscLatency(double freq_ghz) : freq_ghz(freq_ghz) {}
+  TscLatency() {}
+
+  void stopwatch_start() {
+    assert(!started);
+    started = true;
+    stopwatch_start_cycles = ERpc::rdtsc();
+  }
+
+  void stopwatch_stop() {
+    assert(started);
+    started = false;
+    total_cycles += ERpc::rdtsc() - stopwatch_start_cycles;
+    num_samples++;
+  }
+
+  void reset() {
+    total_cycles = 0;
+    num_samples = 0;
+  }
+
+  double get_avg_us() {
+    size_t avg_cycles = total_cycles / num_samples;
+    return ERpc::to_usec(avg_cycles, freq_ghz);
+  }
+};
+
 }
 
 #endif
