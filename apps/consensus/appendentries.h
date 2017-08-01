@@ -21,8 +21,11 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
-  c->server.time_entry_vec.push_back(
-      TimeEntry(TimeEntryType::kRecvAeReq, c->rpc->usec_since_creation()));
+
+  if (kAppCollectTimeEntries) {
+    c->server.time_entry_vec.push_back(
+        TimeEntry(TimeEntryType::kRecvAeReq, ERpc::rdtsc()));
+  }
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   uint8_t *buf = req_msgbuf->buf;
@@ -86,8 +89,10 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   if (ae.entries != nullptr) delete ae.entries;  // Only for non-keepalives
 
-  c->server.time_entry_vec.push_back(
-      TimeEntry(TimeEntryType::kSendAeResp, c->rpc->usec_since_creation()));
+  if (kAppCollectTimeEntries) {
+    c->server.time_entry_vec.push_back(
+        TimeEntry(TimeEntryType::kSendAeResp, ERpc::rdtsc()));
+  }
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -166,8 +171,11 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
              raft_req_tag->req_msgbuf.get_data_size());
 
   raft_req_tag->req_tsc = ERpc::rdtsc();
-  c->server.time_entry_vec.push_back(
-      TimeEntry(TimeEntryType::kSendAeReq, c->rpc->usec_since_creation()));
+
+  if (kAppCollectTimeEntries) {
+    c->server.time_entry_vec.push_back(
+        TimeEntry(TimeEntryType::kSendAeReq, ERpc::rdtsc()));
+  }
 
   int ret = c->rpc->enqueue_request(
       conn->session_num, static_cast<uint8_t>(ReqType::kAppendEntries),
@@ -188,8 +196,10 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  c->server.time_entry_vec.push_back(
-      TimeEntry(TimeEntryType::kRecvAeResp, c->rpc->usec_since_creation()));
+  if (kAppCollectTimeEntries) {
+    c->server.time_entry_vec.push_back(
+        TimeEntry(TimeEntryType::kRecvAeResp, ERpc::rdtsc()));
+  }
 
   auto *raft_req_tag = reinterpret_cast<raft_req_tag_t *>(tag);
   assert(raft_req_tag->resp_msgbuf.get_data_size() ==

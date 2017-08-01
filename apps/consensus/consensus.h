@@ -16,12 +16,12 @@ extern "C" {
 #include "rpc.h"
 #include "util/latency.h"
 
+static constexpr bool kAppCollectTimeEntries = false;
 static constexpr bool kAppVerbose = false;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
-static constexpr size_t kRaftBuflen = 512;
 static constexpr size_t kIPStrLen = 12;
 static constexpr size_t kClientMaxConcurrency = 32;
 
@@ -71,15 +71,6 @@ struct leader_saveinfo_t {
   size_t recv_entry_tsc;  // Timestamp taken when client request is received
 };
 
-enum class TimeEntryType {
-  kTicketReq,
-  kSendAeReq,
-  kRecvAeReq,
-  kSendAeResp,
-  kRecvAeResp,
-  kCommitted
-};
-
 // Helper class to measure cycles used by a function
 class ExecutionTimer {
  public:
@@ -95,16 +86,25 @@ class ExecutionTimer {
   }
 };
 
+// Comments descrive the common-case usage
+enum class TimeEntryType {
+  kTicketReq,   // Ticket request received by leader
+  kSendAeReq,   // Leader sends appendentry request
+  kRecvAeReq,   // Follower receives appendentry request
+  kSendAeResp,  // Follower sends appendentry response
+  kRecvAeResp,  // Leader receives appendentry response
+  kCommitted    // Entry committed at leader
+};
+
 class TimeEntry {
  public:
   TimeEntryType time_entry_type;
-  double usec_since_creation;
+  size_t tsc;
 
   TimeEntry() {}
-  TimeEntry(TimeEntryType t, double us)
-      : time_entry_type(t), usec_since_creation(us) {}
+  TimeEntry(TimeEntryType t, size_t tsc) : time_entry_type(t), tsc(tsc) {}
 
-  std::string to_string() const {
+  std::string to_string(size_t base_tsc, double freq_ghz) const {
     std::string ret;
 
     switch (time_entry_type) {
@@ -128,7 +128,8 @@ class TimeEntry {
         break;
     }
 
-    ret += ": " + std::to_string(usec_since_creation);
+    double usec = ERpc::to_usec(tsc - base_tsc, freq_ghz);
+    ret += ": " + std::to_string(usec);
     return ret;
   }
 };

@@ -45,8 +45,11 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
-  c->server.time_entry_vec.push_back(
-      TimeEntry(TimeEntryType::kTicketReq, c->rpc->usec_since_creation()));
+
+  if (kAppCollectTimeEntries) {
+    c->server.time_entry_vec.push_back(
+        TimeEntry(TimeEntryType::kTicketReq, ERpc::rdtsc()));
+  }
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(ticket_req_t));
@@ -231,8 +234,10 @@ int main(int argc, char **argv) {
         write_index++;
       } else {
         // Committed: Send a response
-        c.server.time_entry_vec.push_back(
-            TimeEntry(TimeEntryType::kCommitted, c.rpc->usec_since_creation()));
+        if (kAppCollectTimeEntries) {
+          c.server.time_entry_vec.push_back(
+              TimeEntry(TimeEntryType::kCommitted, ERpc::rdtsc()));
+        }
 
         ERpc::ReqHandle *req_handle = leader_sav.req_handle;
         double commit_latency = ERpc::to_usec(
@@ -251,11 +256,18 @@ int main(int argc, char **argv) {
     c.server.leader_saveinfo_vec.resize(write_index);
   }
 
+  // This is OK even when kAppCollectTimeEntries = false
   printf("consensus: Printing first 1000 of %zu time entries.\n",
          c.server.time_entry_vec.size());
-  size_t entries = std::min(c.server.time_entry_vec.size(), 1000ul);
-  for (size_t i = 0; i < entries; i++) {
-    printf("%s\n", c.server.time_entry_vec[i].to_string().c_str());
+  size_t num_print = std::min(c.server.time_entry_vec.size(), 1000ul);
+
+  if (num_print > 0) {
+    size_t base_tsc = c.server.time_entry_vec[0].tsc;
+    double freq_ghz = c.rpc->get_freq_ghz();
+    for (size_t i = 0; i < num_print; i++) {
+      printf("%s\n",
+             c.server.time_entry_vec[i].to_string(base_tsc, freq_ghz).c_str());
+    }
   }
 
   printf("consensus: Exiting.\n");
