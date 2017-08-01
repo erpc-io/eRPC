@@ -73,9 +73,26 @@ struct leader_saveinfo_t {
 
 enum class TimeEntryType {
   kTicketReq,
-  kSendAppendentries,
-  kAppendentriesResp,
+  kSendAeReq,
+  kRecvAeReq,
+  kSendAeResp,
+  kRecvAeResp,
   kCommitted
+};
+
+// Helper class to measure cycles used by a function
+class ExecutionTimer {
+ public:
+  size_t start;
+  size_t total_cycles;
+  size_t num_samples;
+
+  double avg() const { return total_cycles / (num_samples * 1.0); }
+
+  void reset() {
+    total_cycles = 0;
+    num_samples = 0;
+  }
 };
 
 class TimeEntry {
@@ -94,11 +111,17 @@ class TimeEntry {
       case TimeEntryType::kTicketReq:
         ret = "ticket_req";
         break;
-      case TimeEntryType::kSendAppendentries:
-        ret = "send_appendentries";
+      case TimeEntryType::kSendAeReq:
+        ret = "send_appendentries_req";
         break;
-      case TimeEntryType::kAppendentriesResp:
-        ret = "appendentries_resp";
+      case TimeEntryType::kRecvAeReq:
+        ret = "recv_appendentries_req";
+        break;
+      case TimeEntryType::kSendAeResp:
+        ret = "send_appendentries_resp";
+        break;
+      case TimeEntryType::kRecvAeResp:
+        ret = "recv_appendentries_resp";
         break;
       case TimeEntryType::kCommitted:
         ret = "committed";
@@ -207,7 +230,7 @@ inline void call_raft_periodic(AppContext *c) {
   double msec_since_last_nonzero = ERpc::to_msec(
       cur_tsc - c->server.raft_periodic_tsc, c->rpc->get_freq_ghz());
 
-  if (msec_since_last_nonzero < 1.0) {
+  if (msec_since_last_nonzero < .1) {
     raft_periodic(c->server.raft, 0);
   } else {
     c->server.raft_periodic_tsc = cur_tsc;

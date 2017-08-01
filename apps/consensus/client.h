@@ -88,12 +88,14 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t tag) {
   // Measure latency
   double us =
       ERpc::to_usec(ERpc::rdtsc() - c->client.req_tsc, c->rpc->get_freq_ghz());
-  c->client.req_latency.update(static_cast<size_t>(us));
+  c->client.req_latency.update(static_cast<size_t>(us) * 10.0);
   c->client.num_resps++;
 
   if (c->client.num_resps == 1000) {
-    printf("consensus: Client latency = %.2f us avg, %zu 99 perc.\n",
-           c->client.req_latency.avg(), c->client.req_latency.perc(.99));
+    printf("consensus: Client latency = {%.2f, %.2f, %.2f}.\n",
+           c->client.req_latency.perc(.10) / 10.0,
+           c->client.req_latency.avg() / 10.0,
+           c->client.req_latency.perc(.99) / 10.0);
     c->client.num_resps = 0;
     c->client.req_latency.reset();
   }
