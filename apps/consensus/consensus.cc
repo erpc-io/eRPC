@@ -88,7 +88,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   delete leader_sav.msg_entry_response;
   free(leader_sav.counter_buf);
   c->server.leader_saveinfo_vec.pop_back();
-  c->server.commit_latency.reset();
+  c->server.commit_latency.stopwatch_stop();
 }
 
 void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
@@ -164,6 +164,7 @@ int main(int argc, char **argv) {
       new ERpc::Rpc<ERpc::IBTransport>(&nexus, static_cast<void *>(&c), 0,
                                        sm_handler, kAppPhyPort, kAppNumaNode);
   c.rpc->retry_connect_on_invalid_rpc_id = true;
+  c.server.commit_latency = ERpc::TscLatency(c.rpc->get_freq_ghz());
 
   // Raft server: Create session to each Raft server, excluding self.
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
@@ -200,6 +201,8 @@ int main(int argc, char **argv) {
     c.rpc->run_event_loop(0);  // Run once
 
     size_t write_index = 0;
+
+    assert(c.server.leader_saveinfo_vec.size() <= 1);
     for (auto &leader_sav : c.server.leader_saveinfo_vec) {
       int commit_status = raft_msg_entry_response_committed(
           c.server.raft, leader_sav.msg_entry_response);
@@ -211,18 +214,17 @@ int main(int argc, char **argv) {
         write_index++;
       } else {
         // Committed: Send a response
+        c.server.commit_latency.stopwatch_stop();
         if (kAppCollectTimeEntries) {
           c.server.time_entry_vec.push_back(
               TimeEntry(TimeEntryType::kCommitted, ERpc::rdtsc()));
         }
 
-        ERpc::ReqHandle *req_handle = leader_sav.req_handle;
-        c.server.commit_latency.stopwatch_stop();
-
         client_resp_t client_resp;
         client_resp.resp_type = ClientRespType::kSuccess;
         client_resp.counter = leader_sav.counter;
 
+        ERpc::ReqHandle *req_handle = leader_sav.req_handle;
         send_client_response(&c, req_handle, &client_resp);  // Prints message
         delete leader_sav.msg_entry_response;
       }

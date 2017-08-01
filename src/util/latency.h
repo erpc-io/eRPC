@@ -199,14 +199,16 @@ class TscLatency {
     num_samples++;
   }
 
+  /// Reset the statistics, while keeping the current timing state
   void reset() {
     total_cycles = 0;
     num_samples = 0;
-    started = false;
   }
 
   double get_avg_us() {
-    if (unlikely(num_samples) == 0) return -1.0;
+    if (unlikely(num_samples) == 0) return -0.0;
+    if (unlikely(freq_ghz == -1.0)) return -0.0;
+
     size_t avg_cycles = total_cycles / num_samples;
     return ERpc::to_usec(avg_cycles, freq_ghz);
   }
