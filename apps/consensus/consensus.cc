@@ -29,6 +29,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
+  c->server.commit_latency.stopwatch_start();
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
         TimeEntry(TimeEntryType::kClientReq, ERpc::rdtsc()));
@@ -55,7 +56,6 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   leader_sav.counter_buf = static_cast<size_t *>(malloc(sizeof(size_t)));
   *leader_sav.counter_buf = counter;
   leader_sav.counter = counter;  // We need a copy that Raft won't free
-  leader_sav.recv_entry_tsc = ERpc::rdtsc();
 
   c->server.leader_saveinfo_vec.push_back(leader_sav);
 
@@ -88,6 +88,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   delete leader_sav.msg_entry_response;
   free(leader_sav.counter_buf);
   c->server.leader_saveinfo_vec.pop_back();
+  c->server.commit_latency.reset();
 }
 
 void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
@@ -187,18 +188,12 @@ int main(int argc, char **argv) {
   size_t loop_tsc = ERpc::rdtsc();
   while (ctrl_c_pressed == 0) {
     if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
-      ERpc::Latency &commit_latency = c.server.commit_latency;
-      ERpc::Latency &ae_latency = c.server.appendentries_latency;
-      printf(
-          "consensus: leader commit latency = {%.2f, %.2f, %2f} us. "
-          "appendentries request latency = {%.2f, %.2f, %.2f} us.\n",
-          commit_latency.perc(.10) / 10.0, commit_latency.avg() / 10.0,
-          commit_latency.perc(.99) / 10.0, ae_latency.perc(.10) / 10.0,
-          ae_latency.avg() / 10.0, ae_latency.perc(.99) / 10.0);
+      ERpc::TscLatency &commit_latency = c.server.commit_latency;
+      printf("consensus: leader commit latency = %.2f us.\n",
+             commit_latency.get_avg_us());
 
       loop_tsc = ERpc::rdtsc();
       commit_latency.reset();
-      ae_latency.reset();
     }
 
     call_raft_periodic(&c);
@@ -222,9 +217,7 @@ int main(int argc, char **argv) {
         }
 
         ERpc::ReqHandle *req_handle = leader_sav.req_handle;
-        double commit_latency = ERpc::to_usec(
-            ERpc::rdtsc() - leader_sav.recv_entry_tsc, c.rpc->get_freq_ghz());
-        c.server.commit_latency.update(commit_latency * 10);
+        c.server.commit_latency.stopwatch_stop();
 
         client_resp_t client_resp;
         client_resp.resp_type = ClientRespType::kSuccess;

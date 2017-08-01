@@ -59,7 +59,6 @@ struct raft_req_tag_t {
   ERpc::MsgBuffer req_msgbuf;
   ERpc::MsgBuffer resp_msgbuf;
   raft_node_t *node;  // The Raft node to which req was sent (for servers only)
-  size_t req_tsc;     // Timestamp taken when the peer request was sent
 };
 
 // Info about a client request saved at a leader for the nested Rpc
@@ -68,7 +67,6 @@ struct leader_saveinfo_t {
   msg_entry_response_t *msg_entry_response;
   size_t *counter_buf;  // Pointer to malloc-ed memory, not &counter
   size_t counter;
-  size_t recv_entry_tsc;  // Timestamp taken when client request is received
 };
 
 // Comments describe the common-case usage
@@ -132,8 +130,7 @@ class AppContext {
     std::vector<TimeEntry> time_entry_vec;
 
     size_t cur_counter = 0;
-    ERpc::Latency commit_latency;         // Leader latency to commit an entry
-    ERpc::Latency appendentries_latency;  // Latency of appendentries requests
+    ERpc::TscLatency commit_latency;  // Leader latency to commit an entry
 
     // Stats
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
@@ -144,11 +141,10 @@ class AppContext {
   struct {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
-    size_t req_tsc;     // Request issue time
     size_t num_resps = 0;
     ERpc::MsgBuffer req_msgbuf;
     ERpc::MsgBuffer resp_msgbuf;
-    ERpc::Latency req_latency;  // Request latency observed by client
+    ERpc::TscLatency req_latency;  // Request latency observed by client
   } client;
 
   // Common members
@@ -216,6 +212,7 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 inline void call_raft_periodic(AppContext *c) {
   size_t cur_tsc = ERpc::rdtsc();
 
+  // XXX: Optimize
   double msec_since_last_nonzero = ERpc::to_msec(
       cur_tsc - c->server.raft_periodic_tsc, c->rpc->get_freq_ghz());
 

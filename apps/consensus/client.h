@@ -45,7 +45,7 @@ void client_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
 
 void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
-  c->client.req_tsc = ERpc::rdtsc();
+  c->client.req_latency.stopwatch_start();
 
   auto *erpc_client_req =
       reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
@@ -69,17 +69,12 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  // Measure latency
-  double us =
-      ERpc::to_usec(ERpc::rdtsc() - c->client.req_tsc, c->rpc->get_freq_ghz());
-  c->client.req_latency.update(static_cast<size_t>(us) * 10.0);
+  c->client.req_latency.stopwatch_stop();
   c->client.num_resps++;
 
   if (c->client.num_resps == 10000) {
-    printf("consensus: Client latency = {%.2f, %.2f, %.2f}.\n",
-           c->client.req_latency.perc(.10) / 10.0,
-           c->client.req_latency.avg() / 10.0,
-           c->client.req_latency.perc(.99) / 10.0);
+    printf("consensus: Client latency = %.2f us.\n",
+           c->client.req_latency.get_avg_us());
     c->client.num_resps = 0;
     c->client.req_latency.reset();
   }
@@ -124,6 +119,8 @@ void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
 
   c->client.resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(client_resp_t));
   assert(c->client.resp_msgbuf.buf != nullptr);
+
+  c->client.req_latency = ERpc::TscLatency(c->rpc->get_freq_ghz());
 
   // Raft client: Create session to each Raft server
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
