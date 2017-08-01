@@ -71,21 +71,6 @@ struct leader_saveinfo_t {
   size_t recv_entry_tsc;  // Timestamp taken when client request is received
 };
 
-// Helper class to measure cycles used by a function
-class ExecutionTimer {
- public:
-  size_t start;
-  size_t total_cycles;
-  size_t num_samples;
-
-  double avg() const { return total_cycles / (num_samples * 1.0); }
-
-  void reset() {
-    total_cycles = 0;
-    num_samples = 0;
-  }
-};
-
 // Comments describe the common-case usage
 enum class TimeEntryType {
   kClientReq,   // Client request received by leader
