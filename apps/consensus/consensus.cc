@@ -91,7 +91,35 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->server.commit_latency.stopwatch_stop();
 }
 
-void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
+void init_raft(AppContext *c) {
+  c->server.raft = raft_new();
+  assert(c->server.raft != nullptr);
+  if (kAppCollectTimeEntries) c->server.time_entry_vec.reserve(1000000);
+  c->server.raft_periodic_tsc = ERpc::rdtsc();
+
+  set_raft_callbacks(c);
+
+  std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
+  c->server.node_id = get_raft_node_id_from_hostname(machine_name);
+  printf("consensus: Created Raft node with ID = %d.\n", c->server.node_id);
+
+  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
+    std::string node_i_hostname = get_hostname_for_machine(i);
+    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
+    node_id_to_name_map[node_i_id] = ERpc::trim_hostname(node_i_hostname);
+
+    if (i == FLAGS_machine_id) {
+      // Add self. user_data = nullptr, peer_is_self = 1
+      raft_add_node(c->server.raft, nullptr, c->server.node_id, 1);
+    } else {
+      // peer_is_self = 0
+      raft_add_node(c->server.raft, static_cast<void *>(&c->conn_vec[i]),
+                    node_i_id, 0);
+    }
+  }
+}
+
+void init_erpc(AppContext *c, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kRequestVote),
       ERpc::ReqFunc(requestvote_handler, ERpc::ReqFuncType::kForeground));
@@ -103,6 +131,32 @@ void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kClientReq),
       ERpc::ReqFunc(client_req_handler, ERpc::ReqFuncType::kForeground));
+
+  // Thread ID = 0
+  c->rpc = new ERpc::Rpc<ERpc::IBTransport>(
+      nexus, static_cast<void *>(c), 0, sm_handler, kAppPhyPort, kAppNumaNode);
+
+  c->rpc->retry_connect_on_invalid_rpc_id = true;
+  c->server.commit_latency = ERpc::TscLatency(c->rpc->get_freq_ghz());
+
+  // Create a session to each Raft server, excluding self
+  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
+    if (i == FLAGS_machine_id) continue;
+
+    std::string hostname = get_hostname_for_machine(i);
+
+    printf("consensus: Creating session to %s, index = %zu.\n",
+           hostname.c_str(), i);
+
+    c->conn_vec[i].session_idx = i;
+    c->conn_vec[i].session_num =
+        c->rpc->create_session(hostname, 0, kAppPhyPort);
+    assert(c->conn_vec[i].session_num >= 0);
+  }
+
+  while (c->num_sm_resps != FLAGS_num_raft_servers - 1) {
+    c->rpc->run_event_loop(200);  // 200 ms
+  }
 }
 
 int main(int argc, char **argv) {
@@ -129,63 +183,16 @@ int main(int argc, char **argv) {
   }
   assert(is_raft_server());  // Handle client before this point
 
-  // Initialize Raft at servers. This must be done before running the eRPC event
-  // loop, including running it for session management.
-  c.server.raft = raft_new();
-  assert(c.server.raft != nullptr);
-  c.server.time_entry_vec.reserve(1000000);
-  c.server.raft_periodic_tsc = ERpc::rdtsc();
-
-  set_raft_callbacks(&c);
-
-  c.server.node_id = get_raft_node_id_from_hostname(machine_name);
-  printf("consensus: Created Raft node with ID = %d.\n", c.server.node_id);
-
-  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string node_i_hostname = get_hostname_for_machine(i);
-    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
-    node_id_to_name_map[node_i_id] = ERpc::trim_hostname(node_i_hostname);
-
-    if (i == FLAGS_machine_id) {
-      // Add self. user_data = nullptr, peer_is_self = 1
-      raft_add_node(c.server.raft, nullptr, c.server.node_id, 1);
-    } else {
-      // peer_is_self = 0
-      raft_add_node(c.server.raft, static_cast<void *>(&c.conn_vec[i]),
-                    node_i_id, 0);
-    }
-  }
+  // The Raft server must be initialized before running the eRPC event loop,
+  // including running it for session management.
+  init_raft(&c);
 
   // Initialize eRPC
-  register_erpc_req_handlers(&nexus);
-
-  // Thread ID = 0
-  c.rpc =
-      new ERpc::Rpc<ERpc::IBTransport>(&nexus, static_cast<void *>(&c), 0,
-                                       sm_handler, kAppPhyPort, kAppNumaNode);
-  c.rpc->retry_connect_on_invalid_rpc_id = true;
-  c.server.commit_latency = ERpc::TscLatency(c.rpc->get_freq_ghz());
-
-  // Raft server: Create session to each Raft server, excluding self.
-  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    if (i == FLAGS_machine_id) continue;
-
-    std::string hostname = get_hostname_for_machine(i);
-
-    printf("consensus: Creating session to %s, index = %zu.\n",
-           hostname.c_str(), i);
-
-    c.conn_vec[i].session_idx = i;
-    c.conn_vec[i].session_num = c.rpc->create_session(hostname, 0, kAppPhyPort);
-    assert(c.conn_vec[i].session_num >= 0);
-  }
-
-  while (c.num_sm_resps != FLAGS_num_raft_servers - 1) {
-    c.rpc->run_event_loop(200);  // 200 ms
-  }
+  init_erpc(&c, &nexus);
 
   if (FLAGS_machine_id == 0) raft_become_leader(c.server.raft);
 
+  // The main loop
   size_t loop_tsc = ERpc::rdtsc();
   while (ctrl_c_pressed == 0) {
     if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
