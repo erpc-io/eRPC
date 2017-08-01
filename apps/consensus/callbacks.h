@@ -19,20 +19,21 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
   assert(!raft_entry_is_cfg_change(ety));
 
   // We're applying an entry to the application's state machine, so we're sure
-  // about its length. Other callbacks can be invoked for non-application log
-  // entries.
-  assert(ety->data.len == sizeof(unsigned int));
+  // about its length. Other log callbacks can be invoked for non-application
+  // log entries.
+  assert(ety->data.len == sizeof(size_t));
 
   auto *c = static_cast<AppContext *>(udata);
   assert(c->check_magic());
 
-  unsigned int *ticket = static_cast<unsigned int *>(ety->data.buf);
+  size_t *counter = static_cast<size_t *>(ety->data.buf);
+  ERpc::rt_assert(*counter == c->server.cur_counter + 1, "Invalid counter");
   if (kAppVerbose) {
-    printf("consensus: Adding ticket %u [%s].\n", *ticket,
+    printf("consensus: Updating counter to %zu [%s].\n", *counter,
            ERpc::get_formatted_time().c_str());
   }
+  c->server.cur_counter++;
 
-  c->server.tickets.insert(*ticket);
   return 0;
 }
 

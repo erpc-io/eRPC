@@ -1,41 +1,24 @@
-/**
- * Copyright (c) 2015, Willem-Hendrik Thiart
- * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
- */
-
 #include "consensus.h"
 #include "appendentries.h"
 #include "callbacks.h"
 #include "client.h"
 #include "requestvote.h"
 
-// Generate a ticket that's unique at this node
-static unsigned int generate_ticket(AppContext *c) {
-  assert(c != nullptr && c->check_magic());
-  unsigned int ticket = c->fast_rand.next_u32();
-
-  while (c->server.tickets.count(ticket) > 0) {
-    ticket = c->fast_rand.next_u32();
-  }
-  return ticket;
-}
-
-// Send a ticket response. This does not free any app-allocated memory.
-void send_ticket_response(AppContext *c, ERpc::ReqHandle *req_handle,
-                          ticket_resp_t *ticket_resp) {
+// Send a response to the client. This does not free any non-ERpc memory.
+void send_client_response(AppContext *c, ERpc::ReqHandle *req_handle,
+                          client_resp_t *client_resp) {
   if (kAppVerbose) {
     printf("consensus: Sending reply to client: %s [%s].\n",
-           ticket_resp->to_string().c_str(),
+           client_resp->to_string().c_str(),
            ERpc::get_formatted_time().c_str());
   }
 
-  auto *_ticket_resp =
-      reinterpret_cast<ticket_resp_t *>(req_handle->pre_resp_msgbuf.buf);
-  *_ticket_resp = *ticket_resp;
+  auto *_client_resp =
+      reinterpret_cast<client_resp_t *>(req_handle->pre_resp_msgbuf.buf);
+  *_client_resp = *client_resp;
 
   c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                            sizeof(ticket_resp_t));
+                            sizeof(client_resp_t));
   req_handle->prealloc_used = true;
   c->rpc->enqueue_response(req_handle);
 }
@@ -48,31 +31,30 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
-        TimeEntry(TimeEntryType::kTicketReq, ERpc::rdtsc()));
+        TimeEntry(TimeEntryType::kClientReq, ERpc::rdtsc()));
   }
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  assert(req_msgbuf->get_data_size() == sizeof(ticket_req_t));
+  assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
 
-  unsigned int ticket = generate_ticket(c);
+  size_t counter = c->server.cur_counter + 1;  // Don't update cur_counter yet!
 
   if (kAppVerbose) {
-    auto *ticket_req = reinterpret_cast<ticket_req_t *>(req_msgbuf->buf);
+    auto *client_req = reinterpret_cast<client_req_t *>(req_msgbuf->buf);
     printf(
         "consensus: Received client request from client thread %zu. "
-        "Assigned ticket = %u [%s].\n",
-        ticket_req->thread_id, ticket, ERpc::get_formatted_time().c_str());
+        "Assigned counter = %zu [%s].\n",
+        client_req->thread_id, counter, ERpc::get_formatted_time().c_str());
   }
 
   leader_saveinfo_t leader_sav;  // Saved to leader_saveinfo_vec below
   leader_sav.req_handle = req_handle;
   leader_sav.msg_entry_response = new msg_entry_response_t();  // Free on commit
 
-  // Raft will free ticket_buf using a log callback, so we need C-style malloc
-  leader_sav.ticket_buf =
-      static_cast<unsigned int *>(malloc(sizeof(unsigned int)));
-  *leader_sav.ticket_buf = ticket;
-  leader_sav.ticket = ticket;  // We need a copy that Raft won't free
+  // Raft will free client_buf using a log callback, so we need C-style malloc
+  leader_sav.counter_buf = static_cast<size_t *>(malloc(sizeof(size_t)));
+  *leader_sav.counter_buf = counter;
+  leader_sav.counter = counter;  // We need a copy that Raft won't free
   leader_sav.recv_entry_tsc = ERpc::rdtsc();
 
   c->server.leader_saveinfo_vec.push_back(leader_sav);
@@ -80,31 +62,31 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
   msg_entry_t entry;
   entry.id = c->fast_rand.next_u32();
-  entry.data.buf = static_cast<void *>(leader_sav.ticket_buf);
-  entry.data.len = sizeof(ticket);
+  entry.data.buf = static_cast<void *>(leader_sav.counter_buf);
+  entry.data.len = sizeof(size_t);
 
   int e =
       raft_recv_entry(c->server.raft, &entry, leader_sav.msg_entry_response);
   if (e == 0) return;
 
   // Send a response with the error
-  ticket_resp_t err_resp;
+  client_resp_t err_resp;
   switch (e) {
     case RAFT_ERR_NOT_LEADER:
       // XXX: Redirect to leader
-      err_resp.resp_type = TicketRespType::kFailTryAgain;
+      err_resp.resp_type = ClientRespType::kFailTryAgain;
       break;
     case RAFT_ERR_SHUTDOWN:
       throw std::runtime_error("RAFT_ERR_SHUTDOWN not handled");
     case RAFT_ERR_ONE_VOTING_CHANGE_ONLY:
-      err_resp.resp_type = TicketRespType::kFailTryAgain;
+      err_resp.resp_type = ClientRespType::kFailTryAgain;
       break;
   }
-  send_ticket_response(c, req_handle, &err_resp);
+  send_client_response(c, req_handle, &err_resp);
 
   // Clean up
   delete leader_sav.msg_entry_response;
-  free(leader_sav.ticket_buf);
+  free(leader_sav.counter_buf);
   c->server.leader_saveinfo_vec.pop_back();
 }
 
@@ -118,7 +100,7 @@ void register_erpc_req_handlers(ERpc::Nexus<ERpc::IBTransport> *nexus) {
       ERpc::ReqFunc(appendentries_handler, ERpc::ReqFuncType::kForeground));
 
   nexus->register_req_func(
-      static_cast<uint8_t>(ReqType::kGetTicket),
+      static_cast<uint8_t>(ReqType::kClientReq),
       ERpc::ReqFunc(client_req_handler, ERpc::ReqFuncType::kForeground));
 }
 
@@ -244,11 +226,11 @@ int main(int argc, char **argv) {
             ERpc::rdtsc() - leader_sav.recv_entry_tsc, c.rpc->get_freq_ghz());
         c.server.commit_latency.update(commit_latency * 10);
 
-        ticket_resp_t ticket_resp;
-        ticket_resp.resp_type = TicketRespType::kSuccess;
-        ticket_resp.ticket = leader_sav.ticket;
+        client_resp_t client_resp;
+        client_resp.resp_type = ClientRespType::kSuccess;
+        client_resp.counter = leader_sav.counter;
 
-        send_ticket_response(&c, req_handle, &ticket_resp);  // Prints message
+        send_client_response(&c, req_handle, &client_resp);  // Prints message
         delete leader_sav.msg_entry_response;
       }
     }

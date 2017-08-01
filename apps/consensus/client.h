@@ -8,33 +8,33 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-enum class TicketRespType : size_t {
+enum class ClientRespType : size_t {
   kSuccess,
   kFailLeaderChanged,
   kFailTryAgain
 };
 
-// The ticket request message
-struct ticket_req_t {
+// The client request message
+struct client_req_t {
   size_t thread_id;
 };
 
-// The ticket response message
-struct ticket_resp_t {
-  TicketRespType resp_type;
+// The client response message
+struct client_resp_t {
+  ClientRespType resp_type;
   union {
-    unsigned int ticket;
+    size_t counter;     // The sequence counter
     size_t leader_idx;  // Leader's index in client's conn_vec
   };
 
   std::string to_string() const {
     switch (resp_type) {
-      case TicketRespType::kSuccess:
-        return "success, ticket = " + std::to_string(ticket);
-      case TicketRespType::kFailLeaderChanged:
+      case ClientRespType::kSuccess:
+        return "success, counter = " + std::to_string(counter);
+      case ClientRespType::kFailLeaderChanged:
         return "failed (leader changed), leader = " +
                std::to_string(leader_idx);
-      case TicketRespType::kFailTryAgain:
+      case ClientRespType::kFailTryAgain:
         return "failed (try again)";
     }
     return "Invalid";
@@ -48,7 +48,7 @@ void send_req_one(AppContext *c) {
   c->client.req_tsc = ERpc::rdtsc();
 
   auto *erpc_client_req =
-      reinterpret_cast<ticket_req_t *>(c->client.req_msgbuf.buf);
+      reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
   erpc_client_req->thread_id = c->client.thread_id;
 
   if (kAppVerbose) {
@@ -58,7 +58,7 @@ void send_req_one(AppContext *c) {
 
   connection_t &conn = c->conn_vec[c->client.leader_idx];
   int ret = c->rpc->enqueue_request(
-      conn.session_num, static_cast<uint8_t>(ReqType::kGetTicket),
+      conn.session_num, static_cast<uint8_t>(ReqType::kClientReq),
       &c->client.req_msgbuf, &c->client.resp_msgbuf, client_cont, 0);  // 0 tag
   assert(ret == 0);
   _unused(ret);
@@ -85,7 +85,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   }
 
   auto *client_resp =
-      reinterpret_cast<ticket_resp_t *>(c->client.resp_msgbuf.buf);
+      reinterpret_cast<client_resp_t *>(c->client.resp_msgbuf.buf);
 
   if (kAppVerbose) {
     printf("consensus: Client received resp %s [%s].\n",
@@ -93,7 +93,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
            ERpc::get_formatted_time().c_str());
   }
 
-  if (client_resp->resp_type == TicketRespType::kFailLeaderChanged) {
+  if (client_resp->resp_type == ClientRespType::kFailLeaderChanged) {
     printf("consensus: Client changing leader to index %zu.\n",
            client_resp->leader_idx);
     c->client.leader_idx = client_resp->leader_idx;
@@ -119,10 +119,10 @@ void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
   c->rpc->retry_connect_on_invalid_rpc_id = true;
 
   // Pre-allocate MsgBuffers
-  c->client.req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_req_t));
+  c->client.req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(client_req_t));
   assert(c->client.req_msgbuf.buf != nullptr);
 
-  c->client.resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(ticket_resp_t));
+  c->client.resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(client_resp_t));
   assert(c->client.resp_msgbuf.buf != nullptr);
 
   // Raft client: Create session to each Raft server

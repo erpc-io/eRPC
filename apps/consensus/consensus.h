@@ -42,7 +42,7 @@ bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
 enum class ReqType : uint8_t {
   kRequestVote = 3,  // Raft requestvote RPC
   kAppendEntries,    // Raft appendentries RPC
-  kGetTicket         // Client-to-server Rpc
+  kClientReq         // Client-to-server Rpc
 };
 
 class AppContext;  // Forward declaration
@@ -66,8 +66,8 @@ struct raft_req_tag_t {
 struct leader_saveinfo_t {
   ERpc::ReqHandle *req_handle;
   msg_entry_response_t *msg_entry_response;
-  unsigned int *ticket_buf;  // Pointer to malloc-ed memory, not &ticket
-  unsigned int ticket;
+  size_t *counter_buf;  // Pointer to malloc-ed memory, not &counter
+  size_t counter;
   size_t recv_entry_tsc;  // Timestamp taken when client request is received
 };
 
@@ -88,7 +88,7 @@ class ExecutionTimer {
 
 // Comments describe the common-case usage
 enum class TimeEntryType {
-  kTicketReq,   // Ticket request received by leader
+  kClientReq,   // Client request received by leader
   kSendAeReq,   // Leader sends appendentry request
   kRecvAeReq,   // Follower receives appendentry request
   kSendAeResp,  // Follower sends appendentry response
@@ -108,8 +108,8 @@ class TimeEntry {
     std::string ret;
 
     switch (time_entry_type) {
-      case TimeEntryType::kTicketReq:
-        ret = "ticket_req";
+      case TimeEntryType::kClientReq:
+        ret = "client_req";
         break;
       case TimeEntryType::kSendAeReq:
         ret = "send_appendentries_req";
@@ -137,8 +137,7 @@ class TimeEntry {
 // Context for both servers and clients
 class AppContext {
  public:
-  static constexpr size_t kAppContextMagic = 0x3185;
-  // Server-only members
+  // Raft server members
   struct {
     int node_id = -1;  // This server's Raft node ID
     raft_server_t *raft = nullptr;
@@ -147,7 +146,7 @@ class AppContext {
     std::vector<leader_saveinfo_t> leader_saveinfo_vec;
     std::vector<TimeEntry> time_entry_vec;
 
-    std::set<unsigned int> tickets;       // Set of tickets issued
+    size_t cur_counter = 0;
     ERpc::Latency commit_latency;         // Leader latency to commit an entry
     ERpc::Latency appendentries_latency;  // Latency of appendentries requests
 
@@ -156,6 +155,7 @@ class AppContext {
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;
 
+  // Consensus client members
   struct {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
@@ -166,13 +166,14 @@ class AppContext {
     ERpc::Latency req_latency;  // Request latency observed by client
   } client;
 
+  // Common members
   std::vector<connection_t> conn_vec;
-
-  // ERpc-related members
   ERpc::Rpc<ERpc::IBTransport> *rpc;
   ERpc::FastRand fast_rand;
   size_t num_sm_resps = 0;
 
+  // Magic
+  static constexpr size_t kAppContextMagic = 0x3185;
   volatile size_t magic = kAppContextMagic;  // Avoid optimizing check_magic()
   bool check_magic() const { return magic == kAppContextMagic; }
 };
