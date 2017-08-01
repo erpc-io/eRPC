@@ -11,6 +11,7 @@
 #include <string.h>
 #include <algorithm>
 #include <cstdio>
+#include "common.h"
 #include "util/timer.h"
 
 namespace ERpc {
@@ -177,10 +178,10 @@ class Latency {
 class TscLatency {
  public:
   double freq_ghz = -1.0;  // Nominal TSC frequency
+  bool started = false;  // Debug-only. True iff the stopwatch has been started.
   size_t stopwatch_start_cycles = 0;
   size_t total_cycles = 0;
   size_t num_samples = 0;
-  bool started = false;  // Debug-only
 
   TscLatency(double freq_ghz) : freq_ghz(freq_ghz) {}
   TscLatency() {}
@@ -194,21 +195,22 @@ class TscLatency {
   void stopwatch_stop() {
     assert(started);
     started = false;
-    total_cycles += ERpc::rdtsc() - stopwatch_start_cycles;
+    total_cycles += (ERpc::rdtsc() - stopwatch_start_cycles);
     num_samples++;
   }
 
   void reset() {
     total_cycles = 0;
     num_samples = 0;
+    started = false;
   }
 
   double get_avg_us() {
+    if (unlikely(num_samples) == 0) return -1.0;
     size_t avg_cycles = total_cycles / num_samples;
     return ERpc::to_usec(avg_cycles, freq_ghz);
   }
 };
-
 }
 
 #endif
