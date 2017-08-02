@@ -215,7 +215,7 @@ inline void call_raft_periodic(AppContext *c) {
   double msec_since_last_nonzero = ERpc::to_msec(
       cur_tsc - c->server.raft_periodic_tsc, c->rpc->get_freq_ghz());
 
-  if (msec_since_last_nonzero < .1) {
+  if (msec_since_last_nonzero < 1.0) {
     raft_periodic(c->server.raft, 0);
   } else {
     c->server.raft_periodic_tsc = cur_tsc;
