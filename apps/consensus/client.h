@@ -137,6 +137,10 @@ void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
 
   while (c->num_sm_resps != FLAGS_num_raft_servers) {
     c->rpc->run_event_loop(200);  // 200 ms
+    if (ctrl_c_pressed == 1) {
+      delete c->rpc;
+      exit(0);
+    }
   }
 
   printf("consensus: Client %zu connected to all servers. Sending requests.\n",

@@ -152,6 +152,10 @@ void init_erpc(AppContext *c, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 
   while (c->num_sm_resps != FLAGS_num_raft_servers - 1) {
     c->rpc->run_event_loop(200);  // 200 ms
+    if (ctrl_c_pressed == 1) {
+      delete c->rpc;
+      exit(0);
+    }
   }
 }
 
