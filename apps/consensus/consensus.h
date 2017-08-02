@@ -15,8 +15,10 @@ extern "C" {
 #include "rpc.h"
 #include "util/latency.h"
 
+// Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;
 static constexpr bool kAppVerbose = false;
+static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;

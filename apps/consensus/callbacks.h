@@ -113,7 +113,14 @@ void set_raft_callbacks(AppContext *c) {
   raft_funcs.log_poll = __raft_logentry_poll;
   raft_funcs.log_pop = __raft_logentry_pop;
   raft_funcs.node_has_sufficient_logs = __raft_node_has_sufficient_logs;
-  raft_funcs.log = __raft_log;
+
+  // Providing a non-null console log callback is expensive, even if we do
+  // nothing in the callback.
+  if (kAppEnableRaftConsoleLog) {
+    raft_funcs.log = __raft_log;
+  } else {
+    raft_funcs.log = nullptr;
+  }
 
   // Callback udata = context
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
