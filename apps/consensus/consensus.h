@@ -211,17 +211,18 @@ volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 inline void call_raft_periodic(AppContext *c) {
+  // raft_periodic() takes the number of msec elapsed since the last call. This
+  // is done for timeouts which are > 100 msec, so this approximation is fine.
   size_t cur_tsc = ERpc::rdtsc();
 
-  // XXX: Optimize
-  double msec_since_last_nonzero = ERpc::to_msec(
-      cur_tsc - c->server.raft_periodic_tsc, c->rpc->get_freq_ghz());
+  // Assume TSC freqency is around 2.8 GHz. 1 ms = 2.8 * 100,000 ticks.
+  bool msec_elapsed = (ERpc::rdtsc() - c->server.raft_periodic_tsc > 2800000);
 
-  if (msec_since_last_nonzero < 1.0) {
-    raft_periodic(c->server.raft, 0);
-  } else {
+  if (msec_elapsed) {
     c->server.raft_periodic_tsc = cur_tsc;
     raft_periodic(c->server.raft, 1);
+  } else {
+    raft_periodic(c->server.raft, 0);
   }
 }
 
