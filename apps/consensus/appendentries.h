@@ -31,8 +31,6 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   uint8_t *buf = req_msgbuf->buf;
 
   auto *appendentries_req = reinterpret_cast<appendentries_req_t *>(buf);
-
-  // Copy over the appendentries message + copy buffers to malloc-ed memory
   msg_appendentries_t ae = appendentries_req->ae;
   assert(ae.entries == nullptr);
   size_t n_entries = static_cast<size_t>(ae.n_entries);
@@ -58,9 +56,9 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
       assert(ae.entries[i].data.buf == nullptr);
 
       size_t data_len = ae.entries[i].data.len;
-      ae.entries[i].data.buf = malloc(data_len);
-      assert(ae.entries[i].data.buf != nullptr);
+      assert(data_len == sizeof(size_t));  // Non-keepalive => app log entry
 
+      ae.entries[i].data.buf = c->counter_buf_pool_alloc();
       memcpy(ae.entries[i].data.buf, buf + sizeof(msg_entry_t), data_len);
 
       buf += (sizeof(msg_entry_t) + data_len);

@@ -26,11 +26,9 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *_context) {
       reinterpret_cast<requestvote_req_t *>(req_msgbuf->buf);
   assert(node_id_to_name_map.count(requestvote_req->node_id) != 0);
 
-  if (kAppVerbose) {
-    printf("consensus: Received requestvote request from %s [%s].\n",
-           node_id_to_name_map[requestvote_req->node_id].c_str(),
-           ERpc::get_formatted_time().c_str());
-  }
+  printf("consensus: Received requestvote request from %s [%s].\n",
+         node_id_to_name_map[requestvote_req->node_id].c_str(),
+         ERpc::get_formatted_time().c_str());
 
   // This does a linear search, which is OK for a small number of Raft servers
   raft_node_t *requester_node =
@@ -71,11 +69,9 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
     return 0;
   }
 
-  if (kAppVerbose) {
-    printf("consensus: Sending requestvote request to node %s [%s].\n",
-           node_id_to_name_map[raft_node_get_id(node)].c_str(),
-           ERpc::get_formatted_time().c_str());
-  }
+  printf("consensus: Sending requestvote request to node %s [%s].\n",
+         node_id_to_name_map[raft_node_get_id(node)].c_str(),
+         ERpc::get_formatted_time().c_str());
 
   auto *raft_req_tag = new raft_req_tag_t();  // XXX: Optimize with pool
   raft_req_tag->req_msgbuf =
@@ -119,11 +115,9 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
   assert(raft_req_tag->resp_msgbuf.get_data_size() ==
          sizeof(msg_requestvote_response_t));
 
-  if (kAppVerbose) {
-    printf("consensus: Received requestvote response from node %s [%s].\n",
-           node_id_to_name_map[raft_node_get_id(raft_req_tag->node)].c_str(),
-           ERpc::get_formatted_time().c_str());
-  }
+  printf("consensus: Received requestvote response from node %s [%s].\n",
+         node_id_to_name_map[raft_node_get_id(raft_req_tag->node)].c_str(),
+         ERpc::get_formatted_time().c_str());
 
   auto *msg_requestvote_resp = reinterpret_cast<msg_requestvote_response_t *>(
       raft_req_tag->resp_msgbuf.buf);

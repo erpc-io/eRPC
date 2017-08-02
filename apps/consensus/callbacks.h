@@ -16,7 +16,8 @@
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            int) {
   assert(udata != nullptr && ety != nullptr);
-  assert(!raft_entry_is_cfg_change(ety));
+  ERpc::rt_assert(!raft_entry_is_cfg_change(ety),
+                  "Configuration change log entries not handled.\n");
 
   // We're applying an entry to the application's state machine, so we're sure
   // about its length. Other log callbacks can be invoked for non-application
@@ -72,7 +73,13 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
   assert(c->check_magic());
 
   raft_entry_t &entry = c->server.raft_log.back();
-  if (entry.data.buf != nullptr) free(entry.data.buf);
+  if (entry.data.len == sizeof(size_t)) {
+    // Handle counter pool buffers separately
+    assert(entry.data.buf != nullptr);
+    c->counter_buf_pool_free(entry.data.buf);
+  } else {
+    if (entry.data.buf != nullptr) free(entry.data.buf);
+  }
 
   c->server.raft_log.pop_back();
   return 0;

@@ -129,6 +129,7 @@ class AppContext {
     size_t raft_periodic_tsc;            // rdtsc timestamp
     leader_saveinfo_t leader_saveinfo;   // Info for the ongoing commit request
     std::vector<TimeEntry> time_entry_vec;
+    std::vector<void *> counter_buf_pool;  // Pool for counter-sized memory
 
     size_t cur_counter = 0;
     ERpc::TscLatency commit_latency;  // Leader latency to commit an entry
@@ -158,6 +159,32 @@ class AppContext {
   static constexpr size_t kAppContextMagic = 0x3185;
   volatile size_t magic = kAppContextMagic;  // Avoid optimizing check_magic()
   bool check_magic() const { return magic == kAppContextMagic; }
+
+  void counter_buf_pool_extend() {
+    printf("consensus: Extending counter buf pool.\n");
+    ERpc::rt_assert(server.raft != nullptr, "Caller must be server");
+
+    size_t alloc_size = rpc->get_max_msg_size();
+    ERpc::MsgBuffer buf_pool_backer = rpc->alloc_msg_buffer(alloc_size);
+    ERpc::rt_assert(buf_pool_backer.buf != nullptr,
+                    "Failed to extend counter buf pool");
+
+    for (size_t i = 0; i < alloc_size / sizeof(size_t); i++) {
+      server.counter_buf_pool.push_back(
+          static_cast<void *>(&buf_pool_backer.buf[i * sizeof(size_t)]));
+    }
+  }
+
+  void *counter_buf_pool_alloc() {
+    if (server.counter_buf_pool.empty()) counter_buf_pool_extend();
+    void *ret = server.counter_buf_pool.back();
+    server.counter_buf_pool.pop_back();
+    return ret;
+  }
+
+  void counter_buf_pool_free(void *addr) {
+    server.counter_buf_pool.push_back(addr);
+  }
 };
 
 // Generate a deterministic, random-ish node ID from a machine's hostname

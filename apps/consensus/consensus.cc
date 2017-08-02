@@ -54,8 +54,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   leader_sav.req_handle = req_handle;
   leader_sav.counter = counter;  // We need a copy that Raft won't free
 
-  // Raft will free this buffer using a log callback, so we need C-style malloc
-  size_t *raft_counter_buf = static_cast<size_t *>(malloc(sizeof(size_t)));
+  size_t *raft_counter_buf = static_cast<size_t *>(c->counter_buf_pool_alloc());
   *raft_counter_buf = counter;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
@@ -90,6 +89,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
   assert(c->server.raft != nullptr);
+
   if (kAppCollectTimeEntries) c->server.time_entry_vec.reserve(1000000);
   c->server.raft_periodic_tsc = ERpc::rdtsc();
 
@@ -189,6 +189,7 @@ int main(int argc, char **argv) {
 
   // Initialize eRPC
   init_erpc(&c, &nexus);
+  c.counter_buf_pool_extend();
 
   if (FLAGS_machine_id == 0) raft_become_leader(c.server.raft);
 
