@@ -48,25 +48,24 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
         client_req->thread_id, counter, ERpc::get_formatted_time().c_str());
   }
 
-  leader_saveinfo_t leader_sav;  // Saved to leader_saveinfo_vec below
+  leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
+  assert(!leader_sav.in_use);
+  leader_sav.in_use = true;
   leader_sav.req_handle = req_handle;
-  leader_sav.msg_entry_response = new msg_entry_response_t();  // Free on commit
-
-  // Raft will free client_buf using a log callback, so we need C-style malloc
-  leader_sav.counter_buf = static_cast<size_t *>(malloc(sizeof(size_t)));
-  *leader_sav.counter_buf = counter;
   leader_sav.counter = counter;  // We need a copy that Raft won't free
 
-  c->server.leader_saveinfo_vec.push_back(leader_sav);
+  // Raft will free this buffer using a log callback, so we need C-style malloc
+  size_t *raft_counter_buf = static_cast<size_t *>(malloc(sizeof(size_t)));
+  *raft_counter_buf = counter;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
   msg_entry_t entry;
   entry.id = c->fast_rand.next_u32();
-  entry.data.buf = static_cast<void *>(leader_sav.counter_buf);
+  entry.data.buf = static_cast<void *>(raft_counter_buf);
   entry.data.len = sizeof(size_t);
 
   int e =
-      raft_recv_entry(c->server.raft, &entry, leader_sav.msg_entry_response);
+      raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
   if (e == 0) return;
 
   // Send a response with the error
@@ -85,9 +84,6 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   send_client_response(c, req_handle, &err_resp);
 
   // Clean up
-  delete leader_sav.msg_entry_response;
-  free(leader_sav.counter_buf);
-  c->server.leader_saveinfo_vec.pop_back();
   c->server.commit_latency.stopwatch_stop();
 }
 
@@ -207,37 +203,30 @@ int main(int argc, char **argv) {
     call_raft_periodic(&c);
     c.rpc->run_event_loop(0);  // Run once
 
-    size_t write_index = 0;
+    leader_saveinfo_t &leader_sav = c.server.leader_saveinfo;
+    if (!leader_sav.in_use) continue;  // Avoid passing garbage to commit check
 
-    assert(c.server.leader_saveinfo_vec.size() <= 1);
-    for (auto &leader_sav : c.server.leader_saveinfo_vec) {
-      int commit_status = raft_msg_entry_response_committed(
-          c.server.raft, leader_sav.msg_entry_response);
-      assert(commit_status == 0 || commit_status == 1);
+    int commit_status = raft_msg_entry_response_committed(
+        c.server.raft, &leader_sav.msg_entry_response);
+    assert(commit_status == 0 || commit_status == 1);
 
-      if (commit_status == 0) {
-        // Not committed yet
-        c.server.leader_saveinfo_vec[write_index] = leader_sav;
-        write_index++;
-      } else {
-        // Committed: Send a response
-        c.server.commit_latency.stopwatch_stop();
-        if (kAppCollectTimeEntries) {
-          c.server.time_entry_vec.push_back(
-              TimeEntry(TimeEntryType::kCommitted, ERpc::rdtsc()));
-        }
+    if (commit_status == 1) {
+      // Committed: Send a response
+      leader_sav.in_use = false;
+      c.server.commit_latency.stopwatch_stop();
 
-        client_resp_t client_resp;
-        client_resp.resp_type = ClientRespType::kSuccess;
-        client_resp.counter = leader_sav.counter;
-
-        ERpc::ReqHandle *req_handle = leader_sav.req_handle;
-        send_client_response(&c, req_handle, &client_resp);  // Prints message
-        delete leader_sav.msg_entry_response;
+      if (kAppCollectTimeEntries) {
+        c.server.time_entry_vec.push_back(
+            TimeEntry(TimeEntryType::kCommitted, ERpc::rdtsc()));
       }
-    }
 
-    c.server.leader_saveinfo_vec.resize(write_index);
+      client_resp_t client_resp;
+      client_resp.resp_type = ClientRespType::kSuccess;
+      client_resp.counter = leader_sav.counter;
+
+      ERpc::ReqHandle *req_handle = leader_sav.req_handle;
+      send_client_response(&c, req_handle, &client_resp);  // Prints message
+    }
   }
 
   // This is OK even when kAppCollectTimeEntries = false

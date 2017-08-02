@@ -61,11 +61,11 @@ struct raft_req_tag_t {
   raft_node_t *node;  // The Raft node to which req was sent (for servers only)
 };
 
-// Info about a client request saved at a leader for the nested Rpc
+// Info about client request(s) saved at a leader for the nested Rpc
 struct leader_saveinfo_t {
-  ERpc::ReqHandle *req_handle;
-  msg_entry_response_t *msg_entry_response;
-  size_t *counter_buf;  // Pointer to malloc-ed memory, not &counter
+  bool in_use = false;          // Leader has an ongoing commit request
+  ERpc::ReqHandle *req_handle;  // This could be a vector if we do batching
+  msg_entry_response_t msg_entry_response;
   size_t counter;
 };
 
@@ -126,7 +126,7 @@ class AppContext {
     raft_server_t *raft = nullptr;
     std::deque<raft_entry_t> raft_log;  // The Raft log
     size_t raft_periodic_tsc;           // rdtsc timestamp
-    std::vector<leader_saveinfo_t> leader_saveinfo_vec;
+    leader_saveinfo_t leader_saveinfo;  // Info for the ongoing commit request
     std::vector<TimeEntry> time_entry_vec;
 
     size_t cur_counter = 0;
