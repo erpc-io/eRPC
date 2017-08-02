@@ -8,7 +8,6 @@ extern "C" {
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <deque>
 #include <set>
 
 #include "../apps_common.h"
@@ -124,9 +123,9 @@ class AppContext {
   struct {
     int node_id = -1;  // This server's Raft node ID
     raft_server_t *raft = nullptr;
-    std::deque<raft_entry_t> raft_log;  // The Raft log
-    size_t raft_periodic_tsc;           // rdtsc timestamp
-    leader_saveinfo_t leader_saveinfo;  // Info for the ongoing commit request
+    std::vector<raft_entry_t> raft_log;  // The Raft log, vector is OK
+    size_t raft_periodic_tsc;            // rdtsc timestamp
+    leader_saveinfo_t leader_saveinfo;   // Info for the ongoing commit request
     std::vector<TimeEntry> time_entry_vec;
 
     size_t cur_counter = 0;

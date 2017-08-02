@@ -193,8 +193,8 @@ int main(int argc, char **argv) {
   while (ctrl_c_pressed == 0) {
     if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
       ERpc::TscLatency &commit_latency = c.server.commit_latency;
-      printf("consensus: leader commit latency = %.2f us.\n",
-             commit_latency.get_avg_us());
+      printf("consensus: leader commit latency = %.2f us. Log size = %zu.\n",
+             commit_latency.get_avg_us(), c.server.raft_log.size());
 
       loop_tsc = ERpc::rdtsc();
       commit_latency.reset();

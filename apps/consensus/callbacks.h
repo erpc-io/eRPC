@@ -80,16 +80,8 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
 
 // Raft callback for removing the first entry from the log. This is provided to
 // support log compaction in the future.
-static int __raft_logentry_poll(raft_server_t *, void *udata, raft_entry_t *,
-                                int) {
-  assert(udata != nullptr);
-  auto *c = static_cast<AppContext *>(udata);
-  assert(c->check_magic());
-
-  raft_entry_t &entry = c->server.raft_log.front();
-  if (entry.data.buf != nullptr) free(entry.data.buf);
-
-  c->server.raft_log.pop_front();
+static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *, int) {
+  printf("consensus: Ignoring __raft_logentry_poll callback.\n");
   return 0;
 }
 
@@ -97,7 +89,7 @@ static int __raft_logentry_poll(raft_server_t *, void *udata, raft_entry_t *,
 // cfg log entry.
 static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
                                            raft_node_t *) {
-  assert(false);  // Ignored
+  printf("consensus: Ignoring __raft_node_has_sufficient_logs callback.\n");
   return 0;
 }
 
