@@ -118,6 +118,41 @@ class TimeEntry {
   }
 };
 
+template <class T>
+class MemPool {
+ public:
+  size_t num_to_alloc = 1;
+  std::vector<T *> backing_ptr_vec;
+  std::vector<T *> pool;
+
+  void extend_pool() {
+    T* backing_ptr = new T[num_to_alloc];
+    for (size_t i = 0; i < num_to_alloc; i++) {
+      pool.push_back(&backing_ptr[i]);
+    }
+
+    backing_ptr_vec.push_back(backing_ptr);
+    num_to_alloc *= 2;
+  }
+
+  T* alloc() {
+    if (pool.empty()) extend_pool();
+    T* ret = pool.back();
+    pool.pop_back();
+    return ret;
+  }
+
+  void free(T* t) {
+    pool.push_back(t);
+  }
+
+  MemPool() {}
+
+  ~MemPool() {
+    for (T *ptr : backing_ptr_vec) delete[] ptr;
+  }
+};
+
 // Context for both servers and clients
 class AppContext {
  public:
@@ -129,12 +164,16 @@ class AppContext {
     size_t raft_periodic_tsc;            // rdtsc timestamp
     leader_saveinfo_t leader_saveinfo;   // Info for the ongoing commit request
     std::vector<TimeEntry> time_entry_vec;
-    std::vector<void *> counter_buf_pool;  // Pool for counter-sized memory
 
+    // Pools
+    std::vector<void *> counter_buf_pool;  // Pool for counter-sized memory
+    MemPool<raft_req_tag_t> raft_req_tag_pool;
+
+    // App state
     size_t cur_counter = 0;
-    ERpc::TscLatency commit_latency;  // Leader latency to commit an entry
 
     // Stats
+    ERpc::TscLatency commit_latency;  // Leader latency to commit an entry
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;

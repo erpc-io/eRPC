@@ -43,11 +43,19 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
            ERpc::get_formatted_time().c_str());
   }
 
+  // Avoid malloc for n_entries < static_msg_entry_arr_size
+  constexpr size_t static_msg_entry_arr_size = 16;
+  msg_entry_t static_msg_entry_arr[static_msg_entry_arr_size];
+
   if (is_keepalive) {
     assert(req_msgbuf->get_data_size() == sizeof(appendentries_req_t));
   } else {
     buf += sizeof(appendentries_req_t);
-    ae.entries = new msg_entry_t[n_entries];  // Freed below
+    if (n_entries <= static_msg_entry_arr_size) {
+      ae.entries = static_msg_entry_arr;
+    } else {
+      ae.entries = new msg_entry_t[n_entries];  // Freed below
+    }
 
     // Invariant: buf points to a msg_entry_t, followed by its buffer
     for (size_t i = 0; i < n_entries; i++) {
@@ -85,7 +93,10 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   _unused(e);
   assert(e == 0);
 
-  if (ae.entries != nullptr) delete ae.entries;  // Only for non-keepalives
+  if (n_entries > static_msg_entry_arr_size) {
+    assert(ae.entries != nullptr && ae.entries != static_msg_entry_arr);
+    delete[] ae.entries;
+  }
 
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
@@ -131,7 +142,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   ERpc::rt_assert(req_size <= c->rpc->get_max_msg_size(),
                   "appendentries request too large for eRPC");
 
-  auto *raft_req_tag = new raft_req_tag_t();  // XXX: Optimize with pool
+  raft_req_tag_t *raft_req_tag = c->server.raft_req_tag_pool.alloc();
   raft_req_tag->req_msgbuf = c->rpc->alloc_msg_buffer(req_size);
   ERpc::rt_assert(raft_req_tag->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
@@ -218,7 +229,7 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
 
   c->rpc->free_msg_buffer(raft_req_tag->req_msgbuf);
   c->rpc->free_msg_buffer(raft_req_tag->resp_msgbuf);
-  delete raft_req_tag;  // Free allocated memory, XXX: Remove when we use pool
+  c->server.raft_req_tag_pool.free(raft_req_tag);
 
   c->rpc->release_response(resp_handle);
 }
