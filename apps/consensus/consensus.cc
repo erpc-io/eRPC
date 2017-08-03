@@ -29,7 +29,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  c->server.commit_latency.stopwatch_start();
+  if (kAppMeasureCommitLatency) c->server.commit_latency.stopwatch_start();
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
         TimeEntry(TimeEntryType::kClientReq, ERpc::rdtsc()));
@@ -68,12 +68,14 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
       raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
   if (likely(e == 0)) return;
 
-  // Send a response with the error
-  c->server.commit_latency.stopwatch_stop();  // Don't leave stopwatch on
+  // If we're here, recv_entry failed. Clean up and send an error response.
+  leader_sav.in_use = false;
+  if (kAppMeasureCommitLatency) c->server.commit_latency.stopwatch_stop();
+
   client_resp_t err_resp;
   switch (e) {
     case RAFT_ERR_NOT_LEADER:
-      // XXX: Redirect to leader
+      // XXX: Redirect client to new leader
       err_resp.resp_type = ClientRespType::kFailTryAgain;
       break;
     case RAFT_ERR_SHUTDOWN:
@@ -217,7 +219,7 @@ int main(int argc, char **argv) {
     if (commit_status == 1) {
       // Committed: Send a response
       leader_sav.in_use = false;
-      c.server.commit_latency.stopwatch_stop();
+      if (kAppMeasureCommitLatency) c.server.commit_latency.stopwatch_stop();
 
       if (kAppCollectTimeEntries) {
         c.server.time_entry_vec.push_back(
