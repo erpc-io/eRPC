@@ -126,7 +126,7 @@ class MemPool {
   std::vector<T *> pool;
 
   void extend_pool() {
-    T* backing_ptr = new T[num_to_alloc];
+    T *backing_ptr = new T[num_to_alloc];
     for (size_t i = 0; i < num_to_alloc; i++) {
       pool.push_back(&backing_ptr[i]);
     }
@@ -135,16 +135,14 @@ class MemPool {
     num_to_alloc *= 2;
   }
 
-  T* alloc() {
+  T *alloc() {
     if (pool.empty()) extend_pool();
-    T* ret = pool.back();
+    T *ret = pool.back();
     pool.pop_back();
     return ret;
   }
 
-  void free(T* t) {
-    pool.push_back(t);
-  }
+  void free(T *t) { pool.push_back(t); }
 
   MemPool() {}
 
@@ -173,8 +171,8 @@ class AppContext {
     size_t cur_counter = 0;
 
     // Stats
-    ERpc::TscLatency commit_latency;  // Leader latency to commit an entry
-    size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
+    ERpc::TscLatency commit_latency;       // Leader latency to commit an entry
+    size_t stat_requestvote_enq_fail = 0;  // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;
 

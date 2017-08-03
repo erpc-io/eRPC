@@ -72,7 +72,7 @@ class AppContext {
 
   // Number of slots in session_arr, including an unused one for this thread
   size_t num_sessions;
-  int *session_arr = nullptr;  // Sessions created as client
+  int *session_arr = nullptr;  // Sessions created as client. XXX: Vector.
 
   // The entry in session_arr for this thread, so we don't send reqs to ourself
   size_t self_session_index;
@@ -89,7 +89,7 @@ class AppContext {
 
   ~AppContext() {
     if (tmp_stat != nullptr) delete tmp_stat;
-    if (session_arr != nullptr) delete session_arr;
+    if (session_arr != nullptr) delete[] session_arr;
   }
 };
 
