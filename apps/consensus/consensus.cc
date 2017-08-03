@@ -66,9 +66,10 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   int e =
       raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
-  if (e == 0) return;
+  if (likely(e == 0)) return;
 
   // Send a response with the error
+  c->server.commit_latency.stopwatch_stop();  // Don't leave stopwatch on
   client_resp_t err_resp;
   switch (e) {
     case RAFT_ERR_NOT_LEADER:
@@ -82,9 +83,6 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
       break;
   }
   send_client_response(c, req_handle, &err_resp);
-
-  // Clean up
-  c->server.commit_latency.stopwatch_stop();
 }
 
 void init_raft(AppContext *c) {

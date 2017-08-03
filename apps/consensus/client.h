@@ -88,7 +88,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
            ERpc::get_formatted_time().c_str());
   }
 
-  if (client_resp->resp_type == ClientRespType::kFailLeaderChanged) {
+  if (unlikely(client_resp->resp_type == ClientRespType::kFailLeaderChanged)) {
     printf("consensus: Client changing leader to index %zu.\n",
            client_resp->leader_idx);
     c->client.leader_idx = client_resp->leader_idx;

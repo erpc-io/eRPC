@@ -59,13 +59,13 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
     // Invariant: buf points to a msg_entry_t, followed by its buffer
     for (size_t i = 0; i < n_entries; i++) {
-      // Allocate dynamic memory for each appendentry
       ae.entries[i] = *(reinterpret_cast<msg_entry_t *>(buf));
       assert(ae.entries[i].data.buf == nullptr);
 
       size_t data_len = ae.entries[i].data.len;
       assert(data_len == sizeof(size_t));  // Non-keepalive => app log entry
 
+      // Allocate dynamic memory for each appendentry
       ae.entries[i].data.buf = c->counter_buf_pool_alloc();
       memcpy(ae.entries[i].data.buf, buf + sizeof(msg_entry_t), data_len);
 
@@ -142,42 +142,41 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   ERpc::rt_assert(req_size <= c->rpc->get_max_msg_size(),
                   "appendentries request too large for eRPC");
 
-  raft_req_tag_t *raft_req_tag = c->server.raft_req_tag_pool.alloc();
-  raft_req_tag->req_msgbuf = c->rpc->alloc_msg_buffer(req_size);
-  ERpc::rt_assert(raft_req_tag->req_msgbuf.buf != nullptr,
+  raft_req_tag_t *rrt = c->server.raft_req_tag_pool.alloc();
+  rrt->req_msgbuf = c->rpc->alloc_msg_buffer(req_size);
+  ERpc::rt_assert(rrt->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
 
-  raft_req_tag->resp_msgbuf =
+  rrt->resp_msgbuf =
       c->rpc->alloc_msg_buffer(sizeof(msg_appendentries_response_t));
-  ERpc::rt_assert(raft_req_tag->resp_msgbuf.buf != nullptr,
+  ERpc::rt_assert(rrt->resp_msgbuf.buf != nullptr,
                   "Failed to allocate response MsgBuffer");
 
-  raft_req_tag->node = node;
+  rrt->node = node;
 
   // Fill in the appendentries request header
   auto *erpc_appendentries =
-      reinterpret_cast<appendentries_req_t *>(raft_req_tag->req_msgbuf.buf);
+      reinterpret_cast<appendentries_req_t *>(rrt->req_msgbuf.buf);
 
   erpc_appendentries->node_id = c->server.node_id;
   erpc_appendentries->ae = *m;
   erpc_appendentries->ae.entries = nullptr;  // Was local pointer
 
   // Serialize each entry
-  uint8_t *buf = raft_req_tag->req_msgbuf.buf + sizeof(appendentries_req_t);
+  uint8_t *buf = rrt->req_msgbuf.buf + sizeof(appendentries_req_t);
   for (size_t i = 0; i < static_cast<size_t>(m->n_entries); i++) {
     auto *msg_entry = reinterpret_cast<msg_entry_t *>(buf);
     *msg_entry = m->entries[i];
     msg_entry->data.buf = nullptr;  // Was local pointer
     buf += sizeof(msg_entry_t);
 
-    assert(m->entries[i].data.len > 0);
+    assert(m->entries[i].data.len == sizeof(size_t));
     memcpy(buf, m->entries[i].data.buf,
            static_cast<size_t>(m->entries[i].data.len));
     buf += static_cast<size_t>(m->entries[i].data.len);
   }
-  assert(buf ==
-         raft_req_tag->req_msgbuf.buf +
-             raft_req_tag->req_msgbuf.get_data_size());
+
+  assert(buf == rrt->req_msgbuf.buf + rrt->req_msgbuf.get_data_size());
 
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
@@ -186,8 +185,8 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
   int ret = c->rpc->enqueue_request(
       conn->session_num, static_cast<uint8_t>(ReqType::kAppendEntries),
-      &raft_req_tag->req_msgbuf, &raft_req_tag->resp_msgbuf, appendentries_cont,
-      reinterpret_cast<size_t>(raft_req_tag));
+      &rrt->req_msgbuf, &rrt->resp_msgbuf, appendentries_cont,
+      reinterpret_cast<size_t>(rrt));
   assert(ret == 0 || ret == -EBUSY);  // We checked is_connected above
   if (ret == -EBUSY) c->server.stat_appendentries_enq_fail++;
 
@@ -208,28 +207,27 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
         TimeEntry(TimeEntryType::kRecvAeResp, ERpc::rdtsc()));
   }
 
-  auto *raft_req_tag = reinterpret_cast<raft_req_tag_t *>(tag);
-  assert(raft_req_tag->resp_msgbuf.get_data_size() ==
+  auto *rrt = reinterpret_cast<raft_req_tag_t *>(tag);
+  assert(rrt->resp_msgbuf.get_data_size() ==
          sizeof(msg_appendentries_response_t));
 
   if (kAppVerbose) {
     printf("consensus: Received appendentries response from node %s [%s].\n",
-           node_id_to_name_map[raft_node_get_id(raft_req_tag->node)].c_str(),
+           node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            ERpc::get_formatted_time().c_str());
   }
 
   auto *msg_appendentries_response =
-      reinterpret_cast<msg_appendentries_response_t *>(
-          raft_req_tag->resp_msgbuf.buf);
+      reinterpret_cast<msg_appendentries_response_t *>(rrt->resp_msgbuf.buf);
 
-  int e = raft_recv_appendentries_response(c->server.raft, raft_req_tag->node,
+  int e = raft_recv_appendentries_response(c->server.raft, rrt->node,
                                            msg_appendentries_response);
   _unused(e);
   assert(e == 0);
 
-  c->rpc->free_msg_buffer(raft_req_tag->req_msgbuf);
-  c->rpc->free_msg_buffer(raft_req_tag->resp_msgbuf);
-  c->server.raft_req_tag_pool.free(raft_req_tag);
+  c->rpc->free_msg_buffer(rrt->req_msgbuf);
+  c->rpc->free_msg_buffer(rrt->resp_msgbuf);
+  c->server.raft_req_tag_pool.free(rrt);
 
   c->rpc->release_response(resp_handle);
 }
