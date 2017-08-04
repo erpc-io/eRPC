@@ -56,11 +56,8 @@ static constexpr bool large_rpc_supported() {
 
 /// Collect datapath if enabled
 static inline constexpr void dpath_stat_inc(size_t &stat, size_t val) {
-  if (!kDatapathStats) {
-    return;
-  } else {
-    stat += val;
-  }
+  if (!kDatapathStats) return;
+  stat += val;
 }
 
 /// Fault injection code that can be disabled for non-tests

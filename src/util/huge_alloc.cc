@@ -35,17 +35,13 @@ HugeAlloc::~HugeAlloc() {
 bool HugeAlloc::create_cache(size_t size, size_t num_buffers) {
   size_t size_class = get_class(size);
   size_t reqd_buffers = num_buffers - freelist[size_class].size();
-  if (reqd_buffers <= 0) {
-    return true;
-  }
+  if (reqd_buffers <= 0) return true;
 
   std::vector<Buffer> free_buffer_vec;
 
   for (size_t i = 0; i < reqd_buffers; i++) {
     Buffer buffer = alloc(size);
-    if (buffer.buf == nullptr) {
-      return false;
-    }
+    if (buffer.buf == nullptr) return false;
 
     free_buffer_vec.push_back(buffer);
   }

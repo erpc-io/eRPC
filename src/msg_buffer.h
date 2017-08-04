@@ -59,9 +59,7 @@ class MsgBuffer {
 
   /// Check if a MsgBuffer's magic is valid
   inline bool check_magic() const {
-    if (likely(get_pkthdr_0()->magic == kPktHdrMagic)) {
-      return true;
-    }
+    if (likely(get_pkthdr_0()->magic == kPktHdrMagic)) return true;
     return false;
   }
 
@@ -103,9 +101,7 @@ class MsgBuffer {
 
   /// Return a string representation of this MsgBuffer
   std::string to_string() const {
-    if (buf == nullptr) {
-      return "[Invalid]";
-    }
+    if (buf == nullptr) return "[Invalid]";
 
     std::ostringstream ret;
     ret << "[buf " << static_cast<void *>(buf) << ", "

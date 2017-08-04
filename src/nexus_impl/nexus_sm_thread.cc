@@ -27,9 +27,7 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
   assert(event != nullptr);
 
   ENetPeer *epeer = event->peer;
-  if (is_peer_mode_server(epeer)) {
-    return;
-  }
+  if (is_peer_mode_server(epeer)) return;
 
   // If we're here, this is a client-mode ENet peer
   auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
@@ -59,9 +57,7 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
 
   ENetPeer *epeer = event->peer;  // Freed by ENet
   uint32_t epeer_ip = epeer->address.host;
-  if (is_peer_mode_server(epeer)) {
-    return;
-  }
+  if (is_peer_mode_server(epeer)) return;
 
   // If we're here, this is a client mode peer, so we have mappings
   assert(ctx->ip_map.count(epeer_ip) > 0);
@@ -245,10 +241,7 @@ void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
 template <class TTr>
 void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
   assert(ctx != nullptr);
-
-  if (ctx->sm_tx_list.size == 0) {
-    return;
-  }
+  if (ctx->sm_tx_list.size == 0) return;
 
   ctx->sm_tx_list.lock();
 
