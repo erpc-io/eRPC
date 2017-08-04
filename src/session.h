@@ -27,11 +27,7 @@ class Session {
   friend class Rpc<IBTransport>;
 
  public:
-  enum class Role : int {
-    // Weird numbers to help detect use of freed session pointers
-    kServer = 37,
-    kClient = 95
-  };
+  enum class Role : int { kServer, kClient };
 
   static constexpr size_t kSessionReqWindow = 8;  ///< *Request* window size
   static constexpr size_t kSessionCredits = 8;    ///< *Packet* credits
