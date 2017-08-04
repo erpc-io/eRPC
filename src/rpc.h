@@ -43,9 +43,6 @@ class Rpc {
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
-  /// Disable packet loss handling
-  static constexpr bool kDisablePktLossHandling = true;
-
   /// Duration of a packet loss detection epoch in milliseconds
   static constexpr size_t kPktLossEpochMs = kFaultInjection ? 1 : 10;
 
