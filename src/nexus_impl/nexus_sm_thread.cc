@@ -27,7 +27,7 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
   assert(event != nullptr);
 
   ENetPeer *epeer = event->peer;
-  if (is_peer_mode_server(epeer)) return;
+  if (sm_is_peer_mode_server(epeer)) return;
 
   // If we're here, this is a client-mode ENet peer
   auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
@@ -57,7 +57,7 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
 
   ENetPeer *epeer = event->peer;  // Freed by ENet
   uint32_t epeer_ip = epeer->address.host;
-  if (is_peer_mode_server(epeer)) return;
+  if (sm_is_peer_mode_server(epeer)) return;
 
   // If we're here, this is a client mode peer, so we have mappings
   assert(ctx->ip_map.count(epeer_ip) > 0);
@@ -112,7 +112,7 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
 
   ENetPeer *epeer = event->peer;
 
-  if (!is_peer_mode_server(epeer)) {
+  if (!sm_is_peer_mode_server(epeer)) {
     // This is an event for a client-mode peer, so we have mappings
     assert(ctx->ip_map.count(epeer->address.host) > 0);
     assert(ctx->name_map[ctx->ip_map[epeer->address.host]] == epeer);
@@ -224,7 +224,7 @@ void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
   assert(sm_pkt != nullptr);
 
   // If the work item uses a client-mode peer, the peer must be connected
-  if (!is_peer_mode_server(wi.epeer)) {
+  if (!sm_is_peer_mode_server(wi.epeer)) {
     assert(static_cast<SmENetPeerData *>(wi.epeer->data)->connected);
   }
 

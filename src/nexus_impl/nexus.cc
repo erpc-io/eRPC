@@ -10,7 +10,7 @@ namespace ERpc {
 template <class TTr>
 Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
                   size_t num_bg_threads)
-    : freq_ghz(get_freq_ghz()),
+    : freq_ghz(measure_rdtsc_freq()),
       hostname(hostname),
       num_bg_threads(num_bg_threads) {
   // Print warning messages if low-performance settings are enabled
@@ -22,12 +22,10 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
     LOG_WARN("eRPC Nexus: Fault injection enabled. Performance will be low.\n");
   }
 
-  rt_assert(num_bg_threads <= kMaxBgThreads,
-            "eRPC Nexus: Too many background threads.");
+  rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
 
   if (small_rpc_optlevel == small_rpc_optlevel_extreme) {
-    rt_assert(num_bg_threads == 0,
-              "eRPC Nexus: Background threads not supported in extreme mode.");
+    rt_assert(num_bg_threads == 0, "Background threads not supported");
   }
 
   kill_switch = false;
@@ -167,7 +165,7 @@ int Nexus<TTr>::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
 }
 
 template <class TTr>
-double Nexus<TTr>::get_freq_ghz() {
+double Nexus<TTr>::measure_rdtsc_freq() {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
   uint64_t rdtsc_start = rdtsc();
@@ -178,12 +176,7 @@ double Nexus<TTr>::get_freq_ghz() {
   for (uint64_t i = 0; i < 1000000; i++) {
     sum += i + (sum + i) * (i % sum);
   }
-
-  if (sum != 13580802877818827968ull) {
-    LOG_ERROR("eRPC: FATAL. Failed in rdtsc frequency measurement.");
-    assert(false);
-    exit(-1);
-  }
+  rt_assert(sum == 13580802877818827968ull, "Error in RDTSC freq measurement");
 
   clock_gettime(CLOCK_REALTIME, &end);
   uint64_t clock_ns =
@@ -192,10 +185,7 @@ double Nexus<TTr>::get_freq_ghz() {
   uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
 
   double _freq_ghz = rdtsc_cycles / clock_ns;
-
-  // Less than 500 MHz and greater than 5.0 GHz is abnormal
-  rt_assert(_freq_ghz >= 0.5 && _freq_ghz <= 5.0,
-            "eRPC Nexus: Invalid frequency.");
+  rt_assert(_freq_ghz >= 0.5 && _freq_ghz <= 5.0, "Invalid RDTSC frequency");
 
   return _freq_ghz;
 }
