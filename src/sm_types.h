@@ -271,9 +271,7 @@ class SessionEndpoint {
 class SmPkt {
  public:
   SmPktType pkt_type;
-  SmErrType err_type;  ///< Error type, for responses only
-  size_t gen_data;     ///< General-purpose data
-
+  SmErrType err_type;              ///< Error type, for responses only
   SessionEndpoint client, server;  ///< Endpoint metadata
 
   bool is_req() const { return sm_pkt_type_is_req(pkt_type); }

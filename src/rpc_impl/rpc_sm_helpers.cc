@@ -79,8 +79,7 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type,
-                                 size_t gen_data) {
+void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
   assert(in_creator());
   assert(session != nullptr && session->is_client());
 
@@ -88,7 +87,6 @@ void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type,
   sm_pkt->pkt_type = pkt_type;
   sm_pkt->client = session->client;
   sm_pkt->server = session->server;
-  sm_pkt->gen_data = gen_data;
 
   nexus_hook.sm_tx_list->unlocked_push_back(
       typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt, nullptr));

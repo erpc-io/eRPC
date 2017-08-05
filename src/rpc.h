@@ -260,8 +260,7 @@ class Rpc {
   /// Allocate and enqueue a session management request packet to the session
   /// management thread. The allocated packet will be freed by the session
   /// management thread after transmission.
-  void enqueue_sm_req_st(Session *session, SmPktType pkt_type,
-                         size_t gen_data = 0);
+  void enqueue_sm_req_st(Session *session, SmPktType pkt_type);
 
   /// Allocate a response-copy of the session manegement packet and enqueue it
   /// to the session management thread. The allocated packet will be freed by
