@@ -186,9 +186,7 @@ void IBTransport::post_recvs(size_t num_recvs) {
   assert(recvs_to_post < kRecvSlack);
 
   recvs_to_post += num_recvs;
-  if (recvs_to_post < kRecvSlack) {
-    return;
-  }
+  if (recvs_to_post < kRecvSlack) return;
 
   if (use_fast_recv) {
     // Construct a special RECV wr that the modded driver understands. Encode
@@ -206,7 +204,6 @@ void IBTransport::post_recvs(size_t num_recvs) {
 
     // Reset slack counter
     recvs_to_post = 0;
-
     return;
   }
 

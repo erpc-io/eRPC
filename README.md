@@ -104,10 +104,6 @@
    at runtime.
 
 ## Short-term TODOs
- * Stack: Work on replacing global sv with context c. Check AppContext magic
-   everywhere. Set libcraft node udata while creating node.
- * Clone willemt/raft, remove fprofile-arcs and ftest-coverage, add -g, march=native.
-   Add install script.
  * In IBTransport, check if MLX environment vars are set. Do it in constructor.
  * Try using union for `server_info` and `client_info` in sslot. This causes
    C++ issues bc of non-trivial destructor in anonymous union.
@@ -132,9 +128,8 @@
  * Handle MsgBuffer allocation failures in eRPC.
 
 ## Longer-term TODOs
- * Optimize Mellanox drivers `post_send` and `poll_cq`, including memcpy,
-   function pointers, and unused opcodes/QP types/cases. If inline size is
-   fixed at 60 bytes, optimized that. Add fast RECV posting.
+ * Replace exit(-1) in non-destructor code with `rt_assert` IF it doesn't
+   reduce perf (`rt_assert` takes a string argument - does that cause overhead?)
  * Less frequent use of `rdtsc()`
  * Optimize `pkthdr_0` filling using preconstructed headers.
  * Are we losing some performance by using `size_t` instead of `uint32_t` in
