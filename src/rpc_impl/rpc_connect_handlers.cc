@@ -9,62 +9,60 @@ namespace ERpc {
 // We need to handle all types of errors in remote arguments that the client can
 // make when calling create_session(), which cannot check for such errors.
 template <class TTr>
-void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
+void Rpc<TTr>::handle_connect_req_st(
+    const typename Nexus<TTr>::SmWorkItem &req_wi) {
   assert(in_creator());
-  assert(wi != nullptr && wi->epeer != nullptr);
-
-  SmPkt *sm_pkt = wi->sm_pkt;
-  assert(sm_pkt != nullptr && sm_pkt->pkt_type == SmPktType::kConnectReq);
+  assert(req_wi.epeer != nullptr);
+  assert(req_wi.sm_pkt.pkt_type == SmPktType::kConnectReq);
 
   // Ensure that server fields known by the client were filled correctly
-  assert(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0);
-  assert(sm_pkt->server.rpc_id == rpc_id);
-  assert(sm_pkt->server.secret == sm_pkt->client.secret);
+  assert(strcmp(req_wi.sm_pkt.server.hostname, nexus->hostname.c_str()) == 0);
+  assert(req_wi.sm_pkt.server.rpc_id == rpc_id);
+  assert(req_wi.sm_pkt.server.secret == req_wi.sm_pkt.client.secret);
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",
-          rpc_id, sm_pkt->client.name().c_str());
+          rpc_id, req_wi.sm_pkt.client.name().c_str());
 
   // Check that the transport matches
-  Transport::TransportType pkt_tr_type = sm_pkt->server.transport_type;
+  Transport::TransportType pkt_tr_type = req_wi.sm_pkt.server.transport_type;
   if (pkt_tr_type != transport->transport_type) {
     LOG_WARN("%s: Invalid transport %s. Sending response.\n", issue_msg,
              Transport::get_transport_name(pkt_tr_type).c_str());
-    enqueue_sm_resp_st(wi, SmErrType::kInvalidTransport);
+    enqueue_sm_resp_st(req_wi, SmErrType::kInvalidTransport);
     return;
   }
 
   // Check if the requested physical port is correct
-  if (sm_pkt->server.phy_port != phy_port) {
+  if (req_wi.sm_pkt.server.phy_port != phy_port) {
     LOG_WARN("%s: Invalid server port %u. Sending response.\n", issue_msg,
-             sm_pkt->server.phy_port);
-    enqueue_sm_resp_st(wi, SmErrType::kInvalidRemotePort);
+             req_wi.sm_pkt.server.phy_port);
+    enqueue_sm_resp_st(req_wi, SmErrType::kInvalidRemotePort);
     return;
   }
 
   // Check if we are allowed to create another session
   if (!have_recvs()) {
     LOG_WARN("%s: RECVs exhausted. Sending response.\n", issue_msg);
-    enqueue_sm_resp_st(wi, SmErrType::kRecvsExhausted);
+    enqueue_sm_resp_st(req_wi, SmErrType::kRecvsExhausted);
   }
 
   if (session_vec.size() == kMaxSessionsPerThread) {
     LOG_WARN("%s: Reached session limit %zu. Sending response.\n", issue_msg,
              kMaxSessionsPerThread);
-    enqueue_sm_resp_st(wi, SmErrType::kTooManySessions);
+    enqueue_sm_resp_st(req_wi, SmErrType::kTooManySessions);
     return;
   }
 
-  // Try to resolve the client's routing info into the packet. If session
-  // creation succeeds, we'll copy it to the server's session endpoint.
-  Transport::RoutingInfo *client_rinfo = &(sm_pkt->client.routing_info);
-
-  bool resolve_success = transport->resolve_remote_routing_info(client_rinfo);
+  // Try to resolve the client's routing info. If session creation succeeds,
+  // we'll copy it to the server's session endpoint.
+  Transport::RoutingInfo client_rinfo;
+  bool resolve_success = transport->resolve_remote_routing_info(&client_rinfo);
   if (!resolve_success) {
-    std::string routing_info_str = TTr::routing_info_str(client_rinfo);
+    std::string routing_info_str = TTr::routing_info_str(&client_rinfo);
     LOG_WARN("%s: Unable to resolve routing info %s. Sending response.\n",
              issue_msg, routing_info_str.c_str());
-    enqueue_sm_resp_st(wi, SmErrType::kRoutingResolutionFailure);
+    enqueue_sm_resp_st(req_wi, SmErrType::kRoutingResolutionFailure);
     return;
   }
 
@@ -83,47 +81,50 @@ void Rpc<TTr>::handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi) {
       }
 
       LOG_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
-      enqueue_sm_resp_st(wi, SmErrType::kOutOfMemory);
+      enqueue_sm_resp_st(req_wi, SmErrType::kOutOfMemory);
       return;
     }
   }
 
-  // Set the server endpoint metadata fields in the received packet, which we
-  // will then send back to the client.
-  sm_pkt->server.session_num = session_vec.size();
-  transport->fill_local_routing_info(&(sm_pkt->server.routing_info));
+  // Record info to session
+  session->server = req_wi.sm_pkt.server;
+  session->server.session_num = session_vec.size();
+  transport->fill_local_routing_info(&session->server.routing_info);
 
-  // Save endpoint metadata from pkt. This saves the resolved routing info.
-  session->server = sm_pkt->server;
-  session->client = sm_pkt->client;
+  session->client = req_wi.sm_pkt.client;
+  session->client.routing_info = client_rinfo;
 
-  session->local_session_num = sm_pkt->server.session_num;
-  session->remote_session_num = sm_pkt->client.session_num;
+  session->local_session_num = session->server.session_num;
+  session->remote_session_num = session->client.session_num;
 
   alloc_recvs();
   session_vec.push_back(session);  // Add to list of all sessions
 
+  // For successful responses, we need to edit the response SM packet
+  typename Nexus<TTr>::SmWorkItem resp_wi = req_wi;
+  resp_wi.sm_pkt.server = session->server;
+  resp_wi.sm_pkt.client = session->client;
+
   LOG_INFO("%s: None. Sending response.\n", issue_msg);
-  enqueue_sm_resp_st(wi, SmErrType::kNoError);
+  enqueue_sm_resp_st(resp_wi, SmErrType::kNoError);
   return;
 }
 
 template <class TTr>
-void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
+void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   assert(in_creator());
-  assert(sm_pkt != nullptr);
-  assert(sm_pkt->pkt_type == SmPktType::kConnectResp);
-  assert(sm_err_type_is_valid(sm_pkt->err_type));
+  assert(sm_pkt.pkt_type == SmPktType::kConnectResp);
+  assert(sm_err_type_is_valid(sm_pkt.err_type));
 
   // Create the basic issue message using only the packet
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "eRPC Rpc %u: Received connect response from %s for session %u. "
           "Issue",
-          rpc_id, sm_pkt->server.name().c_str(), sm_pkt->client.session_num);
+          rpc_id, sm_pkt.server.name().c_str(), sm_pkt.client.session_num);
 
   // Try to locate the requester session and do some sanity checks
-  uint16_t session_num = sm_pkt->client.session_num;
+  uint16_t session_num = sm_pkt.client.session_num;
   assert(session_num < session_vec.size());
 
   Session *session = session_vec[session_num];
@@ -131,16 +132,16 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
   assert(session->is_client());
   assert(session->state == SessionState::kConnectInProgress);
   assert(session->client_info.sm_api_req_pending);
-  assert(session->client == sm_pkt->client);
+  assert(session->client == sm_pkt.client);
 
   // We don't have the server's session number locally yet, so we cannot use
   // SessionEndpoint comparator to compare server endpoint metadata.
-  assert(strcmp(session->server.hostname, sm_pkt->server.hostname) == 0);
-  assert(session->server.rpc_id == sm_pkt->server.rpc_id);
+  assert(strcmp(session->server.hostname, sm_pkt.server.hostname) == 0);
+  assert(session->server.rpc_id == sm_pkt.server.rpc_id);
   assert(session->server.session_num == kInvalidSessionNum);
 
   // Handle special error cases for which we retry the connect request
-  if (sm_pkt->err_type == SmErrType::kInvalidRemoteRpcId) {
+  if (sm_pkt.err_type == SmErrType::kInvalidRemoteRpcId) {
     if (retry_connect_on_invalid_rpc_id) {
       LOG_WARN("%s: Invalid remote Rpc ID. Retrying.\n", issue_msg);
       enqueue_sm_req_st(session, SmPktType::kConnectReq);
@@ -153,14 +154,14 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
 
   // If the connect response has an error, the server has not allocated a
   // session object. Mark the session as disconnected and invoke callback.
-  if (sm_pkt->err_type != SmErrType::kNoError) {
+  if (sm_pkt.err_type != SmErrType::kNoError) {
     LOG_WARN("%s: Error %s.\n", issue_msg,
-             sm_err_type_str(sm_pkt->err_type).c_str());
+             sm_err_type_str(sm_pkt.err_type).c_str());
 
     session->state = SessionState::kDisconnected;
     free_recvs();  // Free before calling handler, which might want a reconnect
     sm_handler(session->local_session_num, SmEventType::kConnectFailed,
-               sm_pkt->err_type, context);
+               sm_pkt.err_type, context);
 
     bury_session_st(session);
     return;
@@ -168,14 +169,13 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
 
   // If we are here, the server has created a session endpoint.
 
-  // Try to resolve the server's routing information into the packet. If this
-  // fails, invoke kConnectFailed callback.
-  Transport::RoutingInfo *srv_routing_info = &(sm_pkt->server.routing_info);
+  // Try to resolve the server's routing info
+  Transport::RoutingInfo srv_routing_info;
   bool resolve_success;
   if (kFaultInjection && faults.fail_resolve_server_rinfo) {
     resolve_success = false;  // Inject fault
   } else {
-    resolve_success = transport->resolve_remote_routing_info(srv_routing_info);
+    resolve_success = transport->resolve_remote_routing_info(&srv_routing_info);
   }
 
   if (!resolve_success) {
@@ -187,7 +187,7 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
     session->client_info.sm_callbacks_disabled = true;
 
     // Save server metadata for when we receieve the disconnect response
-    session->server = sm_pkt->server;
+    session->server = sm_pkt.server;
 
     // Do what destroy_session() does with a kConnected session
     session->state = SessionState::kDisconnectInProgress;
@@ -208,8 +208,9 @@ void Rpc<TTr>::handle_connect_resp_st(SmPkt *sm_pkt) {
     return;
   }
 
-  // Save server endpoint metadata. This saves the resolved routing info.
-  session->server = sm_pkt->server;
+  // Save server endpoint metadata
+  session->server = sm_pkt.server;  // This fills most fields
+  session->server.routing_info = srv_routing_info;
   session->remote_session_num = session->server.session_num;
   session->state = SessionState::kConnected;
 

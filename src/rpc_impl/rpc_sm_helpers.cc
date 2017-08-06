@@ -13,29 +13,28 @@ void Rpc<TTr>::handle_sm_st() {
   nexus_hook.sm_rx_list.lock();
 
   // Handle all session management requests
-  for (typename Nexus<TTr>::SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
-    SmPkt *sm_pkt = wi.sm_pkt;
-    assert(sm_pkt != nullptr);
-    assert(sm_pkt_type_is_valid(sm_pkt->pkt_type));
+  for (const typename Nexus<TTr>::SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
+    const SmPkt &sm_pkt = wi.sm_pkt;
+    assert(sm_pkt_type_is_valid(sm_pkt.pkt_type));
 
     // The sender of a packet cannot be this Rpc
-    if (sm_pkt->is_req()) {
-      assert(!(strcmp(sm_pkt->client.hostname, nexus->hostname.c_str()) == 0 &&
-               sm_pkt->client.rpc_id == rpc_id));
+    if (sm_pkt.is_req()) {
+      assert(!(strcmp(sm_pkt.client.hostname, nexus->hostname.c_str()) == 0 &&
+               sm_pkt.client.rpc_id == rpc_id));
     } else {
-      assert(!(strcmp(sm_pkt->server.hostname, nexus->hostname.c_str()) == 0 &&
-               sm_pkt->server.rpc_id == rpc_id));
+      assert(!(strcmp(sm_pkt.server.hostname, nexus->hostname.c_str()) == 0 &&
+               sm_pkt.server.rpc_id == rpc_id));
     }
 
-    switch (sm_pkt->pkt_type) {
+    switch (sm_pkt.pkt_type) {
       case SmPktType::kConnectReq:
-        handle_connect_req_st(&wi);
+        handle_connect_req_st(wi);
         break;
       case SmPktType::kConnectResp:
         handle_connect_resp_st(sm_pkt);
         break;
       case SmPktType::kDisconnectReq:
-        handle_disconnect_req_st(&wi);
+        handle_disconnect_req_st(wi);
         break;
       case SmPktType::kDisconnectResp:
         handle_disconnect_resp_st(sm_pkt);
@@ -44,9 +43,6 @@ void Rpc<TTr>::handle_sm_st() {
         // This is handled in the Nexus
         throw std::runtime_error("Invalid packet type");
     }
-
-    // Free the packet memory allocated by the SM thread
-    delete sm_pkt;
   }
 
   // Clear the session management RX list
@@ -83,34 +79,27 @@ void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
   assert(in_creator());
   assert(session != nullptr && session->is_client());
 
-  SmPkt *sm_pkt = new SmPkt();  // Freed by SM thread
-  sm_pkt->pkt_type = pkt_type;
-  sm_pkt->client = session->client;
-  sm_pkt->server = session->server;
+  SmPkt sm_pkt;
+  sm_pkt.pkt_type = pkt_type;
+  sm_pkt.client = session->client;
+  sm_pkt.server = session->server;
 
   nexus_hook.sm_tx_list->unlocked_push_back(
       typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt, nullptr));
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_resp_st(typename Nexus<TTr>::SmWorkItem *req_wi,
+void Rpc<TTr>::enqueue_sm_resp_st(const typename Nexus<TTr>::SmWorkItem &req_wi,
                                   SmErrType err_type) {
   assert(in_creator());
-  assert(req_wi != nullptr);
-  assert(req_wi->epeer != nullptr);
-  assert(req_wi->sm_pkt != nullptr);
-  assert(req_wi->sm_pkt->is_req());
+  assert(req_wi.epeer != nullptr);
+  assert(req_wi.sm_pkt.is_req());
 
-  // The SM packet in the work item will be freed later by this thread. Create
-  // a copy that will be freed by the SM thread.
-  auto *sm_pkt = new SmPkt();
-  *sm_pkt = *req_wi->sm_pkt;
+  SmPkt sm_pkt = req_wi.sm_pkt;
+  sm_pkt.pkt_type = sm_pkt_type_req_to_resp(sm_pkt.pkt_type);  // Change to resp
+  sm_pkt.err_type = err_type;
 
-  // Change the packet type to response
-  sm_pkt->pkt_type = sm_pkt_type_req_to_resp(sm_pkt->pkt_type);
-  sm_pkt->err_type = err_type;
-
-  typename Nexus<TTr>::SmWorkItem wi(rpc_id, sm_pkt, req_wi->epeer);
+  typename Nexus<TTr>::SmWorkItem wi(rpc_id, sm_pkt, req_wi.epeer);
   nexus_hook.sm_tx_list->unlocked_push_back(wi);
 }
 

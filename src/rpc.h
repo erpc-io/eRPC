@@ -265,18 +265,18 @@ class Rpc {
   /// Allocate a response-copy of the session manegement packet and enqueue it
   /// to the session management thread. The allocated packet will be freed by
   /// the session management thread on transmission.
-  void enqueue_sm_resp_st(typename Nexus<TTr>::SmWorkItem *req_wi,
+  void enqueue_sm_resp_st(const typename Nexus<TTr>::SmWorkItem &req_wi,
                           SmErrType err_type);
 
   //
   // Session management packet handlers (rpc_connect_handlers.cc,
   // rpc_disconnect_handlers.cc)
   //
-  void handle_connect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
-  void handle_connect_resp_st(SmPkt *pkt);
+  void handle_connect_req_st(const typename Nexus<TTr>::SmWorkItem &req_wi);
+  void handle_connect_resp_st(const SmPkt &pkt);
 
-  void handle_disconnect_req_st(typename Nexus<TTr>::SmWorkItem *wi);
-  void handle_disconnect_resp_st(SmPkt *pkt);
+  void handle_disconnect_req_st(const typename Nexus<TTr>::SmWorkItem &wi);
+  void handle_disconnect_resp_st(const SmPkt &pkt);
 
   //
   // Handle available RECVs

@@ -28,13 +28,11 @@ class Nexus {
   /// A work item exchanged between an Rpc thread and an SM thread
   class SmWorkItem {
    public:
-    SmWorkItem(uint8_t rpc_id, SmPkt *sm_pkt, ENetPeer *epeer)
-        : rpc_id(rpc_id), sm_pkt(sm_pkt), epeer(epeer) {
-      assert(sm_pkt != nullptr);
-    };
+    SmWorkItem(uint8_t rpc_id, SmPkt sm_pkt, ENetPeer *epeer)
+        : rpc_id(rpc_id), sm_pkt(sm_pkt), epeer(epeer) {}
 
     const uint8_t rpc_id;  ///< The local Rpc ID
-    SmPkt *sm_pkt;         ///< The SM packet for this work item
+    SmPkt sm_pkt;
     ENetPeer *epeer;
   };
 
