@@ -68,6 +68,15 @@
  * On entering the event loop, the Rpc checks its Nexus hook for new session
    management packets. If there are new packets, it invokes the appropriate
    session management handler, and frees the packet.
+ * A Nexus can have two ENet peers established to a host: a client-mode peer
+   used for sending session management requests, and a server-mode peer used for
+   responding to these requests.
+ * A client-mode peer is created to each host that we create a client-mode
+   session to. Client-mode peers have non-null `epeer->data`, and are recorded
+   in the SM thread context's maps.
+ * A server mode peer is created by the ENet library when we get a ENet connect
+   event from a client-mode peer. These peers have null `peer->data`, and are
+   not recorded in the SM thread context's maps.
 
 ## Session management retries
  * A session management operation is retried by the client in these cases:

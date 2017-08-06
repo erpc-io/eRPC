@@ -147,7 +147,7 @@ class Nexus {
    public:
     std::string rem_hostname;  ///< Specified by the ERpc user
     bool connected;
-    std::vector<SmWorkItem> work_item_vec;
+    std::vector<SmWorkItem> wi_tx_queue;  ///< Work item to TX on peer connect
   };
 
   /// Measure RDTSC frequency. This is expensive and is only done once.

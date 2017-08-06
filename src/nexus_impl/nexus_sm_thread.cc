@@ -8,20 +8,6 @@ static constexpr size_t kENetChannels = 1;
 /// Amount of time to block for ENet events
 static constexpr size_t kSmThreadEventLoopMs = 20;
 
-// Implementation notes:
-//
-// A Nexus can have two ENet peers established to a host: a client-mode peer
-// used for sending session management requests, and a server-mode peer used for
-// responding to these requests.
-//
-// A client-mode peer is created to each host that we create a client-mode
-// session to. Client-mode peers have non-null peer->data, and are recorded in
-// the SM thread context maps.
-//
-// A server mode peer is created when we get a ENet connect event from a
-// client-mode peers. Server-mode peers have null peer-data, and are not
-// recorded in the SM threa context maps.
-
 template <class TTr>
 void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
   assert(event != nullptr);
@@ -32,21 +18,21 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
   // If we're here, this is a client-mode ENet peer
   auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
   assert(!epeer_data->connected);
-  assert(epeer_data->work_item_vec.size() > 0);
+  assert(epeer_data->wi_tx_queue.size() > 0);
 
   epeer_data->connected = true;
   LOG_INFO(
       "eRPC Nexus: ENet socket connected to %s. Transmitting "
       "%zu queued SM requests.\n",
-      epeer_data->rem_hostname.c_str(), epeer_data->work_item_vec.size());
+      epeer_data->rem_hostname.c_str(), epeer_data->wi_tx_queue.size());
 
   // Transmit work items queued while waiting for connection
-  for (SmWorkItem &wi : epeer_data->work_item_vec) {
+  for (SmWorkItem &wi : epeer_data->wi_tx_queue) {
     assert(wi.sm_pkt->is_req());
     sm_thread_tx_and_free(wi);
   }
 
-  epeer_data->work_item_vec.clear();
+  epeer_data->wi_tx_queue.clear();
 }
 
 template <class TTr>
@@ -80,7 +66,7 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
 
     ENetPeer *new_epeer =
         enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
-    for (SmWorkItem &wi : epeer_data->work_item_vec) {
+    for (SmWorkItem &wi : epeer_data->wi_tx_queue) {
       assert(wi.epeer == epeer);
       wi.epeer = new_epeer;
     }
@@ -262,7 +248,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
         // Wait if the peer is not yet connected
         auto *epeer_data = static_cast<SmENetPeerData *>(wi.epeer->data);
         if (!epeer_data->connected) {
-          epeer_data->work_item_vec.push_back(wi);
+          epeer_data->wi_tx_queue.push_back(wi);
         } else {
           sm_thread_tx_and_free(wi);
         }
@@ -280,7 +266,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
         rt_assert(wi.epeer != nullptr,
                   "eRPC Nexus: Failed to connect ENet to " + rem_hostname);
 
-        // Reduce ENet peer timeout. This needs more work (e.g., what values
+        // XXX: Reduce ENet peer timeout. This needs more work: what values
         // can we safely use without false positives?)
         // enet_peer_timeout(wi.epeer, 1, 1, 500);
 
@@ -294,7 +280,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
         epeer_data->rem_hostname = rem_hostname;
         epeer_data->connected = false;
 
-        epeer_data->work_item_vec.push_back(wi);
+        epeer_data->wi_tx_queue.push_back(wi);
       }
     } else {
       // Transmit a session management response
