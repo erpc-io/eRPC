@@ -275,7 +275,7 @@ class Rpc {
   void handle_connect_req_st(const typename Nexus<TTr>::SmWorkItem &req_wi);
   void handle_connect_resp_st(const SmPkt &pkt);
 
-  void handle_disconnect_req_st(const typename Nexus<TTr>::SmWorkItem &wi);
+  void handle_disconnect_req_st(const typename Nexus<TTr>::SmWorkItem &req_wi);
   void handle_disconnect_resp_st(const SmPkt &pkt);
 
   //

@@ -10,26 +10,25 @@ namespace ERpc {
 // connected successfully.
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_req_st(
-    const typename Nexus<TTr>::SmWorkItem &wi) {
+    const typename Nexus<TTr>::SmWorkItem &req_wi) {
   assert(in_creator());
-  assert(wi.epeer != nullptr);
+  assert(req_wi.epeer != nullptr);
 
-  const SmPkt &sm_pkt = wi.sm_pkt;
-  assert(sm_pkt.pkt_type == SmPktType::kDisconnectReq);
+  assert(req_wi.sm_pkt.pkt_type == SmPktType::kDisconnectReq);
 
   // Check the info filled by the client
-  uint16_t session_num = sm_pkt.server.session_num;
+  uint16_t session_num = req_wi.sm_pkt.server.session_num;
   assert(session_num < session_vec.size());
 
   Session *session = session_vec.at(session_num);
   assert(session != nullptr && session->is_server());
   assert(session->is_connected());
-  assert(session->server == sm_pkt.server);
-  assert(session->client == sm_pkt.client);
+  assert(session->server == req_wi.sm_pkt.server);
+  assert(session->client == req_wi.sm_pkt.client);
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received disconnect request from %s. Issue",
-          rpc_id, sm_pkt.client.name().c_str());
+          rpc_id, req_wi.sm_pkt.client.name().c_str());
 
   // Check that responses for all sslots have been sent
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
@@ -46,7 +45,7 @@ void Rpc<TTr>::handle_disconnect_req_st(
   free_recvs();
 
   LOG_INFO("%s. None. Sending response.\n", issue_msg);
-  enqueue_sm_resp_st(wi, SmErrType::kNoError);
+  enqueue_sm_resp_st(req_wi, SmErrType::kNoError);
 
   bury_session_st(session);  // Free session resources + NULL in session_vec
 }

@@ -29,7 +29,7 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx *, ENetEvent *event) {
   // Transmit work items queued while waiting for connection
   for (SmWorkItem &wi : epeer_data->wi_tx_queue) {
     assert(wi.sm_pkt.is_req());
-    sm_thread_tx_and_free(wi);
+    sm_thread_tx_one(wi);
   }
 
   epeer_data->wi_tx_queue.clear();
@@ -61,8 +61,7 @@ void Nexus<TTr>::sm_thread_handle_disconnect(SmThreadCtx *ctx,
     rem_address.port = ctx->mgmt_udp_port;
     int ret =
         enet_address_set_host(&rem_address, epeer_data->rem_hostname.c_str());
-    rt_assert(ret == 0,
-              "eRPC Nexus: ENet failed to resolve " + epeer_data->rem_hostname);
+    rt_assert(ret == 0, "ENet failed to resolve " + epeer_data->rem_hostname);
 
     ENetPeer *new_epeer =
         enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
@@ -148,9 +147,9 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event) {
       sm_pkt.pkt_type = sm_pkt_type_req_to_resp(sm_pkt.pkt_type);
       sm_pkt.err_type = SmErrType::kInvalidRemoteRpcId;
 
-      // Create a fake (invalid) work item for sm_thread_tx_and_free
+      // Create a fake (invalid) work item for sm_thread_tx_one
       SmWorkItem temp_wi(kInvalidRpcId, sm_pkt, epeer);
-      sm_thread_tx_and_free(temp_wi);  // This frees sm_pkt
+      sm_thread_tx_one(temp_wi);  // This frees sm_pkt
     } else {
       LOG_WARN(
           "eRPC Nexus: Received session management response for invalid "
@@ -202,7 +201,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx *ctx) {
 }
 
 template <class TTr>
-void Nexus<TTr>::sm_thread_tx_and_free(SmWorkItem &wi) {
+void Nexus<TTr>::sm_thread_tx_one(SmWorkItem &wi) {
   assert(wi.epeer != nullptr);
 
   // If the work item uses a client-mode peer, the peer must be connected
@@ -244,21 +243,20 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
         if (!epeer_data->connected) {
           epeer_data->wi_tx_queue.push_back(wi);
         } else {
-          sm_thread_tx_and_free(wi);
+          sm_thread_tx_one(wi);
         }
       } else {
         // We don't have a client-mode ENet peer to this host, so create one
         ENetAddress rem_address;
         rem_address.port = ctx->mgmt_udp_port;
         if (enet_address_set_host(&rem_address, rem_hostname.c_str()) != 0) {
-          throw std::runtime_error(
-              "eRPC Nexus: ENet failed to resolve address " + rem_hostname);
+          throw std::runtime_error("ENet failed to resolve " + rem_hostname);
         }
 
         wi.epeer =
             enet_host_connect(ctx->enet_host, &rem_address, kENetChannels, 0);
         rt_assert(wi.epeer != nullptr,
-                  "eRPC Nexus: Failed to connect ENet to " + rem_hostname);
+                  "Failed to connect ENet to " + rem_hostname);
 
         // XXX: Reduce ENet peer timeout. This needs more work: what values
         // can we safely use without false positives?)
@@ -279,7 +277,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
     } else {
       // Transmit a session management response
       assert(wi.epeer != nullptr);
-      sm_thread_tx_and_free(wi);
+      sm_thread_tx_one(wi);
     }
   }
 
@@ -292,7 +290,7 @@ void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
   assert(ctx != nullptr);
 
   // Create an ENet socket that remote nodes can connect to
-  rt_assert(enet_initialize() == 0, "eRPC Nexus: Failed to initialize ENet.");
+  rt_assert(enet_initialize() == 0, "Failed to initialize ENet");
 
   ENetAddress address;
   enet_address_set_host(&address, "localhost");
@@ -301,9 +299,9 @@ void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
 
   ctx->enet_host =
       enet_host_create(&address, kMaxNumMachines, kENetChannels, 0, 0);
-  rt_assert(ctx->enet_host != nullptr, "eRPC Nexus: enet_host_create failed.");
+  rt_assert(ctx->enet_host != nullptr, "enet_host_create() failed");
 
-  // This is not a busy loop, since sm_thread_rx() blocks for several ms
+  // This is not a busy loop because sm_thread_rx() blocks for several ms
   while (*ctx->kill_switch == false) {
     sm_thread_tx(ctx);
     sm_thread_rx(ctx);

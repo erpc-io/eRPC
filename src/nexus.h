@@ -155,14 +155,11 @@ class Nexus {
   static void bg_thread_func(BgThreadCtx *ctx);
 
   //
-  // Session management thread functions
+  // Session management thread functions (nexus_sm_thread.cc)
   //
 
   /// The thread function executed by the session management thread
   static void sm_thread_func(SmThreadCtx *ctx);
-
-  /// Transmit a work item and free its session management packet memory
-  static void sm_thread_tx_and_free(SmWorkItem &wi);
 
   /// Handle an ENet connect event
   static void sm_thread_handle_connect(SmThreadCtx *ctx, ENetEvent *event);
@@ -179,6 +176,9 @@ class Nexus {
 
   /// Transmit session management packets enqueued by Rpc threads
   static void sm_thread_tx(SmThreadCtx *ctx);
+
+  /// Transmit one work item over ENet
+  static void sm_thread_tx_one(SmWorkItem &wi);
 
   /// Return true iff this is a server-mode ENet peer
   static bool sm_is_peer_mode_server(ENetPeer *e) { return e->data == nullptr; }
