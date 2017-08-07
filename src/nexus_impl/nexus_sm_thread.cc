@@ -143,7 +143,7 @@ void Nexus<TTr>::sm_thread_handle_receive(SmThreadCtx &ctx, ENetEvent *event) {
 
       // Create a fake (invalid) work item for sm_thread_tx_one
       SmWorkItem temp_wi(kInvalidRpcId, sm_pkt, epeer);
-      sm_thread_tx_one(temp_wi);  // This frees sm_pkt
+      sm_thread_tx_one(temp_wi);
     } else {
       LOG_WARN(
           "eRPC Nexus: Received session management response for invalid "
@@ -215,13 +215,12 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx &ctx) {
     assert(sm_pkt_type_is_valid(wi.sm_pkt.pkt_type));
 
     if (wi.sm_pkt.is_req()) {
-      // wi.epeer must be filled here because Rpc threads don't have ENet peer
-      // information while issuing requests.
+      // We must fill wi.epeer here as Rpc threads don't have ENet peer info
       assert(wi.epeer == nullptr);
       auto rem_hostname = std::string(wi.sm_pkt.server.hostname);
 
+      // Check if we have an ENet peer to this remote host
       if (ctx.client_name_map.count(rem_hostname) > 0) {
-        // We already have a client-mode ENet peer to this host
         wi.epeer = ctx.client_name_map[rem_hostname];
 
         // Wait if the peer is not yet connected
@@ -232,7 +231,6 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx &ctx) {
           sm_thread_tx_one(wi);
         }
       } else {
-        // We don't have a client-mode ENet peer to this host, so create one
         ENetAddress rem_address;
         rem_address.port = ctx.mgmt_udp_port;
         if (enet_address_set_host(&rem_address, rem_hostname.c_str()) != 0) {

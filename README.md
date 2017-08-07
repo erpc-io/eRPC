@@ -72,11 +72,10 @@
    used for sending session management requests, and a server-mode peer used for
    responding to these requests.
  * A client-mode peer is created to each host that we create a client-mode
-   session to. Client-mode peers have non-null `epeer->data`, and are recorded
-   in the SM thread context's maps.
+   session to. Client-mode peers are recorded in the SM thread context's maps.
  * A server mode peer is created by the ENet library when we get a ENet connect
-   event from a client-mode peer. These peers have null `peer->data`, and are
-   not recorded in the SM thread context's maps.
+   event from a client-mode peer. These peers are not recorded in the SM thread
+   context's maps.
 
 ## Session management retries
  * A session management operation is retried by the client in these cases:
@@ -85,17 +84,6 @@
      this case, a new ENet peer is created and the connection is retried.
    * A session connect request fails because the server does not have the
      requested RPC ID running, and `retry_connect_on_invalid_rpc_id` is set.
-
-## Session management packet ownership
- * Rpc threads allocate an SM packet before queueing it to the SM thread. This
-   packet is freed by the SM thread when it transmits it using
-   `sm_tx_work_item_and_free()`.
-    * Rpc threads allocate SM request packets in `enqueue_sm_req()`, and
-      response packets in `enqueue_sm_resp()`.
- * The SM thread allocates an SM packet when it gets an ENet RECEIVE event.
-   This packet is freed by the Rpc thread, even when it is a request SM packet
-   (for which a response SM packet will be "looped back" to the SM thread).
-     * The Rpc thread frees SM packets in `handle_session_management_st()`.
 
 ## Compile-time optimization notes:
  * Optimizations for `small_rpc_tput`:
