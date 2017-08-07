@@ -176,20 +176,20 @@ class Nexus {
   static void sm_thread_func(SmThreadCtx ctx);
 
   /// Handle an ENet connect event
-  static void sm_thread_handle_connect(SmThreadCtx *ctx, ENetEvent *event);
+  static void sm_thread_handle_connect(SmThreadCtx &ctx, ENetEvent *event);
 
   /// Handle an ENet disconnect event
-  static void sm_thread_handle_disconnect(SmThreadCtx *ctx, ENetEvent *event);
+  static void sm_thread_handle_disconnect(SmThreadCtx &ctx, ENetEvent *event);
 
   /// Handle an ENet receive event
-  static void sm_thread_handle_receive(SmThreadCtx *ctx, ENetEvent *event);
+  static void sm_thread_handle_receive(SmThreadCtx &ctx, ENetEvent *event);
 
   /// Receive session management packets and enqueue them to Rpc threads. This
   /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.
-  static void sm_thread_rx(SmThreadCtx *ctx);
+  static void sm_thread_rx(SmThreadCtx &ctx);
 
   /// Transmit session management packets enqueued by Rpc threads
-  static void sm_thread_tx(SmThreadCtx *ctx);
+  static void sm_thread_tx(SmThreadCtx &ctx);
 
   /// Transmit one work item over ENet
   static void sm_thread_tx_one(SmWorkItem &wi);
