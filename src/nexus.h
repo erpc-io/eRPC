@@ -140,12 +140,26 @@ class Nexus {
     std::unordered_map<uint32_t, std::string> ip_map;
   };
 
+  enum class SmENetPeerMode { kServer, kClient };
+
   /// Peer metadata maintained in client-mode ENet peers
   class SmENetPeerData {
    public:
-    std::string rem_hostname;  ///< Specified by the ERpc user
-    bool connected;
-    std::vector<SmWorkItem> wi_tx_queue;  ///< Work item to TX on peer connect
+    SmENetPeerMode peer_mode;
+    std::string rem_hostname;  ///< User-specified ENet hostname
+
+    /// True while we have a connection to the remote host. We never reconnect
+    /// after disconnecting, so this is set to true only once.
+    bool connected = false;
+
+    struct {
+      /// Work items to transmit when the connection is established
+      std::vector<SmWorkItem> tx_queue;
+    } client;
+
+    SmENetPeerData(SmENetPeerMode peer_mode) : peer_mode(peer_mode) {}
+    bool is_server() const { return peer_mode == SmENetPeerMode::kServer; }
+    bool is_client() const { return peer_mode == SmENetPeerMode::kClient; }
   };
 
   /// Measure RDTSC frequency. This is expensive and is only done once.
@@ -179,9 +193,6 @@ class Nexus {
 
   /// Transmit one work item over ENet
   static void sm_thread_tx_one(SmWorkItem &wi);
-
-  /// Return true iff this is a server-mode ENet peer
-  static bool sm_is_peer_mode_server(ENetPeer *e) { return e->data == nullptr; }
 
  public:
   /// Read-mostly members exposed to Rpc threads
