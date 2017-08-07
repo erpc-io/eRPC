@@ -241,9 +241,7 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx &ctx) {
         rt_assert(wi.epeer != nullptr,
                   "ENet connect failed to " + rem_hostname);
 
-        // XXX: Reduce ENet peer timeout. This needs more work: what values
-        // can we safely use without false positives?)
-        // enet_peer_timeout(wi.epeer, 1, 1, 500);
+        enet_peer_timeout(wi.epeer, 32, 30, 500);  // Reduce timeout
 
         // Add the peer to mappings to avoid creating a duplicate peer later
         ctx.client_name_map[rem_hostname] = wi.epeer;
