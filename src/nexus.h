@@ -132,21 +132,18 @@ class Nexus {
     std::mutex *nexus_lock;
     MtList<SmWorkItem> *sm_tx_list;  ///< SM packets to transmit
 
-    // Used internally by the SM thread
+    // Created internally by the SM thread
     ENetHost *enet_host;
-
-    // Mappings maintained for client sessions only
-    std::unordered_map<std::string, ENetPeer *> name_map;
-    std::unordered_map<uint32_t, std::string> ip_map;
+    std::unordered_map<std::string, ENetPeer *> client_name_map;
+    std::unordered_map<uint32_t, std::string> client_ip_map;
   };
 
   enum class SmENetPeerMode { kServer, kClient };
 
-  /// Peer metadata maintained in client-mode ENet peers
+  /// ENet peer data
   class SmENetPeerData {
    public:
     SmENetPeerMode peer_mode;
-    std::string rem_hostname;  ///< User-specified ENet hostname
 
     /// True while we have a connection to the remote host. We never reconnect
     /// after disconnecting, so this is set to true only once.
@@ -162,7 +159,7 @@ class Nexus {
     bool is_client() const { return peer_mode == SmENetPeerMode::kClient; }
   };
 
-  /// Measure RDTSC frequency. This is expensive and is only done once.
+  /// Measure RDTSC frequency. This is expensive and is done once per process.
   double measure_rdtsc_freq();
 
   /// The function executed by background threads
