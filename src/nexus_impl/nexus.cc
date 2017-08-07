@@ -35,12 +35,14 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   for (size_t i = 0; i < num_bg_threads; i++) {
     assert(tls_registry.cur_etid == i);
 
-    bg_thread_ctx_arr[i].kill_switch = &kill_switch;
-    bg_thread_ctx_arr[i].req_func_arr = &req_func_arr;
-    bg_thread_ctx_arr[i].tls_registry = &tls_registry;
-    bg_thread_ctx_arr[i].bg_thread_index = i;
+    BgThreadCtx bg_thread_ctx;
+    bg_thread_ctx.kill_switch = &kill_switch;
+    bg_thread_ctx.req_func_arr = &req_func_arr;
+    bg_thread_ctx.tls_registry = &tls_registry;
+    bg_thread_ctx.bg_thread_index = i;
+    bg_thread_ctx.bg_req_list = &bg_req_list[i];
 
-    bg_thread_arr[i] = std::thread(bg_thread_func, &bg_thread_ctx_arr[i]);
+    bg_thread_arr[i] = std::thread(bg_thread_func, bg_thread_ctx);
 
     // Wait for the launched thread to grab a ERpc thread ID, otherwise later
     // background threads or the foreground thread can grab ID = i.
@@ -50,14 +52,16 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   }
 
   // Launch the session management thread
+  SmThreadCtx sm_thread_ctx;
   sm_thread_ctx.mgmt_udp_port = mgmt_udp_port;
   sm_thread_ctx.kill_switch = &kill_switch;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
+  sm_thread_ctx.sm_tx_list = &sm_tx_list;
 
   LOG_INFO("eRPC Nexus: Launching session management thread on core %zu.\n",
            kNexusSmThreadCore);
-  sm_thread = std::thread(sm_thread_func, &sm_thread_ctx);
+  sm_thread = std::thread(sm_thread_func, sm_thread_ctx);
   bind_to_core(sm_thread, kNexusSmThreadCore);
 
   LOG_INFO("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
@@ -102,12 +106,12 @@ void Nexus<TTr>::register_hook(Hook *hook) {
   // Install background request submission lists
   for (size_t i = 0; i < num_bg_threads; i++) {
     assert(hook->bg_req_list_arr[i] == nullptr);
-    hook->bg_req_list_arr[i] = &bg_thread_ctx_arr[i].bg_req_list;
+    hook->bg_req_list_arr[i] = &bg_req_list[i];
   }
 
   // Install session managment request submission list
   assert(hook->sm_tx_list == nullptr);
-  hook->sm_tx_list = &sm_thread_ctx.sm_tx_list;
+  hook->sm_tx_list = &sm_tx_list;
 
   nexus_lock.unlock();
 }

@@ -222,11 +222,11 @@ void Nexus<TTr>::sm_thread_tx_one(SmWorkItem &wi) {
 template <class TTr>
 void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
   assert(ctx != nullptr);
-  if (ctx->sm_tx_list.size == 0) return;
+  if (ctx->sm_tx_list->size == 0) return;
 
-  ctx->sm_tx_list.lock();
+  ctx->sm_tx_list->lock();
 
-  for (SmWorkItem &wi : ctx->sm_tx_list.list) {
+  for (SmWorkItem &wi : ctx->sm_tx_list->list) {
     assert(sm_pkt_type_is_valid(wi.sm_pkt.pkt_type));
 
     if (wi.sm_pkt.is_req()) {
@@ -279,35 +279,33 @@ void Nexus<TTr>::sm_thread_tx(SmThreadCtx *ctx) {
     }
   }
 
-  ctx->sm_tx_list.locked_clear();
-  ctx->sm_tx_list.unlock();
+  ctx->sm_tx_list->locked_clear();
+  ctx->sm_tx_list->unlock();
 }
 
 template <class TTr>
-void Nexus<TTr>::sm_thread_func(SmThreadCtx *ctx) {
-  assert(ctx != nullptr);
-
+void Nexus<TTr>::sm_thread_func(SmThreadCtx ctx) {
   // Create an ENet socket that remote nodes can connect to
   rt_assert(enet_initialize() == 0, "Failed to initialize ENet");
 
   ENetAddress address;
   enet_address_set_host(&address, "localhost");
   address.host = ENET_HOST_ANY;
-  address.port = ctx->mgmt_udp_port;
+  address.port = ctx.mgmt_udp_port;
 
-  ctx->enet_host = enet_host_create(&address, kMaxNumMachines, 0, 0, 0);
-  rt_assert(ctx->enet_host != nullptr, "enet_host_create() failed");
+  ctx.enet_host = enet_host_create(&address, kMaxNumMachines, 0, 0, 0);
+  rt_assert(ctx.enet_host != nullptr, "enet_host_create() failed");
 
   // This is not a busy loop because sm_thread_rx() blocks for several ms
-  while (*ctx->kill_switch == false) {
-    sm_thread_tx(ctx);
-    sm_thread_rx(ctx);
+  while (*ctx.kill_switch == false) {
+    sm_thread_tx(&ctx);
+    sm_thread_rx(&ctx);
   }
 
   LOG_INFO("eRPC Nexus: Session management thread exiting.\n");
 
   // ENet cleanup
-  enet_host_destroy(ctx->enet_host);
+  enet_host_destroy(ctx.enet_host);
   enet_deinitialize();
 
   return;
