@@ -192,7 +192,7 @@ class Nexus {
   static void sm_thread_tx(SmThreadCtx &ctx);
 
   /// Transmit one work item over ENet
-  static void sm_thread_tx_one(SmWorkItem &wi);
+  static void sm_thread_tx_one(const SmWorkItem &wi);
 
  public:
   /// Read-mostly members exposed to Rpc threads

@@ -29,11 +29,7 @@ void Nexus<TTr>::sm_thread_handle_connect(SmThreadCtx &, ENetEvent *event) {
       epeer_data->rem_hostname.c_str(), epeer_data->client.tx_queue.size());
 
   // Transmit work items queued while waiting for connection
-  for (SmWorkItem &wi : epeer_data->client.tx_queue) {
-    assert(wi.sm_pkt.is_req());
-    sm_thread_tx_one(wi);
-  }
-
+  for (const SmWorkItem &wi : epeer_data->client.tx_queue) sm_thread_tx_one(wi);
   epeer_data->client.tx_queue.clear();
 }
 
@@ -198,17 +194,16 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx &ctx) {
 }
 
 template <class TTr>
-void Nexus<TTr>::sm_thread_tx_one(SmWorkItem &wi) {
+void Nexus<TTr>::sm_thread_tx_one(const SmWorkItem &wi) {
   assert(wi.epeer != nullptr && wi.epeer->data != nullptr);
   assert(static_cast<SmENetPeerData *>(wi.epeer->data)->connected);
 
   // This copies the packet payload
-  ENetPacket *enet_pkt =
+  ENetPacket *p =
       enet_packet_create(&wi.sm_pkt, sizeof(SmPkt), ENET_PACKET_FLAG_RELIABLE);
-  rt_assert(enet_pkt != nullptr, "Failed to create ENet packet.");
+  rt_assert(p != nullptr, "Failed to create ENet packet.");
 
-  rt_assert(enet_peer_send(wi.epeer, 0, enet_pkt) == 0,
-            "enet_peer_send() failed");
+  rt_assert(enet_peer_send(wi.epeer, 0, p) == 0, "enet_peer_send() failed");
 }
 
 template <class TTr>
