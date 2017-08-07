@@ -54,9 +54,9 @@ void Rpc<TTr>::handle_connect_req_st(
     return;
   }
 
-  // Try to resolve the client's routing info. If session creation succeeds,
-  // we'll copy it to the server's session endpoint.
-  Transport::RoutingInfo client_rinfo;
+  // Try to resolve the client-provided routing info. If session creation
+  // succeeds, we'll copy it to the server's session endpoint.
+  Transport::RoutingInfo client_rinfo = req_wi.sm_pkt.client.routing_info;
   bool resolve_success = transport->resolve_remote_routing_info(&client_rinfo);
   if (!resolve_success) {
     std::string routing_info_str = TTr::routing_info_str(&client_rinfo);
@@ -169,8 +169,8 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
 
   // If we are here, the server has created a session endpoint.
 
-  // Try to resolve the server's routing info
-  Transport::RoutingInfo srv_routing_info;
+  // Try to resolve the server-provided routing info
+  Transport::RoutingInfo srv_routing_info = sm_pkt.server.routing_info;
   bool resolve_success;
   if (kFaultInjection && faults.fail_resolve_server_rinfo) {
     resolve_success = false;  // Inject fault

@@ -154,5 +154,7 @@ TEST(Restrictions, ContFuncDeletesRpc) {
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
+  if (!ERpc::kDatapathChecks) exit(-1);  // Fail quickly
+
   return RUN_ALL_TESTS();
 }
