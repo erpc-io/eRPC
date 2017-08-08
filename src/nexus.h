@@ -147,8 +147,12 @@ class Nexus {
 
     // Created internally by the SM thread
     ENetHost *enet_host;
-    std::unordered_map<uint32_t, std::string> ip_map;
-    std::unordered_map<std::string, ENetPeer *> name_map;
+
+    /// Map remote hostnames to client-mode peers
+    std::unordered_map<std::string, ENetPeer *> client_map;
+
+    /// Map remote hostnames to server-mode peers
+    std::unordered_map<std::string, ENetPeer *> server_map;
   };
 
   enum class SmENetPeerMode { kServer, kClient };
@@ -157,6 +161,7 @@ class Nexus {
   class SmENetPeerData {
    public:
     SmENetPeerMode peer_mode;
+    std::string rem_hostname;
 
     struct {
       /// True while we have a connection to the server peer. We never reconnect
@@ -168,8 +173,8 @@ class Nexus {
     } client;
 
     struct {
-      /// True after we've installed mappings for this server-mode peer
-      bool mappings_installed = false;
+      /// True if we've installed the remote hostname and server map entry
+      bool initialized = false;
     } server;
 
     SmENetPeerData(SmENetPeerMode peer_mode) : peer_mode(peer_mode) {}
@@ -191,13 +196,13 @@ class Nexus {
   static void sm_thread_func(SmThreadCtx ctx);
 
   /// Handle an ENet connect event
-  static void sm_thread_on_enet_connect(SmThreadCtx &ctx, ENetEvent *event);
+  static void sm_thread_on_enet_connect(SmThreadCtx &ctx, ENetEvent &event);
 
   /// Handle an ENet disconnect event
-  static void sm_thread_on_enet_disconnect(SmThreadCtx &ctx, ENetEvent *event);
+  static void sm_thread_on_enet_disconnect(SmThreadCtx &ctx, ENetEvent &event);
 
   /// Handle an ENet receive event
-  static void sm_thread_on_enet_receive(SmThreadCtx &ctx, ENetEvent *event);
+  static void sm_thread_on_enet_receive(SmThreadCtx &ctx, ENetEvent &event);
 
   /// Receive session management packets and enqueue them to Rpc threads. This
   /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.
