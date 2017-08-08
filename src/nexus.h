@@ -27,13 +27,26 @@ class Nexus {
 
   /// A work item exchanged between an Rpc thread and an SM thread
   class SmWorkItem {
+    enum class Reset { kFalse, kTrue };
+
    public:
-    SmWorkItem(uint8_t rpc_id, SmPkt sm_pkt, ENetPeer *epeer)
-        : rpc_id(rpc_id), sm_pkt(sm_pkt), epeer(epeer) {}
+    SmWorkItem(uint8_t rpc_id, SmPkt sm_pkt)
+        : rpc_id(rpc_id), reset(Reset::kFalse), sm_pkt(sm_pkt) {}
+
+    SmWorkItem(uint8_t rpc_id, size_t reset_session_num)
+        : rpc_id(rpc_id),
+          reset(Reset::kTrue),
+          reset_session_num(reset_session_num) {}
+
+    bool is_reset() const { return reset == Reset::kTrue; }
 
     const uint8_t rpc_id;  ///< The local Rpc ID
-    SmPkt sm_pkt;
-    ENetPeer *epeer;
+    const Reset reset;     ///< Is this work item a reset?
+
+    union {
+      SmPkt sm_pkt;
+      size_t reset_session_num;  ///< The session in rpc_id to reset
+    };
   };
 
   /// A work item submitted to a background thread
@@ -134,8 +147,8 @@ class Nexus {
 
     // Created internally by the SM thread
     ENetHost *enet_host;
-    std::unordered_map<std::string, ENetPeer *> client_name_map;
-    std::unordered_map<uint32_t, std::string> client_ip_map;
+    std::unordered_map<uint32_t, std::string> ip_map;
+    std::unordered_map<std::string, ENetPeer *> name_map;
   };
 
   enum class SmENetPeerMode { kServer, kClient };
@@ -145,14 +158,19 @@ class Nexus {
    public:
     SmENetPeerMode peer_mode;
 
-    /// True while we have a connection to the remote host. We never reconnect
-    /// after disconnecting, so this is set to true only once.
-    bool connected = false;
-
     struct {
-      /// Work items to transmit when the connection is established
+      /// True while we have a connection to the server peer. We never reconnect
+      /// after disconnecting, so this is set to true only once.
+      bool connected = false;
+
+      /// Work items to transmit when the client's connection is established
       std::vector<SmWorkItem> tx_queue;
     } client;
+
+    struct {
+      /// True after we've installed mappings for this server-mode peer
+      bool mappings_installed = false;
+    } server;
 
     SmENetPeerData(SmENetPeerMode peer_mode) : peer_mode(peer_mode) {}
     bool is_server() const { return peer_mode == SmENetPeerMode::kServer; }
@@ -173,23 +191,23 @@ class Nexus {
   static void sm_thread_func(SmThreadCtx ctx);
 
   /// Handle an ENet connect event
-  static void sm_thread_handle_connect(SmThreadCtx &ctx, ENetEvent *event);
+  static void sm_thread_on_enet_connect(SmThreadCtx &ctx, ENetEvent *event);
 
   /// Handle an ENet disconnect event
-  static void sm_thread_handle_disconnect(SmThreadCtx &ctx, ENetEvent *event);
+  static void sm_thread_on_enet_disconnect(SmThreadCtx &ctx, ENetEvent *event);
 
   /// Handle an ENet receive event
-  static void sm_thread_handle_receive(SmThreadCtx &ctx, ENetEvent *event);
+  static void sm_thread_on_enet_receive(SmThreadCtx &ctx, ENetEvent *event);
 
   /// Receive session management packets and enqueue them to Rpc threads. This
   /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.
   static void sm_thread_rx(SmThreadCtx &ctx);
 
-  /// Transmit session management packets enqueued by Rpc threads
-  static void sm_thread_tx(SmThreadCtx &ctx);
+  /// Process session management packets enqueued by Rpc threads
+  static void sm_thread_process_tx_queue(SmThreadCtx &ctx);
 
-  /// Transmit one work item over ENet
-  static void sm_thread_tx_one(const SmWorkItem &wi);
+  /// Transmit one work item over a connected ENet peer
+  static void sm_thread_tx_one(const SmWorkItem &wi, ENetPeer *epeer);
 
  public:
   /// Read-mostly members exposed to Rpc threads

@@ -12,7 +12,6 @@ template <class TTr>
 void Rpc<TTr>::handle_connect_req_st(
     const typename Nexus<TTr>::SmWorkItem &req_wi) {
   assert(in_creator());
-  assert(req_wi.epeer != nullptr);
   assert(req_wi.sm_pkt.pkt_type == SmPktType::kConnectReq);
 
   // Ensure that server fields known by the client were filled correctly

@@ -85,22 +85,21 @@ void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
   sm_pkt.server = session->server;
 
   nexus_hook.sm_tx_list->unlocked_push_back(
-      typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt, nullptr));
+      typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt));
 }
 
 template <class TTr>
 void Rpc<TTr>::enqueue_sm_resp_st(const typename Nexus<TTr>::SmWorkItem &req_wi,
                                   SmErrType err_type) {
   assert(in_creator());
-  assert(req_wi.epeer != nullptr);
   assert(req_wi.sm_pkt.is_req());
 
   SmPkt sm_pkt = req_wi.sm_pkt;
   sm_pkt.pkt_type = sm_pkt_type_req_to_resp(sm_pkt.pkt_type);  // Change to resp
   sm_pkt.err_type = err_type;
 
-  typename Nexus<TTr>::SmWorkItem wi(rpc_id, sm_pkt, req_wi.epeer);
-  nexus_hook.sm_tx_list->unlocked_push_back(wi);
+  nexus_hook.sm_tx_list->unlocked_push_back(
+      typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt));
 }
 
 }  // End ERpc
