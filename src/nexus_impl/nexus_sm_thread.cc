@@ -148,8 +148,7 @@ void Nexus<TTr>::sm_thread_on_enet_receive_server(SmThreadCtx &ctx,
 
   SmPkt sm_pkt = sm_thread_pull_sm_pkt(ev);
   assert(sm_pkt.is_req());
-
-  std::string rem_hostname = sm_pkt.get_remote_hostname();
+  const std::string &rem_hostname = sm_pkt.client.hostname;
 
   if (!epeer_data->server.initialized) {
     // We cannot have two server-mode peers to the same remote hostname
@@ -213,7 +212,7 @@ void Nexus<TTr>::sm_thread_on_enet_receive_client(SmThreadCtx &ctx,
   SmPkt sm_pkt = sm_thread_pull_sm_pkt(ev);
   assert(sm_pkt.is_resp());
 
-  std::string rem_hostname = sm_pkt.get_remote_hostname();
+  const std::string &rem_hostname = sm_pkt.server.hostname;
   assert(ctx.client_map.at(rem_hostname) == ev.peer);
 
   LOG_INFO("eRPC Nexus: Received SM packet (type %s) from %s.\n",
@@ -288,6 +287,7 @@ void Nexus<TTr>::sm_thread_enet_send_one(const SmWorkItem &wi,
   rt_assert(enet_peer_send(epeer, 0, epkt) == 0, "enet_peer_send() failed");
 }
 
+// Process a (Rpc thread-enqueued) work item containing an SM request
 template <class TTr>
 void Nexus<TTr>::sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
                                                 const SmWorkItem &wi) {
@@ -300,7 +300,7 @@ void Nexus<TTr>::sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
           sm_pkt_type_str(sm_pkt.pkt_type).c_str(),
           sm_pkt.server.name().c_str());
 
-  std::string rem_hostname = sm_pkt.get_remote_hostname();
+  const std::string &rem_hostname = sm_pkt.server.hostname;
   bool peer_exists = ctx.client_map.count(rem_hostname) > 0;
 
   if (peer_exists) {
@@ -337,12 +337,13 @@ void Nexus<TTr>::sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
   }
 }
 
+// Process a (Rpc thread-enqueued) work item containing an SM response
 template <class TTr>
 void Nexus<TTr>::sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
                                                  const SmWorkItem &wi) {
   const SmPkt &sm_pkt = wi.sm_pkt;
   assert(sm_pkt.is_resp());
-  std::string rem_hostname = sm_pkt.get_remote_hostname();
+  const std::string &rem_hostname = sm_pkt.client.hostname;
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,

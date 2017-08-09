@@ -12,8 +12,15 @@ void Rpc<TTr>::handle_sm_st() {
   assert(nexus_hook.sm_rx_list.size > 0);
   nexus_hook.sm_rx_list.lock();
 
-  // Handle all session management requests
+  // Handle SM work items queued by the session management thread
   for (const typename Nexus<TTr>::SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
+    // Reset work items don't have a valid SM packet, so handle them first
+    if (wi.is_reset()) {
+      assert(wi.reset_rem_hostname.length() > 0);
+      handle_reset_st(wi.reset_rem_hostname);
+      continue;
+    }
+
     const SmPkt &sm_pkt = wi.sm_pkt;
     assert(sm_pkt_type_is_valid(sm_pkt.pkt_type));
 

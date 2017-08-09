@@ -163,7 +163,8 @@ void init_erpc(AppContext *c, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   ERpc::rt_assert(ERpc::Rpc<ERpc::IBTransport>::kEvLoopTickerReset == 1,
-                  "Consensus app requires ticker = 1 for low latency.");
+                  "Consensus app requires Rpc::kEvLoopTickerReset = 1 for low "
+                  "latency.");
 
   // Work around g++-5's unused variable warning for validators
   _unused(num_raft_servers_validator_registered);

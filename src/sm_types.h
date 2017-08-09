@@ -276,11 +276,6 @@ class SmPkt {
 
   bool is_req() const { return sm_pkt_type_is_req(pkt_type); }
   bool is_resp() const { return !is_req(); }
-
-  std::string get_remote_hostname() const {
-    if (is_req()) return server.hostname;
-    return client.hostname;
-  }
 };
 
 }  // End ERpc
