@@ -36,7 +36,7 @@ class Transport {
   /**
    * @brief Generic struct to store routing info for any transport.
    *
-   * This can contain both cluster-wide valid members (e.g., LID, QPN), and
+   * This can contain both cluster-wide valid members (e.g., {LID, QPN}), and
    * members that are only locally valid (e.g., a pointer to \p ibv_ah).
    */
   struct RoutingInfo {
@@ -52,7 +52,8 @@ class Transport {
         : transport_mr(transport_mr), lkey(lkey) {}
   };
 
-  /// Info about a packet that needs TX
+  /// Info about a packet that needs TX. Using void* instead of MsgBuffer* is
+  /// not straightforward since we need to locate packet headers.
   struct tx_burst_item_t {
     RoutingInfo* routing_info;  ///< Routing info for this packet
     MsgBuffer* msg_buffer;      ///< MsgBuffer for this packet
