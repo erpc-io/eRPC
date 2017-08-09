@@ -74,13 +74,15 @@ void Nexus<TTr>::sm_thread_on_enet_disconnect_server(SmThreadCtx &ctx,
   std::string rem_hostname = epeer_data->rem_hostname;
   assert(ctx.server_map.at(rem_hostname) == epeer);
 
-  LOG_INFO("eRPC Nexus: ENet server peer to %s disconnected.\n",
-           rem_hostname.c_str());
-
   // Remove from map and free memory
   ctx.server_map.erase(rem_hostname);
   delete static_cast<SmENetPeerData *>(epeer->data);
   epeer->data = nullptr;
+
+  LOG_INFO(
+      "eRPC Nexus: ENet server peer to %s disconnected. "
+      "Broadcasting resets to local Rpcs.\n",
+      rem_hostname.c_str());
 
   sm_thread_broadcast_reset(ctx, rem_hostname);
 }
@@ -112,14 +114,15 @@ void Nexus<TTr>::sm_thread_on_enet_disconnect_client(SmThreadCtx &ctx,
     new_epeer->data = epeer->data;
     ctx.client_map.at(rem_hostname) = new_epeer;
   } else {
-    LOG_INFO(
-        "eRPC Nexus: ENet socket disconnected from %s. Not reconnecting.\n",
-        rem_hostname.c_str());
-
     // Remove from map and free memory
     ctx.client_map.erase(rem_hostname);
     delete static_cast<SmENetPeerData *>(epeer->data);
     epeer->data = nullptr;
+
+    LOG_INFO(
+        "eRPC Nexus: ENet socket disconnected from %s. Not reconnecting. "
+        "Broadcasting resets to local Rpcs.\n",
+        rem_hostname.c_str());
 
     sm_thread_broadcast_reset(ctx, rem_hostname);
   }
@@ -159,16 +162,16 @@ void Nexus<TTr>::sm_thread_on_enet_receive_server(SmThreadCtx &ctx,
 
   assert(ctx.server_map.at(rem_hostname) == epeer);
 
-  LOG_INFO("eRPC Nexus: Received SM packet (type %s, source %s).\n",
+  LOG_INFO("eRPC Nexus: Received SM packet (type %s) from %s.\n",
            sm_pkt_type_str(sm_pkt.pkt_type).c_str(),
            sm_pkt.client.name().c_str());
 
   // Handle reset peer request here, since it's not passed to any Rpc
   if (sm_pkt.pkt_type == SmPktType::kFaultResetPeerReq) {
     LOG_WARN(
-        "eRPC Nexus: Received reset-remote-peer fault from Rpc [%s, %u]. "
+        "eRPC Nexus: Received reset-remote-peer fault from %s. "
         "Forcefully resetting ENet peer.\n",
-        sm_pkt.client.hostname, sm_pkt.client.rpc_id);
+        sm_pkt.client.name().c_str());
     enet_peer_reset(epeer);  // XXX: Do we need to remove from maps?
     return;
   }
@@ -188,8 +191,8 @@ void Nexus<TTr>::sm_thread_on_enet_receive_server(SmThreadCtx &ctx,
 
     LOG_WARN(
         "eRPC Nexus: Received session management request for invalid "
-        "Rpc %u from Rpc [%s, %u]. Sending response.\n",
-        target_rpc_id, sm_pkt.client.hostname, sm_pkt.client.rpc_id);
+        "Rpc %u from %s. Sending response.\n",
+        target_rpc_id, sm_pkt.client.name().c_str());
 
     sm_pkt.pkt_type = sm_pkt_type_req_to_resp(sm_pkt.pkt_type);
     sm_pkt.err_type = SmErrType::kInvalidRemoteRpcId;
@@ -213,7 +216,7 @@ void Nexus<TTr>::sm_thread_on_enet_receive_client(SmThreadCtx &ctx,
   std::string rem_hostname = sm_pkt.get_remote_hostname();
   assert(ctx.client_map.at(rem_hostname) == ev.peer);
 
-  LOG_INFO("eRPC Nexus: Received SM packet (type %s, source %s).\n",
+  LOG_INFO("eRPC Nexus: Received SM packet (type %s) from %s.\n",
            sm_pkt_type_str(sm_pkt.pkt_type).c_str(),
            sm_pkt.server.name().c_str());
 
@@ -229,8 +232,8 @@ void Nexus<TTr>::sm_thread_on_enet_receive_client(SmThreadCtx &ctx,
   } else {
     LOG_WARN(
         "eRPC Nexus: Received session management response for invalid "
-        "Rpc %u from Rpc [%s, %u]. Ignoring.\n",
-        target_rpc_id, sm_pkt.client.hostname, sm_pkt.client.rpc_id);
+        "Rpc %u from %s. Ignoring.\n",
+        target_rpc_id, sm_pkt.client.name().c_str());
   }
 
   ctx.nexus_lock->unlock();
