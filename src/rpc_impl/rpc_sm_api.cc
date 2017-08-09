@@ -132,8 +132,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   }
 
   if (session->client_info.sm_api_req_pending) {
-    LOG_WARN("%s: A session management API request is already pending.\n",
-             issue_msg);
+    LOG_WARN("%s: An SM request is pending. Denied.\n", issue_msg);
     return -EBUSY;
   }
 
@@ -199,9 +198,7 @@ size_t Rpc<TTr>::num_active_sessions_st() {
   size_t ret = 0;
   // session_vec can only be modified by the creator, so no need to lock
   for (Session *session : session_vec) {
-    if (session != nullptr) {
-      ret++;
-    }
+    if (session != nullptr) ret++;
   }
 
   return ret;
