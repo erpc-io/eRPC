@@ -141,6 +141,7 @@ set(SOURCES
   src/rpc_impl/rpc_tx.cc
   src/rpc_impl/rpc_connect_handlers.cc
   src/rpc_impl/rpc_disconnect_handlers.cc
+  src/rpc_impl/rpc_reset_handler.cc
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/session.cc

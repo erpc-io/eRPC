@@ -278,6 +278,10 @@ class Rpc {
   void handle_disconnect_req_st(const typename Nexus<TTr>::SmWorkItem &req_wi);
   void handle_disconnect_resp_st(const SmPkt &pkt);
 
+  /// Handle a reset event. This happens our ENet peer (server- or client-mode)
+  /// to rem_hostname gets disconnected because of an ENet timeout.
+  void handle_reset_st(const std::string rem_hostname);
+
   //
   // Handle available RECVs
   //
