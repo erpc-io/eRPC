@@ -162,9 +162,6 @@ void init_erpc(AppContext *c, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
-  ERpc::rt_assert(ERpc::Rpc<ERpc::IBTransport>::kEvLoopTickerReset == 1,
-                  "Consensus app requires Rpc::kEvLoopTickerReset = 1 for low "
-                  "latency.");
 
   // Work around g++-5's unused variable warning for validators
   _unused(num_raft_servers_validator_registered);
@@ -172,9 +169,7 @@ int main(int argc, char **argv) {
 
   AppContext c;
   c.conn_vec.resize(FLAGS_num_raft_servers);  // Both clients and servers
-  for (auto &peer_conn : c.conn_vec) {
-    peer_conn.c = &c;
-  }
+  for (auto &peer_conn : c.conn_vec) peer_conn.c = &c;
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
@@ -210,7 +205,7 @@ int main(int argc, char **argv) {
     }
 
     call_raft_periodic(&c);
-    c.rpc->run_event_loop(0);  // Run once
+    c.rpc->run_event_loop_once();
 
     leader_saveinfo_t &leader_sav = c.server.leader_saveinfo;
     if (!leader_sav.in_use) continue;  // Avoid passing garbage to commit check

@@ -20,6 +20,7 @@ void Nexus<TTr>::sm_thread_on_enet_connect_server(SmThreadCtx &,
 template <class TTr>
 void Nexus<TTr>::sm_thread_on_enet_connect_client(SmThreadCtx &ctx,
                                                   ENetEvent &ev) {
+  _unused(ctx);
   ENetPeer *epeer = ev.peer;
   assert(epeer->data != nullptr);
 

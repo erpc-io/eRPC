@@ -395,9 +395,18 @@ class Rpc {
     run_event_loop_timeout_st(timeout_ms);
   }
 
+  /// Run the event loop once
+  inline void run_event_loop_once() { run_event_loop_once_st(); }
+
  private:
-  void run_event_loop_one_st();
+  /// Implementation of the run_event_loop(timeout) API function
   void run_event_loop_timeout_st(size_t timeout_ms);
+
+  /// Implementation of run_event_loop() API function
+  void run_event_loop_once_st();
+
+  /// Actually run one iteration of the event loop
+  void run_event_loop_do_one_st();
 
   //
   // TX (rpc_tx.cc)

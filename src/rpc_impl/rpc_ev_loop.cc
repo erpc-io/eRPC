@@ -3,7 +3,7 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::run_event_loop_one_st() {
+void Rpc<TTr>::run_event_loop_do_one_st() {
   assert(in_creator());
 
   dpath_stat_inc(dpath_stats.ev_loop_calls, 1);
@@ -13,7 +13,7 @@ void Rpc<TTr>::run_event_loop_one_st() {
     handle_sm_st();  // Callee grabs the hook lock
   }
 
-  if (ev_loop_ticker == kEvLoopTickerReset) {
+  if (ev_loop_ticker >= kEvLoopTickerReset) {
     // Check for packet loss if we're in a new epoch
     size_t cur_ts = rdtsc();
 
@@ -41,11 +41,24 @@ void Rpc<TTr>::run_event_loop_one_st() {
 }
 
 template <class TTr>
+void Rpc<TTr>::run_event_loop_once_st() {
+  assert(in_creator());
+
+  if (kDatapathChecks) {
+    assert(!in_event_loop);
+    in_event_loop = true;
+  }
+
+  ev_loop_ticker++;            // Needed for packet loss handling
+  run_event_loop_do_one_st();  // Run at least once even if timeout_ms is 0
+
+  if (kDatapathChecks) in_event_loop = false;
+}
+
+template <class TTr>
 void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
   assert(in_creator());
 
-  // This is the only point-of-entrance to the event loop for eRPC users.
-  // So, in_event_loop should be modified only here.
   if (kDatapathChecks) {
     assert(!in_event_loop);
     in_event_loop = true;
@@ -54,10 +67,10 @@ void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
   uint64_t start_tsc = rdtsc();
   while (true) {
     ev_loop_ticker++;
-    run_event_loop_one_st();  // Run at least once even if timeout_ms is 0
+    run_event_loop_do_one_st();  // Run at least once even if timeout_ms is 0
 
     // Amortize timer overhead over event loop iterations
-    if (ev_loop_ticker == kEvLoopTickerReset) {
+    if (ev_loop_ticker >= kEvLoopTickerReset) {
       ev_loop_ticker = 0;
       double elapsed_ms = to_sec(rdtsc() - start_tsc, nexus->freq_ghz) * 1000;
       if (elapsed_ms > timeout_ms) break;
