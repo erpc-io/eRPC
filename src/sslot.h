@@ -17,7 +17,7 @@ template <typename T>
 class Rpc;
 
 /**
- * @brief Session slot metadata maintained about an Rpc
+ * @brief Session slot metadata maintained about an RPC
  *
  * This slot structure is used by both server and client sessions.
  */
@@ -30,10 +30,9 @@ class SSlot {
 
  public:
   // Server-only members. These are exposed to request handlers.
-  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic MsgBuffer to store app response
-
-  MsgBuffer pre_resp_msgbuf;  ///< Prealloc MsgBuffer to store app response
-  bool prealloc_used;         ///< Did the app use \p pre_resp_msgbuf
+  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic buffer to store RPC response
+  MsgBuffer pre_resp_msgbuf;  ///< Preallocated buffer to store RPC response
+  bool prealloc_used;         ///< Did the handler use \p pre_resp_msgbuf?
 
  private:
   // Members that are valid for both server and client
@@ -43,8 +42,11 @@ class SSlot {
   /// access to \p session, so we need this info separately.
   bool is_client;
 
-  size_t index;          ///< Index of this sslot in the session's sslot_arr
-  MsgBuffer *tx_msgbuf;  ///< The TX MsgBuffer, valid if it is not NULL
+  size_t index;  ///< Index of this sslot in the session's sslot_arr
+
+  /// The TX MsgBuffer, valid if it is non-null. For client sslots, a non-null
+  /// \p tx_msgbuf indicates that the request is active/incomplete.
+  MsgBuffer *tx_msgbuf;
 
   size_t cur_req_num;
 

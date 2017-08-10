@@ -223,7 +223,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->client_info.resp_rcvd = 1;
   bump_credits(sslot->session);
 
-  // Bury request MsgBuffer and mark response as received
+  // Bury req MsgBuffer and mark response as received ( = request completed)
   sslot->tx_msgbuf = nullptr;  // Equivalent to bury()
 
   // Copy the header and data
@@ -552,7 +552,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   // Invoke the continuation iff we have all the response packets
   if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) return;
 
-  // Bury request MsgBuffer and mark response as received
+  // Bury req MsgBuffer and mark response as received ( =  request completed)
   sslot->tx_msgbuf = nullptr;  // Equivalent to bury()
 
   if (small_rpc_likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
