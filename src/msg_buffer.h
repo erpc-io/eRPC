@@ -159,7 +159,7 @@ class MsgBuffer {
 
  public:
   /// Pointer to the first *data* byte. (\p buffer.buf does not point to the
-  /// first data byte.) The MsgBuffer is invalid if this is NULL.
+  /// first data byte.) The MsgBuffer is invalid if this is null.
   uint8_t *buf;
 
  private:

@@ -38,7 +38,7 @@ class ReqFunc {
 
   ReqFunc(erpc_req_func_t req_func, ReqFuncType req_func_type)
       : req_func(req_func), req_func_type(req_func_type) {
-    rt_assert(req_func != nullptr, "Invalid Ops with NULL handler function");
+    rt_assert(req_func != nullptr, "Invalid Ops with null handler function");
   }
 
   /// Check if this request handler is registered

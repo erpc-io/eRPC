@@ -25,7 +25,7 @@ class Buffer {
     return ret.str();
   }
 
-  /// The backing memory of this Buffer. The Buffer is invalid if this is NULL.
+  /// The backing memory of this Buffer. The Buffer is invalid if this is null.
   uint8_t *buf;
   size_t class_size;  ///< The class size
   uint32_t lkey;      ///< The memory registration lkey

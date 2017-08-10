@@ -82,7 +82,7 @@ class Rpc {
    * @param max_data_size Maximum non-header bytes in the returned MsgBuffer
    *
    * @return \p The allocated MsgBuffer. The MsgBuffer is invalid (i.e., its
-   * \p buf is NULL) if we ran out of memory.
+   * \p buf is null) if we ran out of memory.
    *
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
@@ -252,7 +252,7 @@ class Rpc {
   /// packets.
   void handle_sm_st();
 
-  /// Free a session's resources and mark it as NULL in the session vector.
+  /// Free a session's resources and mark it as null in the session vector.
   /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
   /// responsible for freeing user-allocated MsgBuffers.
   void bury_session_st(Session *session);

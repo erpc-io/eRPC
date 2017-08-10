@@ -263,7 +263,7 @@ class Nexus {
 
   std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
 
-  /// Rpc-Nexus hooks. Non-NULL hooks are valid.
+  /// Rpc-Nexus hooks. Non-null hooks are valid.
   Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};
 
   volatile bool kill_switch;  ///< Used to turn off SM and background threads

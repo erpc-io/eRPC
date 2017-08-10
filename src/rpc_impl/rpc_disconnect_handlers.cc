@@ -47,7 +47,7 @@ void Rpc<TTr>::handle_disconnect_req_st(
   LOG_INFO("%s. None. Sending response.\n", issue_msg);
   enqueue_sm_resp_st(req_wi, SmErrType::kNoError);
 
-  bury_session_st(session);  // Free session resources + NULL in session_vec
+  bury_session_st(session);  // Free session resources + nullify in session_vec
 }
 
 // We free the session's RECVs before sending the disconnect request, not here
@@ -89,7 +89,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
         issue_msg);
   }
 
-  bury_session_st(session);  // Free session resources + NULL in session_vec
+  bury_session_st(session);  // Free session resources + nullify in session_vec
 }
 
 }  // End ERpc
