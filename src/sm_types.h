@@ -24,7 +24,9 @@ enum class SessionState {
   kConnectInProgress,
   kConnected,  ///< The only state for server-side sessions
   kDisconnectInProgress,
-  kDisconnected,  ///< Temporary state for the disconnected callback
+  /// Temporary state for the disconnected callback. The session is buried
+  /// immediately after the callback, so this state is never exposed.
+  kDisconnected,
 };
 
 /// Packet types used for session management

@@ -41,7 +41,7 @@ void Rpc<TTr>::handle_disconnect_req_st(
     }
   }
 
-  session->state = SessionState::kDisconnected;
+  session->state = SessionState::kDisconnected;  // Temporary state
   free_recvs();
 
   LOG_INFO("%s. None. Sending response.\n", issue_msg);
@@ -76,7 +76,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   assert(session->server == sm_pkt.server);
 
   session->client_info.sm_api_req_pending = false;
-  session->state = SessionState::kDisconnected;
+  session->state = SessionState::kDisconnected;  // Temporary state
 
   if (!session->client_info.sm_callbacks_disabled) {
     LOG_INFO("%s: None. Session disconnected.\n", issue_msg);

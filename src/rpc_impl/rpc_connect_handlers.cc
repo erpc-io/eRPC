@@ -157,7 +157,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
     LOG_WARN("%s: Error %s.\n", issue_msg,
              sm_err_type_str(sm_pkt.err_type).c_str());
 
-    session->state = SessionState::kDisconnected;
+    session->state = SessionState::kDisconnected;  // A temporary state
     free_recvs();  // Free before calling handler, which might want a reconnect
     sm_handler(session->local_session_num, SmEventType::kConnectFailed,
                sm_pkt.err_type, context);
