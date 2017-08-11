@@ -69,9 +69,8 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 
   // Free session resources
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    // Free the preallocated MsgBuffer
-    MsgBuffer &msg_buf = session->sslot_arr[i].pre_resp_msgbuf;
-    free_msg_buffer(msg_buf);
+    auto &sslot = session->sslot_arr[i];
+    free_msg_buffer(sslot.pre_resp_msgbuf);  // Always valid
 
     // XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
     // guaranteed to have been freed at this point?

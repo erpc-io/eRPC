@@ -29,7 +29,7 @@ class SSlot {
   friend class RespHandle;
 
  public:
-  // Server-only members. These are exposed to request handlers.
+  // Server-only members. Exposed to req handlers, so not kept in server struct.
   MsgBuffer dyn_resp_msgbuf;  ///< Dynamic buffer to store RPC response
   MsgBuffer pre_resp_msgbuf;  ///< Preallocated buffer to store RPC response
   bool prealloc_used;         ///< Did the handler use \p pre_resp_msgbuf?
@@ -44,15 +44,15 @@ class SSlot {
 
   size_t index;  ///< Index of this sslot in the session's sslot_arr
 
-  /// The TX MsgBuffer, valid if it is non-null. For client sslots, a non-null
-  /// \p tx_msgbuf indicates that the request is active/incomplete.
+  /// The request (client) or response (server) buffer. For client sslots, a
+  /// non-null value indicates that the request is active/incomplete.
   MsgBuffer *tx_msgbuf;
 
   size_t cur_req_num;
 
   // Info saved only at the client
   struct {
-    MsgBuffer *resp_msgbuf;
+    MsgBuffer *resp_msgbuf;      ///< User-supplied response buffer
     erpc_cont_func_t cont_func;  ///< Continuation function for the request
     size_t tag;                  ///< Tag of the request
 
@@ -80,7 +80,7 @@ class SSlot {
   } client_info;
 
   struct {
-    MsgBuffer req_msgbuf;
+    MsgBuffer req_msgbuf;  ///< The fake/dynamic request buffer
     ///@{
     /// Request metadata saved by the server before calling the request
     /// handler. These fields are needed in enqueue_response(), and the
@@ -94,48 +94,6 @@ class SSlot {
     size_t req_rcvd;  ///< Number of request packets received
     size_t rfr_rcvd;  ///< Number of request-for-response packets received
   } server_info;
-
-  /// Return a string representation of this session slot
-  std::string to_string() const {
-    return "";
-    /*
-    std::string req_num_string, req_type_string;
-
-    if (is_client) {
-      if (client_info.resp_msgbuf == nullptr) {
-        return "[Invalid]";
-      }
-
-      req_num_string = std::to_string(resp_msgbuf->get_req_num());
-      req_type_string = std::to_string(rx_msgbuf.get_req_type());
-
-    }
-
-    if (rx_msgbuf.buf == nullptr && tx_msgbuf == nullptr) {
-      return "[Invalid]";
-    }
-
-    // Extract the request number and type from either RX or TX MsgBuffer
-    std::string req_num_string, req_type_string;
-    if (rx_msgbuf.buf != nullptr) {
-      req_num_string = std::to_string(rx_msgbuf.get_req_num());
-      req_type_string = std::to_string(rx_msgbuf.get_req_type());
-    }
-
-    if (tx_msgbuf != nullptr && rx_msgbuf.buf == nullptr) {
-      req_num_string = std::to_string(tx_msgbuf->get_req_num());
-      req_type_string = std::to_string(tx_msgbuf->get_req_type());
-    }
-
-    std::ostringstream ret;
-    ret << "[req num" << req_num_string << ", "
-        << "req type " << req_type_string << ", "
-        << "rx_msgbuf " << rx_msgbuf.to_string() << ", "
-        << "tx_msgbuf "
-        << (tx_msgbuf == nullptr ? "0x0" : tx_msgbuf->to_string()) << "]";
-    return ret.str();
-    */
-  }
 };
 
 class ReqHandle : public SSlot {

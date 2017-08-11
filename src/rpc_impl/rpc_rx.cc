@@ -584,8 +584,6 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot,
   }
 
   auto *req_list = nexus_hook.bg_req_list_arr[bg_etid];
-
-  // Thread-safe
   req_list->unlocked_push_back(
       typename Nexus<TTr>::BgWorkItem(wi_type, this, context, sslot));
 }
