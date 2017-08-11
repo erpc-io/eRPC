@@ -114,13 +114,12 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
           "eRPC Rpc %u: destroy_session() failed for session %d. Issue", rpc_id,
           session_num);
 
-  // Check that the caller is the creator thread
   if (!in_creator()) {
     LOG_WARN("%s: Caller thread is not creator.\n", issue_msg);
     return -EPERM;
   }
 
-  if (!is_usr_session_num_in_range(session_num)) {
+  if (!is_usr_session_num_in_range_st(session_num)) {
     LOG_WARN("%s: Invalid session number.\n", issue_msg);
     return -EINVAL;
   }

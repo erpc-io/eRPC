@@ -37,7 +37,7 @@ void Rpc<TTr>::fault_inject_disable_pkt_loss_handling() {
 template <class TTr>
 void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   fault_inject_check_ok();
-  assert(is_usr_session_num_in_range(session_num));
+  assert(is_usr_session_num_in_range_st(session_num));
 
   // We don't grab session lock because, for this session, other management ops
   // are handled by this thread, and we don't care about datapath operations

@@ -26,7 +26,7 @@ void Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
     LOG_WARN(
         "eRPC Rpc %u: Resetting %s session, session number = %u, state = %s.",
         rpc_id, session->is_client() ? "client" : "server",
-        session->local_session_num, session_state_str(session->state));
+        session->local_session_num, session_state_str(session->state).c_str());
   }
 }
 

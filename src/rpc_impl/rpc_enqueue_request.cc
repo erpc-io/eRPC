@@ -13,42 +13,17 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                               size_t cont_etid) {
   // Since this can be called from a background thread, only do basic checks
   // that don't require accessing the session.
-  assert(is_usr_session_num_in_range(session_num));
-  if (!kDatapathChecks) {
-    assert(req_msgbuf != nullptr);
-    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic() &&
-           req_msgbuf->is_dynamic());
-    assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
-    assert(req_msgbuf->num_pkts > 0);
+  assert(req_msgbuf != nullptr);
+  assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic() &&
+         req_msgbuf->is_dynamic());
+  assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
+  assert(req_msgbuf->num_pkts > 0);
 
-    assert(resp_msgbuf != nullptr);
-    assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic() &&
-           resp_msgbuf->is_dynamic());
-    assert(resp_msgbuf->data_size > 0 && resp_msgbuf->data_size <= kMaxMsgSize);
-    assert(resp_msgbuf->num_pkts > 0);
-  } else {
-    if (unlikely(req_msgbuf == nullptr || req_msgbuf->buf == nullptr ||
-                 !req_msgbuf->check_magic() || !req_msgbuf->is_dynamic())) {
-      return -EINVAL;
-    }
-
-    if (unlikely(req_msgbuf->data_size == 0 ||
-                 req_msgbuf->data_size > kMaxMsgSize ||
-                 req_msgbuf->num_pkts == 0)) {
-      return -EINVAL;
-    }
-
-    if (unlikely(resp_msgbuf == nullptr || resp_msgbuf->buf == nullptr ||
-                 !resp_msgbuf->check_magic() || !resp_msgbuf->is_dynamic())) {
-      return -EINVAL;
-    }
-
-    if (unlikely(resp_msgbuf->data_size == 0 ||
-                 resp_msgbuf->data_size > kMaxMsgSize ||
-                 resp_msgbuf->num_pkts == 0)) {
-      return -EINVAL;
-    }
-  }
+  assert(resp_msgbuf != nullptr);
+  assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic() &&
+         resp_msgbuf->is_dynamic());
+  assert(resp_msgbuf->data_size > 0 && resp_msgbuf->data_size <= kMaxMsgSize);
+  assert(resp_msgbuf->num_pkts > 0);
 
   // When called from a background thread, enqueue to the foreground thread
   if (small_rpc_unlikely(!in_creator())) {
@@ -62,6 +37,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // If we're here, we are in the foreground thread
   assert(in_creator());
+  assert(is_usr_session_num_in_range_st(session_num));
 
   Session *session = session_vec[static_cast<size_t>(session_num)];
   if (!kDatapathChecks) {

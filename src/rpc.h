@@ -725,23 +725,20 @@ class Rpc {
   inline bool in_creator() const { return get_etid() == creator_etid; }
 
   /// Return true iff a user-provide session number is in the session vector
-  inline bool is_usr_session_num_in_range(int session_num) const {
+  inline bool is_usr_session_num_in_range_st(int session_num) const {
+    assert(in_creator());
     return session_num >= 0 &&
            static_cast<size_t>(session_num) < session_vec.size();
   }
 
   /// Lock the mutex if the Rpc is accessible from multiple threads
   inline void lock_cond(std::mutex *mutex) {
-    if (small_rpc_unlikely(multi_threaded)) {
-      mutex->lock();
-    }
+    if (small_rpc_unlikely(multi_threaded)) mutex->lock();
   }
 
   /// Unlock the mutex if the Rpc is accessible from multiple threads
   inline void unlock_cond(std::mutex *mutex) {
-    if (small_rpc_unlikely(multi_threaded)) {
-      mutex->unlock();
-    }
+    if (small_rpc_unlikely(multi_threaded)) mutex->unlock();
   }
 
   // rpc_send_cr.cc
