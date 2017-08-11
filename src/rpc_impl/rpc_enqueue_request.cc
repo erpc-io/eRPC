@@ -34,12 +34,11 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     bg_queues.enqueue_request.unlocked_push_back(req_args);
     return 0;
   }
-
-  // If we're here, we are in the foreground thread
   assert(in_creator());
-  assert(is_usr_session_num_in_range_st(session_num));
 
+  assert(is_usr_session_num_in_range_st(session_num));
   Session *session = session_vec[static_cast<size_t>(session_num)];
+
   if (!kDatapathChecks) {
     // We never disconnect a session without notifying the eRPC user, so
     // returning an error is not strictly required.

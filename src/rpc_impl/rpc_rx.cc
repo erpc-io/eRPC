@@ -137,18 +137,12 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->cur_req_num = pkthdr->req_num;
   sslot->server_info.req_rcvd = 1;
 
-  // Bury the previous, possibly dynamic response (sslot->tx_msgbuf).
-  // This marks the response for cur_req_num as unavailable
+  // Bury the previous, possibly dynamic response (sslot->tx_msgbuf). This marks
+  // the response for cur_req_num as unavailable
   bury_resp_msgbuf_server(sslot);
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
-  if (unlikely(!req_func.is_registered())) {
-    LOG_WARN(
-        "eRPC Rpc %u: Warning: Received packet for unknown request type %zu. "
-        "Dropping packet.\n",
-        rpc_id, pkthdr->req_type);
-    return;
-  }
+  assert(req_func.is_registered());
 
   // Remember request metadata for enqueue_response()
   sslot->server_info.req_func_type = req_func.req_func_type;
@@ -439,13 +433,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   if (sslot->server_info.req_rcvd != req_msgbuf.num_pkts) return;
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
-  if (unlikely(!req_func.is_registered())) {
-    LOG_WARN(
-        "eRPC Rpc %u: Warning: Received packet for unknown request type %zu. "
-        "Dropping packet.\n",
-        rpc_id, pkthdr->req_type);
-    return;
-  }
+  assert(req_func.is_registered());
 
   // Remember request metadata for enqueue_response()
   sslot->server_info.req_func_type = req_func.req_func_type;

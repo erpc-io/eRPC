@@ -722,7 +722,7 @@ class Rpc {
   /// Return true iff we're currently running in this Rpc's creator thread
   inline bool in_creator() const { return get_etid() == creator_etid; }
 
-  /// Return true iff a user-provide session number is in the session vector
+  /// Return true iff a user-provided session number is in the session vector
   inline bool is_usr_session_num_in_range_st(int session_num) const {
     assert(in_creator());
     return session_num >= 0 &&
