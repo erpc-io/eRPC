@@ -373,8 +373,6 @@ class Rpc {
       bg_queues.release_response.unlocked_push_back(resp_handle);
       return;
     }
-
-    // If we're here, we are in the foreground thread
     assert(in_creator());
 
     // Request MsgBuffer (tx_msgbuf) was buried when this response was received

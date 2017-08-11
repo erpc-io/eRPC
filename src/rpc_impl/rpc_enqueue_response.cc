@@ -18,15 +18,19 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     bg_queues.enqueue_response.unlocked_push_back(req_handle);
     return;
   }
-
-  // If we're here, we are in the foreground thread
   assert(in_creator());
 
   Session *session = sslot->session;
-  assert(session != nullptr);
-
-  assert(session->is_server());
-  assert(session->is_connected());
+  assert(session != nullptr && session->is_server());
+  if (unlikely(!session->is_connected())) {
+    // This can happen during session reset
+    LOG_WARN(
+        "eRPC Rpc %u: enqueue_response() for unconnected session %u. "
+        "Session state = %s.\n",
+        rpc_id, session->local_session_num,
+        session_state_str(session->state).c_str());
+    return;
+  }
 
   MsgBuffer *resp_msgbuf;
   if (small_rpc_likely(sslot->prealloc_used)) {
@@ -61,7 +65,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   }
 
   // Fill in the slot and reset queueing progress
-  sslot->tx_msgbuf = resp_msgbuf;  // Valid response
+  assert(sslot->tx_msgbuf == nullptr);  // Buried before calling request handler
+  sslot->tx_msgbuf = resp_msgbuf;       // Mark response as valid
   if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
 
   // Enqueue the zeroth response packet

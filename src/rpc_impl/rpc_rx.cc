@@ -120,9 +120,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
         transport->tx_flush();
         return;
       } else {
-        // The response is not available yet, client will have to timeout again
-        LOG_DEBUG("%s: Dropping because response not available yet.\n",
-                  issue_msg);
+        LOG_DEBUG("%s: Response not available yet. Dropping.\n", issue_msg);
         return;
       }
     }
@@ -438,9 +436,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   copy_data_to_msgbuf(&req_msgbuf, pkt);  // Header 0 was copied earlier
 
   // Invoke the request handler iff we have all the request packets
-  if (sslot->server_info.req_rcvd != req_msgbuf.num_pkts) {
-    return;
-  }
+  if (sslot->server_info.req_rcvd != req_msgbuf.num_pkts) return;
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   if (unlikely(!req_func.is_registered())) {
