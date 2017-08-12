@@ -20,10 +20,9 @@ void Rpc<TTr>::process_req_txq_st() {
     assert(sslot->client_info.req_sent < req_msgbuf->num_pkts);
 
     if (small_rpc_likely(req_msgbuf->num_pkts == 1)) {
-      // Optimize for small messages that fit in one packet
-      tx_small_msg_one_st(sslot, req_msgbuf);
+      tx_small_req_one_st(sslot, req_msgbuf);
     } else {
-      tx_large_msg_one_st(sslot, req_msgbuf);
+      tx_large_req_one_st(sslot, req_msgbuf);
     }
 
     // Session slots that still need TX stay in the queue
@@ -37,7 +36,7 @@ void Rpc<TTr>::process_req_txq_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::tx_small_msg_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
+void Rpc<TTr>::tx_small_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
   assert(in_creator());
 
   Session *session = sslot->session;
@@ -54,7 +53,7 @@ void Rpc<TTr>::tx_small_msg_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
 }
 
 template <class TTr>
-void Rpc<TTr>::tx_large_msg_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
+void Rpc<TTr>::tx_large_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
   assert(in_creator());
 
   Session *session = sslot->session;
