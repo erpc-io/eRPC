@@ -818,7 +818,10 @@ class Rpc {
   std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
 
   // RPC work queues
-  std::vector<SSlot *> req_txq;  ///< Request sslots that need TX
+
+  /// Request sslots that need TX. Response sslots are not queued because they
+  /// never stall for credits (or congestion, if CC is implemented).
+  std::vector<SSlot *> req_txq;
 
   /// Queues for datapath API requests from background threads
   struct {
