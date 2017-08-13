@@ -143,6 +143,8 @@ class Rpc {
 
   /**
    * @brief Bury a server sslot's response MsgBuffer (i.e., sslot->tx_msgbuf).
+   * This is done in the foreground thread after receiving a packet for the
+   * next request.
    *
    * This does not fully validate the MsgBuffer, since we don't want to
    * conditionally bury only initialized MsgBuffers.
@@ -151,7 +153,7 @@ class Rpc {
    * even prealloc response MsgBuffers are non-fake: the \p prealloc_used field
    * is used to decide if we need to free memory.
    */
-  inline void bury_resp_msgbuf_server(SSlot *sslot) {
+  inline void bury_resp_msgbuf_server_st(SSlot *sslot) {
     assert(sslot != nullptr);
 
     // Free the response MsgBuffer iff it is not preallocated
@@ -168,7 +170,8 @@ class Rpc {
   }
 
   /**
-   * @brief Bury a server sslot's request MsgBuffer.
+   * @brief Bury a server sslot's request MsgBuffer. This is done after the
+   * request handler returns, so it can be called from a background thread.
    *
    * This does not fully validate the MsgBuffer, since we don't want to
    * conditinally bury only initialized MsgBuffers.

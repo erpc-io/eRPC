@@ -138,8 +138,8 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->server_info.req_rcvd = 1;
 
   // Bury the previous, possibly dynamic response (sslot->tx_msgbuf). This marks
-  // the response for cur_req_num as unavailable
-  bury_resp_msgbuf_server(sslot);
+  // the response for cur_req_num as unavailable.
+  bury_resp_msgbuf_server_st(sslot);
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   assert(req_func.is_registered());
@@ -406,9 +406,9 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     sslot->cur_req_num = pkthdr->req_num;
     sslot->server_info.req_rcvd = 1;
 
-    // Bury the previous, possibly dynamic response.
-    // This marks the response for cur_req_num as unavailable
-    bury_resp_msgbuf_server(sslot);
+    // Bury the previous, possibly dynamic response. This marks the response for
+    // cur_req_num as unavailable.
+    bury_resp_msgbuf_server_st(sslot);
 
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(req_msgbuf.buf != nullptr);

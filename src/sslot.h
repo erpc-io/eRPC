@@ -80,7 +80,10 @@ class SSlot {
   } client_info;
 
   struct {
-    MsgBuffer req_msgbuf;  ///< The fake/dynamic request buffer
+    /// The fake or dynamic request buffer. This is buried after the request
+    /// handler returns, so it can be buried from a background thread.
+    MsgBuffer req_msgbuf;
+
     ///@{
     /// Request metadata saved by the server before calling the request
     /// handler. These fields are needed in enqueue_response(), and the
