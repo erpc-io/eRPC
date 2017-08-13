@@ -22,15 +22,11 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   Session *session = sslot->session;
   assert(session != nullptr && session->is_server());
-  if (unlikely(!session->is_connected())) {
-    // This can happen during session reset
-    LOG_WARN(
-        "eRPC Rpc %u: enqueue_response() for unconnected session %u. "
-        "Session state = %s.\n",
-        rpc_id, session->local_session_num,
-        session_state_str(session->state).c_str());
-    return;
-  }
+
+  // Session reset could be waiting for enqueue_response() to complete, which
+  // is equivalent to sslot->tx_msgbuf being non-null
+  assert(session->state == SessionState::kConnected ||
+         session->state == SessionState::kDisconnectInProgress);
 
   MsgBuffer *resp_msgbuf;
   if (small_rpc_likely(sslot->prealloc_used)) {
@@ -68,6 +64,16 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(sslot->tx_msgbuf == nullptr);  // Buried before calling request handler
   sslot->tx_msgbuf = resp_msgbuf;       // Mark response as valid
   if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
+
+  if (unlikely(!session->is_connected())) {
+    // During session reset, don't add packets to TX burst
+    LOG_WARN(
+        "eRPC Rpc %u: enqueue_response() for unconnected session %u. "
+        "Session state = %s.\n",
+        rpc_id, session->local_session_num,
+        session_state_str(session->state).c_str());
+    return;
+  }
 
   // Enqueue the zeroth response packet
   enqueue_pkt_tx_burst_st(

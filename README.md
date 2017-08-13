@@ -50,6 +50,8 @@
      of the response MsgBuffer when it calls `enqueue_response()`. eRPC will
      free it when the response is no longer needed for retransmission.
  * Burying invariants:
+   * MsgBuffers are buried at the first code point where they *can* be buried.
+     This is inconvenient at times, but it does more good than harm.
    * At clients, the request MsgBuffer is buried (nullified, since the request
      MsgBuffer is app-owned) on receiving the complete response, and before
      invoking the continuation. So, a null value of `sslot->tx_msgbuf` indicates
