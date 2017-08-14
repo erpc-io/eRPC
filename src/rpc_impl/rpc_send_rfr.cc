@@ -6,7 +6,7 @@ template <class TTr>
 void Rpc<TTr>::send_req_for_resp_now_st(const SSlot *sslot,
                                         const pkthdr_t *resp_pkthdr) {
   assert(in_creator());
-  assert(sslot != nullptr && sslot->session->is_client());
+  assert(sslot != nullptr && sslot->is_client);
   assert(sslot->client_info.resp_msgbuf->is_dynamic() &&
          sslot->client_info.resp_msgbuf->is_resp());
   assert(resp_pkthdr != nullptr && resp_pkthdr->check_magic());
