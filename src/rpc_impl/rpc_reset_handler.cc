@@ -28,6 +28,8 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
         rpc_id, session->is_client() ? "client" : "server",
         session->local_session_num, session_state_str(session->state).c_str());
   }
+
+  return true;
 }
 
 }  // End ERpc

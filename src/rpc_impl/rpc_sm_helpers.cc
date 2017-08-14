@@ -12,12 +12,15 @@ void Rpc<TTr>::handle_sm_st() {
   assert(nexus_hook.sm_rx_list.size > 0);
   nexus_hook.sm_rx_list.lock();
 
+  std::vector<SmWorkItem> reset_fail_queue;
+
   // Handle SM work items queued by the session management thread
-  for (const typename Nexus<TTr>::SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
+  for (const SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
     // Reset work items don't have a valid SM packet, so handle them first
     if (wi.is_reset()) {
       assert(wi.reset_rem_hostname.length() > 0);
-      handle_reset_st(wi.reset_rem_hostname);
+      bool success = handle_reset_st(wi.reset_rem_hostname);
+      if (!success) reset_fail_queue.push_back(wi);
       continue;
     }
 
@@ -52,8 +55,10 @@ void Rpc<TTr>::handle_sm_st() {
     }
   }
 
-  // Clear the session management RX list
+  // Re-queue reset work items that couldn't complete
   nexus_hook.sm_rx_list.locked_clear();
+  for (auto &wi : reset_fail_queue) nexus_hook.sm_rx_list.list.push_back(wi);
+
   nexus_hook.sm_rx_list.unlock();
 }
 
@@ -90,12 +95,11 @@ void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
   sm_pkt.client = session->client;
   sm_pkt.server = session->server;
 
-  nexus_hook.sm_tx_list->unlocked_push_back(
-      typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt));
+  nexus_hook.sm_tx_list->unlocked_push_back(SmWorkItem(rpc_id, sm_pkt));
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_resp_st(const typename Nexus<TTr>::SmWorkItem &req_wi,
+void Rpc<TTr>::enqueue_sm_resp_st(const SmWorkItem &req_wi,
                                   SmErrType err_type) {
   assert(in_creator());
   assert(req_wi.sm_pkt.is_req());
@@ -104,8 +108,7 @@ void Rpc<TTr>::enqueue_sm_resp_st(const typename Nexus<TTr>::SmWorkItem &req_wi,
   sm_pkt.pkt_type = sm_pkt_type_req_to_resp(sm_pkt.pkt_type);  // Change to resp
   sm_pkt.err_type = err_type;
 
-  nexus_hook.sm_tx_list->unlocked_push_back(
-      typename Nexus<TTr>::SmWorkItem(rpc_id, sm_pkt));
+  nexus_hook.sm_tx_list->unlocked_push_back(SmWorkItem(rpc_id, sm_pkt));
 }
 
 }  // End ERpc

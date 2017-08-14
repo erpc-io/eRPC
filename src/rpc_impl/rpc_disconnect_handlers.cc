@@ -9,8 +9,7 @@ namespace ERpc {
 // We don't need to check remote arguments since the session was already
 // connected successfully.
 template <class TTr>
-void Rpc<TTr>::handle_disconnect_req_st(
-    const typename Nexus<TTr>::SmWorkItem &req_wi) {
+void Rpc<TTr>::handle_disconnect_req_st(const SmWorkItem &req_wi) {
   assert(in_creator());
 
   const SmPkt &sm_pkt = req_wi.sm_pkt;

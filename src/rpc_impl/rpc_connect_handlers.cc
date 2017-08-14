@@ -9,8 +9,7 @@ namespace ERpc {
 // We need to handle all types of errors in remote arguments that the client can
 // make when calling create_session(), which cannot check for such errors.
 template <class TTr>
-void Rpc<TTr>::handle_connect_req_st(
-    const typename Nexus<TTr>::SmWorkItem &req_wi) {
+void Rpc<TTr>::handle_connect_req_st(const SmWorkItem &req_wi) {
   assert(in_creator());
   assert(req_wi.sm_pkt.pkt_type == SmPktType::kConnectReq);
 
@@ -100,7 +99,7 @@ void Rpc<TTr>::handle_connect_req_st(
   session_vec.push_back(session);  // Add to list of all sessions
 
   // For successful responses, we need to edit the response SM packet
-  typename Nexus<TTr>::SmWorkItem resp_wi = req_wi;
+  SmWorkItem resp_wi = req_wi;
   resp_wi.sm_pkt.server = session->server;
   resp_wi.sm_pkt.client = session->client;
 

@@ -268,23 +268,22 @@ class Rpc {
   /// Allocate a response-copy of the session manegement packet and enqueue it
   /// to the session management thread. The allocated packet will be freed by
   /// the session management thread on transmission.
-  void enqueue_sm_resp_st(const typename Nexus<TTr>::SmWorkItem &req_wi,
-                          SmErrType err_type);
+  void enqueue_sm_resp_st(const SmWorkItem &req_wi, SmErrType err_type);
 
   //
   // Session management packet handlers (rpc_connect_handlers.cc,
   // rpc_disconnect_handlers.cc)
   //
-  void handle_connect_req_st(const typename Nexus<TTr>::SmWorkItem &req_wi);
+  void handle_connect_req_st(const SmWorkItem &req_wi);
   void handle_connect_resp_st(const SmPkt &pkt);
 
-  void handle_disconnect_req_st(const typename Nexus<TTr>::SmWorkItem &req_wi);
+  void handle_disconnect_req_st(const SmWorkItem &req_wi);
   void handle_disconnect_resp_st(const SmPkt &pkt);
 
   /**
    * @brief Try to reset sessions connected to \p rem_hostname.
-   * @return True if the session was reset successfully. False if the reset
-   * event needs to be queued and processed later.
+   * @return True if all such sessions was reset successfully. False if the
+   * reset event needs to be queued and processed later.
    */
   bool handle_reset_st(const std::string rem_hostname);
   bool handle_reset_server_st(Session *session);
