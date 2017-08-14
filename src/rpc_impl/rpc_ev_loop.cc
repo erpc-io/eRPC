@@ -18,10 +18,7 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
     size_t cur_ts = rdtsc();
 
     if (cur_ts - prev_epoch_ts >= pkt_loss_epoch_cycles) {
-      // Scan for packet loss unless a disablng fault has been injected by user
-      if (!(kFaultInjection && faults.disable_pkt_loss_handling)) {
-        pkt_loss_scan_reqs_st();
-      }
+      pkt_loss_scan_reqs_st();
       prev_epoch_ts = cur_ts;
     }
   }

@@ -29,12 +29,6 @@ void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob) {
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_disable_pkt_loss_handling() {
-  fault_inject_check_ok();
-  faults.disable_pkt_loss_handling = true;
-}
-
-template <class TTr>
 void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   fault_inject_check_ok();
   assert(is_usr_session_num_in_range_st(session_num));

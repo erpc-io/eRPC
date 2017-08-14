@@ -634,7 +634,7 @@ class Rpc {
    * will be generated locally when ENet detects the remote peer failure.
    *
    * This will also affect sessions in other Rpc objects on this machine that
-   * are connected to the same host as the session for \p session_num.
+   * are connected to the same remote host as \p session_num.
    *
    * @throw runtime_error if the caller cannot inject faults
    */
@@ -645,9 +645,6 @@ class Rpc {
    * @throw runtime_error if the caller cannot inject faults
    */
   void fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob);
-
-  /// Disable packet loss handling by this Rpc
-  void fault_inject_disable_pkt_loss_handling();
 
  private:
   /**
@@ -834,16 +831,16 @@ class Rpc {
   } bg_queues;
 
   // Packet loss
-  size_t prev_epoch_ts;                 ///< Timestamp of the previous epoch
-  std::vector<SSlot *> recovery_queue;  ///< Queue of recovering sslots
+  size_t prev_epoch_ts;  ///< Timestamp of the previous epoch
 
   // Misc
 
-  /// For tracking event loop reentrance (only with kDatapathChecks)
-  bool in_event_loop = false;
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
   SlowRand slow_rand;         ///< A slow random generator for "real" randomness
   FastRand fast_rand;         ///< A fast random generator
+
+  /// For tracking event loop reentrance (only with kDatapathChecks)
+  bool in_event_loop = false;
 
   /// All the faults that can be injected into ERpc for testing
   struct {
@@ -851,7 +848,6 @@ class Rpc {
     /// case where a client fails to resolve routing info sent by the server.
     bool fail_resolve_server_rinfo = false;
 
-    bool disable_pkt_loss_handling = false;  ///< Disable packet loss handling
     double pkt_drop_prob = 0.0;  ///< Probability of dropping a packet
   } faults;
 
