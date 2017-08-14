@@ -6,7 +6,6 @@
 namespace ERpc {
 
 // Packet header
-static constexpr size_t kMaxReqTypes = std::numeric_limits<uint8_t>::max();
 static constexpr size_t kMsgSizeBits = 24;  ///< Bits for message size
 static constexpr size_t kReqNumBits = 44;   ///< Bits for request number
 static constexpr size_t kPktNumBits = 13;   ///< Bits for packet number

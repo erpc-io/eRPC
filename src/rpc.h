@@ -789,7 +789,7 @@ class Rpc {
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.
-  const std::array<ReqFunc, kMaxReqTypes> req_func_arr;
+  const std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
 
   // Rpc metadata
   size_t creator_etid;  ///< ERpc thread ID of the creator thread

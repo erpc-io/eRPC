@@ -128,7 +128,7 @@ class Nexus {
     /// copy of the Nexus's request functions, background threads have a
     /// pointer. This is because background threads are launched before request
     /// functions are registered.
-    std::array<ReqFunc, kMaxReqTypes> *req_func_arr;
+    std::array<ReqFunc, kReqTypeArraySize> *req_func_arr;
 
     TlsRegistry *tls_registry;        ///< The Nexus's thread-local registry
     size_t bg_thread_index;           ///< Index of this background thread
@@ -253,7 +253,7 @@ class Nexus {
   TlsRegistry tls_registry;     ///< A thread-local registry
 
   /// The ground truth for registered request functions
-  std::array<ReqFunc, kMaxReqTypes> req_func_arr;
+  std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
   const uint8_t pad[64] = {0};  ///< Separate read-write members from read-only
 
  private:

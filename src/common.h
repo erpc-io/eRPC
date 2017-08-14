@@ -35,6 +35,10 @@ namespace ERpc {
 /// The max Rpc ID. 256 threads per machine is enough.
 static constexpr size_t kMaxRpcId = std::numeric_limits<uint8_t>::max() - 1;
 
+/// Array size to hold registered request handler functions
+static constexpr size_t kReqTypeArraySize =
+    std::numeric_limits<uint8_t>::max() + 1ull;
+
 /// The maximum number of machines in the cluster (ENet's connection limit)
 static constexpr size_t kMaxNumMachines = 4095;
 
@@ -49,6 +53,7 @@ static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
 
 // Invalid values
 static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
+static constexpr uint8_t kInvalidReqType = kReqTypeArraySize - 1;
 static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
 
 /// Invalid ERpc thread ID of a background thread
