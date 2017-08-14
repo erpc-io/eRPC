@@ -154,7 +154,8 @@ class Rpc {
    * is used to decide if we need to free memory.
    */
   inline void bury_resp_msgbuf_server_st(SSlot *sslot) {
-    assert(sslot != nullptr);
+    assert(in_creator());
+    assert(sslot != nullptr && sslot->session->is_server());
 
     // Free the response MsgBuffer iff it is not preallocated
     if (small_rpc_unlikely(!sslot->prealloc_used)) {
@@ -177,8 +178,7 @@ class Rpc {
    * conditinally bury only initialized MsgBuffers.
    */
   inline void bury_req_msgbuf_server(SSlot *sslot) {
-    assert(sslot != nullptr);
-    assert(sslot->session->is_server());
+    assert(sslot != nullptr && sslot->session->is_server());
 
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
     if (small_rpc_unlikely(req_msgbuf.is_dynamic())) {
