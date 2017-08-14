@@ -286,8 +286,8 @@ class Rpc {
    * reset event needs to be queued and processed later.
    */
   bool handle_reset_st(const std::string rem_hostname);
-  bool handle_reset_server_st(Session *session);
   bool handle_reset_client_st(Session *session);
+  bool handle_reset_server_st(Session *session);
 
   //
   // Handle available RECVs

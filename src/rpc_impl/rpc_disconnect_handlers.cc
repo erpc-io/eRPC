@@ -30,8 +30,7 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmWorkItem &req_wi) {
           rpc_id, sm_pkt.client.name().c_str());
 
   // Check that responses for all sslots have been sent
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    SSlot &sslot = session->sslot_arr[i];
+  for (const SSlot &sslot : session->sslot_arr) {
     assert(sslot.server_info.req_msgbuf.is_buried());  // Reqs must be buried
 
     // If there's a response in this sslot, we've finished sending it

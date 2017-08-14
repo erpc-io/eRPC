@@ -54,7 +54,7 @@ class Session {
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 
-  SSlot sslot_arr[kSessionReqWindow];  ///< The session slots
+  std::array<SSlot, kSessionReqWindow> sslot_arr;  ///< The session slots
 
   ///@{ Info saved for faster unconditional access
   Transport::RoutingInfo *remote_routing_info;
