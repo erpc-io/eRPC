@@ -7,7 +7,7 @@
 namespace ERpc {
 
 template <class TTr>
-void Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
+bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
   assert(in_creator());
   LOG_INFO("eRPC Rpc %u: Received reset event for remote hostname = %s.\n",
            rpc_id, reset_rem_hostname.c_str());

@@ -173,7 +173,9 @@ class Nexus {
     } client;
 
     struct {
-      /// True if we've installed the remote hostname and server map entry
+      /// Server-mode peers are created on an ENet connect event, at which time
+      /// we don't have the remote hostname. This records if we've installed the
+      /// remote hostname and server map entry.
       bool initialized = false;
     } server;
 
@@ -182,7 +184,7 @@ class Nexus {
     bool is_client() const { return peer_mode == SmENetPeerMode::kClient; }
   };
 
-  /// Measure RDTSC frequency. This is expensive and is done once per process.
+  /// Measure RDTSC frequency. This is expensive and only done once per process.
   double measure_rdtsc_freq();
 
   /// The function executed by background threads

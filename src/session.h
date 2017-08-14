@@ -19,6 +19,7 @@ namespace ERpc {
 // Forward declarations for friendship. Prevent Nexus's background threads
 // from accessing session members.
 class IBTransport;
+
 template <typename T>
 class Rpc;
 
@@ -61,10 +62,6 @@ class Session {
   uint16_t remote_session_num;
   ///@}
 
-  struct {
-    size_t credits_exhaused = 0;
-  } dpath_stats;
-
   /// Information that is required only at the client endpoint
   struct {
     /// Free session slots. We could use a vector of SSlot pointers, but indices
@@ -80,10 +77,11 @@ class Session {
     /// True if this session has a pending session management API request.
     /// This does not account for fault-injection requests.
     bool sm_api_req_pending = false;
-
-    uint64_t mgmt_req_tsc;  ///< Timestamp of the last management request
-    bool is_cc = false;     ///< True if this session is congestion controlled
   } client_info;
+
+  struct {
+    size_t credits_exhaused = 0;
+  } dpath_stats;
 };
 
 }  // End ERpc
