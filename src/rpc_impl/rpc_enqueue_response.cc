@@ -23,10 +23,22 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   Session *session = sslot->session;
   assert(session != nullptr && session->is_server());
 
-  // Session reset could be waiting for enqueue_response() to complete, which
-  // is equivalent to sslot->tx_msgbuf being non-null
-  assert(session->state == SessionState::kConnected ||
-         session->state == SessionState::kDisconnectInProgress);
+  if (unlikely(!session->is_connected())) {
+    // A session reset could be waiting for this enqueue_response()
+    assert(session->state == SessionState::kDisconnectInProgress);
+
+    LOG_WARN(
+        "eRPC Rpc %u: enqueue_response() for unconnected session %u. "
+        "Session state = %s.\n",
+        rpc_id, session->local_session_num,
+        session_state_str(session->state).c_str());
+
+    // Mark enqueue_response() as completed
+    assert(sslot->server_info.req_type != kInvalidReqType);
+    sslot->server_info.req_type = kInvalidReqType;
+
+    return;  // During session reset, don't add packets to TX burst
+  }
 
   MsgBuffer *resp_msgbuf;
   if (small_rpc_likely(sslot->prealloc_used)) {
@@ -65,15 +77,9 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   sslot->tx_msgbuf = resp_msgbuf;       // Mark response as valid
   if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
 
-  if (unlikely(!session->is_connected())) {
-    // During session reset, don't add packets to TX burst
-    LOG_WARN(
-        "eRPC Rpc %u: enqueue_response() for unconnected session %u. "
-        "Session state = %s.\n",
-        rpc_id, session->local_session_num,
-        session_state_str(session->state).c_str());
-    return;
-  }
+  // Mark enqueue_response() as completed
+  assert(sslot->server_info.req_type != kInvalidReqType);
+  sslot->server_info.req_type = kInvalidReqType;
 
   // Enqueue the zeroth response packet
   enqueue_pkt_tx_burst_st(

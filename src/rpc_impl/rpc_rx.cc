@@ -144,9 +144,12 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   assert(req_func.is_registered());
 
-  // Remember request metadata for enqueue_response()
-  sslot->server_info.req_func_type = req_func.req_func_type;
+  // Remember request metadata for enqueue_response(). req_type was invalidated
+  // on previous enqueue_response(). Setting it implies that an enqueue_resp()
+  // is now pending; this invariant is used to safely reset sessions.
+  assert(sslot->server_info.req_type == kInvalidReqType);
   sslot->server_info.req_type = pkthdr->req_type;
+  sslot->server_info.req_func_type = req_func.req_func_type;
 
   if (small_rpc_likely(!req_func.is_background())) {
     // For foreground request handlers, a "fake" static request MsgBuffer
@@ -435,9 +438,12 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   assert(req_func.is_registered());
 
-  // Remember request metadata for enqueue_response()
-  sslot->server_info.req_func_type = req_func.req_func_type;
+  // Remember request metadata for enqueue_response(). req_type was invalidated
+  // on previous enqueue_response(). Setting it implies that an enqueue_resp()
+  // is now pending; this invariant is used to safely reset sessions.
+  assert(sslot->server_info.req_type == kInvalidReqType);
   sslot->server_info.req_type = pkthdr->req_type;
+  sslot->server_info.req_func_type = req_func.req_func_type;
 
   // rx_msgbuf here is independent of the RX ring, so we never need a copy
   if (!req_func.is_background()) {

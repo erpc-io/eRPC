@@ -88,16 +88,19 @@ class SSlot {
       /// handler returns, so it can be buried from a background thread.
       MsgBuffer req_msgbuf;
 
-      ///@{
-      /// Request metadata saved by the server before calling the request
-      /// handler. These fields are needed in enqueue_response(), and the
-      /// request MsgBuffer which can be used to infer these fields, may not
-      /// be valid at that point.
-      uint8_t req_type;
-      ReqFuncType req_func_type;
-      ///@}
+      // Request metadata saved by the server before calling the reques handler.
+      // These fields are needed in enqueue_response(), and the request
+      // MsgBuffer which can be used to infer these fields, may not be valid at
+      // that point.
 
-      // Note that the server does not track any TX progress
+      /// The request type. This is set to a valid value only while we are
+      /// waiting for an enqueue_response(), from a foreground or a background
+      /// thread. This property is needed to safely reset sessions, and it is
+      /// difficult to establish with other members (e.g., the MsgBuffers).
+      uint8_t req_type;
+      ReqFuncType req_func_type;  ///< The req handler type (e.g., background)
+
+      // RX progress. Note that the server does not track any TX progress
       size_t req_rcvd;  ///< Number of request packets received
       size_t rfr_rcvd;  ///< Number of request-for-response packets received
     } server_info;
