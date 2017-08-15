@@ -19,12 +19,14 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
   bool success_all = true;
 
   for (Session *session : session_vec) {
+    // Filter sessions connected to the reset hostname
     if (session == nullptr) continue;
 
-    std::string session_rem_hostname = session->is_client()
-                                           ? session->client.hostname
-                                           : session->server.hostname;
-    if (session_rem_hostname != reset_rem_hostname) continue;
+    if (session->is_client()) {
+      if (session->server.hostname != reset_rem_hostname) continue;
+    } else {
+      if (session->client.hostname != reset_rem_hostname) continue;
+    }
 
     LOG_WARN(
         "eRPC Rpc %u: Resetting %s session, session number = %u, state = %s.",
@@ -52,7 +54,31 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   assert(session != nullptr && session->is_client());
 
   // Erase session slots from request TX queue
-  return true;
+  for (const SSlot &sslot : session->sslot_arr) {
+    req_txq.erase(std::remove(req_txq.begin(), req_txq.end(), &sslot),
+                  req_txq.end());
+  }
+
+  // Invoke continuation-with-failure for sslots with pending requests
+  for (SSlot &sslot : session->sslot_arr) {
+    if (sslot.tx_msgbuf != nullptr) {
+      sslot.tx_msgbuf = nullptr;  // Invoke continuation-with-failure only once
+
+      // sslot contains a valid request
+      MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
+      assert(resp_msgbuf != nullptr && resp_msgbuf->buf != nullptr &&
+             resp_msgbuf->check_magic() && resp_msgbuf->is_dynamic());
+      assert(sslot.client_info.cont_func != nullptr);
+
+      resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
+      sslot.client_info.cont_func(static_cast<RespHandle *>(&sslot), context,
+                                  sslot.client_info.tag);
+    }
+  }
+
+  // Return true iff all continuations have called enqueue_response(p
+  return session->client_info.sslot_free_vec.size() ==
+         Session::kSessionReqWindow;
 }
 
 template <class TTr>

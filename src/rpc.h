@@ -107,8 +107,8 @@ class Rpc {
     return msg_buffer;
   }
 
-  /// Resize a MsgBuffer to a smaller size than its max allocation.
-  /// This does not modify the MsgBuffer's packet headers.
+  /// Resize a MsgBuffer to a smaller size than its max allocation, including
+  /// zero size. This does not modify the MsgBuffer's packet headers.
   static inline void resize_msg_buffer(MsgBuffer *msg_buffer,
                                        size_t new_data_size) {
     assert(msg_buffer != nullptr);

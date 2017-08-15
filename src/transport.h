@@ -153,8 +153,12 @@ class Transport {
   /// Return a string representation of \p routing_info
   static std::string routing_info_str(RoutingInfo* routing_info);
 
-  /// Return the number of packets required to send \p data_size data bytes.
-  /// This should avoid division if \p data_size fits in one packet.
+  /**
+   * @brief Return the number of packets required for \p data_size data bytes.
+   *
+   * This should avoid division if \p data_size fits in one packet.
+   * For \p data_size = 0, the return value need not be 0, i.e., it can be 1.
+   */
   static size_t data_size_to_num_pkts(size_t data_size);
 
   // Members that are needed by all transports. Constructor args first.

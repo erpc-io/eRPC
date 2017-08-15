@@ -140,13 +140,11 @@ class MsgBuffer {
         data_size(max_data_size),
         max_num_pkts(1),
         num_pkts(1) {
-    assert(buf != nullptr);
-    // max_data_size can be zero
-    buffer.buf = nullptr;  // This is a non-dynamic ("fake") MsgBuffer
+    assert(pkt != nullptr);
+    assert(reinterpret_cast<const pkthdr_t *>(pkt)->check_magic());  // pkthdr 0
+    // max_data_size can be zero for control packets, so can't assert
 
-    const pkthdr_t *pkthdr_0 = reinterpret_cast<const pkthdr_t *>(pkt);
-    _unused(pkthdr_0);
-    assert(pkthdr_0->check_magic());
+    buffer.buf = nullptr;  // Mark as a non-dynamic ("fake") MsgBuffer
   }
 
   /// Resize this MsgBuffer to any size smaller than its maximum allocation
