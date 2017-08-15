@@ -185,8 +185,7 @@ void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
       rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
   ASSERT_GE(session_num, 0);
 
-  context.arm(SmEventType::kConnectFailed,
-              SmErrType::kRoutingResolutionFailure);
+  context.arm(SmEventType::kDisconnected, SmErrType::kNoError);
   wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_sm_resps, 1);  // The connect failed event
 

@@ -129,7 +129,6 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   assert(session != nullptr);
   assert(session->is_client());
   assert(session->state == SessionState::kConnectInProgress);
-  assert(session->client_info.sm_api_req_pending);
   assert(session->client == sm_pkt.client);
 
   // We don't have the server's session number locally yet, so we cannot use
@@ -147,12 +146,8 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
     }
   }
 
-  // Mark the request as complete
-  session->client_info.sm_api_req_pending = false;
-
-  // If the connect response has an error, the server has not allocated a
-  // session object. Mark the session as disconnected and invoke callback.
   if (sm_pkt.err_type != SmErrType::kNoError) {
+    // The server didn't allocate session resources, so we can just destroy
     LOG_WARN("%s: Error %s.\n", issue_msg,
              sm_err_type_str(sm_pkt.err_type).c_str());
 
@@ -177,32 +172,17 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   }
 
   if (!resolve_success) {
-    LOG_WARN("%s: Client failed to resolve server routing info.\n", issue_msg);
+    // Free server resources by disconnecting. No connected (with error)
+    // callback will be invoked.
+    LOG_WARN("%s: Failed to resolve server routing info. Disconnecting.\n",
+             issue_msg);
 
-    // The server has allocated a Session, so try to free server resources by
-    // disconnecting. The user will only get the kConnectFailed callback, i.e.,
-    // no callback will be invoked when we get the disconnect response.
-    session->client_info.sm_callbacks_disabled = true;
-
-    // Save server metadata for when we receieve the disconnect response
-    session->server = sm_pkt.server;
+    session->server = sm_pkt.server;  // Needed for disconnect response later
 
     // Do what destroy_session() does with a connected session
     session->state = SessionState::kDisconnectInProgress;
-    free_recvs();  // Free before calling handler, which might want a reconnect
-
-    LOG_WARN(
-        "eRPC Rpc %u: Sending callback-less disconnect request for "
-        "session %u, and invoking kConnectFailed callback.\n",
-        rpc_id, session->local_session_num);
-
-    // Enqueue a session management work request
-    session->client_info.sm_api_req_pending = true;
+    free_recvs();  // Don't wait for the disconnect response to reclaim RECVs
     enqueue_sm_req_st(session, SmPktType::kDisconnectReq);
-
-    sm_handler(session->local_session_num, SmEventType::kConnectFailed,
-               SmErrType::kRoutingResolutionFailure, context);
-
     return;
   }
 

@@ -69,14 +69,6 @@ class Session {
     FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
     size_t credits = kSessionCredits;  ///< Currently available credits
-
-    /// Set to disable the disconnect callback. This is used when session
-    /// connection fails despite getting an error-free connect response
-    bool sm_callbacks_disabled = false;
-
-    /// True if this session has a pending session management API request.
-    /// This does not account for fault-injection requests.
-    bool sm_api_req_pending = false;
   } client_info;
 
   struct {

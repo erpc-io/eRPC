@@ -69,22 +69,14 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   Session *session = session_vec[session_num];
   assert(session != nullptr && session->is_client());
   assert(session->state == SessionState::kDisconnectInProgress);
-  assert(session->client_info.sm_api_req_pending);
   assert(session->client == sm_pkt.client);
   assert(session->server == sm_pkt.server);
 
-  session->client_info.sm_api_req_pending = false;
   session->state = SessionState::kDisconnected;  // Temporary state
 
-  if (!session->client_info.sm_callbacks_disabled) {
-    LOG_INFO("%s: None. Session disconnected.\n", issue_msg);
-    sm_handler(session->local_session_num, SmEventType::kDisconnected,
-               SmErrType::kNoError, context);
-  } else {
-    LOG_INFO("%s: None. Session disconnected, callback not needed.\n",
-             issue_msg);
-  }
-
+  LOG_INFO("%s: None. Session disconnected.\n", issue_msg);
+  sm_handler(session->local_session_num, SmEventType::kDisconnected,
+             SmErrType::kNoError, context);
   bury_session_st(session);
 }
 

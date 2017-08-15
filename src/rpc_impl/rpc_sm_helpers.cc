@@ -65,12 +65,7 @@ void Rpc<TTr>::handle_sm_st() {
 template <class TTr>
 void Rpc<TTr>::bury_session_st(Session *session) {
   assert(in_creator());
-  assert(session != nullptr);
-  assert(session->state == SessionState::kDisconnected);
-
-  if (session->is_client()) {
-    assert(!session->client_info.sm_api_req_pending);
-  }
+  assert(session != nullptr && session->state == SessionState::kDisconnected);
 
   // Free session resources
   for (const SSlot &sslot : session->sslot_arr) {

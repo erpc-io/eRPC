@@ -92,18 +92,12 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 
   if (pending_conts == 0) {
     // Act similar to handling a disconnect response
-    session->client_info.sm_api_req_pending = false;
+    LOG_INFO("%s: None. Session resetted.\n", issue_msg);
     session->state = SessionState::kDisconnected;  // Temporary state
-
-    if (!session->client_info.sm_callbacks_disabled) {
-      LOG_INFO("%s: None. Session resetted.\n", issue_msg);
-      sm_handler(session->local_session_num, SmEventType::kDisconnected,
-                 SmErrType::kSrvDisconnected, context);
-    } else {
-      LOG_INFO("%s: None. Session resetted, callback not needed.\n", issue_msg);
-    }
-
+    sm_handler(session->local_session_num, SmEventType::kDisconnected,
+               SmErrType::kSrvDisconnected, context);
     bury_session_st(session);
+
     return true;
   } else {
     LOG_WARN(

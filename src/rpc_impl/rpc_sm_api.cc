@@ -99,9 +99,6 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
 
   alloc_recvs();
   session_vec.push_back(session);  // Add to list of all sessions
-
-  // Enqueue a session management work request
-  session->client_info.sm_api_req_pending = true;
   enqueue_sm_req_st(session, SmPktType::kConnectReq);
 
   return client_endpoint.session_num;
@@ -130,11 +127,6 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     return -EPERM;
   }
 
-  if (session->client_info.sm_api_req_pending) {
-    LOG_WARN("%s: An SM request is pending. Denied.\n", issue_msg);
-    return -EBUSY;
-  }
-
   if (!session->is_client()) {
     LOG_WARN("%s: User cannot destroy server session.\n", issue_msg);
     return -EINVAL;
@@ -160,17 +152,14 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       return -EPERM;
 
     case SessionState::kConnected:
-      session->state = SessionState::kDisconnectInProgress;
-      free_recvs();  // Don't wait for the disconnect response to reclaim RECVs
-
       LOG_INFO(
           "eRPC Rpc %u: Sending disconnect request for session %u "
           "to [%s, %u].\n",
           rpc_id, session->local_session_num, session->server.hostname,
           session->server.rpc_id);
 
-      // Enqueue a session management work request
-      session->client_info.sm_api_req_pending = true;
+      session->state = SessionState::kDisconnectInProgress;
+      free_recvs();  // Don't wait for the disconnect response to reclaim RECVs
       enqueue_sm_req_st(session, SmPktType::kDisconnectReq);
       return 0;
 
