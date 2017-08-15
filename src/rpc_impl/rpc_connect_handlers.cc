@@ -165,7 +165,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
     return;
   }
 
-  // If we are here, the server has created a session endpoint.
+  // If we are here, the server has created a session endpoint
 
   // Try to resolve the server-provided routing info
   Transport::RoutingInfo srv_routing_info = sm_pkt.server.routing_info;
@@ -187,7 +187,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
     // Save server metadata for when we receieve the disconnect response
     session->server = sm_pkt.server;
 
-    // Do what destroy_session() does with a kConnected session
+    // Do what destroy_session() does with a connected session
     session->state = SessionState::kDisconnectInProgress;
     free_recvs();  // Free before calling handler, which might want a reconnect
 

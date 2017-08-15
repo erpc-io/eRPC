@@ -21,12 +21,11 @@ static constexpr uint16_t kInvalidSessionNum =
 static constexpr uint32_t kInvalidSecret = 0;
 
 enum class SessionState {
-  kConnectInProgress,
-  kConnected,  ///< The only state for server-side sessions
-  kDisconnectInProgress,
-  /// Temporary state for the disconnected callback. The session is buried
-  /// immediately after the callback, so this state is never exposed.
-  kDisconnected,
+  kConnectInProgress,  ///< Client-only state, connect request is in flight
+  kConnected,
+  kDisconnectInProgress,  ///< Client-only state, disconnect req is in flight
+  kResetInProgress,       ///< A session reset is in progress
+  kDisconnected,  ///< Temporary state for disconnect callback/burying session
 };
 
 /// Packet types used for session management
@@ -69,6 +68,8 @@ static std::string session_state_str(SessionState state) {
       return std::string("[Connected]");
     case SessionState::kDisconnectInProgress:
       return std::string("[Disconnect in progress]");
+    case SessionState::kResetInProgress:
+      return std::string("[Reset in progress]");
     case SessionState::kDisconnected:
       return std::string("[Disconnected]");
   }

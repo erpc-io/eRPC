@@ -25,13 +25,11 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   if (unlikely(!session->is_connected())) {
     // A session reset could be waiting for this enqueue_response()
-    assert(session->state == SessionState::kDisconnectInProgress);
+    assert(session->state == SessionState::kResetInProgress);
 
     LOG_WARN(
-        "eRPC Rpc %u: enqueue_response() for unconnected session %u. "
-        "Session state = %s.\n",
-        rpc_id, session->local_session_num,
-        session_state_str(session->state).c_str());
+        "eRPC Rpc %u: enqueue_response() for reset-in-progress session %u.\n",
+        rpc_id, session->local_session_num);
 
     // Mark enqueue_response() as completed
     assert(sslot->server_info.req_type != kInvalidReqType);

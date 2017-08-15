@@ -178,12 +178,13 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       LOG_WARN("%s: Session disconnection in progress.\n", issue_msg);
       return -EALREADY;
 
-    case SessionState::kDisconnected:
-      LOG_WARN("%s: Session already destroyed.\n", issue_msg);
-      return -ESHUTDOWN;
-  }
+    case SessionState::kResetInProgress:
+      LOG_WARN("%s: None. Session reset in progress.\n", issue_msg);
+      return 0;
 
-  throw std::runtime_error("eRPC Rpc: Invalid session state");
+    default:
+      throw std::runtime_error("Invalid session state");
+  }
 }
 
 template <class TTr>

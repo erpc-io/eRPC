@@ -22,18 +22,9 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
     // Filter sessions connected to the reset hostname
     if (session == nullptr) continue;
 
-    if (session->is_client()) {
-      if (session->server.hostname != reset_rem_hostname) continue;
-    } else {
-      if (session->client.hostname != reset_rem_hostname) continue;
-    }
-
-    LOG_WARN(
-        "eRPC Rpc %u: Resetting %s session, session number = %u, state = %s.",
-        rpc_id, session->is_client() ? "client" : "server",
-        session->local_session_num, session_state_str(session->state).c_str());
-
-    session->state = SessionState::kDisconnectInProgress;  // Drop all RX pkts
+    auto session_rem_hostname = session->is_client() ? session->server.hostname
+                                                     : session->client.hostname;
+    if (session_rem_hostname != reset_rem_hostname) continue;
 
     bool success_one;
     if (session->is_client()) {
@@ -41,6 +32,9 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
     } else {
       success_one = handle_reset_server_st(session);
     }
+
+    // The handler must mark session unconnected so that RX pkts will be dropped
+    if (!success_one) assert(session->state == SessionState::kResetInProgress);
 
     success_all &= success_one;
   }
@@ -52,6 +46,13 @@ template <class TTr>
 bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   assert(in_creator());
   assert(session != nullptr && session->is_client());
+
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg,
+          "eRPC Rpc %u: Attempting to reset client session %u, state = %s."
+          "Issue",
+          rpc_id, session->local_session_num,
+          session_state_str(session->state).c_str());
 
   // Erase session slots from request TX queue
   for (const SSlot &sslot : session->sslot_arr) {
@@ -76,9 +77,34 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
     }
   }
 
-  // Return true iff all continuations have called enqueue_response(p
-  return session->client_info.sslot_free_vec.size() ==
-         Session::kSessionReqWindow;
+  // Free session iff all continuations have called enqueue_response()
+  size_t pending_conts =
+      Session::kSessionReqWindow - session->client_info.sslot_free_vec.size();
+
+  if (pending_conts == 0) {
+    // Act similar to handling a disconnect response
+    session->client_info.sm_api_req_pending = false;
+    session->state = SessionState::kDisconnected;  // Temporary state
+
+    if (!session->client_info.sm_callbacks_disabled) {
+      LOG_INFO("%s: None. Session reset completed.\n", issue_msg);
+      sm_handler(session->local_session_num, SmEventType::kDisconnected,
+                 SmErrType::kNoError, context);
+    } else {
+      LOG_INFO(
+          "%s: None. Session reset completed. Not invoking disconnect "
+          "callback because session was never connected successfully.",
+          issue_msg);
+    }
+
+    return true;
+
+  } else {
+    LOG_WARN(
+        "eRPC Rpc %u: Cannot reset session %u. %zu continuations pending.\n",
+        rpc_id, session->local_session_num, pending_conts);
+    return false;
+  }
 }
 
 template <class TTr>
