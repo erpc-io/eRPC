@@ -1,5 +1,5 @@
 /**
- * @file rpc_reset_handler.cc
+ * @file rpc_reset_handlers.cc
  * @brief Handler for ENet reset event
  */
 #include "rpc.h"
@@ -21,21 +21,17 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
   for (Session *session : session_vec) {
     // Filter sessions connected to the reset hostname
     if (session == nullptr) continue;
-
-    auto session_rem_hostname = session->is_client() ? session->server.hostname
-                                                     : session->client.hostname;
-    if (session_rem_hostname != reset_rem_hostname) continue;
-
     bool success_one;
+
     if (session->is_client()) {
+      if (session->server.hostname != reset_rem_hostname) continue;
       success_one = handle_reset_client_st(session);
     } else {
+      if (session->client.hostname != reset_rem_hostname) continue;
       success_one = handle_reset_server_st(session);
     }
 
-    // The handler must mark session unconnected so that RX pkts will be dropped
     if (!success_one) assert(session->state == SessionState::kResetInProgress);
-
     success_all &= success_one;
   }
 
@@ -54,7 +50,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
-  // The session can be in any state, except the temporary disconnected state.
+  // The session can be in any state (except the temporary disconnected state).
   // In the connected state, the session may have outstanding requests.
   if (session->is_connected()) {
     // Erase session slots from request TX queue

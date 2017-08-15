@@ -272,7 +272,7 @@ class Rpc {
 
   //
   // Session management packet handlers (rpc_connect_handlers.cc,
-  // rpc_disconnect_handlers.cc)
+  // rpc_disconnect_handlers.cc, rpc_reset_handlers.cc)
   //
   void handle_connect_req_st(const SmWorkItem &req_wi);
   void handle_connect_resp_st(const SmPkt &pkt);
@@ -286,7 +286,13 @@ class Rpc {
    * reset event needs to be queued and processed later.
    */
   bool handle_reset_st(const std::string rem_hostname);
+
+  /// Try to reset a client session. If this is not currently possible, the
+  /// session state must be set to reset-in-progress.
   bool handle_reset_client_st(Session *session);
+
+  /// Try to reset a server session. If this is not currently possible, the
+  /// session state must be set to reset-in-progress.
   bool handle_reset_server_st(Session *session);
 
   //
