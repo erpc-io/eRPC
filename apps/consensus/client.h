@@ -10,8 +10,7 @@
 
 enum class ClientRespType : size_t {
   kSuccess,
-  kFailLeaderChanged,
-  kFailTryAgain
+  kFailNotLeader,
 };
 
 // The client request message
@@ -22,20 +21,14 @@ struct client_req_t {
 // The client response message
 struct client_resp_t {
   ClientRespType resp_type;
-  union {
-    size_t counter;     // The sequence counter
-    size_t leader_idx;  // Leader's index in client's conn_vec
-  };
+  size_t counter;  // The sequence counter, valid if request is successful
 
   std::string to_string() const {
     switch (resp_type) {
       case ClientRespType::kSuccess:
         return "success, counter = " + std::to_string(counter);
-      case ClientRespType::kFailLeaderChanged:
-        return "failed (leader changed), leader = " +
-               std::to_string(leader_idx);
-      case ClientRespType::kFailTryAgain:
-        return "failed (try again)";
+      case ClientRespType::kFailNotLeader:
+        return "failed (leader changed)";
     }
     return "Invalid";
   }
@@ -79,23 +72,41 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
     c->client.req_latency.reset();
   }
 
-  auto *client_resp =
-      reinterpret_cast<client_resp_t *>(c->client.resp_msgbuf.buf);
+  if (unlikely(c->client.resp_msgbuf.get_data_size() == 0)) {
+    // This is a continuation-with-failure
+    printf("consensus: Client Rpc on connection %zu failed.\n",
+           c->client.leader_idx);
+    c->client.leader_idx++;
 
-  if (kAppVerbose) {
-    printf("consensus: Client received resp %s [%s].\n",
-           client_resp->to_string().c_str(),
-           ERpc::get_formatted_time().c_str());
-  }
+    if (c->client.leader_idx == FLAGS_num_raft_servers) {
+      printf("consensus: All Raft servers suspected failed. Exiting.\n");
+      exit(0);
+    }
+  } else {
+    // This is a successful continuation
+    auto *client_resp =
+        reinterpret_cast<client_resp_t *>(c->client.resp_msgbuf.buf);
 
-  if (unlikely(client_resp->resp_type == ClientRespType::kFailLeaderChanged)) {
-    printf("consensus: Client changing leader to index %zu.\n",
-           client_resp->leader_idx);
-    c->client.leader_idx = client_resp->leader_idx;
+    if (kAppVerbose) {
+      printf("consensus: Client received resp %s [%s].\n",
+             client_resp->to_string().c_str(),
+             ERpc::get_formatted_time().c_str());
+    }
+
+    if (unlikely(client_resp->resp_type == ClientRespType::kFailNotLeader)) {
+      c->client.leader_idx++;
+
+      if (c->client.leader_idx == FLAGS_num_raft_servers) {
+        printf("consensus: All Raft servers suspected failed. Exiting.\n");
+        exit(0);
+      }
+
+      printf("consensus: Client changing leader to index %zu.\n",
+             c->client.leader_idx);
+    }
   }
 
   c->rpc->release_response(resp_handle);
-
   send_req_one(c);
 }
 

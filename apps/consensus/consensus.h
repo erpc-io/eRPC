@@ -239,10 +239,6 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
   auto *c = static_cast<AppContext *>(_context);
   c->num_sm_resps++;
 
-  if (sm_err_type != ERpc::SmErrType::kNoError) {
-    throw std::runtime_error("Received SM response with error.");
-  }
-
   if (!(sm_event_type == ERpc::SmEventType::kConnected ||
         sm_event_type == ERpc::SmEventType::kDisconnected)) {
     throw std::runtime_error("Received unexpected SM event.");
@@ -261,11 +257,11 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
   }
 
   fprintf(stderr,
-          "consensus: Rpc %u: Session number %d (index %zu) %s. "
+          "consensus: Rpc %u: Session number %d (index %zu) %s. Error = %s. "
           "Time elapsed = %.3f s.\n",
           c->rpc->get_rpc_id(), session_num, session_idx,
-          sm_event_type == ERpc::SmEventType::kConnected ? "connected"
-                                                         : "disconncted",
+          ERpc::sm_event_type_str(sm_event_type).c_str(),
+          ERpc::sm_err_type_str(sm_err_type).c_str(),
           c->rpc->sec_since_creation());
 }
 

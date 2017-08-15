@@ -121,7 +121,7 @@ void Nexus<TTr>::sm_thread_on_enet_disconnect_client(SmThreadCtx &ctx,
     epeer->data = nullptr;
 
     LOG_INFO(
-        "eRPC Nexus: ENet socket disconnected from %s. Not reconnecting. "
+        "eRPC Nexus: ENet peer to %s disconnected. "
         "Broadcasting resets to local Rpcs.\n",
         rem_hostname.c_str());
 
@@ -384,7 +384,7 @@ void Nexus<TTr>::sm_thread_process_tx_queue(SmThreadCtx &ctx) {
 
 template <class TTr>
 void Nexus<TTr>::sm_thread_func(SmThreadCtx ctx) {
-  // Create an ENet socket that remote nodes can connect to
+  // Create an ENet host that remote nodes can connect to
   rt_assert(enet_initialize() == 0, "Failed to initialize ENet");
 
   ENetAddress address;

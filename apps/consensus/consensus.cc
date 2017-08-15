@@ -23,7 +23,6 @@ void send_client_response(AppContext *c, ERpc::ReqHandle *req_handle,
   c->rpc->enqueue_response(req_handle);
 }
 
-// appendentries request: node ID, msg_appendentries_t, [{size, buf}]
 void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
@@ -75,13 +74,12 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   client_resp_t err_resp;
   switch (e) {
     case RAFT_ERR_NOT_LEADER:
-      // XXX: Redirect client to new leader
-      err_resp.resp_type = ClientRespType::kFailTryAgain;
+      err_resp.resp_type = ClientRespType::kFailNotLeader;
       break;
     case RAFT_ERR_SHUTDOWN:
       throw std::runtime_error("RAFT_ERR_SHUTDOWN not handled");
     case RAFT_ERR_ONE_VOTING_CHANGE_ONLY:
-      err_resp.resp_type = ClientRespType::kFailTryAgain;
+      err_resp.resp_type = ClientRespType::kFailNotLeader;
       break;
   }
   send_client_response(c, req_handle, &err_resp);
