@@ -25,7 +25,6 @@ enum class SessionState {
   kConnected,
   kDisconnectInProgress,  ///< Client-only state, disconnect req is in flight
   kResetInProgress,       ///< A session reset is in progress
-  kDisconnected,  ///< Temporary state for disconnect callback/burying session
 };
 
 /// Packet types used for session management
@@ -70,8 +69,6 @@ static std::string session_state_str(SessionState state) {
       return std::string("[Disconnect in progress]");
     case SessionState::kResetInProgress:
       return std::string("[Reset in progress]");
-    case SessionState::kDisconnected:
-      return std::string("[Disconnected]");
   }
   return std::string("[Invalid state]");
 }

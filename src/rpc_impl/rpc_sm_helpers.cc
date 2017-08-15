@@ -65,7 +65,7 @@ void Rpc<TTr>::handle_sm_st() {
 template <class TTr>
 void Rpc<TTr>::bury_session_st(Session *session) {
   assert(in_creator());
-  assert(session != nullptr && session->state == SessionState::kDisconnected);
+  assert(session != nullptr);
 
   // Free session resources
   for (const SSlot &sslot : session->sslot_arr) {

@@ -151,12 +151,11 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
     LOG_WARN("%s: Error %s.\n", issue_msg,
              sm_err_type_str(sm_pkt.err_type).c_str());
 
-    session->state = SessionState::kDisconnected;  // A temporary state
-    free_recvs();  // Free before calling handler, which might want a reconnect
+    free_recvs();  // Free before SM callback to allow creating a new session
     sm_handler(session->local_session_num, SmEventType::kConnectFailed,
                sm_pkt.err_type, context);
-
     bury_session_st(session);
+
     return;
   }
 
@@ -181,7 +180,6 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
 
     // Do what destroy_session() does with a connected session
     session->state = SessionState::kDisconnectInProgress;
-    free_recvs();  // Don't wait for the disconnect response to reclaim RECVs
     enqueue_sm_req_st(session, SmPktType::kDisconnectReq);
     return;
   }

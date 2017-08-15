@@ -21,8 +21,8 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
   for (Session *session : session_vec) {
     // Filter sessions connected to the reset hostname
     if (session == nullptr) continue;
-    bool success_one;
 
+    bool success_one;
     if (session->is_client()) {
       if (session->server.hostname != reset_rem_hostname) continue;
       success_one = handle_reset_client_st(session);
@@ -31,6 +31,7 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
       success_one = handle_reset_server_st(session);
     }
 
+    // If reset succeeds, the session is freed
     if (!success_one) assert(session->state == SessionState::kResetInProgress);
     success_all &= success_one;
   }
@@ -89,11 +90,10 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   if (pending_conts == 0) {
     // Act similar to handling a disconnect response
     LOG_INFO("%s: None. Session resetted.\n", issue_msg);
-    session->state = SessionState::kDisconnected;  // Temporary state
+    free_recvs();  // Free before SM callback to allow creating a new session
     sm_handler(session->local_session_num, SmEventType::kDisconnected,
                SmErrType::kSrvDisconnected, context);
     bury_session_st(session);
-
     return true;
   } else {
     LOG_WARN(
@@ -109,7 +109,33 @@ template <class TTr>
 bool Rpc<TTr>::handle_reset_server_st(Session *session) {
   assert(in_creator());
   assert(session != nullptr && session->is_server());
-  return true;
+
+  char issue_msg[kMaxIssueMsgLen];
+  sprintf(issue_msg,
+          "eRPC Rpc %u: Attempting to reset server session %u, state = %s."
+          "Issue",
+          rpc_id, session->local_session_num,
+          session_state_str(session->state).c_str());
+
+  size_t pending_enqueue_resps = 0;
+  for (const SSlot &sslot : session->sslot_arr) {
+    if (sslot.server_info.req_type != kInvalidReqType) pending_enqueue_resps++;
+  }
+
+  if (pending_enqueue_resps == 0) {
+    // Act similar to handling a disconnect request, but don't send SM response
+    LOG_INFO("%s: None. Session resetted.\n", issue_msg);
+    free_recvs();
+    bury_session_st(session);
+    return true;
+  } else {
+    LOG_WARN(
+        "eRPC Rpc %u: Cannot reset session %u. %zu enqueue_response pending.\n",
+        rpc_id, session->local_session_num, pending_enqueue_resps);
+
+    session->state = SessionState::kResetInProgress;
+    return false;
+  }
 }
 
 }  // End ERpc

@@ -31,7 +31,8 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmWorkItem &req_wi) {
 
   // Check that responses for all sslots have been sent
   for (const SSlot &sslot : session->sslot_arr) {
-    assert(sslot.server_info.req_msgbuf.is_buried());  // Reqs must be buried
+    assert(sslot.server_info.req_msgbuf.is_buried());
+    assert(sslot.server_info.req_type == kInvalidReqType);
 
     // If there's a response in this sslot, we've finished sending it
     if (sslot.tx_msgbuf != nullptr) {
@@ -39,12 +40,9 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmWorkItem &req_wi) {
     }
   }
 
-  session->state = SessionState::kDisconnected;  // Temporary state
-  free_recvs();
-
   LOG_INFO("%s. None. Sending response.\n", issue_msg);
+  free_recvs();
   enqueue_sm_resp_st(req_wi, SmErrType::kNoError);
-
   bury_session_st(session);
 }
 
@@ -72,9 +70,8 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   assert(session->client == sm_pkt.client);
   assert(session->server == sm_pkt.server);
 
-  session->state = SessionState::kDisconnected;  // Temporary state
-
   LOG_INFO("%s: None. Session disconnected.\n", issue_msg);
+  free_recvs();  // Free before SM callback to allow creating a new session
   sm_handler(session->local_session_num, SmEventType::kDisconnected,
              SmErrType::kNoError, context);
   bury_session_st(session);

@@ -159,7 +159,6 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
           session->server.rpc_id);
 
       session->state = SessionState::kDisconnectInProgress;
-      free_recvs();  // Don't wait for the disconnect response to reclaim RECVs
       enqueue_sm_req_st(session, SmPktType::kDisconnectReq);
       return 0;
 
