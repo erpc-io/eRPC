@@ -45,7 +45,7 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmWorkItem &req_wi) {
   LOG_INFO("%s. None. Sending response.\n", issue_msg);
   enqueue_sm_resp_st(req_wi, SmErrType::kNoError);
 
-  bury_session_st(session);  // Free session resources + nullify in session_vec
+  bury_session_st(session);
 }
 
 // We free the session's RECVs before sending the disconnect request, not here
@@ -81,13 +81,11 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
     sm_handler(session->local_session_num, SmEventType::kDisconnected,
                SmErrType::kNoError, context);
   } else {
-    LOG_INFO(
-        "%s: None. Session disconnected. Not invoking disconnect "
-        "callback because session was never connected successfully.",
-        issue_msg);
+    LOG_INFO("%s: None. Session disconnected, callback not needed.\n",
+             issue_msg);
   }
 
-  bury_session_st(session);  // Free session resources + nullify in session_vec
+  bury_session_st(session);
 }
 
 }  // End ERpc

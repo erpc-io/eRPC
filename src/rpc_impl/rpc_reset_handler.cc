@@ -54,32 +54,41 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
-  // Erase session slots from request TX queue
-  for (const SSlot &sslot : session->sslot_arr) {
-    req_txq.erase(std::remove(req_txq.begin(), req_txq.end(), &sslot),
-                  req_txq.end());
-  }
+  // The session can be in any state, except the temporary disconnected state.
+  // In the connected state, the session may have outstanding requests.
+  if (session->is_connected()) {
+    // Erase session slots from request TX queue
+    for (const SSlot &sslot : session->sslot_arr) {
+      req_txq.erase(std::remove(req_txq.begin(), req_txq.end(), &sslot),
+                    req_txq.end());
+    }
 
-  // Invoke continuation-with-failure for sslots with pending requests
-  for (SSlot &sslot : session->sslot_arr) {
-    if (sslot.tx_msgbuf != nullptr) {
-      sslot.tx_msgbuf = nullptr;  // Invoke continuation-with-failure only once
+    // Invoke continuation-with-failure for sslots with pending requests
+    for (SSlot &sslot : session->sslot_arr) {
+      if (sslot.tx_msgbuf != nullptr) {
+        sslot.tx_msgbuf = nullptr;  // Invoke failure continuation only once
 
-      // sslot contains a valid request
-      MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
-      assert(resp_msgbuf != nullptr && resp_msgbuf->buf != nullptr &&
-             resp_msgbuf->check_magic() && resp_msgbuf->is_dynamic());
-      assert(sslot.client_info.cont_func != nullptr);
+        // sslot contains a valid request
+        MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
+        assert(resp_msgbuf != nullptr && resp_msgbuf->buf != nullptr &&
+               resp_msgbuf->check_magic() && resp_msgbuf->is_dynamic());
+        assert(sslot.client_info.cont_func != nullptr);
 
-      resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
-      sslot.client_info.cont_func(static_cast<RespHandle *>(&sslot), context,
-                                  sslot.client_info.tag);
+        resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
+        sslot.client_info.cont_func(static_cast<RespHandle *>(&sslot), context,
+                                    sslot.client_info.tag);
+      }
     }
   }
 
-  // Free session iff all continuations have called enqueue_response()
+  // We can free the session after all continutions call enqueue_response()
   size_t pending_conts =
       Session::kSessionReqWindow - session->client_info.sslot_free_vec.size();
+
+  if (session->state == SessionState::kConnectInProgress ||
+      session->state == SessionState::kDisconnectInProgress) {
+    assert(pending_conts == 0);
+  }
 
   if (pending_conts == 0) {
     // Act similar to handling a disconnect response
@@ -87,22 +96,21 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
     session->state = SessionState::kDisconnected;  // Temporary state
 
     if (!session->client_info.sm_callbacks_disabled) {
-      LOG_INFO("%s: None. Session reset completed.\n", issue_msg);
+      LOG_INFO("%s: None. Session resetted.\n", issue_msg);
       sm_handler(session->local_session_num, SmEventType::kDisconnected,
-                 SmErrType::kNoError, context);
+                 SmErrType::kSrvDisconnected, context);
     } else {
-      LOG_INFO(
-          "%s: None. Session reset completed. Not invoking disconnect "
-          "callback because session was never connected successfully.",
-          issue_msg);
+      LOG_INFO("%s: None. Session resetted, callback not needed.\n", issue_msg);
     }
 
+    bury_session_st(session);
     return true;
-
   } else {
     LOG_WARN(
         "eRPC Rpc %u: Cannot reset session %u. %zu continuations pending.\n",
         rpc_id, session->local_session_num, pending_conts);
+
+    session->state = SessionState::kResetInProgress;
     return false;
   }
 }

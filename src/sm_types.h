@@ -40,7 +40,7 @@ enum class SmPktType : int {
 /// The types of responses to a session management packet
 enum class SmErrType : int {
   kNoError,          ///< The only non-error error type
-  kSrvDisconnected,  ///< The server session is disconnected
+  kSrvDisconnected,  ///< The control-path connection to the server failed
   kTooManySessions,  ///< Connect req failed because server is out of sessions
   kRecvsExhausted,   ///< Connect req failed because server is out of RECVs
   kOutOfMemory,      ///< Connect req failed because server is out of memory
