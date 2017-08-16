@@ -111,25 +111,34 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  auto *raft_req_tag = reinterpret_cast<raft_req_tag_t *>(tag);
-  assert(raft_req_tag->resp_msgbuf.get_data_size() ==
-         sizeof(msg_requestvote_response_t));
+  auto *rrt = reinterpret_cast<raft_req_tag_t *>(tag);
 
-  printf("consensus: Received requestvote response from node %s [%s].\n",
-         node_id_to_name_map[raft_node_get_id(raft_req_tag->node)].c_str(),
-         ERpc::get_formatted_time().c_str());
+  if (likely(rrt->resp_msgbuf.get_data_size() > 0)) {
+    // The RPC was successful
+    assert(rrt->resp_msgbuf.get_data_size() ==
+           sizeof(msg_requestvote_response_t));
 
-  auto *msg_requestvote_resp = reinterpret_cast<msg_requestvote_response_t *>(
-      raft_req_tag->resp_msgbuf.buf);
+    printf("consensus: Received requestvote response from node %s [%s].\n",
+           node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
+           ERpc::get_formatted_time().c_str());
 
-  int e = raft_recv_requestvote_response(c->server.raft, raft_req_tag->node,
-                                         msg_requestvote_resp);
-  assert(e == 0);  // XXX: Doc says: Shutdown if e != 0
-  _unused(e);
+    auto *msg_requestvote_resp =
+        reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf);
 
-  c->rpc->free_msg_buffer(raft_req_tag->req_msgbuf);
-  c->rpc->free_msg_buffer(raft_req_tag->resp_msgbuf);
-  delete raft_req_tag;  // Free allocated memory, XXX: Remove when we use pool
+    int e = raft_recv_requestvote_response(c->server.raft, rrt->node,
+                                           msg_requestvote_resp);
+    assert(e == 0);  // XXX: Doc says: Shutdown if e != 0
+    _unused(e);
+  } else {
+    // This is a continuation-with-failure
+    printf("consensus: Requestvote request to node %s failed [%s].\n",
+           node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
+           ERpc::get_formatted_time().c_str());
+  }
+
+  c->rpc->free_msg_buffer(rrt->req_msgbuf);
+  c->rpc->free_msg_buffer(rrt->resp_msgbuf);
+  delete rrt;  // Free allocated memory, XXX: Remove when we use pool
 
   c->rpc->release_response(resp_handle);
 }

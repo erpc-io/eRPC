@@ -91,13 +91,8 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
     c->client.req_latency.reset();
   }
 
-  if (unlikely(c->client.resp_msgbuf.get_data_size() == 0)) {
-    // This is a continuation-with-failure
-    printf("consensus: Client Rpc on connection %zu failed.\n",
-           c->client.leader_idx);
-    change_leader(c);
-  } else {
-    // This is a successful continuation
+  if (likely(c->client.resp_msgbuf.get_data_size() > 0)) {
+    // The RPC was successful
     auto *client_resp =
         reinterpret_cast<client_resp_t *>(c->client.resp_msgbuf.buf);
 
@@ -110,6 +105,11 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
     if (unlikely(client_resp->resp_type == ClientRespType::kFailNotLeader)) {
       change_leader(c);
     }
+  } else {
+    // This is a continuation-with-failure
+    printf("consensus: Client request to Raft server %zu failed [%s].\n",
+           c->client.leader_idx, ERpc::get_formatted_time().c_str());
+    change_leader(c);
   }
 
   c->rpc->release_response(resp_handle);

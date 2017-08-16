@@ -211,22 +211,31 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
   }
 
   auto *rrt = reinterpret_cast<raft_req_tag_t *>(tag);
-  assert(rrt->resp_msgbuf.get_data_size() ==
-         sizeof(msg_appendentries_response_t));
 
-  if (kAppVerbose) {
-    printf("consensus: Received appendentries response from node %s [%s].\n",
+  if (likely(rrt->resp_msgbuf.get_data_size() > 0)) {
+    // The RPC was successful
+    assert(rrt->resp_msgbuf.get_data_size() ==
+           sizeof(msg_appendentries_response_t));
+
+    if (kAppVerbose) {
+      printf("consensus: Received appendentries response from node %s [%s].\n",
+             node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
+             ERpc::get_formatted_time().c_str());
+    }
+
+    auto *msg_appendentries_response =
+        reinterpret_cast<msg_appendentries_response_t *>(rrt->resp_msgbuf.buf);
+
+    int e = raft_recv_appendentries_response(c->server.raft, rrt->node,
+                                             msg_appendentries_response);
+    _unused(e);
+    assert(e == 0);
+  } else {
+    // This is a continuation-with-failure
+    printf("consensus: Appendentries request to node %s failed [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            ERpc::get_formatted_time().c_str());
   }
-
-  auto *msg_appendentries_response =
-      reinterpret_cast<msg_appendentries_response_t *>(rrt->resp_msgbuf.buf);
-
-  int e = raft_recv_appendentries_response(c->server.raft, rrt->node,
-                                           msg_appendentries_response);
-  _unused(e);
-  assert(e == 0);
 
   c->rpc->free_msg_buffer(rrt->req_msgbuf);
   c->rpc->free_msg_buffer(rrt->resp_msgbuf);
