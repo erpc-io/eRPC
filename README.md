@@ -117,15 +117,29 @@
    * Use power-of-two number of sessions and avoid Lemire's trick in app.
    * In the continuation function, reduce frequency of scanning for stagnated
      batches.
+ * Optimizations for `consensus`:
+   * Set session request window to 1, or implement Rpc flush.
+   * Set transport max inline size to 120 bytes for ConnectX-3.
  * Setting `small_rpc_optlevel` to `small_rpc_optlevel_extreme` will disable
    support for large messages and background threads.
  * Setting `FAULT_INJECTION` to off will disable support to inject eRPC faults
    at runtime.
 
 ## Short-term TODOs
+ * Reduce background thread lock duration
+ * When a client-mode ENet peer gets disconnected, we should not reset
+   server-mode sessions (and vice-versa). ENet peers should have unique IDs
+   that are passed to sessions, so we can reset only those sessions that used
+   and ENet peer. Currently, we may have victim disconnects as follows:
+    * Client session 1 is connected to host A
+    * The client-mode ENet peer to A is disconnected and removed from the
+      client map.
+    * We're trying to reset session 1, but cannot do so because continuations
+      are running. We allow user code to run when this happens.
+    * User creates client session 2 to host A.
+    * We retry resetting session 1. Since resetting is based on remote hostname
+      only, we end up also resetting session 2.
  * In IBTransport, check if MLX environment vars are set. Do it in constructor.
- * Try using union for `server_info` and `client_info` in sslot. This causes
-   C++ issues bc of non-trivial destructor in anonymous union.
  * RFR sending needs to be paced, so we cannot use `send_rfr_now`.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
    RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
@@ -154,7 +168,6 @@
  * Are we losing some performance by using `size_t` instead of `uint32_t` in
    in-memory structs like Buffer and MsgBuffer?
  * Need to have a test for session management request timeouts.
- * Use pool for session object allocation?
 
 ## Perf notes
  * Flags that control performance:
