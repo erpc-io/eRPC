@@ -51,7 +51,8 @@ class AppContext;  // Forward declaration
 
 // Peer-peer or client-peer connection
 struct connection_t {
-  int session_num = -1;  // ERpc session number
+  bool disconnected = false;  // True if this session is disconnected
+  int session_num = -1;       // ERpc session number
   size_t session_idx = std::numeric_limits<size_t>::max();  // Index in vector
   AppContext *c;  // Back link to AppContext
 };
@@ -247,13 +248,12 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
   // The callback gives us the ERpc session number - get the index in conn_vec
   size_t session_idx = c->conn_vec.size();
   for (size_t i = 0; i < c->conn_vec.size(); i++) {
-    if (c->conn_vec[i].session_num == session_num) {
-      session_idx = i;
-    }
+    if (c->conn_vec[i].session_num == session_num) session_idx = i;
   }
+  ERpc::rt_assert(session_idx < c->conn_vec.size(), "Invalid session number");
 
-  if (session_idx == c->conn_vec.size()) {
-    throw std::runtime_error("SM callback for invalid session number.");
+  if (sm_event_type == ERpc::SmEventType::kDisconnected) {
+    c->conn_vec[session_idx].disconnected = true;
   }
 
   fprintf(stderr,

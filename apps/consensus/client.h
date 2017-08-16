@@ -34,7 +34,21 @@ struct client_resp_t {
   }
 };
 
-void client_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
+void client_cont(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+
+void change_leader(AppContext *c) {
+  size_t cur_leader_idx = c->client.leader_idx;
+  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
+    size_t next_leader_idx = (cur_leader_idx + i) % FLAGS_num_raft_servers;
+    if (!c->conn_vec[next_leader_idx].disconnected) {
+      c->client.leader_idx = next_leader_idx;
+      return;
+    }
+  }
+
+  printf("consensus: Cannot change leader. Exiting.\n");
+  exit(0);
+}
 
 void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
@@ -76,12 +90,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
     // This is a continuation-with-failure
     printf("consensus: Client Rpc on connection %zu failed.\n",
            c->client.leader_idx);
-    c->client.leader_idx++;
-
-    if (c->client.leader_idx == FLAGS_num_raft_servers) {
-      printf("consensus: All Raft servers suspected failed. Exiting.\n");
-      exit(0);
-    }
+    change_leader(c);
   } else {
     // This is a successful continuation
     auto *client_resp =

@@ -127,7 +127,10 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   }
 
   if (!c->rpc->is_connected(conn->session_num)) {
-    printf("consensus: Cannot send appendentries (disconnected).\n");
+    if (kAppVerbose) {
+      printf("consensus: Cannot send appendentries on session %d.\n",
+             conn->session_num);
+    }
     return 0;
   }
 
