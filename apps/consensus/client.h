@@ -8,10 +8,7 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-enum class ClientRespType : size_t {
-  kSuccess,
-  kFailNotLeader,
-};
+enum class ClientRespType : size_t { kSuccess, kFailRedirect, kFailTryAgain };
 
 // The client request message
 struct client_req_t {
@@ -21,14 +18,20 @@ struct client_req_t {
 // The client response message
 struct client_resp_t {
   ClientRespType resp_type;
-  size_t counter;  // The sequence counter, valid if request is successful
+
+  union {
+    size_t counter;      // The sequence counter, valid if resp type is kSuccess
+    int leader_node_id;  // ID of the leader node if resp type is kFailRedirect
+  };
 
   std::string to_string() const {
     switch (resp_type) {
       case ClientRespType::kSuccess:
         return "success, counter = " + std::to_string(counter);
-      case ClientRespType::kFailNotLeader:
-        return "failed (leader changed)";
+      case ClientRespType::kFailRedirect:
+        return "failed: redirect to node " + std::to_string(leader_node_id);
+      case ClientRespType::kFailTryAgain:
+        return "failed: try again";
     }
     return "Invalid";
   }
@@ -36,7 +39,8 @@ struct client_resp_t {
 
 void client_cont(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
-void change_leader(AppContext *c) {
+// Change the leader to a different Raft server that we are connected to
+void change_leader_to_any(AppContext *c) {
   size_t cur_leader_idx = c->client.leader_idx;
 
   // Pick the next session to a Raft server that is not disconnected
@@ -51,7 +55,32 @@ void change_leader(AppContext *c) {
     }
   }
 
-  printf("consensus: Client failed to change leader. Exiting.\n");
+  printf(
+      "consensus: Client failed to change leader to any Raft server. "
+      "Exiting.\n");
+  exit(0);
+}
+
+// Change the leader to a server with the given node ID
+void change_leader_to_node(AppContext *c, int node_id) {
+  // Pick the next session to a Raft server that is not disconnected
+  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
+    std::string node_i_hostname = get_hostname_for_machine(i);
+    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
+
+    if (node_i_id == node_id) {
+      ERpc::rt_assert(!c->conn_vec[i].disconnected,
+                      "Changing to disconnected leader not supported");
+      c->client.leader_idx = i;
+
+      printf("consensus: Client changed leader view to %zu.\n",
+             c->client.leader_idx);
+      return;
+    }
+  }
+
+  printf("consensus: Client failed to change leader to node %d. Exiting.\n",
+         node_id);
   exit(0);
 }
 
@@ -82,8 +111,8 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   assert(c->check_magic());
 
   c->client.req_latency.stopwatch_stop();
-  c->client.num_resps++;
 
+  c->client.num_resps++;
   if (c->client.num_resps == 10000) {
     printf(
         "consensus: Client latency = %.2f us. Request window = %zu (best 1) "
@@ -105,14 +134,17 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
              ERpc::get_formatted_time().c_str());
     }
 
-    if (unlikely(client_resp->resp_type == ClientRespType::kFailNotLeader)) {
-      change_leader(c);
+    auto resp_type = client_resp->resp_type;
+    if (unlikely(resp_type == ClientRespType::kFailRedirect)) {
+      change_leader_to_node(c, client_resp->leader_node_id);
+    } else if (unlikely(resp_type == ClientRespType::kFailTryAgain)) {
+      // Just fall through
     }
   } else {
     // This is a continuation-with-failure
     printf("consensus: Client request to Raft server %zu failed [%s].\n",
            c->client.leader_idx, ERpc::get_formatted_time().c_str());
-    change_leader(c);
+    change_leader_to_any(c);
   }
 
   c->rpc->release_response(resp_handle);

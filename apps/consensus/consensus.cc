@@ -37,6 +37,26 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
 
+  // Check if it's OK to receive the client's request
+  raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
+  if (unlikely(leader == nullptr)) {
+    // We don't know the leader
+    client_resp_t err_resp;
+    err_resp.resp_type = ClientRespType::kFailTryAgain;
+    send_client_response(c, req_handle, &err_resp);
+    return;
+  }
+
+  if (unlikely(raft_node_get_id(leader) != c->server.node_id)) {
+    // We know the leader but it's not this node
+    client_resp_t err_resp;
+    err_resp.resp_type = ClientRespType::kFailRedirect;
+    err_resp.leader_node_id = raft_node_get_id(leader);
+    send_client_response(c, req_handle, &err_resp);
+    return;
+  }
+
+  // We're the leader
   size_t counter = c->server.cur_counter + 1;  // Don't update cur_counter yet!
 
   if (kAppVerbose) {
@@ -65,24 +85,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   int e =
       raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
-  if (likely(e == 0)) return;
-
-  // If we're here, recv_entry failed. Clean up and send an error response.
-  leader_sav.in_use = false;
-  if (kAppMeasureCommitLatency) c->server.commit_latency.stopwatch_stop();
-
-  client_resp_t err_resp;
-  switch (e) {
-    case RAFT_ERR_NOT_LEADER:
-      err_resp.resp_type = ClientRespType::kFailNotLeader;
-      break;
-    case RAFT_ERR_SHUTDOWN:
-      throw std::runtime_error("RAFT_ERR_SHUTDOWN not handled");
-    case RAFT_ERR_ONE_VOTING_CHANGE_ONLY:
-      err_resp.resp_type = ClientRespType::kFailNotLeader;
-      break;
-  }
-  send_client_response(c, req_handle, &err_resp);
+  ERpc::rt_assert(e == 0, "raft_recv_entry() failed");
 }
 
 void init_raft(AppContext *c) {
