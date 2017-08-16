@@ -38,15 +38,20 @@ void client_cont(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
 void change_leader(AppContext *c) {
   size_t cur_leader_idx = c->client.leader_idx;
-  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
+
+  // Pick the next session to a Raft server that is not disconnected
+  for (size_t i = 1; i < FLAGS_num_raft_servers; i++) {
     size_t next_leader_idx = (cur_leader_idx + i) % FLAGS_num_raft_servers;
     if (!c->conn_vec[next_leader_idx].disconnected) {
       c->client.leader_idx = next_leader_idx;
+
+      printf("consensus: Client changed leader view to %zu.\n",
+             c->client.leader_idx);
       return;
     }
   }
 
-  printf("consensus: Cannot change leader. Exiting.\n");
+  printf("consensus: Client failed to change leader. Exiting.\n");
   exit(0);
 }
 
@@ -103,15 +108,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
     }
 
     if (unlikely(client_resp->resp_type == ClientRespType::kFailNotLeader)) {
-      c->client.leader_idx++;
-
-      if (c->client.leader_idx == FLAGS_num_raft_servers) {
-        printf("consensus: All Raft servers suspected failed. Exiting.\n");
-        exit(0);
-      }
-
-      printf("consensus: Client changing leader to index %zu.\n",
-             c->client.leader_idx);
+      change_leader(c);
     }
   }
 
