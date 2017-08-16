@@ -31,16 +31,16 @@ enum PktType : uint64_t {
 static std::string pkt_type_str(uint64_t pkt_type) {
   switch (pkt_type) {
     case kPktTypeReq:
-      return std::string("request");
+      return "request";
     case kPktTypeReqForResp:
-      return std::string("request for response");
+      return "request for response";
     case kPktTypeExplCR:
-      return std::string("explicit credit return");
+      return "explicit credit return";
     case kPktTypeResp:
-      return std::string("response");
+      return "response";
   }
 
-  throw std::runtime_error("eRPC: Invalid packet type.");
+  throw std::runtime_error("Invalid packet type.");
 }
 
 struct pkthdr_t {

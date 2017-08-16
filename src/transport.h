@@ -71,11 +71,11 @@ class Transport {
   static std::string get_transport_name(TransportType transport_type) {
     switch (transport_type) {
       case TransportType::kInfiniBand:
-        return std::string("[InfiniBand]");
+        return "[InfiniBand]";
       case TransportType::kRoCE:
-        return std::string("[RoCE]");
+        return "[RoCE]";
       case TransportType::kOmniPath:
-        return std::string("[OmniPath]");
+        return "[OmniPath]";
     }
     throw std::runtime_error("eRPC: Invalid transport");
   }

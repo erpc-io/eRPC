@@ -62,32 +62,32 @@ typedef void (*sm_handler_t)(int, SmEventType, SmErrType, void *);
 static std::string session_state_str(SessionState state) {
   switch (state) {
     case SessionState::kConnectInProgress:
-      return std::string("[Connect in progress]");
+      return "[Connect in progress]";
     case SessionState::kConnected:
-      return std::string("[Connected]");
+      return "[Connected]";
     case SessionState::kDisconnectInProgress:
-      return std::string("[Disconnect in progress]");
+      return "[Disconnect in progress]";
     case SessionState::kResetInProgress:
-      return std::string("[Reset in progress]");
+      return "[Reset in progress]";
   }
-  return std::string("[Invalid state]");
+  return "[Invalid state]";
 }
 
 static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SmPktType::kConnectReq:
-      return std::string("[Connect request]");
+      return "[Connect request]";
     case SmPktType::kConnectResp:
-      return std::string("[Connect response]");
+      return "[Connect response]";
     case SmPktType::kDisconnectReq:
-      return std::string("[Disconnect request]");
+      return "[Disconnect request]";
     case SmPktType::kDisconnectResp:
-      return std::string("[Disconnect response]");
+      return "[Disconnect response]";
     case SmPktType::kFaultResetPeerReq:
-      return std::string("[Reset peer request (fault injection)]");
+      return "[Reset peer request (fault injection)]";
   };
 
-  throw std::runtime_error("eRPC: Invalid session management packet type.");
+  throw std::runtime_error("Invalid session management packet type.");
 }
 
 /// Check if a session management packet type is valid
@@ -117,7 +117,7 @@ static bool sm_pkt_type_is_req(SmPktType sm_pkt_type) {
       return false;
   }
 
-  throw std::runtime_error("eRPC: Invalid session management packet type.");
+  throw std::runtime_error("Invalid session management packet type.");
 }
 
 /// Return the response type for request type \p sm_pkt_type
@@ -134,7 +134,7 @@ static SmPktType sm_pkt_type_req_to_resp(SmPktType sm_pkt_type) {
       break;
   }
 
-  throw std::runtime_error("eRPC: Invalid session management packet type.");
+  throw std::runtime_error("Invalid session management packet type.");
 }
 
 /// Return true iff this request packet type has a response type. Some request
@@ -152,7 +152,7 @@ static bool sm_pkt_type_req_has_resp(SmPktType sm_pkt_type) {
       break;
   }
 
-  throw std::runtime_error("eRPC: Invalid session management packet type.");
+  throw std::runtime_error("Invalid session management packet type.");
 }
 
 static bool sm_err_type_is_valid(SmErrType err_type) {
@@ -176,40 +176,40 @@ static std::string sm_err_type_str(SmErrType err_type) {
 
   switch (err_type) {
     case SmErrType::kNoError:
-      return std::string("[No error]");
+      return "[No error]";
     case SmErrType::kSrvDisconnected:
-      return std::string("[Server disconnected]");
+      return "[Server disconnected]";
     case SmErrType::kTooManySessions:
-      return std::string("[Too many sessions]");
+      return "[Too many sessions]";
     case SmErrType::kRecvsExhausted:
-      return std::string("[RECVs exhausted]");
+      return "[RECVs exhausted]";
     case SmErrType::kOutOfMemory:
-      return std::string("[Out of memory]");
+      return "[Out of memory]";
     case SmErrType::kRoutingResolutionFailure:
-      return std::string("[Routing resolution failure]");
+      return "[Routing resolution failure]";
     case SmErrType::kInvalidRemoteRpcId:
-      return std::string("[Invalid remote Rpc ID]");
+      return "[Invalid remote Rpc ID]";
     case SmErrType::kInvalidRemotePort:
-      return std::string("[Invalid remote port]");
+      return "[Invalid remote port]";
     case SmErrType::kInvalidTransport:
-      return std::string("[Invalid transport]");
+      return "[Invalid transport]";
   }
 
-  throw std::runtime_error("eRPC: Invalid session management error type");
+  throw std::runtime_error("Invalid session management error type");
 }
 
 static std::string sm_event_type_str(SmEventType event_type) {
   switch (event_type) {
     case SmEventType::kConnected:
-      return std::string("[Connected]");
+      return "[Connected]";
     case SmEventType::kConnectFailed:
-      return std::string("[Connect failed]");
+      return "[Connect failed]";
     case SmEventType::kDisconnected:
-      return std::string("[Disconnected]");
+      return "[Disconnected]";
     case SmEventType::kDisconnectFailed:
-      return std::string("[kDisconnect failed]");
+      return "[kDisconnect failed]";
   }
-  return std::string("[Invalid event type]");
+  return "[Invalid event type]";
 }
 
 /// Basic metadata about a session end point. This is sent in session management
