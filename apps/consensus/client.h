@@ -85,8 +85,11 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   c->client.num_resps++;
 
   if (c->client.num_resps == 10000) {
-    printf("consensus: Client latency = %.2f us.\n",
-           c->client.req_latency.get_avg_us());
+    printf(
+        "consensus: Client latency = %.2f us. Request window = %zu (best 1) "
+        "Inline size = %zu (best 120).\n",
+        c->client.req_latency.get_avg_us(), ERpc::Session::kSessionReqWindow,
+        ERpc::IBTransport::kMaxInline);
     c->client.num_resps = 0;
     c->client.req_latency.reset();
   }
