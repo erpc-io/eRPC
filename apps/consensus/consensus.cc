@@ -254,6 +254,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  printf("consensus: Exiting.\n");
+  printf(
+      "consensus: Final log size (including uncommitted entries) = %zu. "
+      "Final counter = %zu. Exiting.\n",
+      c.server.raft_log.size(), c.server.cur_counter);
   delete c.rpc;
 }

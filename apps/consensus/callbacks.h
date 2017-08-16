@@ -16,8 +16,7 @@
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            int) {
   assert(udata != nullptr && ety != nullptr);
-  ERpc::rt_assert(!raft_entry_is_cfg_change(ety),
-                  "Configuration change log entries not handled.\n");
+  assert(!raft_entry_is_cfg_change(ety));
 
   // We're applying an entry to the application's state machine, so we're sure
   // about its length. Other log callbacks can be invoked for non-application
@@ -52,7 +51,6 @@ static int __raft_persist_term(raft_server_t *, void *, const int) {
 static int __raft_logentry_offer(raft_server_t *, void *udata,
                                  raft_entry_t *ety, int) {
   assert(udata != nullptr && ety != nullptr);
-  _unused(ety);
   assert(!raft_entry_is_cfg_change(ety));
 
   auto *c = static_cast<AppContext *>(udata);
