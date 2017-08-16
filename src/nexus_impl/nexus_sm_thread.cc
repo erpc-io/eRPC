@@ -121,7 +121,7 @@ void Nexus<TTr>::sm_thread_on_enet_disconnect_client(SmThreadCtx &ctx,
     epeer->data = nullptr;
 
     LOG_INFO(
-        "eRPC Nexus: ENet peer to %s disconnected. "
+        "eRPC Nexus: ENet client peer to %s disconnected. "
         "Broadcasting resets to local Rpcs.\n",
         rem_hostname.c_str());
 

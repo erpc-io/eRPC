@@ -46,8 +46,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: Attempting to reset client session %u, state = %s."
-          "Issue",
+          "eRPC Rpc %u: Trying to reset client session %u, state = %s. Issue",
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
@@ -87,6 +86,9 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
     assert(pending_conts == 0);
   }
 
+  // Change state before failure continuations
+  session->state = SessionState::kDisconnectInProgress;
+
   if (pending_conts == 0) {
     // Act similar to handling a disconnect response
     LOG_INFO("%s: None. Session resetted.\n", issue_msg);
@@ -99,8 +101,6 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
     LOG_WARN(
         "eRPC Rpc %u: Cannot reset session %u. %zu continuations pending.\n",
         rpc_id, session->local_session_num, pending_conts);
-
-    session->state = SessionState::kResetInProgress;
     return false;
   }
 }
@@ -109,11 +109,11 @@ template <class TTr>
 bool Rpc<TTr>::handle_reset_server_st(Session *session) {
   assert(in_creator());
   assert(session != nullptr && session->is_server());
+  session->state = SessionState::kResetInProgress;
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: Attempting to reset server session %u, state = %s."
-          "Issue",
+          "eRPC Rpc %u: Trying to reset server session %u, state = %s. Issue",
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
@@ -133,7 +133,6 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
         "eRPC Rpc %u: Cannot reset session %u. %zu enqueue_response pending.\n",
         rpc_id, session->local_session_num, pending_enqueue_resps);
 
-    session->state = SessionState::kResetInProgress;
     return false;
   }
 }
