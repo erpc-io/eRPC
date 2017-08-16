@@ -40,18 +40,24 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   // Check if it's OK to receive the client's request
   raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
   if (unlikely(leader == nullptr)) {
-    // We don't know the leader
+    printf(
+        "consensus: Received client request, but leader unknown. "
+        "Asking client to retry later.\n");
     client_resp_t err_resp;
     err_resp.resp_type = ClientRespType::kFailTryAgain;
     send_client_response(c, req_handle, &err_resp);
     return;
   }
 
-  if (unlikely(raft_node_get_id(leader) != c->server.node_id)) {
-    // We know the leader but it's not this node
+  int leader_node_id = raft_node_get_id(leader);
+  if (unlikely(leader_node_id != c->server.node_id)) {
+    printf(
+        "consensus: Received client request, but leader is %s (not me). "
+        "Redirecting client.\n",
+        node_id_to_name_map.at(leader_node_id).c_str());
     client_resp_t err_resp;
     err_resp.resp_type = ClientRespType::kFailRedirect;
-    err_resp.leader_node_id = raft_node_get_id(leader);
+    err_resp.leader_node_id = leader_node_id;
     send_client_response(c, req_handle, &err_resp);
     return;
   }
@@ -198,7 +204,7 @@ int main(int argc, char **argv) {
   while (ctrl_c_pressed == 0) {
     if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
       ERpc::TscLatency &commit_latency = c.server.commit_latency;
-      printf("consensus: leader commit latency = %.2f us. Log size = %zu.\n",
+      printf("consensus: Leader commit latency = %.2f us. Log size = %zu.\n",
              commit_latency.get_avg_us(), c.server.raft_log.size());
 
       loop_tsc = ERpc::rdtsc();

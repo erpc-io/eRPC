@@ -42,6 +42,8 @@ void client_cont(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 // Change the leader to a different Raft server that we are connected to
 void change_leader_to_any(AppContext *c) {
   size_t cur_leader_idx = c->client.leader_idx;
+  printf("consensus: Client change_leader_to_any() from current leader %zu.\n",
+         c->client.leader_idx);
 
   // Pick the next session to a Raft server that is not disconnected
   for (size_t i = 1; i < FLAGS_num_raft_servers; i++) {
@@ -62,25 +64,24 @@ void change_leader_to_any(AppContext *c) {
 }
 
 // Change the leader to a server with the given node ID
-void change_leader_to_node(AppContext *c, int node_id) {
+bool change_leader_to_node(AppContext *c, int node_id) {
   // Pick the next session to a Raft server that is not disconnected
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     std::string node_i_hostname = get_hostname_for_machine(i);
     int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
 
     if (node_i_id == node_id) {
-      ERpc::rt_assert(!c->conn_vec[i].disconnected,
-                      "Changing to disconnected leader not supported");
-      c->client.leader_idx = i;
+      if (c->conn_vec[i].disconnected) {
+        // We're being redirected to a failed Raft server
+        return false;
+      }
 
-      printf("consensus: Client changed leader view to %zu.\n",
-             c->client.leader_idx);
-      return;
+      c->client.leader_idx = i;
+      return true;
     }
   }
 
-  printf("consensus: Client failed to change leader to node %d. Exiting.\n",
-         node_id);
+  printf("consensus: Client could not find node %d. Exiting.\n", node_id);
   exit(0);
 }
 
@@ -136,13 +137,32 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
 
     auto resp_type = client_resp->resp_type;
     if (unlikely(resp_type == ClientRespType::kFailRedirect)) {
-      change_leader_to_node(c, client_resp->leader_node_id);
+      printf(
+          "consensus: Client request to server %zu failed with code redirect. "
+          "Trying to change leader to %s.\n",
+          c->client.leader_idx,
+          node_id_to_name_map[client_resp->leader_node_id].c_str());
+
+      bool success = change_leader_to_node(c, client_resp->leader_node_id);
+      if (!success) {
+        printf(
+            "consensus: Client failed to change leader to %s. "
+            "Retrying to current leader %zu after 200 ms.\n",
+            node_id_to_name_map[client_resp->leader_node_id].c_str(),
+            c->client.leader_idx);
+        usleep(200000);
+      }
     } else if (unlikely(resp_type == ClientRespType::kFailTryAgain)) {
       // Just fall through
+      printf(
+          "consensus: Client request to server %zu failed with code try again. "
+          "Trying again after 200 ms.\n",
+          c->client.leader_idx);
+      usleep(200000);
     }
   } else {
     // This is a continuation-with-failure
-    printf("consensus: Client request to Raft server %zu failed [%s].\n",
+    printf("consensus: Client RPC to server %zu failed to complete [%s].\n",
            c->client.leader_idx, ERpc::get_formatted_time().c_str());
     change_leader_to_any(c);
   }

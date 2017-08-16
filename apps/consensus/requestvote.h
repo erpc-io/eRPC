@@ -131,7 +131,7 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
     _unused(e);
   } else {
     // This is a continuation-with-failure
-    printf("consensus: Requestvote request to node %s failed [%s].\n",
+    printf("consensus: Requestvote RPC to node %s failed to complete [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            ERpc::get_formatted_time().c_str());
   }

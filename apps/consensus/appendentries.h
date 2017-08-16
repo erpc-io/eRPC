@@ -232,7 +232,7 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
     assert(e == 0);
   } else {
     // This is a continuation-with-failure
-    printf("consensus: Appendentries request to node %s failed [%s].\n",
+    printf("consensus: Appendentries RPC to node %s failed [%s] to complete.\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            ERpc::get_formatted_time().c_str());
   }
