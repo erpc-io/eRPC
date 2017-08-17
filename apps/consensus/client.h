@@ -135,30 +135,52 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
              ERpc::get_formatted_time().c_str());
     }
 
-    auto resp_type = client_resp->resp_type;
-    if (unlikely(resp_type == ClientRespType::kFailRedirect)) {
-      printf(
-          "consensus: Client request to server %zu failed with code redirect. "
-          "Trying to change leader to %s.\n",
-          c->client.leader_idx,
-          node_id_to_name_map[client_resp->leader_node_id].c_str());
+    switch (client_resp->resp_type) {
+      case ClientRespType::kSuccess: {
+        ERpc::rt_assert(
+            client_resp->counter > c->client.last_counter,
+            "Invalid counter " + std::to_string(client_resp->counter) +
+                ", last counter = " + std::to_string(c->client.last_counter));
 
-      bool success = change_leader_to_node(c, client_resp->leader_node_id);
-      if (!success) {
+        if (unlikely(client_resp->counter != c->client.last_counter + 1)) {
+          // This can happen during a leader change
+          printf(
+              "consensus: Gap in client counter sequence. "
+              "Last counter = %zu, received now = %zu.\n",
+              c->client.last_counter, client_resp->counter);
+        }
+
+        c->client.last_counter = client_resp->counter;
+        break;
+      }
+
+      case ClientRespType::kFailRedirect: {
         printf(
-            "consensus: Client failed to change leader to %s. "
-            "Retrying to current leader %zu after 200 ms.\n",
-            node_id_to_name_map[client_resp->leader_node_id].c_str(),
+            "consensus: Client request to server %zu failed with code = "
+            "redirect. Trying to change leader to %s.\n",
+            c->client.leader_idx,
+            node_id_to_name_map[client_resp->leader_node_id].c_str());
+
+        bool success = change_leader_to_node(c, client_resp->leader_node_id);
+        if (!success) {
+          printf(
+              "consensus: Client failed to change leader to %s. "
+              "Retrying to current leader %zu after 200 ms.\n",
+              node_id_to_name_map[client_resp->leader_node_id].c_str(),
+              c->client.leader_idx);
+          usleep(200000);
+        }
+        break;
+      }
+
+      case ClientRespType::kFailTryAgain: {
+        printf(
+            "consensus: Client request to server %zu failed with code = "
+            "try again. Trying again after 200 ms.\n",
             c->client.leader_idx);
         usleep(200000);
+        break;
       }
-    } else if (unlikely(resp_type == ClientRespType::kFailTryAgain)) {
-      // Just fall through
-      printf(
-          "consensus: Client request to server %zu failed with code try again. "
-          "Trying again after 200 ms.\n",
-          c->client.leader_idx);
-      usleep(200000);
     }
   } else {
     // This is a continuation-with-failure

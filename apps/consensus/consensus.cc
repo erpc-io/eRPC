@@ -220,6 +220,8 @@ int main(int argc, char **argv) {
 
     if (commit_status == 1) {
       // Committed: Send a response
+      raft_apply_all(c.server.raft);
+
       leader_sav.in_use = false;
       if (kAppMeasureCommitLatency) c.server.commit_latency.stopwatch_stop();
 
@@ -228,11 +230,10 @@ int main(int argc, char **argv) {
             TimeEntry(TimeEntryType::kCommitted, ERpc::rdtsc()));
       }
 
-      client_resp_t client_resp;
-      client_resp.resp_type = ClientRespType::kSuccess;
-
       // XXX: Is this correct, or should we send response in _apply_log()
       // callback? This doesn't adversely affect failure-free performance.
+      client_resp_t client_resp;
+      client_resp.resp_type = ClientRespType::kSuccess;
       client_resp.counter = c.server.counter;
 
       ERpc::ReqHandle *req_handle = leader_sav.req_handle;

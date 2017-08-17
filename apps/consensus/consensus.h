@@ -102,6 +102,7 @@ class AppContext {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
     size_t num_resps = 0;
+    size_t last_counter = 0;  // The last received counter
     ERpc::MsgBuffer req_msgbuf;
     ERpc::MsgBuffer resp_msgbuf;
     ERpc::TscLatency req_latency;  // Request latency observed by client
