@@ -13,6 +13,7 @@ extern "C" {
 #include "../apps_common.h"
 #include "cityhash/city.h"
 #include "rpc.h"
+#include "time_entry.h"
 #include "util/latency.h"
 
 // Debug/measurement
@@ -70,87 +71,6 @@ struct leader_saveinfo_t {
   ERpc::ReqHandle *req_handle;  // This could be a vector if we do batching
   msg_entry_response_t msg_entry_response;
   size_t counter;
-};
-
-// Comments describe the common-case usage
-enum class TimeEntryType {
-  kClientReq,   // Client request received by leader
-  kSendAeReq,   // Leader sends appendentry request
-  kRecvAeReq,   // Follower receives appendentry request
-  kSendAeResp,  // Follower sends appendentry response
-  kRecvAeResp,  // Leader receives appendentry response
-  kCommitted    // Entry committed at leader
-};
-
-class TimeEntry {
- public:
-  TimeEntryType time_entry_type;
-  size_t tsc;
-
-  TimeEntry() {}
-  TimeEntry(TimeEntryType t, size_t tsc) : time_entry_type(t), tsc(tsc) {}
-
-  std::string to_string(size_t base_tsc, double freq_ghz) const {
-    std::string ret;
-
-    switch (time_entry_type) {
-      case TimeEntryType::kClientReq:
-        ret = "client_req";
-        break;
-      case TimeEntryType::kSendAeReq:
-        ret = "send_appendentries_req";
-        break;
-      case TimeEntryType::kRecvAeReq:
-        ret = "recv_appendentries_req";
-        break;
-      case TimeEntryType::kSendAeResp:
-        ret = "send_appendentries_resp";
-        break;
-      case TimeEntryType::kRecvAeResp:
-        ret = "recv_appendentries_resp";
-        break;
-      case TimeEntryType::kCommitted:
-        ret = "committed";
-        break;
-    }
-
-    double usec = ERpc::to_usec(tsc - base_tsc, freq_ghz);
-    ret += ": " + std::to_string(usec);
-    return ret;
-  }
-};
-
-template <class T>
-class MemPool {
- public:
-  size_t num_to_alloc = 1;
-  std::vector<T *> backing_ptr_vec;
-  std::vector<T *> pool;
-
-  void extend_pool() {
-    T *backing_ptr = new T[num_to_alloc];
-    for (size_t i = 0; i < num_to_alloc; i++) {
-      pool.push_back(&backing_ptr[i]);
-    }
-
-    backing_ptr_vec.push_back(backing_ptr);
-    num_to_alloc *= 2;
-  }
-
-  T *alloc() {
-    if (pool.empty()) extend_pool();
-    T *ret = pool.back();
-    pool.pop_back();
-    return ret;
-  }
-
-  void free(T *t) { pool.push_back(t); }
-
-  MemPool() {}
-
-  ~MemPool() {
-    for (T *ptr : backing_ptr_vec) delete[] ptr;
-  }
 };
 
 // Context for both servers and clients

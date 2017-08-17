@@ -8,12 +8,12 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-enum class ClientRespType : size_t { kSuccess, kFailRedirect, kFailTryAgain };
-
 // The client request message
 struct client_req_t {
   size_t thread_id;
 };
+
+enum class ClientRespType : size_t { kSuccess, kFailRedirect, kFailTryAgain };
 
 // The client response message
 struct client_resp_t {

@@ -57,8 +57,8 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 // Per-thread application context
 class AppContext {
  public:
+  TmpStat *tmp_stat = nullptr;
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
-  ERpc::TmpStat *tmp_stat = nullptr;
   ERpc::Latency latency;
 
   std::vector<int> session_num_vec;

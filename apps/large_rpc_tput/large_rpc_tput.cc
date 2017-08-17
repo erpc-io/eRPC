@@ -246,8 +246,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 // The function executed by each thread in the cluster
 void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   AppContext c;
-  c.tmp_stat =
-      new ERpc::TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
+  c.tmp_stat = new TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
