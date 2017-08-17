@@ -85,7 +85,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
   msg_entry_t entry;
   entry.type = RAFT_LOGTYPE_NORMAL;
-  entry.id = c->fast_rand.next_u32();
+  entry.id = FLAGS_machine_id;
   entry.data.buf = static_cast<void *>(raft_counter_buf);
   entry.data.len = sizeof(size_t);
 
