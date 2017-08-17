@@ -87,7 +87,7 @@ bool change_leader_to_node(AppContext *c, int node_id) {
 
 void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
-  c->client.req_latency.stopwatch_start();
+  c->client.req_start_tsc = ERpc::rdtsc();
 
   auto *erpc_client_req =
       reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
@@ -111,17 +111,30 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  c->client.req_latency.stopwatch_stop();
-
+  double latency_us = ERpc::to_usec(ERpc::rdtsc() - c->client.req_start_tsc,
+                                    c->rpc->get_freq_ghz());
+  c->client.req_us_vec.push_back(latency_us);
   c->client.num_resps++;
+
   if (c->client.num_resps == 10000) {
+    // At this point, there is no request outstanding, so long compute is OK
+    auto &lat_vec = c->client.req_us_vec;
+    std::sort(lat_vec.begin(), lat_vec.end());
+
+    double us_min = lat_vec.at(0);
+    double us_median = lat_vec.at(lat_vec.size() / 2);
+    double us_99 = lat_vec.at(lat_vec.size() * .99);
+    double us_999 = lat_vec.at(lat_vec.size() * .999);
+    double us_max = lat_vec.at(lat_vec.size() - 1);
+
     printf(
-        "consensus: Client latency = %.2f us. Request window = %zu (best 1) "
-        "Inline size = %zu (best 120).\n",
-        c->client.req_latency.get_avg_us(), ERpc::Session::kSessionReqWindow,
-        ERpc::IBTransport::kMaxInline);
+        "consensus: Latency us = "
+        "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f max}. "
+        "Request window = %zu (best 1). Inline size = %zu (best 120).\n",
+        us_min, us_median, us_99, us_999, us_max,
+        ERpc::Session::kSessionReqWindow, ERpc::IBTransport::kMaxInline);
     c->client.num_resps = 0;
-    c->client.req_latency.reset();
+    c->client.req_us_vec.clear();
   }
 
   if (likely(c->client.resp_msgbuf.get_data_size() > 0)) {
@@ -213,8 +226,6 @@ void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
 
   c->client.resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(client_resp_t));
   assert(c->client.resp_msgbuf.buf != nullptr);
-
-  c->client.req_latency = ERpc::TscLatency(c->rpc->get_freq_ghz());
 
   // Raft client: Create session to each Raft server
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {

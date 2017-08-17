@@ -105,7 +105,10 @@ class AppContext {
     size_t last_counter = 0;  // The last received counter
     ERpc::MsgBuffer req_msgbuf;
     ERpc::MsgBuffer resp_msgbuf;
-    ERpc::TscLatency req_latency;  // Request latency observed by client
+
+    // For latency measurement
+    uint64_t req_start_tsc;
+    std::vector<double> req_us_vec;  // We clear this after printing stats
   } client;
 
   // Common members
