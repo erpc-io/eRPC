@@ -70,7 +70,6 @@ struct leader_saveinfo_t {
   bool in_use = false;          // Leader has an ongoing commit request
   ERpc::ReqHandle *req_handle;  // This could be a vector if we do batching
   msg_entry_response_t msg_entry_response;
-  size_t counter;
 };
 
 // Context for both servers and clients
@@ -86,11 +85,11 @@ class AppContext {
     std::vector<TimeEntry> time_entry_vec;
 
     // Pools
-    std::vector<void *> counter_buf_pool;  // Pool for counter-sized memory
+    std::vector<void *> rsm_cmd_buf_pool;  // Pool for 8B state machine commands
     MemPool<raft_req_tag_t> raft_req_tag_pool;
 
     // App state
-    size_t cur_counter = 0;
+    size_t counter = 0;
 
     // Stats
     ERpc::TscLatency commit_latency;       // Leader latency to commit an entry
@@ -119,8 +118,8 @@ class AppContext {
   volatile size_t magic = kAppContextMagic;  // Avoid optimizing check_magic()
   bool check_magic() const { return magic == kAppContextMagic; }
 
-  void counter_buf_pool_extend() {
-    printf("consensus: Extending counter buf pool.\n");
+  void rsm_cmd_buf_pool_extend() {
+    printf("consensus: Extending RSM command buffer pool.\n");
     ERpc::rt_assert(server.raft != nullptr, "Caller must be server");
 
     size_t alloc_size = rpc->get_max_msg_size();
@@ -129,20 +128,20 @@ class AppContext {
                     "Failed to extend counter buf pool");
 
     for (size_t i = 0; i < alloc_size / sizeof(size_t); i++) {
-      server.counter_buf_pool.push_back(
+      server.rsm_cmd_buf_pool.push_back(
           static_cast<void *>(&buf_pool_backer.buf[i * sizeof(size_t)]));
     }
   }
 
-  void *counter_buf_pool_alloc() {
-    if (server.counter_buf_pool.empty()) counter_buf_pool_extend();
-    void *ret = server.counter_buf_pool.back();
-    server.counter_buf_pool.pop_back();
+  void *rsm_cmd_buf_pool_alloc() {
+    if (server.rsm_cmd_buf_pool.empty()) rsm_cmd_buf_pool_extend();
+    void *ret = server.rsm_cmd_buf_pool.back();
+    server.rsm_cmd_buf_pool.pop_back();
     return ret;
   }
 
-  void counter_buf_pool_free(void *addr) {
-    server.counter_buf_pool.push_back(addr);
+  void rsm_cmd_buf_pool_free(void *addr) {
+    server.rsm_cmd_buf_pool.push_back(addr);
   }
 };
 

@@ -10,7 +10,7 @@
 
 // The client request message
 struct client_req_t {
-  size_t thread_id;
+  size_t client_id;
 };
 
 enum class ClientRespType : size_t { kSuccess, kFailRedirect, kFailTryAgain };
@@ -91,7 +91,7 @@ void send_req_one(AppContext *c) {
 
   auto *erpc_client_req =
       reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
-  erpc_client_req->thread_id = c->client.thread_id;
+  erpc_client_req->client_id = FLAGS_machine_id;
 
   if (kAppVerbose) {
     printf("consensus: Client sending request to leader index %zu [%s].\n",

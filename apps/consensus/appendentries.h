@@ -50,26 +50,26 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   if (is_keepalive) {
     assert(req_msgbuf->get_data_size() == sizeof(appendentries_req_t));
   } else {
+    // Non-keepalive appendentries requests contain app-defined log entries
     buf += sizeof(appendentries_req_t);
     if (n_entries <= static_msg_entry_arr_size) {
       ae.entries = static_msg_entry_arr;
     } else {
-      ae.entries = new msg_entry_t[n_entries];  // Freed below
+      ae.entries = new msg_entry_t[n_entries];  // Freed conditionally below
     }
 
     // Invariant: buf points to a msg_entry_t, followed by its buffer
     for (size_t i = 0; i < n_entries; i++) {
       ae.entries[i] = *(reinterpret_cast<msg_entry_t *>(buf));
       assert(ae.entries[i].data.buf == nullptr);
-
-      size_t data_len = ae.entries[i].data.len;
-      assert(data_len == sizeof(size_t));  // Non-keepalive => app log entry
+      assert(ae.entries[i].data.len == sizeof(size_t));
 
       // Allocate dynamic memory for each appendentry
-      ae.entries[i].data.buf = c->counter_buf_pool_alloc();
-      memcpy(ae.entries[i].data.buf, buf + sizeof(msg_entry_t), data_len);
+      ae.entries[i].data.buf = c->rsm_cmd_buf_pool_alloc();
+      memcpy(ae.entries[i].data.buf, buf + sizeof(msg_entry_t),
+             ae.entries[i].data.len);
 
-      buf += (sizeof(msg_entry_t) + data_len);
+      buf += (sizeof(msg_entry_t) + ae.entries[i].data.len);
     }
 
     assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());

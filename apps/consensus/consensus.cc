@@ -36,13 +36,16 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
+  const auto *client_req = reinterpret_cast<client_req_t *>(req_msgbuf->buf);
 
   // Check if it's OK to receive the client's request
   raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
   if (unlikely(leader == nullptr)) {
     printf(
-        "consensus: Received client request, but leader unknown. "
-        "Asking client to retry later.\n");
+        "consensus: Received request from client %zu, but leader unknown. "
+        "Asking client to retry later.\n",
+        client_req->client_id);
+
     client_resp_t err_resp;
     err_resp.resp_type = ClientRespType::kFailTryAgain;
     send_client_response(c, req_handle, &err_resp);
@@ -52,9 +55,9 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   int leader_node_id = raft_node_get_id(leader);
   if (unlikely(leader_node_id != c->server.node_id)) {
     printf(
-        "consensus: Received client request, but leader is %s (not me). "
-        "Redirecting client.\n",
-        node_id_to_name_map.at(leader_node_id).c_str());
+        "consensus: Received request from client %zu, "
+        "but leader is %s (not me). Redirecting client.\n",
+        client_req->client_id, node_id_to_name_map.at(leader_node_id).c_str());
     client_resp_t err_resp;
     err_resp.resp_type = ClientRespType::kFailRedirect;
     err_resp.leader_node_id = leader_node_id;
@@ -63,30 +66,24 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   }
 
   // We're the leader
-  size_t counter = c->server.cur_counter + 1;  // Don't update cur_counter yet!
-
   if (kAppVerbose) {
-    auto *client_req = reinterpret_cast<client_req_t *>(req_msgbuf->buf);
-    printf(
-        "consensus: Received client request from client thread %zu. "
-        "Assigned counter = %zu [%s].\n",
-        client_req->thread_id, counter, ERpc::get_formatted_time().c_str());
+    printf("consensus: Received client request from client %zu [%s].\n",
+           client_req->client_id, ERpc::get_formatted_time().c_str());
   }
 
   leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
   assert(!leader_sav.in_use);
   leader_sav.in_use = true;
   leader_sav.req_handle = req_handle;
-  leader_sav.counter = counter;  // We need a copy that Raft won't free
 
-  size_t *raft_counter_buf = static_cast<size_t *>(c->counter_buf_pool_alloc());
-  *raft_counter_buf = counter;
+  size_t *rsm_cmd_buf = static_cast<size_t *>(c->rsm_cmd_buf_pool_alloc());
+  *rsm_cmd_buf = client_req->client_id;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
   msg_entry_t entry;
   entry.type = RAFT_LOGTYPE_NORMAL;
   entry.id = FLAGS_machine_id;
-  entry.data.buf = static_cast<void *>(raft_counter_buf);
+  entry.data.buf = static_cast<void *>(rsm_cmd_buf);
   entry.data.len = sizeof(size_t);
 
   int e =
@@ -195,7 +192,7 @@ int main(int argc, char **argv) {
 
   // Initialize eRPC
   init_erpc(&c, &nexus);
-  c.counter_buf_pool_extend();
+  c.rsm_cmd_buf_pool_extend();
 
   if (FLAGS_machine_id == 0) raft_become_leader(c.server.raft);
 
@@ -233,7 +230,10 @@ int main(int argc, char **argv) {
 
       client_resp_t client_resp;
       client_resp.resp_type = ClientRespType::kSuccess;
-      client_resp.counter = leader_sav.counter;
+
+      // XXX: Is this correct, or should we send response in _apply_log()
+      // callback? This doesn't adversely affect failure-free performance.
+      client_resp.counter = c.server.counter;
 
       ERpc::ReqHandle *req_handle = leader_sav.req_handle;
       send_client_response(&c, req_handle, &client_resp);  // Prints message
@@ -257,6 +257,6 @@ int main(int argc, char **argv) {
   printf(
       "consensus: Final log size (including uncommitted entries) = %zu. "
       "Final counter = %zu. Exiting.\n",
-      c.server.raft_log.size(), c.server.cur_counter);
+      c.server.raft_log.size(), c.server.counter);
   delete c.rpc;
 }

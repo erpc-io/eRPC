@@ -26,14 +26,17 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
   auto *c = static_cast<AppContext *>(udata);
   assert(c->check_magic());
 
-  size_t *counter = static_cast<size_t *>(ety->data.buf);
-  ERpc::rt_assert(*counter == c->server.cur_counter + 1, "Invalid counter");
-  if (kAppVerbose) {
-    printf("consensus: Updating counter to %zu [%s].\n", *counter,
-           ERpc::get_formatted_time().c_str());
-  }
-  c->server.cur_counter++;
+  // The RSM command contains the client ID
+  size_t client_id = *static_cast<size_t *>(ety->data.buf);
 
+  if (kAppVerbose) {
+    printf(
+        "consensus: Applying log entry from client %zu, "
+        "received at Raft server %u [%s].\n",
+        client_id, ety->id, ERpc::get_formatted_time().c_str());
+  }
+
+  c->server.counter++;  // Update RSM state
   return 0;
 }
 
@@ -72,9 +75,9 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
 
   raft_entry_t &entry = c->server.raft_log.back();
   if (entry.data.len == sizeof(size_t)) {
-    // Handle counter pool buffers separately
+    // Handle RSM command pool buffers separately
     assert(entry.data.buf != nullptr);
-    c->counter_buf_pool_free(entry.data.buf);
+    c->rsm_cmd_buf_pool_free(entry.data.buf);
   } else {
     if (entry.data.buf != nullptr) free(entry.data.buf);
   }
