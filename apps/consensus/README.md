@@ -13,7 +13,8 @@
 
 ## Optimization notes
  * The replicated counter works best with the following options:
-   * Datapath checks are disabled
-   * Session request window is set to 1
-   * Transport inline size is set to 120. This disallows the use of the modded
-     driver that supports only 60-byte inline size.
+   * Raft commit `9623f2f` from `anujkaliaiid/raft`
+   * ERpc datapath checks are disabled
+   * ERpc session request window is set to 1
+   * IB/RoCE transport inline size is set to 120. This disallows the use of the
+     modded driver that supports only 60-byte inline size.
