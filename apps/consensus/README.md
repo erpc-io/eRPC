@@ -5,3 +5,15 @@
  * The client's request consists of its global ID. This request is replicated
    in the shared log. A Raft server increments its counter in the `applylog()`
    callback.
+
+## Notes to run
+ * Wait for the leader (machine 0) to get elected before starting the client.
+   Not doing so can cause some weird issues like segfaults. Leader change seems
+   to work, but that's a secondary issue.
+
+## Optimization notes
+ * The replicated counter works best with the following options:
+   * Datapath checks are disabled
+   * Session request window is set to 1
+   * Transport inline size is set to 120. This disallows the use of the modded
+     driver that supports only 60-byte inline size.
