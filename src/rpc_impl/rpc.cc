@@ -23,16 +23,12 @@ Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
       multi_threaded(nexus->num_bg_threads > 0),
       pkt_loss_epoch_cycles(kPktLossEpochMs * 1000000 * nexus->freq_ghz),
       req_func_arr(nexus->req_func_arr) {
-  // Ensure that we're running as root
-  rt_assert(!getuid(), "eRPC Rpc: You need to be root to use eRPC");
-
-  rt_assert(nexus != nullptr, "eRPC Rpc: Invalid nexus");
-
-  rt_assert(rpc_id != kInvalidRpcId && !nexus->rpc_id_exists(rpc_id),
-            "eRPC Rpc: Invalid rpc_id");
-
-  rt_assert(phy_port < kMaxPhyPorts, "eRPC Rpc: Invalid physical port");
-  rt_assert(numa_node < kMaxNumaNodes, "eRPC Rpc: Invalid NUMA node");
+  rt_assert(!getuid(), "You need to be root to use eRPC");
+  rt_assert(nexus != nullptr, "Invalid Nexus");
+  rt_assert(rpc_id != kInvalidRpcId, "Invalid Rpc ID");
+  rt_assert(!nexus->rpc_id_exists(rpc_id), "Rpc ID already exists");
+  rt_assert(phy_port < kMaxPhyPorts, "Invalid physical port");
+  rt_assert(numa_node < kMaxNumaNodes, "Invalid NUMA node");
 
   tls_registry = &nexus->tls_registry;
   tls_registry->init();  // Initialize thread-local variables for this thread
