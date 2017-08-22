@@ -1,18 +1,12 @@
 #include "masstree_analytics.h"
 #include <signal.h>
 #include <cstring>
-#include "../apps_common.h"
 
 static constexpr bool kAppVerbose = false;
 
 // If true, we memset() request and respose buffers to kAppDataByte. If false,
 // only the first data byte is touched.
 static constexpr bool kAppMemset = false;
-
-// Profile controls
-std::function<size_t(AppContext *, size_t resp_session_idx)>
-    get_session_idx_func = nullptr;
-std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
 // A basic session management handler that expects successful responses
 void sm_handler(int session_num, ERpc::SmEventType sm_event_type,

@@ -9,6 +9,11 @@
 #include <papi.h>
 #include <fstream>
 #include "rpc.h"
+#include "util/latency.h"
+
+//
+// Gflags
+//
 
 // Flags that must be used in every app. test_ms and num_machines required in
 // the app's config file by the autorun scripts.
@@ -38,6 +43,9 @@ void avoid_gcc5_unused_warning() {
   _unused(machine_id_validator_registered);
 }
 
+//
+// PAPI
+//
 void papi_init() {
   float real_time, proc_time, ipc;
   long long ins;
@@ -144,5 +152,53 @@ class TmpStat {
  private:
   std::ofstream output_file;
 };
+
+// Per-thread application context
+class BasicAppContext {
+ public:
+  TmpStat *tmp_stat = nullptr;
+  ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
+  ERpc::FastRand fastrand;
+  ERpc::Latency latency;
+
+  std::vector<int> session_num_vec;
+
+  size_t thread_id;         // The ID of the thread that owns this context
+  size_t num_sm_resps = 0;  // Number of SM responses
+
+  ~BasicAppContext() {
+    if (tmp_stat != nullptr) delete tmp_stat;
+  }
+};
+
+// A reasonable SM handler
+void basic_sm_handler(int session_num, ERpc::SmEventType sm_event_type,
+                      ERpc::SmErrType sm_err_type, void *_context) {
+  assert(_context != nullptr);
+
+  auto *c = static_cast<BasicAppContext *>(_context);
+  c->num_sm_resps++;
+
+  if (!(sm_event_type == ERpc::SmEventType::kConnected ||
+        sm_event_type == ERpc::SmEventType::kDisconnected)) {
+    throw std::runtime_error("Received unexpected SM event.");
+  }
+
+  // The callback gives us the ERpc session number - get the index
+  size_t session_idx = c->session_num_vec.size();
+  for (size_t i = 0; i < c->session_num_vec.size(); i++) {
+    if (c->session_num_vec[i] == session_num) session_idx = i;
+  }
+  ERpc::rt_assert(session_idx < c->session_num_vec.size(),
+                  "Invalid session number");
+
+  fprintf(stderr,
+          "apps_common: Rpc %u: Session number %d (index %zu) %s. Error = %s. "
+          "Time elapsed = %.3f s.\n",
+          c->rpc->get_rpc_id(), session_num, session_idx,
+          ERpc::sm_event_type_str(sm_event_type).c_str(),
+          ERpc::sm_err_type_str(sm_err_type).c_str(),
+          c->rpc->sec_since_creation());
+}
 
 #endif  // APPS_COMMON_H
