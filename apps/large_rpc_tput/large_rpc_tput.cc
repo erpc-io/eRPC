@@ -347,15 +347,11 @@ int main(int argc, char **argv) {
   _unused(concurrency_validator_registered);
   _unused(profile_validator_registered);
 
-  // Parse args
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
   setup_profile();
-  if (get_session_idx_func == nullptr) {
-    throw std::runtime_error("Profile must set session index getter.");
-  }
-  if (connect_sessions_func == nullptr) {
-    throw std::runtime_error("Profile must set connect sessions function.");
-  }
+  ERpc::rt_assert(get_session_idx_func != nullptr, "No session index getter");
+  ERpc::rt_assert(connect_sessions_func != nullptr, "No connect_sessions_func");
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
