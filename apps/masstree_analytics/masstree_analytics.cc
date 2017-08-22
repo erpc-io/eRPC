@@ -167,10 +167,11 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   send_reqs(c);
 }
 
-// The function executed by each thread in the cluster
-void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
+void client_thread_func(size_t thread_id,
+                        ERpc::Nexus<ERpc::IBTransport> *nexus) {
+  assert(FLAGS_machine_id > 0);
+
   AppContext c;
-  c.tmp_stat = new TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
@@ -190,61 +191,29 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   size_t server_thread_id = thread_id % FLAGS_num_server_fg_threads;
 
   c.session_num_vec.resize(1);
-  c.session_num_vec[0] = rpc.create_session(server_hostname,
+  c.session_num_vec[0] =
+      rpc.create_session(server_hostname, server_thread_id, kAppPhyPort);
 
-
-  // Create sessions. Some threads may not create any sessions, and therefore
-  // not run the event loop required for other threads to connect them. This
-  // is OK because all threads will run the event loop below.
-  connect_sessions_func(&c);
-
-  if (c.session_num_vec.size() > 0) {
-    fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
-            thread_id);
-    c.stat_req_vec.resize(c.session_num_vec.size());
-    std::fill(c.stat_req_vec.begin(), c.stat_req_vec.end(), 0);
-  } else {
-    fprintf(stderr, "large_rpc_tput: Thread %zu: No sessions created.\n",
-            thread_id);
+  while (c.num_sm_resps != 1) {
+    rpc.run_event_loop(200);  // 200 milliseconds
+    if (ctrl_c_pressed == 1) return;
   }
 
-  // Regardless of the profile and thread role, all threads allocate request
-  // and response MsgBuffers. Some threads may not send requests.
-  alloc_req_resp_msg_buffers(&c);
-
-  if (FLAGS_num_threads == 1) papi_init();  // No IPC for multi-thread
-
+  fprintf(stderr, "Thread %zu: Sessions connected.\n", thread_id);
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
+}
 
-  // Send requests. For some profiles, machine 0 does not send requests.
-  // In these cases, by not injecting any requests now, we ensure that machine 0
-  // *never* sends requests.
-  bool _send_reqs = true;
-  if (FLAGS_machine_id == 0) {
-    if (FLAGS_profile == "timely_small" || FLAGS_profile == "victim") {
-      _send_reqs = false;
-    }
-  }
+void server_thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
+                        MtIndex *mti, threadinfo_t *ti) {
+  assert(FLAGS_machine_id == 0);
 
-  if (_send_reqs) {
-    if (c.session_num_vec.size() == 0) {
-      throw std::runtime_error("Cannot send requests without sessions.");
-    }
+  AppContext c;
+  c.thread_id = thread_id;
 
-    for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
-      size_t session_idx =
-          get_session_idx_func(&c, std::numeric_limits<size_t>::max());
-      c.req_vec.push_back(tag_t(session_idx, msgbuf_idx));
-    }
-    send_reqs(&c);
-  }
-
-  for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
-    rpc.run_event_loop(1000);  // 1 second
-    if (ctrl_c_pressed == 1) break;
-  }
-
-  // We don't disconnect sessions
+  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
+                                   static_cast<uint8_t>(thread_id),
+                                   basic_sm_handler, kAppPhyPort, kAppNumaNode);
+  while (ctrl_c_pressed == 0) rpc.run_event_loop(200);
 }
 
 int main(int argc, char **argv) {
@@ -252,33 +221,55 @@ int main(int argc, char **argv) {
 
   // Work around g++-5's unused variable warning for validators
   _unused(concurrency_validator_registered);
-
-  // Parse args
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  if (get_session_idx_func == nullptr) {
-    throw std::runtime_error("Profile must set session index getter.");
-  }
-  if (connect_sessions_func == nullptr) {
-    throw std::runtime_error("Profile must set connect sessions function.");
-  }
 
-  std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
-                                       FLAGS_num_bg_threads);
-  nexus.register_req_func(
-      kAppReqType,
-      ERpc::ReqFunc(point_req_handler, ERpc::ReqFuncType::kForeground));
-  nexus.register_req_func(
-      kAppReqType,
-      ERpc::ReqFunc(range_req_handler, ERpc::ReqFuncType::kBackground));
+  if (is_server()) {
+    // Create the Masstree using the main thread and insert a million keys
+    threadinfo_t *ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+    MtIndex mti;
+    mti.setup(ti);
 
-  std::thread threads[FLAGS_num_threads];
-  for (size_t i = 0; i < FLAGS_num_threads; i++) {
-    threads[i] = std::thread(thread_func, i, &nexus);
-    ERpc::bind_to_core(threads[i], i);
-  }
+    for (size_t i = 0; i < kNumKeys; i++) {
+      size_t key = i;
+      size_t value = i;
+      mti.put(key, value, ti);
+    }
 
-  for (size_t i = 0; i < FLAGS_num_threads; i++) {
-    threads[i].join();
+    // Create Masstree threadinfo structs for worker threads
+    std::vector<threadinfo *> ti_vec;
+    for (size_t i = 0; i < kNumWorkerThreads; i++) {
+      ti_vec.push_back(threadinfo::make(threadinfo::TI_PROCESS, i));
+    }
+
+    // ERpc stuff
+    std::string machine_name = get_hostname_for_machine(0);
+    ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
+                                         FLAGS_server_bg_threads);
+
+    nexus.register_req_func(
+        kAppReqType,
+        ERpc::ReqFunc(point_req_handler, ERpc::ReqFuncType::kForeground));
+    nexus.register_req_func(
+        kAppReqType,
+        ERpc::ReqFunc(range_req_handler, ERpc::ReqFuncType::kBackground));
+
+    std::thread threads[num_threads];
+    for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) {
+      threads[i] = std::thread(server_thread_func, i, &nexus, &mti);
+      ERpc::bind_to_core(threads[i], i);
+    }
+
+    for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) threads[i].join();
+  } else {
+    std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
+    ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
+
+    std::thread threads[FLAGS_num_client_threads];
+    for (size_t i = 0; i < FLAGS_num_client_threads; i++) {
+      threads[i] = std::thread(client_thread_func, i, &nexus);
+      ERpc::bind_to_core(threads[i], i);
+    }
+
+    for (size_t i = 0; i < FLAGS_num_client_threads; i++) threads[i].join();
   }
 }

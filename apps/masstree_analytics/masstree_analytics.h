@@ -31,10 +31,13 @@ static bool validate_req_window(const char *, uint64_t req_window) {
 }
 DEFINE_validator(req_window, &validate_req_window);
 
+// Return true iff this machine is the one server
+bool is_server(){ return FLAGS_machine_id == 0};
+
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
-  std::vector<size_t> stat_req_vec;  // Number of requests sent on a session
+  MtIndex *mt_index = nullptr;  // The Masstree index. Valid at server only.
 
   uint64_t req_ts[kMaxConcurrency];  // Per-request timestamps
   ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];

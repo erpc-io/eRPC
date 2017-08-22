@@ -46,9 +46,7 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
 
     // Wait for the launched thread to grab a ERpc thread ID, otherwise later
     // background threads or the foreground thread can grab ID = i.
-    while (tls_registry.cur_etid == i) {
-      usleep(1);
-    }
+    while (tls_registry.cur_etid == i) usleep(1);
   }
 
   // Launch the session management thread
@@ -74,11 +72,7 @@ Nexus<TTr>::~Nexus() {
 
   // Signal background and session management threads to kill themselves
   kill_switch = true;
-
-  for (size_t i = 0; i < num_bg_threads; i++) {
-    bg_thread_arr[i].join();
-  }
-
+  for (size_t i = 0; i < num_bg_threads; i++) bg_thread_arr[i].join();
   sm_thread.join();
 }
 

@@ -7,12 +7,14 @@
 #include "masstree_tcursor.hh"
 #include "query_masstree.hh"
 
+typedef threadinfo threadinfo_t;
+
 class MtIndex {
  public:
   MtIndex() {}
   ~MtIndex() {}
 
-  inline void setup(threadinfo *ti) {
+  inline void setup(threadinfo_t *ti) {
     table_ = new Masstree::default_table();
     table_->initialize(*ti);
   }
@@ -20,7 +22,7 @@ class MtIndex {
   inline void swap_endian(uint64_t &x) { x = __bswap_64(x); }
 
   // Upsert
-  inline void put(size_t key, size_t value, threadinfo *ti) {
+  inline void put(size_t key, size_t value, threadinfo_t *ti) {
     swap_endian(key);
     Str key_str(reinterpret_cast<const char *>(&key), sizeof(size_t));
 
@@ -43,7 +45,7 @@ class MtIndex {
   }
 
   // Get (unique value)
-  inline bool get(size_t key, size_t &value, threadinfo *ti) {
+  inline bool get(size_t key, size_t &value, threadinfo_t *ti) {
     swap_endian(key);
     Str key_str(reinterpret_cast<const char *>(&key), sizeof(size_t));
 
@@ -62,9 +64,9 @@ class MtIndex {
     scanner_t(int range) : range(range) {}
 
     template <typename SS2, typename K2>
-    void visit_leaf(const SS2 &, const K2 &, threadinfo &) {}
+    void visit_leaf(const SS2 &, const K2 &, threadinfo_t &) {}
 
-    bool visit_value(Str, const row_type *, threadinfo &) {
+    bool visit_value(Str, const row_type *, threadinfo_t &) {
       range--;
       return range > 0;
     }
@@ -72,7 +74,7 @@ class MtIndex {
     int range;
   };
 
-  size_t count_in_range(size_t cur_key, size_t range, threadinfo *ti) {
+  size_t count_in_range(size_t cur_key, size_t range, threadinfo_t *ti) {
     if (range == 0) return 0;
 
     swap_endian(cur_key);
