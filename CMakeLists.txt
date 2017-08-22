@@ -180,6 +180,7 @@ elseif(APP STREQUAL "masstree_analytics")
   # CMake-based Masstree library from anujkaliaiitd/masstree-beta
   link_directories($ENV{HOME}/masstree-beta)
   include_directories($ENV{HOME}/masstree-beta)
+  set(SOURCES ${SOURCES} apps/masstree_analytics/mt_index_api.cc)
   set(LIBRARIES ${LIBRARIES} lmasstree)
 endif()
 

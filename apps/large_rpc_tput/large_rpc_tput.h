@@ -93,18 +93,13 @@ void alloc_req_resp_msg_buffers(AppContext *c) {
 
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
     c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
-    if (c->resp_msgbuf[msgbuf_idx].buf == nullptr) {
-      throw std::runtime_error("Failed to pre-allocate response MsgBuffer.");
-    }
+    ERpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
 
-    auto &req_msgbuf = c->req_msgbuf[msgbuf_idx];
-    req_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_req_size);
-    if (req_msgbuf.buf == nullptr) {
-      throw std::runtime_error("Failed to pre-allocate req MsgBuffer.");
-    }
+    c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_req_size);
+    ERpc::rt_assert(c->req_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
 
     // Fill the request regardless of kAppMemset. This is a one-time thing.
-    memset(req_msgbuf.buf, kAppDataByte, FLAGS_req_size);
+    memset(c->req_msgbuf[msgbuf_idx].buf, kAppDataByte, FLAGS_req_size);
   }
 }
 

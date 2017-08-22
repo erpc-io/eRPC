@@ -39,6 +39,7 @@ flags = [
     '-DFAULT_INJECTION',
     '-I/users/akalia/eRPC/src',
     '-I/users/akalia/eRPC/third_party',
+    '-I/users/akalia/masstree-beta',
     '-Wall',
     '-Werror',
     '-Wextra',
