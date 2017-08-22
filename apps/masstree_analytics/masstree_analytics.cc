@@ -4,116 +4,71 @@
 
 static constexpr bool kAppVerbose = false;
 
-// If true, we memset() request and respose buffers to kAppDataByte. If false,
-// only the first data byte is touched.
-static constexpr bool kAppMemset = false;
-
-// A basic session management handler that expects successful responses
-void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
-                ERpc::SmErrType sm_err_type, void *_context) {
-  assert(_context != nullptr);
-
-  auto *c = static_cast<AppContext *>(_context);
-  c->num_sm_resps++;
-
-  if (sm_err_type != ERpc::SmErrType::kNoError) {
-    throw std::runtime_error("Received SM response with error.");
-  }
-
-  if (!(sm_event_type == ERpc::SmEventType::kConnected ||
-        sm_event_type == ERpc::SmEventType::kDisconnected)) {
-    throw std::runtime_error("Received unexpected SM event.");
-  }
-
-  // The callback gives us the ERpc session number - get the index in vector
-  size_t session_idx = c->session_num_vec.size();
-  for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-    if (c->session_num_vec[i] == session_num) {
-      session_idx = i;
-    }
-  }
-
-  if (session_idx == c->session_num_vec.size()) {
-    throw std::runtime_error("SM callback for invalid session number.");
-  }
-
-  fprintf(stderr,
-          "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s. "
-          "Time elapsed = %.3f s.\n",
-          c->rpc->get_rpc_id(), session_num, session_idx,
-          sm_event_type == ERpc::SmEventType::kConnected ? "connected"
-                                                         : "disconncted",
-          c->rpc->sec_since_creation());
-}
-
 void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
-// Send requests (i.e., msgbuf indexes) queued in req_vec. Requests that cannot
-// be sent are req-queued into req_vec.
-void send_reqs(AppContext *c) {
+// Send one request using this MsgBuffer
+void send_req_one(AppContext *c, size_t msgbuf_idx) {
   assert(c != nullptr);
-  size_t write_index = 0;
 
-  for (size_t i = 0; i < c->req_vec.size(); i++) {
-    size_t msgbuf_idx = c->req_vec[i].msgbuf_idx;
-    size_t session_idx = c->req_vec[i].session_idx;
+  size_t session_idx = c->req_vec[i].session_idx;
 
-    ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
-    assert(req_msgbuf.get_data_size() == FLAGS_req_size);
+  ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
+  assert(req_msgbuf.get_data_size() == FLAGS_req_size);
 
-    if (kAppVerbose) {
-      printf(
-          "large_rpc_tput: Trying to send request for session index %zu, "
-          "msgbuf_idx %zu.\n",
-          session_idx, msgbuf_idx);
-    }
+  if (kAppVerbose) {
+    printf(
+        "large_rpc_tput: Trying to send request for session index %zu, "
+        "msgbuf_idx %zu.\n",
+        session_idx, msgbuf_idx);
+  }
 
-    // Timestamp before trying enqueue_request(). If enqueue_request() fails,
-    // we'll timestamp again on the next try.
-    c->req_ts[msgbuf_idx] = ERpc::rdtsc();
-    int ret = c->rpc->enqueue_request(
-        c->session_num_vec[session_idx], kAppReqType, &req_msgbuf,
-        &c->resp_msgbuf[msgbuf_idx], app_cont_func, c->req_vec[i]._tag);
-    assert(ret == 0 || ret == -EBUSY);
+  // Timestamp before trying enqueue_request(). If enqueue_request() fails,
+  // we'll timestamp again on the next try.
+  c->req_ts[msgbuf_idx] = ERpc::rdtsc();
+  int ret = c->rpc->enqueue_request(
+      c->session_num_vec[session_idx], kAppReqType, &req_msgbuf,
+      &c->resp_msgbuf[msgbuf_idx], app_cont_func, c->req_vec[i]._tag);
+  assert(ret == 0 || ret == -EBUSY);
 
-    if (ret == -EBUSY) {
-      c->req_vec[write_index] = c->req_vec[i];
-      write_index++;
-      // Try other requests
-    } else {
-      c->stat_req_vec[session_idx]++;
-      c->stat_tx_bytes_tot += FLAGS_req_size;
-    }
+  if (ret == -EBUSY) {
+    c->req_vec[write_index] = c->req_vec[i];
+    write_index++;
+    // Try other requests
+  } else {
+    c->stat_req_vec[session_idx]++;
+    c->stat_tx_bytes_tot += FLAGS_req_size;
   }
 
   c->req_vec.resize(write_index);  // Pending requests = write_index
 }
 
-void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
   auto *c = static_cast<AppContext *>(_context);
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  uint8_t resp_byte = req_msgbuf->buf[0];
+  _unused(req_msgbuf);
 
-  // Use dynamic response
-  req_handle->prealloc_used = false;
-  ERpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
-  resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_resp_size);  // Freed by eRPC
-  assert(resp_msgbuf.buf != nullptr);
+  req_handle->prealloc_used = true;
+  ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                  sizeof(size_t));
+  c->rpc->enqueue_response(req_handle);
+}
 
-  // Touch the response
-  if (kAppMemset) {
-    memset(resp_msgbuf.buf, resp_byte, FLAGS_resp_size);
-  } else {
-    resp_msgbuf.buf[0] = resp_byte;
-  }
+void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+  assert(req_handle != nullptr);
+  assert(_context != nullptr);
 
-  c->stat_rx_bytes_tot += FLAGS_req_size;
-  c->stat_tx_bytes_tot += FLAGS_resp_size;
+  auto *c = static_cast<AppContext *>(_context);
 
+  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  _unused(req_msgbuf);
+
+  req_handle->prealloc_used = true;
+  ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                  sizeof(size_t));
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -219,10 +174,24 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   c.thread_id = thread_id;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
-                                   static_cast<uint8_t>(thread_id), sm_handler,
-                                   kAppPhyPort, kAppNumaNode);
+                                   static_cast<uint8_t>(thread_id),
+                                   basic_sm_handler, kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
+
+  if (FLAGS_machine_id == 0) {
+    // Server
+    while (ctrl_c_pressed == 0) rpc.run_event_loop(200);
+    return;
+  }
+
+  // Each client creates a session to only one server thread
+  auto server_hostname = get_hostname_for_machine(0);
+  size_t server_thread_id = thread_id % FLAGS_num_server_fg_threads;
+
+  c.session_num_vec.resize(1);
+  c.session_num_vec[0] = rpc.create_session(server_hostname,
+
 
   // Create sessions. Some threads may not create any sessions, and therefore
   // not run the event loop required for other threads to connect them. This
@@ -279,7 +248,6 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
 }
 
 int main(int argc, char **argv) {
-  assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
   // Work around g++-5's unused variable warning for validators
@@ -298,7 +266,11 @@ int main(int argc, char **argv) {
   ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
                                        FLAGS_num_bg_threads);
   nexus.register_req_func(
-      kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
+      kAppReqType,
+      ERpc::ReqFunc(point_req_handler, ERpc::ReqFuncType::kForeground));
+  nexus.register_req_func(
+      kAppReqType,
+      ERpc::ReqFunc(range_req_handler, ERpc::ReqFuncType::kBackground));
 
   std::thread threads[FLAGS_num_threads];
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
