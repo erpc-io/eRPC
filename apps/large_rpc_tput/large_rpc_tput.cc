@@ -170,21 +170,16 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->latency.update(static_cast<size_t>(usec));
 
   // Check the response
-  if (unlikely(resp_msgbuf->get_data_size() != FLAGS_resp_size)) {
-    throw std::runtime_error("Invalid response size.\n");
-  }
+  ERpc::rt_assert(resp_msgbuf->get_data_size() == FLAGS_resp_size,
+                  "Invalid response size");
 
   if (kAppMemset) {
     // Check all response cachelines (checking every byte is slow)
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
-      if (unlikely(resp_msgbuf->buf[i] != kAppDataByte)) {
-        throw std::runtime_error("Invalid response data.");
-      }
+      ERpc::rt_assert(resp_msgbuf->buf[i] == kAppDataByte, "Invalid resp data");
     }
   } else {
-    if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
-      throw std::runtime_error("Invalid response data.");
-    }
+    ERpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte, "Invalid resp data");
   }
 
   c->stat_rx_bytes_tot += FLAGS_resp_size;
@@ -289,9 +284,8 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
   }
 
   if (_send_reqs) {
-    if (c.session_num_vec.size() == 0) {
-      throw std::runtime_error("Cannot send requests without sessions.");
-    }
+    ERpc::rt_assert(c.session_num_vec.size() > 0,
+                    "Cannot send requests without sessions");
 
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
       size_t session_idx =
@@ -338,10 +332,8 @@ int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
-  if (!ERpc::large_rpc_supported()) {
-    throw std::runtime_error(
-        "Current eRPC optlevel does not allow large RPCs.");
-  }
+  ERpc::rt_assert(ERpc::large_rpc_supported(),
+                  "Current eRPC optlevel does not allow large RPCs.");
 
   // Work around g++-5's unused variable warning for validators
   _unused(concurrency_validator_registered);
