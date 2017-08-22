@@ -169,23 +169,8 @@ set(OTHER_TESTS
   test_rand
   test_fixed_vector)
 
-# The app to compile (small_rpc_tput, large_rpc_tput, consensus, masstree_analytics)
-set(APP $ENV{autorun_app})
-
-# Add app-specific defines if needed
-if(APP STREQUAL "consensus")
-  # Raft library from willemt/raft, installed at system-level
-  set(LIBRARIES ${LIBRARIES} craft)
-elseif(APP STREQUAL "masstree_analytics")
-  # CMake-based Masstree library from anujkaliaiitd/masstree-beta
-  link_directories($ENV{HOME}/masstree-beta)
-  include_directories($ENV{HOME}/masstree-beta)
-  set(SOURCES ${SOURCES} apps/masstree_analytics/mt_index_api.cc)
-  set(LIBRARIES ${LIBRARIES} lmasstree)
-endif()
-
+# Compile the tests
 if(COMPILE_ERPC_LIB)
-  # Compile all tests and one application
   MESSAGE(STATUS "Compiling ERPC as a library")
   add_library(erpc ${SOURCES})
 
@@ -199,14 +184,30 @@ if(COMPILE_ERPC_LIB)
     add_executable(${test_name} tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
   endforeach()
+endif()
 
+# The app to compile (small_rpc_tput, large_rpc_tput, consensus, masstree_analytics)
+set(APP $ENV{autorun_app})
+
+# Add app-specific defines now, isolating them from the tests
+if(APP STREQUAL "consensus")
+  # Raft library from willemt/raft, installed at system-level
+  set(LIBRARIES ${LIBRARIES} craft)
+elseif(APP STREQUAL "masstree_analytics")
+  # CMake-based Masstree library from anujkaliaiitd/masstree-beta
+  link_directories($ENV{HOME}/masstree-beta)
+  include_directories($ENV{HOME}/masstree-beta)
+  add_definitions(-include $ENV{HOME}/masstree-beta/config.h)
+  set(SOURCES ${SOURCES} apps/masstree_analytics/mt_index_api.cc)
+  set(LIBRARIES ${LIBRARIES} masstree)
+endif()
+
+# Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO
+# for the app. LTO is hard to do with a compiled library.
+if(COMPILE_ERPC_LIB)
   add_executable(${APP} apps/${APP}/${APP}.cc)
   target_link_libraries(${APP} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 else(COMPILE_ERPC_LIB)
-  # Compile only the one application. This uses lto, which is complicated to do
-  # with a precompiled liberpc. See Evernote for details.
-  MESSAGE(STATUS "Not compiling ERPC as a library")
-
   add_executable(${APP} apps/${APP}/${APP}.cc ${SOURCES})
   target_link_libraries(${APP} ${GTEST_LIBRARIES} ${LIBRARIES})
 endif(COMPILE_ERPC_LIB)

@@ -1,7 +1,8 @@
 --test_ms 20000
---req_size 65536
---resp_size 32
---num_bg_threads 0
+--num_server_fg_threads 1
+--num_server_bg_threads 1
+--num_client_threads 1
 --num_machines 16
 --num_threads 1
 --concurrency 8
+--num_keys 1024

@@ -13,7 +13,7 @@ static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppPointReqType = 1;
-static constexpr size_t kAppPointReqType = 2;
+static constexpr size_t kAppRangeReqType = 2;
 static constexpr size_t kMaxReqWindow = 8;  // Max pending reqs per client
 
 // Globals
@@ -25,6 +25,7 @@ DEFINE_uint64(num_server_fg_threads, 0, "Number of server foreground threads");
 DEFINE_uint64(num_server_bg_threads, 0, "Number of server background threads");
 DEFINE_uint64(num_client_threads, 0, "Number of client threads");
 DEFINE_uint64(req_window, 0, "Outstanding requests per client thread");
+DEFINE_uint64(num_keys, 0, "Number of keys in the server's Masstree");
 
 static bool validate_req_window(const char *, uint64_t req_window) {
   return req_window <= kMaxReqWindow;
@@ -32,16 +33,16 @@ static bool validate_req_window(const char *, uint64_t req_window) {
 DEFINE_validator(req_window, &validate_req_window);
 
 // Return true iff this machine is the one server
-bool is_server(){ return FLAGS_machine_id == 0};
+bool is_server() { return FLAGS_machine_id == 0; };
 
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
   MtIndex *mt_index = nullptr;  // The Masstree index. Valid at server only.
 
-  uint64_t req_ts[kMaxConcurrency];  // Per-request timestamps
-  ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];
-  ERpc::MsgBuffer resp_msgbuf[kMaxConcurrency];
+  uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
+  ERpc::MsgBuffer req_msgbuf[kMaxReqWindow];
+  ERpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
 };
 
 // Allocate request and response MsgBuffers
@@ -50,10 +51,10 @@ void alloc_req_resp_msg_buffers(AppContext *c) {
   assert(c->rpc != nullptr);
 
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_req_window; msgbuf_idx++) {
-    c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
+    c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(size_t));
     ERpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
 
-    c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_req_size);
+    c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(size_t));
     ERpc::rt_assert(c->req_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
   }
 }
