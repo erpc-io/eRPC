@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(eRPC)
 
 if(NOT DEFINED ENV{autorun_app})
-  MESSAGE(FATAL_ERROR "Please set autorun_app")
+  MESSAGE(FATAL_ERROR "Please set environment variable autorun_app")
 endif()
 
 set(CMAKE_CXX_COMPILER g++-7)
@@ -19,7 +19,7 @@ add_definitions(-Wno-unused-function)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet gflags papi craft)
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet gflags papi)
 
 # Testing
 enable_testing()
@@ -169,11 +169,22 @@ set(OTHER_TESTS
   test_rand
   test_fixed_vector)
 
-# The apps to compile
-# Available apps: small_rpc_tput, large_rpc_tput, consensus
-set(APPS $ENV{autorun_app})
+# The app to compile (small_rpc_tput, large_rpc_tput, consensus, masstree_analytics)
+set(APP $ENV{autorun_app})
+
+# Add app-specific defines if needed
+if(APP STREQUAL "consensus")
+  # Raft library from willemt/raft, installed at system-level
+  set(LIBRARIES ${LIBRARIES} craft)
+elseif(APP STREQUAL "masstree_analytics")
+  # CMake-based Masstree library from anujkaliaiitd/masstree-beta
+  link_directories($ENV{HOME}/masstree-beta)
+  include_directories($ENV{HOME}/masstree-beta)
+  set(LIBRARIES ${LIBRARIES} lmasstree)
+endif()
 
 if(COMPILE_ERPC_LIB)
+  # Compile all tests and one application
   MESSAGE(STATUS "Compiling ERPC as a library")
   add_library(erpc ${SOURCES})
 
@@ -188,17 +199,13 @@ if(COMPILE_ERPC_LIB)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
   endforeach()
 
-  foreach(app_name IN LISTS APPS)
-    add_executable(${app_name} apps/${app_name}/${app_name}.cc)
-    target_link_libraries(${app_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-  endforeach()
+  add_executable(${APP} apps/${APP}/${APP}.cc)
+  target_link_libraries(${APP} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
 else(COMPILE_ERPC_LIB)
-  # Using a compiled eRPC library with CMake and LTO is difficult.
-  # See Evernote for details.
+  # Compile only the one application. This uses lto, which is complicated to do
+  # with a precompiled liberpc. See Evernote for details.
   MESSAGE(STATUS "Not compiling ERPC as a library")
 
-  foreach(app_name IN LISTS APPS)
-    add_executable(${app_name} apps/${app_name}/${app_name}.cc ${SOURCES})
-    target_link_libraries(${app_name} ${GTEST_LIBRARIES} ${LIBRARIES})
-  endforeach()
+  add_executable(${APP} apps/${APP}/${APP}.cc ${SOURCES})
+  target_link_libraries(${APP} ${GTEST_LIBRARIES} ${LIBRARIES})
 endif(COMPILE_ERPC_LIB)
