@@ -12,9 +12,7 @@ extern "C" {
 
 #include "../apps_common.h"
 #include "cityhash/city.h"
-#include "rpc.h"
 #include "time_entry.h"
-#include "util/latency.h"
 
 // Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;
@@ -155,7 +153,7 @@ int get_raft_node_id_from_hostname(std::string hostname) {
   return static_cast<int>(hash);
 }
 
-// ERpc sessiom management handler
+// ERpc session management handler
 void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
                 ERpc::SmErrType sm_err_type, void *_context) {
   assert(_context != nullptr);
