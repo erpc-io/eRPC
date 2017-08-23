@@ -159,7 +159,6 @@ class BasicAppContext {
   TmpStat *tmp_stat = nullptr;
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
   ERpc::FastRand fastrand;
-  ERpc::Latency latency;
 
   std::vector<int> session_num_vec;
 

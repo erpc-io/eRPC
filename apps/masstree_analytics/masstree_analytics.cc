@@ -6,28 +6,6 @@ static constexpr bool kAppVerbose = false;
 
 void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
-// Send one request using this MsgBuffer
-void send_req(AppContext *c, size_t msgbuf_idx) {
-  assert(c != nullptr);
-
-  ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
-  assert(req_msgbuf.get_data_size() == sizeof(size_t));
-
-  if (kAppVerbose) {
-    printf("masstree_analytics: Trying to send request with msgbuf_idx %zu.\n",
-           msgbuf_idx);
-  }
-
-  // Timestamp before trying enqueue_request(). If enqueue_request() fails,
-  // we'll timestamp again on the next try.
-  c->req_ts[msgbuf_idx] = ERpc::rdtsc();
-  int ret = c->rpc->enqueue_request(0, kAppPointReqType, &req_msgbuf,
-                                    &c->resp_msgbuf[msgbuf_idx], app_cont_func,
-                                    msgbuf_idx);
-  _unused(ret);
-  assert(ret == 0);
-}
-
 void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
@@ -58,27 +36,89 @@ void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
+req_t generate_request(AppContext *c) {
+  req_t ret;
+
+  if (c->fastrand.next_u32() % 100 == 0) {
+    // Generate a range request
+    ret.req_type = ReqType::kRange;
+    ret.range_req.key = c->fastrand.next_u32() % FLAGS_num_keys;
+    ret.range_req.range = FLAGS_num_keys;  // All keys
+  } else {
+    // Generate a point request
+    ret.req_type = ReqType::kPoint;
+    ret.point_req.key = c->fastrand.next_u32() % FLAGS_num_keys;
+  }
+
+  return ret;
+}
+
+// Send one request using this MsgBuffer
+void send_req(AppContext *c, size_t msgbuf_idx) {
+  assert(c != nullptr);
+
+  ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
+  assert(req_msgbuf.get_data_size() == sizeof(req_t));
+
+  *reinterpret_cast<req_t *>(req_msgbuf.buf) = generate_request(c);
+
+  if (kAppVerbose) {
+    printf("masstree_analytics: Trying to send request with msgbuf_idx %zu.\n",
+           msgbuf_idx);
+  }
+
+  c->req_ts[msgbuf_idx] = ERpc::rdtsc();
+  int ret = c->rpc->enqueue_request(0, kAppPointReqType, &req_msgbuf,
+                                    &c->resp_msgbuf[msgbuf_idx], app_cont_func,
+                                    msgbuf_idx);
+  _unused(ret);
+  assert(ret == 0);
+}
+
 void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(resp_handle != nullptr);
   assert(_context != nullptr);
-
-  const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf != nullptr);
 
   size_t msgbuf_idx = _tag;
   if (kAppVerbose) {
     printf("large_rpc_tput: Received response for msgbuf %zu.\n", msgbuf_idx);
   }
 
-  // Measure latency. 1 us granularity is sufficient for large RPC latency.
-  // XXX: Fix.
   auto *c = static_cast<AppContext *>(_context);
   double usec = ERpc::to_usec(ERpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
   assert(usec >= 0);
-  c->latency.update(static_cast<size_t>(usec));
 
-  ERpc::rt_assert(resp_msgbuf->get_data_size() == sizeof(size_t),
+  ReqType req_type =
+      reinterpret_cast<req_t *>(c->req_msgbuf[msgbuf_idx].buf)->req_type;
+  assert(req_type == ReqType::kPoint || req_type == ReqType::kRange);
+
+  if (req_type == ReqType::kPoint) {
+    c->point_latency.update(static_cast<size_t>(usec * 10.0));  // < microsecond
+  } else {
+    c->range_latency.update(static_cast<size_t>(usec * 0.1));  // ~millisecond
+  }
+
+  if (c->num_sm_resps++ == 1000000) {
+    double point_us_median = c->point_latency.perc(.5) / 10.0;
+    double point_us_99 = c->point_latency.perc(.99) / 10.0;
+    double range_us_90 = c->range_latency.perc(.90) * 10.0;
+
+    printf(
+        "masstree_analytics: Client %zu. "
+        "Point latency (us) = {%.2f 50, %.2f 99}. "
+        "Range latency (us) = %.2f 90.\n",
+        c->thread_id, point_us_median, point_us_99, range_us_90);
+
+    c->num_sm_resps = 0;
+    c->point_latency.reset();
+    c->range_latency.reset();
+  }
+
+  const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
+  assert(resp_msgbuf != nullptr);
+
+  ERpc::rt_assert(resp_msgbuf->get_data_size() == sizeof(resp_t),
                   "Invalid response size");
 
   send_req(c, msgbuf_idx);

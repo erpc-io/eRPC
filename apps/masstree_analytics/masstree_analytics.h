@@ -35,14 +35,42 @@ DEFINE_validator(req_window, &validate_req_window);
 // Return true iff this machine is the one server
 bool is_server() { return FLAGS_machine_id == 0; };
 
+enum class ReqType : size_t { kPoint, kRange };
+struct req_t {
+  ReqType req_type;
+  union {
+    struct {
+      size_t key;
+    } point_req;
+
+    struct {
+      size_t key;
+      size_t range;  // The max number of keys after key to sum up
+    } range_req;
+  }
+};
+
+enum class RespType : size_t { kFound, kNotFound };
+struct resp_t {
+  RespType resp_type;
+  union {
+    size_t value;      // The value for point GETs
+    size_t range_sum;  // The range sum for range queries
+  }
+};
+
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
   MtIndex *mt_index = nullptr;  // The Masstree index. Valid at server only.
+  ERpc::Latency point_latency;  // Latency of point requests (factor = 10)
+  ERpc::Latency range_latency;  // Latency of point requests (factor = .1)
 
   uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
   ERpc::MsgBuffer req_msgbuf[kMaxReqWindow];
   ERpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
+
+  size_t num_resps_tot = 0;  // Total responses received (range & point)
 };
 
 // Allocate request and response MsgBuffers
@@ -51,11 +79,11 @@ void alloc_req_resp_msg_buffers(AppContext *c) {
   assert(c->rpc != nullptr);
 
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_req_window; msgbuf_idx++) {
-    c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(size_t));
-    ERpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
-
-    c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(size_t));
+    c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(req_t));
     ERpc::rt_assert(c->req_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
+
+    c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(resp_t));
+    ERpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
   }
 }
 
