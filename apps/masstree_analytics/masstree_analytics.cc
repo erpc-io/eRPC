@@ -29,7 +29,7 @@ void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   auto *req = reinterpret_cast<const req_t *>(req_msgbuf->buf);
   assert(req->req_type == kAppPointReqType);
 
-  size_t value;
+  size_t value = 0;
   bool success = mti->get(req->point_req.key, value, ti);
 
   req_handle->prealloc_used = true;
