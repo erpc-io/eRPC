@@ -2,51 +2,96 @@
 #include <signal.h>
 #include <cstring>
 
-static constexpr bool kAppVerbose = false;
-
 void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
 void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
+  assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
 
-  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  _unused(req_msgbuf);
+  // Point request handler runs in a foreground thread
+  size_t etid = c->rpc->get_etid();
+  assert(etid >= FLAGS_num_server_bg_threads &&
+         etid < FLAGS_num_server_bg_threads + FLAGS_num_server_fg_threads);
+
+  if (kAppVerbose) {
+    printf(
+        "masstree_analytics: Running point_req_handler() in eRPC thread %zu.\n",
+        etid);
+  }
+
+  MtIndex *mti = c->server.mt_index;
+  threadinfo_t *ti = c->server.ti_arr[etid];
+  assert(mti != nullptr && ti != nullptr);
+
+  const auto *req_msgbuf = req_handle->get_req_msgbuf();
+  assert(req_msgbuf->get_data_size() == sizeof(req_t));
+
+  auto *req = reinterpret_cast<const req_t *>(req_msgbuf->buf);
+  assert(req->req_type == kAppPointReqType);
+
+  size_t value;
+  bool success = mti->get(req->point_req.key, value, ti);
 
   req_handle->prealloc_used = true;
   ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                  sizeof(size_t));
+                                                  sizeof(resp_t));
+  auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
+
+  resp->resp_type = success ? RespType::kFound : RespType::kNotFound;
+  resp->value = value;  // Garbage is OK in case of kNotFound
+
   c->rpc->enqueue_response(req_handle);
 }
 
 void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
+  assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
 
-  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  _unused(req_msgbuf);
+  // Range request handler runs in a background thread
+  size_t etid = c->rpc->get_etid();
+  assert(etid < FLAGS_num_server_bg_threads);
+
+  if (kAppVerbose) {
+    printf(
+        "masstree_analytics: Running range_req_handler() in eRPC thread %zu.\n",
+        etid);
+  }
+
+  MtIndex *mti = c->server.mt_index;
+  threadinfo_t *ti = c->server.ti_arr[etid];
+  assert(mti != nullptr && ti != nullptr);
+
+  const auto *req_msgbuf = req_handle->get_req_msgbuf();
+  assert(req_msgbuf->get_data_size() == sizeof(req_t));
+
+  auto *req = reinterpret_cast<const req_t *>(req_msgbuf->buf);
+  assert(req->req_type == kAppRangeReqType);
+
+  size_t count =
+      mti->count_in_range(req->range_req.key, req->range_req.range, ti);
 
   req_handle->prealloc_used = true;
   ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                  sizeof(size_t));
+                                                  sizeof(resp_t));
+  auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
+  resp->resp_type = RespType::kFound;
+  resp->range_count = count;
+
   c->rpc->enqueue_response(req_handle);
 }
 
+// Helper function for clients
 req_t generate_request(AppContext *c) {
   req_t ret;
 
   if (c->fastrand.next_u32() % 100 == 0) {
     // Generate a range request
-    ret.req_type = ReqType::kRange;
+    ret.req_type = kAppRangeReqType;
     ret.range_req.key = c->fastrand.next_u32() % FLAGS_num_keys;
     ret.range_req.range = FLAGS_num_keys;  // All keys
   } else {
     // Generate a point request
-    ret.req_type = ReqType::kPoint;
+    ret.req_type = kAppPointReqType;
     ret.point_req.key = c->fastrand.next_u32() % FLAGS_num_keys;
   }
 
@@ -57,52 +102,61 @@ req_t generate_request(AppContext *c) {
 void send_req(AppContext *c, size_t msgbuf_idx) {
   assert(c != nullptr);
 
-  ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
+  ERpc::MsgBuffer &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
   assert(req_msgbuf.get_data_size() == sizeof(req_t));
 
-  *reinterpret_cast<req_t *>(req_msgbuf.buf) = generate_request(c);
+  const req_t req = generate_request(c);
+  *reinterpret_cast<req_t *>(req_msgbuf.buf) = req;
 
   if (kAppVerbose) {
     printf("masstree_analytics: Trying to send request with msgbuf_idx %zu.\n",
            msgbuf_idx);
   }
 
-  c->req_ts[msgbuf_idx] = ERpc::rdtsc();
-  int ret = c->rpc->enqueue_request(0, kAppPointReqType, &req_msgbuf,
-                                    &c->resp_msgbuf[msgbuf_idx], app_cont_func,
-                                    msgbuf_idx);
+  c->client.req_ts[msgbuf_idx] = ERpc::rdtsc();
+  int ret = c->rpc->enqueue_request(0, req.req_type, &req_msgbuf,
+                                    &c->client.resp_msgbuf[msgbuf_idx],
+                                    app_cont_func, msgbuf_idx);
   _unused(ret);
   assert(ret == 0);
 }
 
 void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
-  assert(resp_handle != nullptr);
-  assert(_context != nullptr);
+  assert(resp_handle != nullptr && _context != nullptr);
 
   size_t msgbuf_idx = _tag;
   if (kAppVerbose) {
-    printf("large_rpc_tput: Received response for msgbuf %zu.\n", msgbuf_idx);
+    printf("masstree_analytics: Received response for msgbuf %zu.\n",
+           msgbuf_idx);
   }
 
   auto *c = static_cast<AppContext *>(_context);
-  double usec = ERpc::to_usec(ERpc::rdtsc() - c->req_ts[msgbuf_idx],
+
+  const auto *resp_msgbuf = resp_handle->get_resp_msgbuf();
+  ERpc::rt_assert(resp_msgbuf->get_data_size() == sizeof(resp_t),
+                  "Invalid response size");
+  c->rpc->release_response(resp_handle);
+
+  assert(resp_msgbuf->get_data_size() > 0);  // Check that the Rpc succeeded
+
+  double usec = ERpc::to_usec(ERpc::rdtsc() - c->client.req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
   assert(usec >= 0);
 
-  ReqType req_type =
-      reinterpret_cast<req_t *>(c->req_msgbuf[msgbuf_idx].buf)->req_type;
-  assert(req_type == ReqType::kPoint || req_type == ReqType::kRange);
+  req_t *req = reinterpret_cast<req_t *>(c->client.req_msgbuf[msgbuf_idx].buf);
+  assert(req->req_type == kAppPointReqType ||
+         req->req_type == kAppRangeReqType);
 
-  if (req_type == ReqType::kPoint) {
-    c->point_latency.update(static_cast<size_t>(usec * 10.0));  // < microsecond
+  if (req->req_type == kAppPointReqType) {
+    c->client.point_latency.update(static_cast<size_t>(usec * 10.0));  // < 1us
   } else {
-    c->range_latency.update(static_cast<size_t>(usec * 0.1));  // ~millisecond
+    c->client.range_latency.update(static_cast<size_t>(usec * 0.1));  // ~ms
   }
 
   if (c->num_sm_resps++ == 1000000) {
-    double point_us_median = c->point_latency.perc(.5) / 10.0;
-    double point_us_99 = c->point_latency.perc(.99) / 10.0;
-    double range_us_90 = c->range_latency.perc(.90) * 10.0;
+    double point_us_median = c->client.point_latency.perc(.5) / 10.0;
+    double point_us_99 = c->client.point_latency.perc(.99) / 10.0;
+    double range_us_90 = c->client.range_latency.perc(.90) * 10.0;
 
     printf(
         "masstree_analytics: Client %zu. "
@@ -111,15 +165,9 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         c->thread_id, point_us_median, point_us_99, range_us_90);
 
     c->num_sm_resps = 0;
-    c->point_latency.reset();
-    c->range_latency.reset();
+    c->client.point_latency.reset();
+    c->client.range_latency.reset();
   }
-
-  const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf != nullptr);
-
-  ERpc::rt_assert(resp_msgbuf->get_data_size() == sizeof(resp_t),
-                  "Invalid response size");
 
   send_req(c, msgbuf_idx);
 }
@@ -144,29 +192,36 @@ void client_thread_func(size_t thread_id,
   c.session_num_vec.resize(1);
   c.session_num_vec[0] =
       rpc.create_session(server_hostname, server_thread_id, kAppPhyPort);
-  assert(c.session_num_vec[0] > 0);
+  assert(c.session_num_vec[0] >= 0);
 
   while (c.num_sm_resps != 1) {
     rpc.run_event_loop(200);  // 200 milliseconds
     if (ctrl_c_pressed == 1) return;
   }
   assert(c.rpc->is_connected(c.session_num_vec[0]));
-  fprintf(stderr, "Thread %zu: Sessions connected.\n", thread_id);
+  fprintf(stderr,
+          "masstree_analytics: Thread %zu: Connected. Sending requests.\n",
+          thread_id);
 
   alloc_req_resp_msg_buffers(&c);
   for (size_t i = 0; i < FLAGS_req_window; i++) send_req(&c, i);
+
+  while (ctrl_c_pressed == 0) c.rpc->run_event_loop(200);
 }
 
 void server_thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
-                        MtIndex *, threadinfo_t **) {
+                        MtIndex *mti, threadinfo_t **ti_arr) {
   assert(FLAGS_machine_id == 0);
 
   AppContext c;
   c.thread_id = thread_id;
+  c.server.mt_index = mti;
+  c.server.ti_arr = ti_arr;
 
   ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id),
                                    basic_sm_handler, kAppPhyPort, kAppNumaNode);
+  c.rpc = &rpc;
   while (ctrl_c_pressed == 0) rpc.run_event_loop(200);
 }
 

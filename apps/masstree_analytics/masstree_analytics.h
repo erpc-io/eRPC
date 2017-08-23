@@ -1,5 +1,5 @@
-#ifndef LARGE_RPC_TPUT_H
-#define LARGE_RPC_TPUT_H
+#ifndef MASSTREE_ANALYTICS_H
+#define MASSTREE_ANALYTICS_H
 
 #include <gflags/gflags.h>
 #include <signal.h>
@@ -9,6 +9,7 @@
 #include "util/latency.h"
 #include "util/misc.h"
 
+static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
@@ -35,9 +36,8 @@ DEFINE_validator(req_window, &validate_req_window);
 // Return true iff this machine is the one server
 bool is_server() { return FLAGS_machine_id == 0; };
 
-enum class ReqType : size_t { kPoint, kRange };
 struct req_t {
-  ReqType req_type;
+  size_t req_type;
   union {
     struct {
       size_t key;
@@ -47,30 +47,36 @@ struct req_t {
       size_t key;
       size_t range;  // The max number of keys after key to sum up
     } range_req;
-  }
+  };
 };
 
 enum class RespType : size_t { kFound, kNotFound };
 struct resp_t {
   RespType resp_type;
   union {
-    size_t value;      // The value for point GETs
-    size_t range_sum;  // The range sum for range queries
-  }
+    size_t value;        // The value for point GETs
+    size_t range_count;  // The range sum for range queries
+  };
 };
 
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
-  MtIndex *mt_index = nullptr;  // The Masstree index. Valid at server only.
-  ERpc::Latency point_latency;  // Latency of point requests (factor = 10)
-  ERpc::Latency range_latency;  // Latency of point requests (factor = .1)
+  struct {
+    MtIndex *mt_index = nullptr;      // The shared Masstree index
+    threadinfo_t **ti_arr = nullptr;  // Thread info array, indexed by ERpc TID
+  } server;
 
-  uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
-  ERpc::MsgBuffer req_msgbuf[kMaxReqWindow];
-  ERpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
+  struct {
+    ERpc::Latency point_latency;  // Latency of point requests (factor = 10)
+    ERpc::Latency range_latency;  // Latency of point requests (factor = .1)
 
-  size_t num_resps_tot = 0;  // Total responses received (range & point)
+    uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
+    ERpc::MsgBuffer req_msgbuf[kMaxReqWindow];
+    ERpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
+
+    size_t num_resps_tot = 0;  // Total responses received (range & point)
+  } client;
 };
 
 // Allocate request and response MsgBuffers
@@ -79,12 +85,14 @@ void alloc_req_resp_msg_buffers(AppContext *c) {
   assert(c->rpc != nullptr);
 
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_req_window; msgbuf_idx++) {
-    c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(req_t));
-    ERpc::rt_assert(c->req_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
+    auto &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
+    req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(req_t));
+    ERpc::rt_assert(req_msgbuf.buf != nullptr, "Request msgbuf alloc failed");
 
-    c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(sizeof(resp_t));
-    ERpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
+    auto &resp_msgbuf = c->client.resp_msgbuf[msgbuf_idx];
+    resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(resp_t));
+    ERpc::rt_assert(resp_msgbuf.buf != nullptr, "Response msgbuf alloc failed");
   }
 }
 
-#endif
+#endif  // MASSTREE_ANALYTICS_H

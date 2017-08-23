@@ -2,7 +2,5 @@
 --num_server_fg_threads 1
 --num_server_bg_threads 1
 --num_client_threads 1
---num_machines 2
---num_threads 1
---concurrency 8
+--req_window 1
 --num_keys 1024
