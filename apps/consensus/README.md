@@ -11,6 +11,22 @@
       * Use multiple eRPC requests to transmit one appendentries request.
       * Increase eRPC's maximum message size. This requires straightforward
         changes to packet header bits and the hugepage allocator.
+
+## Notes to run
+ * Wait for the leader (machine 0) to get elected before starting the client.
+   Not doing so can cause some weird issues like segfaults. Leader change seems
+   to work, but that's not terribly important to our evaluation.
+
+## Optimization notes
+ * The replicated counter works best with the following options:
+   * All machines are under the same switch
+   * Raft commit `9623f2f` from `anujkaliaiid/raft`
+   * ERpc datapath checks are disabled
+   * ERpc session request window is set to 1
+   * IB/RoCE transport inline size is set to 120. This disallows the use of the
+     modded driver that supports only 60-byte inline size.
+
+## Code/design notes
  * In the common case:
    * The client sends a request containing its global ID to the leader
    * The leader processes one client request at a time. It sends `AppendEntries`
@@ -48,15 +64,3 @@
      the leader. If a Raft server does not know the leader, it directs the
      the client to try again.
 
-## Notes to run
- * Wait for the leader (machine 0) to get elected before starting the client.
-   Not doing so can cause some weird issues like segfaults. Leader change seems
-   to work, but that's not terribly important to our evaluation.
-
-## Optimization notes
- * The replicated counter works best with the following options:
-   * Raft commit `9623f2f` from `anujkaliaiid/raft`
-   * ERpc datapath checks are disabled
-   * ERpc session request window is set to 1
-   * IB/RoCE transport inline size is set to 120. This disallows the use of the
-     modded driver that supports only 60-byte inline size.
