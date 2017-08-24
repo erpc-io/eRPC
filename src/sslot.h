@@ -88,10 +88,9 @@ class SSlot {
       /// handler returns, so it can be buried from a background thread.
       MsgBuffer req_msgbuf;
 
-      // Request metadata saved by the server before calling the reques handler.
-      // These fields are needed in enqueue_response(), and the request
-      // MsgBuffer which can be used to infer these fields, may not be valid at
-      // that point.
+      // Request metadata saved by the server before calling the request
+      // handler. These fields are needed in enqueue_response(), and the request
+      // MsgBuffer, which contains these fields, may not be valid at that point.
 
       /// The request type. This is set to a valid value only while we are
       /// waiting for an enqueue_response(), from a foreground or a background
