@@ -10,15 +10,16 @@ namespace ERpc {
 template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
-  SSlot *sslot = static_cast<SSlot *>(req_handle);
 
   // When called from a background thread, enqueue to the foreground thread
   if (small_rpc_unlikely(!in_creator())) {
-    assert(sslot->server_info.req_func_type == ReqFuncType::kBackground);
     bg_queues.enqueue_response.unlocked_push_back(req_handle);
     return;
   }
   assert(in_creator());
+
+  SSlot *sslot = static_cast<SSlot *>(req_handle);
+  bury_req_msgbuf_server(sslot);  // Bury the possibly-dynamic request MsgBuffer
 
   Session *session = sslot->session;
   assert(session != nullptr && session->is_server());

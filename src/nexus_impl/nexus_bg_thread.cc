@@ -46,7 +46,6 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx ctx) {
         assert(req_func.is_registered());  // Checked during submit_bg
 
         req_func.req_func(static_cast<ReqHandle *>(wi.sslot), wi.context);
-        wi.rpc->bury_req_msgbuf_server(wi.sslot);  // Bury dynamic req msgbuf
       } else {
         wi.sslot->client_info.cont_func(static_cast<RespHandle *>(wi.sslot),
                                         wi.context, wi.sslot->client_info.tag);

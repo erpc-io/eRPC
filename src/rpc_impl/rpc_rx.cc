@@ -126,10 +126,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
     }
   }
 
-  // If we're here, this is the first (and only) packet of the next request
+  // If we're here, this is the first (and only) packet of this new request
   assert(pkthdr->req_num == sslot->cur_req_num + Session::kSessionReqWindow);
 
-  // The previous request MsgBuffer was buried when its handler returned
+  // The previous request MsgBuffer was buried when its response was enqueued
   auto &req_msgbuf = sslot->server_info.req_msgbuf;
   assert(req_msgbuf.is_buried());
 
@@ -156,7 +156,6 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
     // suffices -- it's valid for the duration of req_func().
     req_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
-    req_msgbuf.buf = nullptr;  // Equivalent to bury()
     return;
   } else {
     // For background request handlers, we need a RX ring--independent copy of
@@ -362,8 +361,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
       return;
     }
 
-    // rx_msgbuf could be buried if we've received the entire request and
-    // processed it, so directly compute the number of packets in the request
+    // req_msgbuf could be buried if we've received the entire request and
+    // queued the response, so directly compute the number of packets in request
     size_t num_pkts_in_req = TTr::data_size_to_num_pkts(pkthdr->msg_size);
     if (sslot->server_info.req_rcvd != num_pkts_in_req) {
       assert(req_msgbuf.is_dynamic_and_matches(pkthdr));
@@ -403,7 +402,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   // Allocate or locate the request MsgBuffer
   if (pkthdr->pkt_num == 0) {
     // This is the first packet received for this request
-    assert(req_msgbuf.is_buried());  // Buried earlier when req handler returned
+    assert(req_msgbuf.is_buried());  // Buried on prev req's enqueue_response()
 
     // Update sslot tracking
     sslot->cur_req_num = pkthdr->req_num;
@@ -445,10 +444,9 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->server_info.req_type = pkthdr->req_type;
   sslot->server_info.req_func_type = req_func.req_func_type;
 
-  // rx_msgbuf here is independent of the RX ring, so we never need a copy
+  // req_msgbuf here is independent of the RX ring, so don't make another copy
   if (!req_func.is_background()) {
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
-    bury_req_msgbuf_server(sslot);
   } else {
     submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kReq);
   }
