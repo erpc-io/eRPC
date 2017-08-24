@@ -111,18 +111,17 @@ class Rpc {
   /// zero size. This does not modify the MsgBuffer's packet headers.
   static inline void resize_msg_buffer(MsgBuffer *msg_buffer,
                                        size_t new_data_size) {
-    assert(msg_buffer != nullptr);
-    assert(msg_buffer->buf != nullptr && msg_buffer->check_magic());
+    assert(msg_buffer->is_valid());  // Can be fake
     assert(new_data_size <= msg_buffer->max_data_size);
 
-    // This function avoids division for small data sizes
+    // Avoid division for single-packet data sizes
     size_t new_num_pkts = TTr::data_size_to_num_pkts(new_data_size);
     msg_buffer->resize(new_data_size, new_num_pkts);
   }
 
   /// Free a MsgBuffer created by \p alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
-    assert(msg_buffer.is_dynamic() && msg_buffer.check_magic());
+    assert(msg_buffer.is_valid_dynamic());
 
     lock_cond(&huge_alloc_lock);
     huge_alloc->free_buf(msg_buffer.buffer);
@@ -160,9 +159,7 @@ class Rpc {
     // Free the response MsgBuffer iff it is not preallocated
     if (small_rpc_unlikely(!sslot->prealloc_used)) {
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
-      assert(tx_msgbuf != nullptr && tx_msgbuf->buf != nullptr);
-      assert(tx_msgbuf->is_dynamic() && tx_msgbuf->check_magic());
-
+      assert(tx_msgbuf->is_valid_dynamic());
       free_msg_buffer(*tx_msgbuf);
       // Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf
     }
@@ -183,7 +180,7 @@ class Rpc {
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
     if (small_rpc_unlikely(req_msgbuf.is_dynamic())) {
       // This check is OK, as dynamic MsgBuffers must be initialized
-      assert(req_msgbuf.buf != nullptr && req_msgbuf.check_magic());
+      assert(req_msgbuf.is_valid_dynamic());
       free_msg_buffer(req_msgbuf);
       req_msgbuf.buffer.buf = nullptr;  // Mark invalid for future
     }

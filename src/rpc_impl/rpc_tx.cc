@@ -9,14 +9,10 @@ void Rpc<TTr>::process_req_txq_st() {
 
   for (size_t i = 0; i < req_txq.size(); i++) {
     SSlot *sslot = req_txq[i];
-    assert(sslot != nullptr);
-    assert(sslot->session->is_client());
-    assert(sslot->session->is_connected());
+    assert(sslot->session->is_client() && sslot->session->is_connected());
 
     MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
-    assert(req_msgbuf != nullptr);
-    assert(req_msgbuf->buf != nullptr && req_msgbuf->check_magic());
-    assert(req_msgbuf->is_req());
+    assert(req_msgbuf->is_valid_dynamic() && req_msgbuf->is_req());
     assert(sslot->client_info.req_sent < req_msgbuf->num_pkts);
 
     if (small_rpc_likely(req_msgbuf->num_pkts == 1)) {

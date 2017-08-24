@@ -15,8 +15,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(item.msg_buffer != nullptr);
 
     const MsgBuffer* msg_buffer = item.msg_buffer;
-    assert(msg_buffer != nullptr);
-    assert(msg_buffer->buf != nullptr && msg_buffer->check_magic());
+    assert(msg_buffer->is_valid());  // Can be fake for control packets
 
     assert(item.data_bytes <= kMaxDataPerPkt);
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);

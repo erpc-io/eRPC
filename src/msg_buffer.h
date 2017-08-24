@@ -57,14 +57,17 @@ class MsgBuffer {
   }
   ///@}
 
-  /// Check if a MsgBuffer's magic is valid
-  inline bool check_magic() const {
-    if (likely(get_pkthdr_0()->magic == kPktHdrMagic)) return true;
-    return false;
+  /// Basic validity check that every MsgBuffer must satisfy
+  inline bool is_valid() const {
+    return buf != nullptr && get_pkthdr_0()->magic == kPktHdrMagic;
   }
 
-  /// Check if this MsgBuffer uses dynamic memory allocation
+  /// Return true iff this MsgBuffer uses a dynamically-allocated MsgBuffer.
+  /// This function does not sanity-check other fields.
   inline bool is_dynamic() const { return buffer.buf != nullptr; }
+
+  /// Check if this MsgBuffer is a valid dynamic MsgBuffer
+  inline bool is_valid_dynamic() const { return is_valid() && is_dynamic(); }
 
   /// Check if the \p req_type and \req num fields of this MsgBuffer match
   /// \p pkthdr
@@ -77,16 +80,13 @@ class MsgBuffer {
   /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
   /// fields match those in \p pkthdr
   bool is_dynamic_and_matches(const pkthdr_t *pkthdr) const {
-    assert(pkthdr != nullptr);
-    return is_dynamic() && check_magic() && matches(pkthdr);
+    return is_valid_dynamic() && matches(pkthdr);
   }
 
   /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
   /// fields match those in \p other
   bool is_dynamic_and_matches(const MsgBuffer *other) const {
-    assert(other != nullptr);
-    return is_dynamic() && check_magic() &&
-           (get_req_type() == other->get_req_type()) &&
+    return is_valid_dynamic() && (get_req_type() == other->get_req_type()) &&
            (get_req_num() == other->get_req_num());
   }
 

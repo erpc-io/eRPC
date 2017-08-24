@@ -6,11 +6,10 @@ template <class TTr>
 void Rpc<TTr>::send_req_for_resp_now_st(const SSlot *sslot,
                                         const pkthdr_t *resp_pkthdr) {
   assert(in_creator());
-  assert(sslot != nullptr && sslot->is_client);
-  assert(sslot->client_info.resp_msgbuf->is_dynamic() &&
+  assert(sslot->is_client);
+  assert(sslot->client_info.resp_msgbuf->is_valid_dynamic() &&
          sslot->client_info.resp_msgbuf->is_resp());
-  assert(resp_pkthdr != nullptr && resp_pkthdr->check_magic());
-  assert(resp_pkthdr->is_resp());
+  assert(resp_pkthdr->check_magic() && resp_pkthdr->is_resp());
 
   // Fill in the RFR packet header. Commented fields are copied from pkthdr.
   pkthdr_t rfr_pkthdr = *resp_pkthdr;

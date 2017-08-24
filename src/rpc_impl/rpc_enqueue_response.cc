@@ -45,10 +45,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   } else {
     resp_msgbuf = &sslot->dyn_resp_msgbuf;
   }
-
-  // Sanity-check resp_msgbuf
-  assert(resp_msgbuf->buf != nullptr && resp_msgbuf->check_magic());
-  assert(resp_msgbuf->data_size > 0);
+  assert(resp_msgbuf->is_valid_dynamic() && resp_msgbuf->data_size > 0);
 
   // Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
@@ -58,7 +55,6 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   resp_pkthdr_0->pkt_type = kPktTypeResp;
   resp_pkthdr_0->pkt_num = 0;
   resp_pkthdr_0->req_num = sslot->cur_req_num;
-  assert(resp_pkthdr_0->check_magic());
 
   // Fill in non-zeroth packet headers, if any
   if (small_rpc_unlikely(resp_msgbuf->num_pkts > 1)) {

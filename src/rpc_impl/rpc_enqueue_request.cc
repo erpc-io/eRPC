@@ -13,13 +13,11 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                               size_t cont_etid) {
   // Since this can be called from a background thread, only do basic checks
   // that don't require accessing the session.
-  assert(req_msgbuf != nullptr && req_msgbuf->buf != nullptr &&
-         req_msgbuf->check_magic() && req_msgbuf->is_dynamic());
+  assert(req_msgbuf->is_valid_dynamic());
   assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
   assert(req_msgbuf->num_pkts > 0);
 
-  assert(resp_msgbuf != nullptr && resp_msgbuf->buf != nullptr &&
-         resp_msgbuf->check_magic() && resp_msgbuf->is_dynamic());
+  assert(resp_msgbuf->is_valid_dynamic());
 
   // The current size of resp_msgbuf can be 0
   assert(resp_msgbuf->max_data_size > 0 &&
@@ -92,7 +90,6 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = sslot.cur_req_num;
-  assert(pkthdr_0->check_magic());
 
   // Fill in non-zeroth packet headers, if any
   if (small_rpc_unlikely(req_msgbuf->num_pkts > 1)) {

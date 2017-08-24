@@ -204,12 +204,9 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   }
 
   // If we're here, this is the first (and only) packet of the response
-  assert(sslot->tx_msgbuf != nullptr &&  // Check the request MsgBuffer
-         sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
+  assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
 
-  // Check that the app's response MsgBuffer has sufficient space, and resize it
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-  assert(resp_msgbuf != nullptr);
   assert(resp_msgbuf->max_data_size >= pkthdr->msg_size);
   resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
 
@@ -498,18 +495,16 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
 
   bump_credits(sslot->session);
 
-  // Allocate or locate the response MsgBuffer
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
   if (pkthdr->pkt_num == 0) {
-    // This is the first packet received for this response. Resize the
-    // client-owned response MsgBuffer. eRPC owns this MsgBuffer until the
-    // continuation is invoked.
+    // This is the first response packet, so resize the response MsgBuffer
+    assert(resp_msgbuf->max_data_size >= pkthdr->msg_size);
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
     *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;  // Copy packet header
 
     sslot->client_info.resp_rcvd = 1;
   } else {
-    // This is not the first packet for this request
+    // We've already resized the response MsgBuffer
     assert(resp_msgbuf->is_dynamic_and_matches(pkthdr));
     assert(sslot->client_info.resp_rcvd >= 1);
 
@@ -586,9 +581,7 @@ void Rpc<TTr>::debug_check_bg_rx_msgbuf(
   MsgBuffer *rx_msgbuf = sslot->is_client ? sslot->client_info.resp_msgbuf
                                           : &sslot->server_info.req_msgbuf;
   _unused(rx_msgbuf);
-
-  assert(rx_msgbuf->buf != nullptr && rx_msgbuf->check_magic());
-  assert(rx_msgbuf->is_dynamic());
+  assert(rx_msgbuf->is_valid_dynamic());
 
   if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
     assert(rx_msgbuf->is_req());
