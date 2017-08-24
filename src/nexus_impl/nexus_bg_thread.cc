@@ -28,30 +28,26 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx ctx) {
     assert(ctx.bg_req_list->size > 0);
 
     for (BgWorkItem wi : ctx.bg_req_list->list) {
-      assert(wi.context != nullptr && wi.sslot != nullptr);
-
-      // Sanity-check RX and TX MsgBuffers
-      Rpc<TTr>::debug_check_bg_rx_msgbuf(wi.sslot, wi.wi_type);
-      assert(wi.sslot->tx_msgbuf == nullptr);
-
+      SSlot *s = wi.sslot;
       LOG_TRACE(
           "eRPC Background: Background thread %zu running %s for Rpc %u."
           "Request number = %zu.\n",
           ctx.bg_thread_index, wi.is_req() ? "request handler" : "continuation",
-          wi.rpc->get_rpc_id(), wi.sslot->server_info.req_msgbuf.get_req_num());
+          wi.rpc->get_rpc_id(), s->cur_req_num);
 
       if (wi.is_req()) {
-        uint8_t req_type = wi.sslot->server_info.req_msgbuf.get_req_type();
+        assert(!s->is_client && s->server_info.req_msgbuf.is_valid_dynamic());
+
+        uint8_t req_type = s->server_info.req_msgbuf.get_req_type();
         const ReqFunc &req_func = ctx.req_func_arr->at(req_type);
         assert(req_func.is_registered());  // Checked during submit_bg
 
-        req_func.req_func(static_cast<ReqHandle *>(wi.sslot), wi.context);
+        req_func.req_func(static_cast<ReqHandle *>(s), wi.context);
       } else {
-        wi.sslot->client_info.cont_func(static_cast<RespHandle *>(wi.sslot),
-                                        wi.context, wi.sslot->client_info.tag);
+        assert(s->is_client && s->client_info.resp_msgbuf->is_valid_dynamic());
 
-        // The continuation's release_response() will be handled by the
-        // foreground thread later, so we can't check that it was called here.
+        wi.sslot->client_info.cont_func(static_cast<RespHandle *>(s),
+                                        wi.context, s->client_info.tag);
       }
     }
 

@@ -552,12 +552,8 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot,
                                     typename Nexus<TTr>::BgWorkItemType wi_type,
                                     size_t bg_etid) {
   assert(in_creator());
-  assert(sslot != nullptr);
   assert(bg_etid < nexus->num_bg_threads || bg_etid == kInvalidBgETid);
   assert(nexus->num_bg_threads > 0);
-
-  // Sanity-check RX and TX MsgBuffers
-  debug_check_bg_rx_msgbuf(sslot, wi_type);
   assert(sslot->tx_msgbuf == nullptr);
 
   if (bg_etid == kInvalidBgETid) {
@@ -569,25 +565,4 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot,
   req_list->unlocked_push_back(
       typename Nexus<TTr>::BgWorkItem(wi_type, this, context, sslot));
 }
-
-// This is a debug function that gets optimized out
-template <class TTr>
-void Rpc<TTr>::debug_check_bg_rx_msgbuf(
-    SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type) {
-  assert(sslot != nullptr);
-  _unused(sslot);
-  _unused(wi_type);
-
-  MsgBuffer *rx_msgbuf = sslot->is_client ? sslot->client_info.resp_msgbuf
-                                          : &sslot->server_info.req_msgbuf;
-  _unused(rx_msgbuf);
-  assert(rx_msgbuf->is_valid_dynamic());
-
-  if (wi_type == Nexus<TTr>::BgWorkItemType::kReq) {
-    assert(rx_msgbuf->is_req());
-  } else {
-    assert(rx_msgbuf->is_resp());
-  }
-}
-
 }  // End ERpc
