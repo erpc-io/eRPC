@@ -37,10 +37,18 @@
    to the application.
  * The two interesting cases first:
    * Request MsgBuffer ownership at server: The request handler loses ownership
-     of the request MsgBuffer when it returns, at which point eRPC frees it.
-     This is true for both foreground and background request handlers. Note that
-     request handle ownership is released on `enqueue_response()`, which may
-     happen after the request handler returns.
+     of the request MsgBuffer when it returns, or when it calls
+     `enqueue_response()`, whichever is first.
+      * When `enqueue_response()` is called, we allow the client to send us
+        a new request. So we cannot wait until the request handler returns to
+        bury the request MsgBuffer. If we do so, we can bury a newer request's
+        MsgBuffer when a background request handler returns.
+      * The app loses ownership of the request MsgBuffer when the request
+        handler returns, even though eRPC may delay burying it until
+        `enqueue_response()` is called. This constraint is required because we
+        execute foreground handlers for short requests off the RX ring.
+      * Request handle ownership is released on `enqueue_response()`, which may
+        happen after the request handler returns.
    * Response MsgBuffer ownership at client: The response MsgBuffer is owned by
      the user.
  * The two less interesting cases:
@@ -52,13 +60,12 @@
      of the response MsgBuffer when it calls `enqueue_response()`. eRPC will
      free it when the response is no longer needed for retransmission.
  * Burying invariants:
-   * MsgBuffers are buried at the first code point where they *can* be buried.
-     This is inconvenient at times, but it does more good than harm.
    * At clients, the request MsgBuffer is buried (nullified, since the request
      MsgBuffer is app-owned) on receiving the complete response, and before
      invoking the continuation. So, a null value of `sslot->tx_msgbuf` indicates
      that the sslot is not waiting for a response. Similarly, a non-null value
      of `sslot->tx_msgbuf` indicates that the sslot is waiting for a response.
+     This is used to invoke failure continuations during session resets.
 
 ## RPC failures
  * On session reset, the client may get continuation-with-failure callbacks.

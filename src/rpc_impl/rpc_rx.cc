@@ -129,9 +129,8 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   // If we're here, this is the first (and only) packet of this new request
   assert(pkthdr->req_num == sslot->cur_req_num + Session::kSessionReqWindow);
 
-  // The previous request MsgBuffer was buried when its response was enqueued
   auto &req_msgbuf = sslot->server_info.req_msgbuf;
-  assert(req_msgbuf.is_buried());
+  assert(req_msgbuf.is_buried());  // Buried on prev req's enqueue_response()
 
   // Update sslot tracking
   sslot->cur_req_num = pkthdr->req_num;
