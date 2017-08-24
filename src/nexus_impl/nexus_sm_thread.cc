@@ -5,9 +5,7 @@ namespace ERpc {
 /// Amount of time to block for ENet evs
 static constexpr size_t kSmThreadEventLoopMs = 20;
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_on_enet_connect_server(SmThreadCtx &,
-                                                  ENetEvent &ev) {
+void Nexus::sm_thread_on_enet_connect_server(SmThreadCtx &, ENetEvent &ev) {
   ENetPeer *epeer = ev.peer;
   assert(epeer->data == nullptr);
 
@@ -17,9 +15,7 @@ void Nexus<TTr>::sm_thread_on_enet_connect_server(SmThreadCtx &,
   epeer->data = new SmENetPeerData(SmENetPeerMode::kServer);
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_on_enet_connect_client(SmThreadCtx &ctx,
-                                                  ENetEvent &ev) {
+void Nexus::sm_thread_on_enet_connect_client(SmThreadCtx &ctx, ENetEvent &ev) {
   _unused(ctx);
   ENetPeer *epeer = ev.peer;
   assert(epeer->data != nullptr);
@@ -44,9 +40,8 @@ void Nexus<TTr>::sm_thread_on_enet_connect_client(SmThreadCtx &ctx,
   epeer_data->client.tx_queue.clear();
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_broadcast_reset(SmThreadCtx &ctx,
-                                           std::string rem_hostname) {
+void Nexus::sm_thread_broadcast_reset(SmThreadCtx &ctx,
+                                      std::string rem_hostname) {
   SmWorkItem reset_wi(rem_hostname);
 
   // Lock the Nexus to prevent Rpc registration while we lookup live hooks
@@ -60,9 +55,8 @@ void Nexus<TTr>::sm_thread_broadcast_reset(SmThreadCtx &ctx,
   ctx.nexus_lock->unlock();
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_on_enet_disconnect_server(SmThreadCtx &ctx,
-                                                     ENetEvent &ev) {
+void Nexus::sm_thread_on_enet_disconnect_server(SmThreadCtx &ctx,
+                                                ENetEvent &ev) {
   ENetPeer *epeer = ev.peer;  // epeer's memory is re-used by ENet
 
   // If we never received an SM packet, there's nothing to reset
@@ -88,9 +82,8 @@ void Nexus<TTr>::sm_thread_on_enet_disconnect_server(SmThreadCtx &ctx,
   sm_thread_broadcast_reset(ctx, rem_hostname);
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_on_enet_disconnect_client(SmThreadCtx &ctx,
-                                                     ENetEvent &ev) {
+void Nexus::sm_thread_on_enet_disconnect_client(SmThreadCtx &ctx,
+                                                ENetEvent &ev) {
   ENetPeer *epeer = ev.peer;  // epeer's memory is re-used by ENet
   auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
   assert(epeer_data->is_client());
@@ -131,8 +124,7 @@ void Nexus<TTr>::sm_thread_on_enet_disconnect_client(SmThreadCtx &ctx,
   return;
 }
 
-template <class TTr>
-SmPkt Nexus<TTr>::sm_thread_pull_sm_pkt(ENetEvent &ev) {
+SmPkt Nexus::sm_thread_pull_sm_pkt(ENetEvent &ev) {
   assert(ev.packet->dataLength == sizeof(SmPkt));
   SmPkt sm_pkt;
   memcpy(static_cast<void *>(&sm_pkt), ev.packet->data, sizeof(SmPkt));
@@ -140,9 +132,7 @@ SmPkt Nexus<TTr>::sm_thread_pull_sm_pkt(ENetEvent &ev) {
   return sm_pkt;
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_on_enet_receive_server(SmThreadCtx &ctx,
-                                                  ENetEvent &ev) {
+void Nexus::sm_thread_on_enet_receive_server(SmThreadCtx &ctx, ENetEvent &ev) {
   assert(ev.peer != nullptr && ev.peer->data != nullptr);
   ENetPeer *epeer = ev.peer;
   auto *epeer_data = static_cast<SmENetPeerData *>(epeer->data);
@@ -205,9 +195,7 @@ void Nexus<TTr>::sm_thread_on_enet_receive_server(SmThreadCtx &ctx,
   return;
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_on_enet_receive_client(SmThreadCtx &ctx,
-                                                  ENetEvent &ev) {
+void Nexus::sm_thread_on_enet_receive_client(SmThreadCtx &ctx, ENetEvent &ev) {
   assert(ev.peer != nullptr && ev.peer->data != nullptr);
 
   SmPkt sm_pkt = sm_thread_pull_sm_pkt(ev);
@@ -240,8 +228,7 @@ void Nexus<TTr>::sm_thread_on_enet_receive_client(SmThreadCtx &ctx,
   return;
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_rx(SmThreadCtx &ctx) {
+void Nexus::sm_thread_rx(SmThreadCtx &ctx) {
   ENetEvent ev;
   int ret = enet_host_service(ctx.enet_host, &ev, kSmThreadEventLoopMs);
   assert(ret >= 0);
@@ -275,9 +262,7 @@ void Nexus<TTr>::sm_thread_rx(SmThreadCtx &ctx) {
   }
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_enet_send_one(const SmWorkItem &wi,
-                                         ENetPeer *epeer) {
+void Nexus::sm_thread_enet_send_one(const SmWorkItem &wi, ENetPeer *epeer) {
   assert(epeer != nullptr && epeer->data != nullptr);
 
   // This copies the packet payload
@@ -289,9 +274,8 @@ void Nexus<TTr>::sm_thread_enet_send_one(const SmWorkItem &wi,
 }
 
 // Process a (Rpc thread-enqueued) work item containing an SM request
-template <class TTr>
-void Nexus<TTr>::sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
-                                                const SmWorkItem &wi) {
+void Nexus::sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
+                                           const SmWorkItem &wi) {
   const SmPkt &sm_pkt = wi.sm_pkt;
   assert(sm_pkt.is_req());
 
@@ -339,9 +323,8 @@ void Nexus<TTr>::sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
 }
 
 // Process a (Rpc thread-enqueued) work item containing an SM response
-template <class TTr>
-void Nexus<TTr>::sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
-                                                 const SmWorkItem &wi) {
+void Nexus::sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
+                                            const SmWorkItem &wi) {
   const SmPkt &sm_pkt = wi.sm_pkt;
   assert(sm_pkt.is_resp());
   const std::string &rem_hostname = sm_pkt.client.hostname;
@@ -363,8 +346,7 @@ void Nexus<TTr>::sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
   sm_thread_enet_send_one(wi, ctx.server_map.at(rem_hostname));
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_process_tx_queue(SmThreadCtx &ctx) {
+void Nexus::sm_thread_process_tx_queue(SmThreadCtx &ctx) {
   if (ctx.sm_tx_list->size == 0) return;
 
   ctx.sm_tx_list->lock();
@@ -382,8 +364,7 @@ void Nexus<TTr>::sm_thread_process_tx_queue(SmThreadCtx &ctx) {
   ctx.sm_tx_list->unlock();
 }
 
-template <class TTr>
-void Nexus<TTr>::sm_thread_func(SmThreadCtx ctx) {
+void Nexus::sm_thread_func(SmThreadCtx ctx) {
   // Create an ENet host that remote nodes can connect to
   rt_assert(enet_initialize() == 0, "Failed to initialize ENet");
 

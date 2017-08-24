@@ -62,7 +62,7 @@ class Rpc {
    * @brief Construct the Rpc object from a foreground thread
    * @throw runtime_error if construction fails
    */
-  Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,
+  Rpc(Nexus *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,
       uint8_t phy_port = 0, size_t numa_node = 0);
 
   /// Destroy the Rpc from a foreground thread
@@ -534,8 +534,8 @@ class Rpc {
   /// Check an RX MsgBuffer submitted to a background thread. It should be
   /// valid, dynamic, and the \p is_req field should match. This holds for
   /// both background request handlers and continuations.
-  static void debug_check_bg_rx_msgbuf(
-      SSlot *sslot, typename Nexus<TTr>::BgWorkItemType wi_type);
+  static void debug_check_bg_rx_msgbuf(SSlot *sslot,
+                                       Nexus::BgWorkItemType wi_type);
 
  private:
   /// Return a credit to this session
@@ -606,8 +606,7 @@ class Rpc {
    * @param wi_type Work item type (request or response)
    * @param bg_etid ERpc thread ID of the background thread to submit to
    */
-  void submit_background_st(SSlot *sslot,
-                            typename Nexus<TTr>::BgWorkItemType wi_type,
+  void submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
                             size_t bg_etid = kMaxBgThreads);
 
   //
@@ -779,7 +778,7 @@ class Rpc {
 
  private:
   // Constructor args
-  Nexus<TTr> *nexus;
+  Nexus *nexus;
   void *context;  ///< The application context
   const uint8_t rpc_id;
   const sm_handler_t sm_handler;
@@ -796,8 +795,8 @@ class Rpc {
   const std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
 
   // Rpc metadata
-  size_t creator_etid;  ///< ERpc thread ID of the creator thread
-  typename Nexus<TTr>::Hook nexus_hook;  ///< A hook shared with the Nexus
+  size_t creator_etid;        ///< ERpc thread ID of the creator thread
+  Nexus::Hook nexus_hook;     ///< A hook shared with the Nexus
   TlsRegistry *tls_registry;  ///< Pointer to the Nexus's thread-local registry
 
   // Sessions

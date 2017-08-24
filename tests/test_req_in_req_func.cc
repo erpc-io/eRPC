@@ -257,7 +257,7 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 }
 
-void client_thread(Nexus<IBTransport> *nexus, size_t num_sessions) {
+void client_thread(Nexus *nexus, size_t num_sessions) {
   // Create the Rpc and connect the sessions
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);

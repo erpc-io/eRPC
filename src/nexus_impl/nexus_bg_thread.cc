@@ -1,14 +1,12 @@
 #include "nexus.h"
 #include "common.h"
 #include "ops.h"
-#include "rpc.h"
 #include "session.h"
 #include "util/mt_list.h"
 
 namespace ERpc {
 
-template <class TTr>
-void Nexus<TTr>::bg_thread_func(BgThreadCtx ctx) {
+void Nexus::bg_thread_func(BgThreadCtx ctx) {
   ctx.tls_registry->init();  // Initialize thread-local variables
 
   // The BgWorkItem request list can be indexed using the background thread's
@@ -33,7 +31,7 @@ void Nexus<TTr>::bg_thread_func(BgThreadCtx ctx) {
           "eRPC Background: Background thread %zu running %s for Rpc %u."
           "Request number = %zu.\n",
           ctx.bg_thread_index, wi.is_req() ? "request handler" : "continuation",
-          wi.rpc->get_rpc_id(), s->cur_req_num);
+          wi.rpc_id, s->cur_req_num);
 
       if (wi.is_req()) {
         assert(!s->is_client && s->server_info.req_msgbuf.is_valid_dynamic());

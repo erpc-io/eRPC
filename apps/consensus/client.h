@@ -206,8 +206,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   send_req_one(c);
 }
 
-void client_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
-                 AppContext *c) {
+void client_func(size_t thread_id, ERpc::Nexus *nexus, AppContext *c) {
   assert(nexus != nullptr && c != nullptr);
   assert(c->conn_vec.size() == FLAGS_num_raft_servers);
   assert(thread_id <= ERpc::kMaxRpcId);

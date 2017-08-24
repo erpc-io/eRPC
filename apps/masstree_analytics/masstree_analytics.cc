@@ -172,8 +172,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   send_req(c, msgbuf_idx);
 }
 
-void client_thread_func(size_t thread_id,
-                        ERpc::Nexus<ERpc::IBTransport> *nexus) {
+void client_thread_func(size_t thread_id, ERpc::Nexus *nexus) {
   assert(FLAGS_machine_id > 0);
 
   AppContext c;
@@ -209,8 +208,8 @@ void client_thread_func(size_t thread_id,
   while (ctrl_c_pressed == 0) c.rpc->run_event_loop(200);
 }
 
-void server_thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus,
-                        MtIndex *mti, threadinfo_t **ti_arr) {
+void server_thread_func(size_t thread_id, ERpc::Nexus *nexus, MtIndex *mti,
+                        threadinfo_t **ti_arr) {
   assert(FLAGS_machine_id == 0);
 
   AppContext c;
@@ -255,8 +254,8 @@ int main(int argc, char **argv) {
 
     // ERpc stuff
     std::string machine_name = get_hostname_for_machine(0);
-    ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
-                                         FLAGS_num_server_bg_threads);
+    ERpc::Nexus nexus(machine_name, kAppNexusUdpPort,
+                      FLAGS_num_server_bg_threads);
 
     nexus.register_req_func(
         kAppPointReqType,
@@ -277,7 +276,7 @@ int main(int argc, char **argv) {
     }
   } else {
     std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-    ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
+    ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
 
     std::thread threads[FLAGS_num_client_threads];
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {

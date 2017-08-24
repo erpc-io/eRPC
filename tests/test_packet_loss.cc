@@ -91,7 +91,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 ///
 /// The second \p size_t argument exists only because the client thread function
 /// template in test_basics requires it.
-void generic_test_func(Nexus<IBTransport> *nexus, size_t) {
+void generic_test_func(Nexus *nexus, size_t) {
   // Create the Rpc and connect the session
   AppContext context;
   client_connect_sessions(nexus, context, config_num_sessions,

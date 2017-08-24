@@ -28,7 +28,7 @@ void test_sm_handler(int session_num, SmEventType sm_event_type,
 //
 // Test: Successful connection establishment
 //
-void simple_connect(Nexus<IBTransport> *nexus, size_t) {
+void simple_connect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
@@ -61,7 +61,7 @@ TEST(Base, SimpleConnect) {
 // Create (and connect) a session with an invalid remote port. The server should
 // reply with the error code
 //
-void invalid_remote_port(Nexus<IBTransport> *nexus, size_t) {
+void invalid_remote_port(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),

@@ -239,7 +239,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 // The function executed by each thread in the cluster
-void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
+void thread_func(size_t thread_id, ERpc::Nexus *nexus) {
   AppContext c;
   c.tmp_stat = new TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
@@ -346,8 +346,7 @@ int main(int argc, char **argv) {
   ERpc::rt_assert(connect_sessions_func != nullptr, "No connect_sessions_func");
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort,
-                                       FLAGS_num_bg_threads);
+  ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, FLAGS_num_bg_threads);
   nexus.register_req_func(
       kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
 

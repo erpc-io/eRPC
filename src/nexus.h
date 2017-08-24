@@ -13,10 +13,6 @@
 
 namespace ERpc {
 
-// Forward declaration
-template <typename T>
-class Rpc;
-
 /// A work item exchanged between an Rpc thread and an SM thread
 class SmWorkItem {
   enum class Reset { kFalse, kTrue };
@@ -41,7 +37,6 @@ class SmWorkItem {
   std::string reset_rem_hostname;
 };
 
-template <class TTr>
 class Nexus {
  public:
   static constexpr size_t kNexusSmThreadCore = 15;  /// CPU core for SM thread
@@ -52,13 +47,13 @@ class Nexus {
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(BgWorkItemType wi_type, Rpc<TTr> *rpc, void *context,
+    BgWorkItem(BgWorkItemType wi_type, uint8_t rpc_id, void *context,
                SSlot *sslot)
-        : wi_type(wi_type), rpc(rpc), context(context), sslot(sslot) {}
+        : wi_type(wi_type), rpc_id(rpc_id), context(context), sslot(sslot) {}
 
     const BgWorkItemType wi_type;
-    Rpc<TTr> *rpc;  ///< The Rpc object that submitted this work item
-    void *context;  ///< The context to use for request handler
+    const uint8_t rpc_id;  ///< The Rpc ID that submitted this work item
+    void *context;         ///< The context to use for request handler
     SSlot *sslot;
 
     bool is_req() const { return wi_type == BgWorkItemType::kReq; }
@@ -278,10 +273,6 @@ class Nexus {
   MtList<BgWorkItem> bg_req_list[kMaxBgThreads];  ///< Background reqs list
   std::thread bg_thread_arr[kMaxBgThreads];       ///< Background thread context
 };
-
-// Instantiate required Nexus classes so they get compiled for the linker
-template class Nexus<IBTransport>;
-
 }  // End ERpc
 
 #endif  // ERPC_RPC_H

@@ -27,7 +27,7 @@ void test_sm_handler(int session_num, SmEventType sm_event_type,
 }
 
 // The client thread
-void client_thread_func(Nexus<IBTransport> *nexus) {
+void client_thread_func(Nexus *nexus) {
   // Start the tests only after the server is ready
   while (!server_ready) {
     usleep(1);
@@ -58,7 +58,7 @@ void client_thread_func(Nexus<IBTransport> *nexus) {
 }
 
 // The server thread
-void server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id) {
+void server_thread_func(Nexus *nexus, uint8_t rpc_id) {
   Rpc<IBTransport> rpc(nexus, nullptr, rpc_id, &test_sm_handler, phy_port,
                        numa_node);
 
@@ -68,7 +68,7 @@ void server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id) {
 
 /// Test: Check if passing invalid arguments to create_session gives an error
 TEST(TestBuild, TestBuild) {
-  Nexus<IBTransport> nexus("localhost", NEXUS_UDP_PORT, 0);  // 0 bg threads
+  Nexus nexus("localhost", NEXUS_UDP_PORT, 0);  // 0 bg threads
 
   // Launch the server thread
   std::thread server_thread(server_thread_func, &nexus, SERVER_RPC_ID);

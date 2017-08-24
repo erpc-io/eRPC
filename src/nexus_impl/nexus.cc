@@ -7,9 +7,8 @@
 
 namespace ERpc {
 
-template <class TTr>
-Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
-                  size_t num_bg_threads)
+Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
+             size_t num_bg_threads)
     : freq_ghz(measure_rdtsc_freq()),
       hostname(hostname),
       num_bg_threads(num_bg_threads) {
@@ -66,8 +65,7 @@ Nexus<TTr>::Nexus(std::string hostname, uint16_t mgmt_udp_port,
            mgmt_udp_port, hostname.c_str());
 }
 
-template <class TTr>
-Nexus<TTr>::~Nexus() {
+Nexus::~Nexus() {
   LOG_INFO("eRPC Nexus: Destroying Nexus.\n");
 
   // Signal background and session management threads to kill themselves
@@ -76,16 +74,14 @@ Nexus<TTr>::~Nexus() {
   sm_thread.join();
 }
 
-template <class TTr>
-bool Nexus<TTr>::rpc_id_exists(uint8_t rpc_id) {
+bool Nexus::rpc_id_exists(uint8_t rpc_id) {
   nexus_lock.lock();
   bool ret = (reg_hooks_arr[rpc_id] != nullptr);
   nexus_lock.unlock();
   return ret;
 }
 
-template <class TTr>
-void Nexus<TTr>::register_hook(Hook *hook) {
+void Nexus::register_hook(Hook *hook) {
   assert(hook != nullptr);
 
   uint8_t rpc_id = hook->rpc_id;
@@ -110,8 +106,7 @@ void Nexus<TTr>::register_hook(Hook *hook) {
   nexus_lock.unlock();
 }
 
-template <class TTr>
-void Nexus<TTr>::unregister_hook(Hook *hook) {
+void Nexus::unregister_hook(Hook *hook) {
   assert(hook != nullptr);
 
   uint8_t rpc_id = hook->rpc_id;
@@ -124,8 +119,7 @@ void Nexus<TTr>::unregister_hook(Hook *hook) {
   nexus_lock.unlock();
 }
 
-template <class TTr>
-int Nexus<TTr>::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
+int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
           "eRPC Nexus: Failed to register handlers for request type %u. Issue",
@@ -162,8 +156,7 @@ int Nexus<TTr>::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   return 0;
 }
 
-template <class TTr>
-double Nexus<TTr>::measure_rdtsc_freq() {
+double Nexus::measure_rdtsc_freq() {
   struct timespec start, end;
   clock_gettime(CLOCK_REALTIME, &start);
   uint64_t rdtsc_start = rdtsc();

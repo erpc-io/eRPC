@@ -11,7 +11,7 @@
 namespace ERpc {
 
 template <class TTr>
-Rpc<TTr>::Rpc(Nexus<TTr> *nexus, void *context, uint8_t rpc_id,
+Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
               sm_handler_t sm_handler, uint8_t phy_port, size_t numa_node)
     : nexus(nexus),
       context(context),

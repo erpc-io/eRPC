@@ -120,7 +120,7 @@ void init_raft(AppContext *c) {
   }
 }
 
-void init_erpc(AppContext *c, ERpc::Nexus<ERpc::IBTransport> *nexus) {
+void init_erpc(AppContext *c, ERpc::Nexus *nexus) {
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kRequestVote),
       ERpc::ReqFunc(requestvote_handler, ERpc::ReqFuncType::kForeground));
@@ -176,7 +176,7 @@ int main(int argc, char **argv) {
   for (auto &peer_conn : c.conn_vec) peer_conn.c = &c;
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  ERpc::Nexus<ERpc::IBTransport> nexus(machine_name, kAppNexusUdpPort, 0);
+  ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
 
   if (!is_raft_server()) {
     // Run client

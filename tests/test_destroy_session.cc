@@ -35,7 +35,7 @@ void sm_handler(int session_num, SmEventType sm_event_type,
 ///
 /// Simple successful disconnection of one session, and other simple tests
 ///
-void simple_disconnect(Nexus<IBTransport> *nexus, size_t) {
+void simple_disconnect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
@@ -82,7 +82,7 @@ TEST(Base, SimpleDisconnect) {
 /// Repeat: Create as many sessions to the server as possible and disconnect
 /// them all.
 ///
-void disconnect_multi(Nexus<IBTransport> *nexus, size_t) {
+void disconnect_multi(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions()
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
@@ -137,7 +137,7 @@ TEST(Base, DisconnectMulti) {
 ///
 /// Disconnect a session that encountered a remote error. This should succeed.
 ///
-void disconnect_remote_error(Nexus<IBTransport> *nexus, size_t) {
+void disconnect_remote_error(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
@@ -170,7 +170,7 @@ TEST(Base, DisconnectRemoteError) {
 /// Create a session for which the client fails to resolve the server's routing
 /// info while processing the connect response.
 ///
-void disconnect_local_error(Nexus<IBTransport> *nexus, size_t) {
+void disconnect_local_error(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),

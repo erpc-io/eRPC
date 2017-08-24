@@ -19,7 +19,7 @@ static constexpr uint8_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 
 // Shared between client and server thread
-std::atomic<size_t> num_servers_up;  ///< Number of ready servers
+std::atomic<size_t> num_servers_up;   ///< Number of ready servers
 std::atomic<bool> all_servers_ready;  ///< True iff all server threads are ready
 std::atomic<bool> client_done;        ///< True when the client has disconnected
 
@@ -118,7 +118,7 @@ void basic_empty_req_handler(ReqHandle *, void *) {
  * @param num_srv_threads The number of server Rpc (foreground) threads
  * @param connect_servers True iff the server threads should be connected
  */
-void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
+void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
                               sm_handler_t sm_handler, size_t num_srv_threads,
                               ConnectServers connect_servers,
                               double pkt_loss_prob) {
@@ -164,8 +164,7 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
     // Wait for the sessions to connect
     wait_for_sm_resps_or_timeout(context, num_srv_threads - 1, nexus->freq_ghz);
   } else {
-    test_printf("Server %u: not connecting to other server threads.\n",
-                rpc_id);
+    test_printf("Server %u: not connecting to other server threads.\n", rpc_id);
   }
 
   while (!client_done) {  // Wait for all clients
@@ -174,9 +173,10 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
 
   // Disconnect sessions created to other server threads if needed
   if (connect_servers == ConnectServers::kTrue) {
-    test_printf("Server %u: disconnecting from %zu other server threads. "
-                "Current active sessions = %zu.\n",
-                rpc_id, num_srv_threads - 1, rpc.num_active_sessions());
+    test_printf(
+        "Server %u: disconnecting from %zu other server threads. "
+        "Current active sessions = %zu.\n",
+        rpc_id, num_srv_threads - 1, rpc.num_active_sessions());
 
     for (size_t i = 0; i < num_srv_threads; i++) {
       uint8_t other_rpc_id = static_cast<uint8_t>(kAppServerRpcId + i);
@@ -224,10 +224,10 @@ void basic_server_thread_func(Nexus<IBTransport> *nexus, uint8_t rpc_id,
  */
 void launch_server_client_threads(
     size_t num_sessions, size_t num_bg_threads,
-    void (*client_thread_func)(Nexus<IBTransport> *, size_t),
+    void (*client_thread_func)(Nexus *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers, double srv_pkt_drop_prob) {
-  Nexus<IBTransport> nexus("localhost", kAppNexusUdpPort, num_bg_threads);
+  Nexus nexus("localhost", kAppNexusUdpPort, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
@@ -279,9 +279,8 @@ void launch_server_client_threads(
  * \p i is created to Rpc \p {kAppServerRpcId + i} at localhost
  * @param sm_handler The client's sm handler
  */
-void client_connect_sessions(Nexus<IBTransport> *nexus,
-                             BasicAppContext &context, size_t num_sessions,
-                             sm_handler_t sm_handler) {
+void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
+                             size_t num_sessions, sm_handler_t sm_handler) {
   assert(nexus != nullptr);
   assert(num_sessions >= 1);
 

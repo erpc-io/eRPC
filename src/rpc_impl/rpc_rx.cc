@@ -163,7 +163,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
     assert(req_msgbuf.buf != nullptr);
     memcpy(reinterpret_cast<char *>(req_msgbuf.get_pkthdr_0()), pkt,
            pkthdr->msg_size + sizeof(pkthdr_t));
-    submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kReq);
+    submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
     return;
   }
 }
@@ -226,7 +226,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
                                  sslot->client_info.tag);
   } else {
     // Background thread will run continuation
-    submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
+    submit_background_st(sslot, Nexus::BgWorkItemType::kResp,
                          sslot->client_info.cont_etid);
     return;
   }
@@ -444,7 +444,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   if (!req_func.is_background()) {
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
   } else {
-    submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kReq);
+    submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
   }
 }
 
@@ -541,15 +541,14 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
                                  sslot->client_info.tag);
   } else {
-    submit_background_st(sslot, Nexus<TTr>::BgWorkItemType::kResp,
+    submit_background_st(sslot, Nexus::BgWorkItemType::kResp,
                          sslot->client_info.cont_etid);
   }
   return;
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_background_st(SSlot *sslot,
-                                    typename Nexus<TTr>::BgWorkItemType wi_type,
+void Rpc<TTr>::submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
                                     size_t bg_etid) {
   assert(in_creator());
   assert(bg_etid < nexus->num_bg_threads || bg_etid == kInvalidBgETid);
@@ -563,6 +562,6 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot,
 
   auto *req_list = nexus_hook.bg_req_list_arr[bg_etid];
   req_list->unlocked_push_back(
-      typename Nexus<TTr>::BgWorkItem(wi_type, this, context, sslot));
+      Nexus::BgWorkItem(wi_type, rpc_id, context, sslot));
 }
 }  // End ERpc
