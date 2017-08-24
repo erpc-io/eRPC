@@ -128,6 +128,7 @@
 ## Short-term TODOs
  * Reduce background thread lock duration
  * Make apps use BasicAppContext and `basic_sm_handler`.
+ * Use `rt_assert` in src and apps
  * When a client-mode ENet peer gets disconnected, we should not reset
    server-mode sessions (and vice-versa). ENet peers should have unique IDs
    that are passed to sessions, so we can reset only those sessions that used
