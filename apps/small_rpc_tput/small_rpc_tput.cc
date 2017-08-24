@@ -64,20 +64,10 @@ class BatchContext {
 };
 
 // Per-thread application context
-class AppContext {
+class AppContext : public BasicAppContext {
  public:
-  TmpStat *tmp_stat = nullptr;
-  ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
-  ERpc::FastRand fastrand;
-
-  // Number of slots in session_arr, including an unused one for this thread
-  size_t num_sessions;
-  int *session_arr = nullptr;  // Sessions created as client. XXX: Vector.
-
-  // The entry in session_arr for this thread, so we don't send reqs to ourself
+  // The entry in session_num_vec for this thread, to avoid self-request
   size_t self_session_index;
-  size_t thread_id;         // The ID of the thread that owns this context
-  size_t num_sm_resps = 0;  // Number of SM responses
   struct timespec tput_t0;  // Start time for throughput measurement
 
   size_t stat_resp_rx[kMaxConcurrency] = {0};  // Resps received for batch i
@@ -87,36 +77,19 @@ class AppContext {
   std::array<BatchContext, kMaxConcurrency> batch_arr;  // Per-batch context
   ERpc::Latency latency;  // Cold if latency measurement disabled
 
-  ~AppContext() {
-    if (tmp_stat != nullptr) delete tmp_stat;
-    if (session_arr != nullptr) delete[] session_arr;
-  }
+  ~AppContext() {}
 };
-
-// A basic session management handler that expects successful responses
-void basic_sm_handler(int, ERpc::SmEventType sm_event_type,
-                      ERpc::SmErrType sm_err_type, void *_context) {
-  _unused(sm_event_type);
-  _unused(sm_err_type);
-
-  auto *context = static_cast<AppContext *>(_context);
-  context->num_sm_resps++;
-
-  assert(sm_err_type == ERpc::SmErrType::kNoError);
-  assert(sm_event_type == ERpc::SmEventType::kConnected ||
-         sm_event_type == ERpc::SmEventType::kDisconnected);
-}
 
 size_t get_rand_session_index(AppContext *c) {
   assert(c != nullptr);
-  static_assert(sizeof(c->num_sessions) == 8, "");
+  const size_t num_sessions = c->session_num_vec.size();
 
   // Use Lemire's trick to compute random numbers modulo c->num_sessions
   uint32_t x = c->fastrand.next_u32();
-  size_t rand_session_index = (static_cast<size_t>(x) * c->num_sessions) >> 32;
+  size_t rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
   while (rand_session_index == c->self_session_index) {
     x = c->fastrand.next_u32();
-    rand_session_index = (static_cast<size_t>(x) * c->num_sessions) >> 32;
+    rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
   }
 
   return rand_session_index;
@@ -146,7 +119,7 @@ void send_reqs(AppContext *c, size_t batch_i) {
 
     if (kAppMeasureLatency) bc.req_tsc[msgbuf_index] = ERpc::rdtsc();
     tag_t tag(batch_i, msgbuf_index);
-    int ret = c->rpc->enqueue_request(c->session_arr[rand_session_index],
+    int ret = c->rpc->enqueue_request(c->session_num_vec[rand_session_index],
                                       kAppReqType, &bc.req_msgbuf[msgbuf_index],
                                       &bc.resp_msgbuf[msgbuf_index],
                                       app_cont_func, tag._tag);
@@ -304,37 +277,26 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
   }
 
-  c.num_sessions = FLAGS_num_machines * FLAGS_num_threads;
+  c.session_num_vec.resize(FLAGS_num_machines * FLAGS_num_threads);
   c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
-
-  // Allocate session array
-  c.session_arr = new int[FLAGS_num_machines * FLAGS_num_threads];
-  for (size_t i = 0; i < FLAGS_num_machines * FLAGS_num_threads; i++) {
-    c.session_arr[i] = -1;
-  }
 
   // Initiate connection for sessions
   for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
     std::string hostname = get_hostname_for_machine(m_i);
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      size_t session_index = (m_i * FLAGS_num_threads) + t_i;
-      // Do not create a session to self
-      if (session_index == c.self_session_index) continue;
+      const size_t session_idx = (m_i * FLAGS_num_threads) + t_i;
+      if (session_idx == c.self_session_index) continue;  // No session to self
 
-      c.session_arr[session_index] =
+      c.session_num_vec[session_idx] =
           rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
-      assert(c.session_arr[session_index] >= 0);
+      assert(c.session_num_vec[session_idx] >= 0);
     }
   }
 
   while (c.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
     rpc.run_event_loop(200);  // 200 milliseconds
-
-    if (ctrl_c_pressed == 1) {
-      delete c.session_arr;
-      return;
-    }
+    if (ctrl_c_pressed == 1) return;
   }
 
   fprintf(stderr, "Thread %zu: All sessions connected. Running event loop.\n",
@@ -352,9 +314,7 @@ void thread_func(size_t thread_id, ERpc::Nexus<ERpc::IBTransport> *nexus) {
     }
   }
 
-  for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    send_reqs(&c, i);
-  }
+  for (size_t i = 0; i < FLAGS_concurrency; i++) send_reqs(&c, i);
 
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(1000);  // 1 second
@@ -383,7 +343,5 @@ int main(int argc, char **argv) {
     ERpc::bind_to_core(threads[i], i);
   }
 
-  for (size_t i = 0; i < FLAGS_num_threads; i++) {
-    threads[i].join();
-  }
+  for (size_t i = 0; i < FLAGS_num_threads; i++) threads[i].join();
 }
