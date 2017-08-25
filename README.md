@@ -178,7 +178,5 @@
    in-memory structs like Buffer and MsgBuffer?
  * Need to have a test for session management request timeouts.
 
-## Perf notes
- * Flags that control performance:
-   * kDataPathChecks
-   * `small_rpc_likely`
+## Required packages
+ * numa, gtest, gflags, ibverbs, boost-date-time, enet
