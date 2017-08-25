@@ -103,23 +103,21 @@ else(DEBUG)
 endif(DEBUG)
 
 # Fault injection (packet losses, machine failure)
-option(FAULT_INJECTION "Enable fault injection" ON)
 if(FAULT_INJECTION)
-  MESSAGE(STATUS "Fault injection is enabled. Performance will be low. To disable, run `cmake . -DFAULT_INJECTION=OFF`.")
+  MESSAGE(STATUS "Fault injection is enabled. Performance will be low.")
   add_definitions(-DFAULT_INJECTION)
 else(FAULT_INJECTION)
-  MESSAGE(STATUS "Fault injection is disabled, so tests may fail. To enable, run `cmake . -DFAULT_INJECTION=ON`.")
+  MESSAGE(STATUS "Fault injection is disabled, so tests may fail.")
 endif(FAULT_INJECTION)
 
 # LTO
-option(LTO "Enable link time optimization" OFF)
 if(LTO)
-  MESSAGE(STATUS "LTO is enabled. Tests won't be compiled. To disable, run `cmake . -DLTO=OFF`.")
+  MESSAGE(STATUS "LTO is enabled. Tests won't be compiled.")
   SET(COMPILE_ERPC_LIB OFF)
   add_definitions(-flto)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
 else(LTO)
-  MESSAGE(STATUS "LTO is disabled. To enable, run `cmake . -DLTO=ON`.")
+  MESSAGE(STATUS "LTO is disabled. Performance will be low.")
 endif(LTO)
 
 set(SOURCES
