@@ -6,13 +6,10 @@ template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
   assert(in_creator());
   auto &queue = bg_queues.enqueue_request;
-  if (queue.size == 0) return;
+  size_t cmds_to_process = queue.size;
 
-  queue.lock();  // Prevent background threads from enqueueing requests
-  size_t write_index = 0;  // Requests that we can't enqueue are re-added here
-
-  for (size_t i = 0; i < queue.size; i++) {
-    enqueue_request_args_t &req_args = queue.list[i];
+  for (size_t i = 0; i < cmds_to_process; i++) {
+    enqueue_request_args_t req_args = queue.unlocked_pop();
     int ret =
         enqueue_request(req_args.session_num, req_args.req_type,
                         req_args.req_msgbuf, req_args.resp_msgbuf,
@@ -20,46 +17,31 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
 
     assert(ret == 0 || ret == -ENOMEM);  // XXX: Handle other failures
 
-    if (ret == -ENOMEM) {
-      // This means that the session is out of sslots
-      queue.list[write_index++] = req_args;
-    }
+    // If session is out of sslots, re-add to queue
+    if (ret == -ENOMEM) queue.unlocked_push(req_args);
   }
-
-  queue.locked_resize(write_index);  // There are write_index elements left
-  queue.unlock();
 }
 
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
   assert(in_creator());
-  MtList<ReqHandle *> &queue = bg_queues.enqueue_response;
-  if (queue.size == 0) return;
+  MtQueue<ReqHandle *> &queue = bg_queues.enqueue_response;
 
-  queue.lock();  // Prevent background threads from enqueueing responses
-
-  for (ReqHandle *req_handle : queue.list) {
+  while (queue.size > 0) {
+    ReqHandle *req_handle = queue.unlocked_pop();
     enqueue_response(req_handle);
   }
-
-  queue.locked_clear();
-  queue.unlock();
 }
 
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_release_response_st() {
   assert(in_creator());
-  MtList<RespHandle *> &queue = bg_queues.release_response;
-  if (queue.size == 0) return;
+  MtQueue<RespHandle *> &queue = bg_queues.release_response;
 
-  queue.lock();  // Prevent background threads from enqueueing responses
-
-  for (RespHandle *resp_handle : queue.list) {
+  while (queue.size > 0) {
+    RespHandle *resp_handle = queue.unlocked_pop();
     release_response(resp_handle);
   }
-
-  queue.locked_clear();
-  queue.unlock();
 }
 
 }  // End ERpc

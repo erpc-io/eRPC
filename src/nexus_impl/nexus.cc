@@ -39,7 +39,7 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
     bg_thread_ctx.req_func_arr = &req_func_arr;
     bg_thread_ctx.tls_registry = &tls_registry;
     bg_thread_ctx.bg_thread_index = i;
-    bg_thread_ctx.bg_req_list = &bg_req_list[i];
+    bg_thread_ctx.bg_req_queue = &bg_req_queue[i];
 
     bg_thread_arr[i] = std::thread(bg_thread_func, bg_thread_ctx);
 
@@ -54,7 +54,7 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   sm_thread_ctx.kill_switch = &kill_switch;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
-  sm_thread_ctx.sm_tx_list = &sm_tx_list;
+  sm_thread_ctx.sm_tx_queue = &sm_tx_queue;
 
   LOG_INFO("eRPC Nexus: Launching session management thread on core %zu.\n",
            kNexusSmThreadCore);
@@ -82,8 +82,6 @@ bool Nexus::rpc_id_exists(uint8_t rpc_id) {
 }
 
 void Nexus::register_hook(Hook *hook) {
-  assert(hook != nullptr);
-
   uint8_t rpc_id = hook->rpc_id;
   assert(rpc_id <= kMaxRpcId);
   assert(reg_hooks_arr[rpc_id] == nullptr);
@@ -95,20 +93,16 @@ void Nexus::register_hook(Hook *hook) {
 
   // Install background request submission lists
   for (size_t i = 0; i < num_bg_threads; i++) {
-    assert(hook->bg_req_list_arr[i] == nullptr);
-    hook->bg_req_list_arr[i] = &bg_req_list[i];
+    hook->bg_req_queue_arr[i] = &bg_req_queue[i];
   }
 
   // Install session managment request submission list
-  assert(hook->sm_tx_list == nullptr);
-  hook->sm_tx_list = &sm_tx_list;
+  hook->sm_tx_queue = &sm_tx_queue;
 
   nexus_lock.unlock();
 }
 
 void Nexus::unregister_hook(Hook *hook) {
-  assert(hook != nullptr);
-
   uint8_t rpc_id = hook->rpc_id;
   assert(rpc_id <= kMaxRpcId);
   assert(reg_hooks_arr[rpc_id] == hook);

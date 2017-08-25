@@ -8,7 +8,7 @@
 #include "session.h"
 #include "sm_types.h"
 #include "transport_impl/ib_transport.h"
-#include "util/mt_list.h"
+#include "util/mt_queue.h"
 #include "util/tls_registry.h"
 
 namespace ERpc {
@@ -64,16 +64,16 @@ class Nexus {
    public:
     uint8_t rpc_id;  ///< ID of the Rpc that created this hook
 
-    /// Background thread request lists, installed by the Nexus
-    MtList<BgWorkItem> *bg_req_list_arr[kMaxBgThreads] = {nullptr};
+    /// Background thread request queues, installed by the Nexus
+    MtQueue<BgWorkItem> *bg_req_queue_arr[kMaxBgThreads] = {nullptr};
 
-    /// The session management TX list, installed by Nexus. This is used by Rpc
+    /// The session management TX queue, installed by Nexus. This is used by Rpc
     /// threads to submit packets to the SM thread.
-    MtList<SmWorkItem> *sm_tx_list = nullptr;
+    MtQueue<SmWorkItem> *sm_tx_queue = nullptr;
 
-    /// The Rpc thread's session management RX list, installed by the Rpc.
+    /// The Rpc thread's session management RX queue, installed by the Rpc.
     /// Packets received by the SM thread for this Rpc are queued here.
-    MtList<SmWorkItem> sm_rx_list;
+    MtQueue<SmWorkItem> sm_rx_queue;
   };
 
   /**
@@ -125,9 +125,9 @@ class Nexus {
     /// functions are registered.
     std::array<ReqFunc, kReqTypeArraySize> *req_func_arr;
 
-    TlsRegistry *tls_registry;        ///< The Nexus's thread-local registry
-    size_t bg_thread_index;           ///< Index of this background thread
-    MtList<BgWorkItem> *bg_req_list;  ///< Background thread request list
+    TlsRegistry *tls_registry;          ///< The Nexus's thread-local registry
+    size_t bg_thread_index;             ///< Index of this background thread
+    MtQueue<BgWorkItem> *bg_req_queue;  ///< Background thread request queue
   };
 
   /// Session management thread context
@@ -138,7 +138,7 @@ class Nexus {
     volatile bool *kill_switch;     ///< The Nexus's kill switch
     volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
     std::mutex *nexus_lock;
-    MtList<SmWorkItem> *sm_tx_list;  ///< SM packets to transmit
+    MtQueue<SmWorkItem> *sm_tx_queue;  ///< SM packets to transmit
 
     // Created internally by the SM thread
     ENetHost *enet_host;
@@ -266,12 +266,12 @@ class Nexus {
   volatile bool kill_switch;  ///< Used to turn off SM and background threads
 
   // Session management thread
-  MtList<SmWorkItem> sm_tx_list;  ///< SM packet submission list
-  std::thread sm_thread;          ///< The session management thread
+  MtQueue<SmWorkItem> sm_tx_queue;  ///< SM packet submission queue
+  std::thread sm_thread;            ///< The session management thread
 
   // Background threads
-  MtList<BgWorkItem> bg_req_list[kMaxBgThreads];  ///< Background reqs list
-  std::thread bg_thread_arr[kMaxBgThreads];       ///< Background thread context
+  MtQueue<BgWorkItem> bg_req_queue[kMaxBgThreads];  ///< Background req queues
+  std::thread bg_thread_arr[kMaxBgThreads];  ///< Background thread context
 };
 }  // End ERpc
 

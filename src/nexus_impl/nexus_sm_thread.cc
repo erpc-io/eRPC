@@ -49,7 +49,7 @@ void Nexus::sm_thread_broadcast_reset(SmThreadCtx &ctx,
   for (size_t rpc_id = 0; rpc_id <= kMaxRpcId; rpc_id++) {
     if (ctx.reg_hooks_arr[rpc_id] != nullptr) {
       Hook *hook = const_cast<Hook *>(ctx.reg_hooks_arr[rpc_id]);
-      hook->sm_rx_list.unlocked_push_back(reset_wi);
+      hook->sm_rx_queue.unlocked_push(reset_wi);
     }
   }
   ctx.nexus_lock->unlock();
@@ -173,8 +173,7 @@ void Nexus::sm_thread_on_enet_receive_server(SmThreadCtx &ctx, ENetEvent &ev) {
   Hook *target_hook = const_cast<Hook *>(ctx.reg_hooks_arr[target_rpc_id]);
 
   if (target_hook != nullptr) {
-    SmWorkItem wi(target_rpc_id, sm_pkt);
-    target_hook->sm_rx_list.unlocked_push_back(wi);
+    target_hook->sm_rx_queue.unlocked_push(SmWorkItem(target_rpc_id, sm_pkt));
   } else {
     // We don't have an Rpc object for the target Rpc. Send resp if possible.
     assert(sm_pkt_type_req_has_resp(sm_pkt.pkt_type));
@@ -215,8 +214,7 @@ void Nexus::sm_thread_on_enet_receive_client(SmThreadCtx &ctx, ENetEvent &ev) {
   Hook *target_hook = const_cast<Hook *>(ctx.reg_hooks_arr[target_rpc_id]);
 
   if (target_hook != nullptr) {
-    SmWorkItem wi(target_rpc_id, sm_pkt);
-    target_hook->sm_rx_list.unlocked_push_back(wi);
+    target_hook->sm_rx_queue.unlocked_push(SmWorkItem(target_rpc_id, sm_pkt));
   } else {
     LOG_WARN(
         "eRPC Nexus: Received session management response for invalid "
@@ -347,21 +345,19 @@ void Nexus::sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
 }
 
 void Nexus::sm_thread_process_tx_queue(SmThreadCtx &ctx) {
-  if (ctx.sm_tx_list->size == 0) return;
+  MtQueue<SmWorkItem> *queue = ctx.sm_tx_queue;
+  size_t cmds_to_process = queue->size;
 
-  ctx.sm_tx_list->lock();
-
-  for (const SmWorkItem &wi : ctx.sm_tx_list->list) {
+  for (size_t i = 0; i < cmds_to_process; i++) {
+    const SmWorkItem wi = queue->unlocked_pop();
     assert(!wi.is_reset());  // Rpc threads cannot queue reset work items
+
     if (wi.sm_pkt.is_req()) {
       sm_thread_process_tx_queue_req(ctx, wi);
     } else {
       sm_thread_process_tx_queue_resp(ctx, wi);
     }
   }
-
-  ctx.sm_tx_list->locked_clear();
-  ctx.sm_tx_list->unlock();
 }
 
 void Nexus::sm_thread_func(SmThreadCtx ctx) {

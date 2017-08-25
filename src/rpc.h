@@ -15,7 +15,7 @@
 #include "util/buffer.h"
 #include "util/huge_alloc.h"
 #include "util/logger.h"
-#include "util/mt_list.h"
+#include "util/mt_queue.h"
 #include "util/rand.h"
 #include "util/timer.h"
 
@@ -380,7 +380,7 @@ class Rpc {
 
     // When called from a background thread, enqueue to the foreground thread
     if (small_rpc_unlikely(!in_creator())) {
-      bg_queues.release_response.unlocked_push_back(resp_handle);
+      bg_queues.release_response.unlocked_push(resp_handle);
       return;
     }
     assert(in_creator());
@@ -831,9 +831,9 @@ class Rpc {
 
   /// Queues for datapath API requests from background threads
   struct {
-    MtList<enqueue_request_args_t> enqueue_request;
-    MtList<ReqHandle *> enqueue_response;
-    MtList<RespHandle *> release_response;
+    MtQueue<enqueue_request_args_t> enqueue_request;
+    MtQueue<ReqHandle *> enqueue_response;
+    MtQueue<RespHandle *> release_response;
   } bg_queues;
 
   // Packet loss

@@ -30,7 +30,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     auto req_args =
         enqueue_request_args_t(session_num, req_type, req_msgbuf, resp_msgbuf,
                                cont_func, tag, get_etid());
-    bg_queues.enqueue_request.unlocked_push_back(req_args);
+    bg_queues.enqueue_request.unlocked_push(req_args);
     return 0;
   }
   assert(in_creator());

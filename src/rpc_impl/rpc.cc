@@ -24,7 +24,6 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
       pkt_loss_epoch_cycles(kPktLossEpochMs * 1000000 * nexus->freq_ghz),
       req_func_arr(nexus->req_func_arr) {
   rt_assert(!getuid(), "You need to be root to use eRPC");
-  rt_assert(nexus != nullptr, "Invalid Nexus");
   rt_assert(rpc_id != kInvalidRpcId, "Invalid Rpc ID");
   rt_assert(!nexus->rpc_id_exists(rpc_id), "Rpc ID already exists");
   rt_assert(phy_port < kMaxPhyPorts, "Invalid physical port");
@@ -51,12 +50,9 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     throw e;
   }
 
-  // Register the hook with the Nexus + sanity-check background request lists
+  // Register the hook with the Nexus. This installs SM and bg command queues.
   nexus_hook.rpc_id = rpc_id;
   nexus->register_hook(&nexus_hook);
-  for (size_t i = 0; i < nexus->num_bg_threads; i++) {
-    assert(nexus_hook.bg_req_list_arr[i] != nullptr);
-  }
 
   LOG_INFO("eRPC Rpc: Created with ID = %u, ERpc TID = %zu.\n", rpc_id,
            creator_etid);

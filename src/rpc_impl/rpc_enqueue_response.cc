@@ -13,7 +13,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // When called from a background thread, enqueue to the foreground thread
   if (small_rpc_unlikely(!in_creator())) {
-    bg_queues.enqueue_response.unlocked_push_back(req_handle);
+    bg_queues.enqueue_response.unlocked_push(req_handle);
     return;
   }
   assert(in_creator());

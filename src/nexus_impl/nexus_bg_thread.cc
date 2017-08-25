@@ -2,7 +2,7 @@
 #include "common.h"
 #include "ops.h"
 #include "session.h"
-#include "util/mt_list.h"
+#include "util/mt_queue.h"
 
 namespace ERpc {
 
@@ -16,17 +16,19 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
            ctx.bg_thread_index, ctx.tls_registry->get_etid());
 
   while (*ctx.kill_switch == false) {
-    if (ctx.bg_req_list->size == 0) {
+    if (ctx.bg_req_queue->size == 0) {
       // Try again later
       usleep(1);
       continue;
     }
 
-    ctx.bg_req_list->lock();
-    assert(ctx.bg_req_list->size > 0);
+    MtQueue<BgWorkItem> *queue = ctx.bg_req_queue;
+    size_t cmds_to_process = queue->size;
 
-    for (BgWorkItem wi : ctx.bg_req_list->list) {
+    for (size_t i = 0; i < cmds_to_process; i++) {
+      BgWorkItem wi = queue->unlocked_pop();
       SSlot *s = wi.sslot;
+
       LOG_TRACE(
           "eRPC Background: Background thread %zu running %s for Rpc %u."
           "Request number = %zu.\n",
@@ -48,9 +50,6 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
                                         wi.context, s->client_info.tag);
       }
     }
-
-    ctx.bg_req_list->locked_clear();
-    ctx.bg_req_list->unlock();
   }
 
   LOG_INFO("eRPC Nexus: Background thread %zu exiting.\n", ctx.bg_thread_index);

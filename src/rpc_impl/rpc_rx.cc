@@ -560,8 +560,7 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
     bg_etid = fast_rand.next_u32() % nexus->num_bg_threads;
   }
 
-  auto *req_list = nexus_hook.bg_req_list_arr[bg_etid];
-  req_list->unlocked_push_back(
-      Nexus::BgWorkItem(wi_type, rpc_id, context, sslot));
+  auto *req_queue = nexus_hook.bg_req_queue_arr[bg_etid];
+  req_queue->unlocked_push(Nexus::BgWorkItem(wi_type, rpc_id, context, sslot));
 }
 }  // End ERpc

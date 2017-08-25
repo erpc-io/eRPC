@@ -9,18 +9,19 @@ namespace ERpc {
 template <class TTr>
 void Rpc<TTr>::handle_sm_st() {
   assert(in_creator());
-  assert(nexus_hook.sm_rx_list.size > 0);
-  nexus_hook.sm_rx_list.lock();
-
-  std::vector<SmWorkItem> reset_fail_queue;
 
   // Handle SM work items queued by the session management thread
-  for (const SmWorkItem &wi : nexus_hook.sm_rx_list.list) {
+  MtQueue<SmWorkItem> &queue = nexus_hook.sm_rx_queue;
+  const size_t cmds_to_process = queue.size;
+
+  for (size_t i = 0; i < cmds_to_process; i++) {
+    SmWorkItem wi = queue.unlocked_pop();
+
     // Reset work items don't have a valid SM packet, so handle them first
     if (wi.is_reset()) {
       assert(wi.reset_rem_hostname.length() > 0);
       bool success = handle_reset_st(wi.reset_rem_hostname);
-      if (!success) reset_fail_queue.push_back(wi);
+      if (!success) queue.unlocked_push(wi);
       continue;
     }
 
@@ -54,12 +55,6 @@ void Rpc<TTr>::handle_sm_st() {
         throw std::runtime_error("Invalid packet type");
     }
   }
-
-  // Re-queue reset work items that couldn't complete
-  nexus_hook.sm_rx_list.locked_clear();
-  for (auto &wi : reset_fail_queue) nexus_hook.sm_rx_list.list.push_back(wi);
-
-  nexus_hook.sm_rx_list.unlock();
 }
 
 template <class TTr>
@@ -89,7 +84,7 @@ void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
   sm_pkt.client = session->client;
   sm_pkt.server = session->server;
 
-  nexus_hook.sm_tx_list->unlocked_push_back(SmWorkItem(rpc_id, sm_pkt));
+  nexus_hook.sm_tx_queue->unlocked_push(SmWorkItem(rpc_id, sm_pkt));
 }
 
 template <class TTr>
@@ -102,7 +97,7 @@ void Rpc<TTr>::enqueue_sm_resp_st(const SmWorkItem &req_wi,
   sm_pkt.pkt_type = sm_pkt_type_req_to_resp(sm_pkt.pkt_type);  // Change to resp
   sm_pkt.err_type = err_type;
 
-  nexus_hook.sm_tx_list->unlocked_push_back(SmWorkItem(rpc_id, sm_pkt));
+  nexus_hook.sm_tx_queue->unlocked_push(SmWorkItem(rpc_id, sm_pkt));
 }
 
 }  // End ERpc
