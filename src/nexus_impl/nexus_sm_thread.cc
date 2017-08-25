@@ -345,11 +345,8 @@ void Nexus::sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
 }
 
 void Nexus::sm_thread_process_tx_queue(SmThreadCtx &ctx) {
-  MtQueue<SmWorkItem> *queue = ctx.sm_tx_queue;
-  size_t cmds_to_process = queue->size;
-
-  for (size_t i = 0; i < cmds_to_process; i++) {
-    const SmWorkItem wi = queue->unlocked_pop();
+  while (ctx.sm_tx_queue->size > 0) {
+    const SmWorkItem wi = ctx.sm_tx_queue->unlocked_pop();
     assert(!wi.is_reset());  // Rpc threads cannot queue reset work items
 
     if (wi.sm_pkt.is_req()) {

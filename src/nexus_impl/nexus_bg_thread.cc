@@ -22,11 +22,8 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
       continue;
     }
 
-    MtQueue<BgWorkItem> *queue = ctx.bg_req_queue;
-    size_t cmds_to_process = queue->size;
-
-    for (size_t i = 0; i < cmds_to_process; i++) {
-      BgWorkItem wi = queue->unlocked_pop();
+    while (ctx.bg_req_queue->size > 0) {
+      BgWorkItem wi = ctx.bg_req_queue->unlocked_pop();
       SSlot *s = wi.sslot;
 
       LOG_TRACE(

@@ -12,7 +12,7 @@ void Rpc<TTr>::handle_sm_st() {
 
   // Handle SM work items queued by the session management thread
   MtQueue<SmWorkItem> &queue = nexus_hook.sm_rx_queue;
-  const size_t cmds_to_process = queue.size;
+  const size_t cmds_to_process = queue.size;  // We might re-add to the queue
 
   for (size_t i = 0; i < cmds_to_process; i++) {
     SmWorkItem wi = queue.unlocked_pop();
