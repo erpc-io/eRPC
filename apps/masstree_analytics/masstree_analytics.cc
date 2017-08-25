@@ -153,7 +153,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->client.range_latency.update(static_cast<size_t>(usec * 0.1));  // ~ms
   }
 
-  if (c->num_sm_resps++ == 1000000) {
+  if (c->num_sm_resps++ == 200000) {
     double point_us_median = c->client.point_latency.perc(.5) / 10.0;
     double point_us_99 = c->client.point_latency.perc(.99) / 10.0;
     double range_us_90 = c->client.range_latency.perc(.90) * 10.0;
