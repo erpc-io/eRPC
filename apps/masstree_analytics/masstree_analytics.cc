@@ -84,7 +84,7 @@ void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 req_t generate_request(AppContext *c) {
   req_t ret;
 
-  if (c->fastrand.next_u32() % 100 == 0) {
+  if (c->fastrand.next_u32() % 100 == 1000) {
     // Generate a range request
     ret.req_type = kAppRangeReqType;
     ret.range_req.key = c->fastrand.next_u32() % FLAGS_num_keys;
@@ -153,18 +153,23 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->client.range_latency.update(static_cast<size_t>(usec * 0.1));  // ~ms
   }
 
-  if (c->num_sm_resps++ == 200000) {
+  constexpr size_t kMeasurement = 1000000;
+  if (c->client.num_resps_tot++ == kMeasurement) {
     double point_us_median = c->client.point_latency.perc(.5) / 10.0;
     double point_us_99 = c->client.point_latency.perc(.99) / 10.0;
     double range_us_90 = c->client.range_latency.perc(.90) * 10.0;
 
+    double seconds = ERpc::sec_since(c->client.tput_t0);
+    double tput = kMeasurement / (seconds * 1000000);
+
     printf(
-        "masstree_analytics: Client %zu. "
+        "masstree_analytics: Client %zu. Tput = %.3f Mrps. "
         "Point latency (us) = {%.2f 50, %.2f 99}. "
         "Range latency (us) = %.2f 90.\n",
-        c->thread_id, point_us_median, point_us_99, range_us_90);
+        c->thread_id, tput, point_us_median, point_us_99, range_us_90);
 
-    c->num_sm_resps = 0;
+    clock_gettime(CLOCK_REALTIME, &c->client.tput_t0);
+    c->client.num_resps_tot = 0;
     c->client.point_latency.reset();
     c->client.range_latency.reset();
   }
@@ -186,11 +191,12 @@ void client_thread_func(size_t thread_id, ERpc::Nexus *nexus) {
 
   // Each client creates a session to only one server thread
   auto server_hostname = get_hostname_for_machine(0);
-  size_t server_thread_id = thread_id % FLAGS_num_server_fg_threads;
+  size_t client_gid = (FLAGS_machine_id * FLAGS_num_client_threads) + thread_id;
+  size_t server_tid = client_gid % FLAGS_num_server_fg_threads;  // ERpc TID
 
   c.session_num_vec.resize(1);
   c.session_num_vec[0] =
-      rpc.create_session(server_hostname, server_thread_id, kAppPhyPort);
+      rpc.create_session(server_hostname, server_tid, kAppPhyPort);
   assert(c.session_num_vec[0] >= 0);
 
   while (c.num_sm_resps != 1) {
@@ -203,6 +209,7 @@ void client_thread_func(size_t thread_id, ERpc::Nexus *nexus) {
           thread_id);
 
   alloc_req_resp_msg_buffers(&c);
+  clock_gettime(CLOCK_REALTIME, &c.client.tput_t0);
   for (size_t i = 0; i < FLAGS_req_window; i++) send_req(&c, i);
 
   while (ctrl_c_pressed == 0) c.rpc->run_event_loop(200);

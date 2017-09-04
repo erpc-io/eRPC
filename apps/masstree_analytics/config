@@ -1,6 +1,6 @@
 --test_ms 20000
---num_server_fg_threads 1
+--num_server_fg_threads 8
 --num_server_bg_threads 1
---num_client_threads 1
---req_window 1
---num_keys 1024
+--num_client_threads 4
+--req_window 8
+--num_keys 1000

@@ -71,11 +71,12 @@ class AppContext : public BasicAppContext {
     ERpc::Latency point_latency;  // Latency of point requests (factor = 10)
     ERpc::Latency range_latency;  // Latency of point requests (factor = .1)
 
+    struct timespec tput_t0;         // Throughput measurement start
     uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
     ERpc::MsgBuffer req_msgbuf[kMaxReqWindow];
     ERpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
 
-    size_t num_resps_tot = 0;  // Total responses received (range & point)
+    size_t num_resps_tot = 0;  // Total responses received (range & point reqs)
   } client;
 };
 

@@ -22,7 +22,7 @@ fi
 # Check for non-gdb mode
 if [ "$#" -eq 1 ]; then
   blue "do.sh: machine ID = $1"
-  sudo taskset -c 0 ./build/$autorun_app $(cat apps/$autorun_app/config) --machine_id $1
+  sudo ./build/$autorun_app $(cat apps/$autorun_app/config) --machine_id $1
 fi
 
 # Check for gdb mode
