@@ -228,11 +228,13 @@ class Rpc {
   /// can be called only from the creator thread.
   size_t num_active_sessions() { return num_active_sessions_st(); }
 
-  /// Return true iff this sess
+  /// Return true iff this session is connected. The session must not have
+  /// been disconnected.
   bool is_connected(int session_num) {
     assert(session_num >= 0 &&
            static_cast<size_t>(session_num) < session_vec.size());
-    return session_vec[static_cast<size_t>(session_num)] != nullptr;
+
+    return session_vec[static_cast<size_t>(session_num)]->is_connected();
   }
 
  private:
