@@ -12,8 +12,7 @@ void req_handler(ERpc::ReqHandle *req_handle, void *) {
 
 int main() {
   Nexus nexus("128.110.96.136", UDP_PORT);
-  nexus.register_req_func(REQ_TYPE,
-                          ReqFunc(req_handler, ReqFuncType::kForeground));
+  nexus.register_req_func(REQ_TYPE, ReqFunc(req_handler, kForeground));
 
   rpc = new Rpc<IBTransport>(&nexus, nullptr, SERVER_ID, nullptr);
   rpc->run_event_loop(100000);
