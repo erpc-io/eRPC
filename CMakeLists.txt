@@ -199,17 +199,18 @@ elseif(APP STREQUAL "masstree_analytics")
   set(LIBRARIES ${LIBRARIES} masstree)
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/get.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/del.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/bucket.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/set.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/prefetch.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/init.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/lock.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/info.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/table/fixedtable_impl/item.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/util/cityhash/city_mod.cc)
-  set(APP_ADDITIONAL_SOURCES mica/src/mica/util/config.cc)
+  set(APP_ADDITIONAL_SOURCES
+    mica/src/mica/table/fixedtable_impl/get.cc
+    mica/src/mica/table/fixedtable_impl/del.cc
+    mica/src/mica/table/fixedtable_impl/bucket.cc
+    mica/src/mica/table/fixedtable_impl/set.cc
+    mica/src/mica/table/fixedtable_impl/prefetch.cc
+    mica/src/mica/table/fixedtable_impl/init.cc
+    mica/src/mica/table/fixedtable_impl/lock.cc
+    mica/src/mica/table/fixedtable_impl/info.cc
+    mica/src/mica/table/fixedtable_impl/item.cc
+    mica/src/mica/util/cityhash/city_mod.cc
+    mica/src/mica/util/config.cc)
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO

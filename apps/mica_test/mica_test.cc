@@ -30,10 +30,7 @@ typename ERpc::Transport::dereg_mr_func_t dereg_mr_func =
     std::bind(dereg_mr_wrapper, _1);
 // End dummy registration and deregistration functions for HugeAlloc
 
-struct FixedTableConfig : public ::mica::table::BasicFixedTableConfig {
-  static constexpr bool kFetchAddOnlyIfEven = false;
-};
-typedef ::mica::table::FixedTable<FixedTableConfig> FixedTable;
+typedef ::mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
 
 typedef ::mica::table::Result MicaResult; /* An enum */
 typedef uint64_t test_key_t;
@@ -57,7 +54,7 @@ int main() {
   uint64_t seed = 0xdeadbeef;
   std::chrono::high_resolution_clock timer;
 
-  auto config = ::mica::util::Config::load_file("test_table.json");
+  auto config = ::mica::util::Config::load_file("apps/mica_test/mica_test.json");
 
   size_t num_keys =
       static_cast<size_t>(config.get("test").get("num_keys").get_int64());
