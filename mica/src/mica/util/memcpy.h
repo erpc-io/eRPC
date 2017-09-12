@@ -4,7 +4,11 @@
 
 #include <cstring>
 #include "mica/common.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "mica/util/rte_memcpy/rte_memcpy_mod.h"
+
 #include "mica/util/roundup.h"
 
 namespace mica {
@@ -160,4 +164,5 @@ static bool memcmp_equal(const T1* a, const T2* b, size_t n) {
 }
 }
 
+#pragma GCC diagnostic pop
 #endif

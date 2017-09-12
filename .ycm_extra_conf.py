@@ -39,7 +39,7 @@ flags = [
     '-DFAULT_INJECTION',
     '-I/users/akalia/eRPC/src',
     '-I/users/akalia/eRPC/third_party',
-    '-I/users/akalia/eRPC/apps/mica_test/src',
+    '-I/users/akalia/eRPC/mica/src',
     '-I/users/akalia/masstree-beta',
     '-Wall',
     '-Werror',

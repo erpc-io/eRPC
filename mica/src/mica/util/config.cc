@@ -11,6 +11,7 @@
 #pragma GCC diagnostic ignored "-Wconversion"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Winline"
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "mica/util/rapidjson/stringbuffer.h"
 #include "mica/util/rapidjson/writer.h"
 #include "mica/util/rapidjson/error/en.h"
