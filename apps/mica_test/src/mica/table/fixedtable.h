@@ -18,11 +18,20 @@
 //    table.
 //  * extra_collision_avoidance (float): The amount of additional memory to
 //    resolve excessive hash collisions as a fraction of the main hash table.
+//    Default = 0. if kEviction = true, 0.1 otherwise.
+//  * concurrent_read (bool): If true, enable concurrent reads by multiple
+//    threads.
+//  * concurrent_write (bool): If true, enable concurrent writes by multiple
+//    threads.
 //  * numa_node (integer): The ID of the NUMA node to store the data.
 namespace mica {
 namespace table {
 struct BasicFixedTableConfig {
   static constexpr size_t kBucketCap = 7;
+
+  // Support concurrent access.  The actual concurrent access is enabled by
+  // concurrent_read and concurrent_write in the configuration.
+  static constexpr bool kConcurrent = true;
 
   // Be verbose.
   static constexpr bool kVerbose = false;
@@ -49,26 +58,19 @@ class FixedTable {
 
   // fixedtable_impl/bucket.cc
   void print_bucket_occupancy();
-  double get_locked_bkt_fraction();
+
+  // fixedtable_impl/del.h
+  Result del(uint64_t key_hash, ft_key_t key);
 
   // fixedtable_impl/get.cc
   Result get(uint64_t key_hash, ft_key_t key, char* out_value) const;
 
-  // fixedtable_impl/unlock_bkt.cc
-  Result unlock_bucket_hash(uint64_t key_hash);
-
-  // fixedtable_impl/lock_bkt.cc
-  Result lock_bucket_hash(uint64_t key_hash);
+  // fixedtable_impl/atomic_fetch_add.h
+  Result atomic_fetch_add(uint64_t key_hash, ft_key_t key, char *value,
+                          uint64_t increment);
 
   // fixedtable_impl/set.cc
-  Result set(uint64_t key_hash, ft_key_t key,
-             const char* value);
-
-  // fixedtable_impl/set_spinlock.cc - local use only
-  Result set_spinlock(uint64_t key_hash, ft_key_t key, const char* value);
-
-  // fixedtable_impl/del.h
-  Result del(uint64_t key_hash, ft_key_t key);
+  Result set(uint64_t key_hash, ft_key_t key, const char* value);
 
   // fixedtable_impl/prefetch.h
   void prefetch_table(uint64_t key_hash) const;
@@ -79,30 +81,18 @@ class FixedTable {
   void reset_stats(bool reset_count);
 
  private:
-  // Bucket configuration
-  static constexpr uint32_t kNumLocksBits = 5;
-  static constexpr uint32_t kMaxNumLocks = ((1u << kNumLocksBits) - 1);
-  static_assert(kMaxNumLocks > StaticConfig::kBucketCap, "");
-  
-  static constexpr uint32_t kCallerIdBits = (32 - kNumLocksBits);
-  static constexpr uint32_t kMaxCallerId = ((1u << kCallerIdBits) - 1);
-  static constexpr uint32_t kInvalidCallerId = kMaxCallerId;
-
   // To keep the value size runtime-configurable, the value array is not
   // included in the Bucket struct. In the allocated memory, the value array
   // for a Bucket is adjacent to it. So, the size of each logical bucket is
   // (sizeof(Bucket) + val_size * kBucketCap).
   // To locate the ith Bucket, use the get_bucket(i) function.
   struct Bucket {
-    uint32_t locker_id :kCallerIdBits;
-    uint32_t num_locks :kNumLocksBits; // Number of locks held by @locker_id
-
+    uint32_t version;                  // XXX: is uint32_t wide enough?
     uint32_t next_extra_bucket_index;  // 1-base; 0 = no extra bucket
-    uint64_t timestamp;
     ft_key_t key_arr[StaticConfig::kBucketCap];
   };
 
-  static_assert(sizeof(Bucket) == 2 * sizeof(uint64_t) +
+  static_assert(sizeof(Bucket) == 2 * sizeof(uint32_t) +
     StaticConfig::kBucketCap * sizeof(ft_key_t), "");
 
   size_t bkt_size_with_val;	// Size of the buckets with value
@@ -150,27 +140,25 @@ class FixedTable {
                        ft_key_t key, const char* value);
 
   // fixedtable_impl/lock.h
-  bool lock_bucket_ptr(Bucket* bucket);
-  void unlock_bucket_ptr(Bucket* bucket);
+  void lock_bucket(Bucket* bucket);
+  void unlock_bucket(Bucket* bucket);
   void lock_extra_bucket_free_list();
   void unlock_extra_bucket_free_list();
-  uint64_t read_timestamp(const Bucket* bucket) const;
-  bool is_locked(uint64_t timestamp) const;
-  bool is_unlocked(uint64_t timestamp) const;
+  uint32_t read_version_begin(const Bucket* bucket) const;
+  uint32_t read_version_end(const Bucket* bucket) const;
 
   ::mica::util::Config config_;
-public:
   size_t val_size;	// Size of each value
   int bkt_shm_key;	// User-defined SHM key used for bucket memory
   Alloc* alloc_;
-  bool is_primary;
 
-private:
   ERpc::HugeAlloc *huge_alloc;
   Bucket* buckets_ = NULL;
   Bucket* extra_buckets_ = NULL;  // = (buckets + num_buckets); extra_buckets[0]
                                   // is not used because index 0 indicates "no
                                   // more extra bucket"
+
+  uint8_t concurrent_access_mode_;
 
   uint32_t num_buckets_;
   uint32_t num_buckets_mask_;
@@ -186,20 +174,4 @@ private:
                                   // adjacent cacheline prefetching.
 }
 }
-
-#include "mica/table/fixedtable_impl/lock.h"
-#include "mica/table/fixedtable_impl/bucket.h"
-#include "mica/table/fixedtable_impl/item.h"
-#include "mica/table/fixedtable_impl/info.h"
-#include "mica/table/fixedtable_impl/init.h"
-
-// Datapath operations
-#include "mica/table/fixedtable_impl/del.h"
-#include "mica/table/fixedtable_impl/set.h"
-#include "mica/table/fixedtable_impl/set_spinlock.h"
-#include "mica/table/fixedtable_impl/get.h"
-#include "mica/table/fixedtable_impl/lock_bkt.h"
-#include "mica/table/fixedtable_impl/unlock_bkt.h"
-#include "mica/table/fixedtable_impl/prefetch.h"
-
 #endif

@@ -9,12 +9,10 @@ namespace mica {
 namespace table {
 enum class Result {
   kSuccess = 0,
-  kLocked,
   kError,
   kInsufficientSpacePool,
   kInsufficientSpaceIndex,
   kExists,
-  kNotEven,
   kNotFound,
   kPartialValue,
   kNotProcessed,
@@ -28,8 +26,6 @@ static std::string ResultString(enum Result r)
 	switch(r) {
 		case Result::kSuccess:
 			return std::string("Success");
-		case Result::kLocked:
-			return std::string("Locked");
 		case Result::kError:
 			return std::string("Error");
 		case Result::kInsufficientSpacePool:
@@ -38,8 +34,6 @@ static std::string ResultString(enum Result r)
 			return std::string("Insufficient space in index");
 		case Result::kExists:
 			return std::string("Exists");
-		case Result::kNotEven:
-			return std::string("Value not even (F&A)");
 		case Result::kNotFound:
 			return std::string("Not found");
 		case Result::kPartialValue:

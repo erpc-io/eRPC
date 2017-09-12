@@ -8,9 +8,9 @@ namespace mica {
 namespace table {
 template <class StaticConfig>
 FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
-     size_t val_size, ERpc::HugeAlloc* alloc, bool is_primary) :
+     size_t val_size, ERpc::HugeAlloc*) :
      config_(config), val_size(val_size), bkt_shm_key(bkt_shm_key),
-     alloc_(alloc), is_primary(is_primary) {
+     alloc_(alloc) {
   assert(val_size % sizeof(uint64_t) == 0); // Make buckets 8-byte aligned
 
   // The Bucket struct does not contain values
@@ -29,6 +29,8 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   size_t num_extra_buckets = static_cast<size_t>(
       static_cast<double>(num_buckets) * extra_collision_avoidance);
 
+  bool concurrent_read = config.get("concurrent_read").get_bool();
+  bool concurrent_write = config.get("concurrent_write").get_bool();
   size_t numa_node = config.get("numa_node").get_uint64();
 
   assert(num_buckets > 0);
@@ -58,6 +60,13 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
                    ((num_buckets_ - 1) * bkt_size_with_val));
   // the rest extra_bucket information is initialized in reset()
 
+  if (!concurrent_read)
+    concurrent_access_mode_ = 0;
+  else if (concurrent_read && !concurrent_write)
+    concurrent_access_mode_ = 1;
+  else
+    concurrent_access_mode_ = 2;
+
   reset();
 
   if (StaticConfig::kVerbose) {
@@ -65,6 +74,9 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
 
     if (StaticConfig::kCollectStats)
       fprintf(stderr, "warning: kCollectStats is defined (low performance)\n");
+
+    if (StaticConfig::kConcurrent && !concurrent_read && !concurrent_write)
+      fprintf(stderr, "warning: kConcurrent is defined (low performance)\n");
 
     fprintf(stderr, "info: num_buckets = %u\n", num_buckets_);
     fprintf(stderr, "info: num_extra_buckets = %u\n", num_extra_buckets_);
@@ -88,10 +100,6 @@ void FixedTable<StaticConfig>::reset() {
   // Initialize bucket metadata + fill in invalid keys
   for (size_t bkt_i = 0; bkt_i < num_buckets_ + num_extra_buckets_; bkt_i++) {
     Bucket *bucket = get_bucket(bkt_i);
-    bucket->timestamp = (kTimestampCanary << 61);
-    bucket->locker_id = kInvalidCallerId;
-    bucket->num_locks = 0;
-
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
         item_index++) {
       bucket->key_arr[item_index] = kFtInvalidKey;

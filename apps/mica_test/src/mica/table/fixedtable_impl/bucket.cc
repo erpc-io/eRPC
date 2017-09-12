@@ -239,20 +239,6 @@ size_t FixedTable<StaticConfig>::find_item_index(Bucket* bucket, ft_key_t key,
 }
 
 template <class StaticConfig>
-double FixedTable<StaticConfig>::get_locked_bkt_fraction() {
-  size_t num_locked_buckets = 0;
-  // Examine only primary buckets
-  for (size_t bkt_i = 0; bkt_i < num_buckets_; bkt_i++) {
-    Bucket *bucket = get_bucket(bkt_i);
-    if(is_locked(bucket->timestamp)) {
-      num_locked_buckets++;
-    }
-  }
-
-  return (double) num_locked_buckets / num_buckets_;
-}
-
-template <class StaticConfig>
 void FixedTable<StaticConfig>::print_bucket_occupancy() {
   size_t primary_slots_used = 0, extra_slots_used = 0;
   // A bucket is considered used if any of its slots is used
@@ -294,10 +280,6 @@ void FixedTable<StaticConfig>::print_bucket_occupancy() {
     name.c_str(),
     (double) extra_slots_used / (num_extra_buckets_ * StaticConfig::kBucketCap),
     extra_slots_used, num_extra_buckets_ * StaticConfig::kBucketCap);
-
-  printf("Table %s: Memory efficiency = %.2f\n", name.c_str(),
-    (double) (primary_slots_used + extra_slots_used) /
-        ((num_buckets_ + num_extra_buckets_) * StaticConfig::kBucketCap));
 }
 }
 }
