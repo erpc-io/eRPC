@@ -3,7 +3,7 @@
 namespace mica {
 namespace table {
 template <class StaticConfig>
-Result FixedTable<StaticConfig>::set(uint64_t key_hash, ft_key_t key,
+Result FixedTable<StaticConfig>::set(uint64_t key_hash, const ft_key_t& key,
                                      const char* value) {
   if (key == ft_invalid_key) return Result::kRejected;
 

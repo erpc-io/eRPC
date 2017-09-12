@@ -39,7 +39,7 @@ struct BasicFixedTableConfig {
   // reset_stats().
   static constexpr bool kCollectStats = false;
 
-  static constexpr size_t kKeySize = 8;
+  static constexpr size_t kKeySize = 64;
 };
 
 template <class StaticConfig = BasicFixedTableConfig>
@@ -47,7 +47,8 @@ class FixedTable {
  public:
   // Other key sizes require more operator (==) definitions below
   static_assert(StaticConfig::kKeySize == 8 || StaticConfig::kKeySize == 16 ||
-                StaticConfig::kKeySize == 64 || "");
+                    StaticConfig::kKeySize == 64,
+                "");
 
   struct ft_key_t {
     size_t qword[StaticConfig::kKeySize / 8];
@@ -98,17 +99,13 @@ class FixedTable {
   void print_bucket_occupancy();
 
   // fixedtable_impl/del.h
-  Result del(uint64_t key_hash, ft_key_t key);
+  Result del(uint64_t key_hash, const ft_key_t& key);
 
   // fixedtable_impl/get.cc
-  Result get(uint64_t key_hash, ft_key_t key, char* out_value) const;
-
-  // fixedtable_impl/atomic_fetch_add.h
-  Result atomic_fetch_add(uint64_t key_hash, ft_key_t key, char* value,
-                          uint64_t increment);
+  Result get(uint64_t key_hash, const ft_key_t& key, char* out_value) const;
 
   // fixedtable_impl/set.cc
-  Result set(uint64_t key_hash, ft_key_t key, const char* value);
+  Result set(uint64_t key_hash, const ft_key_t& key, const char* value);
 
   // fixedtable_impl/prefetch.h
   void prefetch_table(uint64_t key_hash) const;
@@ -169,9 +166,10 @@ class FixedTable {
   void free_extra_bucket(Bucket* bucket);
   void fill_hole(Bucket* bucket, size_t unused_item_index);
   size_t get_empty(Bucket* bucket, Bucket** located_bucket);
-  size_t find_item_index(const Bucket* bucket, ft_key_t key,
+  size_t find_item_index(const Bucket* bucket, const ft_key_t& key,
                          const Bucket** located_bucket) const;
-  size_t find_item_index(Bucket* bucket, ft_key_t key, Bucket** located_bucket);
+  size_t find_item_index(Bucket* bucket, const ft_key_t& key,
+                         Bucket** located_bucket);
 
   // fixedtable_impl/info.h
   void print_bucket(const Bucket* bucket) const;
@@ -179,7 +177,7 @@ class FixedTable {
   void stat_dec(size_t Stats::*counter) const;
 
   // fixedtable_impl/item.h
-  void set_item(Bucket* located_bucket, size_t item_index, ft_key_t key,
+  void set_item(Bucket* located_bucket, size_t item_index, const ft_key_t key,
                 const char* value);
 
   // fixedtable_impl/lock.h

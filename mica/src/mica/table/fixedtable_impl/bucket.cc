@@ -202,7 +202,8 @@ size_t FixedTable<StaticConfig>::get_empty(Bucket* bucket,
 
 template <class StaticConfig>
 size_t FixedTable<StaticConfig>::find_item_index(
-    const Bucket* bucket, ft_key_t key, const Bucket** located_bucket) const {
+    const Bucket* bucket, const ft_key_t& key,
+    const Bucket** located_bucket) const {
   const Bucket* current_bucket = bucket;
 
   while (true) {
@@ -231,7 +232,8 @@ size_t FixedTable<StaticConfig>::find_item_index(
 }
 
 template <class StaticConfig>
-size_t FixedTable<StaticConfig>::find_item_index(Bucket* bucket, ft_key_t key,
+size_t FixedTable<StaticConfig>::find_item_index(Bucket* bucket,
+                                                 const ft_key_t& key,
                                                  Bucket** located_bucket) {
   return find_item_index(const_cast<const Bucket*>(bucket), key,
                          const_cast<const Bucket**>(located_bucket));

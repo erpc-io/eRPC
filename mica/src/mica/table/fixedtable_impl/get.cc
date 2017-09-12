@@ -9,7 +9,7 @@ template <class StaticConfig>
  * @param out_value Pointer to a buffer to copy the value to. The buffer should
  * have space for StaticConfig::kValSize bytes
  */
-Result FixedTable<StaticConfig>::get(uint64_t key_hash, ft_key_t key,
+Result FixedTable<StaticConfig>::get(uint64_t key_hash, const ft_key_t& key,
                                      char* out_value) const {
   uint32_t bucket_index = calc_bucket_index(key_hash);
   const Bucket* bucket = get_bucket(bucket_index);

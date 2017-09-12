@@ -21,6 +21,7 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
 
   size_t num_buckets =
       (item_count + StaticConfig::kBucketCap - 1) / StaticConfig::kBucketCap;
+  ERpc::rt_assert(num_buckets > 0, "");
 
   double extra_collision_avoidance = 0.1;
   size_t num_extra_buckets = static_cast<size_t>(
@@ -30,16 +31,14 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   bool concurrent_write = config.get("concurrent_write").get_bool();
   size_t numa_node = config.get("numa_node").get_uint64();
 
-  assert(num_buckets > 0);
-
   size_t log_num_buckets = 0;
   while ((1ull << log_num_buckets) < num_buckets) log_num_buckets++;
-  num_buckets = 1ull << log_num_buckets;
-  assert(log_num_buckets <= 32);
+  ERpc::rt_assert(log_num_buckets <= 32, "");
 
-  ERpc::rt_assert(num_buckets_ < std::numeric_limits<int>::max(), "");
-  ERpc::rt_assert(num_buckets_mask_ < std::numeric_limits<int>::max(), "");
-  ERpc::rt_assert(num_extra_buckets_ < std::numeric_limits<int>::max(), "");
+  num_buckets = 1ull << log_num_buckets;
+  ERpc::rt_assert(num_buckets < std::numeric_limits<int>::max(), "");
+  ERpc::rt_assert(num_extra_buckets < std::numeric_limits<int>::max(), "");
+
   num_buckets_ = static_cast<uint32_t>(num_buckets);
   num_buckets_mask_ = static_cast<uint32_t>(num_buckets - 1);
   num_extra_buckets_ = static_cast<uint32_t>(num_extra_buckets);

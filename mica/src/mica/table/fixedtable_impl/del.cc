@@ -3,7 +3,7 @@
 namespace mica {
 namespace table {
 template <class StaticConfig>
-Result FixedTable<StaticConfig>::del(uint64_t key_hash, ft_key_t key) {
+Result FixedTable<StaticConfig>::del(uint64_t key_hash, const ft_key_t& key) {
   uint32_t bucket_index = calc_bucket_index(key_hash);
 
   Bucket* bucket = get_bucket(bucket_index);
