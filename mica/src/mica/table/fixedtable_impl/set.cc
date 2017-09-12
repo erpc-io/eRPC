@@ -5,6 +5,8 @@ namespace table {
 template <class StaticConfig>
 Result FixedTable<StaticConfig>::set(uint64_t key_hash, ft_key_t key,
                                      const char* value) {
+  if (key == ft_invalid_key) return Result::kRejected;
+
   uint32_t bucket_index = calc_bucket_index(key_hash);
 
   Bucket* bucket = get_bucket(bucket_index);

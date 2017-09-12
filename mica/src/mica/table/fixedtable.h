@@ -28,7 +28,7 @@ namespace table {
 struct BasicFixedTableConfig {
   static constexpr size_t kBucketCap = 7;
 
-  // Support concurrent access.  The actual concurrent access is enabled by
+  // Support concurrent access. The actual concurrent access is enabled by
   // concurrent_read and concurrent_write in the configuration.
   static constexpr bool kConcurrent = false;
 
@@ -38,15 +38,54 @@ struct BasicFixedTableConfig {
   // Collect fine-grained statistics accessible via print_stats() and
   // reset_stats().
   static constexpr bool kCollectStats = false;
+
+  static constexpr size_t kKeySize = 8;
 };
 
 template <class StaticConfig = BasicFixedTableConfig>
 class FixedTable {
  public:
-  std::string name;  // Name of the table
+  // Other key sizes require more operator (==) definitions below
+  static_assert(StaticConfig::kKeySize == 8 || StaticConfig::kKeySize == 16 ||
+                StaticConfig::kKeySize == 64 || "");
 
-  typedef uint64_t ft_key_t;  // FixedTable key type
-  static constexpr uint64_t kFtInvalidKey = 0xffffffffffffffffull;
+  struct ft_key_t {
+    size_t qword[StaticConfig::kKeySize / 8];
+
+    bool operator==(const ft_key_t& other) const {
+      if (StaticConfig::kKeySize == 8) {
+        return qword[0] == other.qword[0];
+      }
+
+      if (StaticConfig::kKeySize == 16) {
+        return qword[0] == other.qword[0] && qword[1] == other.qword[1];
+      }
+
+      if (StaticConfig::kKeySize == 64) {
+        return qword[0] == other.qword[0] && qword[1] == other.qword[1] &&
+               qword[2] == other.qword[2] && qword[3] == other.qword[3] &&
+               qword[4] == other.qword[4] && qword[5] == other.qword[5] &&
+               qword[6] == other.qword[6] && qword[7] == other.qword[7];
+      }
+    }
+
+    bool operator!=(const ft_key_t& other) const {
+      if (StaticConfig::kKeySize == 8) {
+        return qword[0] != other.qword[0];
+      }
+
+      if (StaticConfig::kKeySize == 16) {
+        return qword[0] != other.qword[0] || qword[1] != other.qword[1];
+      }
+
+      if (StaticConfig::kKeySize == 64) {
+        return qword[0] != other.qword[0] || qword[1] != other.qword[1] ||
+               qword[2] != other.qword[2] || qword[3] != other.qword[3] ||
+               qword[4] != other.qword[4] || qword[5] != other.qword[5] ||
+               qword[6] != other.qword[6] || qword[7] != other.qword[7];
+      }
+    }
+  };
 
   // fixedtable_impl/init.cc
   FixedTable(const ::mica::util::Config& config, size_t val_size,
@@ -92,7 +131,7 @@ class FixedTable {
   };
 
   static_assert(sizeof(Bucket) ==
-                    2 * sizeof(uint32_t) +
+                    sizeof(uint64_t) +
                         StaticConfig::kBucketCap * sizeof(ft_key_t),
                 "");
 
@@ -114,6 +153,9 @@ class FixedTable {
     size_t delete_found;
     size_t delete_notfound;
   };
+
+  // fixedtable_impl/init.cc
+  ft_key_t invalid_key() const;
 
   // fixedtable_impl/bucket.h
   uint32_t calc_bucket_index(uint64_t key_hash) const;
@@ -148,10 +190,15 @@ class FixedTable {
   uint32_t read_version_begin(const Bucket* bucket) const;
   uint32_t read_version_end(const Bucket* bucket) const;
 
+ public:
+  std::string name;  // Name of the table
+
+ private:
   ::mica::util::Config config_;
   size_t val_size;  // Size of each value
-
   ERpc::HugeAlloc* alloc_;
+  const ft_key_t ft_invalid_key;  // Invalid key to check for empty buckets
+
   Bucket* buckets_ = NULL;
   Bucket* extra_buckets_ = NULL;  // = (buckets + num_buckets); extra_buckets[0]
                                   // is not used because index 0 indicates "no

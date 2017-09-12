@@ -5,7 +5,10 @@ namespace table {
 template <class StaticConfig>
 FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
                                      size_t val_size, ERpc::HugeAlloc* alloc)
-    : config_(config), val_size(val_size), alloc_(alloc) {
+    : config_(config),
+      val_size(val_size),
+      alloc_(alloc),
+      ft_invalid_key(invalid_key()) {
   assert(val_size % sizeof(uint64_t) == 0);  // Make buckets 8-byte aligned
 
   // The Bucket struct does not contain values
@@ -98,7 +101,7 @@ void FixedTable<StaticConfig>::reset() {
     Bucket* bucket = get_bucket(bkt_i);
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
          item_index++) {
-      bucket->key_arr[item_index] = kFtInvalidKey;
+      bucket->key_arr[item_index] = ft_invalid_key;
     }
   }
 
@@ -123,6 +126,17 @@ void FixedTable<StaticConfig>::reset() {
   }
 
   reset_stats(true);
+}
+
+template <class StaticConfig>
+typename FixedTable<StaticConfig>::ft_key_t
+FixedTable<StaticConfig>::invalid_key() const {
+  ft_key_t ret;
+  for (size_t i = 0; i < StaticConfig::kKeySize / 8; i++) {
+    ret.qword[i] = 0xffffffffffffffffull;
+  }
+
+  return ret;
 }
 }
 }

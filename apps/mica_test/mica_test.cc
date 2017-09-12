@@ -8,10 +8,6 @@
 #include "mica/util/hash.h"
 #include "util/huge_alloc.h"
 
-/*
- * 0: No prefetch
- * 1: Prefetch table
- */
 #define USE_PREFETCH 1
 #define VAL_SIZE 16
 
@@ -30,10 +26,11 @@ typename ERpc::Transport::dereg_mr_func_t dereg_mr_func =
     std::bind(dereg_mr_wrapper, _1);
 // End dummy registration and deregistration functions for HugeAlloc
 
-typedef ::mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
+typedef ::mica::table::FixedTable<mica::table::BasicFixedTableConfig>
+    FixedTable;
+typedef FixedTable::ft_key_t test_key_t;
 
-typedef ::mica::table::Result MicaResult; /* An enum */
-typedef uint64_t test_key_t;
+typedef ::mica::table::Result MicaResult;
 struct test_val_t {
   uint64_t buf[VAL_SIZE / sizeof(uint64_t)];
 };
@@ -54,7 +51,7 @@ int main() {
   uint64_t seed = 0xdeadbeef;
   std::chrono::high_resolution_clock timer;
 
-  auto config = ::mica::util::Config::load_file("apps/mica_test/mica_test.json");
+  auto config = mica::util::Config::load_file("apps/mica_test/mica_test.json");
 
   size_t num_keys =
       static_cast<size_t>(config.get("test").get("num_keys").get_int64());
@@ -67,38 +64,32 @@ int main() {
   auto *alloc = new ERpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
   FixedTable table(config.get("table"), VAL_SIZE, alloc);
 
-  auto *key_arr = reinterpret_cast<test_key_t *>(alloc->alloc_raw(
-     num_keys * sizeof(test_key_t), 0));
+  auto *key_arr = reinterpret_cast<test_key_t *>(
+      alloc->alloc_raw(num_keys * sizeof(test_key_t), 0));
   ERpc::rt_assert(key_arr != nullptr, "");
 
-  auto *val_arr = reinterpret_cast<test_val_t *>(alloc->alloc_raw(
-      num_keys * sizeof(test_val_t), 0));
+  auto *val_arr = reinterpret_cast<test_val_t *>(
+      alloc->alloc_raw(num_keys * sizeof(test_val_t), 0));
 
   uint64_t *key_hash_arr = new uint64_t[batch_size];
   MicaResult out_result;
-  std::unordered_set<uint64_t> S;
 
-  /*
-   * This is more of a correctness test: the keys are queried in the same
-   * order as they are inserted, causing sequential pool memory accesses.
-   */
+  // This is more of a correctness test: the keys are queried in the same
+  // order as they are inserted.
   for (int iter = 0; iter < num_iters; iter++) {
-    /* Populate @key_arr with unique keys */
+    // Populate key_arr with unique keys
     printf("Iteration %d: Generating keys\n", iter);
     for (size_t i = 0; i < num_keys; i++) {
-      uint64_t key = hrd_fastrand(&seed);
-      while (S.count(key) == 1) {
-        key = hrd_fastrand(&seed);
+      test_key_t ft_key;
+      for (size_t j = 0; j < sizeof(test_key_t) / 8; j++) {
+        ft_key.qword[j] = hrd_fastrand(&seed);
       }
 
-      S.insert(key);
-      key_arr[i] = key;
-      val_arr[i].buf[0] = key;
+      key_arr[i] = ft_key;
+      val_arr[i].buf[0] = key_arr[i].qword[0];
     }
 
-    S.clear();
-
-    /* Insert */
+    // Insert
     printf("Iteration %d: Setting keys\n", iter);
     auto start = timer.now();
     for (size_t i = 0; i < num_keys; i += batch_size) {
@@ -110,9 +101,8 @@ int main() {
       }
 
       for (size_t j = 0; j < batch_size; j++) {
-        out_result =
-            table.set(key_hash_arr[j], key_arr[i + j],
-                      reinterpret_cast<char *>(&val_arr[i + j]));
+        out_result = table.set(key_hash_arr[j], key_arr[i + j],
+                               reinterpret_cast<char *>(&val_arr[i + j]));
         if (out_result != MicaResult::kSuccess) {
           printf("Inserting key %zu failed. Error = %s\n", i + j,
                  ::mica::table::ResultString(out_result).c_str());
@@ -123,11 +113,12 @@ int main() {
 
     auto end = timer.now();
     double us =
-        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+            .count();
 
     printf("Insert tput = %.2f M/s\n", num_keys / us);
 
-    /* GET */
+    // GET
     start = timer.now();
     for (size_t i = 0; i < num_keys; i += batch_size) {
       for (size_t j = 0; j < batch_size; j++) {
@@ -140,28 +131,29 @@ int main() {
       for (size_t j = 0; j < batch_size; j++) {
         test_val_t temp_val;
 
-        out_result =
-            table.get(key_hash_arr[j], key_arr[i + j],
-                      reinterpret_cast<char *>(&temp_val));
+        out_result = table.get(key_hash_arr[j], key_arr[i + j],
+                               reinterpret_cast<char *>(&temp_val));
         if (out_result != MicaResult::kSuccess) {
           printf("GET failed for key %zu. Error = %s\n", i + j,
                  ::mica::table::ResultString(out_result).c_str());
           exit(-1);
         }
 
-        if (temp_val.buf[0] != key_arr[i + j]) {
+        if (temp_val.buf[0] != key_arr[i + j].qword[0]) {
           printf("Bad value for key %lu. Expected = %lu, got = %lu\n",
-                 key_arr[i + j], key_arr[i + j], temp_val.buf[0]);
+                 key_arr[i + j].qword[0], key_arr[i + j].qword[0],
+                 temp_val.buf[0]);
           exit(-1);
         }
       }
     }
 
     end = timer.now();
-    us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    us = std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+             .count();
     printf("Get tput = %.2f M/s\n", num_keys / us);
 
-    /* Delete */
+    // Delete
     for (size_t i = 0; i < num_keys; i++) {
       uint64_t key_hash = mica_hash(&key_arr[i], sizeof(test_key_t));
       out_result = table.del(key_hash, key_arr[i]);

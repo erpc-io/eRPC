@@ -18,7 +18,7 @@ Result FixedTable<StaticConfig>::del(uint64_t key_hash, ft_key_t key) {
     return Result::kNotFound;
   }
 
-  located_bucket->key_arr[item_index] = kFtInvalidKey;
+  located_bucket->key_arr[item_index] = ft_invalid_key;
   stat_dec(&Stats::count);
 
   fill_hole(located_bucket, item_index);

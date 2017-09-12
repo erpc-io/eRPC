@@ -100,7 +100,7 @@ void FixedTable<StaticConfig>::free_extra_bucket(Bucket* bucket) {
   // verify if the extra bucket is empty (debug only)
   for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
        item_index++)
-    assert(extra_bucket->key_arr[item_index] == kFtInvalidKey);
+    assert(extra_bucket->key_arr[item_index] == ft_invalid_key);
 
   // detach
   bucket->next_extra_bucket_index = 0;
@@ -135,7 +135,7 @@ void FixedTable<StaticConfig>::fill_hole(Bucket* bucket,
 
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
          item_index++)
-      if (current_extra_bucket->key_arr[item_index] != kFtInvalidKey) {
+      if (current_extra_bucket->key_arr[item_index] != ft_invalid_key) {
         if (moved_item_index == StaticConfig::kBucketCap)
           moved_item_index = item_index;
         else {
@@ -164,7 +164,7 @@ void FixedTable<StaticConfig>::fill_hole(Bucket* bucket,
         get_value(current_extra_bucket, moved_item_index);
     ::mica::util::memcpy<8>(_unused_item_val, _moved_item_val, val_size);
 
-    current_extra_bucket->key_arr[moved_item_index] = kFtInvalidKey;
+    current_extra_bucket->key_arr[moved_item_index] = ft_invalid_key;
 
     // if it was the last entry of current_extra_bucket, free
     // current_extra_bucket
@@ -180,7 +180,7 @@ size_t FixedTable<StaticConfig>::get_empty(Bucket* bucket,
   while (true) {
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
          item_index++) {
-      if (current_bucket->key_arr[item_index] == kFtInvalidKey) {
+      if (current_bucket->key_arr[item_index] == ft_invalid_key) {
         *located_bucket = current_bucket;
         return item_index;
       }
@@ -248,7 +248,7 @@ void FixedTable<StaticConfig>::print_bucket_occupancy() {
     bool bkt_used = false;
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
          item_index++) {
-      if (bucket->key_arr[item_index] != kFtInvalidKey) {
+      if (bucket->key_arr[item_index] != ft_invalid_key) {
         bkt_i < num_buckets_ ? primary_slots_used++ : extra_slots_used++;
         bkt_used = true;
       }
