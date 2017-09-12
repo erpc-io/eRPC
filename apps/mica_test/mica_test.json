@@ -3,13 +3,15 @@
   },
 
   "table": {
-	"name": "test_table",
-    "item_count": 64000000,
+    "name": "test_table",
+    "concurrent_read" : false,
+    "concurrent_write" : false,
+    "item_count": 64000,
     "numa_node": 0
   },
 
   "test": {
-    "num_keys": 16000000,
-	"batch_size": 8
+    "num_keys": 16000,
+    "batch_size": 8
   }
 }
