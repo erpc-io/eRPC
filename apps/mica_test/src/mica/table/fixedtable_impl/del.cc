@@ -1,7 +1,3 @@
-#pragma once
-#ifndef MICA_TABLE_FIXED_TABLE_IMPL_DEL_H_
-#define MICA_TABLE_FIXED_TABLE_IMPL_DEL_H_
-
 #include "mica/table/fixedtable.h"
 
 namespace mica {
@@ -34,5 +30,3 @@ Result FixedTable<StaticConfig>::del(uint64_t key_hash, ft_key_t key) {
 }
 }
 }
-
-#endif

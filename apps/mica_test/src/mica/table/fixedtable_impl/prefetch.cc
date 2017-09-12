@@ -1,7 +1,3 @@
-#pragma once
-#ifndef MICA_TABLE_FIXED_TABLE_IMPL_PREFETCH_H_
-#define MICA_TABLE_FIXED_TABLE_IMPL_PREFETCH_H_
-
 #include "mica/table/fixedtable.h"
 
 namespace mica {
@@ -23,5 +19,3 @@ void FixedTable<StaticConfig>::prefetch_table(uint64_t key_hash) const {
 
 }
 }
-
-#endif

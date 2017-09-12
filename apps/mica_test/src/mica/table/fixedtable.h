@@ -6,7 +6,6 @@
 #include "mica/table/table.h"
 #include "mica/util/config.h"
 #include "mica/util/memcpy.h"
-#include "mica/util/safe_cast.h"
 #include "mica/util/barrier.h"
 #include "util/huge_alloc.h"
 
@@ -150,9 +149,8 @@ class FixedTable {
   ::mica::util::Config config_;
   size_t val_size;	// Size of each value
   int bkt_shm_key;	// User-defined SHM key used for bucket memory
-  Alloc* alloc_;
 
-  ERpc::HugeAlloc *huge_alloc;
+  ERpc::HugeAlloc *alloc_;
   Bucket* buckets_ = NULL;
   Bucket* extra_buckets_ = NULL;  // = (buckets + num_buckets); extra_buckets[0]
                                   // is not used because index 0 indicates "no

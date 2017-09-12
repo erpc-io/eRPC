@@ -1,14 +1,10 @@
-#pragma once
-#ifndef MICA_TABLE_FIXED_TABLE_IMPL_INIT_H_
-#define MICA_TABLE_FIXED_TABLE_IMPL_INIT_H_
-
 #include "mica/table/fixedtable.h"
 
 namespace mica {
 namespace table {
 template <class StaticConfig>
 FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
-     size_t val_size, ERpc::HugeAlloc*) :
+     size_t val_size, ERpc::HugeAlloc* alloc) :
      config_(config), val_size(val_size), bkt_shm_key(bkt_shm_key),
      alloc_(alloc) {
   assert(val_size % sizeof(uint64_t) == 0); // Make buckets 8-byte aligned
@@ -36,17 +32,20 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   assert(num_buckets > 0);
 
   size_t log_num_buckets = 0;
-  while (((size_t)1 << log_num_buckets) < num_buckets) log_num_buckets++;
-  num_buckets = (size_t)1 << log_num_buckets;
+  while ((1ull << log_num_buckets) < num_buckets) log_num_buckets++;
+  num_buckets = 1ull << log_num_buckets;
   assert(log_num_buckets <= 32);
 
-  num_buckets_ = ::mica::util::safe_cast<uint32_t>(num_buckets);
-  num_buckets_mask_ = ::mica::util::safe_cast<uint32_t>(num_buckets - 1);
-  num_extra_buckets_ = ::mica::util::safe_cast<uint32_t>(num_extra_buckets);
+  ERpc::rt_assert(num_buckets_ < std::numeric_limits<int>::max(), "");
+  ERpc::rt_assert(num_buckets_mask_ < std::numeric_limits<int>::max(), "");
+  ERpc::rt_assert(num_extra_buckets_ < std::numeric_limits<int>::max(), "");
+  num_buckets_ = static_cast<uint32_t>(num_buckets);
+  num_buckets_mask_ = static_cast<uint32_t>(num_buckets - 1);
+  num_extra_buckets_ = static_cast<uint32_t>(num_extra_buckets);
 
   {
     size_t shm_size =
-        Alloc::roundup(bkt_size_with_val * (num_buckets_ + num_extra_buckets_));
+        bkt_size_with_val * (num_buckets_ + num_extra_buckets_);
 
     // TODO: Extend num_extra_buckets_ to meet shm_size.
 
@@ -56,7 +55,7 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   }
 
   // subtract by one to compensate 1-base indices
-  extra_buckets_ = reinterpret_cast<Bucket*>((uint8_t *) buckets_ +
+  extra_buckets_ = reinterpret_cast<Bucket*>(static_cast<uint8_t *>(buckets_) +
                    ((num_buckets_ - 1) * bkt_size_with_val));
   // the rest extra_bucket information is initialized in reset()
 
@@ -129,5 +128,3 @@ void FixedTable<StaticConfig>::reset() {
 }
 }
 }
-
-#endif

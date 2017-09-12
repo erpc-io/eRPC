@@ -1,7 +1,3 @@
-#pragma once
-#ifndef MICA_TABLE_FIXED_TABLE_IMPL_LOCK_H_
-#define MICA_TABLE_FIXED_TABLE_IMPL_LOCK_H_
-
 #include "mica/table/fixedtable.h"
 
 namespace mica {
@@ -97,5 +93,3 @@ uint32_t FixedTable<StaticConfig>::read_version_end(const Bucket* bucket) const 
 }
 }
 }
-
-#endif

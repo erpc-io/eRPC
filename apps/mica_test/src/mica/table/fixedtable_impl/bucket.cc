@@ -1,7 +1,3 @@
-#pragma once
-#ifndef MICA_TABLE_FIXED_TABLE_IMPL_BUCKET_H_
-#define MICA_TABLE_FIXED_TABLE_IMPL_BUCKET_H_
-
 #include "mica/table/fixedtable.h"
 
 namespace mica {
@@ -283,5 +279,3 @@ void FixedTable<StaticConfig>::print_bucket_occupancy() {
 }
 }
 }
-
-#endif

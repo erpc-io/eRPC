@@ -68,8 +68,7 @@ int main() {
   assert(batch_size > 0 && num_keys % batch_size == 0);
 
   auto *alloc = new ERpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
-
-  FixedTable table(config.get("table"), VAL_SIZE, &alloc, true);
+  FixedTable table(config.get("table"), VAL_SIZE, alloc);
 
   auto *key_arr = reinterpret_cast<test_key_t *>(alloc->alloc_raw(
      num_keys * sizeof(test_key_t), 0));
