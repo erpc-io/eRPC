@@ -14,9 +14,7 @@
 using namespace ERpc;
 
 // Dummy registration and deregistration functions
-Transport::MemRegInfo reg_mr_wrapper(void *buf, size_t size) {
-  _unused(buf);
-  _unused(size);
+Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
   return Transport::MemRegInfo(DUMMY_MR_PTR,
                                DUMMY_LKEY);  // *transport_mr, lkey
 }
