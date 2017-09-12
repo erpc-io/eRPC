@@ -227,6 +227,31 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
   delete alloc;
 }
 
+/// Test raw allocation
+TEST(HugeAllocTest, RawAlloc) {
+  // kMaxClassSize gets reserved by the allocator on initialization, so thi
+  // is the max size we can hope to get.
+  size_t max_alloc_size =
+      SYSTEM_HUGEPAGES * MB(2) - ERpc::HugeAlloc::kMaxClassSize;
+
+  // Try reserving max memory multiple times to test allocator destructor
+  for (size_t i = 0; i < 5; i++) {
+    auto *alloc = new ERpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
+    void *buf = alloc->alloc_raw(max_alloc_size, 0);
+    ASSERT_NE(buf, nullptr);
+    delete alloc;
+  }
+
+  // Try some corner cases
+  auto *alloc = new ERpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
+  void *buf = alloc->alloc_raw(1, 0);  // 1 byte
+  ASSERT_NE(buf, nullptr);
+
+  // 16 TB allocation should fail for now
+  buf = alloc->alloc_raw(MB(16) * 1024 * 1024, 0);
+  ASSERT_EQ(buf, nullptr);
+}
+
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

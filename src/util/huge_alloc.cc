@@ -108,13 +108,13 @@ uint8_t *HugeAlloc::alloc_raw(size_t size, size_t numa_node) {
         case EINVAL:
           xmsg << "eRPC HugeAlloc: SHM allocation error: SHMMAX/SHMIN "
                << "mismatch. size = " << std::to_string(size) << " ("
-               << std::to_string(size / MB(1)) << " MB)";
+               << std::to_string(size / MB(1)) << " MB).";
           throw std::runtime_error(xmsg.str());
 
         case ENOMEM:
           // Out of memory - this is OK
           LOG_WARN(
-              "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB\n",
+              "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB.\n",
               size / MB(1));
           return nullptr;
 
