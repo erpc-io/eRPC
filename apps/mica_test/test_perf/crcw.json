@@ -1,0 +1,17 @@
+{
+  "alloc": {
+  },
+
+  "table": {
+    "name": "test_table",
+    "item_count": 20000000,
+    "numa_node": 0
+  },
+
+  "test": {
+    "num_threads": 14,
+    "num_keys_thousands": 16384,
+    "batch_size": 4,
+    "put_percentage": 50
+  }
+}
