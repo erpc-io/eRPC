@@ -78,8 +78,24 @@ class HugeAlloc {
   ~HugeAlloc();
 
   /**
-   * @brief Allocate a Buffer. The actual allocation is done in
-   * \p alloc_from_class.
+   * @brief Allocate memory using raw SHM operations, bypassing the allocator's
+   * freelists. Allocated memory is freed when this allocator is destroyed.
+   *
+   * Unlike \p alloc(), the size of the allocated memory need not fit in the
+   * allocator's max class size.
+   *
+   * @param size The minimum size of the allocated memory
+   * @return The allocated hugepage buffer, nullptr if we ran out of memory.
+   *
+   * @throw runtime_error if hugepage reservation failure is catastrophic
+   */
+  uint8_t *alloc_raw(size_t size, size_t numa_node);
+
+  /**
+   * @brief Allocate a Buffer using the allocator's freelists, i.e., the max
+   * size that can be allocated is the max freelist class size.
+   *
+   * The actual allocation is done in \p alloc_from_class.
    *
    * @param size The minimum size of the allocated Buffer. \p size need not
    * equal a class size.
@@ -104,9 +120,7 @@ class HugeAlloc {
       // free Buffers.
       size_t next_class = size_class + 1;
       for (; next_class < kNumClasses; next_class++) {
-        if (!freelist[next_class].empty()) {
-          break;
-        }
+        if (!freelist[next_class].empty()) break;
       }
 
       if (next_class == kNumClasses) {
@@ -233,7 +247,7 @@ class HugeAlloc {
 
   /**
    * @brief Try to reserve \p size (rounded to 2MB) bytes as huge pages on
-   * \p numa_node.
+   * \p numa_node by adding hugepage-backed Buffers to freelists.
    *
    * @return True if the allocation succeeds. False if the allocation fails
    * because no more hugepages are available.

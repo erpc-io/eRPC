@@ -12,13 +12,10 @@ HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
       dereg_mr_func(dereg_mr_func) {
   assert(numa_node <= kMaxNumaNodes);
 
-  if (initial_size < kMaxClassSize) {
-    initial_size = kMaxClassSize;
-  }
+  if (initial_size < kMaxClassSize) initial_size = kMaxClassSize;
   prev_allocation_size = initial_size;
 
-  // Reserve initial hugepages. \p reserve_hugepages will throw runtime_error
-  // if reservation fails.
+  // Reserve initial hugepages. This throws exception if reservation fails.
   reserve_hugepages(initial_size, numa_node);
 }
 
@@ -83,9 +80,7 @@ void HugeAlloc::print_stats() {
   }
 }
 
-bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
-  assert(size >= kMaxClassSize);  // We need at least one max-sized buffer
-
+uint8_t *HugeAlloc::alloc_raw(size_t size, size_t numa_node) {
   std::ostringstream xmsg;  // The exception message
   size = round_up<kHugepageSize>(size);
   int shm_key, shm_id;
@@ -102,7 +97,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
     if (shm_id == -1) {
       switch (errno) {
         case EEXIST:
-          // \p shm_key already exists. Try again.
+          // shm_key already exists. Try again.
           break;
 
         case EACCES:
@@ -121,7 +116,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
           LOG_WARN(
               "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB\n",
               size / MB(1));
-          return false;
+          return nullptr;
 
         default:
           xmsg << "eRPC HugeAlloc: Unexpected SHM malloc error "
@@ -129,7 +124,7 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
           throw std::runtime_error(xmsg.str());
       }
     } else {
-      // \p shm_key worked. Break out of the while loop
+      // shm_key worked. Break out of the while loop.
       break;
     }
   }
@@ -150,8 +145,19 @@ bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   // Register the allocated buffer. This may throw, which is OK.
   Transport::MemRegInfo reg_info = reg_mr_func(shm_buf, size);
 
+  // Save the SHM region so we can free it later
   shm_list.push_back(shm_region_t(shm_key, shm_buf, size, reg_info));
   stats.shm_reserved += size;
+  return shm_buf;
+}
+
+bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
+  assert(size >= kMaxClassSize);  // We need at least one max-sized buffer
+  uint8_t *shm_buf = alloc_raw(size, numa_node);
+  if (shm_buf == nullptr) return false;
+
+  // The caller must hold the allocator lock, so we can peek at shm_list's back
+  Transport::MemRegInfo &reg_info = shm_list.back().mem_reg_info;
 
   // Add Buffers to the largest class
   size_t num_buffers = size / kMaxClassSize;

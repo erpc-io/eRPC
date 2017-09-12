@@ -5,8 +5,8 @@
 #include "util/huge_alloc.h"
 #include "util/test_printf.h"
 
-#define SYSTEM_HUGEPAGES (512) /* The number of hugepages available */
-#define SYSTEM_4K_PAGES (SYSTEM_HUGEPAGES * 512) /* Number of 4K pages*/
+#define SYSTEM_HUGEPAGES (512)  // The number of hugepages available
+#define SYSTEM_4K_PAGES (SYSTEM_HUGEPAGES * 512)  // Number of 4K pages
 
 #define DUMMY_MR_PTR (reinterpret_cast<void *>(0x3185))
 #define DUMMY_LKEY (3186)
@@ -18,7 +18,7 @@ Transport::MemRegInfo reg_mr_wrapper(void *buf, size_t size) {
   _unused(buf);
   _unused(size);
   return Transport::MemRegInfo(DUMMY_MR_PTR,
-                               DUMMY_LKEY); /* *transport_mr, lkey */
+                               DUMMY_LKEY);  // *transport_mr, lkey
 }
 
 void dereg_mr_wrapper(Transport::MemRegInfo mr) {
@@ -36,7 +36,7 @@ typename Transport::dereg_mr_func_t dereg_mr_func =
 /// Measure performance of 4k-page allocation where all pages are allocated
 /// without first creating a page cache.
 TEST(HugeAllocTest, PageAllocPerf) {
-  /* Reserve all memory for high perf */
+  // Reserve all memory for high perf
   ERpc::HugeAlloc *alloc = new ERpc::HugeAlloc(
       SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
 
@@ -46,9 +46,7 @@ TEST(HugeAllocTest, PageAllocPerf) {
 
   while (true) {
     ERpc::Buffer buffer = alloc->alloc(KB(4));
-    if (buffer.buf == nullptr) {
-      break;
-    }
+    if (buffer.buf == nullptr) break;
 
     num_pages_allocated++;
   }
@@ -68,7 +66,7 @@ TEST(HugeAllocTest, PageAllocPerf) {
 
 /// Measure performance of page allocation with a cache
 TEST(HugeAllocTest, PageAllocPerfWithCache) {
-  /* Reserve all memory for high perf */
+  // Reserve all memory for high perf
   ERpc::HugeAlloc *alloc = new ERpc::HugeAlloc(
       SYSTEM_HUGEPAGES * ERpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
 
@@ -81,10 +79,7 @@ TEST(HugeAllocTest, PageAllocPerfWithCache) {
   size_t num_pages_allocated = 0;
   for (size_t i = 0; i < page_cache_size; i++) {
     ERpc::Buffer buffer = alloc->alloc(KB(4));
-    if (buffer.buf == nullptr) {
-      break;
-    }
-
+    if (buffer.buf == nullptr) break;
     num_pages_allocated++;
   }
 
@@ -132,9 +127,7 @@ TEST(HugeAllocTest, 2MBChunksMultiRun) {
     alloc = new ERpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
     for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
       ERpc::Buffer buffer = alloc->alloc(MB(2));
-      if (buffer.buf == nullptr) {
-        break;
-      }
+      if (buffer.buf == nullptr) break;
 
       EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
     }
@@ -154,7 +147,7 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
   for (size_t i = 0; i < 10; i++) {
     size_t app_memory = 0;
 
-    /* Record the allocated buffers so we can free them */
+    // Record the allocated buffers so we can free them
     std::vector<ERpc::Buffer> buffer_vec;
 
     while (true) {
@@ -182,11 +175,9 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
       }
     }
 
-    /* Free all allocated hugepages in random order */
+    // Free all allocated hugepages in random order
     std::random_shuffle(buffer_vec.begin(), buffer_vec.end());
-    for (ERpc::Buffer buffer : buffer_vec) {
-      alloc->free_buf(buffer);
-    }
+    for (ERpc::Buffer buffer : buffer_vec) alloc->free_buf(buffer);
   }
 
   delete alloc;
