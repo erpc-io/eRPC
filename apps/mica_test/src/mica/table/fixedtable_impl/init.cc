@@ -2,11 +2,13 @@
 #ifndef MICA_TABLE_FIXED_TABLE_IMPL_INIT_H_
 #define MICA_TABLE_FIXED_TABLE_IMPL_INIT_H_
 
+#include "mica/table/fixedtable.h"
+
 namespace mica {
 namespace table {
 template <class StaticConfig>
 FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
-     size_t val_size, int bkt_shm_key, Alloc* alloc, bool is_primary) :
+     size_t val_size, ERpc::HugeAlloc* alloc, bool is_primary) :
      config_(config), val_size(val_size), bkt_shm_key(bkt_shm_key),
      alloc_(alloc), is_primary(is_primary) {
   assert(val_size % sizeof(uint64_t) == 0); // Make buckets 8-byte aligned
@@ -46,8 +48,8 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
 
     // TODO: Extend num_extra_buckets_ to meet shm_size.
 
-    buckets_ = reinterpret_cast<Bucket*>(alloc->hrd_malloc_socket(bkt_shm_key,
-        shm_size, numa_node));	// Zeroes out per-bucket timestamps
+    // Zeroes out everything
+    buckets_ = reinterpret_cast<Bucket*>(alloc->alloc_raw(shm_size, numa_node));
     assert(buckets_ != NULL);
   }
 
@@ -76,8 +78,8 @@ FixedTable<StaticConfig>::~FixedTable() {
   printf("Destroying table %s\n", name.c_str());
   reset();
 
-  //if (!alloc_->unmap(buckets_)) assert(false);
-  if(!alloc_->hrd_free(bkt_shm_key, buckets_)) assert(false);
+  // Table's owner will destroy the hugepage allocator, which will release
+  // used hugepages.
 }
 
 template <class StaticConfig>

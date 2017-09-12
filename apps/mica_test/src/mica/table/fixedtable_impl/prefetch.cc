@@ -2,6 +2,8 @@
 #ifndef MICA_TABLE_FIXED_TABLE_IMPL_PREFETCH_H_
 #define MICA_TABLE_FIXED_TABLE_IMPL_PREFETCH_H_
 
+#include "mica/table/fixedtable.h"
+
 namespace mica {
 namespace table {
 template <class StaticConfig>
@@ -17,7 +19,6 @@ void FixedTable<StaticConfig>::prefetch_table(uint64_t key_hash) const {
   __builtin_prefetch(bucket, 0, 0);
   __builtin_prefetch(reinterpret_cast<const char*>(bucket) + 64, 0, 0);
   __builtin_prefetch(reinterpret_cast<const char*>(bucket) + 128, 0, 0);
-
 }
 
 }

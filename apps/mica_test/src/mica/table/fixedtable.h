@@ -8,7 +8,7 @@
 #include "mica/util/memcpy.h"
 #include "mica/util/safe_cast.h"
 #include "mica/util/barrier.h"
-#include "mica/alloc/hrd_alloc.h"
+#include "util/huge_alloc.h"
 
 // FixedTable: Maps fixed-size keys to fixed-size (multiple of 8B) values
 
@@ -30,11 +30,6 @@ struct BasicFixedTableConfig {
   // Collect fine-grained statistics accessible via print_stats() and
   // reset_stats().
   static constexpr bool kCollectStats = false;
-
-  // Do fetch and add only if the 1st 64-bit word of the value is even
-  static constexpr bool kFetchAddOnlyIfEven = true;
-
-  typedef ::mica::alloc::HrdAlloc Alloc;
 };
 
 template <class StaticConfig = BasicFixedTableConfig>
@@ -42,55 +37,38 @@ class FixedTable {
  public:
   std::string name;	// Name of the table
 
-  // if @is_primary is false, the datastore is allowed to execute only
-  // set_locked(), set(), del() operations. In this mode, for set() and del(),
-  // it will not verify that the key's bucket is locked. (At primaries, these
-  // operations verify that bucket was pre-locked during the transaction execute
-  // phase.)
-  typedef typename StaticConfig::Alloc Alloc;
   typedef uint64_t ft_key_t; // FixedTable key type
-
   static constexpr uint64_t kFtInvalidKey = 0xffffffffffffffffull;
 
-  // fixedtable_impl/init.h
+  // fixedtable_impl/init.cc
   FixedTable(const ::mica::util::Config& config, size_t val_size,
-             int bkt_shm_key, Alloc* alloc, bool is_primary);
+             ERpc::HugeAlloc* alloc);
   ~FixedTable();
 
   void reset();
 
-  // fixedtable_impl/bucket.h
+  // fixedtable_impl/bucket.cc
   void print_bucket_occupancy();
   double get_locked_bkt_fraction();
 
-  // fixedtable_impl/get.h
-  Result get(uint32_t caller_id, uint64_t key_hash, ft_key_t key,
-             uint64_t *out_timestamp, char* out_value) const;
+  // fixedtable_impl/get.cc
+  Result get(uint64_t key_hash, ft_key_t key, char* out_value) const;
 
-  // fixedtable_impl/lock_bkt_and_get.h
-  Result lock_bkt_and_get(uint32_t caller_id, uint64_t key_hash, ft_key_t key,
-                          uint64_t *out_timestamp, char *value);
+  // fixedtable_impl/unlock_bkt.cc
+  Result unlock_bucket_hash(uint64_t key_hash);
 
-  // fixedtable_impl/lock_bkt_for_ins.h
-  Result lock_bkt_for_ins(uint32_t caller_id, uint64_t key_hash, ft_key_t key,
-                          uint64_t *out_timestamp);
+  // fixedtable_impl/lock_bkt.cc
+  Result lock_bucket_hash(uint64_t key_hash);
 
-  // fixedtable_impl/unlock_bkt.h
-  Result unlock_bucket_hash(uint32_t caller_id, uint64_t key_hash);
-
-  // fixedtable_impl/lock_bkt.h
-  Result lock_bucket_hash(uint32_t caller_id, uint64_t key_hash);
-
-  // fixedtable_impl/set.h
-  Result set(uint32_t caller_id, uint64_t key_hash, ft_key_t key,
+  // fixedtable_impl/set.cc
+  Result set(uint64_t key_hash, ft_key_t key,
              const char* value);
 
-  // fixedtable_impl/set_spinlock.h - local use only
-  Result set_spinlock(uint32_t caller_id, uint64_t key_hash, ft_key_t key,
-                      const char* value);
+  // fixedtable_impl/set_spinlock.cc - local use only
+  Result set_spinlock(uint64_t key_hash, ft_key_t key, const char* value);
 
   // fixedtable_impl/del.h
-  Result del(uint32_t caller_id, uint64_t key_hash, ft_key_t key);
+  Result del(uint64_t key_hash, ft_key_t key);
 
   // fixedtable_impl/prefetch.h
   void prefetch_table(uint64_t key_hash) const;
@@ -109,9 +87,6 @@ class FixedTable {
   static constexpr uint32_t kCallerIdBits = (32 - kNumLocksBits);
   static constexpr uint32_t kMaxCallerId = ((1u << kCallerIdBits) - 1);
   static constexpr uint32_t kInvalidCallerId = kMaxCallerId;
-
-  // 3-bit number equal to HOTS_TS_TIMESTAMP (hots.h)
-  static constexpr uint64_t kTimestampCanary = 5;
 
   // To keep the value size runtime-configurable, the value array is not
   // included in the Bucket struct. In the allocated memory, the value array
@@ -175,8 +150,8 @@ class FixedTable {
                        ft_key_t key, const char* value);
 
   // fixedtable_impl/lock.h
-  bool lock_bucket_ptr(uint32_t caller_id, Bucket* bucket);
-  void unlock_bucket_ptr(uint32_t caller_id, Bucket* bucket);
+  bool lock_bucket_ptr(Bucket* bucket);
+  void unlock_bucket_ptr(Bucket* bucket);
   void lock_extra_bucket_free_list();
   void unlock_extra_bucket_free_list();
   uint64_t read_timestamp(const Bucket* bucket) const;
@@ -191,6 +166,7 @@ public:
   bool is_primary;
 
 private:
+  ERpc::HugeAlloc *huge_alloc;
   Bucket* buckets_ = NULL;
   Bucket* extra_buckets_ = NULL;  // = (buckets + num_buckets); extra_buckets[0]
                                   // is not used because index 0 indicates "no
@@ -222,8 +198,6 @@ private:
 #include "mica/table/fixedtable_impl/set.h"
 #include "mica/table/fixedtable_impl/set_spinlock.h"
 #include "mica/table/fixedtable_impl/get.h"
-#include "mica/table/fixedtable_impl/lock_bkt_and_get.h"
-#include "mica/table/fixedtable_impl/lock_bkt_for_ins.h"
 #include "mica/table/fixedtable_impl/lock_bkt.h"
 #include "mica/table/fixedtable_impl/unlock_bkt.h"
 #include "mica/table/fixedtable_impl/prefetch.h"

@@ -2,6 +2,8 @@
 #ifndef MICA_TABLE_FIXED_TABLE_IMPL_GET_H_
 #define MICA_TABLE_FIXED_TABLE_IMPL_GET_H_
 
+#include "mica/table/fixedtable.h"
+
 namespace mica {
 namespace table {
 template <class StaticConfig>
@@ -11,11 +13,8 @@ template <class StaticConfig>
  * @param out_value Pointer to a buffer to copy the value to. The buffer should
  * have space for StaticConfig::kValSize bytes
  */
-Result FixedTable<StaticConfig>::get(uint32_t caller_id, uint64_t key_hash,
-                                     ft_key_t key, uint64_t *out_timestamp,
+Result FixedTable<StaticConfig>::get(uint64_t key_hash, ft_key_t key,
                                      char* out_value) const {
-  assert(is_primary);
-
   uint32_t bucket_index = calc_bucket_index(key_hash);
   const Bucket* bucket = get_bucket(bucket_index);
 

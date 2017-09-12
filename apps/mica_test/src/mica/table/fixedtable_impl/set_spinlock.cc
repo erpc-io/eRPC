@@ -2,6 +2,8 @@
 #ifndef MICA_TABLE_FIXED_TABLE_IMPL_SET_LOCKED_H_
 #define MICA_TABLE_FIXED_TABLE_IMPL_SET_LOCKED_H_
 
+#include "mica/table/fixedtable.h"
+
 namespace mica {
 namespace table {
 template <class StaticConfig>

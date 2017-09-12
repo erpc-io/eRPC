@@ -2,6 +2,8 @@
 #ifndef MICA_TABLE_FIXED_TABLE_IMPL_LOCK_BKT_H_
 #define MICA_TABLE_FIXED_TABLE_IMPL_LOCK_BKT_H_
 
+#include "mica/table/fixedtable.h"
+
 // This is a datapath API function exposed to users. The internal locking
 // function @lock_bucket_ptr() is not exposed to users.
 namespace mica {
