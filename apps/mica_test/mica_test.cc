@@ -8,8 +8,8 @@
 #include "mica/util/hash.h"
 #include "util/huge_alloc.h"
 
-#define USE_PREFETCH 1
-#define VAL_SIZE 16
+static constexpr bool kPrefetch = true;
+static constexpr size_t kValSize = 16;
 
 // Dummy registration and deregistration functions for HugeAlloc
 #define DUMMY_MR_PTR (reinterpret_cast<void *>(0x3185))
@@ -32,7 +32,7 @@ typedef FixedTable::ft_key_t test_key_t;
 
 typedef ::mica::table::Result MicaResult;
 struct test_val_t {
-  uint64_t buf[VAL_SIZE / sizeof(uint64_t)];
+  uint64_t buf[kValSize / sizeof(uint64_t)];
 };
 
 template <typename T>
@@ -62,7 +62,7 @@ int main() {
   assert(batch_size > 0 && num_keys % batch_size == 0);
 
   auto *alloc = new ERpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
-  FixedTable table(config.get("table"), VAL_SIZE, alloc);
+  FixedTable table(config.get("table"), kValSize, alloc);
 
   auto *key_arr = reinterpret_cast<test_key_t *>(
       alloc->alloc_raw(num_keys * sizeof(test_key_t), 0));
@@ -77,7 +77,7 @@ int main() {
   // This is more of a correctness test: the keys are queried in the same
   // order as they are inserted.
   for (int iter = 0; iter < num_iters; iter++) {
-    // Populate key_arr with unique keys
+    // Populate key_arr
     printf("Iteration %d: Generating keys\n", iter);
     for (size_t i = 0; i < num_keys; i++) {
       test_key_t ft_key;
@@ -95,9 +95,7 @@ int main() {
     for (size_t i = 0; i < num_keys; i += batch_size) {
       for (size_t j = 0; j < batch_size; j++) {
         key_hash_arr[j] = mica_hash(&key_arr[i + j], sizeof(test_key_t));
-#if USE_PREFETCH == 1
-        table.prefetch_table(key_hash_arr[j]);
-#endif
+        if (kPrefetch) table.prefetch_table(key_hash_arr[j]);
       }
 
       for (size_t j = 0; j < batch_size; j++) {
@@ -123,9 +121,7 @@ int main() {
     for (size_t i = 0; i < num_keys; i += batch_size) {
       for (size_t j = 0; j < batch_size; j++) {
         key_hash_arr[j] = mica_hash(&key_arr[i + j], sizeof(test_key_t));
-#if USE_PREFETCH == 1
-        table.prefetch_table(key_hash_arr[j]);
-#endif
+        if (kPrefetch) table.prefetch_table(key_hash_arr[j]);
       }
 
       for (size_t j = 0; j < batch_size; j++) {
@@ -156,16 +152,12 @@ int main() {
     // Delete
     for (size_t i = 0; i < num_keys; i++) {
       uint64_t key_hash = mica_hash(&key_arr[i], sizeof(test_key_t));
+      // del() can return kNotFound because the input may have duplicates
       out_result = table.del(key_hash, key_arr[i]);
-      if (out_result != MicaResult::kSuccess) {
-        printf("Delete failed for key %zu.\n", i);
-        exit(-1);
-      }
     }
   }
 
   printf("Done test\n");
-  (void)out_result;
 
   return EXIT_SUCCESS;
 }
