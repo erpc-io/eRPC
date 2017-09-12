@@ -20,15 +20,15 @@ Result FixedTable<StaticConfig>::get(uint64_t key_hash, ft_key_t key,
     const Bucket* located_bucket;
     size_t item_index = find_item_index(bucket, key, &located_bucket);
     if (item_index == StaticConfig::kBucketCap) {
-      if (version_start != read_version_end(bucket)) continue;	/* Try again */
+      if (version_start != read_version_end(bucket)) continue; /* Try again */
       stat_inc(&Stats::get_notfound);
       return Result::kNotFound;
     }
 
-    uint8_t *_val = get_value(located_bucket, item_index);
+    uint8_t* _val = get_value(located_bucket, item_index);
     ::mica::util::memcpy<8>(out_value, _val, val_size);
 
-    if (version_start != read_version_end(bucket)) continue;	/* Try again */
+    if (version_start != read_version_end(bucket)) continue; /* Try again */
 
     stat_inc(&Stats::get_found);
     break;

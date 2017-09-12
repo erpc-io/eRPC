@@ -42,7 +42,7 @@ void FixedTable<StaticConfig>::lock_extra_bucket_free_list() {
       while (true) {
         if (__sync_bool_compare_and_swap(
                 static_cast<volatile uint8_t*>(&extra_bucket_free_list_.lock),
-            0U, 1U))
+                0U, 1U))
           break;
       }
     }
@@ -54,7 +54,8 @@ void FixedTable<StaticConfig>::unlock_extra_bucket_free_list() {
   if (StaticConfig::kConcurrent) {
     if (concurrent_access_mode_ == 2) {
       ::mica::util::memory_barrier();
-      assert((*static_cast<volatile uint8_t*>(&extra_bucket_free_list_.lock) & 1U) == 1U);
+      assert((*static_cast<volatile uint8_t*>(&extra_bucket_free_list_.lock) &
+              1U) == 1U);
       // no need to use atomic add because this thread is the only one writing
       // to version
       *static_cast<volatile uint8_t*>(&extra_bucket_free_list_.lock) = 0U;
@@ -63,7 +64,8 @@ void FixedTable<StaticConfig>::unlock_extra_bucket_free_list() {
 }
 
 template <class StaticConfig>
-uint32_t FixedTable<StaticConfig>::read_version_begin(const Bucket* bucket) const {
+uint32_t FixedTable<StaticConfig>::read_version_begin(
+    const Bucket* bucket) const {
   if (StaticConfig::kConcurrent) {
     if (concurrent_access_mode_ != 0) {
       while (true) {
@@ -80,7 +82,8 @@ uint32_t FixedTable<StaticConfig>::read_version_begin(const Bucket* bucket) cons
 }
 
 template <class StaticConfig>
-uint32_t FixedTable<StaticConfig>::read_version_end(const Bucket* bucket) const {
+uint32_t FixedTable<StaticConfig>::read_version_end(
+    const Bucket* bucket) const {
   if (StaticConfig::kConcurrent) {
     if (concurrent_access_mode_ != 0) {
       ::mica::util::memory_barrier();

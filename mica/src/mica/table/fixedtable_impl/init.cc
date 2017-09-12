@@ -4,9 +4,9 @@ namespace mica {
 namespace table {
 template <class StaticConfig>
 FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
-     size_t val_size, ERpc::HugeAlloc* alloc) :
-     config_(config), val_size(val_size), alloc_(alloc) {
-  assert(val_size % sizeof(uint64_t) == 0); // Make buckets 8-byte aligned
+                                     size_t val_size, ERpc::HugeAlloc* alloc)
+    : config_(config), val_size(val_size), alloc_(alloc) {
+  assert(val_size % sizeof(uint64_t) == 0);  // Make buckets 8-byte aligned
 
   // The Bucket struct does not contain values
   bkt_size_with_val = sizeof(Bucket) + (val_size * StaticConfig::kBucketCap);
@@ -42,8 +42,7 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   num_extra_buckets_ = static_cast<uint32_t>(num_extra_buckets);
 
   {
-    size_t shm_size =
-        bkt_size_with_val * (num_buckets_ + num_extra_buckets_);
+    size_t shm_size = bkt_size_with_val * (num_buckets_ + num_extra_buckets_);
 
     // TODO: Extend num_extra_buckets_ to meet shm_size.
 
@@ -53,8 +52,9 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   }
 
   // subtract by one to compensate 1-base indices
-  extra_buckets_ = reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(buckets_) +
-                   ((num_buckets_ - 1) * bkt_size_with_val));
+  extra_buckets_ =
+      reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t*>(buckets_) +
+                                ((num_buckets_ - 1) * bkt_size_with_val));
   // the rest extra_bucket information is initialized in reset()
 
   if (!concurrent_read)
@@ -93,12 +93,11 @@ FixedTable<StaticConfig>::~FixedTable() {
 
 template <class StaticConfig>
 void FixedTable<StaticConfig>::reset() {
-
   // Initialize bucket metadata + fill in invalid keys
   for (size_t bkt_i = 0; bkt_i < num_buckets_ + num_extra_buckets_; bkt_i++) {
-    Bucket *bucket = get_bucket(bkt_i);
+    Bucket* bucket = get_bucket(bkt_i);
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
-        item_index++) {
+         item_index++) {
       bucket->key_arr[item_index] = kFtInvalidKey;
     }
   }
@@ -111,7 +110,8 @@ void FixedTable<StaticConfig>::reset() {
   else {
     uint32_t extra_bucket_index;
     for (extra_bucket_index = 1;
-         extra_bucket_index < 1 + num_extra_buckets_ - 1; extra_bucket_index++) {
+         extra_bucket_index < 1 + num_extra_buckets_ - 1;
+         extra_bucket_index++) {
       get_extra_bucket(extra_bucket_index)->next_extra_bucket_index =
           extra_bucket_index + 1;
     }

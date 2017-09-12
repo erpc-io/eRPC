@@ -10,17 +10,18 @@ uint32_t FixedTable<StaticConfig>::calc_bucket_index(uint64_t key_hash) const {
 
 // Get the value at index @item_index in this bucket
 template <class StaticConfig>
-uint8_t* FixedTable<StaticConfig>::get_value(
-    const Bucket *bucket, size_t item_index) const {
-  return reinterpret_cast<uint8_t *>(const_cast<Bucket *>(bucket)) + sizeof(Bucket) + (item_index * val_size);
+uint8_t* FixedTable<StaticConfig>::get_value(const Bucket* bucket,
+                                             size_t item_index) const {
+  return reinterpret_cast<uint8_t*>(const_cast<Bucket*>(bucket)) +
+         sizeof(Bucket) + (item_index * val_size);
 }
 
 template <class StaticConfig>
-typename FixedTable<StaticConfig>::Bucket*
-FixedTable<StaticConfig>::get_bucket(uint32_t bucket_index) {
+typename FixedTable<StaticConfig>::Bucket* FixedTable<StaticConfig>::get_bucket(
+    uint32_t bucket_index) {
   assert(buckets_ != NULL);
   assert(bucket_index < num_buckets_ + num_extra_buckets_);
-  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(buckets_) +
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t*>(buckets_) +
                                    (bucket_index * bkt_size_with_val));
 }
 
@@ -29,7 +30,7 @@ const typename FixedTable<StaticConfig>::Bucket*
 FixedTable<StaticConfig>::get_bucket(uint32_t bucket_index) const {
   assert(buckets_ != NULL);
   assert(bucket_index < num_buckets_ + num_extra_buckets_);
-  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(buckets_) +
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t*>(buckets_) +
                                    (bucket_index * bkt_size_with_val));
 }
 
@@ -46,8 +47,8 @@ FixedTable<StaticConfig>::get_extra_bucket(uint32_t extra_bucket_index) const {
   assert(extra_bucket_index < 1 + num_extra_buckets_);
 
   // extra_buckets[1] is the actual start
-  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(extra_buckets_) +
-                                  (extra_bucket_index * bkt_size_with_val));
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t*>(extra_buckets_) +
+                                   (extra_bucket_index * bkt_size_with_val));
 }
 
 template <class StaticConfig>
@@ -57,8 +58,8 @@ FixedTable<StaticConfig>::get_extra_bucket(uint32_t extra_bucket_index) {
   assert(extra_bucket_index < 1 + num_extra_buckets_);
 
   // extra_buckets[1] is the actual start
-  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(extra_buckets_) +
-                                  (extra_bucket_index * bkt_size_with_val));
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t*>(extra_buckets_) +
+                                   (extra_bucket_index * bkt_size_with_val));
 }
 
 template <class StaticConfig>
@@ -114,7 +115,8 @@ void FixedTable<StaticConfig>::free_extra_bucket(Bucket* bucket) {
 }
 
 template <class StaticConfig>
-void FixedTable<StaticConfig>::fill_hole(Bucket* bucket, size_t unused_item_index) {
+void FixedTable<StaticConfig>::fill_hole(Bucket* bucket,
+                                         size_t unused_item_index) {
   while (true) {
     // there is no extra bucket; do not try to fill a hole within the same
     // bucket
@@ -155,10 +157,11 @@ void FixedTable<StaticConfig>::fill_hole(Bucket* bucket, size_t unused_item_inde
 
     // move the entry
     bucket->key_arr[unused_item_index] =
-      current_extra_bucket->key_arr[moved_item_index];
+        current_extra_bucket->key_arr[moved_item_index];
 
-    uint8_t *_unused_item_val = get_value(bucket, unused_item_index);
-    uint8_t *_moved_item_val = get_value(current_extra_bucket, moved_item_index);
+    uint8_t* _unused_item_val = get_value(bucket, unused_item_index);
+    uint8_t* _moved_item_val =
+        get_value(current_extra_bucket, moved_item_index);
     ::mica::util::memcpy<8>(_unused_item_val, _moved_item_val, val_size);
 
     current_extra_bucket->key_arr[moved_item_index] = kFtInvalidKey;
@@ -172,7 +175,7 @@ void FixedTable<StaticConfig>::fill_hole(Bucket* bucket, size_t unused_item_inde
 
 template <class StaticConfig>
 size_t FixedTable<StaticConfig>::get_empty(Bucket* bucket,
-                                       Bucket** located_bucket) {
+                                           Bucket** located_bucket) {
   Bucket* current_bucket = bucket;
   while (true) {
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
@@ -241,11 +244,11 @@ void FixedTable<StaticConfig>::print_bucket_occupancy() {
   size_t primary_bkts_used = 0, extra_bkts_used = 0;
 
   for (size_t bkt_i = 0; bkt_i < num_buckets_ + num_extra_buckets_; bkt_i++) {
-    Bucket *bucket = get_bucket(bkt_i);
+    Bucket* bucket = get_bucket(bkt_i);
     bool bkt_used = false;
     for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
-        item_index++) {
-      if(bucket->key_arr[item_index] != kFtInvalidKey) {
+         item_index++) {
+      if (bucket->key_arr[item_index] != kFtInvalidKey) {
         bkt_i < num_buckets_ ? primary_slots_used++ : extra_slots_used++;
         bkt_used = true;
       }
@@ -258,24 +261,23 @@ void FixedTable<StaticConfig>::print_bucket_occupancy() {
 
   // Primary buckets
   printf("Table %s: Primary bucket occupancy = %.4f (%zu of %u buckets used)\n",
-    name.c_str(),
-    primary_bkts_used * 1.0 / num_buckets_, primary_bkts_used, num_buckets_);
+         name.c_str(), primary_bkts_used * 1.0 / num_buckets_,
+         primary_bkts_used, num_buckets_);
 
   printf("Table %s: Primary slot occupancy = %.4f (%zu of %zu slots used)\n",
-    name.c_str(),
-    primary_slots_used * 1.0 / (num_buckets_ * StaticConfig::kBucketCap),
-    primary_slots_used, num_buckets_ * StaticConfig::kBucketCap);
+         name.c_str(),
+         primary_slots_used * 1.0 / (num_buckets_ * StaticConfig::kBucketCap),
+         primary_slots_used, num_buckets_ * StaticConfig::kBucketCap);
 
   // Secondary buckets
   printf("Table %s: Extra bucket occupancy = %.4f (%zu of %u buckets used)\n",
-    name.c_str(),
-    extra_bkts_used * 1.0 / num_extra_buckets_, extra_bkts_used,
-    num_extra_buckets_);
+         name.c_str(), extra_bkts_used * 1.0 / num_extra_buckets_,
+         extra_bkts_used, num_extra_buckets_);
 
   printf("Table %s: Extra slot occupancy = %.4f (%zu of %zu slots used)\n",
-    name.c_str(),
-    extra_slots_used * 1.0 / (num_extra_buckets_ * StaticConfig::kBucketCap),
-    extra_slots_used, num_extra_buckets_ * StaticConfig::kBucketCap);
+         name.c_str(), extra_slots_used * 1.0 /
+                           (num_extra_buckets_ * StaticConfig::kBucketCap),
+         extra_slots_used, num_extra_buckets_ * StaticConfig::kBucketCap);
 }
 }
 }

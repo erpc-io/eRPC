@@ -16,6 +16,5 @@ void FixedTable<StaticConfig>::prefetch_table(uint64_t key_hash) const {
   __builtin_prefetch(reinterpret_cast<const char*>(bucket) + 64, 0, 0);
   __builtin_prefetch(reinterpret_cast<const char*>(bucket) + 128, 0, 0);
 }
-
 }
 }

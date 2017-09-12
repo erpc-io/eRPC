@@ -4,9 +4,9 @@
 
 #include <cstdio>
 #include "mica/table/table.h"
+#include "mica/util/barrier.h"
 #include "mica/util/config.h"
 #include "mica/util/memcpy.h"
-#include "mica/util/barrier.h"
 #include "util/huge_alloc.h"
 
 // FixedTable: Maps fixed-size keys to fixed-size (multiple of 8B) values
@@ -43,9 +43,9 @@ struct BasicFixedTableConfig {
 template <class StaticConfig = BasicFixedTableConfig>
 class FixedTable {
  public:
-  std::string name;	// Name of the table
+  std::string name;  // Name of the table
 
-  typedef uint64_t ft_key_t; // FixedTable key type
+  typedef uint64_t ft_key_t;  // FixedTable key type
   static constexpr uint64_t kFtInvalidKey = 0xffffffffffffffffull;
 
   // fixedtable_impl/init.cc
@@ -65,7 +65,7 @@ class FixedTable {
   Result get(uint64_t key_hash, ft_key_t key, char* out_value) const;
 
   // fixedtable_impl/atomic_fetch_add.h
-  Result atomic_fetch_add(uint64_t key_hash, ft_key_t key, char *value,
+  Result atomic_fetch_add(uint64_t key_hash, ft_key_t key, char* value,
                           uint64_t increment);
 
   // fixedtable_impl/set.cc
@@ -91,10 +91,12 @@ class FixedTable {
     ft_key_t key_arr[StaticConfig::kBucketCap];
   };
 
-  static_assert(sizeof(Bucket) == 2 * sizeof(uint32_t) +
-    StaticConfig::kBucketCap * sizeof(ft_key_t), "");
+  static_assert(sizeof(Bucket) ==
+                    2 * sizeof(uint32_t) +
+                        StaticConfig::kBucketCap * sizeof(ft_key_t),
+                "");
 
-  size_t bkt_size_with_val;	// Size of the buckets with value
+  size_t bkt_size_with_val;  // Size of the buckets with value
 
   struct ExtraBucketFreeList {
     uint8_t lock;
@@ -115,7 +117,7 @@ class FixedTable {
 
   // fixedtable_impl/bucket.h
   uint32_t calc_bucket_index(uint64_t key_hash) const;
-  uint8_t* get_value(const Bucket *bucket, size_t item_index) const;
+  uint8_t* get_value(const Bucket* bucket, size_t item_index) const;
   const Bucket* get_bucket(uint32_t bucket_index) const;
   Bucket* get_bucket(uint32_t bucket_index);
   static bool has_extra_bucket(const Bucket* bucket);
@@ -135,8 +137,8 @@ class FixedTable {
   void stat_dec(size_t Stats::*counter) const;
 
   // fixedtable_impl/item.h
-  void set_item(Bucket *located_bucket, size_t item_index,
-                       ft_key_t key, const char* value);
+  void set_item(Bucket* located_bucket, size_t item_index, ft_key_t key,
+                const char* value);
 
   // fixedtable_impl/lock.h
   void lock_bucket(Bucket* bucket);
@@ -147,9 +149,9 @@ class FixedTable {
   uint32_t read_version_end(const Bucket* bucket) const;
 
   ::mica::util::Config config_;
-  size_t val_size;	// Size of each value
+  size_t val_size;  // Size of each value
 
-  ERpc::HugeAlloc *alloc_;
+  ERpc::HugeAlloc* alloc_;
   Bucket* buckets_ = NULL;
   Bucket* extra_buckets_ = NULL;  // = (buckets + num_buckets); extra_buckets[0]
                                   // is not used because index 0 indicates "no
@@ -169,7 +171,7 @@ class FixedTable {
   mutable Stats stats_;
 } __attribute__((aligned(128)));  // To prevent false sharing caused by
                                   // adjacent cacheline prefetching.
-                  
+
 // Instantiate required FixedTable classes so they get compiled for the linker
 template class FixedTable<BasicFixedTableConfig>;
 }
