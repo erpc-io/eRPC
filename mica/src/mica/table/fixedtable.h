@@ -30,7 +30,7 @@ struct BasicFixedTableConfig {
 
   // Support concurrent access.  The actual concurrent access is enabled by
   // concurrent_read and concurrent_write in the configuration.
-  static constexpr bool kConcurrent = true;
+  static constexpr bool kConcurrent = false;
 
   // Be verbose.
   static constexpr bool kVerbose = false;
@@ -148,7 +148,6 @@ class FixedTable {
 
   ::mica::util::Config config_;
   size_t val_size;	// Size of each value
-  int bkt_shm_key;	// User-defined SHM key used for bucket memory
 
   ERpc::HugeAlloc *alloc_;
   Bucket* buckets_ = NULL;
@@ -170,6 +169,9 @@ class FixedTable {
   mutable Stats stats_;
 } __attribute__((aligned(128)));  // To prevent false sharing caused by
                                   // adjacent cacheline prefetching.
+                  
+// Instantiate required FixedTable classes so they get compiled for the linker
+template class FixedTable<BasicFixedTableConfig>;
 }
 }
 #endif

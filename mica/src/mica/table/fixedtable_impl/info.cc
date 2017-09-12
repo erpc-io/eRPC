@@ -4,11 +4,14 @@ namespace mica {
 namespace table {
 template <class StaticConfig>
 void FixedTable<StaticConfig>::print_bucket(const Bucket* bucket) const {
-  printf("<bucket %zx>: ", (size_t)bucket);
+  printf("<bucket %zx>: ", reinterpret_cast<size_t>(bucket));
+  printf("Key printing not implemented yet.\n");
+  /*
   for (size_t item_index = 0; item_index < StaticConfig::kBucketCap;
        item_index++) {
-    printf("key %zx, ", static_cast<size_t>(bucket->item_vec[item_index].key));
+    printf("key %zx, ", reinterpret_cast<size_t>(bucket->key_arr[item_index].key));
   }
+  */
 
   printf("\n");
 }
@@ -16,7 +19,7 @@ void FixedTable<StaticConfig>::print_bucket(const Bucket* bucket) const {
 template <class StaticConfig>
 void FixedTable<StaticConfig>::print_buckets() const {
   for (size_t bucket_index = 0; bucket_index < num_buckets_; bucket_index++) {
-    Bucket* bucket =  get_bucket(bucket_index);
+    const Bucket* bucket =  get_bucket(bucket_index);
     print_bucket(bucket);
   }
   printf("\n");

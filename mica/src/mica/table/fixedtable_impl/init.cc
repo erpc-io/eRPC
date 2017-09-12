@@ -5,15 +5,13 @@ namespace table {
 template <class StaticConfig>
 FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
      size_t val_size, ERpc::HugeAlloc* alloc) :
-     config_(config), val_size(val_size), bkt_shm_key(bkt_shm_key),
-     alloc_(alloc) {
+     config_(config), val_size(val_size), alloc_(alloc) {
   assert(val_size % sizeof(uint64_t) == 0); // Make buckets 8-byte aligned
 
   // The Bucket struct does not contain values
   bkt_size_with_val = sizeof(Bucket) + (val_size * StaticConfig::kBucketCap);
 
   name = config.get("name").get_str();
-  assert(bkt_shm_key > 0 && bkt_shm_key < 1024 * 1024);
   size_t item_count = config.get("item_count").get_uint64();
   // Compensate the load factor.
   item_count = item_count * 11 / 10;
@@ -55,7 +53,7 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   }
 
   // subtract by one to compensate 1-base indices
-  extra_buckets_ = reinterpret_cast<Bucket*>(static_cast<uint8_t *>(buckets_) +
+  extra_buckets_ = reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(buckets_) +
                    ((num_buckets_ - 1) * bkt_size_with_val));
   // the rest extra_bucket information is initialized in reset()
 

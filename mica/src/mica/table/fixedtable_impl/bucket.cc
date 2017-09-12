@@ -12,7 +12,7 @@ uint32_t FixedTable<StaticConfig>::calc_bucket_index(uint64_t key_hash) const {
 template <class StaticConfig>
 uint8_t* FixedTable<StaticConfig>::get_value(
     const Bucket *bucket, size_t item_index) const {
-  return (uint8_t *) bucket + sizeof(Bucket) + (item_index * val_size);
+  return reinterpret_cast<uint8_t *>(const_cast<Bucket *>(bucket)) + sizeof(Bucket) + (item_index * val_size);
 }
 
 template <class StaticConfig>
@@ -20,7 +20,7 @@ typename FixedTable<StaticConfig>::Bucket*
 FixedTable<StaticConfig>::get_bucket(uint32_t bucket_index) {
   assert(buckets_ != NULL);
   assert(bucket_index < num_buckets_ + num_extra_buckets_);
-  return reinterpret_cast<Bucket*>((uint8_t *) buckets_ +
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(buckets_) +
                                    (bucket_index * bkt_size_with_val));
 }
 
@@ -29,7 +29,7 @@ const typename FixedTable<StaticConfig>::Bucket*
 FixedTable<StaticConfig>::get_bucket(uint32_t bucket_index) const {
   assert(buckets_ != NULL);
   assert(bucket_index < num_buckets_ + num_extra_buckets_);
-  return reinterpret_cast<Bucket*>((uint8_t *) buckets_ +
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(buckets_) +
                                    (bucket_index * bkt_size_with_val));
 }
 
@@ -46,7 +46,7 @@ FixedTable<StaticConfig>::get_extra_bucket(uint32_t extra_bucket_index) const {
   assert(extra_bucket_index < 1 + num_extra_buckets_);
 
   // extra_buckets[1] is the actual start
-  return reinterpret_cast<Bucket*>((uint8_t *) extra_buckets_ +
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(extra_buckets_) +
                                   (extra_bucket_index * bkt_size_with_val));
 }
 
@@ -57,7 +57,7 @@ FixedTable<StaticConfig>::get_extra_bucket(uint32_t extra_bucket_index) {
   assert(extra_bucket_index < 1 + num_extra_buckets_);
 
   // extra_buckets[1] is the actual start
-  return reinterpret_cast<Bucket*>((uint8_t *) extra_buckets_ +
+  return reinterpret_cast<Bucket*>(reinterpret_cast<uint8_t *>(extra_buckets_) +
                                   (extra_bucket_index * bkt_size_with_val));
 }
 
@@ -259,22 +259,22 @@ void FixedTable<StaticConfig>::print_bucket_occupancy() {
   // Primary buckets
   printf("Table %s: Primary bucket occupancy = %.4f (%zu of %u buckets used)\n",
     name.c_str(),
-    (double) primary_bkts_used / num_buckets_, primary_bkts_used, num_buckets_);
+    primary_bkts_used * 1.0 / num_buckets_, primary_bkts_used, num_buckets_);
 
   printf("Table %s: Primary slot occupancy = %.4f (%zu of %zu slots used)\n",
     name.c_str(),
-    (double) primary_slots_used / (num_buckets_ * StaticConfig::kBucketCap),
+    primary_slots_used * 1.0 / (num_buckets_ * StaticConfig::kBucketCap),
     primary_slots_used, num_buckets_ * StaticConfig::kBucketCap);
 
   // Secondary buckets
   printf("Table %s: Extra bucket occupancy = %.4f (%zu of %u buckets used)\n",
     name.c_str(),
-    (double) extra_bkts_used / num_extra_buckets_, extra_bkts_used,
+    extra_bkts_used * 1.0 / num_extra_buckets_, extra_bkts_used,
     num_extra_buckets_);
 
   printf("Table %s: Extra slot occupancy = %.4f (%zu of %zu slots used)\n",
     name.c_str(),
-    (double) extra_slots_used / (num_extra_buckets_ * StaticConfig::kBucketCap),
+    extra_slots_used * 1.0 / (num_extra_buckets_ * StaticConfig::kBucketCap),
     extra_slots_used, num_extra_buckets_ * StaticConfig::kBucketCap);
 }
 }
