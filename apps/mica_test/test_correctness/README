@@ -1,9 +1,0 @@
-This is a correctness test. At every iteration, the test does the following:
-
-1. Insert keys
-2. Lookup all keys in insert order
-3. Increment the value of all keys in insert order
-4. Delete all keys
-
-Doing so repeatedly without failure gives some confidence that memory is
-not leaked during deletes.
