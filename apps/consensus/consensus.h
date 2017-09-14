@@ -16,7 +16,7 @@ extern "C" {
 
 // Key-value sizes
 static constexpr size_t kKeySize = 16;
-static constexpr size_t kKeyValueSize = 16;
+static constexpr size_t kValueSize = 16;
 
 // Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;

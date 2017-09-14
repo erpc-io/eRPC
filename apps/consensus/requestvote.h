@@ -75,8 +75,7 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
          ERpc::get_formatted_time().c_str());
 
   auto *rrt = new raft_req_tag_t();
-  rrt->req_msgbuf =
-      c->rpc->alloc_msg_buffer(sizeof(requestvote_req_t));
+  rrt->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(requestvote_req_t));
   ERpc::rt_assert(rrt->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
 

@@ -8,9 +8,11 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-// The client request message
+// The client's key-value PUT request
 struct client_req_t {
   size_t client_id;
+  uint8_t key[kKeySize];
+  uint8_t value[kValueSize];
 };
 
 enum class ClientRespType : size_t { kSuccess, kFailRedirect, kFailTryAgain };

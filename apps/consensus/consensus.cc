@@ -42,7 +42,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
   if (unlikely(leader == nullptr)) {
     printf(
-        "consensus: Received request from client %zu, but leader unknown. "
+        "consensus: Received request from client %zu, but leader is unknown. "
         "Asking client to retry later.\n",
         client_req->client_id);
 

@@ -1,5 +1,6 @@
 ## General notes
- * A replicated counter is implemented with the following constraints:
+ * A replicated key-value store is implemented with the following constraints:
+   * Only PUTs are supported
    * Only one client is allowed
    * Log compaction and cluster configuration change is not implemented
    * Leader failure is allowed, but the RPCs sent during leader election must
@@ -28,14 +29,24 @@
 
 ## Code/design notes
  * In the common case:
-   * The client sends a request containing its global ID to the leader
+   * The client sends a request containing a key-value item to its leader view
    * The leader processes one client request at a time. It sends `AppendEntries`
      RPCs to the followers, and busy-waits until the Raft entry is committed.
    * When the Raft library decides that an entry is committed, the `applylog()`
-     Raft callback is invoked. We increment the counter in this callback.
+     Raft callback is invoked. We insert the key-value item here.
    * When the server's busy wait ends, it calls `raft_apply_all()` to ensure
      that all committed log entries have been applied to the state machine.
      Then it sends a response to the client.
+ * Client actions on leader failure:
+   * The client detects leader failure when it receives a callback with failure.
+     It tries other Raft servers one-by-one until it finds a leader.
+   * Raft servers that are not the leader reply to client by redirecting it to
+     the leader. If a Raft server does not know the leader, it directs the
+     the client to try again.
+
+## A note about replicated counter
+ * An earlier version of this code implemented a replicated counter, not a
+   key-value store. The following is noteworthy for the counter application.
  * The replicated log contains client IDs, not counter values. This follows the
    traditional state machine replication model, where client-proposed requests
    are replicated in the log. Using counter values as log entries is difficult
@@ -57,10 +68,3 @@
    * The new leader receives a client request. Since its counter is currently 0,
      it also replicates `counter = 0`. Both `counter = 0` entries are eventually
      committed and applied, which is wrong.
- * Client actions on leader failure:
-   * The client detects leader failure when it receives a callback with failure.
-     It tries other Raft servers one-by-one until it finds a leader.
-   * Raft servers that are not the leader reply to client by redirecting it to
-     the leader. If a Raft server does not know the leader, it directs the
-     the client to try again.
-
