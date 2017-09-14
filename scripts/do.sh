@@ -6,7 +6,14 @@ check_env "autorun_app"
 drop_shm
 
 # Install modded driver - this is not a requirement
-(cd ~/libmlx4-1.2.1mlnx1/ && ./update_driver.sh)
+if [ "$autorun_app" != "consensus"]; then
+  blue "Installing modded driver"
+  (cd ~/libmlx4-1.2.1mlnx1/ && ./update_driver.sh)
+else
+  # The consensus app latency improves with inline size = 120 bytes. However,
+  # the modded driver only supports inline size = 60 bytes.
+  blue "Not installing modded driver for consensus app"
+fi
 
 # Check arguments
 if [ "$#" -gt 2 ]; then
