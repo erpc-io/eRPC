@@ -14,19 +14,23 @@ extern "C" {
 #include "cityhash/city.h"
 #include "time_entry.h"
 
+// Key-value sizes
+static constexpr size_t kKeySize = 16;
+static constexpr size_t kKeyValueSize = 16;
+
 // Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;
 static constexpr bool kAppMeasureCommitLatency = false;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
 
+// eRPC defines
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 
 // We run FLAGS_num_machines in the cluster, of which the first
-// FLAGS_num_raft_servers are Raft servers, and the remaining machines are Raft
-// clients.
+// FLAGS_num_raft_servers are Raft servers, and the remaining are Raft clients.
 DEFINE_uint64(num_raft_servers, 0,
               "Number of Raft servers (i.e., non-client machines)");
 static bool validate_num_raft_servers(const char *, uint64_t num_raft_servers) {
@@ -54,11 +58,11 @@ struct connection_t {
   AppContext *c;  // Back link to AppContext
 };
 
-// Tag for requests sent to Raft peers
+// Tag for requests sent to Raft peers (both requestvote and appendentries)
 struct raft_req_tag_t {
   ERpc::MsgBuffer req_msgbuf;
   ERpc::MsgBuffer resp_msgbuf;
-  raft_node_t *node;  // The Raft node to which req was sent (for servers only)
+  raft_node_t *node;  // The Raft node to which req was sent
 };
 
 // Info about client request(s) saved at a leader for the nested Rpc

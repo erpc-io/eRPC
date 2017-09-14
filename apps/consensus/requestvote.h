@@ -74,28 +74,28 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
          node_id_to_name_map[raft_node_get_id(node)].c_str(),
          ERpc::get_formatted_time().c_str());
 
-  auto *raft_req_tag = new raft_req_tag_t();  // XXX: Optimize with pool
-  raft_req_tag->req_msgbuf =
+  auto *rrt = new raft_req_tag_t();
+  rrt->req_msgbuf =
       c->rpc->alloc_msg_buffer(sizeof(requestvote_req_t));
-  ERpc::rt_assert(raft_req_tag->req_msgbuf.buf != nullptr,
+  ERpc::rt_assert(rrt->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
 
-  raft_req_tag->resp_msgbuf =
+  rrt->resp_msgbuf =
       c->rpc->alloc_msg_buffer(sizeof(msg_requestvote_response_t));
-  ERpc::rt_assert(raft_req_tag->resp_msgbuf.buf != nullptr,
+  ERpc::rt_assert(rrt->resp_msgbuf.buf != nullptr,
                   "Failed to allocate response MsgBuffer");
 
-  raft_req_tag->node = node;
+  rrt->node = node;
 
   auto *erpc_requestvote =
-      reinterpret_cast<requestvote_req_t *>(raft_req_tag->req_msgbuf.buf);
+      reinterpret_cast<requestvote_req_t *>(rrt->req_msgbuf.buf);
   erpc_requestvote->node_id = c->server.node_id;
   erpc_requestvote->rv = *m;
 
   int ret = c->rpc->enqueue_request(
       conn->session_num, static_cast<uint8_t>(ReqType::kRequestVote),
-      &raft_req_tag->req_msgbuf, &raft_req_tag->resp_msgbuf, requestvote_cont,
-      reinterpret_cast<size_t>(raft_req_tag));
+      &rrt->req_msgbuf, &rrt->resp_msgbuf, requestvote_cont,
+      reinterpret_cast<size_t>(rrt));
 
   assert(ret == 0 || ret == -EBUSY);  // We checked is_connected above
   if (ret == -EBUSY) c->server.stat_requestvote_enq_fail++;
