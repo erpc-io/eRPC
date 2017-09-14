@@ -133,7 +133,6 @@
    at runtime.
 
 ## Short-term TODOs
- * Rerun tests after `Rpc::is_connected` fix.
  * Use TX flush on client-side retransmission
  * Make apps use BasicAppContext and `basic_sm_handler`.
  * Use `rt_assert` in src and apps
