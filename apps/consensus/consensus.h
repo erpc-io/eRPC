@@ -54,8 +54,8 @@ class AppContext;  // Forward declaration
 struct connection_t {
   bool disconnected = false;  // True if this session is disconnected
   int session_num = -1;       // ERpc session number
-  size_t session_idx = std::numeric_limits<size_t>::max();  // Index in vector
-  AppContext *c;  // Back link to AppContext
+  size_t session_idx = std::numeric_limits<size_t>::max();  // Index in conn_vec
+  AppContext *c;
 };
 
 // Tag for requests sent to Raft peers (both requestvote and appendentries)
@@ -65,11 +65,12 @@ struct raft_req_tag_t {
   raft_node_t *node;  // The Raft node to which req was sent
 };
 
-// Info about client request(s) saved at a leader for the nested Rpc
+// Info about client request(s) saved at a leader for the nested Rpc. Each
+// Raft server has one of these.
 struct leader_saveinfo_t {
   bool in_use = false;          // Leader has an ongoing commit request
   ERpc::ReqHandle *req_handle;  // This could be a vector if we do batching
-  msg_entry_response_t msg_entry_response;
+  msg_entry_response_t msg_entry_response;  // Used to check commit status
 };
 
 // Context for both servers and clients

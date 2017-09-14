@@ -212,7 +212,7 @@ int main(int argc, char **argv) {
     c.rpc->run_event_loop_once();
 
     leader_saveinfo_t &leader_sav = c.server.leader_saveinfo;
-    if (!leader_sav.in_use) continue;  // Avoid passing garbage to commit check
+    if (!leader_sav.in_use) continue;  // We didn't get a client request
 
     int commit_status = raft_msg_entry_response_committed(
         c.server.raft, &leader_sav.msg_entry_response);
