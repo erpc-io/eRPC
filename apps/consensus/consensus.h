@@ -23,8 +23,6 @@ static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
-static constexpr size_t kIPStrLen = 12;
-static constexpr size_t kClientMaxConcurrency = 32;
 
 // We run FLAGS_num_machines in the cluster, of which the first
 // FLAGS_num_raft_servers are Raft servers, and the remaining machines are Raft

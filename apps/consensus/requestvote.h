@@ -8,7 +8,8 @@
 #ifndef REQUESTVOTE_H
 #define REQUESTVOTE_H
 
-// The requestvote request send via eRPC
+// The requestvote request send via eRPC. Requestvote response is just Raft's
+// msg_appendentries_response_t.
 struct requestvote_req_t {
   int node_id;
   msg_requestvote_t rv;

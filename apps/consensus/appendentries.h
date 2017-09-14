@@ -8,7 +8,8 @@
 #ifndef APPENDENTRIES_H
 #define APPENDENTRIES_H
 
-// The appendentries request message sent via eRPC
+// The appendentries request sent via eRPC. Appendentries response is just
+// Raft's msg_appendentries_response_t.
 struct appendentries_req_t {
   int node_id;  // Node ID of the sender
   msg_appendentries_t ae;
@@ -231,7 +232,8 @@ void appendentries_cont(ERpc::RespHandle *resp_handle, void *_context,
     _unused(e);
     assert(e == 0);
   } else {
-    // This is a continuation-with-failure
+    // This is a continuation-with-failure. Fall through and call
+    // raft_periodic() again.
     printf("consensus: Appendentries RPC to node %s failed to complete [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            ERpc::get_formatted_time().c_str());
