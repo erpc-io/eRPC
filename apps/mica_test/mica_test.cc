@@ -11,11 +11,10 @@
 static constexpr bool kPrefetch = true;
 static constexpr size_t kValSize = 16;
 
-typedef ::mica::table::FixedTable<mica::table::BasicFixedTableConfig>
-    FixedTable;
+typedef mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
 typedef FixedTable::ft_key_t test_key_t;
 
-typedef ::mica::table::Result MicaResult;
+typedef mica::table::Result MicaResult;
 struct test_val_t {
   uint64_t buf[kValSize / sizeof(uint64_t)];
 };
