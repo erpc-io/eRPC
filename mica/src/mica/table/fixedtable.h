@@ -214,8 +214,7 @@ class FixedTable {
   ExtraBucketFreeList extra_bucket_free_list_;
 
   mutable Stats stats_;
-} __attribute__((aligned(128)));  // To prevent false sharing caused by
-                                  // adjacent cacheline prefetching.
+};
 
 // Instantiate required FixedTable classes so they get compiled for the linker
 template class FixedTable<BasicFixedTableConfig>;
