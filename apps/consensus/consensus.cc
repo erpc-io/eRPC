@@ -28,7 +28,11 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  if (kAppMeasureCommitLatency) c->server.commit_latency.stopwatch_start();
+  // We need leader_sav to start commit latency measurement, but we won't mark
+  // it in_use until checking that this node is the leader
+  leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
+
+  if (kAppMeasureCommitLatency) leader_sav.start_tsc = ERpc::rdtsc();
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
         TimeEntry(TimeEntryType::kClientReq, ERpc::rdtsc()));
@@ -73,7 +77,6 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
            client_req->to_string().c_str(), ERpc::get_formatted_time().c_str());
   }
 
-  leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
   assert(!leader_sav.in_use);
   leader_sav.in_use = true;
   leader_sav.req_handle = req_handle;
@@ -140,7 +143,6 @@ void init_erpc(AppContext *c, ERpc::Nexus *nexus) {
       nexus, static_cast<void *>(c), 0, sm_handler, kAppPhyPort, kAppNumaNode);
 
   c->rpc->retry_connect_on_invalid_rpc_id = true;
-  c->server.commit_latency = ERpc::TscLatency(c->rpc->get_freq_ghz());
 
   // Create a session to each Raft server, excluding self
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
@@ -208,9 +210,13 @@ int main(int argc, char **argv) {
   size_t loop_tsc = ERpc::rdtsc();
   while (ctrl_c_pressed == 0) {
     if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
-      ERpc::TscLatency &commit_latency = c.server.commit_latency;
-      printf("consensus: Leader commit latency = %.2f us. Log size = %zu.\n",
-             commit_latency.get_avg_us(), c.server.raft_log.size());
+      ERpc::Latency &commit_latency = c.server.commit_latency;
+      printf(
+          "consensus: Leader commit latency (us) = "
+          "{%.2f median, %.2f 99%%}. Log size = %zu.\n",
+          kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
+          kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
+          c.server.raft_log.size());
 
       loop_tsc = ERpc::rdtsc();
       commit_latency.reset();
@@ -231,7 +237,12 @@ int main(int argc, char **argv) {
       raft_apply_all(c.server.raft);
 
       leader_sav.in_use = false;
-      if (kAppMeasureCommitLatency) c.server.commit_latency.stopwatch_stop();
+      if (kAppMeasureCommitLatency) {
+        size_t commit_cycles = ERpc::rdtsc() - leader_sav.start_tsc;
+        double commit_usec =
+            ERpc::to_usec(commit_cycles, c.rpc->get_freq_ghz());
+        c.server.commit_latency.update(commit_usec * 10);
+      }
 
       if (kAppCollectTimeEntries) {
         c.server.time_entry_vec.push_back(

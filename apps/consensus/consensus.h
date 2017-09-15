@@ -119,6 +119,7 @@ struct raft_req_tag_t {
 struct leader_saveinfo_t {
   bool in_use = false;          // Leader has an ongoing commit request
   ERpc::ReqHandle *req_handle;  // This could be a vector if we do batching
+  uint64_t start_tsc;           // Time at which client's request was received
   msg_entry_response_t msg_entry_response;  // Used to check commit status
 };
 
@@ -142,8 +143,8 @@ class AppContext {
     FixedTable *table = nullptr;
 
     // Stats
-    ERpc::TscLatency commit_latency;       // Leader latency to commit an entry
-    size_t stat_requestvote_enq_fail = 0;  // Failed to send requestvote req
+    ERpc::Latency commit_latency;            // Amplification factor = 10
+    size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;
 
