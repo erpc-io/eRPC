@@ -86,7 +86,7 @@ class AppContext {
     std::vector<TimeEntry> time_entry_vec;
 
     // Pools
-    std::vector<void *> rsm_cmd_buf_pool;  // Pool for 8B state machine commands
+    MemPool<size_t> rsm_cmd_buf_pool;  // Pool for 8B state machine commands
     MemPool<raft_req_tag_t> raft_req_tag_pool;
 
     // App state
@@ -122,32 +122,6 @@ class AppContext {
   static constexpr size_t kAppContextMagic = 0x3185;
   volatile size_t magic = kAppContextMagic;  // Avoid optimizing check_magic()
   bool check_magic() const { return magic == kAppContextMagic; }
-
-  void rsm_cmd_buf_pool_extend() {
-    printf("consensus: Extending RSM command buffer pool.\n");
-    ERpc::rt_assert(server.raft != nullptr, "Caller must be server");
-
-    size_t alloc_size = rpc->get_max_msg_size();
-    ERpc::MsgBuffer buf_pool_backer = rpc->alloc_msg_buffer(alloc_size);
-    ERpc::rt_assert(buf_pool_backer.buf != nullptr,
-                    "Failed to extend counter buf pool");
-
-    for (size_t i = 0; i < alloc_size / sizeof(size_t); i++) {
-      server.rsm_cmd_buf_pool.push_back(
-          static_cast<void *>(&buf_pool_backer.buf[i * sizeof(size_t)]));
-    }
-  }
-
-  void *rsm_cmd_buf_pool_alloc() {
-    if (server.rsm_cmd_buf_pool.empty()) rsm_cmd_buf_pool_extend();
-    void *ret = server.rsm_cmd_buf_pool.back();
-    server.rsm_cmd_buf_pool.pop_back();
-    return ret;
-  }
-
-  void rsm_cmd_buf_pool_free(void *addr) {
-    server.rsm_cmd_buf_pool.push_back(addr);
-  }
 };
 
 // Generate a deterministic, random-ish node ID from a machine's hostname

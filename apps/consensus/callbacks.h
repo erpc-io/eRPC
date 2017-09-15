@@ -74,10 +74,10 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
   assert(c->check_magic());
 
   raft_entry_t &entry = c->server.raft_log.back();
-  if (entry.data.len == sizeof(size_t)) {
+  if (likely(entry.data.len == sizeof(size_t))) {
     // Handle RSM command pool buffers separately
     assert(entry.data.buf != nullptr);
-    c->rsm_cmd_buf_pool_free(entry.data.buf);
+    c->server.rsm_cmd_buf_pool.free(static_cast<size_t *>(entry.data.buf));
   } else {
     if (entry.data.buf != nullptr) free(entry.data.buf);
   }

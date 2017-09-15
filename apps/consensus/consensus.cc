@@ -76,7 +76,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   leader_sav.in_use = true;
   leader_sav.req_handle = req_handle;
 
-  size_t *rsm_cmd_buf = static_cast<size_t *>(c->rsm_cmd_buf_pool_alloc());
+  size_t *rsm_cmd_buf = c->server.rsm_cmd_buf_pool.alloc();
   *rsm_cmd_buf = client_req->client_id;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
@@ -190,9 +190,7 @@ int main(int argc, char **argv) {
   // including running it for session management.
   init_raft(&c);
 
-  // Initialize eRPC
-  init_erpc(&c, &nexus);
-  c.rsm_cmd_buf_pool_extend();
+  init_erpc(&c, &nexus);  // Initialize eRPC
 
   if (FLAGS_machine_id == 0) raft_become_leader(c.server.raft);
 

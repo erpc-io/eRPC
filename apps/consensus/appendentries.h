@@ -66,7 +66,7 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
       assert(ae.entries[i].data.len == sizeof(size_t));
 
       // Allocate dynamic memory for each appendentry
-      ae.entries[i].data.buf = c->rsm_cmd_buf_pool_alloc();
+      ae.entries[i].data.buf = c->server.rsm_cmd_buf_pool.alloc();
       memcpy(ae.entries[i].data.buf, buf + sizeof(msg_entry_t),
              ae.entries[i].data.len);
 
