@@ -65,6 +65,7 @@ void send_req_one(AppContext *c) {
   req->key[0] = c->client.last_key;
   req->value[0] = c->client.last_key;
   c->client.last_key++;
+  if (unlikely(c->client.last_key == kAppNumKeys)) c->client.last_key = 0;
 
   if (kAppVerbose) {
     printf("consensus: Client sending request %s to leader index %zu [%s].\n",

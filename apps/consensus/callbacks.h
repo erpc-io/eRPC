@@ -35,8 +35,14 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
         ERpc::get_formatted_time().c_str());
   }
 
-  _unused(c);
-  // c->server.counter++;  // XXX: Update RSM state
+  size_t key_hash = mica::util::hash(&client_req->key, kAppKeySize);
+  FixedTable *table = c->server.table;
+  auto *ft_key = reinterpret_cast<FixedTable::ft_key_t *>(client_req->key);
+
+  auto result = table->set(key_hash, *ft_key,
+                           reinterpret_cast<char *>(&client_req->value));
+  ERpc::rt_assert(result == mica::table::Result::kSuccess,
+                  "MICA insert failed");
   return 0;
 }
 
@@ -60,7 +66,6 @@ static int __raft_logentry_offer(raft_server_t *, void *udata,
   assert(c->check_magic());
 
   c->server.raft_log.push_back(*ety);
-
   return 0;  // Ignored
 }
 

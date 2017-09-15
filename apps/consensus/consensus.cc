@@ -164,6 +164,15 @@ void init_erpc(AppContext *c, ERpc::Nexus *nexus) {
   }
 }
 
+void init_mica(AppContext *c) {
+  assert(c->server.raft != nullptr);  // Only called at servers
+  assert(c->rpc != nullptr);          // We need the Rpc's allocator
+
+  auto config = mica::util::Config::load_file("apps/consensus/kv_store.json");
+  c->server.table = new FixedTable(config.get("table"), kAppValueSize,
+                                   c->rpc->get_huge_alloc());
+}
+
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
 
@@ -191,6 +200,7 @@ int main(int argc, char **argv) {
   init_raft(&c);
 
   init_erpc(&c, &nexus);  // Initialize eRPC
+  init_mica(&c);          // Initialize the key-value store
 
   if (FLAGS_machine_id == 0) raft_become_leader(c.server.raft);
 

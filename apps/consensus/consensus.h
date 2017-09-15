@@ -14,11 +14,19 @@ extern "C" {
 #include "cityhash/city.h"
 #include "time_entry.h"
 
-// Key-value sizes
-static constexpr size_t kKeySize = 16;
-static constexpr size_t kValueSize = 16;
-static_assert(kKeySize % sizeof(size_t) == 0, "");
-static_assert(kValueSize % sizeof(size_t) == 0, "");
+#include "mica/table/fixedtable.h"
+#include "mica/util/hash.h"
+
+// Key-value configuration
+static constexpr size_t kAppKeySize = 64;
+static constexpr size_t kAppValueSize = 16;
+static_assert(kAppKeySize % sizeof(size_t) == 0, "");
+static_assert(kAppValueSize % sizeof(size_t) == 0, "");
+
+typedef mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
+static_assert(sizeof(FixedTable::ft_key_t) == kAppKeySize, "");
+
+static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
 
 // Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;
@@ -52,18 +60,18 @@ enum class ReqType : uint8_t {
 
 // The client's key-value PUT request = the SMR command replicated in logs
 struct client_req_t {
-  size_t key[kKeySize / sizeof(size_t)];
-  size_t value[kValueSize / sizeof(size_t)];
+  size_t key[kAppKeySize / sizeof(size_t)];
+  size_t value[kAppValueSize / sizeof(size_t)];
 
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[Key (";
     for (size_t k : key) {
-      ret << std::to_string(k) << ", ";
+      ret << std::to_string(k) << " ";
     }
     ret << "), Value (";
     for (size_t v : value) {
-      ret << std::to_string(v) << ", ";
+      ret << std::to_string(v) << " ";
     }
     ret << ")]";
     return ret.str();
@@ -131,7 +139,7 @@ class AppContext {
     MemPool<raft_req_tag_t> raft_req_tag_pool;
 
     // App state
-    // XXX
+    FixedTable *table = nullptr;
 
     // Stats
     ERpc::TscLatency commit_latency;       // Leader latency to commit an entry
@@ -157,7 +165,7 @@ class AppContext {
 
   // Common members
   std::vector<connection_t> conn_vec;
-  ERpc::Rpc<ERpc::IBTransport> *rpc;
+  ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
   ERpc::FastRand fast_rand;
   size_t num_sm_resps = 0;
 
