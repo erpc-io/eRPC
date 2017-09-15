@@ -19,19 +19,21 @@ namespace ERpc {
 /// Information about an SHM region
 struct shm_region_t {
   // Constructor args
-  const int shm_key;   ///< The key used to create the SHM region
-  const uint8_t *buf;  ///< The start address of the allocated SHM buffer
-  const size_t size;   ///< The size in bytes of the allocated SHM buffer
-
-  // Filled in by Rpc when this region is registered
-  bool registered;  ///< Is this SHM region registered with the NIC?
+  const int shm_key;      /// The key used to create the SHM region
+  const uint8_t *buf;     /// The start address of the allocated SHM buffer
+  const size_t size;      /// The size in bytes of the allocated SHM buffer
+  const bool registered;  /// Is this SHM region registered with the NIC?
 
   /// The transport-specific memory registration info
   Transport::MemRegInfo mem_reg_info;
 
-  shm_region_t(int shm_key, uint8_t *buf, size_t size,
+  shm_region_t(int shm_key, uint8_t *buf, size_t size, bool registered,
                Transport::MemRegInfo mem_reg_info)
-      : shm_key(shm_key), buf(buf), size(size), mem_reg_info(mem_reg_info) {
+      : shm_key(shm_key),
+        buf(buf),
+        size(size),
+        registered(registered),
+        mem_reg_info(mem_reg_info) {
     assert(size % kHugepageSize == 0);
   }
 };
@@ -53,14 +55,14 @@ struct shm_region_t {
  */
 class HugeAlloc {
  public:
-  static const size_t kMinClassSize = 64;     ///< Min allocation size
-  static const size_t kMinClassBitShift = 6;  ///< For division by kMinClassSize
+  static const size_t kMinClassSize = 64;     /// Min allocation size
+  static const size_t kMinClassBitShift = 6;  /// For division by kMinClassSize
   static_assert((kMinClassSize >> kMinClassBitShift) == 1, "");
 
-  static const size_t kMaxClassSize = MB(8);  ///< Max allocation size
+  static const size_t kMaxClassSize = MB(8);  /// Max allocation size
   static_assert(kMaxClassSize <= std::numeric_limits<int>::max(), "");
 
-  static const size_t kNumClasses = 18;  ///< 64 B (2^6), ..., 8 MB (2^23)
+  static const size_t kNumClasses = 18;  /// 64 B (2^6), ..., 8 MB (2^23)
   static_assert(kMaxClassSize == kMinClassSize << (kNumClasses - 1), "");
 
   /// Return the maximum size of a class
@@ -78,18 +80,24 @@ class HugeAlloc {
   ~HugeAlloc();
 
   /**
-   * @brief Allocate memory using raw SHM operations, bypassing the allocator's
-   * freelists. Allocated memory is freed when this allocator is destroyed.
+   * @brief Allocate memory using raw SHM operations, always bypassing the
+   * allocator's freelists. Unlike \p alloc(), the size of the allocated memory
+   * need not fit in the allocator's max class size.
    *
-   * Unlike \p alloc(), the size of the allocated memory need not fit in the
-   * allocator's max class size.
+   * Optionally, the caller can bypass memory registration. Allocated memory is
+   * freed when this allocator is destroyed.
+   *
+   * This function is used only outside eRPC's core code (e.g., for MICA).
    *
    * @param size The minimum size of the allocated memory
+   * @param numa_node The NUMA node to allocate hugepages on
+   * @param do_register True iff the hugepages should be registered
+   *
    * @return The allocated hugepage buffer, nullptr if we ran out of memory.
    *
    * @throw runtime_error if hugepage reservation failure is catastrophic
    */
-  uint8_t *alloc_raw(size_t size, size_t numa_node);
+  uint8_t *alloc_raw(size_t size, size_t numa_node, bool do_register = false);
 
   /**
    * @brief Allocate a Buffer using the allocator's freelists, i.e., the max
@@ -247,7 +255,8 @@ class HugeAlloc {
 
   /**
    * @brief Try to reserve \p size (rounded to 2MB) bytes as huge pages on
-   * \p numa_node by adding hugepage-backed Buffers to freelists.
+   * \p numa_node by adding hugepage-backed Buffers to freelists. The
+   * allocated hugepages are registered with the NIC.
    *
    * @return True if the allocation succeeds. False if the allocation fails
    * because no more hugepages are available.
@@ -260,21 +269,21 @@ class HugeAlloc {
   /// Delete the SHM region specified by \p shm_key and \p shm_buf
   void delete_shm(int shm_key, const uint8_t *shm_buf);
 
-  std::vector<shm_region_t> shm_list;  ///< SHM regions by increasing alloc size
-  std::vector<Buffer> freelist[kNumClasses];  ///< Per-class freelist
+  std::vector<shm_region_t> shm_list;  /// SHM regions by increasing alloc size
+  std::vector<Buffer> freelist[kNumClasses];  /// Per-class freelist
 
-  SlowRand slow_rand;  ///< RNG to generate SHM keys
-  size_t numa_node;    ///< NUMA node on which all memory is allocated
+  SlowRand slow_rand;  /// RNG to generate SHM keys
+  size_t numa_node;    /// NUMA node on which all memory is allocated
 
   Transport::reg_mr_func_t reg_mr_func;
   Transport::dereg_mr_func_t dereg_mr_func;
 
-  size_t prev_allocation_size;  ///< Size of previous hugepage reservation
+  size_t prev_allocation_size;  /// Size of previous hugepage reservation
 
   // Stats
   struct {
-    size_t shm_reserved = 0;    ///< Total hugepage memory reserved by allocator
-    size_t user_alloc_tot = 0;  ///< Total memory allocated to user
+    size_t shm_reserved = 0;    /// Total hugepage memory reserved by allocator
+    size_t user_alloc_tot = 0;  /// Total memory allocated to user
   } stats;
 };
 

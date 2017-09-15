@@ -50,6 +50,8 @@ class Transport {
 
     MemRegInfo(void* transport_mr, uint32_t lkey)
         : transport_mr(transport_mr), lkey(lkey) {}
+
+    MemRegInfo() : transport_mr(nullptr), lkey(0xffffffff) {}
   };
 
   /// Info about a packet that needs TX. Using void* instead of MsgBuffer* is

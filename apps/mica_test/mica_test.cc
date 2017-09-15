@@ -11,21 +11,6 @@
 static constexpr bool kPrefetch = true;
 static constexpr size_t kValSize = 16;
 
-// Dummy registration and deregistration functions for HugeAlloc
-#define DUMMY_MR_PTR (reinterpret_cast<void *>(0x3185))
-#define DUMMY_LKEY (3186)
-ERpc::Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
-  return ERpc::Transport::MemRegInfo(DUMMY_MR_PTR, DUMMY_LKEY);
-}
-void dereg_mr_wrapper(ERpc::Transport::MemRegInfo) {}
-
-using namespace std::placeholders;
-typename ERpc::Transport::reg_mr_func_t reg_mr_func =
-    std::bind(reg_mr_wrapper, _1, _2);
-typename ERpc::Transport::dereg_mr_func_t dereg_mr_func =
-    std::bind(dereg_mr_wrapper, _1);
-// End dummy registration and deregistration functions for HugeAlloc
-
 typedef ::mica::table::FixedTable<mica::table::BasicFixedTableConfig>
     FixedTable;
 typedef FixedTable::ft_key_t test_key_t;
@@ -61,7 +46,8 @@ int main() {
       static_cast<size_t>(config.get("test").get("batch_size").get_int64());
   assert(batch_size > 0 && num_keys % batch_size == 0);
 
-  auto *alloc = new ERpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
+  // We'll only use alloc_raw, so no need for registration/deregistration funcs
+  auto *alloc = new ERpc::HugeAlloc(1024, 0, nullptr, nullptr);
   FixedTable table(config.get("table"), kValSize, alloc);
 
   auto *key_arr = reinterpret_cast<test_key_t *>(
