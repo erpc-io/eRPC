@@ -146,6 +146,20 @@ set(SOURCES
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
+# MICA sources
+set(MICA_SOURCES
+  mica/src/mica/table/fixedtable_impl/get.cc
+  mica/src/mica/table/fixedtable_impl/del.cc
+  mica/src/mica/table/fixedtable_impl/bucket.cc
+  mica/src/mica/table/fixedtable_impl/set.cc
+  mica/src/mica/table/fixedtable_impl/prefetch.cc
+  mica/src/mica/table/fixedtable_impl/init.cc
+  mica/src/mica/table/fixedtable_impl/lock.cc
+  mica/src/mica/table/fixedtable_impl/info.cc
+  mica/src/mica/table/fixedtable_impl/item.cc
+  mica/src/mica/util/cityhash/city_mod.cc
+  mica/src/mica/util/config.cc)
+
 # The tests to run using ctest
 set(CTEST_TESTS
   test_create_session
@@ -189,6 +203,9 @@ if(APP STREQUAL "consensus")
   # Raft library from willemt/raft, installed at system-level
   set(LIBRARIES ${LIBRARIES} craft)
   set(APP_ADDITIONAL_SOURCES third_party/cityhash/city_mod.cc)
+  # MICA
+  include_directories(mica/src)
+  set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
 elseif(APP STREQUAL "masstree_analytics")
   # CMake-based Masstree library from anujkaliaiitd/masstree-beta
   link_directories($ENV{HOME}/masstree-beta)
@@ -198,18 +215,7 @@ elseif(APP STREQUAL "masstree_analytics")
   set(LIBRARIES ${LIBRARIES} masstree)
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
-  set(APP_ADDITIONAL_SOURCES
-    mica/src/mica/table/fixedtable_impl/get.cc
-    mica/src/mica/table/fixedtable_impl/del.cc
-    mica/src/mica/table/fixedtable_impl/bucket.cc
-    mica/src/mica/table/fixedtable_impl/set.cc
-    mica/src/mica/table/fixedtable_impl/prefetch.cc
-    mica/src/mica/table/fixedtable_impl/init.cc
-    mica/src/mica/table/fixedtable_impl/lock.cc
-    mica/src/mica/table/fixedtable_impl/info.cc
-    mica/src/mica/table/fixedtable_impl/item.cc
-    mica/src/mica/util/cityhash/city_mod.cc
-    mica/src/mica/util/config.cc)
+  set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO

@@ -1,0 +1,12 @@
+{
+  "alloc": {
+  },
+
+  "table": {
+    "name": "replicated_table",
+    "concurrent_read" : false,
+    "concurrent_write" : false,
+    "item_count": 1000000,
+    "numa_node": 0
+  }
+}
