@@ -693,6 +693,13 @@ class Rpc {
   //
 
  public:
+  /// Retrieve this Rpc's hugepage allocator. For expert use only.
+  inline HugeAlloc *get_huge_alloc() {
+    rt_assert(nexus->num_bg_threads == 0,
+              "Cannot extract allocator because background threads exist.");
+    return huge_alloc;
+  }
+
   /// Return the maximum *data* size that can be sent in one packet
   static inline constexpr size_t get_max_data_per_pkt() {
     return TTr::kMaxDataPerPkt;
