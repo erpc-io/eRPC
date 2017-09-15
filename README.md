@@ -134,6 +134,7 @@
 
 ## Short-term TODOs
  * Use TX flush on client-side retransmission
+ * Destroy session test fails with `kSessionCredits = 1`, `kSessionReqWindow = 1`
  * Make apps use BasicAppContext and `basic_sm_handler`.
  * Use `rt_assert` in src and apps
  * When a client-mode ENet peer gets disconnected, we should not reset
