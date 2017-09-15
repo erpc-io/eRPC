@@ -82,7 +82,7 @@ static std::string get_hostname_for_machine(size_t server_i) {
   return s;
 }
 
-// A basic mempool
+// A basic mempool for preallocated objects of type T
 template <class T>
 class MemPool {
  public:
@@ -92,10 +92,7 @@ class MemPool {
 
   void extend_pool() {
     T *backing_ptr = new T[num_to_alloc];
-    for (size_t i = 0; i < num_to_alloc; i++) {
-      pool.push_back(&backing_ptr[i]);
-    }
-
+    for (size_t i = 0; i < num_to_alloc; i++) pool.push_back(&backing_ptr[i]);
     backing_ptr_vec.push_back(backing_ptr);
     num_to_alloc *= 2;
   }
@@ -110,7 +107,6 @@ class MemPool {
   void free(T *t) { pool.push_back(t); }
 
   MemPool() {}
-
   ~MemPool() {
     for (T *ptr : backing_ptr_vec) delete[] ptr;
   }

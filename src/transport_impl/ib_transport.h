@@ -14,8 +14,8 @@ class IBTransport : public Transport {
   static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
-  static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
-  static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
+  static constexpr size_t kPostlist = 1;    ///< Maximum SEND postlist
+  static constexpr size_t kMaxInline = 120;   ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
   static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
   static constexpr size_t kGRHBytes = 40;
