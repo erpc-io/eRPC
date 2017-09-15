@@ -42,9 +42,8 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
   if (unlikely(leader == nullptr)) {
     printf(
-        "consensus: Received request from client %zu, but leader is unknown. "
-        "Asking client to retry later.\n",
-        client_req->client_id);
+        "consensus: Received request from client, but leader is unknown. "
+        "Asking client to retry later.\n");
 
     client_resp_t err_resp;
     err_resp.resp_type = ClientRespType::kFailTryAgain;
@@ -55,9 +54,10 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   int leader_node_id = raft_node_get_id(leader);
   if (unlikely(leader_node_id != c->server.node_id)) {
     printf(
-        "consensus: Received request from client %zu, "
+        "consensus: Received request from client, "
         "but leader is %s (not me). Redirecting client.\n",
-        client_req->client_id, node_id_to_name_map.at(leader_node_id).c_str());
+        node_id_to_name_map.at(leader_node_id).c_str());
+
     client_resp_t err_resp;
     err_resp.resp_type = ClientRespType::kFailRedirect;
     err_resp.leader_node_id = leader_node_id;
@@ -67,8 +67,8 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   // We're the leader
   if (kAppVerbose) {
-    printf("consensus: Received client request from client %zu [%s].\n",
-           client_req->client_id, ERpc::get_formatted_time().c_str());
+    printf("consensus: Received client request from client [%s].\n",
+           ERpc::get_formatted_time().c_str());
   }
 
   leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
@@ -76,15 +76,15 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   leader_sav.in_use = true;
   leader_sav.req_handle = req_handle;
 
-  size_t *rsm_cmd_buf = c->server.rsm_cmd_buf_pool.alloc();
-  *rsm_cmd_buf = client_req->client_id;
+  client_req_t *rsm_cmd_buf = c->server.rsm_cmd_buf_pool.alloc();
+  *rsm_cmd_buf = *client_req;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
   msg_entry_t entry;
   entry.type = RAFT_LOGTYPE_NORMAL;
   entry.id = FLAGS_machine_id;
   entry.data.buf = static_cast<void *>(rsm_cmd_buf);
-  entry.data.len = sizeof(size_t);
+  entry.data.len = sizeof(client_req_t);
 
   int e =
       raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
@@ -113,7 +113,7 @@ void init_raft(AppContext *c) {
       // Add self. user_data = nullptr, peer_is_self = 1
       raft_add_node(c->server.raft, nullptr, c->server.node_id, 1);
     } else {
-      // peer_is_self = 0
+      // Add a non-self node. peer_is_self = 0
       raft_add_node(c->server.raft, static_cast<void *>(&c->conn_vec[i]),
                     node_i_id, 0);
     }
@@ -143,9 +143,7 @@ void init_erpc(AppContext *c, ERpc::Nexus *nexus) {
   // Create a session to each Raft server, excluding self
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     if (i == FLAGS_machine_id) continue;
-
     std::string hostname = get_hostname_for_machine(i);
-
     printf("consensus: Creating session to %s, index = %zu.\n",
            hostname.c_str(), i);
 
@@ -232,7 +230,6 @@ int main(int argc, char **argv) {
       // callback? This doesn't adversely affect failure-free performance.
       client_resp_t client_resp;
       client_resp.resp_type = ClientRespType::kSuccess;
-      client_resp.counter = c.server.counter;
 
       ERpc::ReqHandle *req_handle = leader_sav.req_handle;
       send_client_response(&c, req_handle, &client_resp);  // Prints message
@@ -253,9 +250,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  printf(
-      "consensus: Final log size (including uncommitted entries) = %zu. "
-      "Final counter = %zu. Exiting.\n",
-      c.server.raft_log.size(), c.server.counter);
+  printf("consensus: Final log size (including uncommitted entries) = %zu.\n",
+         c.server.raft_log.size());
   delete c.rpc;
 }

@@ -14,7 +14,7 @@ struct appendentries_req_t {
   int node_id;  // Node ID of the sender
   msg_appendentries_t ae;
   // If ae.n_entries > 0, the msg_entry_t structs are serialized here. Each
-  // struct's buf is placed immediately after the struct.
+  // msg_entry_t struct's buf is placed immediately after the struct.
 };
 
 // appendentries request: node ID, msg_appendentries_t, [{size, buf}]
@@ -31,11 +31,13 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   uint8_t *buf = req_msgbuf->buf;
 
+  // We'll use the msg_appendentries_t in the request MsgBuffer for
+  // raft_recv_appendentries(), but we need to fill out its @entries first.
   auto *appendentries_req = reinterpret_cast<appendentries_req_t *>(buf);
   msg_appendentries_t ae = appendentries_req->ae;
   assert(ae.entries == nullptr);
-  size_t n_entries = static_cast<size_t>(ae.n_entries);
 
+  size_t n_entries = static_cast<size_t>(ae.n_entries);
   bool is_keepalive = (n_entries == 0);
   if (kAppVerbose) {
     printf("consensus: Received appendentries (%s) req from node %s [%s].\n",
@@ -63,14 +65,15 @@ void appendentries_handler(ERpc::ReqHandle *req_handle, void *_context) {
     for (size_t i = 0; i < n_entries; i++) {
       ae.entries[i] = *(reinterpret_cast<msg_entry_t *>(buf));
       assert(ae.entries[i].data.buf == nullptr);
-      assert(ae.entries[i].data.len == sizeof(size_t));
+      assert(ae.entries[i].data.len == sizeof(client_req_t));
 
-      // Allocate dynamic memory for each appendentry
+      // Copy out each SMR command buffer from the request msgbuf since the
+      // msgbuf is valid for this function only.
       ae.entries[i].data.buf = c->server.rsm_cmd_buf_pool.alloc();
       memcpy(ae.entries[i].data.buf, buf + sizeof(msg_entry_t),
-             ae.entries[i].data.len);
+             sizeof(client_req_t));
 
-      buf += (sizeof(msg_entry_t) + ae.entries[i].data.len);
+      buf += (sizeof(msg_entry_t) + sizeof(client_req_t));
     }
 
     assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());
@@ -136,11 +139,11 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   }
 
   // Compute the request size. Keepalive appendentries requests do not have
-  // a buffer, but they have an unused msg_entry_t.
+  // a buffer, but they have an unused msg_entry_t (???).
   size_t req_size = sizeof(appendentries_req_t);
   for (size_t i = 0; i < static_cast<size_t>(m->n_entries); i++) {
-    req_size +=
-        sizeof(msg_entry_t) + static_cast<size_t>(m->entries[i].data.len);
+    assert(m->entries[i].data.len == sizeof(client_req_t));
+    req_size += sizeof(msg_entry_t) + sizeof(client_req_t);
   }
 
   ERpc::rt_assert(req_size <= c->rpc->get_max_msg_size(),
@@ -174,10 +177,9 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
     msg_entry->data.buf = nullptr;  // Was local pointer
     buf += sizeof(msg_entry_t);
 
-    assert(m->entries[i].data.len == sizeof(size_t));
-    memcpy(buf, m->entries[i].data.buf,
-           static_cast<size_t>(m->entries[i].data.len));
-    buf += static_cast<size_t>(m->entries[i].data.len);
+    assert(m->entries[i].data.len == sizeof(client_req_t));
+    memcpy(buf, m->entries[i].data.buf, sizeof(client_req_t));
+    buf += sizeof(client_req_t);
   }
 
   assert(buf == rrt->req_msgbuf.buf + rrt->req_msgbuf.get_data_size());

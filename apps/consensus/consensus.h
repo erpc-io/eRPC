@@ -48,6 +48,31 @@ enum class ReqType : uint8_t {
   kClientReq         // Client-to-server Rpc
 };
 
+// The client's key-value PUT request
+struct client_req_t {
+  uint8_t key[kKeySize];
+  uint8_t value[kValueSize];
+};
+
+// The client response message
+enum class ClientRespType : size_t { kSuccess, kFailRedirect, kFailTryAgain };
+struct client_resp_t {
+  ClientRespType resp_type;
+  int leader_node_id;  // ID of the leader node if resp type is kFailRedirect
+
+  std::string to_string() const {
+    switch (resp_type) {
+      case ClientRespType::kSuccess:
+        return "success";
+      case ClientRespType::kFailRedirect:
+        return "failed: redirect to node " + std::to_string(leader_node_id);
+      case ClientRespType::kFailTryAgain:
+        return "failed: try again";
+    }
+    return "Invalid";
+  }
+};
+
 class AppContext;  // Forward declaration
 
 // Peer-peer or client-peer connection
@@ -86,11 +111,11 @@ class AppContext {
     std::vector<TimeEntry> time_entry_vec;
 
     // Pools
-    MemPool<size_t> rsm_cmd_buf_pool;  // Pool for 8B state machine commands
+    MemPool<client_req_t> rsm_cmd_buf_pool;  // Pool for SMR commands
     MemPool<raft_req_tag_t> raft_req_tag_pool;
 
     // App state
-    size_t counter = 0;
+    // XXX
 
     // Stats
     ERpc::TscLatency commit_latency;       // Leader latency to commit an entry
@@ -103,9 +128,8 @@ class AppContext {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
     size_t num_resps = 0;
-    size_t last_counter = 0;  // The last received counter
-    ERpc::MsgBuffer req_msgbuf;
-    ERpc::MsgBuffer resp_msgbuf;
+    ERpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
+    ERpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
 
     // For latency measurement
     uint64_t req_start_tsc;

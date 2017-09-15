@@ -21,22 +21,18 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
   // We're applying an entry to the application's state machine, so we're sure
   // about its length. Other log callbacks can be invoked for non-application
   // log entries.
-  assert(ety->data.len == sizeof(size_t));
+  assert(ety->data.len == sizeof(client_req_t));
 
   auto *c = static_cast<AppContext *>(udata);
   assert(c->check_magic());
 
-  // The RSM command contains the client ID
-  size_t client_id = *static_cast<size_t *>(ety->data.buf);
-
   if (kAppVerbose) {
-    printf(
-        "consensus: Applying log entry from client %zu, "
-        "received at Raft server %u [%s].\n",
-        client_id, ety->id, ERpc::get_formatted_time().c_str());
+    printf("consensus: Applying log entry received at Raft server %u [%s].\n",
+           ety->id, ERpc::get_formatted_time().c_str());
   }
 
-  c->server.counter++;  // Update RSM state
+  _unused(c);
+  // c->server.counter++;  // XXX: Update RSM state
   return 0;
 }
 
@@ -74,10 +70,11 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
   assert(c->check_magic());
 
   raft_entry_t &entry = c->server.raft_log.back();
-  if (likely(entry.data.len == sizeof(size_t))) {
+  if (likely(entry.data.len == sizeof(client_req_t))) {
     // Handle RSM command pool buffers separately
     assert(entry.data.buf != nullptr);
-    c->server.rsm_cmd_buf_pool.free(static_cast<size_t *>(entry.data.buf));
+    c->server.rsm_cmd_buf_pool.free(
+        static_cast<client_req_t *>(entry.data.buf));
   } else {
     if (entry.data.buf != nullptr) free(entry.data.buf);
   }

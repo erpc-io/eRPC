@@ -8,37 +8,6 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-// The client's key-value PUT request
-struct client_req_t {
-  size_t client_id;
-  uint8_t key[kKeySize];
-  uint8_t value[kValueSize];
-};
-
-enum class ClientRespType : size_t { kSuccess, kFailRedirect, kFailTryAgain };
-
-// The client response message
-struct client_resp_t {
-  ClientRespType resp_type;
-
-  union {
-    size_t counter;      // The sequence counter, valid if resp type is kSuccess
-    int leader_node_id;  // ID of the leader node if resp type is kFailRedirect
-  };
-
-  std::string to_string() const {
-    switch (resp_type) {
-      case ClientRespType::kSuccess:
-        return "success, counter = " + std::to_string(counter);
-      case ClientRespType::kFailRedirect:
-        return "failed: redirect to node " + std::to_string(leader_node_id);
-      case ClientRespType::kFailTryAgain:
-        return "failed: try again";
-    }
-    return "Invalid";
-  }
-};
-
 void client_cont(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
 // Change the leader to a different Raft server that we are connected to
@@ -91,9 +60,10 @@ void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
   c->client.req_start_tsc = ERpc::rdtsc();
 
-  auto *erpc_client_req =
-      reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
-  erpc_client_req->client_id = FLAGS_machine_id;
+  // Format the client's request
+  auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
+  req->key[0] = 0;
+  req->value[0] = 0;
 
   if (kAppVerbose) {
     printf("consensus: Client sending request to leader index %zu [%s].\n",
@@ -152,20 +122,6 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
 
     switch (client_resp->resp_type) {
       case ClientRespType::kSuccess: {
-        ERpc::rt_assert(
-            client_resp->counter > c->client.last_counter,
-            "Invalid counter " + std::to_string(client_resp->counter) +
-                ", last counter = " + std::to_string(c->client.last_counter));
-
-        if (unlikely(client_resp->counter != c->client.last_counter + 1)) {
-          // This can happen during a leader change
-          printf(
-              "consensus: Gap in client counter sequence. "
-              "Last counter = %zu, received now = %zu.\n",
-              c->client.last_counter, client_resp->counter);
-        }
-
-        c->client.last_counter = client_resp->counter;
         break;
       }
 
