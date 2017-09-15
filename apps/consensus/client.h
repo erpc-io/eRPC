@@ -60,14 +60,16 @@ void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
   c->client.req_start_tsc = ERpc::rdtsc();
 
-  // Format the client's request
+  // Format the client's PUT request. Key and value are identical.
   auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
-  req->key[0] = 0;
-  req->value[0] = 0;
+  req->key[0] = c->client.last_key;
+  req->value[0] = c->client.last_key;
+  c->client.last_key++;
 
   if (kAppVerbose) {
-    printf("consensus: Client sending request to leader index %zu [%s].\n",
-           c->client.leader_idx, ERpc::get_formatted_time().c_str());
+    printf("consensus: Client sending request %s to leader index %zu [%s].\n",
+           req->to_string().c_str(), c->client.leader_idx,
+           ERpc::get_formatted_time().c_str());
   }
 
   connection_t &conn = c->conn_vec[c->client.leader_idx];

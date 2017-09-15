@@ -17,6 +17,8 @@ extern "C" {
 // Key-value sizes
 static constexpr size_t kKeySize = 16;
 static constexpr size_t kValueSize = 16;
+static_assert(kKeySize % sizeof(size_t) == 0, "");
+static_assert(kValueSize % sizeof(size_t) == 0, "");
 
 // Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;
@@ -48,10 +50,24 @@ enum class ReqType : uint8_t {
   kClientReq         // Client-to-server Rpc
 };
 
-// The client's key-value PUT request
+// The client's key-value PUT request = the SMR command replicated in logs
 struct client_req_t {
-  uint8_t key[kKeySize];
-  uint8_t value[kValueSize];
+  size_t key[kKeySize / sizeof(size_t)];
+  size_t value[kValueSize / sizeof(size_t)];
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[Key (";
+    for (size_t k : key) {
+      ret << std::to_string(k) << ", ";
+    }
+    ret << "), Value (";
+    for (size_t v : value) {
+      ret << std::to_string(v) << ", ";
+    }
+    ret << ")]";
+    return ret.str();
+  }
 };
 
 // The client response message
@@ -130,6 +146,9 @@ class AppContext {
     size_t num_resps = 0;
     ERpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
     ERpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
+
+    // Generate keys sequentially: MICA hashes them, so locality is unaffected
+    size_t last_key = 0;
 
     // For latency measurement
     uint64_t req_start_tsc;

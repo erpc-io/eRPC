@@ -22,13 +22,17 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
   // about its length. Other log callbacks can be invoked for non-application
   // log entries.
   assert(ety->data.len == sizeof(client_req_t));
+  auto *client_req = reinterpret_cast<client_req_t *>(ety->data.buf);
+  assert(client_req->key[0] == client_req->value[0]);
 
   auto *c = static_cast<AppContext *>(udata);
   assert(c->check_magic());
 
   if (kAppVerbose) {
-    printf("consensus: Applying log entry received at Raft server %u [%s].\n",
-           ety->id, ERpc::get_formatted_time().c_str());
+    printf(
+        "consensus: Applying log entry %s received at Raft server %u [%s].\n",
+        client_req->to_string().c_str(), ety->id,
+        ERpc::get_formatted_time().c_str());
   }
 
   _unused(c);

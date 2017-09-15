@@ -42,8 +42,9 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
   if (unlikely(leader == nullptr)) {
     printf(
-        "consensus: Received request from client, but leader is unknown. "
-        "Asking client to retry later.\n");
+        "consensus: Received request %s from client, but leader is unknown. "
+        "Asking client to retry later.\n",
+        client_req->to_string().c_str());
 
     client_resp_t err_resp;
     err_resp.resp_type = ClientRespType::kFailTryAgain;
@@ -54,8 +55,9 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   int leader_node_id = raft_node_get_id(leader);
   if (unlikely(leader_node_id != c->server.node_id)) {
     printf(
-        "consensus: Received request from client, "
+        "consensus: Received request %s from client, "
         "but leader is %s (not me). Redirecting client.\n",
+        client_req->to_string().c_str(),
         node_id_to_name_map.at(leader_node_id).c_str());
 
     client_resp_t err_resp;
@@ -67,8 +69,8 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   // We're the leader
   if (kAppVerbose) {
-    printf("consensus: Received client request from client [%s].\n",
-           ERpc::get_formatted_time().c_str());
+    printf("consensus: Received request %s from client [%s].\n",
+           client_req->to_string().c_str(), ERpc::get_formatted_time().c_str());
   }
 
   leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
