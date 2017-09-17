@@ -10,10 +10,14 @@
 static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppMeasureLatency = false;
 
+// Optimization knobs. Set to true to disable optimization.
+static constexpr bool kAppOptDisablePreallocResp = true;
+static constexpr bool kAppOptDisableRxRingReq = true;
+
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
-static constexpr size_t kAppReqType = 1;
+static constexpr size_t kAppReqType = 1;    // eRPC request type
 static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
 static constexpr size_t kAppMaxBatchSize = 32;
 static constexpr size_t kMaxConcurrency = 32;
@@ -140,11 +144,30 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->stat_req_rx_tot++;
 
   const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  size_t resp_size = req_msgbuf->get_data_size();
-  ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                  resp_size);
-  req_handle->pre_resp_msgbuf.buf[0] = kAppDataByte;  // Touch resp MsgBuffer
-  req_handle->prealloc_used = true;
+  size_t resp_size = FLAGS_msg_size;
+
+  // RX ring request optimization knob
+  if (kAppOptDisableRxRingReq) {
+    // Simulate copying the request off the RX ring
+    auto copy_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_msg_size);
+    assert(copy_msgbuf.buf != nullptr);
+    memcpy(copy_msgbuf.buf, req_msgbuf->buf, FLAGS_msg_size);
+    c->rpc->free_msg_buffer(copy_msgbuf);
+  }
+
+  // Preallocated response optimization knob
+  if (kAppOptDisablePreallocResp) {
+    req_handle->prealloc_used = false;
+    ERpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
+    resp_msgbuf = c->rpc->alloc_msg_buffer(resp_size);
+    assert(resp_msgbuf.buf != nullptr);
+    resp_msgbuf.buf[0] = req_msgbuf->buf[0];
+  } else {
+    req_handle->prealloc_used = true;
+    ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(
+        &req_handle->pre_resp_msgbuf, resp_size);
+    req_handle->pre_resp_msgbuf.buf[0] = req_msgbuf->buf[0];
+  }
 
   // c->rpc->nano_sleep(20);
   c->rpc->enqueue_response(req_handle);
