@@ -214,6 +214,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     for (size_t i = 0; i < FLAGS_concurrency; i++) {
       min_resps = std::min(min_resps, c->stat_resp_rx[i]);
       max_resps = std::max(max_resps, c->stat_resp_rx[i]);
+      c->stat_resp_rx[i] = 0;
     }
 
     float ipc = -1.0;
@@ -280,7 +281,7 @@ void thread_func(size_t thread_id, ERpc::Nexus *nexus) {
   c.session_num_vec.resize(FLAGS_num_machines * FLAGS_num_threads);
   c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
 
-  // Initiate connection for sessions
+  // Create a session to each thread in the cluster except self
   for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
     std::string hostname = get_hostname_for_machine(m_i);
 
