@@ -11,8 +11,8 @@ static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppMeasureLatency = false;
 
 // Optimization knobs. Set to true to disable optimization.
-static constexpr bool kAppOptDisablePreallocResp = true;
-static constexpr bool kAppOptDisableRxRingReq = true;
+static constexpr bool kAppOptDisablePreallocResp = false;
+static constexpr bool kAppOptDisableRxRingReq = false;
 
 static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
