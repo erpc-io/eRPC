@@ -6,7 +6,7 @@ check_env "autorun_app"
 drop_shm
 
 # Install modded driver - this is not a requirement
-if [ "$autorun_app" != "consensus"]; then
+if [ "$autorun_app" != "consensus" ]; then
   blue "Installing modded driver"
   (cd ~/libmlx4-1.2.1mlnx1/ && ./update_driver.sh)
 else

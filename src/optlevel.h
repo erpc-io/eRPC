@@ -11,8 +11,8 @@
 namespace ERpc {
 
 // Tweak these options for small RPC performance
-#define small_rpc_optlevel (small_rpc_optlevel_likely)
-static constexpr bool kDatapathStats = false;  ///< Collect datapath stats
+#define small_rpc_optlevel (small_rpc_optlevel_none)
+static constexpr bool kDatapathStats = false;   ///< Collect datapath stats
 static constexpr bool kDatapathChecks = false;  ///< Extra datapath checks
 
 ///@{

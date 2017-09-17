@@ -30,8 +30,8 @@ class Session {
  public:
   enum class Role : int { kServer, kClient };
 
-  static constexpr size_t kSessionReqWindow = 1;  ///< *Request* window size
-  static constexpr size_t kSessionCredits = 1;    ///< *Packet* credits
+  static constexpr size_t kSessionReqWindow = 8;  ///< *Request* window size
+  static constexpr size_t kSessionCredits = 8;    ///< *Packet* credits
 
   /// Controls printing of credit exhausted alerts
   static constexpr size_t kCreditsExhaustedWarnLim = 1000000000;
