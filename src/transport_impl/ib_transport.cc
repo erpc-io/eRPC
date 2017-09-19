@@ -18,7 +18,7 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port)
   init_mem_reg_funcs();
 
   LOG_INFO("eRPC IBTransport: Created for ID %u. Device %s, port %d.\n", rpc_id,
-           ib_ctx->device->name, dev_port_id);
+           resolve.ib_ctx->device->name, resolve.dev_port_id);
 }
 
 void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
@@ -69,7 +69,7 @@ IBTransport::~IBTransport() {
     exit(-1);
   }
 
-  if (ibv_close_device(ib_ctx)) {
+  if (ibv_close_device(resolve.ib_ctx)) {
     fprintf(stderr, "eRPC IBTransport: Failed to close device.");
     exit(-1);
   }
@@ -78,18 +78,16 @@ IBTransport::~IBTransport() {
 void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   assert(routing_info != nullptr);
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
-  ib_routing_info_t *ib_routing_info =
-      reinterpret_cast<ib_routing_info_t *>(routing_info);
-  ib_routing_info->port_lid = port_lid;
+  auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
+  ib_routing_info->port_lid = resolve.port_lid;
   ib_routing_info->qpn = qp->qp_num;
 }
 
 bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
   assert(routing_info != nullptr);
-  assert(dev_port_id != 0);  // dev_port_id is resolved on object construction
+  assert(resolve.dev_port_id != 0);  // We resolve on object construction
 
-  ib_routing_info_t *ib_routing_info =
-      reinterpret_cast<ib_routing_info_t *>(routing_info);
+  auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
 
   struct ibv_ah_attr ah_attr;
   memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
@@ -98,7 +96,7 @@ bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
   ah_attr.sl = 0;
   ah_attr.src_path_bits = 0;
 
-  ah_attr.port_num = dev_port_id;  // Local port
+  ah_attr.port_num = resolve.dev_port_id;  // Local port
   ib_routing_info->ah = ibv_create_ah(pd, &ah_attr);
 
   return (ib_routing_info->ah != nullptr);
@@ -117,13 +115,13 @@ void IBTransport::resolve_phy_port() {
   int ports_to_discover = phy_port;
 
   for (int dev_i = 0; dev_i < num_devices; dev_i++) {
-    ib_ctx = ibv_open_device(dev_list[dev_i]);
-    rt_assert(ib_ctx != nullptr,
+    resolve.ib_ctx = ibv_open_device(dev_list[dev_i]);
+    rt_assert(resolve.ib_ctx != nullptr,
               "eRPC IBTransport: Failed to open dev " + std::to_string(dev_i));
 
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
-    if (ibv_query_device(ib_ctx, &device_attr) != 0) {
+    if (ibv_query_device(resolve.ib_ctx, &device_attr) != 0) {
       xmsg << "eRPC IBTransport: Failed to query InfiniBand device "
            << std::to_string(dev_i);
       throw std::runtime_error(xmsg.str());
@@ -132,9 +130,10 @@ void IBTransport::resolve_phy_port() {
     for (uint8_t port_i = 1; port_i <= device_attr.phys_port_cnt; port_i++) {
       // Count this port only if it is enabled
       struct ibv_port_attr port_attr;
-      if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
+      if (ibv_query_port(resolve.ib_ctx, port_i, &port_attr) != 0) {
         xmsg << "eRPC IBTransport: Failed to query port "
-             << std::to_string(port_i) << " on device " << ib_ctx->device->name;
+             << std::to_string(port_i) << " on device "
+             << resolve.ib_ctx->device->name;
         throw std::runtime_error(xmsg.str());
       }
 
@@ -145,9 +144,9 @@ void IBTransport::resolve_phy_port() {
 
       if (ports_to_discover == 0) {
         // Resolution done. ib_ctx contains the resolved device context.
-        device_id = dev_i;
-        dev_port_id = port_i;
-        port_lid = port_attr.lid;
+        resolve.device_id = dev_i;
+        resolve.dev_port_id = port_i;
+        resolve.port_lid = port_attr.lid;
         return;
       }
 
@@ -155,42 +154,42 @@ void IBTransport::resolve_phy_port() {
     }
 
     // Thank you Mario, but our port is in another device
-    if (ibv_close_device(ib_ctx) != 0) {
+    if (ibv_close_device(resolve.ib_ctx) != 0) {
       xmsg << "eRPC IBTransport: Failed to close InfiniBand device "
-           << ib_ctx->device->name;
+           << resolve.ib_ctx->device->name;
       throw std::runtime_error(xmsg.str());
     }
   }
 
   // If we are here, port resolution has failed
-  assert(device_id == -1 && dev_port_id == 0);
+  assert(resolve.device_id == -1 && resolve.dev_port_id == 0);
   xmsg << "eRPC IBTransport: Failed to resolve InfiniBand port index "
        << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
 
 void IBTransport::init_infiniband_structs() {
-  assert(ib_ctx != nullptr && device_id != -1);
+  assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
 
   // Create protection domain, send CQ, and recv CQ
-  pd = ibv_alloc_pd(ib_ctx);
+  pd = ibv_alloc_pd(resolve.ib_ctx);
   rt_assert(pd != nullptr, "eRPC IBTransport: Failed to allocate PD");
 
-  send_cq = ibv_create_cq(ib_ctx, kSendQueueDepth, nullptr, nullptr, 0);
+  send_cq = ibv_create_cq(resolve.ib_ctx, kSendQueueDepth, nullptr, nullptr, 0);
   rt_assert(send_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
 
-  recv_cq = ibv_create_cq(ib_ctx, kRecvQueueDepth, nullptr, nullptr, 0);
+  recv_cq = ibv_create_cq(resolve.ib_ctx, kRecvQueueDepth, nullptr, nullptr, 0);
   rt_assert(recv_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
 
   // Create self address handle
   struct ibv_ah_attr ah_attr;
   memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
   ah_attr.is_global = 0;
-  ah_attr.dlid = port_lid;
+  ah_attr.dlid = resolve.port_lid;
   ah_attr.sl = 0;
   ah_attr.src_path_bits = 0;
 
-  ah_attr.port_num = dev_port_id;  // Local port
+  ah_attr.port_num = resolve.dev_port_id;  // Local port
   self_ah = ibv_create_ah(pd, &ah_attr);
   rt_assert(self_ah != nullptr, "eRPC IBTransport: Failed to create self AH.");
 
@@ -215,7 +214,7 @@ void IBTransport::init_infiniband_structs() {
   memset(static_cast<void *>(&init_attr), 0, sizeof(struct ibv_qp_attr));
   init_attr.qp_state = IBV_QPS_INIT;
   init_attr.pkey_index = 0;
-  init_attr.port_num = static_cast<uint8_t>(dev_port_id);
+  init_attr.port_num = static_cast<uint8_t>(resolve.dev_port_id);
   init_attr.qkey = kQKey;
 
   if (ibv_modify_qp(qp, &init_attr, IBV_QP_STATE | IBV_QP_PKEY_INDEX |
@@ -296,9 +295,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
 
     // Circular link
     recv_wr[i].next = (i < kRecvQueueDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
-
-    // RX ring entry
-    rx_ring[i] = &buf[offset + kGRHBytes];
+    rx_ring[i] = &buf[offset + kGRHBytes];  // RX ring entry
   }
 
   // Fill the RECV queu. post_recv can use fast RECV, so it's not usable here.

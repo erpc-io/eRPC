@@ -120,7 +120,7 @@ class IBTransport : public Transport {
 
  private:
   /**
-   * @brief Fill in \p ib_ctx, \p device_id, and \p dev_port using \p phy_port
+   * @brief Resolve fields in \p resolve using \p phy_port
    * @throw runtime_error if the port cannot be resolved
    */
   void resolve_phy_port();
@@ -186,12 +186,15 @@ class IBTransport : public Transport {
   /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
   void init_sends();
 
-  // InfiniBand info
-  struct ibv_context *ib_ctx = nullptr;
-  int device_id = -1;       ///< Physical device ID resolved from phy_port
-  uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
-  uint16_t port_lid = 0;    ///< InfiniBand LID of phy_port. 0 is invalid.
-  struct ibv_ah *self_ah;   ///< The address handle of this node, used for flush
+  /// InfiniBand info resolved from \p phy_port
+  struct {
+    int device_id = -1;  ///< Device index in list of verbs devices
+    struct ibv_context *ib_ctx = nullptr;  ///< The verbs device context
+    uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
+    uint16_t port_lid = 0;    ///< LID of phy_port. 0 is invalid.
+  } resolve;
+
+  struct ibv_ah *self_ah;  ///< The address handle of this node, used for flush
   struct ibv_pd *pd = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
