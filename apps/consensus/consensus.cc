@@ -96,6 +96,14 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   ERpc::rt_assert(e == 0, "raft_recv_entry() failed");
 }
 
+void init_node_id_to_name_map() {
+  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
+    std::string node_i_hostname = get_hostname_for_machine(i);
+    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
+    node_id_to_name_map[node_i_id] = ERpc::trim_hostname(node_i_hostname);
+  }
+}
+
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
   assert(c->server.raft != nullptr);
@@ -112,7 +120,6 @@ void init_raft(AppContext *c) {
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     std::string node_i_hostname = get_hostname_for_machine(i);
     int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
-    node_id_to_name_map[node_i_id] = ERpc::trim_hostname(node_i_hostname);
 
     if (i == FLAGS_machine_id) {
       // Add self. user_data = nullptr, peer_is_self = 1
@@ -189,6 +196,9 @@ int main(int argc, char **argv) {
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
   ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
 
+  // Both server and client need this map, so init it before launching client
+  init_node_id_to_name_map();
+
   if (!is_raft_server()) {
     // Run client
     auto client_thread = std::thread(client_func, 0, &nexus, &c);
@@ -203,8 +213,6 @@ int main(int argc, char **argv) {
 
   init_erpc(&c, &nexus);  // Initialize eRPC
   init_mica(&c);          // Initialize the key-value store
-
-  if (FLAGS_machine_id == 0) raft_become_leader(c.server.raft);
 
   // The main loop
   size_t loop_tsc = ERpc::rdtsc();

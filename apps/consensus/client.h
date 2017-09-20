@@ -133,17 +133,18 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
             "consensus: Client request to server %zu failed with code = "
             "redirect. Trying to change leader to %s.\n",
             c->client.leader_idx,
-            node_id_to_name_map[client_resp->leader_node_id].c_str());
+            node_id_to_name_map.at(client_resp->leader_node_id).c_str());
 
         bool success = change_leader_to_node(c, client_resp->leader_node_id);
         if (!success) {
           printf(
               "consensus: Client failed to change leader to %s. "
               "Retrying to current leader %zu after 200 ms.\n",
-              node_id_to_name_map[client_resp->leader_node_id].c_str(),
+              node_id_to_name_map.at(client_resp->leader_node_id).c_str(),
               c->client.leader_idx);
-          usleep(200000);
         }
+
+        usleep(200000);
         break;
       }
 
