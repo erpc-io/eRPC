@@ -18,15 +18,15 @@ extern "C" {
 #include "mica/util/hash.h"
 
 // Key-value configuration
-static constexpr size_t kAppKeySize = 64;
+static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
+
+static constexpr size_t kAppKeySize = 16;
 static constexpr size_t kAppValueSize = 16;
 static_assert(kAppKeySize % sizeof(size_t) == 0, "");
 static_assert(kAppValueSize % sizeof(size_t) == 0, "");
 
 typedef mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
 static_assert(sizeof(FixedTable::ft_key_t) == kAppKeySize, "");
-
-static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
 
 // Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;
