@@ -3,28 +3,10 @@
 #include <map>
 #include <thread>
 #include "rpc.h"
-
-using namespace ERpc;
-
-#define NEXUS_UDP_PORT 31851
-#define EVENT_LOOP_MS 200
-
-#define SERVER_RPC_ID 100
-#define CLIENT_RPC_ID 200
+#include "test_basics.h"
 
 // Shared between client and server thread
 std::atomic<bool> server_ready;
-const uint8_t phy_port = 0;
-const size_t numa_node = 0;
-
-/// The session managament handler that is never invoked
-void test_sm_handler(int session_num, SmEventType sm_event_type,
-                     SmErrType sm_err_type, void *_context) {
-  _unused(session_num);
-  _unused(sm_event_type);
-  _unused(sm_err_type);
-  _unused(_context);
-}
 
 // The client thread
 void client_thread_func(Nexus *nexus) {
@@ -34,44 +16,47 @@ void client_thread_func(Nexus *nexus) {
   }
 
   // Create the Rpc
-  Rpc<IBTransport> rpc(nexus, nullptr, CLIENT_RPC_ID, &test_sm_handler,
-                       phy_port, numa_node);
+  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, nullptr, kAppClientRpcId,
+                                   &basic_sm_handler, kAppPhyPort,
+                                   kAppNumaNode);
 
   {
     // Test: Correct args
-    int session_num = rpc.create_session("localhost", SERVER_RPC_ID, phy_port);
+    int session_num =
+        rpc.create_session("localhost", kAppServerRpcId, kAppPhyPort);
     ASSERT_GE(session_num, 0);
   }
 
   {
     // Test: Invalid remote port, which can be detected locally
     int session_num =
-        rpc.create_session("localhost", SERVER_RPC_ID, kMaxPhyPorts);
+        rpc.create_session("localhost", kAppServerRpcId, kMaxPhyPorts);
     ASSERT_LT(session_num, 0);
   }
 
   {
     // Test: Try to create session to self
-    int session_num = rpc.create_session("localhost", CLIENT_RPC_ID, phy_port);
+    int session_num =
+        rpc.create_session("localhost", kAppClientRpcId, kAppPhyPort);
     ASSERT_LT(session_num, 0);
   }
 }
 
 // The server thread
 void server_thread_func(Nexus *nexus, uint8_t rpc_id) {
-  Rpc<IBTransport> rpc(nexus, nullptr, rpc_id, &test_sm_handler, phy_port,
-                       numa_node);
+  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, nullptr, rpc_id, &basic_sm_handler,
+                                   kAppPhyPort, kAppNumaNode);
 
   server_ready = true;
-  rpc.run_event_loop(EVENT_LOOP_MS);
+  rpc.run_event_loop(kAppEventLoopMs);
 }
 
 /// Test: Check if passing invalid arguments to create_session gives an error
 TEST(TestBuild, TestBuild) {
-  Nexus nexus("localhost", NEXUS_UDP_PORT, 0);  // 0 bg threads
+  Nexus nexus("localhost", kAppNexusUdpPort, 0);  // 0 bg threads
 
   // Launch the server thread
-  std::thread server_thread(server_thread_func, &nexus, SERVER_RPC_ID);
+  std::thread server_thread(server_thread_func, &nexus, kAppServerRpcId);
 
   // Launch the client thread
   std::thread client_thread(client_thread_func, &nexus);
