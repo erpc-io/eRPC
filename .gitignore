@@ -57,3 +57,4 @@ CTestTestfile.cmake
 ibnet_out
 apps/consensus/ticket_orig.cc
 scripts/autorun_node_file
+gdb_history
