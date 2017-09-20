@@ -10,8 +10,8 @@ namespace ERpc {
 class IBTransport : public Transport {
  public:
   // Transport-specific constants
-  static constexpr TransportType kTransportType = TransportType::kInfiniBand;
-  static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
+  static constexpr TransportType kTransportType = TransportType::kRoCE;
+  static constexpr size_t kMTU = 1024;  ///< Make (kRecvSize / 64) prime
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
@@ -40,17 +40,20 @@ class IBTransport : public Transport {
    * The client fills in its \p port_lid and \p qpn, which are resolved into
    * the address handle by the server. Similarly for the server.
    *
-   * \p port_lid and \p qpn have cluster-wide meaning, but \p ah is specific
-   * to this machine. The \p ibv_ah struct cannot be inlined into a RoutingInfo
-   * struct because the device driver internally uses a larger struct (e.g.,
-   * \p mlx4_ah for ConnectX-3) which contains \p ibv_ah.
+   * \p port_lid, \p qpn, and \p gid have cluster-wide meaning, but \p ah is
+   * local to this machine.
+   *
+   * The \p ibv_ah struct cannot be inlined into a RoutingInfo struct because
+   * the device driver internally uses a larger struct (e.g., \p mlx4_ah for
+   * ConnectX-3) which contains \p ibv_ah.
    */
   struct ib_routing_info_t {
-    // Meaningful cluster-wide
+    // Fields that are meaningful cluster-wide
     uint16_t port_lid;
     uint32_t qpn;
+    union ibv_gid gid;  // RoCE only
 
-    // Meaningful only locally
+    // Fields that are meaningful only locally
     struct ibv_ah *ah;
   };
   static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
@@ -60,15 +63,23 @@ class IBTransport : public Transport {
 
   ~IBTransport();
 
+  /// Create an address handle using this routing info
+  struct ibv_ah *create_ah(const ib_routing_info_t *) const;
+
   void fill_local_routing_info(RoutingInfo *routing_info) const;
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
 
   static std::string routing_info_str(RoutingInfo *routing_info) {
-    ib_routing_info_t *ib_routing_info =
-        reinterpret_cast<ib_routing_info_t *>(routing_info);
+    auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
+    const auto &gid = ib_routing_info->gid.global;
+
     std::ostringstream ret;
+
     ret << "[LID: " << std::to_string(ib_routing_info->port_lid)
-        << ", QPN: " << std::to_string(ib_routing_info->qpn) << "]";
+        << ", QPN: " << std::to_string(ib_routing_info->qpn)
+        << ", GID interface ID " << std::to_string(gid.interface_id)
+        << ", GID subnet prefix " << std::to_string(gid.subnet_prefix) << "]";
+
     return std::string(ret.str());
   }
 
@@ -186,18 +197,60 @@ class IBTransport : public Transport {
   /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
   void init_sends();
 
-  /// InfiniBand info resolved from \p phy_port
+  static bool is_roce() { return kTransportType == TransportType::kRoCE; }
+  static bool is_infiniband() {
+    return kTransportType == TransportType::kInfiniBand;
+  }
+
+  // ibverbs helper functions
+  static std::string link_layer_str(uint8_t link_layer) {
+    switch (link_layer) {
+      case IBV_LINK_LAYER_UNSPECIFIED:
+        return "[Unspecified]";
+      case IBV_LINK_LAYER_INFINIBAND:
+        return "[InfiniBand]";
+      case IBV_LINK_LAYER_ETHERNET:
+        return "[Ethernet]";
+      default:
+        return "[Invalid]";
+    }
+  }
+
+  static size_t enum_to_mtu(enum ibv_mtu mtu) {
+    switch (mtu) {
+      case IBV_MTU_256:
+        return 256;
+      case IBV_MTU_512:
+        return 512;
+      case IBV_MTU_1024:
+        return 1024;
+      case IBV_MTU_2048:
+        return 2048;
+      case IBV_MTU_4096:
+        return 4096;
+      default:
+        return 0;
+    }
+  }
+
+  /// InfiniBand info resolved from \p phy_port, must be filled by constructor.
   struct {
     int device_id = -1;  ///< Device index in list of verbs devices
     struct ibv_context *ib_ctx = nullptr;  ///< The verbs device context
     uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
     uint16_t port_lid = 0;    ///< LID of phy_port. 0 is invalid.
+
+    // GID for RoCE
+    union ibv_gid gid;
   } resolve;
 
-  struct ibv_ah *self_ah;  ///< The address handle of this node, used for flush
   struct ibv_pd *pd = nullptr;
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
+
+  /// An address handle for this endpoint's port. Used for tx_flush().
+  struct ibv_ah *self_ah = nullptr;
+
   Buffer recv_extent;
   bool use_fast_recv;  ///< True iff fast RECVs are enabled
 

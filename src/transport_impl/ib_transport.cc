@@ -75,31 +75,37 @@ IBTransport::~IBTransport() {
   }
 }
 
+struct ibv_ah *IBTransport::create_ah(const ib_routing_info_t *ib_rinfo) const {
+  struct ibv_ah_attr ah_attr;
+  memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
+  ah_attr.is_global = is_roce() ? 1 : 0;
+  ah_attr.dlid = is_roce() ? 0 : ib_rinfo->port_lid;
+  ah_attr.sl = 0;
+  ah_attr.src_path_bits = 0;
+  ah_attr.port_num = resolve.dev_port_id;  // Local port
+
+  if (is_roce()) {
+    ah_attr.grh.dgid.global.interface_id = ib_rinfo->gid.global.interface_id;
+    ah_attr.grh.dgid.global.subnet_prefix = ib_rinfo->gid.global.subnet_prefix;
+    ah_attr.grh.sgid_index = 0;
+    ah_attr.grh.hop_limit = 1;
+  }
+
+  return ibv_create_ah(pd, &ah_attr);
+}
+
 void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
-  assert(routing_info != nullptr);
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
   ib_routing_info->port_lid = resolve.port_lid;
   ib_routing_info->qpn = qp->qp_num;
+  if (is_roce()) ib_routing_info->gid = resolve.gid;
 }
 
 bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
-  assert(routing_info != nullptr);
-  assert(resolve.dev_port_id != 0);  // We resolve on object construction
-
-  auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
-
-  struct ibv_ah_attr ah_attr;
-  memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
-  ah_attr.is_global = 0;
-  ah_attr.dlid = ib_routing_info->port_lid;
-  ah_attr.sl = 0;
-  ah_attr.src_path_bits = 0;
-
-  ah_attr.port_num = resolve.dev_port_id;  // Local port
-  ib_routing_info->ah = ibv_create_ah(pd, &ah_attr);
-
-  return (ib_routing_info->ah != nullptr);
+  auto *ib_rinfo = reinterpret_cast<ib_routing_info_t *>(routing_info);
+  ib_rinfo->ah = create_ah(ib_rinfo);
+  return (ib_rinfo->ah != nullptr);
 }
 
 void IBTransport::resolve_phy_port() {
@@ -115,13 +121,13 @@ void IBTransport::resolve_phy_port() {
   int ports_to_discover = phy_port;
 
   for (int dev_i = 0; dev_i < num_devices; dev_i++) {
-    resolve.ib_ctx = ibv_open_device(dev_list[dev_i]);
-    rt_assert(resolve.ib_ctx != nullptr,
+    struct ibv_context *ib_ctx = ibv_open_device(dev_list[dev_i]);
+    rt_assert(ib_ctx != nullptr,
               "eRPC IBTransport: Failed to open dev " + std::to_string(dev_i));
 
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
-    if (ibv_query_device(resolve.ib_ctx, &device_attr) != 0) {
+    if (ibv_query_device(ib_ctx, &device_attr) != 0) {
       xmsg << "eRPC IBTransport: Failed to query InfiniBand device "
            << std::to_string(dev_i);
       throw std::runtime_error(xmsg.str());
@@ -130,10 +136,9 @@ void IBTransport::resolve_phy_port() {
     for (uint8_t port_i = 1; port_i <= device_attr.phys_port_cnt; port_i++) {
       // Count this port only if it is enabled
       struct ibv_port_attr port_attr;
-      if (ibv_query_port(resolve.ib_ctx, port_i, &port_attr) != 0) {
+      if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
         xmsg << "eRPC IBTransport: Failed to query port "
-             << std::to_string(port_i) << " on device "
-             << resolve.ib_ctx->device->name;
+             << std::to_string(port_i) << " on device " << ib_ctx->device->name;
         throw std::runtime_error(xmsg.str());
       }
 
@@ -143,10 +148,39 @@ void IBTransport::resolve_phy_port() {
       }
 
       if (ports_to_discover == 0) {
-        // Resolution done. ib_ctx contains the resolved device context.
+        // Resolution succeeded. Check if the link layer matches.
+        if (is_infiniband() &&
+            port_attr.link_layer != IBV_LINK_LAYER_INFINIBAND) {
+          throw std::runtime_error(
+              "Transport type required is InfiniBand but port link layer is " +
+              link_layer_str(port_attr.link_layer));
+        }
+
+        if (is_roce() && port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
+          throw std::runtime_error(
+              "Transport type required is RoCE but port link layer is " +
+              link_layer_str(port_attr.link_layer));
+        }
+
+        // Check the class's constant MTU
+        size_t active_mtu = enum_to_mtu(port_attr.active_mtu);
+        if (kMTU < active_mtu) {
+          throw std::runtime_error("Transport's required MTU is " +
+                                   std::to_string(kMTU) + "but active_mtu is " +
+                                   std::to_string(active_mtu));
+        }
+
         resolve.device_id = dev_i;
+        resolve.ib_ctx = ib_ctx;
         resolve.dev_port_id = port_i;
         resolve.port_lid = port_attr.lid;
+
+        // Resolve and cache the ibv_gid struct for RoCE
+        if (is_roce()) {
+          int ret = ibv_query_gid(ib_ctx, resolve.dev_port_id, 0, &resolve.gid);
+          rt_assert(ret == 0, "Failed to query GID");
+        }
+
         return;
       }
 
@@ -154,15 +188,15 @@ void IBTransport::resolve_phy_port() {
     }
 
     // Thank you Mario, but our port is in another device
-    if (ibv_close_device(resolve.ib_ctx) != 0) {
+    if (ibv_close_device(ib_ctx) != 0) {
       xmsg << "eRPC IBTransport: Failed to close InfiniBand device "
-           << resolve.ib_ctx->device->name;
+           << ib_ctx->device->name;
       throw std::runtime_error(xmsg.str());
     }
   }
 
   // If we are here, port resolution has failed
-  assert(resolve.device_id == -1 && resolve.dev_port_id == 0);
+  assert(resolve.ib_ctx == nullptr);
   xmsg << "eRPC IBTransport: Failed to resolve InfiniBand port index "
        << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
@@ -180,18 +214,6 @@ void IBTransport::init_infiniband_structs() {
 
   recv_cq = ibv_create_cq(resolve.ib_ctx, kRecvQueueDepth, nullptr, nullptr, 0);
   rt_assert(recv_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
-
-  // Create self address handle
-  struct ibv_ah_attr ah_attr;
-  memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
-  ah_attr.is_global = 0;
-  ah_attr.dlid = resolve.port_lid;
-  ah_attr.sl = 0;
-  ah_attr.src_path_bits = 0;
-
-  ah_attr.port_num = resolve.dev_port_id;  // Local port
-  self_ah = ibv_create_ah(pd, &ah_attr);
-  rt_assert(self_ah != nullptr, "eRPC IBTransport: Failed to create self AH.");
 
   // Initialize QP creation attributes
   struct ibv_qp_init_attr create_attr;
@@ -230,6 +252,14 @@ void IBTransport::init_infiniband_structs() {
   if (ibv_modify_qp(qp, &rtr_attr, IBV_QP_STATE)) {
     throw std::runtime_error("eRPC IBTransport: Failed to modify QP to RTR");
   }
+
+  // Create self address handle. We use local routing info for convenience,
+  // so this must be done after creating the QP.
+  RoutingInfo self_routing_info;
+  fill_local_routing_info(&self_routing_info);
+  self_ah =
+      create_ah(reinterpret_cast<ib_routing_info_t *>(&self_routing_info));
+  rt_assert(self_ah != nullptr, "eRPC IBTransport: Failed to create self AH.");
 
   // Reuse rtr_attr for RTS
   rtr_attr.qp_state = IBV_QPS_RTS;
