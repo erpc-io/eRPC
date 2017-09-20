@@ -164,9 +164,9 @@ void IBTransport::resolve_phy_port() {
 
         // Check the class's constant MTU
         size_t active_mtu = enum_to_mtu(port_attr.active_mtu);
-        if (kMTU < active_mtu) {
+        if (kMTU > active_mtu) {
           throw std::runtime_error("Transport's required MTU is " +
-                                   std::to_string(kMTU) + "but active_mtu is " +
+                                   std::to_string(kMTU) + ", active_mtu is " +
                                    std::to_string(active_mtu));
         }
 
