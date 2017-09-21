@@ -169,7 +169,7 @@ double Nexus::measure_rdtsc_freq() {
       static_cast<uint64_t>(end.tv_nsec - start.tv_nsec);
   uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
 
-  double _freq_ghz = rdtsc_cycles / clock_ns;
+  double _freq_ghz = rdtsc_cycles * 1.0 / clock_ns;
   rt_assert(_freq_ghz >= 0.5 && _freq_ghz <= 5.0, "Invalid RDTSC frequency");
 
   return _freq_ghz;
