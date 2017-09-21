@@ -19,8 +19,9 @@ extern "C" {
 
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
+static_assert(ERpc::is_power_of_two(kAppNumKeys), "");
 
-static constexpr size_t kAppKeySize = 16;
+static constexpr size_t kAppKeySize = 64;
 static constexpr size_t kAppValueSize = 16;
 static_assert(kAppKeySize % sizeof(size_t) == 0, "");
 static_assert(kAppValueSize % sizeof(size_t) == 0, "");
@@ -155,9 +156,6 @@ class AppContext {
     size_t num_resps = 0;
     ERpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
     ERpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
-
-    // Generate keys sequentially: MICA hashes them, so locality is unaffected
-    size_t last_key = 0;
 
     // For latency measurement
     uint64_t req_start_tsc;

@@ -62,10 +62,9 @@ void send_req_one(AppContext *c) {
 
   // Format the client's PUT request. Key and value are identical.
   auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
-  req->key[0] = c->client.last_key;
-  req->value[0] = c->client.last_key;
-  c->client.last_key++;
-  if (unlikely(c->client.last_key == kAppNumKeys)) c->client.last_key = 0;
+  size_t rand_key = c->fast_rand.next_u32() & (kAppNumKeys - 1);
+  req->key[0] = rand_key;
+  req->value[0] = rand_key;
 
   if (kAppVerbose) {
     printf("consensus: Client sending request %s to leader index %zu [%s].\n",
@@ -91,7 +90,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   c->client.req_us_vec.push_back(latency_us);
   c->client.num_resps++;
 
-  if (c->client.num_resps == 10000) {
+  if (c->client.num_resps == 100000) {
     // At this point, there is no request outstanding, so long compute is OK
     auto &lat_vec = c->client.req_us_vec;
     std::sort(lat_vec.begin(), lat_vec.end());

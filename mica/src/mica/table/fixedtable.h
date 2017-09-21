@@ -39,7 +39,7 @@ struct BasicFixedTableConfig {
   // reset_stats().
   static constexpr bool kCollectStats = false;
 
-  static constexpr size_t kKeySize = 16;
+  static constexpr size_t kKeySize = 64;
 };
 
 template <class StaticConfig = BasicFixedTableConfig>
