@@ -255,11 +255,11 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
         "Resps/concurrent batch: min %zu, max %zu. IPC = %.2f. "
-        "Latency: %.2f us avg, %.2f us 99 perc.\n",
+        "Latency: %.2f us median, %.2f us 99 perc.\n",
         c->thread_id, c->stat_resp_rx_tot / (seconds * 1000000),
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
-        c->stat_req_rx_tot, min_resps, max_resps, ipc, c->latency.avg() / 10.0,
-        c->latency.perc(.99) / 10.0);
+        c->stat_req_rx_tot, min_resps, max_resps, ipc,
+        c->latency.perc(.50) / 10.0, c->latency.perc(.99) / 10.0);
 
     // Stats: throughput ipc
     c->tmp_stat->write(
