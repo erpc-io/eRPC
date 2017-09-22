@@ -20,7 +20,7 @@ static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;    // eRPC request type
 static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
 static constexpr size_t kAppMaxBatchSize = 32;
-static constexpr size_t kMaxConcurrency = 32;
+static constexpr size_t kMaxConcurrency = 128;
 
 DEFINE_uint64(batch_size, 0, "Request batch size");
 DEFINE_uint64(msg_size, 0, "Request and response size");
