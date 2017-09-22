@@ -174,10 +174,12 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
                   "Invalid response size");
 
   if (kAppClientCheckResp) {
+    bool match = true;
     // Check all response cachelines (checking every byte is slow)
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
-      ERpc::rt_assert(resp_msgbuf->buf[i] == kAppDataByte, "Invalid resp data");
+      if (resp_msgbuf->buf[i] != kAppDataByte) match = false;
     }
+    ERpc::rt_assert(match, "Invalid resp data");
   } else {
     ERpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte, "Invalid resp data");
   }
