@@ -5,7 +5,6 @@
 #include <signal.h>
 #include "../apps_common.h"
 #include "rpc.h"
-#include "util/latency.h"
 #include "util/misc.h"
 
 static constexpr size_t kAppNexusUdpPort = 31851;
@@ -59,7 +58,11 @@ class AppContext {
  public:
   TmpStat *tmp_stat = nullptr;
   ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
-  ERpc::Latency latency;
+
+  // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
+  // >10 ms for 8MB RPCs under congestion. So ERpc::Latency is insufficient
+  // here
+  std::vector<double> latency_vec;
 
   std::vector<int> session_num_vec;
 

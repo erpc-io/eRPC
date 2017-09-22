@@ -73,7 +73,7 @@ void connect_sessions_func_victim(AppContext *c) {
 
     // Initiate connection for sessions
     printf(
-        "large_rpc_tput: Thread %zu: Creating 1 session. Profile = 'victim'.",
+        "large_rpc_tput: Thread %zu: Creating 1 session. Profile = 'victim'.\n",
         c->thread_id);
 
     std::string hostname = get_hostname_for_machine(0);

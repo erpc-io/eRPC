@@ -26,7 +26,7 @@ void connect_sessions_func_random(AppContext *c) {
   // Initiate connection for sessions
   fprintf(stderr,
           "large_rpc_tput: Thread %zu: Creating %zu sessions. "
-          "Profile = 'random'.",
+          "Profile = 'random'.\n",
           c->thread_id, num_sessions);
   for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
     std::string hostname = get_hostname_for_machine(m_i);

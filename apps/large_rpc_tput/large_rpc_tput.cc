@@ -31,9 +31,9 @@
 static constexpr bool kAppVerbose = false;
 
 // Experiement control flags
-static constexpr bool kAppClientMemsetReq = false;   // Fill entire request
-static constexpr bool kAppServerMemsetResp = false;  // Fill entire response
-static constexpr bool kAppClientCheckResp = false;   // Check entire response
+static constexpr bool kAppClientMemsetReq = true;   // Fill entire request
+static constexpr bool kAppServerMemsetResp = true;  // Fill entire response
+static constexpr bool kAppClientCheckResp = true;   // Check entire response
 
 // Profile controls
 std::function<size_t(AppContext *, size_t resp_session_idx)>
@@ -167,8 +167,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   auto *c = static_cast<AppContext *>(_context);
   double usec = ERpc::to_usec(ERpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
-  assert(usec >= 0);
-  c->latency.update(static_cast<size_t>(usec));
+  c->latency_vec.push_back(usec);
 
   // Check the response
   ERpc::rt_assert(resp_msgbuf->get_data_size() == FLAGS_resp_size,
@@ -193,8 +192,14 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double ns = ERpc::ns_since(c->tput_t0);
     double rx_GBps = c->stat_rx_bytes_tot / ns;
     double tx_GBps = c->stat_tx_bytes_tot / ns;
-    double avg_us = c->latency.avg();
-    double _99_us = c->latency.perc(.99);
+
+    // Compute latency stats
+    std::sort(c->latency_vec.begin(), c->latency_vec.end());
+    double latency_sum = 0.0;
+    for (double sample : c->latency_vec) latency_sum += sample;
+
+    double avg_us = latency_sum / c->latency_vec.size();
+    double _99_us = c->latency_vec.at(c->latency_vec.size() * 0.99);
 
     std::string session_req_count_str;
     for (size_t session_req_count : c->stat_req_vec) {
@@ -215,7 +220,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
                        " " + std::to_string(avg_us) + " " +
                        std::to_string(_99_us));
 
-    c->latency.reset();
+    c->latency_vec.clear();
     c->stat_rx_bytes_tot = 0;
     c->stat_tx_bytes_tot = 0;
     c->rpc->reset_dpath_stats_st();

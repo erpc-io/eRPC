@@ -21,7 +21,7 @@ void connect_sessions_func_timely_small(AppContext *c) {
   // Initiate connection for sessions
   fprintf(stderr,
           "large_rpc_tput: Thread %zu: Creating 1 session. "
-          "Profile = 'timely_small'.",
+          "Profile = 'timely_small'.\n",
           c->thread_id);
 
   std::string hostname = get_hostname_for_machine(0);
