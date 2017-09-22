@@ -12,7 +12,8 @@ if [ "$autorun_app" != "consensus" ]; then
 else
   # The consensus app latency improves with inline size = 120 bytes. However,
   # the modded driver only supports inline size = 60 bytes.
-  blue "Not installing modded driver for consensus app"
+  blue "Installing original driver for consensus app"
+  ~/install-original-driver.sh
 fi
 
 # Check arguments
