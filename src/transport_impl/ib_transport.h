@@ -10,8 +10,8 @@ namespace ERpc {
 class IBTransport : public Transport {
  public:
   // Transport-specific constants
-  static constexpr TransportType kTransportType = TransportType::kRoCE;
-  static constexpr size_t kMTU = 1024;  ///< Make (kRecvSize / 64) prime
+  static constexpr TransportType kTransportType = TransportType::kInfiniBand;
+  static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
