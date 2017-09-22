@@ -30,9 +30,10 @@
 
 static constexpr bool kAppVerbose = false;
 
-// If true, we memset() request and respose buffers to kAppDataByte. If false,
-// only the first data byte is touched.
-static constexpr bool kAppMemset = false;
+// Experiement control flags
+static constexpr bool kAppClientMemsetReq = false;   // Fill entire request
+static constexpr bool kAppServerMemsetResp = false;  // Fill entire response
+static constexpr bool kAppClientCheckResp = false;   // Check entire response
 
 // Profile controls
 std::function<size_t(AppContext *, size_t resp_session_idx)>
@@ -136,7 +137,7 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(resp_msgbuf.buf != nullptr);
 
   // Touch the response
-  if (kAppMemset) {
+  if (kAppServerMemsetResp) {
     memset(resp_msgbuf.buf, resp_byte, FLAGS_resp_size);
   } else {
     resp_msgbuf.buf[0] = resp_byte;
@@ -173,7 +174,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   ERpc::rt_assert(resp_msgbuf->get_data_size() == FLAGS_resp_size,
                   "Invalid response size");
 
-  if (kAppMemset) {
+  if (kAppClientCheckResp) {
     // Check all response cachelines (checking every byte is slow)
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
       ERpc::rt_assert(resp_msgbuf->buf[i] == kAppDataByte, "Invalid resp data");
@@ -224,7 +225,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 
   // Create a new request clocking this response, and put in request queue
-  if (kAppMemset) {
+  if (kAppClientMemsetReq) {
     memset(c->req_msgbuf[msgbuf_idx].buf, kAppDataByte, FLAGS_req_size);
   } else {
     c->req_msgbuf[msgbuf_idx].buf[0] = kAppDataByte;

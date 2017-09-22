@@ -1,8 +1,8 @@
 --test_ms 20000
---req_size 65536
---resp_size 32
+--req_size 32
+--resp_size 8000000
 --num_bg_threads 0
---num_machines 16
+--num_machines 2
 --num_threads 1
---concurrency 8
---profile victim
+--concurrency 1
+--profile timely_small
