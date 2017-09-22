@@ -15,7 +15,7 @@ static constexpr size_t kAppMaxEventLoopMs = 20000;  // 20 seconds
 static constexpr uint8_t kAppClientRpcId = 100;
 static constexpr uint8_t kAppServerRpcId = 200;
 static constexpr uint8_t kAppReqType = 3;
-static constexpr uint8_t kAppPhyPort = 1;
+static constexpr uint8_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 
 // Shared between client and server thread
