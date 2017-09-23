@@ -24,12 +24,19 @@ DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(req_size, 0, "Request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
+DEFINE_double(drop_prob, 0, "Packet drop probability");
 DEFINE_string(profile, "", "Experiment profile to use");
 
 static bool validate_concurrency(const char *, uint64_t concurrency) {
   return concurrency <= kMaxConcurrency;
 }
 DEFINE_validator(concurrency, &validate_concurrency);
+
+static bool validate_drop_prob(const char *, double p) {
+  if (!ERpc::kFaultInjection) return p == 0.0;
+  return p >= 0 && p < 1;
+}
+DEFINE_validator(drop_prob, &validate_drop_prob);
 
 static bool validate_profile(const char *, const std::string &profile) {
   return profile == "random" || profile == "timely_small" ||

@@ -256,6 +256,10 @@ void thread_func(size_t thread_id, ERpc::Nexus *nexus) {
                                    static_cast<uint8_t>(thread_id), sm_handler,
                                    kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
+  if (ERpc::kFaultInjection) {
+    rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
+  }
+
   c.rpc = &rpc;
 
   // Create sessions. Some threads may not create any sessions, and therefore
@@ -346,6 +350,7 @@ int main(int argc, char **argv) {
   // Work around g++-5's unused variable warning for validators
   _unused(concurrency_validator_registered);
   _unused(profile_validator_registered);
+  _unused(drop_prob_validator_registered);
 
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
