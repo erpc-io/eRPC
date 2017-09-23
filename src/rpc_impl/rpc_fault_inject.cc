@@ -24,8 +24,9 @@ void Rpc<TTr>::fault_inject_fail_resolve_server_rinfo_st() {
 template <class TTr>
 void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob) {
   fault_inject_check_ok();
-  assert(pkt_drop_prob >= 0.0 && pkt_drop_prob < .95);
+  assert(pkt_drop_prob >= 1.0 / 1000000000 && pkt_drop_prob < .95);
   faults.pkt_drop_prob = pkt_drop_prob;
+  faults.pkt_drop_thresh_billion = pkt_drop_prob * 1000000000;
 }
 
 template <class TTr>

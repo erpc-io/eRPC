@@ -423,6 +423,12 @@ class Rpc {
   //
 
  private:
+  /// Return true iff a packet should be dropped
+  inline bool roll_pkt_drop() {
+    static constexpr uint32_t billion = 1000000000;
+    return ((fast_rand.next_u32() % billion) < faults.pkt_drop_thresh_billion);
+  }
+
   /// Enqueue a packet starting at \p offset in \p sslot's \p tx_msgbuf,
   /// possibly deferring transmission. This handles fault injection for dropping
   /// data packets.
@@ -441,9 +447,7 @@ class Rpc {
     item.data_bytes = data_bytes;
 
     if (kFaultInjection) {
-      // Fault injection is enabled, so we need to set item.drop
-      item.drop = ((fast_rand.next_u32() % 100) < faults.pkt_drop_prob * 100);
-
+      item.drop = roll_pkt_drop();
       if (item.drop) {
         LOG_DEBUG(
             "eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
@@ -476,9 +480,7 @@ class Rpc {
     item.data_bytes = 0;
 
     if (kFaultInjection) {
-      // Fault injection is enabled, so we need to set item.drop
-      item.drop = ((fast_rand.next_u32() % 100) < faults.pkt_drop_prob * 100);
-
+      item.drop = roll_pkt_drop();
       if (item.drop) {
         LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
                   tx_msgbuf->get_pkthdr_str(0).c_str());
@@ -864,6 +866,10 @@ class Rpc {
     bool fail_resolve_server_rinfo = false;
 
     double pkt_drop_prob = 0.0;  ///< Probability of dropping a packet
+
+    /// A packet is dropped if a random number between zero and one billion
+    /// is less than pkt_drop_thresh_billion.
+    uint32_t pkt_drop_thresh_billion = 0;
   } faults;
 
   // Datapath stats
