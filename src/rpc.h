@@ -168,13 +168,13 @@ class Rpc {
   }
 
   /**
-   * @brief Bury a server sslot's request MsgBuffer. This is done after the
-   * request handler returns, so it can be called from a background thread.
+   * @brief Bury a server sslot's request MsgBuffer. This is done in
+   * enqueue_response(), so only in the foreground thread.
    *
    * This does not fully validate the MsgBuffer, since we don't want to
    * conditinally bury only initialized MsgBuffers.
    */
-  inline void bury_req_msgbuf_server(SSlot *sslot) {
+  inline void bury_req_msgbuf_server_st(SSlot *sslot) {
     assert(sslot != nullptr && !sslot->is_client);
 
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;

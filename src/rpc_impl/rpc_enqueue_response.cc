@@ -19,7 +19,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(in_creator());
 
   SSlot *sslot = static_cast<SSlot *>(req_handle);
-  bury_req_msgbuf_server(sslot);  // Bury the possibly-dynamic request MsgBuffer
+  bury_req_msgbuf_server_st(sslot);  // Bury the possibly-dynamic req MsgBuffer
 
   Session *session = sslot->session;
   assert(session != nullptr && session->is_server());
