@@ -69,28 +69,32 @@ class MtIndex {
 
   // An object with callbacks passed to table.scan()
   struct scanner_t {
-    scanner_t(int range) : range(range) {}
+    scanner_t(size_t range) : range(range), range_sum(0) {}
 
     template <typename SS2, typename K2>
     void visit_leaf(const SS2 &, const K2 &, threadinfo_t &) {}
 
-    bool visit_value(Str, const row_type *, threadinfo_t &) {
+    bool visit_value(Str, const row_type *row, threadinfo_t &) {
+      size_t value = *reinterpret_cast<const size_t *>(row->col(0).s);
+      range_sum += value;
       range--;
       return range > 0;
     }
 
-    int range;
+    size_t range;
+    size_t range_sum;
   };
 
-  size_t count_in_range(size_t cur_key, size_t range, threadinfo_t *ti) {
+  /// Return the sum of \p range keys including and after \p cur_key
+  size_t sum_in_range(size_t cur_key, size_t range, threadinfo_t *ti) {
     if (range == 0) return 0;
 
     swap_endian(cur_key);
     Str cur_key_str(reinterpret_cast<const char *>(&cur_key), sizeof(size_t));
 
     scanner_t scanner(range);
-    int count = table_->table().scan(cur_key_str, true, scanner, *ti);
-    return static_cast<size_t>(count);
+    table_->table().scan(cur_key_str, true, scanner, *ti);
+    return scanner.range_sum;
   }
 
  private:

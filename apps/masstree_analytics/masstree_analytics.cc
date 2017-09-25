@@ -68,7 +68,7 @@ void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   assert(req->req_type == kAppRangeReqType);
 
   size_t count =
-      mti->count_in_range(req->range_req.key, req->range_req.range, ti);
+      mti->sum_in_range(req->range_req.key, req->range_req.range, ti);
 
   req_handle->prealloc_used = true;
   ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
