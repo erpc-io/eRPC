@@ -1,11 +1,20 @@
 #include "masstree_analytics.h"
 #include <signal.h>
 #include <cstring>
+#include "cityhash/city.h"
+
+// The keys in the index are 64-bit hashes of keys {0, ..., FLAGS_num_keys}.
+// This gives us random-ish 64-bit keys, without requiring actually maintaining
+// the set of inserted keys
+size_t get_random_key(AppContext *c) {
+  size_t _generator_key = c->fastrand.next_u32() % FLAGS_num_keys;
+  return CityHash64(reinterpret_cast<const char *>(&_generator_key),
+                    sizeof(size_t));
+}
 
 void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
 
 void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
 
   // Point request handler runs in a foreground thread
@@ -44,7 +53,6 @@ void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 }
 
 void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
 
   // Range request handler runs in a background thread
@@ -82,26 +90,25 @@ void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
 // Helper function for clients
 req_t generate_request(AppContext *c) {
-  req_t ret;
+  req_t req;
+  size_t key = get_random_key(c);
 
-  if (c->fastrand.next_u32() % 100 == 1000) {
+  if (c->fastrand.next_u32() % 100 == 0) {
     // Generate a range request
-    ret.req_type = kAppRangeReqType;
-    ret.range_req.key = c->fastrand.next_u32() % FLAGS_num_keys;
-    ret.range_req.range = FLAGS_num_keys;  // All keys
+    req.req_type = kAppRangeReqType;
+    req.range_req.key = key;
+    req.range_req.range = FLAGS_range_size;
   } else {
     // Generate a point request
-    ret.req_type = kAppPointReqType;
-    ret.point_req.key = c->fastrand.next_u32() % FLAGS_num_keys;
+    req.req_type = kAppPointReqType;
+    req.point_req.key = key;
   }
 
-  return ret;
+  return req;
 }
 
 // Send one request using this MsgBuffer
 void send_req(AppContext *c, size_t msgbuf_idx) {
-  assert(c != nullptr);
-
   ERpc::MsgBuffer &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
   assert(req_msgbuf.get_data_size() == sizeof(req_t));
 
@@ -117,13 +124,10 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
   int ret = c->rpc->enqueue_request(0, req.req_type, &req_msgbuf,
                                     &c->client.resp_msgbuf[msgbuf_idx],
                                     app_cont_func, msgbuf_idx);
-  _unused(ret);
-  assert(ret == 0);
+  ERpc::rt_assert(ret == 0, "Failed to enqueue_request()");
 }
 
 void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
-  assert(resp_handle != nullptr && _context != nullptr);
-
   size_t msgbuf_idx = _tag;
   if (kAppVerbose) {
     printf("masstree_analytics: Received response for msgbuf %zu.\n",
@@ -150,14 +154,14 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   if (req->req_type == kAppPointReqType) {
     c->client.point_latency.update(static_cast<size_t>(usec * 10.0));  // < 1us
   } else {
-    c->client.range_latency.update(static_cast<size_t>(usec * 0.1));  // ~ms
+    c->client.range_latency.update(static_cast<size_t>(usec));
   }
 
   constexpr size_t kMeasurement = 1000000;
   if (c->client.num_resps_tot++ == kMeasurement) {
     double point_us_median = c->client.point_latency.perc(.5) / 10.0;
     double point_us_99 = c->client.point_latency.perc(.99) / 10.0;
-    double range_us_90 = c->client.range_latency.perc(.90) * 10.0;
+    double range_us_90 = c->client.range_latency.perc(.99);
 
     double seconds = ERpc::sec_since(c->client.tput_t0);
     double tput = kMeasurement / (seconds * 1000000);
@@ -239,13 +243,14 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   if (is_server()) {
-    // Create the Masstree using the main thread and insert a million keys
+    // Create the Masstree using the main thread and insert keys
     threadinfo_t *ti = threadinfo::make(threadinfo::TI_MAIN, -1);
     MtIndex mti;
     mti.setup(ti);
 
     for (size_t i = 0; i < FLAGS_num_keys; i++) {
-      size_t key = i;
+      size_t key = CityHash64(reinterpret_cast<const char *>(&i),
+                              sizeof(size_t));
       size_t value = i;
       mti.put(key, value, ti);
     }

@@ -211,7 +211,9 @@ elseif(APP STREQUAL "masstree_analytics")
   link_directories($ENV{HOME}/masstree-beta)
   include_directories($ENV{HOME}/masstree-beta)
   add_definitions(-include $ENV{HOME}/masstree-beta/config.h)
-  set(APP_ADDITIONAL_SOURCES apps/masstree_analytics/mt_index_api.cc)
+  set(APP_ADDITIONAL_SOURCES
+    third_party/cityhash/city_mod.cc
+    apps/masstree_analytics/mt_index_api.cc)
   set(LIBRARIES ${LIBRARIES} masstree)
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)

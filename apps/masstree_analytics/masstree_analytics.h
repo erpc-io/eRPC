@@ -27,6 +27,7 @@ DEFINE_uint64(num_server_bg_threads, 0, "Number of server background threads");
 DEFINE_uint64(num_client_threads, 0, "Number of client threads");
 DEFINE_uint64(req_window, 0, "Outstanding requests per client thread");
 DEFINE_uint64(num_keys, 0, "Number of keys in the server's Masstree");
+DEFINE_uint64(range_size, 0, "Size of range to scan");
 
 static bool validate_req_window(const char *, uint64_t req_window) {
   return req_window <= kMaxReqWindow;
@@ -69,13 +70,14 @@ class AppContext : public BasicAppContext {
 
   struct {
     ERpc::Latency point_latency;  // Latency of point requests (factor = 10)
-    ERpc::Latency range_latency;  // Latency of point requests (factor = .1)
+    ERpc::Latency range_latency;  // Latency of point requests (factor = 1)
 
     struct timespec tput_t0;         // Throughput measurement start
     uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
     ERpc::MsgBuffer req_msgbuf[kMaxReqWindow];
     ERpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
 
+    ERpc::FastRand fast_rand;
     size_t num_resps_tot = 0;  // Total responses received (range & point reqs)
   } client;
 };
