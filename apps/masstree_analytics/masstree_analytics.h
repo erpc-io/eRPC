@@ -35,7 +35,7 @@ static bool validate_req_window(const char *, uint64_t req_window) {
 DEFINE_validator(req_window, &validate_req_window);
 
 // Return true iff this machine is the one server
-bool is_server() { return FLAGS_machine_id == 0; };
+bool is_server() { return FLAGS_machine_id == 0; }
 
 struct req_t {
   size_t req_type;

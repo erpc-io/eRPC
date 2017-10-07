@@ -10,7 +10,7 @@ set(CMAKE_C_LINK_EXECUTABLE g++-7)
 
 add_definitions(-std=c++14)
 
-add_definitions(-Wall -Wextra -Werror)
+add_definitions(-Wall -Wextra -Werror -pedantic)
 add_definitions(-Wsign-conversion)
 add_definitions(-Wold-style-cast)
 
@@ -209,7 +209,7 @@ if(APP STREQUAL "consensus")
 elseif(APP STREQUAL "masstree_analytics")
   # CMake-based Masstree library from anujkaliaiitd/masstree-beta
   link_directories($ENV{HOME}/masstree-beta)
-  include_directories($ENV{HOME}/masstree-beta)
+  include_directories(SYSTEM $ENV{HOME}/masstree-beta)
   add_definitions(-include $ENV{HOME}/masstree-beta/config.h)
   set(APP_ADDITIONAL_SOURCES
     third_party/cityhash/city_mod.cc

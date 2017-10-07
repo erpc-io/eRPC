@@ -1,19 +1,16 @@
 #ifndef MT_INDEX_API_H
 #define MT_INDEX_API_H
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include "json.hh"
-#include "kvrow.hh"
-#include "kvthread.hh"
-#include "masstree.hh"
-#include "masstree_insert.hh"
-#include "masstree_remove.hh"
-#include "masstree_scan.hh"
-#include "masstree_tcursor.hh"
-#include "query_masstree.hh"
-#pragma GCC diagnostic pop
+// Masstree is a system directory
+#include <json.hh>
+#include <kvrow.hh>
+#include <kvthread.hh>
+#include <masstree.hh>
+#include <masstree_insert.hh>
+#include <masstree_remove.hh>
+#include <masstree_scan.hh>
+#include <masstree_tcursor.hh>
+#include <query_masstree.hh>
 
 typedef threadinfo threadinfo_t;
 

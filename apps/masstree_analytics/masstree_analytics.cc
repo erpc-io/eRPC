@@ -249,8 +249,8 @@ int main(int argc, char **argv) {
     mti.setup(ti);
 
     for (size_t i = 0; i < FLAGS_num_keys; i++) {
-      size_t key = CityHash64(reinterpret_cast<const char *>(&i),
-                              sizeof(size_t));
+      size_t key =
+          CityHash64(reinterpret_cast<const char *>(&i), sizeof(size_t));
       size_t value = i;
       mti.put(key, value, ti);
     }
@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
     // Create Masstree threadinfo structs for server threads
     size_t total_server_threads =
         FLAGS_num_server_fg_threads + FLAGS_num_server_bg_threads;
-    threadinfo_t *ti_arr[total_server_threads];
+    auto ti_arr = new threadinfo_t *[total_server_threads];
 
     for (size_t i = 0; i < total_server_threads; i++) {
       ti_arr[i] = threadinfo::make(threadinfo::TI_PROCESS, i);
@@ -276,28 +276,25 @@ int main(int argc, char **argv) {
         kAppRangeReqType,
         ERpc::ReqFunc(range_req_handler, ERpc::ReqFuncType::kBackground));
 
-    std::thread threads[FLAGS_num_server_fg_threads];
+    std::vector<std::thread> thread_arr(FLAGS_num_server_fg_threads);
     for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) {
-      threads[i] = std::thread(server_thread_func, i, &nexus, &mti,
-                               static_cast<threadinfo_t **>(ti_arr));
-      ERpc::bind_to_core(threads[i], i);
+      thread_arr[i] = std::thread(server_thread_func, i, &nexus, &mti,
+                                  static_cast<threadinfo_t **>(ti_arr));
+      ERpc::bind_to_core(thread_arr[i], i);
     }
 
-    for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) {
-      threads[i].join();
-    }
+    for (auto &thread : thread_arr) thread.join();
+    delete[] ti_arr;
   } else {
     std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
     ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
 
-    std::thread threads[FLAGS_num_client_threads];
+    std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {
-      threads[i] = std::thread(client_thread_func, i, &nexus);
-      ERpc::bind_to_core(threads[i], i);
+      thread_arr[i] = std::thread(client_thread_func, i, &nexus);
+      ERpc::bind_to_core(thread_arr[i], i);
     }
 
-    for (size_t i = 0; i < FLAGS_num_client_threads; i++) {
-      threads[i].join();
-    }
+    for (auto &thread : thread_arr) thread.join();
   }
 }

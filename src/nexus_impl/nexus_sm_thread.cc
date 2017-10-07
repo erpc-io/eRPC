@@ -25,13 +25,11 @@ void Nexus::sm_thread_on_enet_connect_client(SmThreadCtx &ctx, ENetEvent &ev) {
   assert(epeer_data->is_client() && !epeer_data->client.connected);
   epeer_data->client.connected = true;
 
-  std::string rem_hostname = epeer_data->rem_hostname;
-  assert(ctx.client_map.at(rem_hostname) == epeer);
-
+  assert(ctx.client_map.at(epeer_data->rem_hostname) == epeer);
   LOG_INFO(
       "eRPC Nexus: ENet client peer connected to %s. Transmitting "
       "%zu queued SM requests.\n",
-      rem_hostname.c_str(), epeer_data->client.tx_queue.size());
+      epeer_data->rem_hostname.c_str(), epeer_data->client.tx_queue.size());
 
   assert(epeer_data->client.tx_queue.size() > 0);
   for (const SmWorkItem &wi : epeer_data->client.tx_queue) {
@@ -199,9 +197,7 @@ void Nexus::sm_thread_on_enet_receive_client(SmThreadCtx &ctx, ENetEvent &ev) {
 
   SmPkt sm_pkt = sm_thread_pull_sm_pkt(ev);
   assert(sm_pkt.is_resp());
-
-  const std::string &rem_hostname = sm_pkt.server.hostname;
-  assert(ctx.client_map.at(rem_hostname) == ev.peer);
+  assert(ctx.client_map.at(sm_pkt.server.hostname) == ev.peer);
 
   LOG_INFO("eRPC Nexus: Received SM packet (type %s) from %s.\n",
            sm_pkt_type_str(sm_pkt.pkt_type).c_str(),
