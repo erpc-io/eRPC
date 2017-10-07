@@ -49,12 +49,14 @@ union tag_t {
   struct {
     uint64_t session_idx : 32;  // Index into context's session_num array
     uint64_t msgbuf_idx : 32;   // Index into context's req_msgbuf array
-  };
+  } s;
 
   size_t _tag;
 
-  tag_t(uint64_t session_idx, uint64_t msgbuf_idx)
-      : session_idx(session_idx), msgbuf_idx(msgbuf_idx) {}
+  tag_t(uint64_t session_idx, uint64_t msgbuf_idx) {
+    s.session_idx = session_idx;
+    s.msgbuf_idx = msgbuf_idx;
+  }
   tag_t(size_t _tag) : _tag(_tag) {}
   tag_t() : _tag(0) {}
 };

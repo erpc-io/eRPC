@@ -46,12 +46,14 @@ union tag_t {
   struct {
     uint64_t batch_i : 32;
     uint64_t msgbuf_i : 32;
-  };
+  } s;
 
   size_t _tag;
 
-  tag_t(uint64_t batch_i, uint64_t msgbuf_i)
-      : batch_i(batch_i), msgbuf_i(msgbuf_i) {}
+  tag_t(uint64_t batch_i, uint64_t msgbuf_i) {
+    s.batch_i = batch_i;
+    s.msgbuf_i = msgbuf_i;
+  }
   tag_t(size_t _tag) : _tag(_tag) {}
 };
 
@@ -186,18 +188,18 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     exit(-1);
   }
 
-  tag_t tag = static_cast<tag_t>(_tag);
+  auto tag = static_cast<tag_t>(_tag);
   if (kAppVerbose) {
-    printf("Received response for batch %zu, msgbuf %zu.\n", tag.batch_i,
-           tag.msgbuf_i);
+    printf("Received response for batch %zu, msgbuf %zu.\n", tag.s.batch_i,
+           tag.s.msgbuf_i);
   }
 
   auto *c = static_cast<AppContext *>(_context);
-  BatchContext &bc = c->batch_arr[tag.batch_i];
+  BatchContext &bc = c->batch_arr[tag.s.batch_i];
   bc.num_resps_rcvd++;
 
   if (kAppMeasureLatency) {
-    size_t req_tsc = bc.req_tsc[tag.msgbuf_i];
+    size_t req_tsc = bc.req_tsc[tag.s.msgbuf_i];
     double req_lat_us =
         ERpc::to_usec(ERpc::rdtsc() - req_tsc, c->rpc->get_freq_ghz());
     c->latency.update(static_cast<size_t>(req_lat_us * 10));
@@ -208,16 +210,16 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     assert(bc.num_reqs_sent == FLAGS_batch_size);
     bc.num_reqs_sent = 0;
     bc.num_resps_rcvd = 0;
-    send_reqs(c, tag.batch_i);
+    send_reqs(c, tag.s.batch_i);
   } else if (bc.num_reqs_sent != FLAGS_batch_size) {
     // If we haven't sent a full batch, send more requests
-    send_reqs(c, tag.batch_i);
+    send_reqs(c, tag.s.batch_i);
   }
 
   // Try to send more requests for stagnated batches. This happens when we
   // are unable to send requests for a batch because a session is clogged.
   for (size_t batch_j = 0; batch_j < FLAGS_concurrency; batch_j++) {
-    if (batch_j == tag.batch_i) continue;
+    if (batch_j == tag.s.batch_i) continue;
 
     if (c->batch_arr[batch_j].num_resps_rcvd ==
         c->batch_arr[batch_j].num_reqs_sent) {
@@ -227,7 +229,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 
   c->stat_resp_rx_tot++;
-  c->stat_resp_rx[tag.batch_i]++;
+  c->stat_resp_rx[tag.s.batch_i]++;
 
   if (c->stat_resp_rx_tot == 1000000) {
     double seconds = ERpc::sec_since(c->tput_t0);
@@ -361,11 +363,11 @@ int main(int argc, char **argv) {
   nexus.register_req_func(
       kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
 
-  std::thread threads[FLAGS_num_threads];
+  std::vector<std::thread> threads(FLAGS_num_threads);
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
     ERpc::bind_to_core(threads[i], i);
   }
 
-  for (size_t i = 0; i < FLAGS_num_threads; i++) threads[i].join();
+  for (auto &thread : threads) thread.join();
 }

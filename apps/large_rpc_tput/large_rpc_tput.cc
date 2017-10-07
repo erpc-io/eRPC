@@ -87,8 +87,8 @@ void send_reqs(AppContext *c) {
   size_t write_index = 0;
 
   for (size_t i = 0; i < c->req_vec.size(); i++) {
-    size_t msgbuf_idx = c->req_vec[i].msgbuf_idx;
-    size_t session_idx = c->req_vec[i].session_idx;
+    size_t msgbuf_idx = c->req_vec[i].s.msgbuf_idx;
+    size_t session_idx = c->req_vec[i].s.session_idx;
 
     ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
     assert(req_msgbuf.get_data_size() == FLAGS_req_size);
@@ -156,8 +156,8 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
-  size_t msgbuf_idx = static_cast<tag_t>(_tag).msgbuf_idx;
-  size_t session_idx = static_cast<tag_t>(_tag).session_idx;
+  size_t msgbuf_idx = static_cast<tag_t>(_tag).s.msgbuf_idx;
+  size_t session_idx = static_cast<tag_t>(_tag).s.session_idx;
   if (kAppVerbose) {
     printf("large_rpc_tput: Received response for msgbuf %zu, session %zu.\n",
            msgbuf_idx, session_idx);
@@ -363,13 +363,11 @@ int main(int argc, char **argv) {
   nexus.register_req_func(
       kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
 
-  std::thread threads[FLAGS_num_threads];
+  std::vector<std::thread> threads(FLAGS_num_threads);
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
     ERpc::bind_to_core(threads[i], i);
   }
 
-  for (size_t i = 0; i < FLAGS_num_threads; i++) {
-    threads[i].join();
-  }
+  for (auto &thread : threads) thread.join();
 }
