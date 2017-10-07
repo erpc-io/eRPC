@@ -8,16 +8,12 @@ static constexpr size_t kAppNumReqs = 1000;
 static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
 static_assert(kAppNumReqs < std::numeric_limits<uint16_t>::max(), "");
 
-union tag_t {
-  struct {
-    uint16_t req_i;
-    uint16_t msgbuf_i;
-    uint32_t req_size;
-  };
-  size_t tag;
+struct tag_t {
+  uint16_t req_i;
+  uint16_t msgbuf_i;
+  uint32_t req_size;
   tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
       : req_i(req_i), msgbuf_i(msgbuf_i), req_size(req_size) {}
-  tag_t(size_t tag) : tag(tag) {}
 };
 static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
@@ -77,7 +73,7 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
 
   int ret = c->rpc->enqueue_request(
       c->session_num_arr[0], kAppReqType, &c->req_msgbuf[msgbuf_i],
-      &c->resp_msgbuf[msgbuf_i], cont_func, tag.tag);
+      &c->resp_msgbuf[msgbuf_i], cont_func, *reinterpret_cast<size_t *>(&tag));
   _unused(ret);
   assert(ret == 0);
 
@@ -92,7 +88,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  tag_t tag(_tag);
+  auto tag = *reinterpret_cast<tag_t *>(&_tag);
 
   test_printf("Client: Received response for req %u, length = %zu.\n",
               tag.req_i, resp_msgbuf->get_data_size());

@@ -104,14 +104,14 @@ void generic_test_func(Nexus *nexus, size_t) {
 
   // Pre-create MsgBuffers so we can test reuse and resizing
   size_t tot_reqs_per_iter = config_num_sessions * config_rpcs_per_session;
-  MsgBuffer req_msgbuf[tot_reqs_per_iter];
-  MsgBuffer resp_msgbuf[tot_reqs_per_iter];
+  std::vector<MsgBuffer> req_msgbufs(tot_reqs_per_iter);
+  std::vector<MsgBuffer> resp_msgbufs(tot_reqs_per_iter);
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    req_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
-    assert(req_msgbuf[req_i].buf != nullptr);
+    req_msgbufs[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
+    assert(req_msgbufs[req_i].buf != nullptr);
 
-    resp_msgbuf[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
-    assert(resp_msgbuf[req_i].buf != nullptr);
+    resp_msgbufs[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
+    assert(resp_msgbufs[req_i].buf != nullptr);
   }
 
   // The main request-issuing loop
@@ -124,7 +124,7 @@ void generic_test_func(Nexus *nexus, size_t) {
     for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
       for (size_t w_i = 0; w_i < config_rpcs_per_session; w_i++) {
         assert(iter_req_i < tot_reqs_per_iter);
-        MsgBuffer &cur_req_msgbuf = req_msgbuf[iter_req_i];
+        MsgBuffer &cur_req_msgbuf = req_msgbufs[iter_req_i];
 
         size_t req_size =
             get_rand_msg_size(&context.fastrand, rpc->get_max_data_per_pkt(),
@@ -137,7 +137,7 @@ void generic_test_func(Nexus *nexus, size_t) {
 
         int ret = rpc->enqueue_request(
             session_num_arr[sess_i], kAppReqType, &cur_req_msgbuf,
-            &resp_msgbuf[iter_req_i], cont_func, iter_req_i);
+            &resp_msgbufs[iter_req_i], cont_func, iter_req_i);
         if (ret != 0) {
           test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
         }
@@ -152,17 +152,14 @@ void generic_test_func(Nexus *nexus, size_t) {
     for (size_t i = 0; i < 5; i++) {
       wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter,
                                     nexus->freq_ghz);
-      if (context.num_rpc_resps == tot_reqs_per_iter) {
-        break;
-      }
+      if (context.num_rpc_resps == tot_reqs_per_iter) break;
     }
     assert(context.num_rpc_resps == tot_reqs_per_iter);
   }
 
-  // Free the request MsgBuffers
-  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    rpc->free_msg_buffer(req_msgbuf[req_i]);
-  }
+  // Free the MsgBuffers
+  for (auto &req_msgbuf : req_msgbufs) rpc->free_msg_buffer(req_msgbuf);
+  for (auto &resp_msgbuf : resp_msgbufs) rpc->free_msg_buffer(resp_msgbuf);
 
   // Disconnect the sessions
   for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {

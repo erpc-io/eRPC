@@ -33,22 +33,15 @@ class PrimaryReqInfo {
       : req_size_cp(req_size_cp), req_handle_cp(req_handle_cp), etid(etid) {}
 };
 
-union tag_t {
-  PrimaryReqInfo *srv_req_info_ptr;
-  struct {
-    uint16_t req_i;
-    uint16_t msgbuf_i;
-    uint32_t req_size;
-  };
-  size_t tag;
+struct client_tag_t {
+  uint16_t req_i;
+  uint16_t msgbuf_i;
+  uint32_t req_size;
 
-  tag_t(PrimaryReqInfo *srv_req_info_ptr)
-      : srv_req_info_ptr(srv_req_info_ptr) {}
-  tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
+  client_tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
       : req_i(req_i), msgbuf_i(msgbuf_i), req_size(req_size) {}
-  tag_t(size_t tag) : tag(tag) {}
 };
-static_assert(sizeof(tag_t) == sizeof(size_t), "");
+static_assert(sizeof(client_tag_t) == sizeof(size_t), "");
 
 /// Extended context for client
 class AppContext : public BasicAppContext {
@@ -99,12 +92,11 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
     srv_req_info->req_msgbuf_pb.buf[i] = req_msgbuf_cp->buf[i] + 1;
   }
 
-  tag_t tag(srv_req_info);  // Save the request info pointer in the tag
-
   // Backup is server thread #1
   int ret = context->rpc->enqueue_request(
       context->session_num_arr[1], kAppReqTypePB, &srv_req_info->req_msgbuf_pb,
-      &srv_req_info->resp_msgbuf_pb, primary_cont_func, tag.tag);
+      &srv_req_info->resp_msgbuf_pb, primary_cont_func,
+      reinterpret_cast<size_t>(srv_req_info));
   _unused(ret);
   assert(ret == 0);
 }
@@ -154,8 +146,7 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
 
   // Check that we're still running in the same thread as for the
   // client-to-primary request
-  tag_t tag(_tag);
-  PrimaryReqInfo *srv_req_info = tag.srv_req_info_ptr;
+  auto *srv_req_info = reinterpret_cast<PrimaryReqInfo *>(_tag);
   assert(srv_req_info->etid == context->rpc->get_etid());
 
   // Extract the request info
@@ -210,15 +201,16 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
     context->req_msgbuf[msgbuf_i].buf[i] = kAppDataByte;
   }
 
-  tag_t tag(static_cast<uint16_t>(context->num_reqs_sent),
-            static_cast<uint16_t>(msgbuf_i), static_cast<uint32_t>(req_size));
+  client_tag_t tag(static_cast<uint16_t>(context->num_reqs_sent),
+                   static_cast<uint16_t>(msgbuf_i),
+                   static_cast<uint32_t>(req_size));
   test_printf("Client [Rpc %u]: Sending request %zu of size %zu\n",
               context->rpc->get_rpc_id(), context->num_reqs_sent, req_size);
 
   int ret = context->rpc->enqueue_request(
       context->session_num_arr[0], kAppReqTypeCP,
       &context->req_msgbuf[msgbuf_i], &context->resp_msgbuf[msgbuf_i],
-      client_cont_func, tag.tag);
+      client_cont_func, *reinterpret_cast<size_t *>(&tag));
   _unused(ret);
   assert(ret == 0);
 
@@ -235,7 +227,7 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
 
   // Extract info from tag
-  tag_t tag(_tag);
+  auto tag = *reinterpret_cast<client_tag_t *>(&_tag);
   size_t req_size = static_cast<size_t>(tag.req_size);
   size_t msgbuf_i = static_cast<size_t>(tag.msgbuf_i);
 

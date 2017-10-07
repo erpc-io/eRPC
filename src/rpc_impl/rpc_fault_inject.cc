@@ -8,10 +8,7 @@ namespace ERpc {
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_check_ok() const {
-  if (!kFaultInjection) {
-    throw std::runtime_error("eRPC Rpc: Fault injection is disabled.");
-  }
-
+  if (!kFaultInjection) throw std::runtime_error("eRPC Rpc: Faults disabled.");
   rt_assert(in_creator(), "eRPC Rpc: Non-creator threads can't inject faults.");
 }
 
@@ -22,11 +19,11 @@ void Rpc<TTr>::fault_inject_fail_resolve_server_rinfo_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob) {
+void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double p) {
   fault_inject_check_ok();
-  assert(pkt_drop_prob >= 1.0 / 1000000000 && pkt_drop_prob < .95);
-  faults.pkt_drop_prob = pkt_drop_prob;
-  faults.pkt_drop_thresh_billion = pkt_drop_prob * 1000000000;
+  assert(p == 0.0 || (p >= 1.0 / 1000000000 && p < .95));
+  faults.pkt_drop_prob = p;
+  faults.pkt_drop_thresh_billion = p * 1000000000;
 }
 
 template <class TTr>

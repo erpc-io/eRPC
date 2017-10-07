@@ -241,7 +241,7 @@ void launch_server_client_threads(
 
   test_printf("test: Using %zu sessions\n", num_sessions);
 
-  std::thread server_thread[num_sessions];
+  std::vector<std::thread> server_threads(num_sessions);
 
   // Launch one server Rpc thread for each client session
   for (size_t i = 0; i < num_sessions; i++) {
@@ -250,7 +250,7 @@ void launch_server_client_threads(
                                    ? basic_empty_sm_handler
                                    : basic_sm_handler;
 
-    server_thread[i] = std::thread(
+    server_threads[i] = std::thread(
         basic_server_thread_func, &nexus, kAppServerRpcId + i, _sm_handler,
         num_sessions, connect_servers, srv_pkt_drop_prob);
   }
@@ -262,10 +262,7 @@ void launch_server_client_threads(
 
   std::thread client_thread(client_thread_func, &nexus, num_sessions);
 
-  for (size_t i = 0; i < num_sessions; i++) {
-    server_thread[i].join();
-  }
-
+  for (auto &thread : server_threads) thread.join();
   client_thread.join();
 }
 
