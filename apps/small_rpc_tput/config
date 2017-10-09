@@ -1,7 +1,7 @@
 --test_ms 10000
---batch_size 11
+--batch_size 8
 --msg_size 32
 --num_bg_threads 0
---num_machines 11
+--num_machines 8
 --num_threads 1
---concurrency 5
+--concurrency 8
