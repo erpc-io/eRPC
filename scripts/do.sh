@@ -5,6 +5,13 @@ check_env "autorun_app"
 
 drop_shm
 
+# Check the executable
+if [ ! -f build/$autorun_app ]; then
+  blue "$autorun_app executable not found in build/"
+fi
+
+chmod +x build/$autorun_app # Fix permissions messed up by lsyncd
+
 # Install modded driver - this is not a requirement
 if [ "$autorun_app" != "consensus" ]; then
   blue "Installing modded driver"

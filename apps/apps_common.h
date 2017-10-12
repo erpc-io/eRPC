@@ -64,8 +64,7 @@ float papi_get_ipc() {
 // Return the control net IP address of the machine with index server_i,
 // from the autorun nodes file.
 static std::string get_hostname_for_machine(size_t server_i) {
-  std::string autorun_node_file =
-      "/users/akalia/eRPC/scripts/autorun_node_file";
+  std::string autorun_node_file = "../eRPC/scripts/autorun_node_file";
   std::ifstream in(autorun_node_file.c_str());
 
   std::string s;

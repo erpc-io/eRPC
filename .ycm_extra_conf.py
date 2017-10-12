@@ -33,14 +33,17 @@
 import os
 import ycm_core
 
+from os.path import expanduser
+home_dir = expanduser("~")
+
 flags = [
     '-x',
     'c++',
     '-DFAULT_INJECTION',
-    '-I/users/akalia/eRPC/src',
-    '-I/users/akalia/eRPC/third_party',
-    '-I/users/akalia/eRPC/mica/src',
-    '-I/users/akalia/masstree-beta',
+    '-I' + str(home_dir) + '/eRPC/src',
+    '-I' + str(home_dir) + '/eRPC/third_party',
+    '-I' + str(home_dir) + '/eRPC/mica/src',
+    '-I' + str(home_dir) + '/masstree-beta',
     '-Wall',
     '-Werror',
     '-Wextra',
