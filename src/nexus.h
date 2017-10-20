@@ -134,6 +134,7 @@ class Nexus {
   class SmThreadCtx {
    public:
     // Installed by the Nexus
+    std::string hostname;           ///< User-provided hostname of this node
     uint16_t mgmt_udp_port;         ///< The Nexus's session management port
     volatile bool *kill_switch;     ///< The Nexus's kill switch
     volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array

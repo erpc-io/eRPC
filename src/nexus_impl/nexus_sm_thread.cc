@@ -357,9 +357,11 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
   // Create an ENet host that remote nodes can connect to
   rt_assert(enet_initialize() == 0, "Failed to initialize ENet");
 
+  // Using address.host = ENET_HOST_ANY does not always work for some reason
   ENetAddress address;
-  enet_address_set_host(&address, "localhost");
-  address.host = ENET_HOST_ANY;
+  int ret = enet_address_set_host(&address, ctx.hostname.c_str());
+  rt_assert(ret == 0, "enet_address_set_host() failed");
+
   address.port = ctx.mgmt_udp_port;
 
   ctx.enet_host = enet_host_create(&address, kMaxNumMachines, 0, 0, 0);
