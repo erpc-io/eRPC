@@ -38,8 +38,8 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
     if (small_rpc_likely(item.offset == 0)) {
       // This is the first packet, so we need only 1 SGE. This can be a credit
-      // return packet.
-      pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
+      // return packet or an RFR.
+      const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t) + item.data_bytes);
       sgl[0].lkey = msg_buffer->buffer.lkey;
@@ -64,7 +64,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       wr.num_sge = 2;
     }
 
-    const ib_routing_info_t* ib_routing_info =
+    const auto* ib_routing_info =
         reinterpret_cast<ib_routing_info_t*>(item.routing_info);
 
     if (kFaultInjection && item.drop) {
@@ -80,7 +80,6 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
-
   assert(ret == 0);
   if (unlikely(ret != 0)) {
     fprintf(stderr, "eRPC: Fatal error. ibv_post_send failed. ret = %d\n", ret);
