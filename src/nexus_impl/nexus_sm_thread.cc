@@ -275,7 +275,7 @@ void Nexus::sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
-          "eRPC Nexus: Trying to send SM packet (type %s, dest %s). Issue:",
+          "eRPC Nexus: Trying to send SM packet (type %s, dest %s). Issue",
           sm_pkt_type_str(sm_pkt.pkt_type).c_str(),
           sm_pkt.server.name().c_str());
 
@@ -325,7 +325,7 @@ void Nexus::sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
-          "eRPC Nexus: Trying to send SM packet (type %s, dest %s). Issue:",
+          "eRPC Nexus: Trying to send SM packet (type %s, dest %s). Issue",
           sm_pkt_type_str(sm_pkt.pkt_type).c_str(),
           sm_pkt.client.name().c_str());
 
