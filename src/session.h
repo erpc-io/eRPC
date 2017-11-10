@@ -41,21 +41,19 @@ class Session {
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
  private:
-  Session(Role role, SessionState state) : role(role), state(state) {
-    // A session may be created by the client in kConnectInProgress state, or
-    // by the server in kConnected statet.
+  Session(Role role) : role(role) {
     if (is_client()) {
-      assert(state == SessionState::kConnectInProgress);
+      state = SessionState::kConnectInProgress;
       remote_routing_info = &server.routing_info;
     } else {
-      assert(state == SessionState::kConnected);
+      state = SessionState::kConnected;
       remote_routing_info = &client.routing_info;
     }
 
     // Arrange the free slot vector so that slots are popped in order
     for (size_t i = 0; i < kSessionReqWindow; i++) {
       // Initialize session slot with index = sslot_i
-      size_t sslot_i = (kSessionReqWindow - 1 - i);
+      const size_t sslot_i = (kSessionReqWindow - 1 - i);
       SSlot &sslot = sslot_arr[sslot_i];
 
       // This buries all MsgBuffers
@@ -77,14 +75,14 @@ class Session {
     }
   }
 
-  /// Session resources are freed in Rpc::bury_session(), so this is empty
+  /// All session resources are freed by the owner Rpc
   ~Session() {}
 
   inline bool is_client() const { return role == Role::kClient; }
   inline bool is_server() const { return role == Role::kServer; }
   inline bool is_connected() const { return state == SessionState::kConnected; }
 
-  Role role;           ///< The role (server/client) of this session endpoint
+  const Role role;     ///< The role (server/client) of this session endpoint
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 
