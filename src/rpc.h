@@ -154,7 +154,7 @@ class Rpc {
    */
   inline void bury_resp_msgbuf_server_st(SSlot *sslot) {
     assert(in_creator());
-    assert(sslot != nullptr && !sslot->is_client);
+    assert(!sslot->is_client);
 
     // Free the response MsgBuffer iff it is not preallocated
     if (small_rpc_unlikely(!sslot->prealloc_used)) {
@@ -175,7 +175,7 @@ class Rpc {
    * conditinally bury only initialized MsgBuffers.
    */
   inline void bury_req_msgbuf_server_st(SSlot *sslot) {
-    assert(sslot != nullptr && !sslot->is_client);
+    assert(!sslot->is_client);
 
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
     if (small_rpc_unlikely(req_msgbuf.is_dynamic())) {
@@ -377,7 +377,6 @@ class Rpc {
   /// From a continuation, release ownership of a response handle. The response
   /// MsgBuffer is owned by the app and shouldn't be freed.
   inline void release_response(RespHandle *resp_handle) {
-    assert(resp_handle != nullptr);
     SSlot *sslot = static_cast<SSlot *>(resp_handle);
 
     // When called from a background thread, enqueue to the foreground thread
@@ -435,7 +434,7 @@ class Rpc {
   inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t offset,
                                       size_t data_bytes) {
     assert(in_creator());
-    assert(sslot != nullptr && sslot->tx_msgbuf != nullptr);
+    assert(sslot->tx_msgbuf != nullptr);
     assert(tx_batch_i < TTr::kPostlist);
 
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
@@ -469,7 +468,6 @@ class Rpc {
   inline void enqueue_hdr_tx_burst_and_drain_st(
       Transport::RoutingInfo *routing_info, MsgBuffer *tx_msgbuf) {
     assert(in_creator() && optlevel_large_rpc_supported);
-    assert(routing_info != nullptr && tx_msgbuf != nullptr);
     assert(tx_batch_i < TTr::kPostlist);
     assert(tx_msgbuf->is_expl_cr() || tx_msgbuf->is_req_for_resp());
 

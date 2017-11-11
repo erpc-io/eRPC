@@ -257,7 +257,7 @@ void Nexus::sm_thread_rx(SmThreadCtx &ctx) {
 }
 
 void Nexus::sm_thread_enet_send_one(const SmWorkItem &wi, ENetPeer *epeer) {
-  assert(epeer != nullptr && epeer->data != nullptr);
+  assert(epeer->data != nullptr);
 
   // This copies the packet payload
   ENetPacket *epkt =

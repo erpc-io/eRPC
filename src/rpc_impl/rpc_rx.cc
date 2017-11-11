@@ -83,8 +83,7 @@ void Rpc<TTr>::process_comps_st() {
 template <class TTr>
 void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr && !sslot->is_client);
-  assert(pkt != nullptr);
+  assert(!sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
@@ -171,8 +170,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
 template <class TTr>
 void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr && sslot->is_client);
-  assert(pkt != nullptr);
+  assert(sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
@@ -235,8 +233,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
 template <class TTr>
 void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_creator());
-  assert(sslot != nullptr && sslot->is_client);
-  assert(pkthdr != nullptr);
+  assert(sslot->is_client);
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
@@ -264,8 +261,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 template <class TTr>
 void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_creator());
-  assert(sslot != nullptr && !sslot->is_client);
-  assert(pkthdr != nullptr);
+  assert(!sslot->is_client);
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
@@ -327,8 +323,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 template <class TTr>
 void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr && !sslot->is_client);
-  assert(pkt != nullptr);
+  assert(!sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
   MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
@@ -452,8 +447,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
 template <class TTr>
 void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_creator());
-  assert(sslot != nullptr && sslot->is_client);
-  assert(pkt != nullptr);
+  assert(sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 

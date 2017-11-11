@@ -23,9 +23,6 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port)
 
 void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
                                            uint8_t **rx_ring) {
-  assert(huge_alloc != nullptr);
-  assert(rx_ring != nullptr);
-
   this->huge_alloc = huge_alloc;
   this->numa_node = huge_alloc->get_numa_node();
 
@@ -239,8 +236,8 @@ void IBTransport::init_infiniband_structs() {
   init_attr.port_num = static_cast<uint8_t>(resolve.dev_port_id);
   init_attr.qkey = kQKey;
 
-  if (ibv_modify_qp(qp, &init_attr, IBV_QP_STATE | IBV_QP_PKEY_INDEX |
-                                        IBV_QP_PORT | IBV_QP_QKEY) != 0) {
+  int attr_mask = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_QKEY;
+  if (ibv_modify_qp(qp, &init_attr, attr_mask) != 0) {
     throw std::runtime_error("eRPC IBTransport: Failed to modify QP to init");
   }
 
@@ -292,8 +289,6 @@ void IBTransport::init_mem_reg_funcs() {
 }
 
 void IBTransport::init_recvs(uint8_t **rx_ring) {
-  assert(rx_ring != nullptr);
-
   std::ostringstream xmsg;  // The exception message
 
   // Initialize the memory region for RECVs

@@ -6,9 +6,8 @@ template <class TTr>
 void Rpc<TTr>::send_credit_return_now_st(const Session *session,
                                          const pkthdr_t *req_pkthdr) {
   assert(in_creator());
-  assert(session != nullptr && session->is_server());
-  assert(req_pkthdr != nullptr && req_pkthdr->check_magic());
-  assert(req_pkthdr->is_req());
+  assert(session->is_server());
+  assert(req_pkthdr->is_req() && req_pkthdr->check_magic());
 
   // Fill in the CR packet header. Commented fields are copied from req_pkthdr.
   pkthdr_t cr_pkthdr = *req_pkthdr;

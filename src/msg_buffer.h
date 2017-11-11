@@ -72,7 +72,6 @@ class MsgBuffer {
   /// Check if the \p req_type and \req num fields of this MsgBuffer match
   /// \p pkthdr
   bool matches(const pkthdr_t *pkthdr) const {
-    assert(pkthdr != nullptr);
     return (get_req_type() == pkthdr->req_type &&
             get_req_num() == pkthdr->req_num);
   }
@@ -140,7 +139,6 @@ class MsgBuffer {
         data_size(max_data_size),
         max_num_pkts(1),
         num_pkts(1) {
-    assert(pkt != nullptr);
     assert(reinterpret_cast<const pkthdr_t *>(pkt)->check_magic());  // pkthdr 0
     // max_data_size can be zero for control packets, so can't assert
 

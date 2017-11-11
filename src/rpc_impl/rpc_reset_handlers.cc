@@ -42,7 +42,7 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
 template <class TTr>
 bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   assert(in_creator());
-  assert(session != nullptr && session->is_client());
+  assert(session->is_client());
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
@@ -107,7 +107,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 template <class TTr>
 bool Rpc<TTr>::handle_reset_server_st(Session *session) {
   assert(in_creator());
-  assert(session != nullptr && session->is_server());
+  assert(session->is_server());
   session->state = SessionState::kResetInProgress;
 
   char issue_msg[kMaxIssueMsgLen];
