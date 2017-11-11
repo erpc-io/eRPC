@@ -13,7 +13,8 @@
 
 namespace ERpc {
 
-/// A work item exchanged between an Rpc thread and an SM thread
+/// A work item exchanged between an Rpc thread and an SM thread. This does
+/// not have any Nexus-related members, so it's outside the Nexus class.
 class SmWorkItem {
   enum class Reset { kFalse, kTrue };
 
@@ -41,8 +42,6 @@ class Nexus {
  public:
   static constexpr size_t kNexusSmThreadCore = 15;  /// CPU core for SM thread
   enum class BgWorkItemType : bool { kReq, kResp };
-
-  class Hook;  // Forward declaration
 
   /// A work item submitted to a background thread
   class BgWorkItem {
