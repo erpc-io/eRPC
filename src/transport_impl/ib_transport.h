@@ -5,7 +5,7 @@
 #include "transport.h"
 #include "util/logger.h"
 
-namespace ERpc {
+namespace erpc {
 
 class IBTransport : public Transport {
  public:
@@ -271,6 +271,6 @@ class IBTransport : public Transport {
   bool fast_recv_used = false;
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_INFINIBAND_TRANSPORT_H

@@ -2,7 +2,7 @@
 #include <iostream>
 #include "util/logger.h"
 
-namespace ERpc {
+namespace erpc {
 
 HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
                      Transport::reg_mr_func_t reg_mr_func,
@@ -211,4 +211,4 @@ void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
     exit(-1);
   }
 }
-}  // End ERpc
+}  // End erpc

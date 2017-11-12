@@ -1,6 +1,6 @@
 #include "transport.h"
 
-namespace ERpc {
+namespace erpc {
 
 Transport::Transport(TransportType transport_type, uint8_t rpc_id,
                      uint8_t phy_port)
@@ -8,4 +8,4 @@ Transport::Transport(TransportType transport_type, uint8_t rpc_id,
 
 Transport::~Transport() {}
 
-}  // End ERpc
+}  // End erpc

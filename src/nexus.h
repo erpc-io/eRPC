@@ -11,7 +11,7 @@
 #include "util/mt_queue.h"
 #include "util/tls_registry.h"
 
-namespace ERpc {
+namespace erpc {
 
 /// A work item exchanged between an Rpc thread and an SM thread. This does
 /// not have any Nexus-related members, so it's outside the Nexus class.
@@ -273,6 +273,6 @@ class Nexus {
   MtQueue<BgWorkItem> bg_req_queue[kMaxBgThreads];  ///< Background req queues
   std::thread bg_thread_arr[kMaxBgThreads];  ///< Background thread context
 };
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_RPC_H

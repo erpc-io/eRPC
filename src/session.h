@@ -14,7 +14,7 @@
 #include "util/buffer.h"
 #include "util/fixed_vector.h"
 
-namespace ERpc {
+namespace erpc {
 
 // Forward declarations for friendship. Prevent Nexus's background threads
 // from accessing session members.
@@ -108,6 +108,6 @@ class Session {
   } dpath_stats;
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_SESSION_H

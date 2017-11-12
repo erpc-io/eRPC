@@ -5,7 +5,7 @@
 #include "common.h"
 #include "transport.h"
 
-namespace ERpc {
+namespace erpc {
 
 /// Maximum number of sessions (both as client and server) that can be created
 /// by an Rpc through its lifetime. Increase this for more sessions.
@@ -278,6 +278,6 @@ class SmPkt {
   bool is_resp() const { return !is_req(); }
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_SESSION_MGMT_PKT_TYPE_H

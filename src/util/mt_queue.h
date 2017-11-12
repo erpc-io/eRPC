@@ -7,7 +7,7 @@
 
 #include "util/barrier.h"
 
-namespace ERpc {
+namespace erpc {
 
 /// A simple multi-threaded queue, without performance optimizations for the
 /// the single-threaded case
@@ -49,6 +49,6 @@ class MtQueue {
   std::mutex _lock;
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // MT_QUEUE_H

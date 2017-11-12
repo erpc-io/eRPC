@@ -1,6 +1,6 @@
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
@@ -42,4 +42,4 @@ void Rpc<TTr>::process_bg_queues_release_response_st() {
   }
 }
 
-}  // End ERpc
+}  // End erpc

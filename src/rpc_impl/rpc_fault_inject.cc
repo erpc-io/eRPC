@@ -1,10 +1,10 @@
 /*
  * @file rpc_fault_inject.cc
- * @brief Functions to allow users to inject faults into ERpc
+ * @brief Functions to allow users to inject faults into eRPC
  */
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_check_ok() const {
@@ -46,4 +46,4 @@ void Rpc<TTr>::fault_inject_reset_remote_epeer_st(int session_num) {
   enqueue_sm_req_st(session, SmPktType::kFaultResetPeerReq);
 }
 
-}  // End ERpc
+}  // End erpc

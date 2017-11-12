@@ -14,7 +14,7 @@
 #include "util/buffer.h"
 #include "util/rand.h"
 
-namespace ERpc {
+namespace erpc {
 
 /// Information about an SHM region
 struct shm_region_t {
@@ -287,6 +287,6 @@ class HugeAlloc {
   } stats;
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_HUGE_ALLOC_H

@@ -1,16 +1,16 @@
-#include "nexus.h"
 #include "common.h"
+#include "nexus.h"
 #include "ops.h"
 #include "session.h"
 #include "util/mt_queue.h"
 
-namespace ERpc {
+namespace erpc {
 
 void Nexus::bg_thread_func(BgThreadCtx ctx) {
   ctx.tls_registry->init();  // Initialize thread-local variables
 
   // The BgWorkItem request list can be indexed using the background thread's
-  // index in the Nexus, or its ERpc TID.
+  // index in the Nexus, or its eRPC TID.
   assert(ctx.bg_thread_index == ctx.tls_registry->get_etid());
   LOG_INFO("eRPC Nexus: Background thread %zu running. Tiny TID = %zu.\n",
            ctx.bg_thread_index, ctx.tls_registry->get_etid());
@@ -53,4 +53,4 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
   return;
 }
 
-}  // End ERpc
+}  // End erpc

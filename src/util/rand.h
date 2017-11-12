@@ -3,7 +3,7 @@
 
 #include <random>
 
-namespace ERpc {
+namespace erpc {
 
 class SlowRand {
   std::random_device rand_dev;  // Non-pseudorandom seed for twister
@@ -32,6 +32,6 @@ class FastRand {
   }
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_RAND_H

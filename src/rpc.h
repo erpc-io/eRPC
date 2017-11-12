@@ -19,7 +19,7 @@
 #include "util/rand.h"
 #include "util/timer.h"
 
-namespace ERpc {
+namespace erpc {
 
 /**
  * @brief Rpc object created by foreground threads, and possibly shared with
@@ -334,7 +334,7 @@ class Rpc {
    *
    * @param cont_func The continuation function for this request
    * @tag The tag for this request
-   * @cont_etid The ERpc thread ID of the background thread to run the
+   * @cont_etid The eRPC thread ID of the background thread to run the
    * continuation on. The default value of \p kInvalidBgETid means that the
    * continuation runs in the foreground. This argument is meant only for
    * internal use by eRPC (i.e., user calls must ignore it).
@@ -606,7 +606,7 @@ class Rpc {
    *
    * @param sslot Session sslot with a complete request or response MsgBuffer
    * @param wi_type Work item type (request or response)
-   * @param bg_etid ERpc thread ID of the background thread to submit to
+   * @param bg_etid eRPC thread ID of the background thread to submit to
    */
   void submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
                             size_t bg_etid = kMaxBgThreads);
@@ -714,7 +714,7 @@ class Rpc {
   /// Return true iff the caller is running in a background thread
   inline bool in_background() const { return !in_creator(); }
 
-  /// Return the ERpc thread ID of the caller
+  /// Return the eRPC thread ID of the caller
   inline size_t get_etid() const { return tls_registry->get_etid(); }
 
   /// Busy-sleep for \p ns nanoseconds
@@ -804,7 +804,7 @@ class Rpc {
   const std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
 
   // Rpc metadata
-  size_t creator_etid;        ///< ERpc thread ID of the creator thread
+  size_t creator_etid;        ///< eRPC thread ID of the creator thread
   Nexus::Hook nexus_hook;     ///< A hook shared with the Nexus
   TlsRegistry *tls_registry;  ///< Pointer to the Nexus's thread-local registry
 
@@ -857,7 +857,7 @@ class Rpc {
   /// For tracking event loop reentrance (only with kDatapathChecks)
   bool in_event_loop = false;
 
-  /// All the faults that can be injected into ERpc for testing
+  /// All the faults that can be injected into eRPC for testing
   struct {
     /// Fail server routing info resolution at client. This is used to test the
     /// case where a client fails to resolve routing info sent by the server.
@@ -881,6 +881,6 @@ class Rpc {
 // Instantiate required Rpc classes so they get compiled for the linker
 template class Rpc<IBTransport>;
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_RPC_H

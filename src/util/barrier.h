@@ -1,7 +1,7 @@
 #ifndef ERPC_BARRIER_H
 #define ERPC_BARRIER_H
 
-namespace ERpc {
+namespace erpc {
 
 static void memory_barrier() { asm volatile("" ::: "memory"); }
 
@@ -22,6 +22,6 @@ static void cpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx,
                : "0"(*eax), "2"(*ecx));
 }
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_BARRIER_H

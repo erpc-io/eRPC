@@ -6,7 +6,7 @@
 
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 // This function is not on the critical path and is exposed to the user,
 // so the args checking is always enabled.
@@ -186,4 +186,4 @@ size_t Rpc<TTr>::num_active_sessions_st() {
   return ret;
 }
 
-}  // End ERpc
+}  // End erpc

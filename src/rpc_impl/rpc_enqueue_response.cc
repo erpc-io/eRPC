@@ -1,6 +1,6 @@
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 // For both foreground and background request handlers, enqueue_response() may
 // be called before or after the request handler returns to the event loop, at
@@ -81,4 +81,4 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
       sslot, 0, std::min(resp_msgbuf->data_size, TTr::kMaxDataPerPkt));
 }
 
-}  // End ERpc
+}  // End erpc

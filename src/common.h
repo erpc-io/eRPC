@@ -19,7 +19,7 @@
 #include <vector>
 #include "optlevel.h"
 
-namespace ERpc {
+namespace erpc {
 
 #define _unused(x) ((void)(x))  // Make production build happy
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -56,7 +56,7 @@ static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
 static constexpr uint8_t kInvalidReqType = kReqTypeArraySize - 1;
 static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
 
-/// Invalid ERpc thread ID of a background thread
+/// Invalid eRPC thread ID of a background thread
 static constexpr size_t kInvalidBgETid = kMaxBgThreads;
 
 // Simple methods
@@ -76,6 +76,6 @@ static inline void rt_assert(bool condition, std::string throw_str) {
   if (unlikely(!condition)) throw std::runtime_error(throw_str);
 }
 
-}  // End ERpc
+}  // End erpc
 
 #endif

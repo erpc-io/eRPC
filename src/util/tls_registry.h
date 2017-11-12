@@ -4,7 +4,7 @@
 #include <atomic>
 #include "common.h"
 
-namespace ERpc {
+namespace erpc {
 
 class TlsRegistry {
  public:
@@ -14,9 +14,9 @@ class TlsRegistry {
   /// Initialize all the thread-local registry members
   void init();
 
-  /// Return the ERpc thread ID of the caller
+  /// Return the eRPC thread ID of the caller
   size_t get_etid() const;
-};  // End ERpc
+};  // End erpc
 }
 
 #endif

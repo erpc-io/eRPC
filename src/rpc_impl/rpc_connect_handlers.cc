@@ -4,7 +4,7 @@
  */
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 // We need to handle all types of errors in remote arguments that the client can
 // make when calling create_session(), which cannot check for such errors.
@@ -195,4 +195,4 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
              SmErrType::kNoError, context);
 }
 
-}  // End ERpc
+}  // End erpc

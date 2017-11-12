@@ -4,7 +4,7 @@
 #include <assert.h>
 #include "common.h"
 
-namespace ERpc {
+namespace erpc {
 
 /**
  * @brief A static-sized vector that supports push, pop, and random access
@@ -47,6 +47,6 @@ class FixedVector {
   size_t free_index = 0;  // Index of the first free slot
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // FIXED_VECTOR_H

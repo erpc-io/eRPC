@@ -11,7 +11,7 @@
 #include <ctime>
 #include <string>
 
-namespace ERpc {
+namespace erpc {
 
 // Log levels: higher means more verbose
 #define LOG_LEVEL_OFF 0
@@ -129,6 +129,6 @@ static void output_log_header(int level) {
 /// print an unreasonable number of log messages.
 static bool is_log_level_reasonable() { return LOG_LEVEL <= LOG_LEVEL_INFO; }
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_LOGGER_H

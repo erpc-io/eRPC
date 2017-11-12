@@ -4,7 +4,7 @@
 #include "ib_transport.h"
 #include "util/huge_alloc.h"
 
-namespace ERpc {
+namespace erpc {
 
 constexpr size_t IBTransport::kMaxDataPerPkt;
 
@@ -342,4 +342,4 @@ void IBTransport::init_sends() {
   }
 }
 
-}  // End ERpc
+}  // End erpc

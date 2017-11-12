@@ -2,7 +2,7 @@
 
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 // The cont_etid parameter is passed only when the event loop processes the
 // background threads' queue of enqueue_request calls.
@@ -115,4 +115,4 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   return 0;
 }
 
-}  // End ERpc
+}  // End erpc

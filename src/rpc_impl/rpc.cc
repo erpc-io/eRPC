@@ -8,7 +8,7 @@
 
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
@@ -54,7 +54,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   nexus_hook.rpc_id = rpc_id;
   nexus->register_hook(&nexus_hook);
 
-  LOG_INFO("eRPC Rpc: Created with ID = %u, ERpc TID = %zu.\n", rpc_id,
+  LOG_INFO("eRPC Rpc: Created with ID = %u, eRPC TID = %zu.\n", rpc_id,
            creator_etid);
 
   prev_epoch_ts = rdtsc();  // Assign epoch timestamp as late as possible
@@ -118,4 +118,4 @@ double Rpc<TTr>::usec_since_creation() {
   return to_usec(rdtsc() - creation_tsc, nexus->freq_ghz);
 }
 
-}  // End ERpc
+}  // End erpc

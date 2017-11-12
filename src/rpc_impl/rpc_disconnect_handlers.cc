@@ -4,7 +4,7 @@
  */
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 // We don't need to check remote arguments since the session was already
 // connected successfully.
@@ -77,4 +77,4 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   bury_session_st(session);
 }
 
-}  // End ERpc
+}  // End erpc

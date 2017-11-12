@@ -1,6 +1,6 @@
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::send_credit_return_now_st(const Session *session,
@@ -24,4 +24,4 @@ void Rpc<TTr>::send_credit_return_now_st(const Session *session,
   enqueue_hdr_tx_burst_and_drain_st(session->remote_routing_info, &cr_msgbuf);
 }
 
-}  // End ERpc
+}  // End erpc

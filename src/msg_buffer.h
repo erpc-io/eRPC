@@ -6,7 +6,7 @@
 #include "util/buffer.h"
 #include "util/math_utils.h"
 
-namespace ERpc {
+namespace erpc {
 
 // Forward declarations for friendship
 class IBTransport;

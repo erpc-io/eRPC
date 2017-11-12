@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-namespace ERpc {
+namespace erpc {
 
 /// A class to hold a fixed-size buffer. The size of the buffer is read-only
 /// after the Buffer is created.
@@ -31,6 +31,6 @@ class Buffer {
   uint32_t lkey;      ///< The memory registration lkey
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_BUFFER_H

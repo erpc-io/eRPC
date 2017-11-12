@@ -1,7 +1,7 @@
 #include "tls_registry.h"
 #include "common.h"
 
-namespace ERpc {
+namespace erpc {
 
 thread_local bool tls_initalized;
 thread_local size_t etid;
@@ -17,4 +17,4 @@ size_t TlsRegistry::get_etid() const {
   return etid;
 }
 
-}  // End ERpc
+}  // End erpc

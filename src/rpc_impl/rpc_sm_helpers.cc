@@ -4,7 +4,7 @@
  */
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::handle_sm_st() {
@@ -100,4 +100,4 @@ void Rpc<TTr>::enqueue_sm_resp_st(const SmWorkItem &req_wi,
   nexus_hook.sm_tx_queue->unlocked_push(SmWorkItem(rpc_id, sm_pkt));
 }
 
-}  // End ERpc
+}  // End erpc

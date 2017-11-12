@@ -1,6 +1,6 @@
 #include "ib_transport.h"
 
-namespace ERpc {
+namespace erpc {
 
 // Packets that are the first packet in their MsgBuffer use one DMA, and may
 // be inlined. Packets that are not the first packet use two DMAs, and are never
@@ -237,4 +237,4 @@ void IBTransport::post_recvs(size_t num_recvs) {
   recvs_to_post = 0;
 }
 
-}  // End ERpc
+}  // End erpc

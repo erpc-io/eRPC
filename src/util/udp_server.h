@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <stdexcept>
 
-namespace ERpc {
+namespace erpc {
 
 /// Basic UDP server class that supports receiving messages
 class UDPServer {
@@ -38,6 +38,6 @@ class UDPServer {
   int sock_fd;
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_UDP_SERVER_H

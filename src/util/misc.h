@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <thread>
 
-namespace ERpc {
+namespace erpc {
 
 /// Bind thread to core n
 static void bind_to_core(std::thread &thread, size_t n) {
@@ -23,6 +23,6 @@ static void bind_to_core(std::thread &thread, size_t n) {
   }
 }
 
-}  // End ERpc
+}  // End erpc
 
 #endif

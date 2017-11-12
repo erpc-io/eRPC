@@ -1,6 +1,6 @@
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::process_req_txq_st() {
@@ -73,4 +73,4 @@ void Rpc<TTr>::tx_large_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
   }
 }
 
-}  // End ERpc
+}  // End erpc

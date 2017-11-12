@@ -4,7 +4,7 @@
 #include "msg_buffer.h"
 #include "ops.h"
 
-namespace ERpc {
+namespace erpc {
 
 // Forward declarations for friendship
 class IBTransport;

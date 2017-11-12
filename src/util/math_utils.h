@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <limits>
 
-namespace ERpc {
+namespace erpc {
 
 /// Optimized (x + 1) % N
 template <size_t N>
@@ -42,6 +42,6 @@ static inline size_t msb_index(int x) {
   return static_cast<size_t>(index);
 }
 
-}  /// End ERpc
+}  /// End erpc
 
 #endif  // ERPC_MATH_UTILS_H

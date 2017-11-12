@@ -12,7 +12,7 @@
 #include "util/buffer.h"
 #include "util/math_utils.h"
 
-namespace ERpc {
+namespace erpc {
 
 class HugeAlloc;  // Forward declaration: HugeAlloc needs MemRegInfo
 
@@ -180,6 +180,6 @@ class Transport {
   size_t numa_node;       ///< Derived from \p huge_alloc
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // ERPC_TRANSPORT_H

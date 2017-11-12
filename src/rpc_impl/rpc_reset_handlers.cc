@@ -4,7 +4,7 @@
  */
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
@@ -136,4 +136,4 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
   }
 }
 
-}  // End ERpc
+}  // End erpc

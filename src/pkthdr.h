@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-namespace ERpc {
+namespace erpc {
 
 // Packet header
 static constexpr size_t kMsgSizeBits = 24;  ///< Bits for message size

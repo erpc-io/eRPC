@@ -8,7 +8,7 @@
 #include <map>
 #include <stdexcept>
 
-namespace ERpc {
+namespace erpc {
 
 /// Basic UDP client class that supports sending messages and caches remote
 /// addrinfo mappings
@@ -60,6 +60,6 @@ class UDPClient {
   std::map<std::string, struct addrinfo *> addrinfo_map;
 };
 
-}  // End ERpc
+}  // End erpc
 
 #endif  // UDP_CLIENT_H

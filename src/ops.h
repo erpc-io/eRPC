@@ -7,7 +7,7 @@
 
 #include "msg_buffer.h"
 
-namespace ERpc {
+namespace erpc {
 
 // Forward declarations
 class SSlot;

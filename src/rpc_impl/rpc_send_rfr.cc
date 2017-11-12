@@ -1,6 +1,6 @@
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::send_req_for_resp_now_st(const SSlot *sslot,
@@ -27,4 +27,4 @@ void Rpc<TTr>::send_req_for_resp_now_st(const SSlot *sslot,
                                     &rfr_msgbuf);
 }
 
-}  // End ERpc
+}  // End erpc

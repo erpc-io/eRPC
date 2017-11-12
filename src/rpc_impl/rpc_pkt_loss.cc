@@ -4,7 +4,7 @@
  */
 #include "rpc.h"
 
-namespace ERpc {
+namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::pkt_loss_scan_reqs_st() {
@@ -101,4 +101,4 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     }
   }
 }
-}  // End ERpc
+}  // End erpc

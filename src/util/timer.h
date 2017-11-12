@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-namespace ERpc {
+namespace erpc {
 
 /// Return the TSC
 static inline size_t rdtsc() {
@@ -54,6 +54,6 @@ static double ns_since(const struct timespec &t0) {
   return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
 }
 
-}  /// End ERpc
+}  /// End erpc
 
 #endif  // ERPC_TIMER_H

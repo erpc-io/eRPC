@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
-namespace ERpc {
+namespace erpc {
 
 // Tweak these options for small RPC performance
 #define small_rpc_optlevel (small_rpc_optlevel_none)

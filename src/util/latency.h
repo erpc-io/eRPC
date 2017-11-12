@@ -14,7 +14,7 @@
 #include "common.h"
 #include "util/timer.h"
 
-namespace ERpc {
+namespace erpc {
 
 /*
  * @brief Fast but approximate latency distribution measurement for latency
@@ -189,13 +189,13 @@ class TscLatency {
   void stopwatch_start() {
     assert(!started);
     started = true;
-    stopwatch_start_cycles = ERpc::rdtsc();
+    stopwatch_start_cycles = erpc::rdtsc();
   }
 
   void stopwatch_stop() {
     assert(started);
     started = false;
-    total_cycles += (ERpc::rdtsc() - stopwatch_start_cycles);
+    total_cycles += (erpc::rdtsc() - stopwatch_start_cycles);
     num_samples++;
   }
 
@@ -210,7 +210,7 @@ class TscLatency {
     if (unlikely(freq_ghz == -1.0)) return -0.0;
 
     size_t avg_cycles = total_cycles / num_samples;
-    return ERpc::to_usec(avg_cycles, freq_ghz);
+    return erpc::to_usec(avg_cycles, freq_ghz);
   }
 };
 }

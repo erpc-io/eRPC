@@ -1,6 +1,6 @@
 #include "nexus.h"
 
-namespace ERpc {
+namespace erpc {
 
 /// Amount of time to block for ENet evs
 static constexpr size_t kSmThreadEventLoopMs = 20;
@@ -382,4 +382,4 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
   return;
 }
 
-}  // End ERpc
+}  // End erpc

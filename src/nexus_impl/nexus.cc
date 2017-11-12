@@ -5,7 +5,7 @@
 #include "util/barrier.h"
 #include "util/misc.h"
 
-namespace ERpc {
+namespace erpc {
 
 Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
              size_t num_bg_threads)
@@ -43,7 +43,7 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
 
     bg_thread_arr[i] = std::thread(bg_thread_func, bg_thread_ctx);
 
-    // Wait for the launched thread to grab a ERpc thread ID, otherwise later
+    // Wait for the launched thread to grab a eRPC thread ID, otherwise later
     // background threads or the foreground thread can grab ID = i.
     while (tls_registry.cur_etid == i) usleep(1);
   }
@@ -176,4 +176,4 @@ double Nexus::measure_rdtsc_freq() {
   return _freq_ghz;
 }
 
-}  // End ERpc
+}  // End erpc

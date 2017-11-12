@@ -53,7 +53,7 @@
 // extern "C" {
 // #endif
 
-namespace ERpc {
+namespace erpc {
 
 #ifdef __INTEL_COMPILER
 #pragma warning(disable : 593) /* Stop unused variable warning (reg_a etc). */
@@ -340,7 +340,7 @@ static inline void *rte_memcpy_func(void *dst, const void *src, size_t n) {
   return ret;
 }
 
-}  // End ERpc
+}  // End erpc
 
 // #ifdef __cplusplus
 // }
