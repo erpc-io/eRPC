@@ -27,7 +27,7 @@ class PrimaryReqInfo {
   ReqHandle *req_handle_cp;  ///< Handle for client-to-primary request
   MsgBuffer req_msgbuf_pb;   ///< MsgBuffer for primary-to-backup request
   MsgBuffer resp_msgbuf_pb;  ///< MsgBuffer for primary-to-backup response
-  size_t etid;               ///< ERpc thread ID in the request handler
+  size_t etid;               ///< eRPC thread ID in the request handler
 
   PrimaryReqInfo(size_t req_size_cp, ReqHandle *req_handle_cp, size_t etid)
       : req_size_cp(req_size_cp), req_handle_cp(req_handle_cp), etid(etid) {}

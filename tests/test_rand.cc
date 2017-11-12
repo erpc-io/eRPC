@@ -14,7 +14,7 @@ TEST(SlowRandTest, DistributionTest) {
   const size_t iters = 1000000; /* 1 million samples */
   uint64_t max = 0, min = std::numeric_limits<uint64_t>::max();
 
-  ERpc::SlowRand slow_rand;
+  erpc::SlowRand slow_rand;
   double avg = 0;
 
   for (size_t i = 0; i < iters; i++) {
@@ -40,7 +40,7 @@ TEST(SlowRandTest, DistributionTest) {
  */
 TEST(SlowRandTest, ModHundredTest) {
   const size_t iters = 1000000; /* 1 million samples */
-  ERpc::SlowRand slow_rand;
+  erpc::SlowRand slow_rand;
 
   size_t buckets[100] = {0};
 
@@ -65,7 +65,7 @@ TEST(FastRandTest, DistributionTest) {
   const size_t iters = 1000000; /* 1 million samples */
   uint32_t max = 0, min = std::numeric_limits<uint32_t>::max();
 
-  ERpc::FastRand fast_rand;
+  erpc::FastRand fast_rand;
   double avg = 0;
 
   for (size_t i = 0; i < iters; i++) {
@@ -91,7 +91,7 @@ TEST(FastRandTest, DistributionTest) {
  */
 TEST(FastRandTest, ModHundredTest) {
   const size_t iters = 1000000; /* 1 million samples */
-  ERpc::FastRand fast_rand;
+  erpc::FastRand fast_rand;
 
   size_t buckets[100] = {0};
 

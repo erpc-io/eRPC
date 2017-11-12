@@ -16,7 +16,7 @@ void client_thread_func(Nexus *nexus) {
   }
 
   // Create the Rpc
-  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, nullptr, kAppClientRpcId,
+  erpc::Rpc<erpc::IBTransport> rpc(nexus, nullptr, kAppClientRpcId,
                                    &basic_sm_handler, kAppPhyPort,
                                    kAppNumaNode);
 
@@ -44,7 +44,7 @@ void client_thread_func(Nexus *nexus) {
 
 // The server thread
 void server_thread_func(Nexus *nexus, uint8_t rpc_id) {
-  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, nullptr, rpc_id, &basic_sm_handler,
+  erpc::Rpc<erpc::IBTransport> rpc(nexus, nullptr, rpc_id, &basic_sm_handler,
                                    kAppPhyPort, kAppNumaNode);
 
   server_ready = true;

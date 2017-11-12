@@ -5,7 +5,7 @@
 #include "util/test_printf.h"
 
 TEST(FixedVectorTest, FixedVectorTest) {
-  ERpc::FixedVector<size_t, 4> fv;
+  erpc::FixedVector<size_t, 4> fv;
   ASSERT_EQ(fv.capacity(), 4);
 
   fv.push_back(0);

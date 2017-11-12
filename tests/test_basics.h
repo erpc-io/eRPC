@@ -7,7 +7,7 @@
 #include "rpc.h"
 #include "util/test_printf.h"
 
-using namespace ERpc;
+using namespace erpc;
 
 static constexpr uint16_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppEventLoopMs = 200;
