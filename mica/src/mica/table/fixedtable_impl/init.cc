@@ -4,7 +4,7 @@ namespace mica {
 namespace table {
 template <class StaticConfig>
 FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
-                                     size_t val_size, ERpc::HugeAlloc* alloc)
+                                     size_t val_size, erpc::HugeAlloc* alloc)
     : config_(config),
       val_size(val_size),
       alloc_(alloc),
@@ -21,7 +21,7 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
 
   size_t num_buckets =
       (item_count + StaticConfig::kBucketCap - 1) / StaticConfig::kBucketCap;
-  ERpc::rt_assert(num_buckets > 0, "");
+  erpc::rt_assert(num_buckets > 0, "");
 
   double extra_collision_avoidance = 0.1;
   size_t num_extra_buckets = static_cast<size_t>(
@@ -33,11 +33,11 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
 
   size_t log_num_buckets = 0;
   while ((1ull << log_num_buckets) < num_buckets) log_num_buckets++;
-  ERpc::rt_assert(log_num_buckets <= 32, "");
+  erpc::rt_assert(log_num_buckets <= 32, "");
 
   num_buckets = 1ull << log_num_buckets;
-  ERpc::rt_assert(num_buckets < std::numeric_limits<int>::max(), "");
-  ERpc::rt_assert(num_extra_buckets < std::numeric_limits<int>::max(), "");
+  erpc::rt_assert(num_buckets < std::numeric_limits<int>::max(), "");
+  erpc::rt_assert(num_extra_buckets < std::numeric_limits<int>::max(), "");
 
   num_buckets_ = static_cast<uint32_t>(num_buckets);
   num_buckets_mask_ = static_cast<uint32_t>(num_buckets - 1);

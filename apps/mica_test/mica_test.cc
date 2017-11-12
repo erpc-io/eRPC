@@ -46,12 +46,12 @@ int main() {
   assert(batch_size > 0 && num_keys % batch_size == 0);
 
   // We'll only use alloc_raw, so no need for registration/deregistration funcs
-  auto *alloc = new ERpc::HugeAlloc(1024, 0, nullptr, nullptr);
+  auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
   FixedTable table(config.get("table"), kValSize, alloc);
 
   auto *key_arr = reinterpret_cast<test_key_t *>(
       alloc->alloc_raw(num_keys * sizeof(test_key_t), 0));
-  ERpc::rt_assert(key_arr != nullptr, "");
+  erpc::rt_assert(key_arr != nullptr, "");
 
   auto *val_arr = reinterpret_cast<test_val_t *>(
       alloc->alloc_raw(num_keys * sizeof(test_val_t), 0));

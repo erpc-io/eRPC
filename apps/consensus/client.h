@@ -8,7 +8,7 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-void client_cont(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+void client_cont(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
 // Change the leader to a different Raft server that we are connected to
 void change_leader_to_any(AppContext *c) {
@@ -58,7 +58,7 @@ bool change_leader_to_node(AppContext *c, int node_id) {
 
 void send_req_one(AppContext *c) {
   assert(c != nullptr && c->check_magic());
-  c->client.req_start_tsc = ERpc::rdtsc();
+  c->client.req_start_tsc = erpc::rdtsc();
 
   // Format the client's PUT request. Key and value are identical.
   auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
@@ -69,7 +69,7 @@ void send_req_one(AppContext *c) {
   if (kAppVerbose) {
     printf("consensus: Client sending request %s to leader index %zu [%s].\n",
            req->to_string().c_str(), c->client.leader_idx,
-           ERpc::get_formatted_time().c_str());
+           erpc::get_formatted_time().c_str());
   }
 
   connection_t &conn = c->conn_vec[c->client.leader_idx];
@@ -80,12 +80,12 @@ void send_req_one(AppContext *c) {
   _unused(ret);
 }
 
-void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
+void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
   assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  double latency_us = ERpc::to_usec(ERpc::rdtsc() - c->client.req_start_tsc,
+  double latency_us = erpc::to_usec(erpc::rdtsc() - c->client.req_start_tsc,
                                     c->rpc->get_freq_ghz());
   c->client.req_us_vec.push_back(latency_us);
   c->client.num_resps++;
@@ -106,7 +106,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
         "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f max}. "
         "Request window = %zu (best 1). Inline size = %zu (best 120).\n",
         us_min, us_median, us_99, us_999, us_max,
-        ERpc::Session::kSessionReqWindow, ERpc::IBTransport::kMaxInline);
+        erpc::Session::kSessionReqWindow, erpc::IBTransport::kMaxInline);
     c->client.num_resps = 0;
     c->client.req_us_vec.clear();
   }
@@ -119,7 +119,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
     if (kAppVerbose) {
       printf("consensus: Client received resp %s [%s].\n",
              client_resp->to_string().c_str(),
-             ERpc::get_formatted_time().c_str());
+             erpc::get_formatted_time().c_str());
     }
 
     switch (client_resp->resp_type) {
@@ -159,7 +159,7 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   } else {
     // This is a continuation-with-failure
     printf("consensus: Client RPC to server %zu failed to complete [%s].\n",
-           c->client.leader_idx, ERpc::get_formatted_time().c_str());
+           c->client.leader_idx, erpc::get_formatted_time().c_str());
     change_leader_to_any(c);
   }
 
@@ -167,15 +167,15 @@ void client_cont(ERpc::RespHandle *resp_handle, void *_context, size_t) {
   send_req_one(c);
 }
 
-void client_func(size_t thread_id, ERpc::Nexus *nexus, AppContext *c) {
+void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
   assert(nexus != nullptr && c != nullptr);
   assert(c->conn_vec.size() == FLAGS_num_raft_servers);
-  assert(thread_id <= ERpc::kMaxRpcId);
+  assert(thread_id <= erpc::kMaxRpcId);
 
   c->client.thread_id = thread_id;
   c->client.leader_idx = 0;  // Start with leader = 0
 
-  c->rpc = new ERpc::Rpc<ERpc::IBTransport>(
+  c->rpc = new erpc::Rpc<erpc::IBTransport>(
       nexus, static_cast<void *>(c), static_cast<uint8_t>(thread_id),
       sm_handler, kAppPhyPort, kAppNumaNode);
   c->rpc->retry_connect_on_invalid_rpc_id = true;

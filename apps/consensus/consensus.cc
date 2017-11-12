@@ -4,13 +4,13 @@
 #include "client.h"
 #include "requestvote.h"
 
-// Send a response to the client. This does not free any non-ERpc memory.
-void send_client_response(AppContext *c, ERpc::ReqHandle *req_handle,
+// Send a response to the client. This does not free any non-eRPC memory.
+void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
                           client_resp_t *client_resp) {
   if (kAppVerbose) {
     printf("consensus: Sending reply to client: %s [%s].\n",
            client_resp->to_string().c_str(),
-           ERpc::get_formatted_time().c_str());
+           erpc::get_formatted_time().c_str());
   }
 
   auto *_client_resp =
@@ -23,7 +23,7 @@ void send_client_response(AppContext *c, ERpc::ReqHandle *req_handle,
   c->rpc->enqueue_response(req_handle);
 }
 
-void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
@@ -32,13 +32,13 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   // it in_use until checking that this node is the leader
   leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
 
-  if (kAppMeasureCommitLatency) leader_sav.start_tsc = ERpc::rdtsc();
+  if (kAppMeasureCommitLatency) leader_sav.start_tsc = erpc::rdtsc();
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
-        TimeEntry(TimeEntryType::kClientReq, ERpc::rdtsc()));
+        TimeEntry(TimeEntryType::kClientReq, erpc::rdtsc()));
   }
 
-  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
   const auto *client_req = reinterpret_cast<client_req_t *>(req_msgbuf->buf);
 
@@ -74,7 +74,7 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   // We're the leader
   if (kAppVerbose) {
     printf("consensus: Received request %s from client [%s].\n",
-           client_req->to_string().c_str(), ERpc::get_formatted_time().c_str());
+           client_req->to_string().c_str(), erpc::get_formatted_time().c_str());
   }
 
   assert(!leader_sav.in_use);
@@ -93,14 +93,14 @@ void client_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   int e =
       raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
-  ERpc::rt_assert(e == 0, "raft_recv_entry() failed");
+  erpc::rt_assert(e == 0, "raft_recv_entry() failed");
 }
 
 void init_node_id_to_name_map() {
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     std::string node_i_hostname = get_hostname_for_machine(i);
     int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
-    node_id_to_name_map[node_i_id] = ERpc::trim_hostname(node_i_hostname);
+    node_id_to_name_map[node_i_id] = erpc::trim_hostname(node_i_hostname);
   }
 }
 
@@ -109,7 +109,7 @@ void init_raft(AppContext *c) {
   assert(c->server.raft != nullptr);
 
   if (kAppCollectTimeEntries) c->server.time_entry_vec.reserve(1000000);
-  c->server.raft_periodic_tsc = ERpc::rdtsc();
+  c->server.raft_periodic_tsc = erpc::rdtsc();
 
   set_raft_callbacks(c);
 
@@ -132,21 +132,21 @@ void init_raft(AppContext *c) {
   }
 }
 
-void init_erpc(AppContext *c, ERpc::Nexus *nexus) {
+void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kRequestVote),
-      ERpc::ReqFunc(requestvote_handler, ERpc::ReqFuncType::kForeground));
+      erpc::ReqFunc(requestvote_handler, erpc::ReqFuncType::kForeground));
 
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kAppendEntries),
-      ERpc::ReqFunc(appendentries_handler, ERpc::ReqFuncType::kForeground));
+      erpc::ReqFunc(appendentries_handler, erpc::ReqFuncType::kForeground));
 
   nexus->register_req_func(
       static_cast<uint8_t>(ReqType::kClientReq),
-      ERpc::ReqFunc(client_req_handler, ERpc::ReqFuncType::kForeground));
+      erpc::ReqFunc(client_req_handler, erpc::ReqFuncType::kForeground));
 
   // Thread ID = 0
-  c->rpc = new ERpc::Rpc<ERpc::IBTransport>(
+  c->rpc = new erpc::Rpc<erpc::IBTransport>(
       nexus, static_cast<void *>(c), 0, sm_handler, kAppPhyPort, kAppNumaNode);
 
   c->rpc->retry_connect_on_invalid_rpc_id = true;
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
   for (auto &peer_conn : c.conn_vec) peer_conn.c = &c;
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
+  erpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
 
   // Both server and client need this map, so init it before launching client
   init_node_id_to_name_map();
@@ -215,10 +215,10 @@ int main(int argc, char **argv) {
   init_mica(&c);          // Initialize the key-value store
 
   // The main loop
-  size_t loop_tsc = ERpc::rdtsc();
+  size_t loop_tsc = erpc::rdtsc();
   while (ctrl_c_pressed == 0) {
-    if (ERpc::rdtsc() - loop_tsc > 3000000000ull) {
-      ERpc::Latency &commit_latency = c.server.commit_latency;
+    if (erpc::rdtsc() - loop_tsc > 3000000000ull) {
+      erpc::Latency &commit_latency = c.server.commit_latency;
       printf(
           "consensus: Leader commit latency (us) = "
           "{%.2f median, %.2f 99%%}. Log size = %zu.\n",
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
           c.server.raft_log.size());
 
-      loop_tsc = ERpc::rdtsc();
+      loop_tsc = erpc::rdtsc();
       commit_latency.reset();
     }
 
@@ -246,15 +246,15 @@ int main(int argc, char **argv) {
 
       leader_sav.in_use = false;
       if (kAppMeasureCommitLatency) {
-        size_t commit_cycles = ERpc::rdtsc() - leader_sav.start_tsc;
+        size_t commit_cycles = erpc::rdtsc() - leader_sav.start_tsc;
         double commit_usec =
-            ERpc::to_usec(commit_cycles, c.rpc->get_freq_ghz());
+            erpc::to_usec(commit_cycles, c.rpc->get_freq_ghz());
         c.server.commit_latency.update(commit_usec * 10);
       }
 
       if (kAppCollectTimeEntries) {
         c.server.time_entry_vec.push_back(
-            TimeEntry(TimeEntryType::kCommitted, ERpc::rdtsc()));
+            TimeEntry(TimeEntryType::kCommitted, erpc::rdtsc()));
       }
 
       // XXX: Is this correct, or should we send response in _apply_log()
@@ -262,7 +262,7 @@ int main(int argc, char **argv) {
       client_resp_t client_resp;
       client_resp.resp_type = ClientRespType::kSuccess;
 
-      ERpc::ReqHandle *req_handle = leader_sav.req_handle;
+      erpc::ReqHandle *req_handle = leader_sav.req_handle;
       send_client_response(&c, req_handle, &client_resp);  // Prints message
     }
   }

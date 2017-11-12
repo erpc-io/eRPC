@@ -90,7 +90,7 @@ class FixedTable {
 
   // fixedtable_impl/init.cc
   FixedTable(const ::mica::util::Config& config, size_t val_size,
-             ERpc::HugeAlloc* alloc);
+             erpc::HugeAlloc* alloc);
   ~FixedTable();
 
   void reset();
@@ -194,7 +194,7 @@ class FixedTable {
  private:
   ::mica::util::Config config_;
   size_t val_size;  // Size of each value
-  ERpc::HugeAlloc* alloc_;
+  erpc::HugeAlloc* alloc_;
   const ft_key_t ft_invalid_key;  // Invalid key to check for empty buckets
 
   Bucket* buckets_ = NULL;

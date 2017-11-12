@@ -33,7 +33,7 @@ static bool validate_concurrency(const char *, uint64_t concurrency) {
 DEFINE_validator(concurrency, &validate_concurrency);
 
 static bool validate_drop_prob(const char *, double p) {
-  if (!ERpc::kFaultInjection) return p == 0.0;
+  if (!erpc::kFaultInjection) return p == 0.0;
   return p >= 0 && p < 1;
 }
 DEFINE_validator(drop_prob, &validate_drop_prob);
@@ -66,10 +66,10 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 class AppContext {
  public:
   TmpStat *tmp_stat = nullptr;
-  ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
+  erpc::Rpc<erpc::IBTransport> *rpc = nullptr;
 
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
-  // >10 ms for 8MB RPCs under congestion. So ERpc::Latency is insufficient
+  // >10 ms for 8MB RPCs under congestion. So erpc::Latency is insufficient
   // here
   std::vector<double> latency_vec;
 
@@ -81,7 +81,7 @@ class AppContext {
   size_t thread_id;         // The ID of the thread that owns this context
   size_t num_sm_resps = 0;  // Number of SM responses
   struct timespec tput_t0;  // Start time for throughput measurement
-  ERpc::FastRand fastrand;
+  erpc::FastRand fastrand;
 
   size_t stat_rx_bytes_tot = 0;  // Total bytes received
   size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
@@ -90,8 +90,8 @@ class AppContext {
   std::vector<tag_t> req_vec;        // Request queue
 
   uint64_t req_ts[kMaxConcurrency];  // Per-request timestamps
-  ERpc::MsgBuffer req_msgbuf[kMaxConcurrency];
-  ERpc::MsgBuffer resp_msgbuf[kMaxConcurrency];
+  erpc::MsgBuffer req_msgbuf[kMaxConcurrency];
+  erpc::MsgBuffer resp_msgbuf[kMaxConcurrency];
 
   ~AppContext() {
     if (tmp_stat != nullptr) delete tmp_stat;
@@ -105,10 +105,10 @@ void alloc_req_resp_msg_buffers(AppContext *c) {
 
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
     c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
-    ERpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
+    erpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
 
     c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_req_size);
-    ERpc::rt_assert(c->req_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
+    erpc::rt_assert(c->req_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
 
     // Fill the request regardless of kAppMemset. This is a one-time thing.
     memset(c->req_msgbuf[msgbuf_idx].buf, kAppDataByte, FLAGS_req_size);

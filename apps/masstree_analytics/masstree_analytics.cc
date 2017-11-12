@@ -12,9 +12,9 @@ size_t get_random_key(AppContext *c) {
                     sizeof(size_t));
 }
 
-void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
-void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
 
   // Point request handler runs in a foreground thread
@@ -42,7 +42,7 @@ void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   bool success = mti->get(req->point_req.key, value, ti);
 
   req_handle->prealloc_used = true;
-  ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+  erpc::Rpc<erpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                   sizeof(resp_t));
   auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
 
@@ -52,7 +52,7 @@ void point_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+void range_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
 
   // Range request handler runs in a background thread
@@ -79,7 +79,7 @@ void range_req_handler(ERpc::ReqHandle *req_handle, void *_context) {
       mti->sum_in_range(req->range_req.key, req->range_req.range, ti);
 
   req_handle->prealloc_used = true;
-  ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+  erpc::Rpc<erpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                   sizeof(resp_t));
   auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
   resp->resp_type = RespType::kFound;
@@ -109,7 +109,7 @@ req_t generate_request(AppContext *c) {
 
 // Send one request using this MsgBuffer
 void send_req(AppContext *c, size_t msgbuf_idx) {
-  ERpc::MsgBuffer &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
+  erpc::MsgBuffer &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
   assert(req_msgbuf.get_data_size() == sizeof(req_t));
 
   const req_t req = generate_request(c);
@@ -120,14 +120,14 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
            msgbuf_idx);
   }
 
-  c->client.req_ts[msgbuf_idx] = ERpc::rdtsc();
+  c->client.req_ts[msgbuf_idx] = erpc::rdtsc();
   int ret = c->rpc->enqueue_request(0, req.req_type, &req_msgbuf,
                                     &c->client.resp_msgbuf[msgbuf_idx],
                                     app_cont_func, msgbuf_idx);
-  ERpc::rt_assert(ret == 0, "Failed to enqueue_request()");
+  erpc::rt_assert(ret == 0, "Failed to enqueue_request()");
 }
 
-void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
+void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   size_t msgbuf_idx = _tag;
   if (kAppVerbose) {
     printf("masstree_analytics: Received response for msgbuf %zu.\n",
@@ -137,13 +137,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   auto *c = static_cast<AppContext *>(_context);
 
   const auto *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  ERpc::rt_assert(resp_msgbuf->get_data_size() == sizeof(resp_t),
+  erpc::rt_assert(resp_msgbuf->get_data_size() == sizeof(resp_t),
                   "Invalid response size");
   c->rpc->release_response(resp_handle);
 
   assert(resp_msgbuf->get_data_size() > 0);  // Check that the Rpc succeeded
 
-  double usec = ERpc::to_usec(ERpc::rdtsc() - c->client.req_ts[msgbuf_idx],
+  double usec = erpc::to_usec(erpc::rdtsc() - c->client.req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
   assert(usec >= 0);
 
@@ -163,7 +163,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double point_us_99 = c->client.point_latency.perc(.99) / 10.0;
     double range_us_90 = c->client.range_latency.perc(.99);
 
-    double seconds = ERpc::sec_since(c->client.tput_t0);
+    double seconds = erpc::sec_since(c->client.tput_t0);
     double tput = kMeasurement / (seconds * 1000000);
 
     printf(
@@ -181,13 +181,13 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   send_req(c, msgbuf_idx);
 }
 
-void client_thread_func(size_t thread_id, ERpc::Nexus *nexus) {
+void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
   assert(FLAGS_machine_id > 0);
 
   AppContext c;
   c.thread_id = thread_id;
 
-  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
+  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id),
                                    basic_sm_handler, kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
@@ -196,7 +196,7 @@ void client_thread_func(size_t thread_id, ERpc::Nexus *nexus) {
   // Each client creates a session to only one server thread
   auto server_hostname = get_hostname_for_machine(0);
   size_t client_gid = (FLAGS_machine_id * FLAGS_num_client_threads) + thread_id;
-  size_t server_tid = client_gid % FLAGS_num_server_fg_threads;  // ERpc TID
+  size_t server_tid = client_gid % FLAGS_num_server_fg_threads;  // eRPC TID
 
   c.session_num_vec.resize(1);
   c.session_num_vec[0] =
@@ -219,7 +219,7 @@ void client_thread_func(size_t thread_id, ERpc::Nexus *nexus) {
   while (ctrl_c_pressed == 0) c.rpc->run_event_loop(200);
 }
 
-void server_thread_func(size_t thread_id, ERpc::Nexus *nexus, MtIndex *mti,
+void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
                         threadinfo_t **ti_arr) {
   assert(FLAGS_machine_id == 0);
 
@@ -228,7 +228,7 @@ void server_thread_func(size_t thread_id, ERpc::Nexus *nexus, MtIndex *mti,
   c.server.mt_index = mti;
   c.server.ti_arr = ti_arr;
 
-  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
+  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id),
                                    basic_sm_handler, kAppPhyPort, kAppNumaNode);
   c.rpc = &rpc;
@@ -264,35 +264,35 @@ int main(int argc, char **argv) {
       ti_arr[i] = threadinfo::make(threadinfo::TI_PROCESS, i);
     }
 
-    // ERpc stuff
+    // eRPC stuff
     std::string machine_name = get_hostname_for_machine(0);
-    ERpc::Nexus nexus(machine_name, kAppNexusUdpPort,
+    erpc::Nexus nexus(machine_name, kAppNexusUdpPort,
                       FLAGS_num_server_bg_threads);
 
     nexus.register_req_func(
         kAppPointReqType,
-        ERpc::ReqFunc(point_req_handler, ERpc::ReqFuncType::kForeground));
+        erpc::ReqFunc(point_req_handler, erpc::ReqFuncType::kForeground));
     nexus.register_req_func(
         kAppRangeReqType,
-        ERpc::ReqFunc(range_req_handler, ERpc::ReqFuncType::kBackground));
+        erpc::ReqFunc(range_req_handler, erpc::ReqFuncType::kBackground));
 
     std::vector<std::thread> thread_arr(FLAGS_num_server_fg_threads);
     for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) {
       thread_arr[i] = std::thread(server_thread_func, i, &nexus, &mti,
                                   static_cast<threadinfo_t **>(ti_arr));
-      ERpc::bind_to_core(thread_arr[i], i);
+      erpc::bind_to_core(thread_arr[i], i);
     }
 
     for (auto &thread : thread_arr) thread.join();
     delete[] ti_arr;
   } else {
     std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-    ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
+    erpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
 
     std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {
       thread_arr[i] = std::thread(client_thread_func, i, &nexus);
-      ERpc::bind_to_core(thread_arr[i], i);
+      erpc::bind_to_core(thread_arr[i], i);
     }
 
     for (auto &thread : thread_arr) thread.join();

@@ -51,7 +51,7 @@ class TimeEntry {
         break;
     }
 
-    double usec = ERpc::to_usec(tsc - base_tsc, freq_ghz);
+    double usec = erpc::to_usec(tsc - base_tsc, freq_ghz);
     ret += ": " + std::to_string(usec);
     return ret;
   }

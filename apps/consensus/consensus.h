@@ -19,7 +19,7 @@ extern "C" {
 
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
-static_assert(ERpc::is_power_of_two(kAppNumKeys), "");
+static_assert(erpc::is_power_of_two(kAppNumKeys), "");
 
 static constexpr size_t kAppKeySize = 64;
 static constexpr size_t kAppValueSize = 16;
@@ -103,15 +103,15 @@ class AppContext;  // Forward declaration
 // Peer-peer or client-peer connection
 struct connection_t {
   bool disconnected = false;  // True if this session is disconnected
-  int session_num = -1;       // ERpc session number
+  int session_num = -1;       // eRPC session number
   size_t session_idx = std::numeric_limits<size_t>::max();  // Index in conn_vec
   AppContext *c;
 };
 
 // Tag for requests sent to Raft peers (both requestvote and appendentries)
 struct raft_req_tag_t {
-  ERpc::MsgBuffer req_msgbuf;
-  ERpc::MsgBuffer resp_msgbuf;
+  erpc::MsgBuffer req_msgbuf;
+  erpc::MsgBuffer resp_msgbuf;
   raft_node_t *node;  // The Raft node to which req was sent
 };
 
@@ -119,7 +119,7 @@ struct raft_req_tag_t {
 // Raft server has one of these.
 struct leader_saveinfo_t {
   bool in_use = false;          // Leader has an ongoing commit request
-  ERpc::ReqHandle *req_handle;  // This could be a vector if we do batching
+  erpc::ReqHandle *req_handle;  // This could be a vector if we do batching
   uint64_t start_tsc;           // Time at which client's request was received
   msg_entry_response_t msg_entry_response;  // Used to check commit status
 };
@@ -144,7 +144,7 @@ class AppContext {
     FixedTable *table = nullptr;
 
     // Stats
-    ERpc::Latency commit_latency;            // Amplification factor = 10
+    erpc::Latency commit_latency;            // Amplification factor = 10
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;
@@ -154,8 +154,8 @@ class AppContext {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
     size_t num_resps = 0;
-    ERpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
-    ERpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
+    erpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
+    erpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
 
     // For latency measurement
     uint64_t req_start_tsc;
@@ -164,8 +164,8 @@ class AppContext {
 
   // Common members
   std::vector<connection_t> conn_vec;
-  ERpc::Rpc<ERpc::IBTransport> *rpc = nullptr;
-  ERpc::FastRand fast_rand;
+  erpc::Rpc<erpc::IBTransport> *rpc = nullptr;
+  erpc::FastRand fast_rand;
   size_t num_sm_resps = 0;
 
   // Magic
@@ -180,27 +180,27 @@ int get_raft_node_id_from_hostname(std::string hostname) {
   return static_cast<int>(hash);
 }
 
-// ERpc session management handler
-void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
-                ERpc::SmErrType sm_err_type, void *_context) {
+// eRPC session management handler
+void sm_handler(int session_num, erpc::SmEventType sm_event_type,
+                erpc::SmErrType sm_err_type, void *_context) {
   assert(_context != nullptr);
 
   auto *c = static_cast<AppContext *>(_context);
   c->num_sm_resps++;
 
-  if (!(sm_event_type == ERpc::SmEventType::kConnected ||
-        sm_event_type == ERpc::SmEventType::kDisconnected)) {
+  if (!(sm_event_type == erpc::SmEventType::kConnected ||
+        sm_event_type == erpc::SmEventType::kDisconnected)) {
     throw std::runtime_error("Received unexpected SM event.");
   }
 
-  // The callback gives us the ERpc session number - get the index in conn_vec
+  // The callback gives us the eRPC session number - get the index in conn_vec
   size_t session_idx = c->conn_vec.size();
   for (size_t i = 0; i < c->conn_vec.size(); i++) {
     if (c->conn_vec[i].session_num == session_num) session_idx = i;
   }
-  ERpc::rt_assert(session_idx < c->conn_vec.size(), "Invalid session number");
+  erpc::rt_assert(session_idx < c->conn_vec.size(), "Invalid session number");
 
-  if (sm_event_type == ERpc::SmEventType::kDisconnected) {
+  if (sm_event_type == erpc::SmEventType::kDisconnected) {
     c->conn_vec[session_idx].disconnected = true;
   }
 
@@ -208,8 +208,8 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
           "consensus: Rpc %u: Session number %d (index %zu) %s. Error = %s. "
           "Time elapsed = %.3f s.\n",
           c->rpc->get_rpc_id(), session_num, session_idx,
-          ERpc::sm_event_type_str(sm_event_type).c_str(),
-          ERpc::sm_err_type_str(sm_err_type).c_str(),
+          erpc::sm_event_type_str(sm_event_type).c_str(),
+          erpc::sm_err_type_str(sm_err_type).c_str(),
           c->rpc->sec_since_creation());
 }
 
@@ -222,10 +222,10 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 inline void call_raft_periodic(AppContext *c) {
   // raft_periodic() takes the number of msec elapsed since the last call. This
   // is done for timeouts which are > 100 msec, so this approximation is fine.
-  size_t cur_tsc = ERpc::rdtsc();
+  size_t cur_tsc = erpc::rdtsc();
 
   // Assume TSC freqency is around 2.8 GHz. 1 ms = 2.8 * 100,000 ticks.
-  bool msec_elapsed = (ERpc::rdtsc() - c->server.raft_periodic_tsc > 2800000);
+  bool msec_elapsed = (erpc::rdtsc() - c->server.raft_periodic_tsc > 2800000);
 
   if (msec_elapsed) {
     c->server.raft_periodic_tsc = cur_tsc;

@@ -65,8 +65,8 @@ class BatchContext {
   size_t num_reqs_sent = 0;          // Number of requests sent
   size_t num_resps_rcvd = 0;         // Number of responses received
   size_t req_tsc[kAppMaxBatchSize];  // Timestamp when request was issued
-  ERpc::MsgBuffer req_msgbuf[kAppMaxBatchSize];
-  ERpc::MsgBuffer resp_msgbuf[kAppMaxBatchSize];
+  erpc::MsgBuffer req_msgbuf[kAppMaxBatchSize];
+  erpc::MsgBuffer resp_msgbuf[kAppMaxBatchSize];
 };
 
 // Per-thread application context
@@ -81,7 +81,7 @@ class AppContext : public BasicAppContext {
   size_t stat_req_rx_tot = 0;   // Total requests received (all batches)
 
   std::array<BatchContext, kMaxConcurrency> batch_arr;  // Per-batch context
-  ERpc::Latency latency;  // Cold if latency measurement disabled
+  erpc::Latency latency;  // Cold if latency measurement disabled
 
   ~AppContext() {}
 };
@@ -101,7 +101,7 @@ size_t get_rand_session_index(AppContext *c) {
   return rand_session_index;
 }
 
-void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
 // Try to send requests for batch_i. If requests are successfully sent,
 // increment the batch's num_reqs_sent.
@@ -123,7 +123,7 @@ void send_reqs(AppContext *c, size_t batch_i) {
 
     bc.req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;  // Touch req MsgBuffer
 
-    if (kAppMeasureLatency) bc.req_tsc[msgbuf_index] = ERpc::rdtsc();
+    if (kAppMeasureLatency) bc.req_tsc[msgbuf_index] = erpc::rdtsc();
     tag_t tag(batch_i, msgbuf_index);
     int ret = c->rpc->enqueue_request(c->session_num_vec[rand_session_index],
                                       kAppReqType, &bc.req_msgbuf[msgbuf_index],
@@ -138,14 +138,14 @@ void send_reqs(AppContext *c, size_t batch_i) {
   }
 }
 
-void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
   auto *c = static_cast<AppContext *>(_context);
   c->stat_req_rx_tot++;
 
-  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = FLAGS_msg_size;
 
   // RX ring request optimization knob
@@ -160,13 +160,13 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   // Preallocated response optimization knob
   if (kAppOptDisablePreallocResp) {
     req_handle->prealloc_used = false;
-    ERpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
+    erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
     resp_msgbuf = c->rpc->alloc_msg_buffer(resp_size);
     assert(resp_msgbuf.buf != nullptr);
     resp_msgbuf.buf[0] = req_msgbuf->buf[0];
   } else {
     req_handle->prealloc_used = true;
-    ERpc::Rpc<ERpc::IBTransport>::resize_msg_buffer(
+    erpc::Rpc<erpc::IBTransport>::resize_msg_buffer(
         &req_handle->pre_resp_msgbuf, resp_size);
     req_handle->pre_resp_msgbuf.buf[0] = req_msgbuf->buf[0];
   }
@@ -175,11 +175,11 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
+void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(resp_handle != nullptr);
   assert(_context != nullptr);
 
-  const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
+  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
   // Touch (and check) resp MsgBuffer
@@ -201,7 +201,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   if (kAppMeasureLatency) {
     size_t req_tsc = bc.req_tsc[tag.s.msgbuf_i];
     double req_lat_us =
-        ERpc::to_usec(ERpc::rdtsc() - req_tsc, c->rpc->get_freq_ghz());
+        erpc::to_usec(erpc::rdtsc() - req_tsc, c->rpc->get_freq_ghz());
     c->latency.update(static_cast<size_t>(req_lat_us * 10));
   }
 
@@ -232,7 +232,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_resp_rx[tag.s.batch_i]++;
 
   if (c->stat_resp_rx_tot == 1000000) {
-    double seconds = ERpc::sec_since(c->tput_t0);
+    double seconds = erpc::sec_since(c->tput_t0);
 
     // Min/max responses for a concurrent batch, to check for stagnated batches.
     size_t max_resps = 0, min_resps = std::numeric_limits<size_t>::max();
@@ -280,12 +280,12 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 // The function executed by each thread in the cluster
-void thread_func(size_t thread_id, ERpc::Nexus *nexus) {
+void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
   c.tmp_stat = new TmpStat("small_rpc_tput", "Mrps IPC");
   c.thread_id = thread_id;
 
-  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
+  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id),
                                    basic_sm_handler, kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
@@ -358,15 +358,15 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  ERpc::Nexus nexus(machine_name.c_str(), kAppNexusUdpPort,
+  erpc::Nexus nexus(machine_name.c_str(), kAppNexusUdpPort,
                     FLAGS_num_bg_threads);
   nexus.register_req_func(
-      kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
+      kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 
   std::vector<std::thread> threads(FLAGS_num_threads);
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
-    ERpc::bind_to_core(threads[i], i);
+    erpc::bind_to_core(threads[i], i);
   }
 
   for (auto &thread : threads) thread.join();

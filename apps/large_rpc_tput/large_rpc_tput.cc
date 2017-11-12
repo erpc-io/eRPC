@@ -41,23 +41,23 @@ std::function<size_t(AppContext *, size_t resp_session_idx)>
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
 // A basic session management handler that expects successful responses
-void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
-                ERpc::SmErrType sm_err_type, void *_context) {
+void sm_handler(int session_num, erpc::SmEventType sm_event_type,
+                erpc::SmErrType sm_err_type, void *_context) {
   assert(_context != nullptr);
 
   auto *c = static_cast<AppContext *>(_context);
   c->num_sm_resps++;
 
-  if (sm_err_type != ERpc::SmErrType::kNoError) {
+  if (sm_err_type != erpc::SmErrType::kNoError) {
     throw std::runtime_error("Received SM response with error.");
   }
 
-  if (!(sm_event_type == ERpc::SmEventType::kConnected ||
-        sm_event_type == ERpc::SmEventType::kDisconnected)) {
+  if (!(sm_event_type == erpc::SmEventType::kConnected ||
+        sm_event_type == erpc::SmEventType::kDisconnected)) {
     throw std::runtime_error("Received unexpected SM event.");
   }
 
-  // The callback gives us the ERpc session number - get the index in vector
+  // The callback gives us the eRPC session number - get the index in vector
   size_t session_idx = c->session_num_vec.size();
   for (size_t i = 0; i < c->session_num_vec.size(); i++) {
     if (c->session_num_vec[i] == session_num) {
@@ -73,12 +73,12 @@ void sm_handler(int session_num, ERpc::SmEventType sm_event_type,
           "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s. "
           "Time elapsed = %.3f s.\n",
           c->rpc->get_rpc_id(), session_num, session_idx,
-          sm_event_type == ERpc::SmEventType::kConnected ? "connected"
+          sm_event_type == erpc::SmEventType::kConnected ? "connected"
                                                          : "disconncted",
           c->rpc->sec_since_creation());
 }
 
-void app_cont_func(ERpc::RespHandle *, void *, size_t);  // Forward declaration
+void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
 // Send requests (i.e., msgbuf indexes) queued in req_vec. Requests that cannot
 // be sent are req-queued into req_vec.
@@ -90,7 +90,7 @@ void send_reqs(AppContext *c) {
     size_t msgbuf_idx = c->req_vec[i].s.msgbuf_idx;
     size_t session_idx = c->req_vec[i].s.session_idx;
 
-    ERpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
+    erpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
     assert(req_msgbuf.get_data_size() == FLAGS_req_size);
 
     if (kAppVerbose) {
@@ -102,7 +102,7 @@ void send_reqs(AppContext *c) {
 
     // Timestamp before trying enqueue_request(). If enqueue_request() fails,
     // we'll timestamp again on the next try.
-    c->req_ts[msgbuf_idx] = ERpc::rdtsc();
+    c->req_ts[msgbuf_idx] = erpc::rdtsc();
     int ret = c->rpc->enqueue_request(
         c->session_num_vec[session_idx], kAppReqType, &req_msgbuf,
         &c->resp_msgbuf[msgbuf_idx], app_cont_func, c->req_vec[i]._tag);
@@ -121,18 +121,18 @@ void send_reqs(AppContext *c) {
   c->req_vec.resize(write_index);  // Pending requests = write_index
 }
 
-void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
+void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr);
   assert(_context != nullptr);
 
   auto *c = static_cast<AppContext *>(_context);
 
-  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   uint8_t resp_byte = req_msgbuf->buf[0];
 
   // Use dynamic response
   req_handle->prealloc_used = false;
-  ERpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
+  erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
   resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_resp_size);  // Freed by eRPC
   assert(resp_msgbuf.buf != nullptr);
 
@@ -149,11 +149,11 @@ void req_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
+void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(resp_handle != nullptr);
   assert(_context != nullptr);
 
-  const ERpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
+  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
   size_t msgbuf_idx = static_cast<tag_t>(_tag).s.msgbuf_idx;
@@ -165,12 +165,12 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   // Measure latency. 1 us granularity is sufficient for large RPC latency.
   auto *c = static_cast<AppContext *>(_context);
-  double usec = ERpc::to_usec(ERpc::rdtsc() - c->req_ts[msgbuf_idx],
+  double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
   c->latency_vec.push_back(usec);
 
   // Check the response
-  ERpc::rt_assert(resp_msgbuf->get_data_size() == FLAGS_resp_size,
+  erpc::rt_assert(resp_msgbuf->get_data_size() == FLAGS_resp_size,
                   "Invalid response size");
 
   if (kAppClientCheckResp) {
@@ -179,9 +179,9 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
       if (resp_msgbuf->buf[i] != kAppDataByte) match = false;
     }
-    ERpc::rt_assert(match, "Invalid resp data");
+    erpc::rt_assert(match, "Invalid resp data");
   } else {
-    ERpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte, "Invalid resp data");
+    erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte, "Invalid resp data");
   }
 
   c->stat_rx_bytes_tot += FLAGS_resp_size;
@@ -191,7 +191,7 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     float ipc = -1.0;
     if (FLAGS_num_threads == 1) ipc = papi_get_ipc();
 
-    double ns = ERpc::ns_since(c->tput_t0);
+    double ns = erpc::ns_since(c->tput_t0);
     double rx_GBps = c->stat_rx_bytes_tot / ns;
     double tx_GBps = c->stat_tx_bytes_tot / ns;
 
@@ -247,16 +247,16 @@ void app_cont_func(ERpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 // The function executed by each thread in the cluster
-void thread_func(size_t thread_id, ERpc::Nexus *nexus) {
+void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
   c.tmp_stat = new TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
 
-  ERpc::Rpc<ERpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
+  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
                                    static_cast<uint8_t>(thread_id), sm_handler,
                                    kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
-  if (ERpc::kFaultInjection) {
+  if (erpc::kFaultInjection) {
     rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
   }
 
@@ -296,7 +296,7 @@ void thread_func(size_t thread_id, ERpc::Nexus *nexus) {
   }
 
   if (_send_reqs) {
-    ERpc::rt_assert(c.session_num_vec.size() > 0,
+    erpc::rt_assert(c.session_num_vec.size() > 0,
                     "Cannot send requests without sessions");
 
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
@@ -330,9 +330,9 @@ void setup_profile() {
   }
 
   if (FLAGS_profile == "victim") {
-    ERpc::rt_assert(FLAGS_num_machines >= 3,
+    erpc::rt_assert(FLAGS_num_machines >= 3,
                     "victim profile needs 3 or more machines.");
-    ERpc::rt_assert(FLAGS_concurrency >= 2,
+    erpc::rt_assert(FLAGS_concurrency >= 2,
                     "victim profile needs concurrency >= 2.");
     connect_sessions_func = connect_sessions_func_victim;
     get_session_idx_func = get_session_idx_func_victim;
@@ -344,7 +344,7 @@ int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
-  ERpc::rt_assert(ERpc::large_rpc_supported(),
+  erpc::rt_assert(erpc::large_rpc_supported(),
                   "Current eRPC optlevel does not allow large RPCs.");
 
   // Work around g++-5's unused variable warning for validators
@@ -355,18 +355,18 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   setup_profile();
-  ERpc::rt_assert(get_session_idx_func != nullptr, "No session index getter");
-  ERpc::rt_assert(connect_sessions_func != nullptr, "No connect_sessions_func");
+  erpc::rt_assert(get_session_idx_func != nullptr, "No session index getter");
+  erpc::rt_assert(connect_sessions_func != nullptr, "No connect_sessions_func");
 
   std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  ERpc::Nexus nexus(machine_name, kAppNexusUdpPort, FLAGS_num_bg_threads);
+  erpc::Nexus nexus(machine_name, kAppNexusUdpPort, FLAGS_num_bg_threads);
   nexus.register_req_func(
-      kAppReqType, ERpc::ReqFunc(req_handler, ERpc::ReqFuncType::kForeground));
+      kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 
   std::vector<std::thread> threads(FLAGS_num_threads);
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
-    ERpc::bind_to_core(threads[i], i);
+    erpc::bind_to_core(threads[i], i);
   }
 
   for (auto &thread : threads) thread.join();

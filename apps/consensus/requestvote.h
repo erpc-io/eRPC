@@ -15,12 +15,12 @@ struct requestvote_req_t {
   msg_requestvote_t rv;
 };
 
-void requestvote_handler(ERpc::ReqHandle *req_handle, void *_context) {
+void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
   assert(c->check_magic());
 
-  const ERpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(requestvote_req_t));
 
   auto *requestvote_req =
@@ -29,7 +29,7 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *_context) {
 
   printf("consensus: Received requestvote request from %s [%s].\n",
          node_id_to_name_map[requestvote_req->node_id].c_str(),
-         ERpc::get_formatted_time().c_str());
+         erpc::get_formatted_time().c_str());
 
   // This does a linear search, which is OK for a small number of Raft servers
   raft_node_t *requester_node =
@@ -52,7 +52,7 @@ void requestvote_handler(ERpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void requestvote_cont(ERpc::RespHandle *, void *, size_t);  // Fwd decl
+void requestvote_cont(erpc::RespHandle *, void *, size_t);  // Fwd decl
 
 // Raft callback for sending requestvote request
 static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
@@ -72,16 +72,16 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
 
   printf("consensus: Sending requestvote request to node %s [%s].\n",
          node_id_to_name_map[raft_node_get_id(node)].c_str(),
-         ERpc::get_formatted_time().c_str());
+         erpc::get_formatted_time().c_str());
 
   auto *rrt = new raft_req_tag_t();
   rrt->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(requestvote_req_t));
-  ERpc::rt_assert(rrt->req_msgbuf.buf != nullptr,
+  erpc::rt_assert(rrt->req_msgbuf.buf != nullptr,
                   "Failed to allocate request MsgBuffer");
 
   rrt->resp_msgbuf =
       c->rpc->alloc_msg_buffer(sizeof(msg_requestvote_response_t));
-  ERpc::rt_assert(rrt->resp_msgbuf.buf != nullptr,
+  erpc::rt_assert(rrt->resp_msgbuf.buf != nullptr,
                   "Failed to allocate response MsgBuffer");
 
   rrt->node = node;
@@ -105,7 +105,7 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   return 0;
 }
 
-void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
+void requestvote_cont(erpc::RespHandle *resp_handle, void *_context,
                       size_t tag) {
   assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
@@ -120,7 +120,7 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
 
     printf("consensus: Received requestvote response from node %s [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
-           ERpc::get_formatted_time().c_str());
+           erpc::get_formatted_time().c_str());
 
     auto *msg_requestvote_resp =
         reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf);
@@ -133,7 +133,7 @@ void requestvote_cont(ERpc::RespHandle *resp_handle, void *_context,
     // This is a continuation-with-failure
     printf("consensus: Requestvote RPC to node %s failed to complete [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
-           ERpc::get_formatted_time().c_str());
+           erpc::get_formatted_time().c_str());
   }
 
   c->rpc->free_msg_buffer(rrt->req_msgbuf);

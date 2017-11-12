@@ -5,7 +5,7 @@
 
 // All threads create one session to machine 0
 size_t get_session_idx_func_timely_small(AppContext *, size_t) {
-  ERpc::rt_assert(FLAGS_machine_id != 0, "Machine 0 cannot send reqs.");
+  erpc::rt_assert(FLAGS_machine_id != 0, "Machine 0 cannot send reqs.");
   return 0;
 }
 

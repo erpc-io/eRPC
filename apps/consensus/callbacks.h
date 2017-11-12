@@ -32,7 +32,7 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
     printf(
         "consensus: Applying log entry %s received at Raft server %u [%s].\n",
         client_req->to_string().c_str(), ety->id,
-        ERpc::get_formatted_time().c_str());
+        erpc::get_formatted_time().c_str());
   }
 
   size_t key_hash = mica::util::hash(&client_req->key, kAppKeySize);
@@ -41,7 +41,7 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 
   auto result = table->set(key_hash, *ft_key,
                            reinterpret_cast<char *>(&client_req->value));
-  ERpc::rt_assert(result == mica::table::Result::kSuccess,
+  erpc::rt_assert(result == mica::table::Result::kSuccess,
                   "MICA insert failed");
   return 0;
 }
@@ -112,7 +112,7 @@ void __raft_log(raft_server_t *, raft_node_t *, void *, const char *buf) {
   _unused(buf);
 
   if (kAppVerbose) {
-    printf("raft: %s [%s].\n", buf, ERpc::get_formatted_time().c_str());
+    printf("raft: %s [%s].\n", buf, erpc::get_formatted_time().c_str());
   }
 }
 

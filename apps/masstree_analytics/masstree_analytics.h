@@ -65,19 +65,19 @@ class AppContext : public BasicAppContext {
  public:
   struct {
     MtIndex *mt_index = nullptr;      // The shared Masstree index
-    threadinfo_t **ti_arr = nullptr;  // Thread info array, indexed by ERpc TID
+    threadinfo_t **ti_arr = nullptr;  // Thread info array, indexed by eRPC TID
   } server;
 
   struct {
-    ERpc::Latency point_latency;  // Latency of point requests (factor = 10)
-    ERpc::Latency range_latency;  // Latency of point requests (factor = 1)
+    erpc::Latency point_latency;  // Latency of point requests (factor = 10)
+    erpc::Latency range_latency;  // Latency of point requests (factor = 1)
 
     struct timespec tput_t0;         // Throughput measurement start
     uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
-    ERpc::MsgBuffer req_msgbuf[kMaxReqWindow];
-    ERpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
+    erpc::MsgBuffer req_msgbuf[kMaxReqWindow];
+    erpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
 
-    ERpc::FastRand fast_rand;
+    erpc::FastRand fast_rand;
     size_t num_resps_tot = 0;  // Total responses received (range & point reqs)
   } client;
 };
@@ -90,11 +90,11 @@ void alloc_req_resp_msg_buffers(AppContext *c) {
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_req_window; msgbuf_idx++) {
     auto &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
     req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(req_t));
-    ERpc::rt_assert(req_msgbuf.buf != nullptr, "Request msgbuf alloc failed");
+    erpc::rt_assert(req_msgbuf.buf != nullptr, "Request msgbuf alloc failed");
 
     auto &resp_msgbuf = c->client.resp_msgbuf[msgbuf_idx];
     resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(resp_t));
-    ERpc::rt_assert(resp_msgbuf.buf != nullptr, "Response msgbuf alloc failed");
+    erpc::rt_assert(resp_msgbuf.buf != nullptr, "Response msgbuf alloc failed");
   }
 }
 

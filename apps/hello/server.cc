@@ -1,7 +1,7 @@
 #include "common.h"
 Rpc<IBTransport> *rpc;
 
-void req_handler(ERpc::ReqHandle *req_handle, void *) {
+void req_handler(erpc::ReqHandle *req_handle, void *) {
   auto &resp = req_handle->pre_resp_msgbuf;
   rpc->resize_msg_buffer(&resp, 4);
   sprintf(reinterpret_cast<char *>(resp.buf), "nsdi");

@@ -1,7 +1,7 @@
 #include "common.h"
 Rpc<IBTransport> *rpc;
 
-void cont_func(ERpc::RespHandle *resp_handle, void *, size_t) {
+void cont_func(erpc::RespHandle *resp_handle, void *, size_t) {
   auto *resp_msgbuf = resp_handle->get_resp_msgbuf();
   printf("%s\n", resp_msgbuf->buf);
   rpc->release_response(resp_handle);
