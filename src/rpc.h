@@ -815,6 +815,9 @@ class Rpc {
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
 
+  /// The insert-only map of session tokens to index in the session vector
+  std::map<sm_uniq_token_t, uint16_t> sm_token_map;
+
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport
 

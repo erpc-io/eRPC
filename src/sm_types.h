@@ -17,6 +17,9 @@ static constexpr uint16_t kInvalidSessionNum =
     std::numeric_limits<uint16_t>::max();
 static constexpr uint32_t kInvalidSecret = 0;
 
+// A cluster-wide unique token for each session
+typedef size_t sm_uniq_token_t;
+
 enum class SessionState {
   kConnectInProgress,  ///< Client-only state, connect request is in flight
   kConnected,
@@ -209,8 +212,7 @@ static std::string sm_event_type_str(SmEventType event_type) {
   return "[Invalid event type]";
 }
 
-/// Basic metadata about a session end point. This is sent in session management
-/// packets.
+/// Basic metadata about a session end point, sent in session management packets
 class SessionEndpoint {
  public:
   Transport::TransportType transport_type;
@@ -267,6 +269,7 @@ class SmPkt {
  public:
   SmPktType pkt_type;
   SmErrType err_type;              ///< Error type, for responses only
+  sm_uniq_token_t uniq_token;      ///< The token for this session
   SessionEndpoint client, server;  ///< Endpoint metadata
 
   bool is_req() const { return sm_pkt_type_is_req(pkt_type); }

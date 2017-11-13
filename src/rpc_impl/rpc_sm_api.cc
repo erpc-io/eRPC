@@ -53,7 +53,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
     return -ENOMEM;
   }
 
-  auto *session = new Session(Session::Role::kClient);
+  auto *session = new Session(Session::Role::kClient, slow_rand.next_u64());
 
   // Fill prealloc response MsgBuffers for the client session
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
@@ -68,12 +68,14 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
         free_msg_buffer(resp_msgbuf_j);
       }
 
+      free(session);
       LOG_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
       return -ENOMEM;
     }
   }
 
   session->local_session_num = session_vec.size();
+  sm_token_map[session->uniq_token] = session->local_session_num;
 
   // Fill in client and server endpoint metadata. Commented server fields will
   // be filled when the connect response is received.

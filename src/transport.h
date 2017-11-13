@@ -70,7 +70,7 @@ class Transport {
 
   enum class TransportType { kInfiniBand, kRoCE, kOmniPath };
 
-  static std::string get_transport_name(TransportType transport_type) {
+  static std::string get_name(TransportType transport_type) {
     switch (transport_type) {
       case TransportType::kInfiniBand:
         return "[InfiniBand]";

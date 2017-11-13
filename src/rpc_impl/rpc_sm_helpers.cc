@@ -28,15 +28,6 @@ void Rpc<TTr>::handle_sm_st() {
     const SmPkt &sm_pkt = wi.sm_pkt;
     assert(sm_pkt_type_is_valid(sm_pkt.pkt_type));
 
-    // The sender of a packet cannot be this Rpc
-    if (sm_pkt.is_req()) {
-      assert(!(strcmp(sm_pkt.client.hostname, nexus->hostname.c_str()) == 0 &&
-               sm_pkt.client.rpc_id == rpc_id));
-    } else {
-      assert(!(strcmp(sm_pkt.server.hostname, nexus->hostname.c_str()) == 0 &&
-               sm_pkt.server.rpc_id == rpc_id));
-    }
-
     switch (sm_pkt.pkt_type) {
       case SmPktType::kConnectReq:
         handle_connect_req_st(wi);
@@ -60,7 +51,6 @@ void Rpc<TTr>::handle_sm_st() {
 template <class TTr>
 void Rpc<TTr>::bury_session_st(Session *session) {
   assert(in_dispatch());
-  assert(session != nullptr);
 
   // Free session resources
   for (const SSlot &sslot : session->sslot_arr) {
@@ -77,10 +67,11 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 template <class TTr>
 void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
   assert(in_dispatch());
-  assert(session != nullptr && session->is_client());
+  assert(session->is_client());
 
   SmPkt sm_pkt;
   sm_pkt.pkt_type = pkt_type;
+  sm_pkt.uniq_token = session->uniq_token;
   sm_pkt.client = session->client;
   sm_pkt.server = session->server;
 
