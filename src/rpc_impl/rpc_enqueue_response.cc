@@ -12,11 +12,11 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
 
   // When called from a background thread, enqueue to the foreground thread
-  if (small_rpc_unlikely(!in_creator())) {
+  if (small_rpc_unlikely(!in_dispatch())) {
     bg_queues.enqueue_response.unlocked_push(req_handle);
     return;
   }
-  assert(in_creator());
+  assert(in_dispatch());
 
   SSlot *sslot = static_cast<SSlot *>(req_handle);
   bury_req_msgbuf_server_st(sslot);  // Bury the possibly-dynamic req MsgBuffer

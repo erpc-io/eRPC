@@ -10,7 +10,7 @@ namespace erpc {
 // connected successfully.
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_req_st(const SmWorkItem &req_wi) {
-  assert(in_creator());
+  assert(in_dispatch());
 
   const SmPkt &sm_pkt = req_wi.sm_pkt;
   assert(sm_pkt.pkt_type == SmPktType::kDisconnectReq);
@@ -49,7 +49,7 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmWorkItem &req_wi) {
 // We free the session's RECVs before sending the disconnect request, not here
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(sm_pkt.pkt_type == SmPktType::kDisconnectResp);
   assert(sm_pkt.err_type == SmErrType::kNoError);  // Disconnects don't fail
 

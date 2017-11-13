@@ -8,7 +8,7 @@ namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::pkt_loss_scan_reqs_st() {
-  assert(in_creator());
+  assert(in_dispatch());
 
   for (Session *session : session_vec) {
     // Process only connected client sessions
@@ -38,7 +38,7 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
 // sslot has a valid request
 template <class TTr>
 void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(sslot != nullptr);
 
   auto &ci = sslot->client_info;

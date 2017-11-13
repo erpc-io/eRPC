@@ -4,7 +4,7 @@ namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
-  assert(in_creator());
+  assert(in_dispatch());
   auto &queue = bg_queues.enqueue_request;
   size_t cmds_to_process = queue.size;  // We might re-add to the queue
 
@@ -22,7 +22,7 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
 
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
-  assert(in_creator());
+  assert(in_dispatch());
   MtQueue<ReqHandle *> &queue = bg_queues.enqueue_response;
 
   while (queue.size > 0) {
@@ -33,7 +33,7 @@ void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
 
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_release_response_st() {
-  assert(in_creator());
+  assert(in_dispatch());
   MtQueue<RespHandle *> &queue = bg_queues.release_response;
 
   while (queue.size > 0) {

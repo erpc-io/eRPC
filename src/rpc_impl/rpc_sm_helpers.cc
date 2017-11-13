@@ -8,7 +8,7 @@ namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::handle_sm_st() {
-  assert(in_creator());
+  assert(in_dispatch());
 
   // Handle SM work items queued by the session management thread
   MtQueue<SmWorkItem> &queue = nexus_hook.sm_rx_queue;
@@ -59,7 +59,7 @@ void Rpc<TTr>::handle_sm_st() {
 
 template <class TTr>
 void Rpc<TTr>::bury_session_st(Session *session) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(session != nullptr);
 
   // Free session resources
@@ -76,7 +76,7 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 
 template <class TTr>
 void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(session != nullptr && session->is_client());
 
   SmPkt sm_pkt;
@@ -90,7 +90,7 @@ void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
 template <class TTr>
 void Rpc<TTr>::enqueue_sm_resp_st(const SmWorkItem &req_wi,
                                   SmErrType err_type) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(req_wi.sm_pkt.is_req());
 
   SmPkt sm_pkt = req_wi.sm_pkt;

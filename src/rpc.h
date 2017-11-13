@@ -153,7 +153,7 @@ class Rpc {
    * is used to decide if we need to free memory.
    */
   inline void bury_resp_msgbuf_server_st(SSlot *sslot) {
-    assert(in_creator());
+    assert(in_dispatch());
     assert(!sslot->is_client);
 
     // Free the response MsgBuffer iff it is not preallocated
@@ -380,11 +380,11 @@ class Rpc {
     SSlot *sslot = static_cast<SSlot *>(resp_handle);
 
     // When called from a background thread, enqueue to the foreground thread
-    if (small_rpc_unlikely(!in_creator())) {
+    if (small_rpc_unlikely(!in_dispatch())) {
       bg_queues.release_response.unlocked_push(resp_handle);
       return;
     }
-    assert(in_creator());
+    assert(in_dispatch());
 
     // Request MsgBuffer (tx_msgbuf) was buried when this response was received
     assert(sslot->tx_msgbuf == nullptr);
@@ -433,7 +433,7 @@ class Rpc {
   /// data packets.
   inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t offset,
                                       size_t data_bytes) {
-    assert(in_creator());
+    assert(in_dispatch());
     assert(sslot->tx_msgbuf != nullptr);
     assert(tx_batch_i < TTr::kPostlist);
 
@@ -467,7 +467,7 @@ class Rpc {
   /// This handles fault injection for dropping control packets.
   inline void enqueue_hdr_tx_burst_and_drain_st(
       Transport::RoutingInfo *routing_info, MsgBuffer *tx_msgbuf) {
-    assert(in_creator() && optlevel_large_rpc_supported);
+    assert(in_dispatch() && optlevel_large_rpc_supported);
     assert(tx_batch_i < TTr::kPostlist);
     assert(tx_msgbuf->is_expl_cr() || tx_msgbuf->is_req_for_resp());
 
@@ -496,7 +496,7 @@ class Rpc {
 
   /// Transmit packets in the TX batch
   inline void do_tx_burst_st() {
-    assert(in_creator());
+    assert(in_dispatch());
     assert(tx_batch_i > 0);
 
     dpath_stat_inc(dpath_stats.post_send_calls, 1);
@@ -684,7 +684,7 @@ class Rpc {
 
   /// Reset all datapath stats
   void reset_dpath_stats_st() {
-    assert(in_creator());
+    assert(in_dispatch());
     memset(&dpath_stats, 0, sizeof(dpath_stats));
   }
 
@@ -712,7 +712,7 @@ class Rpc {
   inline uint8_t get_rpc_id() const { return rpc_id; }
 
   /// Return true iff the caller is running in a background thread
-  inline bool in_background() const { return !in_creator(); }
+  inline bool in_background() const { return !in_dispatch(); }
 
   /// Return the eRPC thread ID of the caller
   inline size_t get_etid() const { return tls_registry->get_etid(); }
@@ -735,11 +735,11 @@ class Rpc {
 
  private:
   /// Return true iff we're currently running in this Rpc's creator thread
-  inline bool in_creator() const { return get_etid() == creator_etid; }
+  inline bool in_dispatch() const { return get_etid() == creator_etid; }
 
   /// Return true iff a user-provided session number is in the session vector
   inline bool is_usr_session_num_in_range_st(int session_num) const {
-    assert(in_creator());
+    assert(in_dispatch());
     return session_num >= 0 &&
            static_cast<size_t>(session_num) < session_vec.size();
   }

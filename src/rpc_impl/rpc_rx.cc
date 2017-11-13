@@ -4,7 +4,7 @@ namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::process_comps_st() {
-  assert(in_creator());
+  assert(in_dispatch());
   size_t num_pkts = transport->rx_burst();
   if (num_pkts == 0) return;
 
@@ -82,7 +82,7 @@ void Rpc<TTr>::process_comps_st() {
 
 template <class TTr>
 void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(!sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
@@ -169,7 +169,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
 
 template <class TTr>
 void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
@@ -232,7 +232,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
 
 template <class TTr>
 void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(sslot->is_client);
 
   // Handle reordering
@@ -260,7 +260,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
 template <class TTr>
 void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(!sslot->is_client);
 
   // Handle reordering
@@ -322,7 +322,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 // This function is for large messages, so don't use small_rpc_likely()
 template <class TTr>
 void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(!sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
@@ -446,7 +446,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
 // This function is for large messages, so don't use small_rpc_likely()
 template <class TTr>
 void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(sslot->is_client);
 
   const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
@@ -544,7 +544,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
 template <class TTr>
 void Rpc<TTr>::submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
                                     size_t bg_etid) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(bg_etid < nexus->num_bg_threads || bg_etid == kInvalidBgETid);
   assert(nexus->num_bg_threads > 0);
   assert(sslot->tx_msgbuf == nullptr);

@@ -17,7 +17,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
 
   // Check that the caller is the creator thread
-  if (!in_creator()) {
+  if (!in_dispatch()) {
     LOG_WARN("%s: Caller thread is not the creator thread.\n", issue_msg);
     return -EPERM;
   }
@@ -109,7 +109,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
           "eRPC Rpc %u: destroy_session() failed for session %d. Issue", rpc_id,
           session_num);
 
-  if (!in_creator()) {
+  if (!in_dispatch()) {
     LOG_WARN("%s: Caller thread is not creator.\n", issue_msg);
     return -EPERM;
   }
@@ -175,7 +175,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
 
 template <class TTr>
 size_t Rpc<TTr>::num_active_sessions_st() {
-  assert(in_creator());
+  assert(in_dispatch());
 
   size_t ret = 0;
   // session_vec can only be modified by the creator, so no need to lock

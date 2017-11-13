@@ -4,7 +4,7 @@ namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::process_req_txq_st() {
-  assert(in_creator());
+  assert(in_dispatch());
   size_t write_index = 0;  // Re-add incomplete sslots at this index
 
   for (size_t i = 0; i < req_txq.size(); i++) {
@@ -33,7 +33,7 @@ void Rpc<TTr>::process_req_txq_st() {
 
 template <class TTr>
 void Rpc<TTr>::tx_small_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
-  assert(in_creator());
+  assert(in_dispatch());
 
   Session *session = sslot->session;
   if (session->client_info.credits > 0) {
@@ -50,7 +50,7 @@ void Rpc<TTr>::tx_small_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
 
 template <class TTr>
 void Rpc<TTr>::tx_large_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf) {
-  assert(in_creator());
+  assert(in_dispatch());
 
   Session *session = sslot->session;
   size_t pkts_pending = req_msgbuf->num_pkts - sslot->client_info.req_sent;

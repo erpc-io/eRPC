@@ -63,7 +63,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
 template <class TTr>
 Rpc<TTr>::~Rpc() {
   // Rpc can only be destroyed from the creator thread
-  if (unlikely(!in_creator())) {
+  if (unlikely(!in_dispatch())) {
     LOG_ERROR("eRPC Rpc %u: Error. Cannot destroy from background thread.\n",
               rpc_id);
     exit(-1);

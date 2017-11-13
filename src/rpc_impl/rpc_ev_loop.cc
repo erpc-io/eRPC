@@ -4,7 +4,7 @@ namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::run_event_loop_do_one_st() {
-  assert(in_creator());
+  assert(in_dispatch());
 
   dpath_stat_inc(dpath_stats.ev_loop_calls, 1);
 
@@ -37,7 +37,7 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
 
 template <class TTr>
 void Rpc<TTr>::run_event_loop_once_st() {
-  assert(in_creator());
+  assert(in_dispatch());
 
   if (kDatapathChecks) {
     assert(!in_event_loop);
@@ -52,7 +52,7 @@ void Rpc<TTr>::run_event_loop_once_st() {
 
 template <class TTr>
 void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
-  assert(in_creator());
+  assert(in_dispatch());
 
   if (kDatapathChecks) {
     assert(!in_event_loop);

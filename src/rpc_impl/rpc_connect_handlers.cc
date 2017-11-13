@@ -10,7 +10,7 @@ namespace erpc {
 // make when calling create_session(), which cannot check for such errors.
 template <class TTr>
 void Rpc<TTr>::handle_connect_req_st(const SmWorkItem &req_wi) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(req_wi.sm_pkt.pkt_type == SmPktType::kConnectReq);
 
   // Ensure that server fields known by the client were filled correctly
@@ -110,7 +110,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmWorkItem &req_wi) {
 
 template <class TTr>
 void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(sm_pkt.pkt_type == SmPktType::kConnectResp);
   assert(sm_err_type_is_valid(sm_pkt.err_type));
 

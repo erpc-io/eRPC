@@ -8,7 +8,7 @@ namespace erpc {
 
 template <class TTr>
 bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
-  assert(in_creator());
+  assert(in_dispatch());
   LOG_INFO("eRPC Rpc %u: Handling reset event for remote hostname = %s.\n",
            rpc_id, reset_rem_hostname.c_str());
 
@@ -41,7 +41,7 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
 
 template <class TTr>
 bool Rpc<TTr>::handle_reset_client_st(Session *session) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(session->is_client());
 
   char issue_msg[kMaxIssueMsgLen];
@@ -106,7 +106,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 
 template <class TTr>
 bool Rpc<TTr>::handle_reset_server_st(Session *session) {
-  assert(in_creator());
+  assert(in_dispatch());
   assert(session->is_server());
   session->state = SessionState::kResetInProgress;
 

@@ -25,7 +25,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   assert(resp_msgbuf->max_num_pkts > 0);
 
   // When called from a background thread, enqueue to the foreground thread
-  if (small_rpc_unlikely(!in_creator())) {
+  if (small_rpc_unlikely(!in_dispatch())) {
     assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
     auto req_args =
         enqueue_request_args_t(session_num, req_type, req_msgbuf, resp_msgbuf,
@@ -33,7 +33,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     bg_queues.enqueue_request.unlocked_push(req_args);
     return 0;
   }
-  assert(in_creator());
+  assert(in_dispatch());
 
   assert(is_usr_session_num_in_range_st(session_num));
   Session *session = session_vec[static_cast<size_t>(session_num)];
