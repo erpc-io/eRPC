@@ -83,7 +83,6 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   client_endpoint.phy_port = phy_port;
   client_endpoint.rpc_id = rpc_id;
   client_endpoint.session_num = session->local_session_num;
-  client_endpoint.secret = slow_rand.next_u64() & ((1ull << kSecretBits) - 1);
   transport->fill_local_routing_info(&client_endpoint.routing_info);
 
   SessionEndpoint &server_endpoint = session->server;
@@ -92,7 +91,6 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   server_endpoint.phy_port = rem_phy_port;
   server_endpoint.rpc_id = rem_rpc_id;
   // server_endpoint.session_num = ??
-  server_endpoint.secret = client_endpoint.secret;  // Secret is shared
   // server_endpoint.routing_info = ??
 
   alloc_recvs();

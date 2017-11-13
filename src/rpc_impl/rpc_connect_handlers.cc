@@ -16,7 +16,6 @@ void Rpc<TTr>::handle_connect_req_st(const SmWorkItem &req_wi) {
   // Ensure that server fields known by the client were filled correctly
   assert(strcmp(req_wi.sm_pkt.server.hostname, nexus->hostname.c_str()) == 0);
   assert(req_wi.sm_pkt.server.rpc_id == rpc_id);
-  assert(req_wi.sm_pkt.server.secret == req_wi.sm_pkt.client.secret);
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",

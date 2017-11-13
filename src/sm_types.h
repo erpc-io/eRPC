@@ -12,9 +12,6 @@ namespace erpc {
 static constexpr size_t kMaxSessionsPerThread = 4096;
 static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(), "");
 
-static constexpr size_t kSecretBits = 32;  ///< Session secret for security
-static_assert(kSecretBits <= 32, "");      // Secret must fit in 32 bits
-
 // Invalid metadata values for session endpoint initialization
 static constexpr uint16_t kInvalidSessionNum =
     std::numeric_limits<uint16_t>::max();
@@ -221,7 +218,6 @@ class SessionEndpoint {
   uint8_t phy_port;                ///< Fabric port used by this endpoint
   uint8_t rpc_id;                  ///< ID of the Rpc that created this endpoint
   uint16_t session_num;  ///< The session number of this endpoint in its Rpc
-  uint32_t secret : kSecretBits;        ///< Secret for both session endpoints
   Transport::RoutingInfo routing_info;  ///< Endpoint's routing info
 
   // Fill invalid metadata to aid debugging
@@ -230,7 +226,6 @@ class SessionEndpoint {
     phy_port = kInvalidPhyPort;
     rpc_id = kInvalidRpcId;
     session_num = kInvalidSessionNum;
-    secret = kInvalidSecret;
     memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));
   }
 
@@ -262,7 +257,7 @@ class SessionEndpoint {
     return transport_type == other.transport_type &&
            strcmp(hostname, other.hostname) == 0 &&
            phy_port == other.phy_port && rpc_id == other.rpc_id &&
-           session_num == other.session_num && secret == other.secret;
+           session_num == other.session_num;
   }
 };
 
