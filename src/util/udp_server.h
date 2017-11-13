@@ -28,6 +28,8 @@ class UDPServer {
   }
 
   UDPServer() {}
+  UDPServer(const UDPServer &) = delete;
+
   ~UDPServer() {
     if (sock_fd != -1) close(sock_fd);
   }

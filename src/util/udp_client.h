@@ -24,6 +24,8 @@ class UDPClient {
   }
 
   UDPClient() {}
+  UDPClient(const UDPClient &) = delete;
+
   ~UDPClient() {
     for (auto kv : addrinfo_map) freeaddrinfo(kv.second);
     if (sock_fd != -1) close(sock_fd);
