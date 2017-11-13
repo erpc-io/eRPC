@@ -27,15 +27,18 @@ class UDPServer {
     if (r != 0) throw std::runtime_error("UDPServer: Failed to bind socket.");
   }
 
-  ~UDPServer() { close(sock_fd); }
+  UDPServer() {}
+  ~UDPServer() {
+    if (sock_fd != -1) close(sock_fd);
+  }
 
   int recv_blocking(char *msg, size_t max_size) {
     return recv(sock_fd, msg, max_size, 0);
   }
 
  private:
-  const uint16_t global_udp_port;
-  int sock_fd;
+  uint16_t global_udp_port;
+  int sock_fd = -1;
 };
 
 }  // End erpc
