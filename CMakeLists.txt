@@ -18,7 +18,7 @@ add_definitions(-Wno-unused-function)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread enet gflags papi)
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread gflags papi)
 
 # Testing
 enable_testing()

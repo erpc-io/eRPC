@@ -9,7 +9,7 @@
 ### Required packages
 ###
 
-sudo apt-get -y install cmake libnuma-dev libpapi-dev numactl libgflags-dev libboost-date-time-dev libenet-dev
+sudo apt-get -y install cmake libnuma-dev libpapi-dev numactl libgflags-dev libboost-date-time-dev
 
 # GTest is special for some reason
 sudo apt-get -y install libgtest-dev
