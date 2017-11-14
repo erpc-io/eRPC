@@ -11,8 +11,8 @@ namespace erpc {
 /// Basic UDP server class that supports receiving messages
 class UDPServer {
  public:
-  UDPServer(uint16_t global_udp_port, size_t timeout_ms)
-      : global_udp_port(global_udp_port), timeout_ms(timeout_ms) {
+  UDPServer(uint16_t port, size_t timeout_ms)
+      : port(port), timeout_ms(timeout_ms) {
     sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd == -1) {
       throw std::runtime_error("UDPServer: Failed to create local socket.");
@@ -31,7 +31,7 @@ class UDPServer {
     struct sockaddr_in serveraddr;
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serveraddr.sin_port = htons(static_cast<unsigned short>(global_udp_port));
+    serveraddr.sin_port = htons(static_cast<unsigned short>(port));
 
     int r = bind(sock_fd, reinterpret_cast<struct sockaddr *>(&serveraddr),
                  sizeof(serveraddr));
@@ -45,12 +45,12 @@ class UDPServer {
     if (sock_fd != -1) close(sock_fd);
   }
 
-  int recv_blocking(char *msg, size_t max_size) {
+  ssize_t recv_blocking(char *msg, size_t max_size) {
     return recv(sock_fd, msg, max_size, 0);
   }
 
  private:
-  uint16_t global_udp_port;
+  uint16_t port;  ///< The port to listen on
   size_t timeout_ms;
   int sock_fd = -1;
 };
