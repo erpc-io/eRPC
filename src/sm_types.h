@@ -33,7 +33,6 @@ enum class SmPktType : int {
   kConnectResp,        ///< Session connect response
   kDisconnectReq,      ///< Session disconnect request
   kDisconnectResp,     ///< Session disconnect response
-  kFaultResetPeerReq,  ///< Reset the remote ENet peer
 };
 
 /// The types of responses to a session management packet
@@ -83,8 +82,6 @@ static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
       return "[Disconnect request]";
     case SmPktType::kDisconnectResp:
       return "[Disconnect response]";
-    case SmPktType::kFaultResetPeerReq:
-      return "[Reset peer request (fault injection)]";
   };
 
   throw std::runtime_error("Invalid session management packet type.");
@@ -97,7 +94,6 @@ static bool sm_pkt_type_is_valid(SmPktType sm_pkt_type) {
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectReq:
     case SmPktType::kDisconnectResp:
-    case SmPktType::kFaultResetPeerReq:
       return true;
   }
   return false;
@@ -110,7 +106,6 @@ static bool sm_pkt_type_is_req(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
     case SmPktType::kConnectReq:
     case SmPktType::kDisconnectReq:
-    case SmPktType::kFaultResetPeerReq:
       return true;
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:
@@ -128,25 +123,6 @@ static SmPktType sm_pkt_type_req_to_resp(SmPktType sm_pkt_type) {
       return SmPktType::kConnectResp;
     case SmPktType::kDisconnectReq:
       return SmPktType::kDisconnectResp;
-    case SmPktType::kFaultResetPeerReq:
-    case SmPktType::kConnectResp:
-    case SmPktType::kDisconnectResp:
-      break;
-  }
-
-  throw std::runtime_error("Invalid session management packet type.");
-}
-
-/// Return true iff this request packet type has a response type. Some request
-/// packet types don't have a response packet type.
-static bool sm_pkt_type_req_has_resp(SmPktType sm_pkt_type) {
-  assert(sm_pkt_type_is_req(sm_pkt_type));
-  switch (sm_pkt_type) {
-    case SmPktType::kConnectReq:
-    case SmPktType::kDisconnectReq:
-      return true;
-    case SmPktType::kFaultResetPeerReq:
-      return false;
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp:
       break;
@@ -275,6 +251,13 @@ class SmPkt {
   bool is_req() const { return sm_pkt_type_is_req(pkt_type); }
   bool is_resp() const { return !is_req(); }
 };
+
+static SmPkt sm_construct_resp(const SmPkt &req_sm_pkt, SmErrType err_type) {
+  SmPkt resp_sm_pkt = req_sm_pkt;
+  resp_sm_pkt.pkt_type = sm_pkt_type_req_to_resp(req_sm_pkt.pkt_type);
+  resp_sm_pkt.err_type = err_type;
+  return resp_sm_pkt;
+}
 
 }  // End erpc
 
