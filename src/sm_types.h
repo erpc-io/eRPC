@@ -29,10 +29,10 @@ enum class SessionState {
 
 /// Packet types used for session management
 enum class SmPktType : int {
-  kConnectReq,         ///< Session connect request
-  kConnectResp,        ///< Session connect response
-  kDisconnectReq,      ///< Session disconnect request
-  kDisconnectResp,     ///< Session disconnect response
+  kConnectReq,      ///< Session connect request
+  kConnectResp,     ///< Session connect response
+  kDisconnectReq,   ///< Session disconnect request
+  kDisconnectResp,  ///< Session disconnect response
 };
 
 /// The types of responses to a session management packet
@@ -247,6 +247,13 @@ class SmPkt {
   SmErrType err_type;              ///< Error type, for responses only
   sm_uniq_token_t uniq_token;      ///< The token for this session
   SessionEndpoint client, server;  ///< Endpoint metadata
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << sm_pkt_type_str(pkt_type) << ", " << sm_err_type_str(err_type)
+        << ", client: " << client.name() << ", server: " << server.name();
+    return ret.str();
+  }
 
   bool is_req() const { return sm_pkt_type_is_req(pkt_type); }
   bool is_resp() const { return !is_req(); }
