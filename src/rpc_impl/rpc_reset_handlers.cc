@@ -1,6 +1,6 @@
 /**
  * @file rpc_reset_handlers.cc
- * @brief Handler for ENet reset event
+ * @brief Handlers for session resets
  */
 #include "rpc.h"
 
