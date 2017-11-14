@@ -153,6 +153,3 @@
  * Are we losing some performance by using `size_t` instead of `uint32_t` in
    in-memory structs like Buffer and MsgBuffer?
  * Need to have a test for session management request timeouts.
-
-## Required packages
- * numa, gtest, gflags, ibverbs, boost-date-time, enet
