@@ -19,29 +19,16 @@
 // the app's config file by the autorun scripts.
 DEFINE_uint64(test_ms, 0, "Test milliseconds");
 DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
-DEFINE_uint64(machine_id, erpc::kMaxNumMachines, "The ID of this machine");
+DEFINE_uint64(machine_id, std::numeric_limits<size_t>::max(),
+              "The ID of this machine");
 
 static bool validate_test_ms(const char *, uint64_t test_ms) {
   return test_ms >= 1000;
 }
 DEFINE_validator(test_ms, &validate_test_ms);
 
-static bool validate_num_machines(const char *, uint64_t num_machines) {
-  return num_machines <= erpc::kMaxNumMachines;
-}
-DEFINE_validator(num_machines, &validate_num_machines);
-
-static bool validate_machine_id(const char *, uint64_t machine_id) {
-  return machine_id < erpc::kMaxNumMachines;
-}
-DEFINE_validator(machine_id, &validate_machine_id);
-
 // Work around g++-5's unused variable warning for validators
-void avoid_gcc5_unused_warning() {
-  _unused(test_ms_validator_registered);
-  _unused(num_machines_validator_registered);
-  _unused(machine_id_validator_registered);
-}
+void avoid_gcc5_unused_warning() { _unused(test_ms_validator_registered); }
 
 //
 // PAPI
