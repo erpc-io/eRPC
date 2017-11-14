@@ -11,13 +11,14 @@ namespace erpc {
 /// Basic UDP server class that supports receiving messages
 class UDPServer {
  public:
-  UDPServer(uint16_t port, size_t timeout_ms)
+  UDPServer(uint16_t port, size_t timeout_ms, size_t rx_buffer_size = 0)
       : port(port), timeout_ms(timeout_ms) {
     sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd == -1) {
       throw std::runtime_error("UDPServer: Failed to create local socket.");
     }
 
+    // Set RECV timeout
     if (timeout_ms >= 1000) {
       throw std::runtime_error("UDPServer: Timeout too high.");
     }
@@ -26,6 +27,15 @@ class UDPServer {
     tv.tv_usec = static_cast<long>(timeout_ms) * 1000;
     if (setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
       throw std::runtime_error("UDPServer: Failed to set timeout");
+    }
+
+    // Set buffer size
+    if (rx_buffer_size != 0) {
+      int ret = setsockopt(sock_fd, SOL_SOCKET, SO_RCVBUF, &rx_buffer_size,
+                           sizeof(rx_buffer_size));
+      if (ret != 0) {
+        throw std::runtime_error("UDPServer: Failed to set RX buffer size.");
+      }
     }
 
     struct sockaddr_in serveraddr;
