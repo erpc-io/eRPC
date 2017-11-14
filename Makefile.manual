@@ -17,7 +17,7 @@ CPPFLAGS := ${ENABLE_DGB} ${LTO} -O3 ${DEBUG} -std=c++14 ${INC} -Wall -Werror \
 	-Wno-inline ${PROFILE}
 
 LDFLAGS := ${ENABLE_DGB} ${LTO} -O3 -libverbs -lrt -pthread -lmemcached -lnuma \
-	-lpapi -lgflags -lenet ${PROFILE}
+	-lpapi -lgflags ${PROFILE}
 
 src := src/nexus_impl/nexus.o \
   src/nexus_impl/nexus_bg_thread.o \
