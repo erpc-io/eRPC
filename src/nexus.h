@@ -1,7 +1,6 @@
 #ifndef ERPC_NEXUS_H
 #define ERPC_NEXUS_H
 
-#include <enet/enet.h>
 #include <unistd.h>
 #include <unordered_map>
 #include "common.h"
@@ -12,31 +11,6 @@
 #include "util/tls_registry.h"
 
 namespace erpc {
-
-/// A work item exchanged between an Rpc thread and an SM thread. This does
-/// not have any Nexus-related members, so it's outside the Nexus class.
-class SmWorkItem {
-  enum class Reset { kFalse, kTrue };
-
- public:
-  SmWorkItem(uint8_t rpc_id, SmPkt sm_pkt)
-      : reset(Reset::kFalse), rpc_id(rpc_id), sm_pkt(sm_pkt) {}
-
-  SmWorkItem(std::string reset_rem_hostname)
-      : reset(Reset::kTrue),
-        rpc_id(kInvalidRpcId),
-        reset_rem_hostname(reset_rem_hostname) {}
-
-  bool is_reset() const { return reset == Reset::kTrue; }
-
-  const Reset reset;     ///< Is this work item a reset?
-  const uint8_t rpc_id;  ///< The local Rpc ID, invalid for reset work items
-
-  SmPkt sm_pkt;  ///< The session management packet, for non-reset work items
-
-  /// The remote hostname to reset, valid for reset work items
-  std::string reset_rem_hostname;
-};
 
 class Nexus {
  public:
@@ -66,13 +40,9 @@ class Nexus {
     /// Background thread request queues, installed by the Nexus
     MtQueue<BgWorkItem> *bg_req_queue_arr[kMaxBgThreads] = {nullptr};
 
-    /// The session management TX queue, installed by Nexus. This is used by Rpc
-    /// threads to submit packets to the SM thread.
-    MtQueue<SmWorkItem> *sm_tx_queue = nullptr;
-
     /// The Rpc thread's session management RX queue, installed by the Rpc.
     /// Packets received by the SM thread for this Rpc are queued here.
-    MtQueue<SmWorkItem> sm_rx_queue;
+    MtQueue<SmPkt> sm_rx_queue;
   };
 
   /**
@@ -138,116 +108,24 @@ class Nexus {
     volatile bool *kill_switch;     ///< The Nexus's kill switch
     volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
     std::mutex *nexus_lock;
-    MtQueue<SmWorkItem> *sm_tx_queue;  ///< SM packets to transmit
-
-    // Created internally by the SM thread
-    ENetHost *enet_host;
-
-    /// Map remote hostnames to client-mode peers
-    std::unordered_map<std::string, ENetPeer *> client_map;
-
-    /// Map remote hostnames to server-mode peers
-    std::unordered_map<std::string, ENetPeer *> server_map;
-  };
-
-  enum class SmENetPeerMode { kServer, kClient };
-
-  /// ENet peer data
-  class SmENetPeerData {
-   public:
-    SmENetPeerMode peer_mode;
-    std::string rem_hostname;
-
-    struct {
-      /// True while we have a connection to the server peer. We never reconnect
-      /// after disconnecting, so this is set to true only once.
-      bool connected = false;
-
-      /// Work items to transmit when the client's connection is established
-      std::vector<SmWorkItem> tx_queue;
-    } client;
-
-    struct {
-      /// Server-mode peers are created on an ENet connect event, at which time
-      /// we don't have the remote hostname. This records if we've installed the
-      /// remote hostname and server map entry.
-      bool initialized = false;
-    } server;
-
-    SmENetPeerData(SmENetPeerMode peer_mode) : peer_mode(peer_mode) {}
-    bool is_server() const { return peer_mode == SmENetPeerMode::kServer; }
-    bool is_client() const { return peer_mode == SmENetPeerMode::kClient; }
   };
 
   /// Measure RDTSC frequency. This is expensive and only done once per process.
   double measure_rdtsc_freq();
 
-  /// The function executed by background threads
+  /// The background thread
   static void bg_thread_func(BgThreadCtx ctx);
 
-  //
-  // Session management thread functions (nexus_sm_thread.cc)
-  //
-
-  /// The thread function executed by the session management thread
+  /// The session management thread
   static void sm_thread_func(SmThreadCtx ctx);
-
-  /// Handle an ENet connect event for a server-mode peer
-  static void sm_thread_on_enet_connect_server(SmThreadCtx &ctx,
-                                               ENetEvent &event);
-
-  /// Handle an ENet connect event for a client-mode peer
-  static void sm_thread_on_enet_connect_client(SmThreadCtx &ctx,
-                                               ENetEvent &event);
-
-  /// Broadcast a reset work item to all registered Rpcs
-  static void sm_thread_broadcast_reset(SmThreadCtx &ctx,
-                                        std::string rem_hostname);
-
-  /// Handle an ENet disconnect event for a server-mode peer
-  static void sm_thread_on_enet_disconnect_server(SmThreadCtx &ctx,
-                                                  ENetEvent &event);
-
-  /// Handle an ENet disconnect event for a client-mode peer
-  static void sm_thread_on_enet_disconnect_client(SmThreadCtx &ctx,
-                                                  ENetEvent &event);
-
-  /// Retrieve a session management packet from this ENet event, and free the
-  /// ENet-allocated memory
-  static SmPkt sm_thread_pull_sm_pkt(ENetEvent &event);
-
-  /// Handle an ENet receive event for a server-mode peer
-  static void sm_thread_on_enet_receive_server(SmThreadCtx &ctx,
-                                               ENetEvent &event);
-
-  /// Handle an ENet receive event for a client-mode peer
-  static void sm_thread_on_enet_receive_client(SmThreadCtx &ctx,
-                                               ENetEvent &event);
-
-  /// Receive session management packets and enqueue them to Rpc threads. This
-  /// blocks for up to \p kSmThreadEventLoopMs, lowering CPU use.
-  static void sm_thread_rx(SmThreadCtx &ctx);
-
-  /// Process request work items enqueued by Rpc threads
-  static void sm_thread_process_tx_queue_req(SmThreadCtx &ctx,
-                                             const SmWorkItem &wi);
-
-  /// Process response work items enqueued by Rpc threads
-  static void sm_thread_process_tx_queue_resp(SmThreadCtx &ctx,
-                                              const SmWorkItem &wi);
-
-  /// Process work items enqueued by Rpc threads
-  static void sm_thread_process_tx_queue(SmThreadCtx &ctx);
-
-  /// Transmit one work item over a connected ENet peer
-  static void sm_thread_enet_send_one(const SmWorkItem &wi, ENetPeer *epeer);
 
  public:
   /// Read-mostly members exposed to Rpc threads
-  const double freq_ghz;        ///< TSC frequncy
-  const std::string hostname;   ///< The local host
-  const size_t num_bg_threads;  ///< Background threads to process Rpc reqs
-  TlsRegistry tls_registry;     ///< A thread-local registry
+  const double freq_ghz;         ///< TSC frequncy
+  const std::string hostname;    ///< The local host
+  const uint16_t mgmt_udp_port;  ///< UDP port for session management
+  const size_t num_bg_threads;   ///< Background threads to process Rpc reqs
+  TlsRegistry tls_registry;      ///< A thread-local registry
 
   /// The ground truth for registered request functions
   std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
@@ -265,11 +143,7 @@ class Nexus {
 
   volatile bool kill_switch;  ///< Used to turn off SM and background threads
 
-  // Session management thread
-  MtQueue<SmWorkItem> sm_tx_queue;  ///< SM packet submission queue
-  std::thread sm_thread;            ///< The session management thread
-
-  // Background threads
+  std::thread sm_thread;  ///< The session management thread
   MtQueue<BgWorkItem> bg_req_queue[kMaxBgThreads];  ///< Background req queues
   std::thread bg_thread_arr[kMaxBgThreads];  ///< Background thread context
 };

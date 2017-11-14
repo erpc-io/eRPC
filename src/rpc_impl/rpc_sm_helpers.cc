@@ -11,38 +11,25 @@ void Rpc<TTr>::handle_sm_st() {
   assert(in_dispatch());
 
   // Handle SM work items queued by the session management thread
-  MtQueue<SmWorkItem> &queue = nexus_hook.sm_rx_queue;
+  MtQueue<SmPkt> &queue = nexus_hook.sm_rx_queue;
   const size_t cmds_to_process = queue.size;  // We might re-add to the queue
 
   for (size_t i = 0; i < cmds_to_process; i++) {
-    SmWorkItem wi = queue.unlocked_pop();
-
-    // Reset work items don't have a valid SM packet, so handle them first
-    if (wi.is_reset()) {
-      assert(wi.reset_rem_hostname.length() > 0);
-      bool success = handle_reset_st(wi.reset_rem_hostname);
-      if (!success) queue.unlocked_push(wi);
-      continue;
-    }
-
-    const SmPkt &sm_pkt = wi.sm_pkt;
-    assert(sm_pkt_type_is_valid(sm_pkt.pkt_type));
-
+    const SmPkt sm_pkt = queue.unlocked_pop();
     switch (sm_pkt.pkt_type) {
       case SmPktType::kConnectReq:
-        handle_connect_req_st(wi);
+        handle_connect_req_st(sm_pkt);
         break;
       case SmPktType::kConnectResp:
         handle_connect_resp_st(sm_pkt);
         break;
       case SmPktType::kDisconnectReq:
-        handle_disconnect_req_st(wi);
+        handle_disconnect_req_st(sm_pkt);
         break;
       case SmPktType::kDisconnectResp:
         handle_disconnect_resp_st(sm_pkt);
         break;
-      case SmPktType::kFaultResetPeerReq:
-        // This is handled in the Nexus
+      default:
         throw std::runtime_error("Invalid packet type");
     }
   }
@@ -65,30 +52,29 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_req_st(Session *session, SmPktType pkt_type) {
-  assert(in_dispatch());
-  assert(session->is_client());
-
-  SmPkt sm_pkt;
-  sm_pkt.pkt_type = pkt_type;
-  sm_pkt.uniq_token = session->uniq_token;
-  sm_pkt.client = session->client;
-  sm_pkt.server = session->server;
-
-  nexus_hook.sm_tx_queue->unlocked_push(SmWorkItem(rpc_id, sm_pkt));
+void Rpc<TTr>::sm_pkt_udp_tx_st(const SmPkt &sm_pkt) {
+  LOG_INFO("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
+           sm_pkt.to_string().c_str());
+  if (sm_pkt.is_req()) {
+    udp_client.send(sm_pkt.server.hostname, nexus->mgmt_udp_port,
+                    reinterpret_cast<const char *>(&sm_pkt), sizeof(sm_pkt));
+  } else {
+    udp_client.send(sm_pkt.client.hostname, nexus->mgmt_udp_port,
+                    reinterpret_cast<const char *>(&sm_pkt), sizeof(sm_pkt));
+  }
 }
 
 template <class TTr>
-void Rpc<TTr>::enqueue_sm_resp_st(const SmWorkItem &req_wi,
-                                  SmErrType err_type) {
-  assert(in_dispatch());
-  assert(req_wi.sm_pkt.is_req());
+void Rpc<TTr>::send_sm_req_st(Session *session, SmPktType pkt_type) {
+  assert(in_dispatch() && session->is_client() && sm_pkt_type_is_req(pkt_type));
 
-  SmPkt sm_pkt = req_wi.sm_pkt;
-  sm_pkt.pkt_type = sm_pkt_type_req_to_resp(sm_pkt.pkt_type);  // Change to resp
-  sm_pkt.err_type = err_type;
-
-  nexus_hook.sm_tx_queue->unlocked_push(SmWorkItem(rpc_id, sm_pkt));
+  SmPkt sm_pkt;
+  sm_pkt.pkt_type = pkt_type;
+  sm_pkt.err_type = SmErrType::kNoError;
+  sm_pkt.uniq_token = session->uniq_token;
+  sm_pkt.client = session->client;
+  sm_pkt.server = session->server;
+  sm_pkt_udp_tx_st(sm_pkt);
 }
 
 }  // End erpc

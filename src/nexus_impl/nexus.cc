@@ -11,6 +11,7 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
              size_t num_bg_threads)
     : freq_ghz(measure_rdtsc_freq()),
       hostname(hostname),
+      mgmt_udp_port(mgmt_udp_port),
       num_bg_threads(num_bg_threads) {
   // Print warning messages if low-performance settings are enabled
   if (kDatapathChecks) {
@@ -55,7 +56,6 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   sm_thread_ctx.kill_switch = &kill_switch;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
-  sm_thread_ctx.sm_tx_queue = &sm_tx_queue;
 
   LOG_INFO("eRPC Nexus: Launching session management thread on core %zu.\n",
            kNexusSmThreadCore);
@@ -96,9 +96,6 @@ void Nexus::register_hook(Hook *hook) {
   for (size_t i = 0; i < num_bg_threads; i++) {
     hook->bg_req_queue_arr[i] = &bg_req_queue[i];
   }
-
-  // Install session managment request submission list
-  hook->sm_tx_queue = &sm_tx_queue;
 
   nexus_lock.unlock();
 }

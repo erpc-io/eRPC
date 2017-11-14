@@ -9,62 +9,78 @@ namespace erpc {
 // We need to handle all types of errors in remote arguments that the client can
 // make when calling create_session(), which cannot check for such errors.
 template <class TTr>
-void Rpc<TTr>::handle_connect_req_st(const SmWorkItem &req_wi) {
-  assert(in_dispatch());
-  assert(req_wi.sm_pkt.pkt_type == SmPktType::kConnectReq);
-
-  // Ensure that server fields known by the client were filled correctly
-  assert(strcmp(req_wi.sm_pkt.server.hostname, nexus->hostname.c_str()) == 0);
-  assert(req_wi.sm_pkt.server.rpc_id == rpc_id);
-
+void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
+  assert(in_dispatch() && sm_pkt.pkt_type == SmPktType::kConnectReq);
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",
-          rpc_id, req_wi.sm_pkt.client.name().c_str());
+          rpc_id, sm_pkt.client.name().c_str());
+
+  // Handle reordering
+  if (sm_token_map.count(sm_pkt.uniq_token) > 0) {
+    // We've received this connect request before
+    uint16_t srv_session_num = sm_token_map.at(sm_pkt.uniq_token);
+    assert(session_vec.size() > srv_session_num);
+
+    const Session *session = session_vec[srv_session_num];
+    if (session == nullptr || session->state != SessionState::kConnected) {
+      LOG_WARN("%s: Duplicate request, and response is unneeded.\n", issue_msg);
+      return;
+    } else {
+      SmPkt resp_sm_pkt = sm_construct_resp(sm_pkt, SmErrType::kNoError);
+      resp_sm_pkt.server = session->server;  // Re-send server endpoint info
+
+      LOG_INFO("%s: Duplicate request. Re-sending response.\n", issue_msg);
+      sm_pkt_udp_tx_st(resp_sm_pkt);
+      return;
+    }
+  }
+
+  // If we're here, this is the first time we're receiving this connect request
 
   // Check that the transport matches
-  Transport::TransportType pkt_tr_type = req_wi.sm_pkt.server.transport_type;
-  if (pkt_tr_type != transport->transport_type) {
+  if (sm_pkt.server.transport_type != transport->transport_type) {
     LOG_WARN("%s: Invalid transport %s. Sending response.\n", issue_msg,
-             Transport::get_transport_name(pkt_tr_type).c_str());
-    enqueue_sm_resp_st(req_wi, SmErrType::kInvalidTransport);
+             Transport::get_name(sm_pkt.server.transport_type).c_str());
+    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kInvalidTransport));
     return;
   }
 
   // Check if the requested physical port is correct
-  if (req_wi.sm_pkt.server.phy_port != phy_port) {
+  if (sm_pkt.server.phy_port != phy_port) {
     LOG_WARN("%s: Invalid server port %u. Sending response.\n", issue_msg,
-             req_wi.sm_pkt.server.phy_port);
-    enqueue_sm_resp_st(req_wi, SmErrType::kInvalidRemotePort);
+             sm_pkt.server.phy_port);
+    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kInvalidRemotePort));
     return;
   }
 
   // Check if we are allowed to create another session
   if (!have_recvs()) {
     LOG_WARN("%s: RECVs exhausted. Sending response.\n", issue_msg);
-    enqueue_sm_resp_st(req_wi, SmErrType::kRecvsExhausted);
+    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kRecvsExhausted));
   }
 
   if (session_vec.size() == kMaxSessionsPerThread) {
     LOG_WARN("%s: Reached session limit %zu. Sending response.\n", issue_msg,
              kMaxSessionsPerThread);
-    enqueue_sm_resp_st(req_wi, SmErrType::kTooManySessions);
+    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kTooManySessions));
     return;
   }
 
   // Try to resolve the client-provided routing info. If session creation
   // succeeds, we'll copy it to the server's session endpoint.
-  Transport::RoutingInfo client_rinfo = req_wi.sm_pkt.client.routing_info;
+  Transport::RoutingInfo client_rinfo = sm_pkt.client.routing_info;
   bool resolve_success = transport->resolve_remote_routing_info(&client_rinfo);
   if (!resolve_success) {
     std::string routing_info_str = TTr::routing_info_str(&client_rinfo);
     LOG_WARN("%s: Unable to resolve routing info %s. Sending response.\n",
              issue_msg, routing_info_str.c_str());
-    enqueue_sm_resp_st(req_wi, SmErrType::kRoutingResolutionFailure);
+    sm_pkt_udp_tx_st(
+        sm_construct_resp(sm_pkt, SmErrType::kRoutingResolutionFailure));
     return;
   }
 
   // If we are here, create a new session and fill preallocated MsgBuffers
-  auto *session = new Session(Session::Role::kServer);
+  auto *session = new Session(Session::Role::kServer, sm_pkt.uniq_token);
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     MsgBuffer &msgbuf_i = session->sslot_arr[i].pre_resp_msgbuf;
     msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
@@ -77,18 +93,22 @@ void Rpc<TTr>::handle_connect_req_st(const SmWorkItem &req_wi) {
         free_msg_buffer(msgbuf_j);
       }
 
+      free(session);
       LOG_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
-      enqueue_sm_resp_st(req_wi, SmErrType::kOutOfMemory);
+      sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kOutOfMemory));
       return;
     }
   }
 
-  // Record info to session
-  session->server = req_wi.sm_pkt.server;
+  // Fill-in the server endpoint
+  session->server = sm_pkt.server;
   session->server.session_num = session_vec.size();
   transport->fill_local_routing_info(&session->server.routing_info);
 
-  session->client = req_wi.sm_pkt.client;
+  sm_token_map[session->uniq_token] = session->server.session_num;
+
+  // Fill-in the client endpoint
+  session->client = sm_pkt.client;
   session->client.routing_info = client_rinfo;
 
   session->local_session_num = session->server.session_num;
@@ -97,13 +117,12 @@ void Rpc<TTr>::handle_connect_req_st(const SmWorkItem &req_wi) {
   alloc_recvs();
   session_vec.push_back(session);  // Add to list of all sessions
 
-  // For successful responses, we need to edit the response SM packet
-  SmWorkItem resp_wi = req_wi;
-  resp_wi.sm_pkt.server = session->server;
-  resp_wi.sm_pkt.client = session->client;
+  // Add server endpoint info created above to resp. No need to add client info.
+  SmPkt resp_sm_pkt = sm_construct_resp(sm_pkt, SmErrType::kNoError);
+  resp_sm_pkt.server = session->server;
 
   LOG_INFO("%s: None. Sending response.\n", issue_msg);
-  enqueue_sm_resp_st(resp_wi, SmErrType::kNoError);
+  sm_pkt_udp_tx_st(resp_sm_pkt);
   return;
 }
 
@@ -120,14 +139,18 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
           "Issue",
           rpc_id, sm_pkt.server.name().c_str(), sm_pkt.client.session_num);
 
-  // Try to locate the requester session and do some sanity checks
   uint16_t session_num = sm_pkt.client.session_num;
   assert(session_num < session_vec.size());
 
+  // Handle reordering. We don't need the session token for this.
   Session *session = session_vec[session_num];
-  assert(session != nullptr);
+  if (session == nullptr ||
+      session->state != SessionState::kConnectInProgress) {
+    LOG_WARN("%s: Duplicate response. Ignoring.\n", issue_msg);
+    return;
+  }
+
   assert(session->is_client());
-  assert(session->state == SessionState::kConnectInProgress);
   assert(session->client == sm_pkt.client);
 
   // We don't have the server's session number locally yet, so we cannot use
@@ -140,7 +163,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   if (sm_pkt.err_type == SmErrType::kInvalidRemoteRpcId) {
     if (retry_connect_on_invalid_rpc_id) {
       LOG_WARN("%s: Invalid remote Rpc ID. Retrying.\n", issue_msg);
-      enqueue_sm_req_st(session, SmPktType::kConnectReq);
+      send_sm_req_st(session, SmPktType::kConnectReq);
       return;
     }
   }
@@ -179,7 +202,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
 
     // Do what destroy_session() does with a connected session
     session->state = SessionState::kDisconnectInProgress;
-    enqueue_sm_req_st(session, SmPktType::kDisconnectReq);
+    send_sm_req_st(session, SmPktType::kDisconnectReq);
     return;
   }
 

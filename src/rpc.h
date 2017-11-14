@@ -18,6 +18,7 @@
 #include "util/mt_queue.h"
 #include "util/rand.h"
 #include "util/timer.h"
+#include "util/udp_client.h"
 
 namespace erpc {
 
@@ -257,27 +258,24 @@ class Rpc {
   /// Free a session's resources and mark it as null in the session vector.
   /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
   /// responsible for freeing user-allocated MsgBuffers.
-  void bury_session_st(Session *session);
+  void bury_session_st(Session *);
 
-  /// Allocate and enqueue a session management request packet to the session
-  /// management thread. The allocated packet will be freed by the session
-  /// management thread after transmission.
-  void enqueue_sm_req_st(Session *session, SmPktType pkt_type);
+  /// Send an SM packet. The packet's destination (i.e., client or server) is
+  /// determined using the packet's type.
+  void sm_pkt_udp_tx_st(const SmPkt &);
 
-  /// Allocate a response-copy of the session manegement packet and enqueue it
-  /// to the session management thread. The allocated packet will be freed by
-  /// the session management thread on transmission.
-  void enqueue_sm_resp_st(const SmWorkItem &req_wi, SmErrType err_type);
+  /// Send a session management request for this session
+  void send_sm_req_st(Session *, SmPktType);
 
   //
   // Session management packet handlers (rpc_connect_handlers.cc,
   // rpc_disconnect_handlers.cc, rpc_reset_handlers.cc)
   //
-  void handle_connect_req_st(const SmWorkItem &req_wi);
-  void handle_connect_resp_st(const SmPkt &pkt);
+  void handle_connect_req_st(const SmPkt &);
+  void handle_connect_resp_st(const SmPkt &);
 
-  void handle_disconnect_req_st(const SmWorkItem &req_wi);
-  void handle_disconnect_resp_st(const SmPkt &pkt);
+  void handle_disconnect_req_st(const SmPkt &);
+  void handle_disconnect_resp_st(const SmPkt &);
 
   /**
    * @brief Try to reset sessions connected to \p rem_hostname.
@@ -637,18 +635,6 @@ class Rpc {
   void fault_inject_fail_resolve_server_rinfo_st();
 
   /**
-   * @brief Inject a fault that forcefully resets the remote ENet peer for
-   * a client session, emulating failure of the server. An ENet disconnect event
-   * will be generated locally when ENet detects the remote peer failure.
-   *
-   * This will also affect sessions in other Rpc objects on this machine that
-   * are connected to the same remote host as \p session_num.
-   *
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_reset_remote_epeer_st(int session_num);
-
-  /**
    * @brief Set the TX packet drop probability for this Rpc
    * @throw runtime_error if the caller cannot inject faults
    */
@@ -852,10 +838,10 @@ class Rpc {
   size_t prev_epoch_ts;  ///< Timestamp of the previous epoch
 
   // Misc
-
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
   SlowRand slow_rand;         ///< A slow random generator for "real" randomness
   FastRand fast_rand;         ///< A fast random generator
+  UDPClient udp_client;       ///< UDP endpoint used to send SM packets
 
   /// For tracking event loop reentrance (only with kDatapathChecks)
   bool in_event_loop = false;
