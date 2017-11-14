@@ -39,9 +39,6 @@ static constexpr size_t kMaxRpcId = std::numeric_limits<uint8_t>::max() - 1;
 static constexpr size_t kReqTypeArraySize =
     std::numeric_limits<uint8_t>::max() + 1ull;
 
-/// The maximum number of machines in the cluster (ENet's connection limit)
-static constexpr size_t kMaxNumMachines = 4095;
-
 static constexpr size_t kMaxPhyPorts = 16;  ///< Max fabric device ports
 static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
 static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
