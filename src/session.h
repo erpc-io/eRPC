@@ -43,13 +43,8 @@ class Session {
  private:
   Session(Role role, sm_uniq_token_t uniq_token)
       : role(role), uniq_token(uniq_token) {
-    if (is_client()) {
-      state = SessionState::kConnectInProgress;
-      remote_routing_info = &server.routing_info;
-    } else {
-      state = SessionState::kConnected;
-      remote_routing_info = &client.routing_info;
-    }
+    remote_routing_info =
+        is_client() ? &server.routing_info : &client.routing_info;
 
     // Arrange the free slot vector so that slots are popped in order
     for (size_t i = 0; i < kSessionReqWindow; i++) {
@@ -62,11 +57,11 @@ class Session {
 
       sslot.prealloc_used = true;  // There's no user-allocated memory to free
       sslot.session = this;
-      sslot.is_client = this->is_client();
+      sslot.is_client = is_client();
       sslot.index = sslot_i;
       sslot.cur_req_num = sslot_i;  // 1st req num = (+kSessionReqWindow)
 
-      if (sslot.is_client) {
+      if (is_client()) {
         sslot.client_info.cont_etid = kInvalidBgETid;  // Continuations in fg
       } else {
         sslot.server_info.req_type = kInvalidReqType;

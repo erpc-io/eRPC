@@ -81,6 +81,8 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
   // If we are here, create a new session and fill preallocated MsgBuffers
   auto *session = new Session(Session::Role::kServer, sm_pkt.uniq_token);
+  session->state = SessionState::kConnected;
+
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     MsgBuffer &msgbuf_i = session->sslot_arr[i].pre_resp_msgbuf;
     msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);

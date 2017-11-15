@@ -54,6 +54,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   }
 
   auto *session = new Session(Session::Role::kClient, slow_rand.next_u64());
+  session->state = SessionState::kConnectInProgress;
 
   // Fill prealloc response MsgBuffers for the client session
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {

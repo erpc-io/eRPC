@@ -101,13 +101,13 @@ else(DEBUG)
   add_definitions(-O2)
 endif(DEBUG)
 
-# Fault injection (packet losses, machine failure)
-if(FAULT_INJECTION)
-  MESSAGE(STATUS "Fault injection is enabled. Performance will be low.")
-  add_definitions(-DFAULT_INJECTION)
-else(FAULT_INJECTION)
-  MESSAGE(STATUS "Fault injection is disabled, so tests may fail.")
-endif(FAULT_INJECTION)
+# Testing for packet loss, machine failure, etc
+if(TESTING)
+  MESSAGE(STATUS "Testing is enabled. Performance will be low.")
+  add_definitions(-DTESTING)
+else(TESTING)
+  MESSAGE(STATUS "Testing is disabled, so tests may fail.")
+endif(TESTING)
 
 # LTO
 if(LTO)
