@@ -267,8 +267,10 @@ class Rpc {
   /// determined using the packet's type.
   void sm_pkt_udp_tx_st(const SmPkt &);
 
-  /// Send a session management request for this session
-  void send_sm_req_st(Session *, SmPktType);
+  /// Send a session management request for this session and set the SM request
+  /// timestamp.
+  /// The SM request type is computed using the session state
+  void send_sm_req_st(Session *);
 
   //
   // Session management packet handlers (rpc_connect_handlers.cc,

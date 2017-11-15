@@ -99,7 +99,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   alloc_recvs();
   session_vec.push_back(session);  // Add to list of all sessions
 
-  send_sm_req_st(session, SmPktType::kConnectReq);
+  send_sm_req_st(session);
   return client_endpoint.session_num;
 }
 
@@ -158,7 +158,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
           session->server.rpc_id);
 
       session->state = SessionState::kDisconnectInProgress;
-      send_sm_req_st(session, SmPktType::kDisconnectReq);
+      send_sm_req_st(session);
       return 0;
 
     case SessionState::kDisconnectInProgress:

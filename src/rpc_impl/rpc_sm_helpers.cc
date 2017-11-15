@@ -65,11 +65,17 @@ void Rpc<TTr>::sm_pkt_udp_tx_st(const SmPkt &sm_pkt) {
 }
 
 template <class TTr>
-void Rpc<TTr>::send_sm_req_st(Session *session, SmPktType pkt_type) {
-  assert(in_dispatch() && session->is_client() && sm_pkt_type_is_req(pkt_type));
+void Rpc<TTr>::send_sm_req_st(Session *session) {
+  assert(in_dispatch() && session->is_client());
+  assert(session->state == SessionState::kConnectInProgress ||
+         session->state == SessionState::kDisconnectInProgress);
+  session->client_info.sm_req_ts = rdtsc();
 
   SmPkt sm_pkt;
-  sm_pkt.pkt_type = pkt_type;
+  sm_pkt.pkt_type = session->state == SessionState::kConnectInProgress
+                        ? SmPktType::kConnectReq
+                        : SmPktType::kDisconnectReq;
+
   sm_pkt.err_type = SmErrType::kNoError;
   sm_pkt.uniq_token = session->uniq_token;
   sm_pkt.client = session->client;

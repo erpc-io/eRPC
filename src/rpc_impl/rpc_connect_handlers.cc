@@ -165,7 +165,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   if (sm_pkt.err_type == SmErrType::kInvalidRemoteRpcId) {
     if (retry_connect_on_invalid_rpc_id) {
       LOG_WARN("%s: Invalid remote Rpc ID. Retrying.\n", issue_msg);
-      send_sm_req_st(session, SmPktType::kConnectReq);
+      send_sm_req_st(session);
       return;
     }
   }
@@ -204,7 +204,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
 
     // Do what destroy_session() does with a connected session
     session->state = SessionState::kDisconnectInProgress;
-    send_sm_req_st(session, SmPktType::kDisconnectReq);
+    send_sm_req_st(session);
     return;
   }
 
