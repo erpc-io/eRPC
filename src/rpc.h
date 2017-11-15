@@ -848,9 +848,6 @@ class Rpc {
   FastRand fast_rand;         ///< A fast random generator
   UDPClient udp_client;       ///< UDP endpoint used to send SM packets
 
-  /// For tracking event loop reentrance (only with kDatapathChecks)
-  bool in_event_loop = false;
-
   /// All the faults that can be injected into eRPC for testing
   struct {
     /// Fail server routing info resolution at client. This is used to test the

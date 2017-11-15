@@ -177,20 +177,16 @@ void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
     switch (errno) {
       case EACCES:
         fprintf(stderr,
-                "eRPC HugeAlloc: SHM free error: "
-                "Insufficient permissions. SHM key = %d.\n",
+                "eRPC HugeAlloc: SHM free error for key %d. Permission denied.",
                 shm_key);
         break;
       case ENOENT:
-        fprintf(stderr,
-                "eRPC HugeAlloc: SHM free error: No such SHM key."
-                "SHM key = %d.\n",
+        fprintf(stderr, "eRPC HugeAlloc: SHM free error: No such SHM key %d.\n",
                 shm_key);
         break;
       default:
         fprintf(stderr,
-                "eRPC HugeAlloc: SHM free error: A wild SHM error: "
-                "%s\n",
+                "eRPC HugeAlloc: SHM free error: A wild SHM error: %s\n",
                 strerror(errno));
         break;
     }

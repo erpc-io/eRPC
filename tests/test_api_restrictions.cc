@@ -10,12 +10,7 @@ static constexpr size_t kAppReqSize = 32;  ///< Request size for this test
 /// Per-thread application context
 class AppContext : public BasicAppContext {};
 
-enum class AppDeathMode {
-  kReqHandlerRunsEventLoop,
-  kReqHandlerDeletesRpc,
-  kContFuncRunsEventLoop,
-  kContFuncDeletesRpc
-};
+enum class AppDeathMode { kBgThreadDeletesRpc };
 
 /// Used to configure the cause of death of the req handler or continuation
 std::atomic<AppDeathMode> app_death_mode;
@@ -26,8 +21,6 @@ auto reg_info_vec = {
 
 /// A request handler with a configurable death mode
 void req_handler(ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr && _context != nullptr);
-
   auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
   assert(context->rpc->in_background());
@@ -41,17 +34,8 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   int ret = context->rpc->destroy_session(0);
   ASSERT_EQ(ret, -EPERM);
 
-  if (app_death_mode == AppDeathMode::kReqHandlerRunsEventLoop) {
-    // Try to run the event loop
-    if (kDatapathChecks) {
-      test_printf("test: Trying to run event loop in req handler.\n");
-      ASSERT_DEATH(context->rpc->run_event_loop(kAppEventLoopMs), ".*");
-    }
-  }
-
-  if (app_death_mode == AppDeathMode::kReqHandlerDeletesRpc) {
-    // Try to delete the Rpc. This crashes even without kDatapathChecks.
-    test_printf("test: Trying to delete Rpc in req handler.\n");
+  if (app_death_mode == AppDeathMode::kBgThreadDeletesRpc) {
+    test_printf("test: Trying to delete Rpc in background thread.\n");
     ASSERT_DEATH(delete context->rpc, ".*");
   }
 
@@ -63,24 +47,9 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 
 /// A continuation function with a configurable death mode
 void cont_func(RespHandle *resp_handle, void *_context, size_t) {
-  assert(resp_handle != nullptr && _context != nullptr);
   auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
   assert(!context->rpc->in_background());
-
-  if (app_death_mode == AppDeathMode::kContFuncRunsEventLoop) {
-    // Try to run the event loop
-    if (kDatapathChecks) {
-      test_printf("test: Trying to run event loop in cont func.\n");
-      ASSERT_DEATH(context->rpc->run_event_loop(kAppEventLoopMs), ".*");
-    }
-  }
-
-  if (app_death_mode == AppDeathMode::kContFuncDeletesRpc) {
-    // Try to delete the Rpc. This crashes even without kDatapathChecks.
-    test_printf("test: Trying to delete Rpc in cont func.\n");
-    ASSERT_DEATH(delete context->rpc, ".*");
-  }
 
   context->num_rpc_resps++;
   context->rpc->release_response(resp_handle);
@@ -132,29 +101,12 @@ void TEST_HELPER() {
                                ConnectServers::kFalse, 0.0);
 }
 
-TEST(Restrictions, ReqHandlerRunsEventLoop) {
-  app_death_mode = AppDeathMode::kReqHandlerRunsEventLoop;
-  TEST_HELPER();
-}
-
-TEST(Restrictions, ReqHandlerDeletesRpc) {
-  app_death_mode = AppDeathMode::kReqHandlerDeletesRpc;
-  TEST_HELPER();
-}
-
-TEST(Restrictions, ContFuncRunsEventLoop) {
-  app_death_mode = AppDeathMode::kContFuncRunsEventLoop;
-  TEST_HELPER();
-}
-
-TEST(Restrictions, ContFuncDeletesRpc) {
-  app_death_mode = AppDeathMode::kContFuncDeletesRpc;
+TEST(Restrictions, BgThreadDeletesRpc) {
+  app_death_mode = AppDeathMode::kBgThreadDeletesRpc;
   TEST_HELPER();
 }
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
-  if (!erpc::kDatapathChecks) exit(-1);  // Fail quickly
-
   return RUN_ALL_TESTS();
 }

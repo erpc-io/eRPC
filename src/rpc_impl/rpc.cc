@@ -69,15 +69,6 @@ Rpc<TTr>::~Rpc() {
     exit(-1);
   }
 
-  // Rpc cannot be destroyed from within the event loop (e.g., in a request
-  // handler). However, event loop entrance tracking is enabled only in
-  // kDatapathChecks mode
-  if (kDatapathChecks && in_event_loop) {
-    LOG_ERROR("eRPC Rpc %u: Error. Cannot destroy when inside event loop.\n",
-              rpc_id);
-    exit(-1);
-  }
-
   // XXX: Check if all sessions are disconnected
   for (Session *session : session_vec) {
     if (session != nullptr) {
@@ -103,9 +94,7 @@ void Rpc<TTr>::nano_sleep(size_t ns) {
   size_t start = rdtsc();
   size_t end = start;
   size_t upp = static_cast<size_t>(nexus->freq_ghz * ns);
-  while (end - start < upp) {
-    end = rdtsc();
-  }
+  while (end - start < upp) end = rdtsc();
 }
 
 template <class TTr>

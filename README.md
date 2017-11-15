@@ -121,6 +121,9 @@
 ## Short-term TODOs
  * Use TX flush on client-side retransmission
  * Destroy session test fails with `kSessionCredits = 1`, `kSessionReqWindow = 1`
+ * Make a list of functions allowed in request and continuation handler. For
+   example, `run_ev_loop()` and `delete rpc` are not allowed, and eRPC does not
+   guard against these errors.
  * Make apps use BasicAppContext and `basic_sm_handler`.
  * Use `rt_assert` in src and apps
  * In IBTransport, check if MLX environment vars are set. Do it in constructor.

@@ -38,26 +38,13 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
 template <class TTr>
 void Rpc<TTr>::run_event_loop_once_st() {
   assert(in_dispatch());
-
-  if (kDatapathChecks) {
-    assert(!in_event_loop);
-    in_event_loop = true;
-  }
-
   ev_loop_ticker++;            // Needed for packet loss handling
   run_event_loop_do_one_st();  // Run at least once even if timeout_ms is 0
-
-  if (kDatapathChecks) in_event_loop = false;
 }
 
 template <class TTr>
 void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
   assert(in_dispatch());
-
-  if (kDatapathChecks) {
-    assert(!in_event_loop);
-    in_event_loop = true;
-  }
 
   uint64_t start_tsc = rdtsc();
   while (true) {
@@ -71,8 +58,6 @@ void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
       if (elapsed_ms > timeout_ms) break;
     }
   }
-
-  if (kDatapathChecks) in_event_loop = false;
 }
 
 }  // End erpc

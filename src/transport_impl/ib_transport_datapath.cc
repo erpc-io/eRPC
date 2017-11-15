@@ -162,20 +162,12 @@ void IBTransport::tx_flush() {
 }
 
 size_t IBTransport::rx_burst() {
-  int new_comps = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
-  assert(new_comps >= 0);  // When can this fail?
+  int ret = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
 
-  if (kDatapathChecks) {
-    for (int i = 0; i < new_comps; i++) {
-      if (unlikely(recv_wc[i].status != 0)) {
-        fprintf(stderr, "eRPC: Fatal error. Bad wc status %d\n",
-                recv_wc[i].status);
-        exit(-1);
-      }
-    }
-  }
-
-  return static_cast<size_t>(new_comps);
+  // XXX: When can this fail? This is similar to device failure, so it might
+  // be OK to destroy the owner Rpc object.
+  assert(ret >= 0);
+  return static_cast<size_t>(ret);
 }
 
 void IBTransport::post_recvs(size_t num_recvs) {

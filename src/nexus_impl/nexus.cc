@@ -14,10 +14,6 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
       mgmt_udp_port(mgmt_udp_port),
       num_bg_threads(num_bg_threads) {
   // Print warning messages if low-performance settings are enabled
-  if (kDatapathChecks) {
-    LOG_WARN("eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
-  }
-
   if (kTesting) {
     LOG_WARN("eRPC Nexus: Testing enabled. Performance will be low.\n");
   }

@@ -38,17 +38,9 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   assert(is_usr_session_num_in_range_st(session_num));
   Session *session = session_vec[static_cast<size_t>(session_num)];
 
-  if (!kDatapathChecks) {
-    // We never disconnect a session without notifying the eRPC user, so
-    // returning an error is not strictly required.
-    assert(session != nullptr && session->is_client() &&
-           session->is_connected());
-  } else {
-    if (unlikely(session == nullptr || !session->is_client() ||
-                 !session->is_connected())) {
-      return -EINVAL;
-    }
-  }
+  // We never disconnect a session before notifying the eRPC user, so we don't
+  // need to catch this behavior
+  assert(session != nullptr && session->is_client() && session->is_connected());
 
   // Try to grab a free session slot
   if (unlikely(session->client_info.sslot_free_vec.size() == 0)) return -EBUSY;
