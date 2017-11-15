@@ -60,11 +60,10 @@ static inline constexpr void dpath_stat_inc(size_t &stat, size_t val) {
   stat += val;
 }
 
-/// Fault injection code that can be disabled for non-tests
-#ifdef FAULT_INJECTION
-static constexpr bool kFaultInjection = true;
+#ifdef TESTING
+static constexpr bool kTesting = true;
 #else
-static constexpr bool kFaultInjection = false;
+static constexpr bool kTesting = false;
 #endif
 }
 

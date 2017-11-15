@@ -33,7 +33,7 @@ static bool validate_concurrency(const char *, uint64_t concurrency) {
 DEFINE_validator(concurrency, &validate_concurrency);
 
 static bool validate_drop_prob(const char *, double p) {
-  if (!erpc::kFaultInjection) return p == 0.0;
+  if (!erpc::kTesting) return p == 0.0;
   return p >= 0 && p < 1;
 }
 DEFINE_validator(drop_prob, &validate_drop_prob);

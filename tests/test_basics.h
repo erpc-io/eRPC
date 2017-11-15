@@ -127,9 +127,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
 
   Rpc<IBTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
                        kAppPhyPort, kAppNumaNode);
-  if (kFaultInjection) {
-    rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
-  }
+  if (kTesting) rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
 
   context.rpc = &rpc;
   num_servers_up++;

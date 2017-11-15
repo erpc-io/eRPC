@@ -116,8 +116,7 @@
    * Set transport max inline size to 120 bytes for ConnectX-3.
  * Setting `small_rpc_optlevel` to `small_rpc_optlevel_extreme` will disable
    support for large messages and background threads.
- * Setting `FAULT_INJECTION` to off will disable support to inject eRPC faults
-   at runtime.
+ * Unsetting `TESTING` disables support to inject eRPC faults at runtime.
 
 ## Short-term TODOs
  * Use TX flush on client-side retransmission

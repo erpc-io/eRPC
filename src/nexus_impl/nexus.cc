@@ -18,8 +18,8 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
     LOG_WARN("eRPC Nexus: Datapath checks enabled. Performance will be low.\n");
   }
 
-  if (kFaultInjection) {
-    LOG_WARN("eRPC Nexus: Fault injection enabled. Performance will be low.\n");
+  if (kTesting) {
+    LOG_WARN("eRPC Nexus: Testing enabled. Performance will be low.\n");
   }
 
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");

@@ -8,7 +8,7 @@ namespace erpc {
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_check_ok() const {
-  if (!kFaultInjection) throw std::runtime_error("eRPC Rpc: Faults disabled.");
+  if (!kTesting) throw std::runtime_error("eRPC Rpc: Faults disabled.");
   rt_assert(in_dispatch(),
             "eRPC Rpc: Non-creator threads can't inject faults.");
 }

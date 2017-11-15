@@ -45,10 +45,13 @@ class Rpc {
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
   /// Duration of a packet loss detection epoch in milliseconds
-  static constexpr size_t kPktLossEpochMs = kFaultInjection ? 1 : 10;
+  static constexpr size_t kPktLossEpochMs = kTesting ? 1 : 10;
 
   /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kPktLossTimeoutMs = kFaultInjection ? 1 : 500;
+  static constexpr size_t kPktLossTimeoutMs = kTesting ? 1 : 500;
+
+  /// Timeout for a session management request in milliseconds
+  static constexpr size_t kSMTimeoutMs = kTesting ? 1 : 100;
 
   /// Reset threshold of the event loop ticker. Assuming each iteration of the
   /// event loop lasts 10 microseconds (it is much smaller in reality), the
@@ -443,7 +446,7 @@ class Rpc {
     item.offset = offset;
     item.data_bytes = data_bytes;
 
-    if (kFaultInjection) {
+    if (kTesting) {
       item.drop = roll_pkt_drop();
       if (item.drop) {
         LOG_DEBUG(
@@ -475,7 +478,7 @@ class Rpc {
     item.offset = 0;
     item.data_bytes = 0;
 
-    if (kFaultInjection) {
+    if (kTesting) {
       item.drop = roll_pkt_drop();
       if (item.drop) {
         LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,

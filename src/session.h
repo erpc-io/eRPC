@@ -103,6 +103,7 @@ class Session {
     FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
     size_t credits = kSessionCredits;  ///< Currently available credits
+    size_t sm_req_ts;  ///< Timestamp of the last session management request
   } client_info;
 
   struct {

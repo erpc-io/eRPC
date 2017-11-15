@@ -186,7 +186,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   // Try to resolve the server-provided routing info
   Transport::RoutingInfo srv_routing_info = sm_pkt.server.routing_info;
   bool resolve_success;
-  if (kFaultInjection && faults.fail_resolve_server_rinfo) {
+  if (kTesting && faults.fail_resolve_server_rinfo) {
     resolve_success = false;  // Inject fault
   } else {
     resolve_success = transport->resolve_remote_routing_info(&srv_routing_info);

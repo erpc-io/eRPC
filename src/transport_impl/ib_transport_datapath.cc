@@ -67,7 +67,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     const auto* ib_rinfo =
         reinterpret_cast<ib_routing_info_t*>(item.routing_info);
 
-    if (kFaultInjection && item.drop) {
+    if (kTesting && item.drop) {
       // Remote QPN = 0 is reserved by InfiniBand, so the packet will be dropped
       wr.wr.ud.remote_qpn = 0;
     } else {

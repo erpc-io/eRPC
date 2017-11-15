@@ -256,9 +256,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
                                    static_cast<uint8_t>(thread_id), sm_handler,
                                    kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
-  if (erpc::kFaultInjection) {
-    rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
-  }
+  if (erpc::kTesting) rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
 
   c.rpc = &rpc;
 
