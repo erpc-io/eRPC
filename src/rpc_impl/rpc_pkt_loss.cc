@@ -28,9 +28,7 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
 
       size_t cycles_since_enqueue = rdtsc() - sslot.client_info.enqueue_req_ts;
       size_t ms_since_enqueue = to_msec(cycles_since_enqueue, nexus->freq_ghz);
-      if (ms_since_enqueue >= kPktLossTimeoutMs) {
-        pkt_loss_retransmit_st(&sslot);
-      }
+      if (ms_since_enqueue >= kPktLossTimeoutMs) pkt_loss_retransmit_st(&sslot);
     }
   }
 }
@@ -39,7 +37,6 @@ void Rpc<TTr>::pkt_loss_scan_reqs_st() {
 template <class TTr>
 void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   assert(in_dispatch());
-  assert(sslot != nullptr);
 
   auto &ci = sslot->client_info;
   auto &credits = sslot->session->client_info.credits;

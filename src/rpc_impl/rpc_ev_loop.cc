@@ -12,12 +12,10 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
   if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_rx_st();
 
   if (ev_loop_ticker >= kEvLoopTickerReset) {
-    // Check for packet loss if we're in a new epoch
-    size_t cur_ts = rdtsc();
-
-    if (cur_ts - prev_epoch_ts >= pkt_loss_epoch_cycles) {
-      pkt_loss_scan_reqs_st();
-      prev_epoch_ts = cur_ts;
+    if (rdtsc() - prev_epoch_ts >= pkt_loss_epoch_cycles) {
+      // Check for packet loss if we're in a new epoch
+      prev_epoch_ts = rdtsc();
+      pkt_loss_scan_reqs_st();  // Datapath packet loss
     }
   }
 
@@ -51,7 +49,7 @@ void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
     ev_loop_ticker++;
     run_event_loop_do_one_st();  // Run at least once even if timeout_ms is 0
 
-    // Amortize timer overhead over event loop iterations
+    // Check if timeout_ms has elapsed. Amortize overhead over event loop iters.
     static_assert(kEvLoopTickerReset <= 1000, "");
     if (ev_loop_ticker >= kEvLoopTickerReset) {
       ev_loop_ticker = 0;
