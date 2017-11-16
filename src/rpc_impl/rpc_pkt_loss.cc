@@ -25,7 +25,9 @@ void Rpc<TTr>::pkt_loss_scan_st() {
 
           size_t cycles_elapsed = rdtsc() - sslot.client_info.enqueue_req_ts;
           size_t ms_elapsed = to_msec(cycles_elapsed, nexus->freq_ghz);
-          if (ms_elapsed >= kPktLossTimeoutMs) pkt_loss_retransmit_st(&sslot);
+          if (ms_elapsed >= kRpcPktLossTimeoutMs) {
+            pkt_loss_retransmit_st(&sslot);
+          }
         }
 
         break;
@@ -33,7 +35,7 @@ void Rpc<TTr>::pkt_loss_scan_st() {
       case SessionState::kConnectInProgress:
       case SessionState::kDisconnectInProgress:
         // Session management packet loss detection
-        if (rdtsc() - session->client_info.sm_req_ts > kPktLossTimeoutMs) {
+        if (rdtsc() - session->client_info.sm_req_ts > kSMTimeoutMs) {
           send_sm_req_st(session);
         }
         break;

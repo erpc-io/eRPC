@@ -48,7 +48,7 @@ class Rpc {
   static constexpr size_t kPktLossEpochMs = kTesting ? 1 : 10;
 
   /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kPktLossTimeoutMs = kTesting ? 1 : 500;
+  static constexpr size_t kRpcPktLossTimeoutMs = kTesting ? 1 : 500;
 
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 1 : 100;
