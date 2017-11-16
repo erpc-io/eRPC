@@ -33,11 +33,13 @@ void avoid_gcc5_unused_warning() { _unused(test_ms_validator_registered); }
 //
 // PAPI
 //
-void papi_init() {
+
+// This returns an int instead of throwing an error becuase I can't get PAPI to
+// work on Ubuntu 17.04
+int papi_init() {
   float real_time, proc_time, ipc;
   long long ins;
-  int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-  if (ret < PAPI_OK) throw std::runtime_error("PAPI initialization failed.");
+  return PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
 }
 
 float papi_get_ipc() {

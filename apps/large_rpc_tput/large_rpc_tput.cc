@@ -40,6 +40,8 @@ std::function<size_t(AppContext *, size_t resp_session_idx)>
     get_session_idx_func = nullptr;
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
+bool is_papi_usable = false;  // Not usable on Ubuntu 17.04
+
 // A basic session management handler that expects successful responses
 void sm_handler(int session_num, erpc::SmEventType sm_event_type,
                 erpc::SmErrType sm_err_type, void *_context) {
@@ -189,7 +191,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   if (c->stat_rx_bytes_tot >= 50000000 || c->stat_tx_bytes_tot >= 50000000) {
     float ipc = -1.0;
-    if (FLAGS_num_threads == 1) ipc = papi_get_ipc();
+    if (FLAGS_num_threads == 1 && is_papi_usable) ipc = papi_get_ipc();
 
     double ns = erpc::ns_since(c->tput_t0);
     double rx_GBps = c->stat_rx_bytes_tot / ns;
@@ -279,7 +281,9 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   // and response MsgBuffers. Some threads may not send requests.
   alloc_req_resp_msg_buffers(&c);
 
-  if (FLAGS_num_threads == 1) papi_init();  // No IPC for multi-thread
+  if (FLAGS_num_threads == 1) {
+    is_papi_usable = papi_init();  // No IPC for multi-threaded
+  }
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 

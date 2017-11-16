@@ -41,6 +41,7 @@ DEFINE_validator(concurrency, &validate_concurrency);
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
+bool is_papi_usable = false;  // PAPI seems to not work on Ubuntu 17.04
 
 union tag_t {
   struct {
@@ -242,16 +243,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->stat_resp_rx[i] = 0;
     }
 
-    float ipc = -1.0;
-    if (FLAGS_num_threads == 1) {
-      float real_time, proc_time;
-      long long ins;
-      int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-      if (ret < PAPI_OK) {
-        fprintf(stderr, "PAPI IPC failed.\n");
-        exit(-1);
-      }
-    }
+    float ipc = -1;
+    if (FLAGS_num_threads == 1 && is_papi_usable) ipc = papi_get_ipc();
 
     printf(
         "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
@@ -331,13 +324,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
   // Initialize PAPI measurement if we're running one thread
   if (FLAGS_num_threads == 1) {
-    float real_time, proc_time, ipc;
-    long long ins;
-    int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-    if (ret < PAPI_OK) {
-      fprintf(stderr, "PAPI initialization failed.\n");
-      exit(-1);
-    }
+    is_papi_usable = (papi_init() == PAPI_OK);
   }
 
   for (size_t i = 0; i < FLAGS_concurrency; i++) send_reqs(&c, i);
