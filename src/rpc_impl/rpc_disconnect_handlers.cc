@@ -22,7 +22,7 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
   // Handle reordering. We don't need the session token for this.
   Session *session = session_vec.at(session_num);
   if (session == nullptr) {
-    LOG_WARN("%s: Duplicate request. Re-sending response.\n", issue_msg);
+    LOG_INFO("%s: Duplicate request. Re-sending response.\n", issue_msg);
     sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kNoError));
     return;
   }
@@ -71,7 +71,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   // Handle reordering. We don't need the session token for this.
   Session *session = session_vec[session_num];
   if (session == nullptr) {
-    LOG_WARN("%s: Duplicate response. Ignoring.\n", issue_msg);
+    LOG_INFO("%s: Duplicate response. Ignoring.\n", issue_msg);
     return;
   }
 

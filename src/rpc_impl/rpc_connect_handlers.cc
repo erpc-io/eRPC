@@ -23,7 +23,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
     const Session *session = session_vec[srv_session_num];
     if (session == nullptr || session->state != SessionState::kConnected) {
-      LOG_WARN("%s: Duplicate request, and response is unneeded.\n", issue_msg);
+      LOG_INFO("%s: Duplicate request, and response is unneeded.\n", issue_msg);
       return;
     } else {
       SmPkt resp_sm_pkt = sm_construct_resp(sm_pkt, SmErrType::kNoError);
@@ -148,7 +148,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   Session *session = session_vec[session_num];
   if (session == nullptr ||
       session->state != SessionState::kConnectInProgress) {
-    LOG_WARN("%s: Duplicate response. Ignoring.\n", issue_msg);
+    LOG_INFO("%s: Duplicate response. Ignoring.\n", issue_msg);
     return;
   }
 
