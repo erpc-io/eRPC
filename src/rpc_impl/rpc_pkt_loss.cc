@@ -7,28 +7,42 @@
 namespace erpc {
 
 template <class TTr>
-void Rpc<TTr>::pkt_loss_scan_reqs_st() {
+void Rpc<TTr>::pkt_loss_scan_st() {
   assert(in_dispatch());
 
   for (Session *session : session_vec) {
-    // Process only connected client sessions
-    if (session == nullptr || session->is_server() ||
-        !session->is_connected()) {
-      continue;
+    // Process only client sessions
+    if (session == nullptr || session->is_server()) continue;
+
+    switch (session->state) {
+      case SessionState::kConnected: {
+        // Datapath packet loss detection
+        for (SSlot &sslot : session->sslot_arr) {
+          if (sslot.tx_msgbuf == nullptr) continue;       // Inactive slot
+          if (sslot.client_info.req_sent == 0) continue;  // No packet sent
+
+          assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
+
+          size_t cycles_elapsed = rdtsc() - sslot.client_info.enqueue_req_ts;
+          size_t ms_elapsed = to_msec(cycles_elapsed, nexus->freq_ghz);
+          if (ms_elapsed >= kPktLossTimeoutMs) pkt_loss_retransmit_st(&sslot);
+        }
+
+        break;
+      }
+      case SessionState::kConnectInProgress:
+      case SessionState::kDisconnectInProgress:
+        // Session management packet loss detection
+        if (rdtsc() - session->client_info.sm_req_ts > kPktLossTimeoutMs) {
+          send_sm_req_st(session);
+        }
+        break;
+      case SessionState::kResetInProgress:
+        break;
     }
 
-    for (SSlot &sslot : session->sslot_arr) {
-      // Ignore sslots that don't have a request
-      if (sslot.tx_msgbuf == nullptr) continue;
-
-      // Ignore sslots for which we haven't sent any request packets
-      if (sslot.client_info.req_sent == 0) continue;
-
-      assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
-
-      size_t cycles_since_enqueue = rdtsc() - sslot.client_info.enqueue_req_ts;
-      size_t ms_since_enqueue = to_msec(cycles_since_enqueue, nexus->freq_ghz);
-      if (ms_since_enqueue >= kPktLossTimeoutMs) pkt_loss_retransmit_st(&sslot);
+    if (session->state == SessionState::kConnectInProgress ||
+        session->state == SessionState::kDisconnectInProgress) {
     }
   }
 }

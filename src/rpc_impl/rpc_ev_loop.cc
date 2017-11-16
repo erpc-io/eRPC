@@ -15,7 +15,7 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
     if (rdtsc() - prev_epoch_ts >= pkt_loss_epoch_cycles) {
       // Check for packet loss if we're in a new epoch
       prev_epoch_ts = rdtsc();
-      pkt_loss_scan_reqs_st();  // Datapath packet loss
+      pkt_loss_scan_st();
     }
   }
 

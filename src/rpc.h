@@ -654,8 +654,8 @@ class Rpc {
   // Packet loss handling (rpc_pkt_loss.cc)
   //
 
-  /// Scan all outstanding requests for suspected packet loss
-  void pkt_loss_scan_reqs_st();
+  /// Scan sessions and requests for session management and datapath packet loss
+  void pkt_loss_scan_st();
 
   /// Retransmit packets for an sslot for which we suspect a packet loss
   void pkt_loss_retransmit_st(SSlot *sslot);
