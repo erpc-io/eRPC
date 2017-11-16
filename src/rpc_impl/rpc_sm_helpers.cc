@@ -7,15 +7,12 @@
 namespace erpc {
 
 template <class TTr>
-void Rpc<TTr>::handle_sm_st() {
+void Rpc<TTr>::handle_sm_rx_st() {
   assert(in_dispatch());
-
-  // Handle SM work items queued by the session management thread
   MtQueue<SmPkt> &queue = nexus_hook.sm_rx_queue;
-  const size_t cmds_to_process = queue.size;  // We might re-add to the queue
 
-  for (size_t i = 0; i < cmds_to_process; i++) {
-    const SmPkt sm_pkt = queue.unlocked_pop();
+  while (queue.size > 0) {
+    const SmPkt sm_pkt = queue.unlocked_pop();  // Lock is held only briefly
     switch (sm_pkt.pkt_type) {
       case SmPktType::kConnectReq:
         handle_connect_req_st(sm_pkt);

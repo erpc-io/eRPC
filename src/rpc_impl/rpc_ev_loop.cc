@@ -8,8 +8,8 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
 
   dpath_stat_inc(dpath_stats.ev_loop_calls, 1);
 
-  // Handle session management events, if any
-  if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_st();
+  // Handle any new session management packets
+  if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_rx_st();
 
   if (ev_loop_ticker >= kEvLoopTickerReset) {
     // Check for packet loss if we're in a new epoch

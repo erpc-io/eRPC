@@ -253,10 +253,8 @@ class Rpc {
  private:
   // rpc_sm_helpers.cc
 
-  /// Process all session management packets in the hook's RX list and free
-  /// them. The handlers for individual request/response types should not free
-  /// packets.
-  void handle_sm_st();
+  /// Process all session management packets in the hook's RX list
+  void handle_sm_rx_st();
 
   /// Free a session's resources and mark it as null in the session vector.
   /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
