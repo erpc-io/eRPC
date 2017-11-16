@@ -52,6 +52,7 @@ void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
     run_event_loop_do_one_st();  // Run at least once even if timeout_ms is 0
 
     // Amortize timer overhead over event loop iterations
+    static_assert(kEvLoopTickerReset <= 1000, "");
     if (ev_loop_ticker >= kEvLoopTickerReset) {
       ev_loop_ticker = 0;
       double elapsed_ms = to_sec(rdtsc() - start_tsc, nexus->freq_ghz) * 1000;
