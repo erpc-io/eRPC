@@ -198,13 +198,23 @@ class SessionEndpoint {
   uint16_t session_num;  ///< The session number of this endpoint in its Rpc
   Transport::RoutingInfo routing_info;  ///< Endpoint's routing info
 
-  // Fill invalid metadata to aid debugging
   SessionEndpoint() {
     memset(static_cast<void *>(hostname), 0, sizeof(hostname));
     phy_port = kInvalidPhyPort;
     rpc_id = kInvalidRpcId;
     session_num = kInvalidSessionNum;
     memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));
+  }
+
+  SessionEndpoint(Transport::TransportType transport_type,
+                  std::string hostname_str, uint8_t phy_port, uint8_t rpc_id,
+                  uint16_t session_num)
+      : transport_type(transport_type),
+        phy_port(phy_port),
+        rpc_id(rpc_id),
+        session_num(session_num) {
+    strcpy(hostname, hostname_str.c_str());
+    memset(reinterpret_cast<char *>(&routing_info), 0, sizeof(routing_info));
   }
 
   /// Return a string with a name for this session endpoint, containing
@@ -254,6 +264,15 @@ class SmPkt {
         << ", client: " << client.name() << ", server: " << server.name();
     return ret.str();
   }
+
+  SmPkt() {}
+  SmPkt(SmPktType pkt_type, SmErrType err_type, sm_uniq_token_t uniq_token,
+        SessionEndpoint client, SessionEndpoint server)
+      : pkt_type(pkt_type),
+        err_type(err_type),
+        uniq_token(uniq_token),
+        client(client),
+        server(server) {}
 
   bool is_req() const { return sm_pkt_type_is_req(pkt_type); }
   bool is_resp() const { return !is_req(); }
