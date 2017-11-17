@@ -51,7 +51,7 @@ flags = [
     '-Wno-unused-function',
     '-Wold-style-cast',
     '-Wsign-conversion',
-    '-std=c++14',
+    '-std=c++17',
 ]
 
 

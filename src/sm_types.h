@@ -206,17 +206,6 @@ class SessionEndpoint {
     memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));
   }
 
-  SessionEndpoint(Transport::TransportType transport_type,
-                  std::string hostname_str, uint8_t phy_port, uint8_t rpc_id,
-                  uint16_t session_num)
-      : transport_type(transport_type),
-        phy_port(phy_port),
-        rpc_id(rpc_id),
-        session_num(session_num) {
-    strcpy(hostname, hostname_str.c_str());
-    memset(reinterpret_cast<char *>(&routing_info), 0, sizeof(routing_info));
-  }
-
   /// Return a string with a name for this session endpoint, containing
   /// its hostname, Rpc ID, and the session number.
   inline std::string name() const {

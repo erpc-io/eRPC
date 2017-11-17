@@ -1,6 +1,9 @@
-#include "rpc.h"
 #include <gtest/gtest.h>
 
+#define private public
+#include "rpc.h"
+
+// These tests never run event loop, so SM pkts sent by Rpc have no consequence
 namespace erpc {
 
 // An Rpc with no established sessions
@@ -11,13 +14,12 @@ class RpcTest : public ::testing::Test {
   static constexpr size_t kRpcId = 0;
   static constexpr size_t kNumBgThreads = 0;
   static constexpr size_t kNumaNode = 0;
+  static constexpr size_t kUniqToken = 42;
   static constexpr auto transport_type = Transport::TransportType::kInfiniBand;
 
   static void sm_handler(int, SmEventType, SmErrType, void *) {}
 
-  RpcTest()
-      : general_endpoint(transport_type, "localhost", kPhyPort, kRpcId,
-                         kInvalidSessionNum) {
+  RpcTest() {
     nexus = new Nexus("localhost", kUdpPort, kNumBgThreads);
     rt_assert(nexus != nullptr, "RpcTest: Failed to create nexus");
 
@@ -34,20 +36,29 @@ class RpcTest : public ::testing::Test {
     delete nexus;
   }
 
+  SessionEndpoint gen_session_endpoint(uint8_t rpc_id, uint16_t session_num) {
+    SessionEndpoint se;
+    se.transport_type = transport_type;
+    strcpy(se.hostname, "localhost");
+    se.phy_port = kPhyPort;
+    se.rpc_id = rpc_id;
+    se.session_num = session_num;
+    return se;
+  }
+
   Nexus *nexus = nullptr;
   Rpc<IBTransport> *rpc = nullptr;
-
-  // This RPC endpoint without session number
-  const SessionEndpoint general_endpoint;
 };
 
 TEST_F(RpcTest, handle_connect_req_st) {
-  auto client = SessionEndpoint(Transport::TransportType::kInfiniBand,
-                                "localhost", kPhyPort, kRpcId + 1, 0);
-  const sm_uniq_token_t uniq_token = 0;
+  auto server = gen_session_endpoint(kRpcId, kInvalidSessionNum);
+  auto client = gen_session_endpoint(kRpcId + 1, /* session number */ 0);
+  SmPkt sm_pkt(SmPktType::kConnectReq, SmErrType::kNoError, kUniqToken, client,
+               server);
 
-  SmPkt sm_pkt(SmPktType::kConnectReq, SmErrType::kNoError, uniq_token, client,
-               general_endpoint);
+  rpc->handle_connect_req_st(sm_pkt);
+  ASSERT_EQ(rpc->session_vec.size(), 1);
+  ASSERT_EQ(rpc->sm_token_map.count(kUniqToken), 1);
 }
 
 }  // End erpc

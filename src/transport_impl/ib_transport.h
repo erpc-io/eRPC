@@ -32,7 +32,7 @@ class IBTransport : public Transport {
   // Derived constants
 
   /// Maximum data bytes (i.e., non-header) in a packet
-  static const size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
+  static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
 
   /**
    * @brief Session endpoint routing info for InfiniBand.
