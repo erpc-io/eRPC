@@ -7,11 +7,13 @@
 #include <unistd.h>
 #include <map>
 #include <stdexcept>
+#include <vector>
 
 namespace erpc {
 
 /// Basic UDP client class that supports sending messages and caches remote
 /// addrinfo mappings
+template <class T>
 class UDPClient {
  public:
   UDPClient() {
@@ -29,7 +31,7 @@ class UDPClient {
   }
 
   ssize_t send(const std::string rem_hostname, uint16_t rem_port,
-               const char *msg, size_t size) {
+               const T &msg) {
     struct addrinfo *rem_addrinfo = nullptr;
     if (addrinfo_map.count(rem_hostname) != 0) {
       rem_addrinfo = addrinfo_map.at(rem_hostname);
@@ -52,19 +54,27 @@ class UDPClient {
       addrinfo_map[rem_hostname] = rem_addrinfo;
     }
 
-    ssize_t ret = sendto(sock_fd, msg, size, 0, rem_addrinfo->ai_addr,
+    ssize_t ret = sendto(sock_fd, &msg, sizeof(T), 0, rem_addrinfo->ai_addr,
                          rem_addrinfo->ai_addrlen);
-    if (ret != static_cast<ssize_t>(size)) {
+    if (ret != static_cast<ssize_t>(sizeof(T))) {
       throw std::runtime_error("sendto() failed. errno = " +
                                std::string(strerror(errno)));
     }
 
+    if (enable_recording_flag) sent_vec.push_back(msg);
     return ret;
   }
+
+  /// Maintain a all packets sent by this client
+  void enable_recording() { enable_recording_flag = true; }
 
  private:
   int sock_fd = -1;
   std::map<std::string, struct addrinfo *> addrinfo_map;
+
+  /// The list of all packets sent, maintained if recording is enabled
+  std::vector<T> sent_vec;
+  bool enable_recording_flag = false;  ///< Flag to enable recording
 };
 
 }  // End erpc

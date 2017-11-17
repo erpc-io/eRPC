@@ -9,6 +9,7 @@
 namespace erpc {
 
 /// Basic UDP server class that supports receiving messages
+template <class T>
 class UDPServer {
  public:
   UDPServer(uint16_t port, size_t timeout_ms, size_t rx_buffer_size = 0)
@@ -55,8 +56,8 @@ class UDPServer {
     if (sock_fd != -1) close(sock_fd);
   }
 
-  ssize_t recv_blocking(char *msg, size_t max_size) {
-    return recv(sock_fd, msg, max_size, 0);
+  ssize_t recv_blocking(T &msg) {
+    return recv(sock_fd, static_cast<void *>(&msg), sizeof(T), 0);
   }
 
  private:

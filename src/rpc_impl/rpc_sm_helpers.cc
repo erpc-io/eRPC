@@ -52,13 +52,9 @@ template <class TTr>
 void Rpc<TTr>::sm_pkt_udp_tx_st(const SmPkt &sm_pkt) {
   LOG_INFO("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
            sm_pkt.to_string().c_str());
-  if (sm_pkt.is_req()) {
-    udp_client.send(sm_pkt.server.hostname, nexus->mgmt_udp_port,
-                    reinterpret_cast<const char *>(&sm_pkt), sizeof(sm_pkt));
-  } else {
-    udp_client.send(sm_pkt.client.hostname, nexus->mgmt_udp_port,
-                    reinterpret_cast<const char *>(&sm_pkt), sizeof(sm_pkt));
-  }
+  const std::string rem_hostname =
+      sm_pkt.is_req() ? sm_pkt.server.hostname : sm_pkt.client.hostname;
+  udp_client.send(rem_hostname, nexus->mgmt_udp_port, sm_pkt);
 }
 
 template <class TTr>

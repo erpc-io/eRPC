@@ -846,7 +846,7 @@ class Rpc {
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
   SlowRand slow_rand;         ///< A slow random generator for "real" randomness
   FastRand fast_rand;         ///< A fast random generator
-  UDPClient udp_client;       ///< UDP endpoint used to send SM packets
+  UDPClient<SmPkt> udp_client;  ///< UDP endpoint used to send SM packets
 
   /// All the faults that can be injected into eRPC for testing
   struct {

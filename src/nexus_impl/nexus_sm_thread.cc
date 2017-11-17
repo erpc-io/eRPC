@@ -9,14 +9,14 @@ static constexpr size_t kSmThreadRxBlockMs = 20;
 static constexpr size_t kUDPBufferSz = MB(4);
 
 void Nexus::sm_thread_func(SmThreadCtx ctx) {
-  UDPServer udp_server(ctx.mgmt_udp_port, kSmThreadRxBlockMs, kUDPBufferSz);
-  UDPClient udp_client;
+  UDPServer<SmPkt> udp_server(ctx.mgmt_udp_port, kSmThreadRxBlockMs,
+                              kUDPBufferSz);
+  UDPClient<SmPkt> udp_client;
 
   // This is not a busy loop because of recv_blocking()
   while (*ctx.kill_switch == false) {
     SmPkt sm_pkt;
-    ssize_t ret = udp_server.recv_blocking(reinterpret_cast<char *>(&sm_pkt),
-                                           sizeof(sm_pkt));
+    ssize_t ret = udp_server.recv_blocking(sm_pkt);
 
     if (ret >= 0 && !(*ctx.drop_all_rx_flag)) {
       rt_assert(static_cast<size_t>(ret) == sizeof(sm_pkt),
@@ -43,12 +43,11 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
               "Rpc %u from %s. Sending response.\n",
               target_rpc_id, sm_pkt.client.name().c_str());
 
-          SmPkt resp_sm_pkt =
+          const SmPkt resp_sm_pkt =
               sm_construct_resp(sm_pkt, SmErrType::kInvalidRemoteRpcId);
 
           udp_client.send(resp_sm_pkt.client.hostname, ctx.mgmt_udp_port,
-                          reinterpret_cast<char *>(&resp_sm_pkt),
-                          sizeof(resp_sm_pkt));
+                          resp_sm_pkt);
         } else {
           LOG_WARN(
               "eRPC Nexus: Received session management response for invalid "
