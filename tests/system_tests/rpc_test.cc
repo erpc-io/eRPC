@@ -63,6 +63,12 @@ TEST_F(RpcTest, handle_connect_req_st) {
   SmPkt sm_pkt(SmPktType::kConnectReq, SmErrType::kNoError, kUniqToken, client,
                server);
 
+  // Process first connect request
+  rpc->handle_connect_req_st(sm_pkt);
+  ASSERT_EQ(rpc->session_vec.size(), 1);
+  ASSERT_EQ(rpc->sm_token_map.count(kUniqToken), 1);
+
+  // Process connect request again
   rpc->handle_connect_req_st(sm_pkt);
   ASSERT_EQ(rpc->session_vec.size(), 1);
   ASSERT_EQ(rpc->sm_token_map.count(kUniqToken), 1);
