@@ -33,6 +33,8 @@ namespace erpc {
  */
 template <class TTr>
 class Rpc {
+  friend class RpcTest;
+
  public:
   /// Max request or response *data* size, i.e., excluding packet headers
   static constexpr size_t kMaxMsgSize =
