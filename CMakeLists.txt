@@ -160,36 +160,45 @@ set(MICA_SOURCES
   mica/src/mica/util/config.cc)
 
 # The tests to run using ctest
-set(CTEST_TESTS
-  test_create_session
-  test_create_session_args
-  test_destroy_session
-  test_api_restrictions
-  test_small_msg
-  test_large_msg
-  test_req_in_cont_func
-  test_req_in_req_func
-  test_packet_loss)
+set(CLIENT_TESTS
+  create_session_test
+  create_session_args_test
+  destroy_session_test
+  api_restrictions_test
+  small_msg_test
+  large_msg_test
+  req_in_cont_func_test
+  req_in_req_func_test
+  packet_loss_test)
 
-# Other tests that are run without ctest
-set(OTHER_TESTS
-  test_huge_alloc
-  test_rand
-  test_fixed_vector)
+set(SYSTEM_TESTS
+  rpc_test)
+
+# These are not run using ctest
+set(UTIL_TESTS
+  huge_alloc_test
+  rand_test
+  fixed_vector_test)
 
 # Compile the tests
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling ERPC as a library")
   add_library(erpc ${SOURCES})
 
-  foreach(test_name IN LISTS CTEST_TESTS)
-    add_executable(${test_name} tests/${test_name}.cc)
+  foreach(test_name IN LISTS CLIENT_TESTS)
+    add_executable(${test_name} tests/client_tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
   endforeach()
 
-  foreach(test_name IN LISTS OTHER_TESTS)
-    add_executable(${test_name} tests/${test_name}.cc)
+  foreach(test_name IN LISTS SYSTEM_TESTS)
+    add_executable(${test_name} tests/system_tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    add_test(NAME ${test_name} COMMAND ${test_name})
+  endforeach()
+
+  foreach(test_name IN LISTS UTIL_TESTS)
+    add_executable(${test_name} tests/util_tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
   endforeach()
 endif()
