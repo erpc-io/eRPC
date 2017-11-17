@@ -81,6 +81,9 @@ class Nexus {
    */
   int register_req_func(uint8_t req_type, ReqFunc req_func);
 
+  /// Drop all received SM packets
+  inline void drop_all_rx() { drop_all_rx_flag = true; }
+
  private:
   /// Background thread context
   class BgThreadCtx {
@@ -102,10 +105,11 @@ class Nexus {
   class SmThreadCtx {
    public:
     // Installed by the Nexus
-    std::string hostname;           ///< User-provided hostname of this node
-    uint16_t mgmt_udp_port;         ///< The Nexus's session management port
-    volatile bool *kill_switch;     ///< The Nexus's kill switch
-    volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
+    std::string hostname;             ///< User-provided hostname of this node
+    uint16_t mgmt_udp_port;           ///< The Nexus's session management port
+    volatile bool *kill_switch;       ///< The Nexus's kill switch
+    volatile bool *drop_all_rx_flag;  ///< The Nexus's "drop RX" flag
+    volatile Hook **reg_hooks_arr;    ///< The Nexus's hooks array
     std::mutex *nexus_lock;
   };
 
@@ -141,6 +145,7 @@ class Nexus {
   Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};
 
   volatile bool kill_switch;  ///< Used to turn off SM and background threads
+  volatile bool drop_all_rx_flag = false;  ///< Used to drop all RX packets
 
   std::thread sm_thread;  ///< The session management thread
   MtQueue<BgWorkItem> bg_req_queue[kMaxBgThreads];  ///< Background req queues

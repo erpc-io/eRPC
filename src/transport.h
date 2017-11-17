@@ -145,8 +145,8 @@ class Transport {
 
   /**
    * @brief Try to resolve routing information received from a remote host. The
-   * remote, cluster-wide meaningful info is available in \p routing_info, and
-   * the resolved, locally-meaningful info is also stored in \p routing_info.
+   * remote, cluster-wide meaningful info is available in \p routing_info. The
+   * resolved, locally-meaningful info is also stored in \p routing_info.
    *
    * For example, for InfiniBand, this involves creating the address handle
    * using the remote port LID.

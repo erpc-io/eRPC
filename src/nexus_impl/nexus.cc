@@ -42,6 +42,7 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   sm_thread_ctx.hostname = hostname;
   sm_thread_ctx.mgmt_udp_port = mgmt_udp_port;
   sm_thread_ctx.kill_switch = &kill_switch;
+  sm_thread_ctx.drop_all_rx_flag = &drop_all_rx_flag;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
 

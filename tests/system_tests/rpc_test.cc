@@ -22,6 +22,7 @@ class RpcTest : public ::testing::Test {
   RpcTest() {
     nexus = new Nexus("localhost", kUdpPort, kNumBgThreads);
     rt_assert(nexus != nullptr, "RpcTest: Failed to create nexus");
+    nexus->drop_all_rx();
 
     rpc = new Rpc<IBTransport>(nexus, nullptr, kRpcId, sm_handler, kPhyPort,
                                kNumaNode);
@@ -37,12 +38,18 @@ class RpcTest : public ::testing::Test {
   }
 
   SessionEndpoint gen_session_endpoint(uint8_t rpc_id, uint16_t session_num) {
+    rt_assert(rpc != nullptr,
+              "RpcTest: gen_session_endpoint() requires valid Rpc");
+
     SessionEndpoint se;
     se.transport_type = transport_type;
     strcpy(se.hostname, "localhost");
     se.phy_port = kPhyPort;
     se.rpc_id = rpc_id;
     se.session_num = session_num;
+
+    // Any routing info that's resolvable is fine
+    rpc->transport->fill_local_routing_info(&se.routing_info);
     return se;
   }
 

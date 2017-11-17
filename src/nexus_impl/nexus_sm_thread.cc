@@ -17,7 +17,8 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
     SmPkt sm_pkt;
     ssize_t ret = udp_server.recv_blocking(reinterpret_cast<char *>(&sm_pkt),
                                            sizeof(sm_pkt));
-    if (ret >= 0) {
+
+    if (ret >= 0 && !(*ctx.drop_all_rx_flag)) {
       rt_assert(static_cast<size_t>(ret) == sizeof(sm_pkt),
                 "eRPC Nexus: Invalid SM packet RX size.");
 
@@ -34,18 +35,26 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
       if (target_hook != nullptr) {
         target_hook->sm_rx_queue.unlocked_push(sm_pkt);
       } else {
-        // We don't have an Rpc object for the target Rpc
-        LOG_WARN(
-            "eRPC Nexus: Received session management request for invalid "
-            "Rpc %u from %s. Sending response.\n",
-            target_rpc_id, sm_pkt.client.name().c_str());
+        // We don't have an Rpc object for the target Rpc. Send a response iff
+        // it's a request packet.
+        if (sm_pkt.is_req()) {
+          LOG_WARN(
+              "eRPC Nexus: Received session management request for invalid "
+              "Rpc %u from %s. Sending response.\n",
+              target_rpc_id, sm_pkt.client.name().c_str());
 
-        SmPkt resp_sm_pkt =
-            sm_construct_resp(sm_pkt, SmErrType::kInvalidRemoteRpcId);
+          SmPkt resp_sm_pkt =
+              sm_construct_resp(sm_pkt, SmErrType::kInvalidRemoteRpcId);
 
-        udp_client.send(resp_sm_pkt.client.hostname, ctx.mgmt_udp_port,
-                        reinterpret_cast<char *>(&resp_sm_pkt),
-                        sizeof(resp_sm_pkt));
+          udp_client.send(resp_sm_pkt.client.hostname, ctx.mgmt_udp_port,
+                          reinterpret_cast<char *>(&resp_sm_pkt),
+                          sizeof(resp_sm_pkt));
+        } else {
+          LOG_WARN(
+              "eRPC Nexus: Received session management response for invalid "
+              "Rpc %u from %s. Dropping.\n",
+              target_rpc_id, sm_pkt.client.name().c_str());
+        }
       }
 
       ctx.nexus_lock->unlock();
