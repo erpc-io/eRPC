@@ -84,7 +84,7 @@ class IBTransport : public Transport {
   }
 
   static size_t data_size_to_num_pkts(size_t data_size) {
-    if (small_rpc_likely(data_size <= kMaxDataPerPkt)) return 1;
+    if (data_size <= kMaxDataPerPkt) return 1;
     return (data_size + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
   }
 

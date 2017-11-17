@@ -15,7 +15,7 @@ void Rpc<TTr>::process_req_txq_st() {
     assert(req_msgbuf->is_valid_dynamic() && req_msgbuf->is_req());
     assert(sslot->client_info.req_sent < req_msgbuf->num_pkts);
 
-    if (small_rpc_likely(req_msgbuf->num_pkts == 1)) {
+    if (req_msgbuf->num_pkts == 1) {
       tx_small_req_one_st(sslot, req_msgbuf);
     } else {
       tx_large_req_one_st(sslot, req_msgbuf);

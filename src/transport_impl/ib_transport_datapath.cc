@@ -20,7 +20,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(item.data_bytes <= kMaxDataPerPkt);
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
-    if (small_rpc_unlikely(item.data_bytes == 0)) {
+    if (item.data_bytes == 0) {
       assert(msg_buffer->is_expl_cr() || msg_buffer->is_req_for_resp());
     }
 
@@ -36,7 +36,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     // Set signaling flag. The work request is non-inline by default.
     wr.send_flags = get_signaled_flag();
 
-    if (small_rpc_likely(item.offset == 0)) {
+    if (item.offset == 0) {
       // This is the first packet, so we need only 1 SGE. This can be a credit
       // return packet or an RFR.
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();

@@ -54,8 +54,7 @@ class Nexus {
    * listen for session management packets
    *
    * @param num_bg_threads The number of background RPC request processing
-   * threads to launch. This requires small_rpc_optlevel to not be
-   * small_rpc_optlevel_extreme, which does not support background threads.
+   * threads to launch.
    *
    * @throw runtime_error if Nexus creation fails.
    */

@@ -161,7 +161,7 @@ class Rpc {
     assert(!sslot->is_client);
 
     // Free the response MsgBuffer iff it is not preallocated
-    if (small_rpc_unlikely(!sslot->prealloc_used)) {
+    if (!sslot->prealloc_used) {
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
       assert(tx_msgbuf->is_valid_dynamic());
       free_msg_buffer(*tx_msgbuf);
@@ -182,7 +182,7 @@ class Rpc {
     assert(!sslot->is_client);
 
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
-    if (small_rpc_unlikely(req_msgbuf.is_dynamic())) {
+    if (req_msgbuf.is_dynamic()) {
       // This check is OK, as dynamic MsgBuffers must be initialized
       assert(req_msgbuf.is_valid_dynamic());
       free_msg_buffer(req_msgbuf);
@@ -381,7 +381,7 @@ class Rpc {
     SSlot *sslot = static_cast<SSlot *>(resp_handle);
 
     // When called from a background thread, enqueue to the foreground thread
-    if (small_rpc_unlikely(!in_dispatch())) {
+    if (!in_dispatch()) {
       bg_queues.release_response.unlocked_push(resp_handle);
       return;
     }
@@ -468,7 +468,7 @@ class Rpc {
   /// This handles fault injection for dropping control packets.
   inline void enqueue_hdr_tx_burst_and_drain_st(
       Transport::RoutingInfo *routing_info, MsgBuffer *tx_msgbuf) {
-    assert(in_dispatch() && optlevel_large_rpc_supported);
+    assert(in_dispatch());
     assert(tx_batch_i < TTr::kPostlist);
     assert(tx_msgbuf->is_expl_cr() || tx_msgbuf->is_req_for_resp());
 
@@ -555,7 +555,7 @@ class Rpc {
     size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
 
     size_t bytes_to_copy;
-    if (small_rpc_likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
+    if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
       bytes_to_copy = pkthdr->msg_size;
     } else {
       size_t num_pkts_in_msg =
@@ -735,12 +735,12 @@ class Rpc {
 
   /// Lock the mutex if the Rpc is accessible from multiple threads
   inline void lock_cond(std::mutex *mutex) {
-    if (small_rpc_unlikely(multi_threaded)) mutex->lock();
+    if (multi_threaded) mutex->lock();
   }
 
   /// Unlock the mutex if the Rpc is accessible from multiple threads
   inline void unlock_cond(std::mutex *mutex) {
-    if (small_rpc_unlikely(multi_threaded)) mutex->unlock();
+    if (multi_threaded) mutex->unlock();
   }
 
   // rpc_send_cr.cc

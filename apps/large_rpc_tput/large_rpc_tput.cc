@@ -346,9 +346,6 @@ int main(int argc, char **argv) {
   assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
-  erpc::rt_assert(erpc::large_rpc_supported(),
-                  "Current eRPC optlevel does not allow large RPCs.");
-
   // Work around g++-5's unused variable warning for validators
   _unused(concurrency_validator_registered);
   _unused(profile_validator_registered);

@@ -121,6 +121,7 @@
 ## Short-term TODOs
  * Use TX flush on client-side retransmission
  * Destroy session test fails with `kSessionCredits = 1`, `kSessionReqWindow = 1`
+ * in `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
  * Make a list of functions allowed in request and continuation handler. For
    example, `run_ev_loop()` and `delete rpc` are not allowed, and eRPC does not
    guard against these errors.

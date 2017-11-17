@@ -22,7 +22,7 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
   process_comps_st();
   process_req_txq_st();
 
-  if (small_rpc_unlikely(multi_threaded)) {
+  if (multi_threaded) {
     // Process the background queues
     process_bg_queues_enqueue_request_st();
     process_bg_queues_enqueue_response_st();

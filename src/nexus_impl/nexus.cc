@@ -13,16 +13,8 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
       hostname(hostname),
       mgmt_udp_port(mgmt_udp_port),
       num_bg_threads(num_bg_threads) {
-  // Print warning messages if low-performance settings are enabled
-  if (kTesting) {
-    LOG_WARN("eRPC Nexus: Testing enabled. Performance will be low.\n");
-  }
-
+  if (kTesting) LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
-
-  if (small_rpc_optlevel == small_rpc_optlevel_extreme) {
-    rt_assert(num_bg_threads == 0, "Background threads not supported");
-  }
 
   kill_switch = false;
 

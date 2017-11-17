@@ -25,7 +25,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   assert(resp_msgbuf->max_num_pkts > 0);
 
   // When called from a background thread, enqueue to the foreground thread
-  if (small_rpc_unlikely(!in_dispatch())) {
+  if (!in_dispatch()) {
     assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
     auto req_args =
         enqueue_request_args_t(session_num, req_type, req_msgbuf, resp_msgbuf,
@@ -33,8 +33,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     bg_queues.enqueue_request.unlocked_push(req_args);
     return 0;
   }
-  assert(in_dispatch());
 
+  // If we're here, we're in the dispatch thread
   assert(is_usr_session_num_in_range_st(session_num));
   Session *session = session_vec[static_cast<size_t>(session_num)];
 
@@ -59,15 +59,12 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   sslot.client_info.tag = tag;
   sslot.client_info.req_sent = 0;  // Reset queueing progress
   sslot.client_info.resp_rcvd = 0;
-
-  if (optlevel_large_rpc_supported) {
-    sslot.client_info.rfr_sent = 0;
-    sslot.client_info.expl_cr_rcvd = 0;
-  }
+  sslot.client_info.rfr_sent = 0;
+  sslot.client_info.expl_cr_rcvd = 0;
 
   sslot.client_info.enqueue_req_ts = rdtsc();
 
-  if (small_rpc_unlikely(cont_etid != kInvalidBgETid)) {
+  if (cont_etid != kInvalidBgETid) {
     // We need to run the continuation in a background thread
     sslot.client_info.cont_etid = cont_etid;
   }
@@ -84,7 +81,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   pkthdr_0->req_num = sslot.cur_req_num;
 
   // Fill in non-zeroth packet headers, if any
-  if (small_rpc_unlikely(req_msgbuf->num_pkts > 1)) {
+  if (req_msgbuf->num_pkts > 1) {
     // Headers for non-zeroth packets are created by copying the 0th header,
     // changing only the required fields. All request packets are Unexpected.
     for (size_t i = 1; i < req_msgbuf->num_pkts; i++) {
@@ -97,7 +94,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   // Try to place small requests in the TX batch right now, avoiding queueing.
   // Large requests, and small requests that cannot be transmitted (e.g., due
   // to lack of credits) are queued in req_txq.
-  if (small_rpc_likely(req_msgbuf->num_pkts == 1)) {
+  if (req_msgbuf->num_pkts == 1) {
     tx_small_req_one_st(&sslot, req_msgbuf);
     if (sslot.client_info.req_sent == 0) req_txq.push_back(&sslot);
   } else {

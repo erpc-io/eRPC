@@ -12,12 +12,12 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
 
   // When called from a background thread, enqueue to the foreground thread
-  if (small_rpc_unlikely(!in_dispatch())) {
+  if (!in_dispatch()) {
     bg_queues.enqueue_response.unlocked_push(req_handle);
     return;
   }
-  assert(in_dispatch());
 
+  // If we're here, we're in the dispatch thread
   SSlot *sslot = static_cast<SSlot *>(req_handle);
   bury_req_msgbuf_server_st(sslot);  // Bury the possibly-dynamic req MsgBuffer
 
@@ -39,12 +39,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     return;  // During session reset, don't add packets to TX burst
   }
 
-  MsgBuffer *resp_msgbuf;
-  if (small_rpc_likely(sslot->prealloc_used)) {
-    resp_msgbuf = &sslot->pre_resp_msgbuf;
-  } else {
-    resp_msgbuf = &sslot->dyn_resp_msgbuf;
-  }
+  MsgBuffer *resp_msgbuf =
+      sslot->prealloc_used ? &sslot->pre_resp_msgbuf : &sslot->dyn_resp_msgbuf;
   assert(resp_msgbuf->is_valid_dynamic() && resp_msgbuf->data_size > 0);
 
   // Fill in packet 0's header
@@ -57,7 +53,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   resp_pkthdr_0->req_num = sslot->cur_req_num;
 
   // Fill in non-zeroth packet headers, if any
-  if (small_rpc_unlikely(resp_msgbuf->num_pkts > 1)) {
+  if (resp_msgbuf->num_pkts > 1) {
     // Headers for non-zeroth packets are created by copying the 0th header, and
     // changing only the required fields.
     for (size_t i = 1; i < resp_msgbuf->num_pkts; i++) {
@@ -70,7 +66,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   // Fill in the slot and reset queueing progress
   assert(sslot->tx_msgbuf == nullptr);  // Buried before calling request handler
   sslot->tx_msgbuf = resp_msgbuf;       // Mark response as valid
-  if (optlevel_large_rpc_supported) sslot->server_info.rfr_rcvd = 0;
+  sslot->server_info.rfr_rcvd = 0;
 
   // Mark enqueue_response() as completed
   assert(sslot->server_info.req_type != kInvalidReqType);
