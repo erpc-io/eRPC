@@ -60,16 +60,18 @@ class RpcTest : public ::testing::Test {
   Rpc<IBTransport> *rpc = nullptr;
 };
 
-TEST_F(RpcTest, handle_connect_req_st) {
-  auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
-  auto client = gen_session_endpoint(kTestRpcId + 1, /* session number */ 0);
-  SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError, kTestUniqToken,
-                 client, server);
+/// Test SM packet reordering for handle_connect_req_st()
+TEST_F(RpcTest, handle_connect_req_st_reordering) {
+  const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
+  const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
+  const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
+                       kTestUniqToken, client, server);
+  SmPkt resp;
 
   // Process first connect request - session is created
   rpc->handle_connect_req_st(conn_req);
   ASSERT_EQ(rpc->session_vec.size(), 1);
-  SmPkt resp = rpc->udp_client.sent_queue_pop();
+  resp = rpc->udp_client.sent_queue_pop();
   ASSERT_EQ(resp.pkt_type, SmPktType::kConnectResp);
   ASSERT_EQ(resp.err_type, SmErrType::kNoError);
 
@@ -81,13 +83,48 @@ TEST_F(RpcTest, handle_connect_req_st) {
   ASSERT_EQ(resp.pkt_type, SmPktType::kConnectResp);
   ASSERT_EQ(resp.err_type, SmErrType::kNoError);
 
-  // Artifically destroy the session and re-handle connect request.
+  // Destroy the session and re-handle connect request.
   // New session is not created and response is not sent.
-  Session *session = rpc->session_vec[0];
-  rpc->session_vec[0] = nullptr;
+  rpc->bury_session_st(rpc->session_vec[0]);
   rpc->handle_connect_req_st(conn_req);
   ASSERT_EQ(rpc->udp_client.sent_queue.empty(), true);
-  rpc->session_vec[0] = session;  // Restore the session
+
+  // Delete the client's token and re-handle connect request.
+  // New session *is* created and response is re-sent.
+  rpc->sm_token_map.clear();
+  rpc->session_vec.clear();
+  rpc->handle_connect_req_st(conn_req);
+  ASSERT_EQ(rpc->session_vec.size(), 1);
+  resp = rpc->udp_client.sent_queue_pop();
+  ASSERT_EQ(resp.pkt_type, SmPktType::kConnectResp);
+  ASSERT_EQ(resp.err_type, SmErrType::kNoError);
+}
+
+/// Test error cases for handle_connect_req_st()
+TEST_F(RpcTest, handle_connect_req_st_errors) {
+  const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
+  const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
+  const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
+                       kTestUniqToken, client, server);
+  SmPkt resp;
+
+  // Transport type mismatch. Session is not created & resp with error is sent.
+  SmPkt ttm_conn_req = conn_req;
+  ttm_conn_req.server.transport_type = Transport::TransportType::kInvalid;
+  rpc->handle_connect_req_st(ttm_conn_req);
+  ASSERT_EQ(rpc->session_vec.size(), 0);
+  resp = rpc->udp_client.sent_queue_pop();
+  ASSERT_EQ(resp.pkt_type, SmPktType::kConnectResp);
+  ASSERT_EQ(resp.err_type, SmErrType::kInvalidTransport);
+
+  // Transport type mismatch. Session is not created & resp with error is sent.
+  SmPkt pm_conn_req = conn_req;
+  pm_conn_req.server.phy_port = kInvalidPhyPort;
+  rpc->handle_connect_req_st(pm_conn_req);
+  ASSERT_EQ(rpc->session_vec.size(), 0);
+  resp = rpc->udp_client.sent_queue_pop();
+  ASSERT_EQ(resp.pkt_type, SmPktType::kConnectResp);
+  ASSERT_EQ(resp.err_type, SmErrType::kInvalidRemotePort);
 }
 
 }  // End erpc
