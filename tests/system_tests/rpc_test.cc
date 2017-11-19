@@ -9,23 +9,24 @@ namespace erpc {
 // An Rpc with no established sessions
 class RpcTest : public ::testing::Test {
  public:
-  static constexpr size_t kUdpPort = 3185;
-  static constexpr size_t kPhyPort = 0;
-  static constexpr size_t kRpcId = 0;
-  static constexpr size_t kNumBgThreads = 0;
-  static constexpr size_t kNumaNode = 0;
-  static constexpr size_t kUniqToken = 42;
-  static constexpr auto transport_type = Transport::TransportType::kInfiniBand;
+  static constexpr size_t kTestUdpPort = 3185;
+  static constexpr size_t kTestPhyPort = 0;
+  static constexpr size_t kTestRpcId = 0;
+  static constexpr size_t kTestNumBgThreads = 0;
+  static constexpr size_t kTestNumaNode = 0;
+  static constexpr size_t kTestUniqToken = 42;
+  static constexpr auto kTestTransportType =
+      Transport::TransportType::kInfiniBand;
 
   static void sm_handler(int, SmEventType, SmErrType, void *) {}
 
   RpcTest() {
-    nexus = new Nexus("localhost", kUdpPort, kNumBgThreads);
+    nexus = new Nexus("localhost", kTestUdpPort, kTestNumBgThreads);
     rt_assert(nexus != nullptr, "RpcTest: Failed to create nexus");
     nexus->drop_all_rx();
 
-    rpc = new Rpc<IBTransport>(nexus, nullptr, kRpcId, sm_handler, kPhyPort,
-                               kNumaNode);
+    rpc = new Rpc<IBTransport>(nexus, nullptr, kTestRpcId, sm_handler,
+                               kTestPhyPort, kTestNumaNode);
     rt_assert(rpc != nullptr, "RpcTest: Failed to create Rpc");
 
     rpc->udp_client.enable_recording();
@@ -44,9 +45,9 @@ class RpcTest : public ::testing::Test {
               "RpcTest: gen_session_endpoint() requires valid Rpc");
 
     SessionEndpoint se;
-    se.transport_type = transport_type;
+    se.transport_type = kTestTransportType;
     strcpy(se.hostname, "localhost");
-    se.phy_port = kPhyPort;
+    se.phy_port = kTestPhyPort;
     se.rpc_id = rpc_id;
     se.session_num = session_num;
 
@@ -60,9 +61,9 @@ class RpcTest : public ::testing::Test {
 };
 
 TEST_F(RpcTest, handle_connect_req_st) {
-  auto server = gen_session_endpoint(kRpcId, kInvalidSessionNum);
-  auto client = gen_session_endpoint(kRpcId + 1, /* session number */ 0);
-  SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError, kUniqToken,
+  auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
+  auto client = gen_session_endpoint(kTestRpcId + 1, /* session number */ 0);
+  SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError, kTestUniqToken,
                  client, server);
 
   // Process first connect request - session is created
@@ -86,7 +87,7 @@ TEST_F(RpcTest, handle_connect_req_st) {
   rpc->session_vec[0] = nullptr;
   rpc->handle_connect_req_st(conn_req);
   ASSERT_EQ(rpc->udp_client.sent_queue.empty(), true);
-  rpc->session_vec[0] = session;
+  rpc->session_vec[0] = session;  // Restore the session
 }
 
 }  // End erpc
