@@ -28,6 +28,8 @@ class RpcTest : public ::testing::Test {
                                kNumaNode);
     rt_assert(rpc != nullptr, "RpcTest: Failed to create Rpc");
 
+    rpc->udp_client.enable_recording();
+
     // int sn = rpc->create_session("localhost", kServerRpcId, kPhyPort);
     // rt_assert(sn == 0, "RpcTest: Failed to create session");
   }
@@ -60,18 +62,31 @@ class RpcTest : public ::testing::Test {
 TEST_F(RpcTest, handle_connect_req_st) {
   auto server = gen_session_endpoint(kRpcId, kInvalidSessionNum);
   auto client = gen_session_endpoint(kRpcId + 1, /* session number */ 0);
-  SmPkt sm_pkt(SmPktType::kConnectReq, SmErrType::kNoError, kUniqToken, client,
-               server);
+  SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError, kUniqToken,
+                 client, server);
 
-  // Process first connect request
-  rpc->handle_connect_req_st(sm_pkt);
+  // Process first connect request - session is created
+  rpc->handle_connect_req_st(conn_req);
   ASSERT_EQ(rpc->session_vec.size(), 1);
-  ASSERT_EQ(rpc->sm_token_map.count(kUniqToken), 1);
+  SmPkt resp = rpc->udp_client.sent_queue_pop();
+  ASSERT_EQ(resp.pkt_type, SmPktType::kConnectResp);
+  ASSERT_EQ(resp.err_type, SmErrType::kNoError);
 
-  // Process connect request again
-  rpc->handle_connect_req_st(sm_pkt);
+  // Process connect request again.
+  // New session is not created and response is re-sent.
+  rpc->handle_connect_req_st(conn_req);
   ASSERT_EQ(rpc->session_vec.size(), 1);
-  ASSERT_EQ(rpc->sm_token_map.count(kUniqToken), 1);
+  resp = rpc->udp_client.sent_queue_pop();
+  ASSERT_EQ(resp.pkt_type, SmPktType::kConnectResp);
+  ASSERT_EQ(resp.err_type, SmErrType::kNoError);
+
+  // Artifically destroy the session and re-handle connect request.
+  // New session is not created and response is not sent.
+  Session *session = rpc->session_vec[0];
+  rpc->session_vec[0] = nullptr;
+  rpc->handle_connect_req_st(conn_req);
+  ASSERT_EQ(rpc->udp_client.sent_queue.empty(), true);
+  rpc->session_vec[0] = session;
 }
 
 }  // End erpc
