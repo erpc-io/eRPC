@@ -1,3 +1,27 @@
+## Instructions
+ * These are instructions to build and run eRPC on a machine with vanilla
+   Ubuntu 16.04
+ * eRPC requires a machine with a C++17 compiler and RDMA support
+ * To install all required packages, run `./scripts/packages.sh`
+ * Installing RDMA drivers:
+   * It's best to install drivers using the latest Mellanox OFED
+   * Upstream drivers work as well. This requires installing the `ibverbs` and
+     `mlx4` userspace packages, and enabling the `mlx4_ib` and `ib_uverbs`
+     kernel drivers. On Ubuntu, the incantation is:
+      * `apt install libmlx4-dev libibverbs-dev`
+      * `modprobe mlx4_ib ib_uverbs`
+   * For Connect-IB and newer NICs, replace `mlx4` by `mlx5`
+ * To build the tests, use `cmake . -DPERF=OFF; make -j`. Use `sudo ctest` to
+   run all tests.
+ * To build an application, first set the environment variable `autorun_app` to
+   one of the available apps (see CMakeLists.txt). Then generate a Makefile
+   using `cmake . -DPERF=ON`
+ * The IP addresses of cluster machines are specified in
+   `scripts/autorun_node_file`
+ * To run an app, run `do.sh <i>` on as many machines as needed by the app,
+   where `i` is the zero-based machine index. Alternatively, execute
+   `run-all.sh` on machine 0.
+
 ## Code notes
  * An important simplifying insight is that all functions invoked by the event
    loop run to completion, i.e., we cannot be preempted, leaving objects in
