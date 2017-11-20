@@ -57,6 +57,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   if (!have_recvs()) {
     LOG_WARN("%s: RECVs exhausted. Sending response.\n", issue_msg);
     sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kRecvsExhausted));
+    return;
   }
 
   if (session_vec.size() == kMaxSessionsPerThread) {
