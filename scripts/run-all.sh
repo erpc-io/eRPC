@@ -53,3 +53,6 @@ for node in $autorun_nodes; do
 done
 wait
 blue "...Done"
+
+# Process each machine's output and print the result. This is optional.
+$(dirname $0)/proc-out.sh
