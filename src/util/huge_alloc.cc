@@ -136,10 +136,7 @@ uint8_t *HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
   rt_assert(ret == 0,
             "eRPC HugeAlloc: mbind() failed. Key " + std::to_string(shm_key));
 
-  // If we are here, the allocation succeeded.
-  memset(shm_buf, 0, size);
-
-  // Register the memory region if needed
+  // If we are here, the allocation succeeded.  Register if needed.
   Transport::MemRegInfo reg_info;
   if (do_register) reg_info = reg_mr_func(shm_buf, size);
 

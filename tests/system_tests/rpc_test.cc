@@ -111,31 +111,60 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
                        kTestUniqToken, client, server);
   SmPkt resp;
 
-  // Transport type mismatch. Session is not created & resp with error is sent.
+  // Transport type mismatch
   SmPkt ttm_conn_req = conn_req;
   ttm_conn_req.server.transport_type = Transport::TransportType::kInvalid;
   rpc->handle_connect_req_st(ttm_conn_req);
   test_sm_check(rpc, 0, SmPktType::kConnectResp, SmErrType::kInvalidTransport);
 
-  // Transport type mismatch. Session is not created & resp with error is sent.
+  // Transport type mismatch
   SmPkt pm_conn_req = conn_req;
   pm_conn_req.server.phy_port = kInvalidPhyPort;
   rpc->handle_connect_req_st(pm_conn_req);
   test_sm_check(rpc, 0, SmPktType::kConnectResp, SmErrType::kInvalidRemotePort);
 
-  // Recvs exhausted. Session is not created and resp with error is sent.
+  // RECVs exhausted
   const size_t initial_recvs_available = rpc->recvs_available;
   rpc->recvs_available = Session::kSessionCredits - 1;
   rpc->handle_connect_req_st(conn_req);
   test_sm_check(rpc, 0, SmPktType::kConnectResp, SmErrType::kRecvsExhausted);
   rpc->recvs_available = initial_recvs_available;  // Restore
 
-  // Too many sessions. Session is not created and resp with error is sent
+  // Too many sessions
   rpc->session_vec.resize(kMaxSessionsPerThread, nullptr);
   rpc->handle_connect_req_st(conn_req);
   test_sm_check(rpc, kMaxSessionsPerThread, SmPktType::kConnectResp,
                 SmErrType::kTooManySessions);
   rpc->session_vec.clear();  // Restore
+
+  // Client routing info resolution fails
+  SmPkt resolve_fail_conn_req = conn_req;
+  memset(&resolve_fail_conn_req.client.routing_info, 0,
+         sizeof(resolve_fail_conn_req.client.routing_info));
+  rpc->handle_connect_req_st(resolve_fail_conn_req);
+  test_sm_check(rpc, 0, SmPktType::kConnectResp,
+                SmErrType::kRoutingResolutionFailure);
+
+  // Out of hugepages. This should be the last subtest because we use
+  // alloc_raw() to eat up hugepages faster by avoiding registration. These
+  // hugepages cannot be freed without deleting the allocator.
+  //
+  // We hoard hugepages in two steps. First in large chunks for speed, then
+  // until MTU-sized pages cannot be allocated.
+  while (true) {
+    auto *buf = rpc->huge_alloc->alloc_raw(MB(16), kTestNumaNode, false);
+    if (buf == nullptr) break;
+  }
+
+  while (true) {
+    auto msgbuf = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
+    if (msgbuf.buf == nullptr) break;
+  }
+
+  rpc->handle_connect_req_st(conn_req);
+  test_sm_check(rpc, 0, SmPktType::kConnectResp, SmErrType::kOutOfMemory);
+
+  // No more tests here
 }
 
 }  // End erpc

@@ -51,6 +51,7 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
     // Zeroes out everything
     buckets_ = reinterpret_cast<Bucket*>(alloc->alloc_raw(shm_size, numa_node));
     assert(buckets_ != NULL);
+    memset(buckets_, 0, shm_size);  // alloc_raw does not give zeroed memory
   }
 
   // subtract by one to compensate 1-base indices
