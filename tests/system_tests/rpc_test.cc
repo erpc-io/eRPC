@@ -161,9 +161,10 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
     if (msgbuf.buf == nullptr) break;
   }
 
+  size_t initial_alloc = rpc->huge_alloc->get_stat_user_alloc_tot();
   rpc->handle_connect_req_st(conn_req);
   test_sm_check(rpc, 0, SmPktType::kConnectResp, SmErrType::kOutOfMemory);
-
+  ASSERT_EQ(initial_alloc, rpc->huge_alloc->get_stat_user_alloc_tot());
   // No more tests here
 }
 
