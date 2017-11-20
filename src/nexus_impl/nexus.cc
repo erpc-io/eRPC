@@ -62,6 +62,18 @@ Nexus::~Nexus() {
   kill_switch = true;
   for (size_t i = 0; i < num_bg_threads; i++) bg_thread_arr[i].join();
   sm_thread.join();
+
+  // Reset thread-local storage to prevent errors if gtest reuses the process.
+  // Rationale: At this point, eRPC-owned threads are dead. All worker threads
+  // should be dead as well, so it's safe to reset TLS.
+  for (const Hook *hook : reg_hooks_arr) {
+    if (hook != nullptr) {
+      LOG_WARN("eRPC Rpc: Deleting Nexus, but a worker is still registered");
+      assert(false);  // Die in debug mode
+    }
+  }
+
+  tls_registry.reset();
 }
 
 bool Nexus::rpc_id_exists(uint8_t rpc_id) {
