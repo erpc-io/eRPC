@@ -78,7 +78,6 @@ TEST_F(RpcTest, handle_connect_req_st_reordering) {
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
-  SmPkt resp;
 
   // Process first connect request - session is created
   rpc->handle_connect_req_st(conn_req);
@@ -109,7 +108,6 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
-  SmPkt resp;
 
   // Transport type mismatch
   SmPkt ttm_conn_req = conn_req;
@@ -145,9 +143,11 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
   test_sm_check(rpc, 0, SmPktType::kConnectResp,
                 SmErrType::kRoutingResolutionFailure);
 
-  // Out of hugepages. This should be the last subtest because we use
-  // alloc_raw() to eat up hugepages faster by avoiding registration. These
-  // hugepages cannot be freed without deleting the allocator.
+  // Out of hugepages
+  // 
+  // This should be the last subtest because we use alloc_raw() to eat up
+  // hugepages rapidly by avoiding registration. These hugepages cannot be freed
+  // without deleting the allocator.
   //
   // We hoard hugepages in two steps. First in large chunks for speed, then
   // until MTU-sized pages cannot be allocated.
