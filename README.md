@@ -3,7 +3,7 @@
    Ubuntu 16.04
  * eRPC requires a machine with a C++17 compiler and RDMA support
  * To install all required packages, run `./scripts/packages.sh`
- * Create hugepages
+ * Increase SHM limits and create hugepages. On Ubuntu:
      ```
      sudo bash -c "echo 'kernel.shmmax = 9223372036854775807' >> /etc/sysctl.conf"
      sudo bash -c "echo 'kernel.shmall = 1152921504606846720' >> /etc/sysctl.conf"
