@@ -3,6 +3,13 @@
    Ubuntu 16.04
  * eRPC requires a machine with a C++17 compiler and RDMA support
  * To install all required packages, run `./scripts/packages.sh`
+ * Create hugepages
+     ```
+     sudo bash -c "echo 'kernel.shmmax = 9223372036854775807' >> /etc/sysctl.conf"
+     sudo bash -c "echo 'kernel.shmall = 1152921504606846720' >> /etc/sysctl.conf"
+     sudo sysctl -p /etc/sysctl.conf
+     sudo bash -c "echo 2048 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages"
+     ```
  * Installing RDMA drivers:
    * It's best to install drivers using the latest Mellanox OFED
    * Upstream drivers work as well. This requires installing the `ibverbs` and
