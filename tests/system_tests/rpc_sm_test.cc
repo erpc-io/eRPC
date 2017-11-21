@@ -291,10 +291,14 @@ TEST_F(RpcSmTest, handle_disconnect_req_st_reordering) {
   // Make session 0 a server session in kConnected
   create_server_session_init(client, server);
 
-  // Process first disconnect request. Session is destroyed & response sent.
+  // Process first disconnect request
+  // Session is destroyed, resources released, & response sent.
+  const size_t initial_alloc = rpc->huge_alloc->get_stat_user_alloc_tot();
   rpc->handle_disconnect_req_st(disc_req);
   common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
+  ASSERT_LT(rpc->huge_alloc->get_stat_user_alloc_tot(), initial_alloc);
+  ASSERT_EQ(rpc->recvs_available, rpc->transport->kRecvQueueDepth);
 
   // Process disconnect request again. Response is re-sent.
   rpc->handle_disconnect_req_st(disc_req);
