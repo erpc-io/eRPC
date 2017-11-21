@@ -6,8 +6,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <map>
-#include <queue>
 #include <stdexcept>
+#include <vector>
 
 namespace erpc {
 
@@ -61,26 +61,19 @@ class UDPClient {
                                std::string(strerror(errno)));
     }
 
-    if (enable_recording_flag) sent_queue.push(msg);
+    if (enable_recording_flag) sent_vec.push_back(msg);
     return ret;
   }
 
   /// Maintain a all packets sent by this client
   void enable_recording() { enable_recording_flag = true; }
 
-  T sent_queue_pop() {
-    if (sent_queue.empty()) throw std::runtime_error("UDPClient: Queue empty");
-    T ret = sent_queue.front();
-    sent_queue.pop();
-    return ret;
-  }
-
  private:
   int sock_fd = -1;
   std::map<std::string, struct addrinfo *> addrinfo_map;
 
   /// The list of all packets sent, maintained if recording is enabled
-  std::queue<T> sent_queue;
+  std::vector<T> sent_vec;
   bool enable_recording_flag = false;  ///< Flag to enable recording for testing
 };
 

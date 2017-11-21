@@ -6,18 +6,18 @@
 // These tests never run event loop, so SM pkts sent by Rpc have no consequence
 namespace erpc {
 
+static constexpr size_t kTestUdpPort = 3185;
+static constexpr size_t kTestPhyPort = 0;
+static constexpr size_t kTestRpcId = 0;
+static constexpr size_t kTestNumBgThreads = 0;
+static constexpr size_t kTestNumaNode = 0;
+static constexpr size_t kTestUniqToken = 42;
+
 typedef IBTransport TestTransport;
 
 // An Rpc with no established sessions
 class RpcTest : public ::testing::Test {
  public:
-  static constexpr size_t kTestUdpPort = 3185;
-  static constexpr size_t kTestPhyPort = 0;
-  static constexpr size_t kTestRpcId = 0;
-  static constexpr size_t kTestNumBgThreads = 0;
-  static constexpr size_t kTestNumaNode = 0;
-  static constexpr size_t kTestUniqToken = 42;
-
   static void sm_handler(int, SmEventType, SmErrType, void *) {}
 
   RpcTest() {
@@ -64,18 +64,18 @@ class RpcTest : public ::testing::Test {
 /// 1. \p rpc must have \p num_sessions sessions in its session vector
 /// 2. \p rpc's UDP client must have a packet in its queue. The packet at the
 ///    front must match \p pkt_type and err_type.
-void test_sm_check(Rpc<TestTransport> *rpc, size_t num_sessions,
+void test_sm_check(const Rpc<TestTransport> *rpc, size_t num_sessions,
                    SmPktType pkt_type, SmErrType err_type) {
   ASSERT_EQ(rpc->session_vec.size(), num_sessions);
-  const SmPkt resp = rpc->udp_client.sent_queue_pop();
+  const SmPkt &resp = rpc->udp_client.sent_vec.back();
   ASSERT_EQ(resp.pkt_type, pkt_type);
   ASSERT_EQ(resp.err_type, err_type);
 }
 
 /// Test SM packet reordering for handle_connect_req_st()
 TEST_F(RpcTest, handle_connect_req_st_reordering) {
-  const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
+  const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
 
@@ -89,10 +89,11 @@ TEST_F(RpcTest, handle_connect_req_st_reordering) {
   test_sm_check(rpc, 1, SmPktType::kConnectResp, SmErrType::kNoError);
 
   // Destroy the session and re-handle connect request.
-  // New session is not created and response is not sent.
+  // New session is not created and no response is sent.
   rpc->bury_session_st(rpc->session_vec[0]);
+  rpc->udp_client.sent_vec.clear();
   rpc->handle_connect_req_st(conn_req);
-  ASSERT_EQ(rpc->udp_client.sent_queue.empty(), true);
+  ASSERT_TRUE(rpc->udp_client.sent_vec.empty());
 
   // Delete the client's token and re-handle connect request.
   // New session *is* created and response is re-sent.
@@ -104,8 +105,8 @@ TEST_F(RpcTest, handle_connect_req_st_reordering) {
 
 /// Test error cases for handle_connect_req_st()
 TEST_F(RpcTest, handle_connect_req_st_errors) {
-  const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
+  const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
 
@@ -164,29 +165,77 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
   rpc->handle_connect_req_st(conn_req);
   test_sm_check(rpc, 0, SmPktType::kConnectResp, SmErrType::kOutOfMemory);
   ASSERT_EQ(initial_alloc, rpc->huge_alloc->get_stat_user_alloc_tot());
-  // No more tests here
+  // No more tests here because all hugepages are consumed
 }
 
-TEST_F(RpcTest, handle_connect_resp_st) {
-  const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
+/// Create a dummy client session in its initial state
+Session *create_dummy_client_session(const SessionEndpoint client,
+                                     const SessionEndpoint server) {
+  auto *clt_session = new Session(Session::Role::kClient, kTestUniqToken);
+  clt_session->state = SessionState::kConnectInProgress;
+  clt_session->client = client;
+  clt_session->server = server;
+  clt_session->server.session_num = kInvalidSessionNum;
+  return clt_session;
+}
+
+TEST_F(RpcTest, handle_connect_resp_st_reordering) {
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
-  const SmPkt conn_resp(SmPktType::kConnectReq, SmErrType::kNoError,
+  const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
+  const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
                         kTestUniqToken, client, server);
 
-  /*
   // Create a dummy client session
-  Session *clt_session  = new Session(Session::Role::kClient, kTestUniqToken);
-  clt_session->state = SessionState::kConnectInProgress;
+  rpc->session_vec.push_back(create_dummy_client_session(client, server));
 
-  // Process first connect request - session is created
-  rpc->handle_connect_req_st(conn_req);
-  test_sm_check(rpc, 1, SmPktType::kConnectResp, SmErrType::kNoError);
+  // Process connect response. Session is connected, server sess number is saved
+  rpc->handle_connect_resp_st(conn_resp);
+  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnected);
+  ASSERT_EQ(rpc->session_vec[0]->server.session_num, 1);
 
-  // Process connect request again.
-  // New session is not created and response is re-sent.
-  rpc->handle_connect_req_st(conn_req);
-  test_sm_check(rpc, 1, SmPktType::kConnectResp, SmErrType::kNoError);
-  */
+  // Process connect response again. This gets ignored.
+  rpc->handle_connect_resp_st(conn_resp);
+  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnected);
+  ASSERT_EQ(rpc->session_vec.size(), 1);
+
+  // Artificially destroy the session. Response gets ignored.
+  rpc->session_vec[0] = nullptr;
+  rpc->handle_connect_resp_st(conn_resp);  // No crash
+}
+
+TEST_F(RpcTest, handle_connect_resp_st_resolve_error) {
+  const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
+  const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
+  const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
+                        kTestUniqToken, client, server);
+
+  // Create a dummy client session
+  rpc->session_vec.push_back(create_dummy_client_session(client, server));
+
+  // Fail server routing resolution. Disconnect request is sent but session
+  // is not destroyed.
+  rpc->fault_inject_fail_resolve_rinfo_st();
+  rpc->handle_connect_resp_st(conn_resp);
+  test_sm_check(rpc, 1, SmPktType::kDisconnectReq, SmErrType::kNoError);
+  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kDisconnectInProgress);
+  ASSERT_NE(rpc->session_vec[0], nullptr);
+}
+
+TEST_F(RpcTest, handle_connect_resp_st_response_error) {
+  const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
+  const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
+  const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kTooManySessions,
+                        kTestUniqToken, client, server);
+
+  // Create a dummy client session
+  rpc->session_vec.push_back(create_dummy_client_session(client, server));
+
+  // Process response with error. Session gets destroyed and RECVs are released.
+  rpc->recvs_available -= Session::kSessionCredits;
+  rpc->handle_connect_resp_st(conn_resp);
+  ASSERT_EQ(rpc->session_vec[0], nullptr);
+  ASSERT_EQ(rpc->recvs_available, rpc->transport->kRecvQueueDepth);
+  // No more tests here because session is destroyed
 }
 
 }  // End erpc
