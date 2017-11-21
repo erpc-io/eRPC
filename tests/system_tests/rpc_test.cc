@@ -60,7 +60,7 @@ class RpcTest : public ::testing::Test {
   Rpc<TestTransport> *rpc = nullptr;
 };
 
-/// A reusable check used by session management tests. For the check to pass:
+/// A reusable check for session management tests. For the check to pass:
 /// 1. \p rpc must have \p num_sessions sessions in its session vector
 /// 2. \p rpc's UDP client must have a packet in its queue. The packet at the
 ///    front must match \p pkt_type and err_type.
@@ -144,7 +144,7 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
                 SmErrType::kRoutingResolutionFailure);
 
   // Out of hugepages
-  // 
+  //
   // This should be the last subtest because we use alloc_raw() to eat up
   // hugepages rapidly by avoiding registration. These hugepages cannot be freed
   // without deleting the allocator.
@@ -166,6 +166,28 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
   test_sm_check(rpc, 0, SmPktType::kConnectResp, SmErrType::kOutOfMemory);
   ASSERT_EQ(initial_alloc, rpc->huge_alloc->get_stat_user_alloc_tot());
   // No more tests here
+}
+
+TEST_F(RpcTest, handle_connect_resp_st) {
+  const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
+  const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
+  const SmPkt conn_resp(SmPktType::kConnectReq, SmErrType::kNoError,
+                        kTestUniqToken, client, server);
+
+  /*
+  // Create a dummy client session
+  Session *clt_session  = new Session(Session::Role::kClient, kTestUniqToken);
+  clt_session->state = SessionState::kConnectInProgress;
+
+  // Process first connect request - session is created
+  rpc->handle_connect_req_st(conn_req);
+  test_sm_check(rpc, 1, SmPktType::kConnectResp, SmErrType::kNoError);
+
+  // Process connect request again.
+  // New session is not created and response is re-sent.
+  rpc->handle_connect_req_st(conn_req);
+  test_sm_check(rpc, 1, SmPktType::kConnectResp, SmErrType::kNoError);
+  */
 }
 
 }  // End erpc
