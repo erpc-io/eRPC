@@ -70,7 +70,13 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   // Try to resolve the client-provided routing info. If session creation
   // succeeds, we'll copy it to the server's session endpoint.
   Transport::RoutingInfo client_rinfo = sm_pkt.client.routing_info;
-  bool resolve_success = transport->resolve_remote_routing_info(&client_rinfo);
+  bool resolve_success;
+  if (kTesting && faults.fail_resolve_rinfo) {
+    resolve_success = false;
+  } else {
+    resolve_success = transport->resolve_remote_routing_info(&client_rinfo);
+  }
+
   if (!resolve_success) {
     std::string routing_info_str = TTr::routing_info_str(&client_rinfo);
     LOG_WARN("%s: Unable to resolve routing info %s. Sending response.\n",
@@ -188,7 +194,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   // Try to resolve the server-provided routing info
   Transport::RoutingInfo srv_routing_info = sm_pkt.server.routing_info;
   bool resolve_success;
-  if (kTesting && faults.fail_resolve_server_rinfo) {
+  if (kTesting && faults.fail_resolve_rinfo) {
     resolve_success = false;  // Inject fault
   } else {
     resolve_success = transport->resolve_remote_routing_info(&srv_routing_info);

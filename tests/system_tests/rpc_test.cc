@@ -136,12 +136,11 @@ TEST_F(RpcTest, handle_connect_req_st_errors) {
   rpc->session_vec.clear();  // Restore
 
   // Client routing info resolution fails
-  SmPkt resolve_fail_conn_req = conn_req;
-  memset(&resolve_fail_conn_req.client.routing_info, 0,
-         sizeof(resolve_fail_conn_req.client.routing_info));
-  rpc->handle_connect_req_st(resolve_fail_conn_req);
+  rpc->fault_inject_fail_resolve_rinfo_st();
+  rpc->handle_connect_req_st(conn_req);
   test_sm_check(rpc, 0, SmPktType::kConnectResp,
                 SmErrType::kRoutingResolutionFailure);
+  rpc->faults.fail_resolve_rinfo = false;  // Restore
 
   // Out of hugepages
   //

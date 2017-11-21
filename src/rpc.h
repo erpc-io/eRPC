@@ -632,12 +632,10 @@ class Rpc {
   //
  public:
   /**
-   * @brief Inject a fault that always fails server routing info resolution at
-   * all client sessions of this Rpc
-   *
+   * @brief Inject a fault that always fails all routing info resolution
    * @throw runtime_error if the caller cannot inject faults
    */
-  void fault_inject_fail_resolve_server_rinfo_st();
+  void fault_inject_fail_resolve_rinfo_st();
 
   /**
    * @brief Set the TX packet drop probability for this Rpc
@@ -850,11 +848,8 @@ class Rpc {
 
   /// All the faults that can be injected into eRPC for testing
   struct {
-    /// Fail server routing info resolution at client. This is used to test the
-    /// case where a client fails to resolve routing info sent by the server.
-    bool fail_resolve_server_rinfo = false;
-
-    double pkt_drop_prob = 0.0;  ///< Probability of dropping a packet
+    bool fail_resolve_rinfo = false;  ///< Fail routing info resolution
+    double pkt_drop_prob = 0.0;       ///< Probability of dropping a packet
 
     /// A packet is dropped if a random number between zero and one billion
     /// is less than pkt_drop_thresh_billion.

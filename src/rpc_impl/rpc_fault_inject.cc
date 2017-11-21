@@ -14,9 +14,9 @@ void Rpc<TTr>::fault_inject_check_ok() const {
 }
 
 template <class TTr>
-void Rpc<TTr>::fault_inject_fail_resolve_server_rinfo_st() {
+void Rpc<TTr>::fault_inject_fail_resolve_rinfo_st() {
   fault_inject_check_ok();
-  faults.fail_resolve_server_rinfo = true;
+  faults.fail_resolve_rinfo = true;
 }
 
 template <class TTr>
