@@ -10,7 +10,7 @@ static constexpr size_t kTestUdpPort = 3185;
 static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
-static constexpr size_t kTestBaseRpcId = 0;
+static constexpr size_t kTestRpcId = 0;  // ID of the fixture's Rpc
 
 typedef IBTransport TestTransport;
 
@@ -22,33 +22,34 @@ class RpcSmTest : public ::testing::Test {
   RpcSmTest() {
     nexus = new Nexus("localhost", kTestUdpPort);
     rt_assert(nexus != nullptr, "Failed to create nexus");
-    nexus->drop_all_rx();  // Prevent SM thread from doing any work
+    nexus->drop_all_rx();  // Prevent SM thread from doing any real work
 
-    rpc = new Rpc<TestTransport>(nexus, nullptr, kTestBaseRpcId, sm_handler,
+    rpc = new Rpc<TestTransport>(nexus, nullptr, kTestRpcId, sm_handler,
                                  kTestPhyPort, kTestNumaNode);
     rt_assert(rpc != nullptr, "Failed to create Rpc");
 
-    rpc->udp_client.enable_recording();
+    rpc->udp_client.enable_recording();  // Record UDP transmissions
+
+    // Init local endpoint
+    local_endpoint.transport_type = rpc->transport->transport_type;
+    strcpy(local_endpoint.hostname, "localhost");
+    local_endpoint.phy_port = kTestPhyPort;
+    local_endpoint.rpc_id = kTestRpcId;
+    local_endpoint.session_num = 0;
+    rpc->transport->fill_local_routing_info(&local_endpoint.routing_info);
+
+    // Init remote endpoint. Reusing local routing info & hostname is fine.
+    remote_endpoint.transport_type = rpc->transport->transport_type;
+    strcpy(remote_endpoint.hostname, "localhost");
+    remote_endpoint.phy_port = kTestPhyPort;
+    remote_endpoint.rpc_id = kTestRpcId + 1;
+    remote_endpoint.session_num = 1;
+    rpc->transport->fill_local_routing_info(&remote_endpoint.routing_info);
   }
 
   ~RpcSmTest() {
     delete rpc;
     delete nexus;
-  }
-
-  SessionEndpoint gen_session_endpt(uint8_t rpc_id, uint16_t session_num) {
-    rt_assert(rpc != nullptr, "gen_session_endpt() requires valid Rpc");
-
-    SessionEndpoint se;
-    se.transport_type = rpc->transport->transport_type;
-    strcpy(se.hostname, "localhost");
-    se.phy_port = kTestPhyPort;
-    se.rpc_id = rpc_id;
-    se.session_num = session_num;
-
-    // Any routing info that's resolvable is fine
-    rpc->transport->fill_local_routing_info(&se.routing_info);
-    return se;
   }
 
   /// A reusable check for session management tests. For the check to pass:
@@ -75,8 +76,23 @@ class RpcSmTest : public ::testing::Test {
     return clt_session;
   }
 
+  SessionEndpoint get_local_endpoint() const { return local_endpoint; }
+  SessionEndpoint get_remote_endpoint() const { return remote_endpoint; }
+
+  SessionEndpoint set_invalid_session_num(SessionEndpoint se) {
+    se.session_num = kInvalidSessionNum;
+    return se;
+  }
+
   Nexus *nexus = nullptr;
   Rpc<TestTransport> *rpc = nullptr;
+
+ private:
+  /// Endpoint in this Rpc, with session number = 0
+  SessionEndpoint local_endpoint;
+
+  /// A remote endpoint with Rpc ID = kTestRpcId + 1, session number = 1
+  SessionEndpoint remote_endpoint;
 };
 
 //
@@ -84,8 +100,9 @@ class RpcSmTest : public ::testing::Test {
 //
 
 TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
-  const auto client = gen_session_endpt(kTestBaseRpcId + 1, 0);
-  const auto server = gen_session_endpt(kTestBaseRpcId, kInvalidSessionNum);
+  const auto client = get_remote_endpoint();
+  const auto server = set_invalid_session_num(get_local_endpoint());
+
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
 
@@ -114,8 +131,9 @@ TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
 }
 
 TEST_F(RpcSmTest, handle_connect_req_st_errors) {
-  const auto client = gen_session_endpt(kTestBaseRpcId + 1, 0);
-  const auto server = gen_session_endpt(kTestBaseRpcId, kInvalidSessionNum);
+  const auto client = get_remote_endpoint();
+  const auto server = set_invalid_session_num(get_local_endpoint());
+
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
 
@@ -182,8 +200,8 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
 //
 
 TEST_F(RpcSmTest, handle_connect_resp_st_reordering) {
-  const auto client = gen_session_endpt(kTestBaseRpcId, 0);
-  const auto server = gen_session_endpt(kTestBaseRpcId + 1, 1);
+  const auto client = get_local_endpoint();
+  const auto server = get_remote_endpoint();
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
                         kTestUniqToken, client, server);
 
@@ -208,8 +226,8 @@ TEST_F(RpcSmTest, handle_connect_resp_st_reordering) {
 }
 
 TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
-  const auto client = gen_session_endpt(kTestBaseRpcId, 0);
-  const auto server = gen_session_endpt(kTestBaseRpcId + 1, 1);
+  const auto client = get_local_endpoint();
+  const auto server = get_remote_endpoint();
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
                         kTestUniqToken, client, server);
 
@@ -226,8 +244,8 @@ TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
 }
 
 TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
-  const auto client = gen_session_endpt(kTestBaseRpcId, 0);
-  const auto server = gen_session_endpt(kTestBaseRpcId + 1, 1);
+  const auto client = get_local_endpoint();
+  const auto server = get_remote_endpoint();
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kTooManySessions,
                         kTestUniqToken, client, server);
 
