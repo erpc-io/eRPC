@@ -66,14 +66,34 @@ class RpcSmTest : public ::testing::Test {
   }
 
   /// Create a client session in its initial state
-  static Session *create_client_session_init(const SessionEndpoint client,
-                                             const SessionEndpoint server) {
-    auto *clt_session = new Session(Session::Role::kClient, kTestUniqToken);
-    clt_session->state = SessionState::kConnectInProgress;
-    clt_session->client = client;
-    clt_session->server = server;
-    clt_session->server.session_num = kInvalidSessionNum;
-    return clt_session;
+  void create_client_session_init(const SessionEndpoint client,
+                                  const SessionEndpoint server) {
+    auto *session = new Session(Session::Role::kClient, kTestUniqToken);
+    session->state = SessionState::kConnectInProgress;
+    session->client = client;
+    session->server = server;
+    session->server.session_num = kInvalidSessionNum;
+
+    rpc->recvs_available -= Session::kSessionCredits;
+    rpc->session_vec.push_back(session);
+  }
+
+  /// Create a client session in its initial state
+  void create_server_session_init(const SessionEndpoint client,
+                                  const SessionEndpoint server) {
+    auto *session = new Session(Session::Role::kServer, kTestUniqToken);
+    session->state = SessionState::kConnected;
+    session->client = client;
+    session->server = server;
+
+    for (SSlot &sslot : session->sslot_arr) {
+      sslot.pre_resp_msgbuf =
+          rpc->alloc_msg_buffer(rpc->transport->kMaxDataPerPkt);
+      rt_assert(sslot.pre_resp_msgbuf.buf != nullptr, "Prealloc failed");
+    }
+
+    rpc->recvs_available -= Session::kSessionCredits;
+    rpc->session_vec.push_back(session);
   }
 
   SessionEndpoint get_local_endpoint() const { return local_endpoint; }
@@ -205,8 +225,8 @@ TEST_F(RpcSmTest, handle_connect_resp_st_reordering) {
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
                         kTestUniqToken, client, server);
 
-  // Make session 0 a client session in init state
-  rpc->session_vec.push_back(create_client_session_init(client, server));
+  // Make session 0 a client session in kConnectInProgress
+  create_client_session_init(client, server);
 
   // Process connect response. Session is connected, server session number saved
   rpc->handle_connect_resp_st(conn_resp);
@@ -231,8 +251,8 @@ TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
                         kTestUniqToken, client, server);
 
-  // Make session 0 a client session in init state
-  rpc->session_vec.push_back(create_client_session_init(client, server));
+  // Make session 0 a client session in kConnectInProgress
+  create_client_session_init(client, server);
 
   // Fail server routing resolution. Disconnect request is sent but session
   // is not destroyed.
@@ -249,11 +269,10 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kTooManySessions,
                         kTestUniqToken, client, server);
 
-  // Make session 0 a client session in init state
-  rpc->session_vec.push_back(create_client_session_init(client, server));
+  // Make session 0 a client session in kConnectInProgress
+  create_client_session_init(client, server);
 
   // Process response with error. Session gets destroyed and RECVs are released.
-  rpc->recvs_available -= Session::kSessionCredits;
   rpc->handle_connect_resp_st(conn_resp);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
   ASSERT_EQ(rpc->recvs_available, rpc->transport->kRecvQueueDepth);
@@ -263,37 +282,24 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
 //
 // handle_disconnect_req_st()
 //
-/*
 TEST_F(RpcSmTest, handle_disconnect_req_st_reordering) {
-  const auto client = gen_session_endpt(kTestBaseRpcId + 1, 1);
-  const auto server = gen_session_endpt(kTestBaseRpcId, 0);
-  const SmPkt conn_req(SmPktType::kDisconnectReq, SmErrType::kNoError,
+  const auto client = get_remote_endpoint();
+  const auto server = get_local_endpoint();
+  const SmPkt disc_req(SmPktType::kDisconnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
 
-  // Process first connect request - session is created
-  rpc->handle_connect_req_st(conn_req);
-  common_check(1, SmPktType::kConnectResp, SmErrType::kNoError);
+  // Make session 0 a server session in kConnected
+  create_server_session_init(client, server);
 
-  // Process connect request again.
-  // New session is not created and response is re-sent.
-  rpc->handle_connect_req_st(conn_req);
-  common_check(1, SmPktType::kConnectResp, SmErrType::kNoError);
+  // Process first disconnect request. Session is destroyed & response sent.
+  rpc->handle_disconnect_req_st(disc_req);
+  common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
+  ASSERT_EQ(rpc->session_vec[0], nullptr);
 
-  // Destroy the session and re-handle connect request.
-  // New session is not created and no response is sent.
-  rpc->bury_session_st(rpc->session_vec[0]);
-  rpc->udp_client.sent_vec.clear();
-  rpc->handle_connect_req_st(conn_req);
-  ASSERT_TRUE(rpc->udp_client.sent_vec.empty());
-
-  // Delete the client's token and re-handle connect request.
-  // New session *is* created and response is re-sent.
-  rpc->sm_token_map.clear();
-  rpc->session_vec.clear();
-  rpc->handle_connect_req_st(conn_req);
-  common_check(1, SmPktType::kConnectResp, SmErrType::kNoError);
+  // Process disconnect request again. Response is re-sent.
+  rpc->handle_disconnect_req_st(disc_req);
+  common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
 }
-*/
 
 }  // End erpc
 
