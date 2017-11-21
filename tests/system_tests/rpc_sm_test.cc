@@ -9,40 +9,35 @@ namespace erpc {
 static constexpr size_t kTestUdpPort = 3185;
 static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kTestRpcId = 0;
-static constexpr size_t kTestNumBgThreads = 0;
 static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
 
 typedef IBTransport TestTransport;
 
 // An Rpc with no established sessions
-class RpcTest : public ::testing::Test {
+class RpcSmTest : public ::testing::Test {
  public:
   static void sm_handler(int, SmEventType, SmErrType, void *) {}
 
-  RpcTest() {
-    nexus = new Nexus("localhost", kTestUdpPort, kTestNumBgThreads);
-    rt_assert(nexus != nullptr, "RpcTest: Failed to create nexus");
-    nexus->drop_all_rx();
+  RpcSmTest() {
+    nexus = new Nexus("localhost", kTestUdpPort);
+    rt_assert(nexus != nullptr, "Failed to create nexus");
+    nexus->drop_all_rx();  // Prevent SM thread from doing any work
 
     rpc = new Rpc<TestTransport>(nexus, nullptr, kTestRpcId, sm_handler,
                                  kTestPhyPort, kTestNumaNode);
-    rt_assert(rpc != nullptr, "RpcTest: Failed to create Rpc");
+    rt_assert(rpc != nullptr, "Failed to create Rpc");
 
     rpc->udp_client.enable_recording();
-
-    // int sn = rpc->create_session("localhost", kServerRpcId, kPhyPort);
-    // rt_assert(sn == 0, "RpcTest: Failed to create session");
   }
 
-  ~RpcTest() {
+  ~RpcSmTest() {
     delete rpc;
     delete nexus;
   }
 
   SessionEndpoint gen_session_endpoint(uint8_t rpc_id, uint16_t session_num) {
-    rt_assert(rpc != nullptr,
-              "RpcTest: gen_session_endpoint() requires valid Rpc");
+    rt_assert(rpc != nullptr, "gen_session_endpoint() requires valid Rpc");
 
     SessionEndpoint se;
     se.transport_type = rpc->transport->transport_type;
@@ -67,13 +62,14 @@ class RpcTest : public ::testing::Test {
 void test_sm_check(const Rpc<TestTransport> *rpc, size_t num_sessions,
                    SmPktType pkt_type, SmErrType err_type) {
   ASSERT_EQ(rpc->session_vec.size(), num_sessions);
+  ASSERT_GE(rpc->udp_client.sent_vec.size(), 1);
   const SmPkt &resp = rpc->udp_client.sent_vec.back();
   ASSERT_EQ(resp.pkt_type, pkt_type);
   ASSERT_EQ(resp.err_type, err_type);
 }
 
 /// Test SM packet reordering for handle_connect_req_st()
-TEST_F(RpcTest, handle_connect_req_st_reordering) {
+TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
   const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
@@ -104,7 +100,7 @@ TEST_F(RpcTest, handle_connect_req_st_reordering) {
 }
 
 /// Test error cases for handle_connect_req_st()
-TEST_F(RpcTest, handle_connect_req_st_errors) {
+TEST_F(RpcSmTest, handle_connect_req_st_errors) {
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
   const auto server = gen_session_endpoint(kTestRpcId, kInvalidSessionNum);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
@@ -179,7 +175,7 @@ Session *create_dummy_client_session(const SessionEndpoint client,
   return clt_session;
 }
 
-TEST_F(RpcTest, handle_connect_resp_st_reordering) {
+TEST_F(RpcSmTest, handle_connect_resp_st_reordering) {
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
   const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
@@ -188,7 +184,7 @@ TEST_F(RpcTest, handle_connect_resp_st_reordering) {
   // Create a dummy client session
   rpc->session_vec.push_back(create_dummy_client_session(client, server));
 
-  // Process connect response. Session is connected, server sess number is saved
+  // Process connect response. Session is connected, server session number saved
   rpc->handle_connect_resp_st(conn_resp);
   ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnected);
   ASSERT_EQ(rpc->session_vec[0]->server.session_num, 1);
@@ -199,11 +195,13 @@ TEST_F(RpcTest, handle_connect_resp_st_reordering) {
   ASSERT_EQ(rpc->session_vec.size(), 1);
 
   // Artificially destroy the session. Response gets ignored.
+  Session *clt_session = rpc->session_vec[0];
   rpc->session_vec[0] = nullptr;
   rpc->handle_connect_resp_st(conn_resp);  // No crash
+  rpc->session_vec[0] = clt_session;       // Restore
 }
 
-TEST_F(RpcTest, handle_connect_resp_st_resolve_error) {
+TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
   const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
@@ -221,7 +219,7 @@ TEST_F(RpcTest, handle_connect_resp_st_resolve_error) {
   ASSERT_NE(rpc->session_vec[0], nullptr);
 }
 
-TEST_F(RpcTest, handle_connect_resp_st_response_error) {
+TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
   const auto server = gen_session_endpoint(kTestRpcId, /* session num */ 1);
   const auto client = gen_session_endpoint(kTestRpcId + 1, /* session num */ 0);
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kTooManySessions,
