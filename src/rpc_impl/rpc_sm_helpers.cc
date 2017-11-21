@@ -37,11 +37,14 @@ void Rpc<TTr>::bury_session_st(Session *session) {
   assert(in_dispatch());
 
   // Free session resources
-  for (const SSlot &sslot : session->sslot_arr) {
-    free_msg_buffer(sslot.pre_resp_msgbuf);  // Prealloc buf is always valid
+  //
+  // XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
+  // guaranteed to have been freed at this point?
 
-    // XXX: Which other MsgBuffers do we need to free? Which MsgBuffers are
-    // guaranteed to have been freed at this point?
+  if (session->is_server()) {
+    for (const SSlot &sslot : session->sslot_arr) {
+      free_msg_buffer(sslot.pre_resp_msgbuf);  // Prealloc buf is always valid
+    }
   }
 
   session_vec.at(session->local_session_num) = nullptr;

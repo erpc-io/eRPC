@@ -55,26 +55,6 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
 
   auto *session = new Session(Session::Role::kClient, slow_rand.next_u64());
   session->state = SessionState::kConnectInProgress;
-
-  // Fill prealloc response MsgBuffers for the client session
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    MsgBuffer &resp_msgbuf_i = session->sslot_arr[i].pre_resp_msgbuf;
-    resp_msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
-
-    if (resp_msgbuf_i.buf == nullptr) {
-      // Cleanup everything allocated for this session
-      for (size_t j = 0; j < i; j++) {
-        MsgBuffer &resp_msgbuf_j = session->sslot_arr[j].pre_resp_msgbuf;
-        assert(resp_msgbuf_j.buf != nullptr);
-        free_msg_buffer(resp_msgbuf_j);
-      }
-
-      free(session);
-      LOG_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
-      return -ENOMEM;
-    }
-  }
-
   session->local_session_num = session_vec.size();
   sm_token_map[session->uniq_token] = session->local_session_num;
 
