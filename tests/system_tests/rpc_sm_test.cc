@@ -10,9 +10,7 @@ static constexpr size_t kTestUdpPort = 3185;
 static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
-
 static constexpr size_t kTestBaseRpcId = 0;
-static constexpr size_t kTestBaseSessionNum = 0;
 
 typedef IBTransport TestTransport;
 
@@ -66,9 +64,9 @@ class RpcSmTest : public ::testing::Test {
     ASSERT_EQ(resp.err_type, err_type);
   }
 
-  /// Create a dummy client session in its initial state
-  static Session *create_dummy_client_session(const SessionEndpoint client,
-                                              const SessionEndpoint server) {
+  /// Create a client session in its initial state
+  static Session *create_client_session_init(const SessionEndpoint client,
+                                             const SessionEndpoint server) {
     auto *clt_session = new Session(Session::Role::kClient, kTestUniqToken);
     clt_session->state = SessionState::kConnectInProgress;
     clt_session->client = client;
@@ -86,8 +84,7 @@ class RpcSmTest : public ::testing::Test {
 //
 
 TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
-  const auto client =
-      gen_session_endpt(kTestBaseRpcId + 1, kTestBaseSessionNum);
+  const auto client = gen_session_endpt(kTestBaseRpcId + 1, 0);
   const auto server = gen_session_endpt(kTestBaseRpcId, kInvalidSessionNum);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
@@ -117,8 +114,7 @@ TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
 }
 
 TEST_F(RpcSmTest, handle_connect_req_st_errors) {
-  const auto client =
-      gen_session_endpt(kTestBaseRpcId + 1, kTestBaseSessionNum);
+  const auto client = gen_session_endpt(kTestBaseRpcId + 1, 0);
   const auto server = gen_session_endpt(kTestBaseRpcId, kInvalidSessionNum);
   const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
@@ -186,14 +182,13 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
 //
 
 TEST_F(RpcSmTest, handle_connect_resp_st_reordering) {
-  const auto client = gen_session_endpt(kTestBaseRpcId, kTestBaseSessionNum);
-  const auto server =
-      gen_session_endpt(kTestBaseRpcId + 1, kTestBaseSessionNum + 1);
+  const auto client = gen_session_endpt(kTestBaseRpcId, 0);
+  const auto server = gen_session_endpt(kTestBaseRpcId + 1, 1);
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
                         kTestUniqToken, client, server);
 
-  // Create a dummy client session
-  rpc->session_vec.push_back(create_dummy_client_session(client, server));
+  // Make session 0 a client session in init state
+  rpc->session_vec.push_back(create_client_session_init(client, server));
 
   // Process connect response. Session is connected, server session number saved
   rpc->handle_connect_resp_st(conn_resp);
@@ -213,14 +208,13 @@ TEST_F(RpcSmTest, handle_connect_resp_st_reordering) {
 }
 
 TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
-  const auto client = gen_session_endpt(kTestBaseRpcId, kTestBaseSessionNum);
-  const auto server =
-      gen_session_endpt(kTestBaseRpcId + 1, kTestBaseSessionNum + 1);
+  const auto client = gen_session_endpt(kTestBaseRpcId, 0);
+  const auto server = gen_session_endpt(kTestBaseRpcId + 1, 1);
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kNoError,
                         kTestUniqToken, client, server);
 
-  // Create a dummy client session
-  rpc->session_vec.push_back(create_dummy_client_session(client, server));
+  // Make session 0 a client session in init state
+  rpc->session_vec.push_back(create_client_session_init(client, server));
 
   // Fail server routing resolution. Disconnect request is sent but session
   // is not destroyed.
@@ -232,14 +226,13 @@ TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
 }
 
 TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
-  const auto client = gen_session_endpt(kTestBaseRpcId, kTestBaseSessionNum);
-  const auto server =
-      gen_session_endpt(kTestBaseRpcId + 1, kTestBaseSessionNum + 1);
+  const auto client = gen_session_endpt(kTestBaseRpcId, 0);
+  const auto server = gen_session_endpt(kTestBaseRpcId + 1, 1);
   const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kTooManySessions,
                         kTestUniqToken, client, server);
 
-  // Create a dummy client session
-  rpc->session_vec.push_back(create_dummy_client_session(client, server));
+  // Make session 0 a client session in init state
+  rpc->session_vec.push_back(create_client_session_init(client, server));
 
   // Process response with error. Session gets destroyed and RECVs are released.
   rpc->recvs_available -= Session::kSessionCredits;
@@ -254,9 +247,9 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
 //
 /*
 TEST_F(RpcSmTest, handle_disconnect_req_st_reordering) {
-  const auto client = gen_session_endpt(kTestBaseRpcId + 1, 0);
-  const auto server = gen_session_endpt(kTestBaseRpcId, kInvalidSessionNum);
-  const SmPkt conn_req(SmPktType::kConnectReq, SmErrType::kNoError,
+  const auto client = gen_session_endpt(kTestBaseRpcId + 1, 1);
+  const auto server = gen_session_endpt(kTestBaseRpcId, 0);
+  const SmPkt conn_req(SmPktType::kDisconnectReq, SmErrType::kNoError,
                        kTestUniqToken, client, server);
 
   // Process first connect request - session is created
