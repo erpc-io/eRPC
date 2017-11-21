@@ -10,7 +10,9 @@ namespace erpc {
 // connected successfully.
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
-  assert(in_dispatch() && sm_pkt.pkt_type == SmPktType::kDisconnectReq);
+  assert(in_dispatch());
+  assert(sm_pkt.pkt_type == SmPktType::kDisconnectReq &&
+         sm_pkt.server.rpc_id == rpc_id);
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received disconnect request from %s. Issue",
@@ -55,7 +57,8 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   assert(in_dispatch());
-  assert(sm_pkt.pkt_type == SmPktType::kDisconnectResp);
+  assert(sm_pkt.pkt_type == SmPktType::kDisconnectResp &&
+         sm_pkt.client.rpc_id == rpc_id);
   assert(sm_pkt.err_type == SmErrType::kNoError);  // Disconnects don't fail
 
   // Create the basic issue message using only the packet

@@ -10,7 +10,10 @@ namespace erpc {
 // make when calling create_session(), which cannot check for such errors.
 template <class TTr>
 void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
-  assert(in_dispatch() && sm_pkt.pkt_type == SmPktType::kConnectReq);
+  assert(in_dispatch());
+  assert(sm_pkt.pkt_type == SmPktType::kConnectReq &&
+         sm_pkt.server.rpc_id == rpc_id);
+
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",
           rpc_id, sm_pkt.client.name().c_str());
@@ -138,8 +141,8 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 template <class TTr>
 void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   assert(in_dispatch());
-  assert(sm_pkt.pkt_type == SmPktType::kConnectResp);
-  assert(sm_err_type_is_valid(sm_pkt.err_type));
+  assert(sm_pkt.pkt_type == SmPktType::kConnectResp &&
+         sm_pkt.client.rpc_id == rpc_id);
 
   // Create the basic issue message using only the packet
   char issue_msg[kMaxIssueMsgLen];
