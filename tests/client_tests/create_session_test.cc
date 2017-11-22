@@ -32,16 +32,16 @@ void simple_connect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kAppClientRpcId, &test_sm_handler,
-                                     kAppPhyPort, kAppNumaNode);
+                                     kTestClientRpcId, &test_sm_handler,
+                                     kTestPhyPort, kTestNumaNode);
 
   // Connect the session
   context.exp_err = SmErrType::kNoError;
   context.session_num =
-      context.rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
+      context.rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
   ASSERT_GE(context.session_num, 0);
 
-  context.rpc->run_event_loop(kAppEventLoopMs);
+  context.rpc->run_event_loop(kTestEventLoopMs);
   ASSERT_EQ(context.num_sm_resps, 1);
 
   // Free resources
@@ -50,7 +50,7 @@ void simple_connect(Nexus *nexus, size_t) {
 }
 
 TEST(Base, SimpleConnect) {
-  auto reg_info_vec = {ReqFuncRegInfo(kAppReqType, basic_empty_req_handler,
+  auto reg_info_vec = {ReqFuncRegInfo(kTestReqType, basic_empty_req_handler,
                                       ReqFuncType::kForeground)};
 
   launch_server_client_threads(1, 0, simple_connect, reg_info_vec,
@@ -65,16 +65,16 @@ void invalid_remote_port(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kAppClientRpcId, &test_sm_handler,
-                                     kAppPhyPort, kAppNumaNode);
+                                     kTestClientRpcId, &test_sm_handler,
+                                     kTestPhyPort, kTestNumaNode);
 
   // Connect the session
   context.exp_err = SmErrType::kInvalidRemotePort;
   context.session_num = context.rpc->create_session(
-      "localhost", kAppServerRpcId, kAppPhyPort + 1);
+      "localhost", kTestServerRpcId, kTestPhyPort + 1);
   ASSERT_GE(context.session_num, 0);  // Local session creation works
 
-  context.rpc->run_event_loop(kAppEventLoopMs);
+  context.rpc->run_event_loop(kTestEventLoopMs);
   ASSERT_EQ(context.num_sm_resps, 1);
 
   // Free resources
@@ -83,7 +83,7 @@ void invalid_remote_port(Nexus *nexus, size_t) {
 }
 
 TEST(Base, InvalidRemotePort) {
-  auto reg_info_vec = {ReqFuncRegInfo(kAppReqType, basic_empty_req_handler,
+  auto reg_info_vec = {ReqFuncRegInfo(kTestReqType, basic_empty_req_handler,
                                       ReqFuncType::kForeground)};
 
   launch_server_client_threads(1, 0, invalid_remote_port, reg_info_vec,

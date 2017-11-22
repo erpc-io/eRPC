@@ -4,11 +4,11 @@ void req_handler(ReqHandle *, void *);  // Forward declaration
 
 /// Request handler for foreground testing
 auto reg_info_vec_fg = {
-    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kForeground)};
+    ReqFuncRegInfo(kTestReqType, req_handler, ReqFuncType::kForeground)};
 
 /// Request handler for background testing
 auto reg_info_vec_bg = {
-    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kBackground)};
+    ReqFuncRegInfo(kTestReqType, req_handler, ReqFuncType::kBackground)};
 
 /// Per-thread application context
 class AppContext : public BasicAppContext {
@@ -125,7 +125,7 @@ void generic_test_func(Nexus *nexus, size_t) {
         }
 
         int ret = rpc->enqueue_request(
-            session_num_arr[sess_i], kAppReqType, &cur_req_msgbuf,
+            session_num_arr[sess_i], kTestReqType, &cur_req_msgbuf,
             &resp_msgbufs[iter_req_i], cont_func, iter_req_i);
         if (ret != 0) {
           test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
@@ -149,7 +149,7 @@ void generic_test_func(Nexus *nexus, size_t) {
     rpc->destroy_session(session_num_arr[sess_i]);
   }
 
-  rpc->run_event_loop(kAppEventLoopMs);
+  rpc->run_event_loop(kTestEventLoopMs);
 
   // Free resources
   delete rpc;

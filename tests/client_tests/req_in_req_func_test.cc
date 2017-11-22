@@ -10,15 +10,15 @@
 // should run in the background.
 bool primary_bg, backup_bg;
 
-static constexpr uint8_t kAppDataByte = 10;
-static constexpr size_t kAppNumReqs = 33;
-static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
+static constexpr uint8_t kTestDataByte = 10;
+static constexpr size_t kTestNumReqs = 33;
+static_assert(kTestNumReqs > Session::kSessionReqWindow, "");
 
 /// Request type used for client to primary
-static constexpr uint8_t kAppReqTypeCP = kAppReqType + 1;
+static constexpr uint8_t kTestReqTypeCP = kTestReqType + 1;
 
 /// Request type used for primary to backup
-static constexpr uint8_t kAppReqTypePB = kAppReqType + 2;
+static constexpr uint8_t kTestReqTypePB = kTestReqType + 2;
 
 /// Per-request info maintained at the primary
 class PrimaryReqInfo {
@@ -94,7 +94,7 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
 
   // Backup is server thread #1
   int ret = context->rpc->enqueue_request(
-      context->session_num_arr[1], kAppReqTypePB, &srv_req_info->req_msgbuf_pb,
+      context->session_num_arr[1], kTestReqTypePB, &srv_req_info->req_msgbuf_pb,
       &srv_req_info->resp_msgbuf_pb, primary_cont_func,
       reinterpret_cast<size_t>(srv_req_info));
   _unused(ret);
@@ -198,7 +198,7 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
 
   // Fill in all the bytes of the request MsgBuffer with msgbuf_i
   for (size_t i = 0; i < req_size; i++) {
-    context->req_msgbuf[msgbuf_i].buf[i] = kAppDataByte;
+    context->req_msgbuf[msgbuf_i].buf[i] = kTestDataByte;
   }
 
   client_tag_t tag(static_cast<uint16_t>(context->num_reqs_sent),
@@ -208,7 +208,7 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
               context->rpc->get_rpc_id(), context->num_reqs_sent, req_size);
 
   int ret = context->rpc->enqueue_request(
-      context->session_num_arr[0], kAppReqTypeCP,
+      context->session_num_arr[0], kTestReqTypeCP,
       &context->req_msgbuf[msgbuf_i], &context->resp_msgbuf[msgbuf_i],
       client_cont_func, *reinterpret_cast<size_t *>(&tag));
   _unused(ret);
@@ -238,13 +238,13 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   // Check the response
   ASSERT_EQ(resp_msgbuf->get_data_size(), req_size);
   for (size_t i = 0; i < req_size; i++) {
-    ASSERT_EQ(resp_msgbuf->buf[i], kAppDataByte + 3);
+    ASSERT_EQ(resp_msgbuf->buf[i], kTestDataByte + 3);
   }
 
   context->num_rpc_resps++;
   context->rpc->release_response(resp_handle);
 
-  if (context->num_reqs_sent < kAppNumReqs) {
+  if (context->num_reqs_sent < kTestNumReqs) {
     client_request_helper(context, msgbuf_i);
   }
 }
@@ -269,8 +269,8 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
     client_request_helper(&context, i);
   }
 
-  wait_for_rpc_resps_or_timeout(context, kAppNumReqs, nexus->freq_ghz);
-  assert(context.num_rpc_resps == kAppNumReqs);
+  wait_for_rpc_resps_or_timeout(context, kTestNumReqs, nexus->freq_ghz);
+  assert(context.num_rpc_resps == kTestNumReqs);
 
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
@@ -295,8 +295,8 @@ TEST(Base, BothInForeground) {
   backup_bg = false;
 
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kForeground),
-      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kForeground)};
+      ReqFuncRegInfo(kTestReqTypeCP, req_handler_cp, ReqFuncType::kForeground),
+      ReqFuncRegInfo(kTestReqTypePB, req_handler_pb, ReqFuncType::kForeground)};
 
   // 2 client sessions (=> 2 server threads), 0 background threads
   launch_server_client_threads(2, 0, client_thread, reg_info_vec,
@@ -309,8 +309,8 @@ TEST(Base, PrimaryInBackground) {
   backup_bg = false;
 
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
-      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kForeground)};
+      ReqFuncRegInfo(kTestReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
+      ReqFuncRegInfo(kTestReqTypePB, req_handler_pb, ReqFuncType::kForeground)};
 
   // 2 client sessions (=> 2 server threads), 3 background threads
   launch_server_client_threads(2, 1, client_thread, reg_info_vec,
@@ -323,8 +323,8 @@ TEST(Base, BothInBackground) {
   backup_bg = true;
 
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
-      ReqFuncRegInfo(kAppReqTypePB, req_handler_pb, ReqFuncType::kBackground)};
+      ReqFuncRegInfo(kTestReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
+      ReqFuncRegInfo(kTestReqTypePB, req_handler_pb, ReqFuncType::kBackground)};
 
   // 2 client sessions (=> 2 server threads), 3 background threads
   launch_server_client_threads(2, 3, client_thread, reg_info_vec,

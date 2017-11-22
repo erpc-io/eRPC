@@ -9,14 +9,14 @@
 
 using namespace erpc;
 
-static constexpr uint16_t kAppNexusUdpPort = 31851;
-static constexpr size_t kAppEventLoopMs = 200;
-static constexpr size_t kAppMaxEventLoopMs = 20000;  // 20 seconds
-static constexpr uint8_t kAppClientRpcId = 100;
-static constexpr uint8_t kAppServerRpcId = 200;
-static constexpr uint8_t kAppReqType = 3;
-static constexpr uint8_t kAppPhyPort = 0;
-static constexpr size_t kAppNumaNode = 0;
+static constexpr uint16_t kTestNexusUdpPort = 31851;
+static constexpr size_t kTestEventLoopMs = 200;
+static constexpr size_t kTestMaxEventLoopMs = 20000;  // 20 seconds
+static constexpr uint8_t kTestClientRpcId = 100;
+static constexpr uint8_t kTestServerRpcId = 200;
+static constexpr uint8_t kTestReqType = 3;
+static constexpr uint8_t kTestPhyPort = 0;
+static constexpr size_t kTestNumaNode = 0;
 
 // Shared between client and server thread
 std::atomic<size_t> num_servers_up;   ///< Number of ready servers
@@ -126,7 +126,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
   context.is_client = false;
 
   Rpc<IBTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
-                       kAppPhyPort, kAppNumaNode);
+                       kTestPhyPort, kTestNumaNode);
   if (kTesting) rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
 
   context.rpc = &rpc;
@@ -144,18 +144,19 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
     test_printf("test: Server %u connecting to %zu other server threads.\n",
                 rpc_id, num_srv_threads - 1);
 
-    // Session number for server (kAppServerRpcId + x) is session_num_arr[x]
+    // Session number for server (kTestServerRpcId + x) is session_num_arr[x]
     context.session_num_arr = new int[num_srv_threads];
 
     // Create the sessions
     for (size_t i = 0; i < num_srv_threads; i++) {
-      uint8_t other_rpc_id = static_cast<uint8_t>(kAppServerRpcId + i);
+      uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
       if (other_rpc_id == rpc_id) {
         continue;
       }
 
       context.session_num_arr[i] = context.rpc->create_session(
-          "localhost", kAppServerRpcId + static_cast<uint8_t>(i), kAppPhyPort);
+          "localhost", kTestServerRpcId + static_cast<uint8_t>(i),
+          kTestPhyPort);
       assert(context.session_num_arr[i] >= 0);
     }
 
@@ -166,7 +167,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
   }
 
   while (!client_done) {  // Wait for all clients
-    rpc.run_event_loop(kAppEventLoopMs);
+    rpc.run_event_loop(kTestEventLoopMs);
   }
 
   // Disconnect sessions created to other server threads if needed
@@ -177,7 +178,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
         rpc_id, num_srv_threads - 1, rpc.num_active_sessions());
 
     for (size_t i = 0; i < num_srv_threads; i++) {
-      uint8_t other_rpc_id = static_cast<uint8_t>(kAppServerRpcId + i);
+      uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
       if (other_rpc_id == rpc_id) {
         continue;
       }
@@ -190,7 +191,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
     // to send disconnect responses to other server threads.
     context.num_sm_resps = 0;
     while (num_servers_up > 0) {
-      rpc.run_event_loop(kAppEventLoopMs);
+      rpc.run_event_loop(kTestEventLoopMs);
       if (context.num_sm_resps == num_srv_threads - 1) {
         num_servers_up--;  // Mark this server as down
         context.num_sm_resps = 0;
@@ -225,7 +226,7 @@ void launch_server_client_threads(
     void (*client_thread_func)(Nexus *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers, double srv_pkt_drop_prob) {
-  Nexus nexus("localhost", kAppNexusUdpPort, num_bg_threads);
+  Nexus nexus("localhost", kTestNexusUdpPort, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
@@ -249,7 +250,7 @@ void launch_server_client_threads(
                                    : basic_sm_handler;
 
     server_threads[i] = std::thread(
-        basic_server_thread_func, &nexus, kAppServerRpcId + i, _sm_handler,
+        basic_server_thread_func, &nexus, kTestServerRpcId + i, _sm_handler,
         num_sessions, connect_servers, srv_pkt_drop_prob);
   }
 
@@ -271,7 +272,7 @@ void launch_server_client_threads(
  * @param nexus The process's Nexus
  * @param context The uninitialized client context
  * @param num_sessions The number of sessions to create for the client. Session
- * \p i is created to Rpc \p {kAppServerRpcId + i} at localhost
+ * \p i is created to Rpc \p {kTestServerRpcId + i} at localhost
  * @param sm_handler The client's sm handler
  */
 void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
@@ -285,18 +286,18 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
 
   context.is_client = true;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kAppClientRpcId, sm_handler, kAppPhyPort,
-                                     kAppNumaNode);
+                                     kTestClientRpcId, sm_handler, kTestPhyPort,
+                                     kTestNumaNode);
 
   // Connect the sessions
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
-        "localhost", kAppServerRpcId + static_cast<uint8_t>(i), kAppPhyPort);
+        "localhost", kTestServerRpcId + static_cast<uint8_t>(i), kTestPhyPort);
   }
 
   while (context.num_sm_resps < num_sessions) {
-    context.rpc->run_event_loop(kAppEventLoopMs);
+    context.rpc->run_event_loop(kTestEventLoopMs);
   }
 
   // basic_sm_handler checks that the callbacks have no errors
@@ -305,7 +306,7 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
 
 /**
  * @brief Run the event loop on \p context's Rpc until we get at least
- * \p num_resps session management responses, or until \p kAppMaxEventLoopMs
+ * \p num_resps session management responses, or until \p kTestMaxEventLoopMs
  * are elapsed
  *
  * @param context The server or client context containing the Rpc
@@ -315,13 +316,13 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
 void wait_for_sm_resps_or_timeout(BasicAppContext &context,
                                   const size_t num_resps,
                                   const double freq_ghz) {
-  // Run the event loop for up to kAppMaxEventLoopMs milliseconds
+  // Run the event loop for up to kTestMaxEventLoopMs milliseconds
   uint64_t cycles_start = rdtsc();
   while (context.num_sm_resps < num_resps) {
-    context.rpc->run_event_loop(kAppEventLoopMs);
+    context.rpc->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
-    if (ms_elapsed > kAppMaxEventLoopMs) {
+    if (ms_elapsed > kTestMaxEventLoopMs) {
       break;
     }
   }
@@ -329,7 +330,7 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &context,
 
 /**
  * @brief Run the event loop on \p context's Rpc until we get at least
- * \p num_resps RPC responses, or until \p kAppMaxEventLoopMs are elapsed
+ * \p num_resps RPC responses, or until \p kTestMaxEventLoopMs are elapsed
  *
  * @param context The server or client context containing the Rpc
  * @param num_resps The number of RPC responses to wait for
@@ -338,13 +339,13 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &context,
 void wait_for_rpc_resps_or_timeout(BasicAppContext &context,
                                    const size_t num_resps,
                                    const double freq_ghz) {
-  // Run the event loop for up to kAppMaxEventLoopMs milliseconds
+  // Run the event loop for up to kTestMaxEventLoopMs milliseconds
   uint64_t cycles_start = rdtsc();
   while (context.num_rpc_resps < num_resps) {
-    context.rpc->run_event_loop(kAppEventLoopMs);
+    context.rpc->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
-    if (ms_elapsed > kAppMaxEventLoopMs) {
+    if (ms_elapsed > kTestMaxEventLoopMs) {
       break;
     }
   }

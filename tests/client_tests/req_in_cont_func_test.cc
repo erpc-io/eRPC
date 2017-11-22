@@ -4,9 +4,9 @@
  */
 #include "test_basics.h"
 
-static constexpr size_t kAppNumReqs = 1000;
-static_assert(kAppNumReqs > Session::kSessionReqWindow, "");
-static_assert(kAppNumReqs < std::numeric_limits<uint16_t>::max(), "");
+static constexpr size_t kTestNumReqs = 1000;
+static_assert(kTestNumReqs > Session::kSessionReqWindow, "");
+static_assert(kTestNumReqs < std::numeric_limits<uint16_t>::max(), "");
 
 struct tag_t {
   uint16_t req_i;
@@ -72,7 +72,7 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
               req_size);
 
   int ret = c->rpc->enqueue_request(
-      c->session_num_arr[0], kAppReqType, &c->req_msgbuf[msgbuf_i],
+      c->session_num_arr[0], kTestReqType, &c->req_msgbuf[msgbuf_i],
       &c->resp_msgbuf[msgbuf_i], cont_func, *reinterpret_cast<size_t *>(&tag));
   _unused(ret);
   assert(ret == 0);
@@ -98,7 +98,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   context->num_rpc_resps++;
   context->rpc->release_response(resp_handle);
 
-  if (context->num_reqs_sent < kAppNumReqs) {
+  if (context->num_reqs_sent < kTestNumReqs) {
     enqueue_request_helper(context, static_cast<tag_t>(tag).msgbuf_i);
   }
 }
@@ -121,8 +121,8 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
     enqueue_request_helper(&context, i);
   }
 
-  wait_for_rpc_resps_or_timeout(context, kAppNumReqs, nexus->freq_ghz);
-  assert(context.num_rpc_resps == kAppNumReqs);
+  wait_for_rpc_resps_or_timeout(context, kTestNumReqs, nexus->freq_ghz);
+  assert(context.num_rpc_resps == kTestNumReqs);
 
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
@@ -142,7 +142,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
 
 TEST(SendReqInContFunc, Foreground) {
   auto reg_info_vec = {
-      ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kForeground)};
+      ReqFuncRegInfo(kTestReqType, req_handler, ReqFuncType::kForeground)};
   launch_server_client_threads(1, 0, client_thread, reg_info_vec,
                                ConnectServers::kFalse, 0.0);
 }

@@ -5,7 +5,7 @@
 
 #include "test_basics.h"
 
-static constexpr size_t kAppReqSize = 32;  ///< Request size for this test
+static constexpr size_t kTestReqSize = 32;  ///< Request size for this test
 
 /// Per-thread application context
 class AppContext : public BasicAppContext {};
@@ -17,7 +17,7 @@ std::atomic<AppDeathMode> app_death_mode;
 
 void req_handler(ReqHandle *, void *);  // Forward declaration
 auto reg_info_vec = {
-    ReqFuncRegInfo(kAppReqType, req_handler, ReqFuncType::kBackground)};
+    ReqFuncRegInfo(kTestReqType, req_handler, ReqFuncType::kBackground)};
 
 /// A request handler with a configurable death mode
 void req_handler(ReqHandle *req_handle, void *_context) {
@@ -27,7 +27,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 
   // Try to create a session
   int session_num =
-      context->rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
+      context->rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
   ASSERT_EQ(session_num, -EPERM);
 
   // Try to destroy a valid session number
@@ -40,7 +40,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   }
 
   Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                      kAppReqSize);
+                                      kTestReqSize);
   req_handle->prealloc_used = true;
   context->rpc->enqueue_response(req_handle);
 }
@@ -65,14 +65,14 @@ void test_func(Nexus *nexus, size_t num_sessions) {
   int session_num = context.session_num_arr[0];
 
   // Send a message
-  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(kAppReqSize);
+  MsgBuffer req_msgbuf = rpc->alloc_msg_buffer(kTestReqSize);
   assert(req_msgbuf.buf != nullptr);
 
-  MsgBuffer resp_msgbuf = rpc->alloc_msg_buffer(kAppReqSize);
+  MsgBuffer resp_msgbuf = rpc->alloc_msg_buffer(kTestReqSize);
   assert(resp_msgbuf.buf != nullptr);
 
   // Run continuation in foreground thread
-  int ret = rpc->enqueue_request(session_num, kAppReqType, &req_msgbuf,
+  int ret = rpc->enqueue_request(session_num, kTestReqType, &req_msgbuf,
                                  &resp_msgbuf, cont_func, 0);
   _unused(ret);
   assert(ret == 0);
@@ -84,7 +84,7 @@ void test_func(Nexus *nexus, size_t num_sessions) {
 
   // Disconnect the session
   rpc->destroy_session(session_num);
-  rpc->run_event_loop(kAppEventLoopMs);
+  rpc->run_event_loop(kTestEventLoopMs);
 
   // Free resources
   delete rpc;

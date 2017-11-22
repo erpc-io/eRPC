@@ -1,7 +1,7 @@
 #include "test_basics.h"
 
 /// This test uses a request handler that is never invoked
-auto reg_info_vec = {ReqFuncRegInfo(kAppReqType, basic_empty_req_handler,
+auto reg_info_vec = {ReqFuncRegInfo(kTestReqType, basic_empty_req_handler,
                                     ReqFuncType::kForeground)};
 
 /// Per-thread application context
@@ -39,13 +39,13 @@ void simple_disconnect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
-                                     kAppNumaNode);
+                                     kTestClientRpcId, &sm_handler,
+                                     kTestPhyPort, kTestNumaNode);
   auto *rpc = context.rpc;
 
   // Create the session
   int session_num =
-      rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
+      rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
   ASSERT_GE(session_num, 0);
   ASSERT_NE(rpc->destroy_session(session_num), 0);  // Try early disconnect
 
@@ -86,8 +86,8 @@ void disconnect_multi(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions()
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
-                                     kAppNumaNode);
+                                     kTestClientRpcId, &sm_handler,
+                                     kTestPhyPort, kTestNumaNode);
   auto *rpc = context.rpc;
 
   // The number of sessions we can create before running out of RECVs
@@ -97,14 +97,14 @@ void disconnect_multi(Nexus *nexus, size_t) {
   for (size_t iter = 0; iter < 3; iter++) {
     for (size_t i = 0; i < num_sessions; i++) {
       int session_num =
-          rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
+          rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
       ASSERT_GE(session_num, 0);
       context.session_num_arr[i] = session_num;
     }
 
     // Try to create one more session. This should fail.
     int session_num =
-        rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
+        rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
     ASSERT_LT(session_num, 0);
 
     // Connect the sessions
@@ -141,13 +141,13 @@ void disconnect_remote_error(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
-                                     kAppNumaNode);
+                                     kTestClientRpcId, &sm_handler,
+                                     kTestPhyPort, kTestNumaNode);
   auto *rpc = context.rpc;
 
   // Create a session that uses an invalid remote port
   int session_num =
-      rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort + 1);
+      rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort + 1);
   ASSERT_GE(session_num, 0);
   context.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemotePort);
   wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
@@ -174,15 +174,15 @@ void disconnect_local_error(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kAppClientRpcId, &sm_handler, kAppPhyPort,
-                                     kAppNumaNode);
+                                     kTestClientRpcId, &sm_handler,
+                                     kTestPhyPort, kTestNumaNode);
   auto *rpc = context.rpc;
 
   // Force Rpc to fail remote routing info resolution at client
   rpc->fault_inject_fail_resolve_rinfo_st();
 
   int session_num =
-      rpc->create_session("localhost", kAppServerRpcId, kAppPhyPort);
+      rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
   ASSERT_GE(session_num, 0);
 
   context.arm(SmEventType::kDisconnected, SmErrType::kNoError);
@@ -192,7 +192,7 @@ void disconnect_local_error(Nexus *nexus, size_t) {
   // After invoking the kConnectFailed callback, the Rpc event loop tries to
   // free session resources at the server. This does not invoke a callback on
   // completion, so just wait for the callback-less freeing to complete.
-  rpc->run_event_loop(kAppEventLoopMs);
+  rpc->run_event_loop(kTestEventLoopMs);
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
   delete context.rpc;
