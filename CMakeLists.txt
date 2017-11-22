@@ -162,7 +162,6 @@ set(MICA_SOURCES
 # The tests to run using ctest
 set(CLIENT_TESTS
   create_session_test
-  create_session_args_test
   destroy_session_test
   api_restrictions_test
   small_msg_test
