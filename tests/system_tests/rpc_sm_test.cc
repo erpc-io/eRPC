@@ -1,33 +1,9 @@
-#include <gtest/gtest.h>
+#include "system_tests.h"
 
-#define private public
-#include "rpc.h"
-
-// These tests never run event loop, so SM pkts sent by Rpc have no consequence
 namespace erpc {
-
-static constexpr size_t kTestUdpPort = 3185;
-static constexpr size_t kTestPhyPort = 0;
-static constexpr size_t kTestNumaNode = 0;
-static constexpr size_t kTestUniqToken = 42;
-static constexpr size_t kTestRpcId = 0;  // ID of the fixture's Rpc
-
-typedef IBTransport TestTransport;
-
-// An Rpc with no established sessions
-class RpcSmTest : public ::testing::Test {
+class RpcSmTest : public RpcTest {
  public:
-  static void sm_handler(int, SmEventType, SmErrType, void *) {}
-
   RpcSmTest() {
-    nexus = new Nexus("localhost", kTestUdpPort);
-    rt_assert(nexus != nullptr, "Failed to create nexus");
-    nexus->drop_all_rx();  // Prevent SM thread from doing any real work
-
-    rpc = new Rpc<TestTransport>(nexus, nullptr, kTestRpcId, sm_handler,
-                                 kTestPhyPort, kTestNumaNode);
-    rt_assert(rpc != nullptr, "Failed to create Rpc");
-
     rpc->udp_client.enable_recording();  // Record UDP transmissions
 
     // Init local endpoint
@@ -47,10 +23,7 @@ class RpcSmTest : public ::testing::Test {
     rpc->transport->fill_local_routing_info(&remote_endpoint.routing_info);
   }
 
-  ~RpcSmTest() {
-    delete rpc;
-    delete nexus;
-  }
+  ~RpcSmTest() {}
 
   /// A reusable check for session management tests. For the check to pass:
   /// 1. \p rpc must have \p num_sessions sessions in its session vector
@@ -65,39 +38,6 @@ class RpcSmTest : public ::testing::Test {
     ASSERT_EQ(resp.err_type, err_type);
   }
 
-  /// Create a client session in its initial state
-  void create_client_session_init(const SessionEndpoint client,
-                                  const SessionEndpoint server) {
-    auto *session = new Session(Session::Role::kClient, kTestUniqToken);
-    session->state = SessionState::kConnectInProgress;
-    session->local_session_num = rpc->session_vec.size();
-
-    session->client = client;
-    session->server = server;
-    session->server.session_num = kInvalidSessionNum;
-
-    rpc->recvs_available -= Session::kSessionCredits;
-    rpc->session_vec.push_back(session);
-  }
-
-  /// Create a client session in its initial state
-  void create_server_session_init(const SessionEndpoint client,
-                                  const SessionEndpoint server) {
-    auto *session = new Session(Session::Role::kServer, kTestUniqToken);
-    session->state = SessionState::kConnected;
-    session->client = client;
-    session->server = server;
-
-    for (SSlot &sslot : session->sslot_arr) {
-      sslot.pre_resp_msgbuf =
-          rpc->alloc_msg_buffer(rpc->transport->kMaxDataPerPkt);
-      rt_assert(sslot.pre_resp_msgbuf.buf != nullptr, "Prealloc failed");
-    }
-
-    rpc->recvs_available -= Session::kSessionCredits;
-    rpc->session_vec.push_back(session);
-  }
-
   SessionEndpoint get_local_endpoint() const { return local_endpoint; }
   SessionEndpoint get_remote_endpoint() const { return remote_endpoint; }
 
@@ -105,9 +45,6 @@ class RpcSmTest : public ::testing::Test {
     se.session_num = kInvalidSessionNum;
     return se;
   }
-
-  Nexus *nexus = nullptr;
-  Rpc<TestTransport> *rpc = nullptr;
 
  private:
   /// Endpoint in this Rpc, with session number = 0
@@ -120,7 +57,6 @@ class RpcSmTest : public ::testing::Test {
 //
 // handle_connect_req_st()
 //
-
 TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
   const auto client = get_remote_endpoint();
   const auto server = set_invalid_session_num(get_local_endpoint());
