@@ -171,7 +171,8 @@ set(CLIENT_TESTS
   packet_loss_test)
 
 set(SYSTEM_TESTS
-  rpc_sm_test)
+  rpc_sm_test
+  rpc_rx_test)
 
 # These are not run using ctest
 set(UTIL_TESTS
