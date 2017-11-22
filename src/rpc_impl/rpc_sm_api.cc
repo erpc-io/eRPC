@@ -56,7 +56,6 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   auto *session = new Session(Session::Role::kClient, slow_rand.next_u64());
   session->state = SessionState::kConnectInProgress;
   session->local_session_num = session_vec.size();
-  sm_token_map[session->uniq_token] = session->local_session_num;
 
   // Fill in client and server endpoint metadata. Commented server fields will
   // be filled when the connect response is received.

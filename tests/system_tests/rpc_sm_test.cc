@@ -144,9 +144,9 @@ TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
   rpc->handle_connect_req_st(conn_req);
   ASSERT_TRUE(rpc->udp_client.sent_vec.empty());
 
-  // Delete the client's token and re-handle connect request.
+  // Delete the client's connect request token and re-handle connect request.
   // New session *is* created and response is re-sent.
-  rpc->sm_token_map.clear();
+  rpc->conn_req_token_map.clear();
   rpc->session_vec.clear();
   rpc->handle_connect_req_st(conn_req);
   common_check(1, SmPktType::kConnectResp, SmErrType::kNoError);

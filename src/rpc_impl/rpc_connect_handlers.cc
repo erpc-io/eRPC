@@ -19,9 +19,9 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
           rpc_id, sm_pkt.client.name().c_str());
 
   // Handle reordering
-  if (sm_token_map.count(sm_pkt.uniq_token) > 0) {
+  if (conn_req_token_map.count(sm_pkt.uniq_token) > 0) {
     // We've received this connect request before
-    uint16_t srv_session_num = sm_token_map.at(sm_pkt.uniq_token);
+    uint16_t srv_session_num = conn_req_token_map[sm_pkt.uniq_token];
     assert(session_vec.size() > srv_session_num);
 
     const Session *session = session_vec[srv_session_num];
@@ -117,7 +117,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   session->server.session_num = session_vec.size();
   transport->fill_local_routing_info(&session->server.routing_info);
 
-  sm_token_map[session->uniq_token] = session->server.session_num;
+  conn_req_token_map[session->uniq_token] = session->server.session_num;
 
   // Fill-in the client endpoint
   session->client = sm_pkt.client;

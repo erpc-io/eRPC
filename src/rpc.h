@@ -804,8 +804,9 @@ class Rpc {
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
 
-  /// The insert-only map of session tokens to index in the session vector
-  std::map<sm_uniq_token_t, uint16_t> sm_token_map;
+  /// The insert-only map of unique tokens received in session connect
+  /// requests, to the session's index in the session vector.
+  std::map<conn_req_uniq_token_t, uint16_t> conn_req_token_map;
 
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport
@@ -838,7 +839,7 @@ class Rpc {
   } bg_queues;
 
   // Packet loss
-  size_t prev_epoch_ts;  ///< Timestamp of the previous epoch
+  size_t prev_epoch_ts;  ///< Timestamp of the previous event loop epoch
 
   // Misc
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset

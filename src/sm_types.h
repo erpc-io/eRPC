@@ -17,8 +17,8 @@ static constexpr uint16_t kInvalidSessionNum =
     std::numeric_limits<uint16_t>::max();
 static constexpr uint32_t kInvalidSecret = 0;
 
-// A cluster-wide unique token for each session
-typedef size_t sm_uniq_token_t;
+// A cluster-wide unique token for each session, generated on session creation
+typedef size_t conn_req_uniq_token_t;
 
 enum class SessionState {
   kConnectInProgress,  ///< Client-only state, connect request is in flight
@@ -243,9 +243,9 @@ class SessionEndpoint {
 class SmPkt {
  public:
   SmPktType pkt_type;
-  SmErrType err_type;              ///< Error type, for responses only
-  sm_uniq_token_t uniq_token;      ///< The token for this session
-  SessionEndpoint client, server;  ///< Endpoint metadata
+  SmErrType err_type;                ///< Error type, for responses only
+  conn_req_uniq_token_t uniq_token;  ///< The token for this session
+  SessionEndpoint client, server;    ///< Endpoint metadata
 
   std::string to_string() const {
     std::ostringstream ret;
@@ -255,8 +255,9 @@ class SmPkt {
   }
 
   SmPkt() {}
-  SmPkt(SmPktType pkt_type, SmErrType err_type, sm_uniq_token_t uniq_token,
-        SessionEndpoint client, SessionEndpoint server)
+  SmPkt(SmPktType pkt_type, SmErrType err_type,
+        conn_req_uniq_token_t uniq_token, SessionEndpoint client,
+        SessionEndpoint server)
       : pkt_type(pkt_type),
         err_type(err_type),
         uniq_token(uniq_token),

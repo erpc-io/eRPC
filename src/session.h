@@ -41,7 +41,7 @@ class Session {
   static_assert(is_power_of_two(kSessionReqWindow), "");
 
  private:
-  Session(Role role, sm_uniq_token_t uniq_token)
+  Session(Role role, conn_req_uniq_token_t uniq_token)
       : role(role), uniq_token(uniq_token) {
     remote_routing_info =
         is_client() ? &server.routing_info : &client.routing_info;
@@ -79,7 +79,7 @@ class Session {
   inline bool is_connected() const { return state == SessionState::kConnected; }
 
   const Role role;  ///< The role (server/client) of this session endpoint
-  const sm_uniq_token_t uniq_token;  ///< A cluster-wide unique token
+  const conn_req_uniq_token_t uniq_token;  ///< A cluster-wide unique token
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 
