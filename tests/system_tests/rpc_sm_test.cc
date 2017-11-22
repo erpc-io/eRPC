@@ -330,6 +330,26 @@ TEST_F(RpcSmTest, handle_disconnect_resp_st) {
   rpc->handle_disconnect_resp_st(disc_resp);
 }
 
+//
+// create_session_st()
+//
+TEST_F(RpcSmTest, create_session_st) {
+  // Correct args
+  int session_num =
+      rpc->create_session("localhost", kTestRpcId + 1, kTestPhyPort);
+  ASSERT_EQ(session_num, 0);
+  common_check(1, SmPktType::kConnectReq, SmErrType::kNoError);
+  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnectInProgress);
+
+  // Invalid remote port, which can be detected locally
+  session_num = rpc->create_session("localhost", kTestRpcId + 1, kMaxPhyPorts);
+  ASSERT_LT(session_num, 0);
+
+  // Try to create session to self
+  session_num = rpc->create_session("localhost", kTestRpcId, kTestPhyPort);
+  ASSERT_LT(session_num, 0);
+}
+
 }  // End erpc
 
 int main(int argc, char **argv) {
