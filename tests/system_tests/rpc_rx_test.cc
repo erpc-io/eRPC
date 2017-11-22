@@ -6,7 +6,7 @@ class RpcRxTest : public RpcTest {};
 //
 // process_comps_st()
 //
-TEST_F(RpcRxTest, process_comps_st) {}
+TEST_F(RpcRxTest, process_small_req_st) {}
 
 }  // End erpc
 

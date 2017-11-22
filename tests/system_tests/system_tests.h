@@ -28,6 +28,22 @@ class RpcTest : public ::testing::Test {
     rpc = new Rpc<TestTransport>(nexus, nullptr, kTestRpcId, sm_handler,
                                  kTestPhyPort, kTestNumaNode);
     rt_assert(rpc != nullptr, "Failed to create Rpc");
+
+    // Init local endpoint
+    local_endpoint.transport_type = rpc->transport->transport_type;
+    strcpy(local_endpoint.hostname, "localhost");
+    local_endpoint.phy_port = kTestPhyPort;
+    local_endpoint.rpc_id = kTestRpcId;
+    local_endpoint.session_num = 0;
+    rpc->transport->fill_local_routing_info(&local_endpoint.routing_info);
+
+    // Init remote endpoint. Reusing local routing info & hostname is fine.
+    remote_endpoint.transport_type = rpc->transport->transport_type;
+    strcpy(remote_endpoint.hostname, "localhost");
+    remote_endpoint.phy_port = kTestPhyPort;
+    remote_endpoint.rpc_id = kTestRpcId + 1;
+    remote_endpoint.session_num = 1;
+    rpc->transport->fill_local_routing_info(&remote_endpoint.routing_info);
   }
 
   ~RpcTest() {
@@ -68,8 +84,24 @@ class RpcTest : public ::testing::Test {
     rpc->session_vec.push_back(session);
   }
 
-  Nexus *nexus = nullptr;
+  SessionEndpoint get_local_endpoint() const { return local_endpoint; }
+  SessionEndpoint get_remote_endpoint() const { return remote_endpoint; }
+
+  SessionEndpoint set_invalid_session_num(SessionEndpoint se) {
+    se.session_num = kInvalidSessionNum;
+    return se;
+  }
+
   Rpc<TestTransport> *rpc = nullptr;
+
+ private:
+  Nexus *nexus = nullptr;
+
+  /// Endpoint in this Rpc (Rpc ID = kTestRpcId), with session number = 0
+  SessionEndpoint local_endpoint;
+
+  /// A remote endpoint with Rpc ID = kTestRpcId + 1, session number = 1
+  SessionEndpoint remote_endpoint;
 };
 
 }  // End erpc
