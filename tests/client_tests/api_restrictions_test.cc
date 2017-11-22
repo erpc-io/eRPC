@@ -3,7 +3,7 @@
  * @brief Test the restrictions on the eRPC API.
  */
 
-#include "test_basics.h"
+#include "client_tests.h"
 
 static constexpr size_t kTestReqSize = 32;  ///< Request size for this test
 

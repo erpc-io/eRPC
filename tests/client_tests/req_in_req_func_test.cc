@@ -4,7 +4,7 @@
  * primary-backup setup, where the client sends requests to the primary,
  * which completes an RPC with *one* of the backups before replying.
  */
-#include "test_basics.h"
+#include "client_tests.h"
 
 // Set to true if the request handler or continuation at the primary or backup
 // should run in the background.

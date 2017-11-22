@@ -1,4 +1,4 @@
-#include "test_basics.h"
+#include "client_tests.h"
 
 /// This test uses a request handler that is never invoked
 auto reg_info_vec = {ReqFuncRegInfo(kTestReqType, basic_empty_req_handler,

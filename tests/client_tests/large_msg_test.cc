@@ -1,4 +1,4 @@
-#include "test_basics.h"
+#include "client_tests.h"
 
 void req_handler(ReqHandle *, void *);  // Forward declaration
 
@@ -81,7 +81,7 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
 /// on each of \p config_num_sessions sessions, for multiple iterations.
 ///
 /// The second \p size_t argument exists only because the client thread function
-/// template in test_basics requires it.
+/// template in client_tests.h requires it.
 void generic_test_func(Nexus *nexus, size_t) {
   // Create the Rpc and connect the session
   AppContext context;

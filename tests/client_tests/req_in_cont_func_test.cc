@@ -2,7 +2,7 @@
  * @file test_nested_rpc.cc
  * @brief Test issuing requests from within continuations.
  */
-#include "test_basics.h"
+#include "client_tests.h"
 
 static constexpr size_t kTestNumReqs = 1000;
 static_assert(kTestNumReqs > Session::kSessionReqWindow, "");

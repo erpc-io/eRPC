@@ -1,4 +1,4 @@
-#include "test_basics.h"
+#include "client_tests.h"
 
 class AppContext : public BasicAppContext {
  public:
