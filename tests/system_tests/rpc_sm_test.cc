@@ -70,6 +70,8 @@ class RpcSmTest : public ::testing::Test {
                                   const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kClient, kTestUniqToken);
     session->state = SessionState::kConnectInProgress;
+    session->local_session_num = rpc->session_vec.size();
+
     session->client = client;
     session->server = server;
     session->server.session_num = kInvalidSessionNum;
@@ -282,7 +284,7 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
 //
 // handle_disconnect_req_st()
 //
-TEST_F(RpcSmTest, handle_disconnect_req_st_reordering) {
+TEST_F(RpcSmTest, handle_disconnect_req_st) {
   const auto client = get_remote_endpoint();
   const auto server = get_local_endpoint();
   const SmPkt disc_req(SmPktType::kDisconnectReq, SmErrType::kNoError,
@@ -303,6 +305,29 @@ TEST_F(RpcSmTest, handle_disconnect_req_st_reordering) {
   // Process disconnect request again. Response is re-sent.
   rpc->handle_disconnect_req_st(disc_req);
   common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
+}
+
+//
+// handle_disconnect_resp_st()
+//
+TEST_F(RpcSmTest, handle_disconnect_resp_st) {
+  const auto client = get_local_endpoint();
+  const auto server = get_remote_endpoint();
+  const SmPkt disc_resp(SmPktType::kDisconnectResp, SmErrType::kNoError,
+                        kTestUniqToken, client, server);
+
+  // Make session 0 a client session in kDisconnectInProgress
+  create_client_session_init(client, server);  // In kConnectInProgress for now
+  rpc->session_vec[0]->state = SessionState::kDisconnectInProgress;
+  rpc->session_vec[0]->server.session_num = server.session_num;
+
+  // Process first disconnect response
+  rpc->handle_disconnect_resp_st(disc_resp);
+  ASSERT_EQ(rpc->session_vec[0], nullptr);
+  ASSERT_EQ(rpc->recvs_available, rpc->transport->kRecvQueueDepth);
+
+  // Process disconnect request again. This gets ignored.
+  rpc->handle_disconnect_resp_st(disc_resp);
 }
 
 }  // End erpc
