@@ -18,8 +18,9 @@ class RpcRxTest : public RpcTest {
   }
 
   RpcRxTest() {
-    nexus->register_req_func(kTestReqType,
-                             ReqFunc(req_handler, ReqFuncType::kForeground));
+    // Ugh I hate myself
+    *const_cast<ReqFunc *>(&rpc->req_func_arr[kTestReqType]) =
+        ReqFunc(req_handler, ReqFuncType::kForeground);
 
     // Set Rpc context
     test_context.rpc = rpc;
