@@ -34,9 +34,6 @@ size_t config_num_bg_threads;    ///< Number of background threads
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
 void req_handler(ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
 
