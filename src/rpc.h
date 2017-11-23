@@ -553,7 +553,6 @@ class Rpc {
   /// Copy the data from \p pkt to \p msgbuf
   inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, const uint8_t *pkt) {
     const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
-
     size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
 
     size_t bytes_to_copy;
@@ -566,13 +565,10 @@ class Rpc {
                           ? (pkthdr->msg_size - offset)
                           : TTr::kMaxDataPerPkt;
     }
-
     assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
     assert(offset + bytes_to_copy <= msgbuf->get_data_size());
 
-    memcpy(reinterpret_cast<char *>(&msgbuf->buf[offset]),
-           reinterpret_cast<const char *>(pkt + sizeof(pkthdr_t)),
-           bytes_to_copy);
+    memcpy(&msgbuf->buf[offset], pkt + sizeof(pkthdr_t), bytes_to_copy);
   }
 
   /**
@@ -689,15 +685,20 @@ class Rpc {
   }
 
   /// Retrieve this Rpc's hugepage allocator. For expert use only.
-  inline HugeAlloc *get_huge_alloc() {
+  inline HugeAlloc *get_huge_alloc() const {
     rt_assert(nexus->num_bg_threads == 0,
               "Cannot extract allocator because background threads exist.");
     return huge_alloc;
   }
 
-  /// Return the maximum *data* size that can be sent in one packet
+  /// Return the maximum *data* size in one packet for the (private) transport
   static inline constexpr size_t get_max_data_per_pkt() {
     return TTr::kMaxDataPerPkt;
+  }
+
+  /// Return the (private) transport's RECV queue depth
+  static inline constexpr size_t get_recv_queue_depth() {
+    return TTr::kRecvQueueDepth;
   }
 
   /// Return the maximum message *data* size that can be sent

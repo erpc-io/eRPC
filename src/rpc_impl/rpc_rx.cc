@@ -160,8 +160,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
     // the request. The allocated req_msgbuf is freed by the background thread.
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(req_msgbuf.buf != nullptr);
-    memcpy(reinterpret_cast<char *>(req_msgbuf.get_pkthdr_0()), pkt,
-           pkthdr->msg_size + sizeof(pkthdr_t));
+    memcpy(req_msgbuf.get_pkthdr_0(), pkt, pkthdr->msg_size + sizeof(pkthdr_t));
     submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
     return;
   }
@@ -215,9 +214,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   sslot->tx_msgbuf = nullptr;  // Equivalent to bury()
 
   // Copy the header and data
-  memcpy(reinterpret_cast<char *>(resp_msgbuf->get_pkthdr_0()),
-         reinterpret_cast<const char *>(pkt),
-         pkthdr->msg_size + sizeof(pkthdr_t));
+  memcpy(resp_msgbuf->get_pkthdr_0(), pkt, pkthdr->msg_size + sizeof(pkthdr_t));
 
   if (sslot->client_info.cont_etid == kInvalidBgETid) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
