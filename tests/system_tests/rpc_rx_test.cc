@@ -1,37 +1,32 @@
 #include "system_tests.h"
 
 namespace erpc {
+
+class TestContext {
+ public:
+  Rpc<TestTransport> *rpc = nullptr;
+  size_t num_resps = 0;
+};
+
+/// The common request handler for subtests. Copies request to response.
+void req_handler(ReqHandle *req_handle, void *_context) {
+  auto *context = static_cast<TestContext *>(_context);
+  const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  const size_t resp_size = req_msgbuf->get_data_size();
+
+  memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
+  req_handle->prealloc_used = true;
+
+  context->rpc->enqueue_response(req_handle);
+}
+
 class RpcRxTest : public RpcTest {
  public:
-  static constexpr size_t kTestReqType = 1;
-
-  /// The common request handler for subtests. Copies request to response.
-  static void req_handler(ReqHandle *req_handle, void *_context) {
-    auto *context = static_cast<TestContext *>(_context);
-    const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-    const size_t resp_size = req_msgbuf->get_data_size();
-
-    memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
-    req_handle->prealloc_used = true;
-
-    context->rpc->enqueue_response(req_handle);
-  }
-
   RpcRxTest() {
-    // Ugh I hate myself
-    *const_cast<ReqFunc *>(&rpc->req_func_arr[kTestReqType]) =
-        ReqFunc(req_handler, ReqFuncType::kForeground);
-
     // Set Rpc context
     test_context.rpc = rpc;
     test_context.rpc->set_context(&test_context);
   }
-
-  class TestContext {
-   public:
-    Rpc<TestTransport> *rpc = nullptr;
-    size_t num_resps = 0;
-  };
 
   TestContext test_context;
 };

@@ -11,8 +11,10 @@ static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
 static constexpr size_t kTestRpcId = 0;  // ID of the fixture's Rpc
+static constexpr size_t kTestReqType = 1;
 
 typedef IBTransport TestTransport;
+extern void req_handler(ReqHandle *, void *);  // Defined in each test.cc
 
 /// Basic eRPC test class with an Rpc object and functions to create client
 /// and server sessions
@@ -24,6 +26,8 @@ class RpcTest : public ::testing::Test {
     nexus = new Nexus("localhost", kTestUdpPort);
     rt_assert(nexus != nullptr, "Failed to create nexus");
     nexus->drop_all_rx();  // Prevent SM thread from doing any real work
+    nexus->register_req_func(kTestReqType,
+                             ReqFunc(req_handler, ReqFuncType::kForeground));
 
     rpc = new Rpc<TestTransport>(nexus, nullptr, kTestRpcId, sm_handler,
                                  kTestPhyPort, kTestNumaNode);
