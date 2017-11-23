@@ -25,9 +25,6 @@ size_t config_num_bg_threads;    ///< Number of background threads
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
 void req_handler(ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
 
@@ -41,12 +38,10 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   // MsgBuffer allocation is thread safe
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(resp_size);
   assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
-  size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
-
-  memcpy(reinterpret_cast<char *>(req_handle->dyn_resp_msgbuf.buf),
-         reinterpret_cast<char *>(req_msgbuf->buf), resp_size);
+  memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
   req_handle->prealloc_used = false;
 
+  size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
   test_printf(
       "Server: Received request of length %zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
@@ -59,9 +54,6 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 /// request buffer is identical to the response buffer, and increments the
 /// number of responses in the context.
 void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
-  assert(resp_handle != nullptr);
-  assert(_context != nullptr);
-
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response of length %zu.\n",
               resp_msgbuf->get_data_size());

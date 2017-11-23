@@ -22,9 +22,6 @@ size_t config_msg_size;  ///< The size of the request and response messages
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
 void req_handler(ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
 
@@ -35,8 +32,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
   Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
-  memcpy(static_cast<void *>(req_handle->pre_resp_msgbuf.buf),
-         static_cast<void *>(req_msgbuf->buf), resp_size);
+  memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
   req_handle->prealloc_used = true;
 
   context->rpc->enqueue_response(req_handle);
@@ -46,9 +42,6 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 /// request buffer is identical to the response buffer, and increments the
 /// number of responses in the context.
 void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
-  assert(resp_handle != nullptr);
-  assert(_context != nullptr);
-
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   ASSERT_EQ(resp_msgbuf->get_data_size(), config_msg_size);
 

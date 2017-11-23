@@ -9,7 +9,6 @@ class AppContext : public BasicAppContext {
 // Only invoked for clients
 void test_sm_handler(int session_num, SmEventType sm_event_type,
                      SmErrType sm_err_type, void *_context) {
-  ASSERT_TRUE(_context != nullptr);
   AppContext *context = static_cast<AppContext *>(_context);
   context->num_sm_resps++;
 

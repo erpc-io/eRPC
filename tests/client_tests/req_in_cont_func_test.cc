@@ -27,9 +27,6 @@ class AppContext : public BasicAppContext {
 };
 
 void req_handler(ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<AppContext *>(_context);
   assert(!context->is_client);
 
@@ -41,11 +38,9 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   // eRPC will free the MsgBuffer
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
   assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
+  memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, req_size);
+
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
-
-  memcpy(reinterpret_cast<char *>(req_handle->dyn_resp_msgbuf.buf),
-         reinterpret_cast<char *>(req_msgbuf->buf), req_size);
-
   test_printf(
       "Server: Received request of length %zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
@@ -58,7 +53,7 @@ void cont_func(RespHandle *, void *, size_t);  // Forward declaration
 
 /// Enqueue a request using the request MsgBuffer with index = msgbuf_i
 void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
-  assert(c != nullptr && msgbuf_i < Session::kSessionReqWindow);
+  assert(msgbuf_i < Session::kSessionReqWindow);
 
   size_t req_size =
       get_rand_msg_size(&c->fast_rand, c->rpc->get_max_data_per_pkt(),
@@ -81,10 +76,6 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
 }
 
 void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
-  assert(resp_handle != nullptr);
-  assert(_context != nullptr);
-  _unused(_tag);
-
   auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();

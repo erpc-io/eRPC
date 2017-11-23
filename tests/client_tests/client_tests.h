@@ -59,7 +59,6 @@ enum class ConnectServers : bool { kTrue, kFalse };
 /// running time.
 size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
                          size_t max_msg_size) {
-  assert(fast_rand != nullptr);
   assert(max_msg_size > max_data_per_pkt * 10);
 
   size_t X = 50;
@@ -277,12 +276,10 @@ void launch_server_client_threads(
  */
 void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
                              size_t num_sessions, sm_handler_t sm_handler) {
-  assert(nexus != nullptr);
   assert(num_sessions >= 1);
 
-  while (!all_servers_ready) {  // Wait for all server threads to start
-    usleep(1);
-  }
+  // Wait for all server threads to start
+  while (!all_servers_ready) usleep(1);
 
   context.is_client = true;
   context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),

@@ -62,9 +62,6 @@ void primary_cont_func(RespHandle *, void *, size_t);
 /// The primary's request handler for client-to-primary requests. Forwards the
 /// received request to one of the backup servers.
 void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
-  assert(req_handle_cp != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<BasicAppContext *>(_context);
   assert(!context->is_client);
   ASSERT_EQ(context->rpc->in_background(), primary_bg);
@@ -104,9 +101,6 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
 /// The backups' request handler for primary-to-backup to requests. Echoes the
 /// received request back to the primary.
 void req_handler_pb(ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<BasicAppContext *>(_context);
   assert(!context->is_client);
   ASSERT_EQ(context->rpc->in_background(), backup_bg);
@@ -133,9 +127,6 @@ void req_handler_pb(ReqHandle *req_handle, void *_context) {
 /// The primary's continuation function when it gets a response from a backup
 void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
                        size_t _tag) {
-  assert(resp_handle_pb != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<BasicAppContext *>(_context);
   assert(!context->is_client);
   ASSERT_EQ(context->rpc->in_background(), primary_bg);
@@ -188,7 +179,7 @@ void client_cont_func(RespHandle *, void *, size_t);  // Forward declaration
 
 /// Enqueue a request to server 0 using the request MsgBuffer index msgbuf_i
 void client_request_helper(AppContext *context, size_t msgbuf_i) {
-  assert(context != nullptr && msgbuf_i < Session::kSessionReqWindow);
+  assert(msgbuf_i < Session::kSessionReqWindow);
 
   size_t req_size = get_rand_msg_size(&context->fast_rand,
                                       context->rpc->get_max_data_per_pkt(),
@@ -218,9 +209,6 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
 }
 
 void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
-  assert(resp_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
 
