@@ -8,7 +8,7 @@ endif()
 set(CMAKE_CXX_COMPILER g++-7)
 set(CMAKE_C_LINK_EXECUTABLE g++-7)
 
-add_definitions(-std=c++14)
+add_definitions(-std=c++11)
 
 add_definitions(-Wall -Wextra -Werror -pedantic)
 add_definitions(-Wsign-conversion)

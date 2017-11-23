@@ -12,7 +12,7 @@ namespace erpc {
 
 static constexpr bool kDatapathStats = false;
 
-static inline constexpr void dpath_stat_inc(size_t &stat, size_t val) {
+static inline void dpath_stat_inc(size_t &stat, size_t val) {
   if (kDatapathStats) stat += val;
 }
 
