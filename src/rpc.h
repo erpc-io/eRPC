@@ -682,6 +682,12 @@ class Rpc {
   //
 
  public:
+  /// Set this Rpc's context
+  inline void set_context(void *_context) {
+    rt_assert(context == nullptr, "Cannot reset non-null Rpc context");
+    context = _context;
+  }
+
   /// Retrieve this Rpc's hugepage allocator. For expert use only.
   inline HugeAlloc *get_huge_alloc() {
     rt_assert(nexus->num_bg_threads == 0,
