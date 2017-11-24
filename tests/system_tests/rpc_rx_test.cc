@@ -2,6 +2,8 @@
 
 namespace erpc {
 
+static constexpr size_t kTestSmallReqSize = 32;
+
 class TestContext {
  public:
   Rpc<TestTransport> *rpc = nullptr;
@@ -18,6 +20,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   req_handle->prealloc_used = true;
 
   context->rpc->enqueue_response(req_handle);
+  context->num_resps++;
 }
 
 class RpcRxTest : public RpcTest {
@@ -29,26 +32,31 @@ class RpcRxTest : public RpcTest {
   }
 
   TestContext test_context;
+
+  /// Return true iff the request handler was called, and reset num_resps
+  bool check_resp_and_reset() {
+    bool ret = (test_context.num_resps == 1);
+    test_context.num_resps = 0;
+    return ret;
+  }
 };
 
 //
-// process_comps_st()
+// process_small_req_st()
 //
 TEST_F(RpcRxTest, process_small_req_st) {
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
-  const size_t req_size = 32;
 
   create_server_session_init(client, server);
   Session *srv_session = rpc->session_vec[0];
 
-  MsgBuffer req = rpc->alloc_msg_buffer(req_size);
-  rt_assert(req.buf != nullptr, "Request alloc failed");
-
+  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallReqSize);
   strcpy(reinterpret_cast<char *>(req.buf), "req");
+
   pkthdr_t *pkthdr_0 = req.get_pkthdr_0();
   pkthdr_0->req_type = kTestReqType;
-  pkthdr_0->msg_size = req_size;
+  pkthdr_0->msg_size = kTestSmallReqSize;
   pkthdr_0->dest_session_num = server.session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->pkt_num = 0;
@@ -56,6 +64,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
 
   rpc->process_small_req_st(&srv_session->sslot_arr[0],
                             reinterpret_cast<uint8_t *>(pkthdr_0));
+  ASSERT_TRUE(check_resp_and_reset());
 }
 
 }  // End erpc
