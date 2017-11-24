@@ -94,9 +94,10 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   // Try to place small requests in the TX batch right now, avoiding queueing.
   // Large requests, and small requests that cannot be transmitted (e.g., due
   // to lack of credits) are queued in req_txq.
-  if (req_msgbuf->num_pkts == 1) {
-    tx_small_req_one_st(&sslot, req_msgbuf);
-    if (sslot.client_info.req_sent == 0) req_txq.push_back(&sslot);
+  if (req_msgbuf->num_pkts == 1 && session->client_info.credits > 0) {
+    session->client_info.credits--;
+    enqueue_pkt_tx_burst_st(&sslot, 0, req_msgbuf->data_size);
+    sslot.client_info.req_sent++;
   } else {
     req_txq.push_back(&sslot);
   }
