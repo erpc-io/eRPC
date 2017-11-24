@@ -455,8 +455,6 @@ class Rpc {
             "eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
             tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
       }
-    } else {
-      assert(!item.drop);
     }
 
     LOG_TRACE("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
@@ -486,8 +484,6 @@ class Rpc {
         LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
                   tx_msgbuf->get_pkthdr_str(0).c_str());
       }
-    } else {
-      assert(!item.drop);
     }
 
     LOG_TRACE("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
@@ -857,10 +853,9 @@ class Rpc {
   /// All the faults that can be injected into eRPC for testing
   struct {
     bool fail_resolve_rinfo = false;  ///< Fail routing info resolution
-    double pkt_drop_prob = 0.0;       ///< Probability of dropping a packet
+    double pkt_drop_prob = 0.0;       ///< Probability of dropping an RPC packet
 
-    /// A packet is dropped if a random number between zero and one billion
-    /// is less than pkt_drop_thresh_billion.
+    /// Derived: Drop packet iff urand[0, ..., one billion] is smaller than this
     uint32_t pkt_drop_thresh_billion = 0;
   } faults;
 

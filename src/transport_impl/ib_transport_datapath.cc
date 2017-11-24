@@ -7,8 +7,6 @@ namespace erpc {
 // inlined for simplicity.
 void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
                            size_t num_pkts) {
-  assert(tx_burst_arr != nullptr);
-
   for (size_t i = 0; i < num_pkts; i++) {
     const tx_burst_item_t& item = tx_burst_arr[i];
     assert(item.routing_info != nullptr);
