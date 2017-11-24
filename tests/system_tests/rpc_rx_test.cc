@@ -16,8 +16,9 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   const size_t resp_size = req_msgbuf->get_data_size();
 
-  memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
   req_handle->prealloc_used = true;
+  context->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
+  memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
 
   context->rpc->enqueue_response(req_handle);
   context->num_resps++;
@@ -43,6 +44,8 @@ TEST_F(RpcRxTest, process_small_req_st) {
 
   create_server_session_init(client, server);
   Session *srv_session = rpc->session_vec[0];
+  rpc->transport->resolve_remote_routing_info(
+      &srv_session->client.routing_info);
 
   MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallReqSize);
   strcpy(reinterpret_cast<char *>(req.buf), "req");
