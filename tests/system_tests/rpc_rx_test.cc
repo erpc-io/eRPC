@@ -32,13 +32,6 @@ class RpcRxTest : public RpcTest {
   }
 
   TestContext test_context;
-
-  /// Return true iff the request handler was called, and reset num_resps
-  bool check_resp_and_reset() {
-    bool ret = (test_context.num_resps == 1);
-    test_context.num_resps = 0;
-    return ret;
-  }
 };
 
 //
@@ -59,12 +52,19 @@ TEST_F(RpcRxTest, process_small_req_st) {
   pkthdr_0->msg_size = kTestSmallReqSize;
   pkthdr_0->dest_session_num = server.session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
+
+  // Process an in-order request
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
-
   rpc->process_small_req_st(&srv_session->sslot_arr[0],
                             reinterpret_cast<uint8_t *>(pkthdr_0));
-  ASSERT_TRUE(check_resp_and_reset());
+  ASSERT_EQ(test_context.num_resps, 1);
+  test_context.num_resps = 0;
+
+  // Process the same request again. Request handler is not called.
+  rpc->process_small_req_st(&srv_session->sslot_arr[0],
+                            reinterpret_cast<uint8_t *>(pkthdr_0));
+  ASSERT_EQ(test_context.num_resps, 0);
 }
 
 }  // End erpc
