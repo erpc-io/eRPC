@@ -47,9 +47,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   rpc->transport->resolve_remote_routing_info(
       &srv_session->client.routing_info);
 
-  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallReqSize);
-  strcpy(reinterpret_cast<char *>(req.buf), "req");
-
+  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallReqSize);  // Garbage is fine
   pkthdr_t *pkthdr_0 = req.get_pkthdr_0();
   pkthdr_0->req_type = kTestReqType;
   pkthdr_0->msg_size = kTestSmallReqSize;
@@ -64,7 +62,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
                             reinterpret_cast<uint8_t *>(pkthdr_0));
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
-  test_context.num_req_handler_calls = 0;  // Restore
+  test_context.num_req_handler_calls = 0;
 
   // Receive the same request packet again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
@@ -81,7 +79,6 @@ TEST_F(RpcRxTest, process_small_req_st) {
                             reinterpret_cast<uint8_t *>(pkthdr_0));
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.size(), 0);
-  // Restore
   rpc->session_vec[0]->sslot_arr[0].cur_req_num -= Session::kSessionReqWindow;
 
   // Mark the response as unavailable, and receive the request packet again.
@@ -91,7 +88,16 @@ TEST_F(RpcRxTest, process_small_req_st) {
   rpc->process_small_req_st(&srv_session->sslot_arr[0],
                             reinterpret_cast<uint8_t *>(pkthdr_0));
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
-  rpc->session_vec[0]->sslot_arr[0].tx_msgbuf = tx_msgbuf_save;  // Restore
+  rpc->session_vec[0]->sslot_arr[0].tx_msgbuf = tx_msgbuf_save;
+
+  // Receive the next in-order small request packet.
+  // Response handler is called and response is sent.
+  pkthdr_0->req_num += Session::kSessionReqWindow;
+  rpc->process_small_req_st(&srv_session->sslot_arr[0],
+                            reinterpret_cast<uint8_t *>(pkthdr_0));
+  ASSERT_EQ(test_context.num_req_handler_calls, 1);
+  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
+  test_context.num_req_handler_calls = 0;
 }
 
 }  // End erpc
