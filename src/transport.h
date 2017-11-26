@@ -180,6 +180,10 @@ class Transport {
   // Members initialized after the hugepage allocator is provided
   HugeAlloc* huge_alloc;  ///< The parent Rpc's hugepage allocator
   size_t numa_node;       ///< Derived from \p huge_alloc
+
+  struct {
+    size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called
+  } testing;
 };
 
 }  // End erpc

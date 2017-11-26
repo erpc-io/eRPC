@@ -89,8 +89,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
 // This is a slower polling function than the one used in tx_burst: it prints
 // a warning message when the number of polling attempts gets too high. This
-// overhead is fine because the send queue is flushed only on packet loss or
-// reordering.
+// overhead is fine because the send queue is flushed rarely.
 void IBTransport::poll_send_cq_for_flush(bool first) {
   struct ibv_wc wc;
   size_t num_tries = 0;
@@ -111,6 +110,8 @@ void IBTransport::poll_send_cq_for_flush(bool first) {
 }
 
 void IBTransport::tx_flush() {
+  testing.tx_flush_count++;
+
   if (unlikely(nb_tx == 0)) {
     fprintf(stderr,
             "eRPC: Warning. tx_flush called, but no SEND request in queue.\n");
