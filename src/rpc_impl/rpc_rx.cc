@@ -12,7 +12,7 @@ void Rpc<TTr>::process_comps_st() {
     uint8_t *pkt = rx_ring[rx_ring_head];
     rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
 
-    const pkthdr_t *pkthdr = reinterpret_cast<pkthdr_t *>(pkt);
+    auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
@@ -84,8 +84,7 @@ template <class TTr>
 void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_dispatch());
   assert(!sslot->is_client);
-
-  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
   // Handle reordering
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
@@ -170,8 +169,7 @@ template <class TTr>
 void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_dispatch());
   assert(sslot->is_client);
-
-  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
@@ -320,8 +318,7 @@ template <class TTr>
 void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_dispatch());
   assert(!sslot->is_client);
-
-  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
   MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
 
   // Handle reordering
@@ -443,8 +440,7 @@ template <class TTr>
 void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_dispatch());
   assert(sslot->is_client);
-
-  const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
