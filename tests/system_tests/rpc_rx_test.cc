@@ -56,19 +56,23 @@ TEST_F(RpcRxTest, process_small_req_st) {
   pkthdr_0->dest_session_num = server.session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
 
-  // Process an in-order request
+  // Process an in-order request.
+  // Response handler is called and response is sent.
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
   rpc->process_small_req_st(&srv_session->sslot_arr[0],
                             reinterpret_cast<uint8_t *>(pkthdr_0));
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
-  test_context.num_req_handler_calls = 0;
+  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
+  test_context.num_req_handler_calls = 0;  // Restore
 
   // Process the same request again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
   rpc->process_small_req_st(&srv_session->sslot_arr[0],
                             reinterpret_cast<uint8_t *>(pkthdr_0));
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
+  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
+  ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 }
 
 }  // End erpc
