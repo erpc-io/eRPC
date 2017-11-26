@@ -2,12 +2,13 @@
 
 namespace erpc {
 
-static constexpr size_t kTestSmallReqSize = 32;
+static constexpr size_t kTestSmallMsgSize = 32;
 
 class TestContext {
  public:
   Rpc<TestTransport> *rpc = nullptr;
   size_t num_req_handler_calls = 0;
+  size_t num_cont_func_calls = 0;
 };
 
 /// The common request handler for subtests. Copies request to response.
@@ -22,6 +23,13 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 
   context->rpc->enqueue_response(req_handle);
   context->num_req_handler_calls++;
+}
+
+/// The common continuation for subtests.
+void cont_func(RespHandle *resp_handle, void *_context, size_t) {
+  auto *context = static_cast<TestContext *>(_context);
+  context->num_cont_func_calls++;
+  context->rpc->release_response(resp_handle);
 }
 
 class RpcRxTest : public RpcTest {
@@ -47,10 +55,11 @@ TEST_F(RpcRxTest, process_small_req_st) {
   rpc->transport->resolve_remote_routing_info(
       &srv_session->client.routing_info);
 
-  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallReqSize);  // Garbage is fine
+  // The request packet that is recevied
+  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   pkthdr_t *pkthdr_0 = req.get_pkthdr_0();
   pkthdr_0->req_type = kTestReqType;
-  pkthdr_0->msg_size = kTestSmallReqSize;
+  pkthdr_0->msg_size = kTestSmallMsgSize;
   pkthdr_0->dest_session_num = server.session_num;
   pkthdr_0->pkt_type = kPktTypeReq;
   pkthdr_0->pkt_num = 0;
@@ -98,6 +107,42 @@ TEST_F(RpcRxTest, process_small_req_st) {
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
+}
+
+//
+// process_small_resp_st()
+//
+TEST_F(RpcRxTest, process_small_resp_st) {
+  const auto client = get_local_endpoint();
+  const auto server = get_remote_endpoint();
+
+  create_client_session_init(client, server);
+  Session *clt_session = rpc->session_vec[0];
+  clt_session->server.session_num = server.session_num;
+  rpc->transport->resolve_remote_routing_info(
+      &clt_session->server.routing_info);
+  clt_session->state = SessionState::kConnected;
+
+  // Allow enqueue_request() to do sslot formatting for the request
+  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
+  MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
+  rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
+
+  // Construct the test response packet received
+  MsgBuffer remote_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
+  pkthdr_t *pkthdr_0 = remote_resp.get_pkthdr_0();
+  pkthdr_0->req_type = kTestReqType;
+  pkthdr_0->msg_size = kTestSmallMsgSize;
+  pkthdr_0->dest_session_num = client.session_num;
+  pkthdr_0->pkt_type = kPktTypeResp;
+  pkthdr_0->pkt_num = 0;
+  pkthdr_0->req_num = Session::kSessionReqWindow;
+
+  // Receive an in-order small response packet. Continuation is invoked.
+  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
+                             reinterpret_cast<uint8_t *>(pkthdr_0));
+  ASSERT_EQ(test_context.num_cont_func_calls, 1);
+  test_context.num_cont_func_calls = 0;
 }
 
 }  // End erpc
