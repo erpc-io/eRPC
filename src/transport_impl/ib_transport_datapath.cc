@@ -46,10 +46,10 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
       wr.num_sge = 1;
     } else {
-      // This is not the first packet, so we need 2 SGEs. The offset-to-pkt_num
-      // computation involes a division, but it's OK because it's a large msg.
-      size_t pkt_num = (item.offset + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
-      const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(pkt_num);
+      // This is not the first packet, so we need 2 SGEs. This involves a
+      // a division, which is OK because it is a large message.
+      const pkthdr_t* pkthdr =
+          msg_buffer->get_pkthdr_n(item.offset / kMaxDataPerPkt);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
       sgl[0].lkey = msg_buffer->buffer.lkey;

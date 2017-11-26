@@ -22,7 +22,7 @@ class FixedQueue {
 
   inline void push(T t) {
     if (queue.size() == N) queue.pop();
-    queue.push_back(t);
+    queue.push(t);
   }
 
   inline T pop() {

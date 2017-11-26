@@ -13,6 +13,7 @@
 #include "transport.h"
 #include "transport_impl/ib_transport.h"
 #include "util/buffer.h"
+#include "util/fixed_queue.h"
 #include "util/huge_alloc.h"
 #include "util/logger.h"
 #include "util/mt_queue.h"
@@ -449,11 +450,15 @@ class Rpc {
     item.data_bytes = data_bytes;
 
     if (kTesting) {
+      size_t pkt_num = offset / TTr::kMaxDataPerPkt;
+      const pkthdr_t pkthdr = pkt_num == 0 ? *tx_msgbuf->get_pkthdr_0()
+                                           : *tx_msgbuf->get_pkthdr_n(pkt_num);
+      testing.pkthdr_tx_queue.push(pkthdr);
+
       item.drop = roll_pkt_drop();
       if (item.drop) {
-        LOG_DEBUG(
-            "eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
-            tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
+        LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
+                  tx_msgbuf->get_pkthdr_str(pkt_num).c_str());
       }
     }
 
@@ -479,6 +484,7 @@ class Rpc {
     item.data_bytes = 0;
 
     if (kTesting) {
+      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_0());
       item.drop = roll_pkt_drop();
       if (item.drop) {
         LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
@@ -555,8 +561,7 @@ class Rpc {
     if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
       bytes_to_copy = pkthdr->msg_size;
     } else {
-      size_t num_pkts_in_msg =
-          (pkthdr->msg_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
+      size_t num_pkts_in_msg = TTr::data_size_to_num_pkts(pkthdr->msg_size);
       bytes_to_copy = (pkthdr->pkt_num == num_pkts_in_msg - 1)
                           ? (pkthdr->msg_size - offset)
                           : TTr::kMaxDataPerPkt;
@@ -865,6 +870,14 @@ class Rpc {
     size_t pkts_sent = 0;
     size_t post_send_calls = 0;
   } dpath_stats;
+
+  // Additional members for testing
+
+  /// Number of packet headers recorded
+  static constexpr size_t kTestingPkthdrQueueSz = 16;
+  struct {
+    FixedQueue<pkthdr_t, kTestingPkthdrQueueSz> pkthdr_tx_queue;
+  } testing;
 };
 
 // Instantiate required Rpc classes so they get compiled for the linker
