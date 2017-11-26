@@ -7,7 +7,8 @@
 namespace erpc {
 
 /**
- * @brief A static-sized vector that supports push, pop, and random access
+ * @brief A fast static-sized vector that supports push_back, pop_back, and
+ * random access. Exceeding the size of the vector results in an error.
  *
  * @tparam T The type of elements stored in the vector
  * @tparam N The size of the vector
@@ -32,7 +33,7 @@ class FixedVector {
     return t;
   }
 
-  /// Similar to std::vector::size()
+  /// Return the number of elements currently in the vector
   inline size_t size() { return free_index; }
 
   /// Return the maximum capacity of the FixedVector
