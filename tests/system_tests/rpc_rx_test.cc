@@ -7,7 +7,7 @@ static constexpr size_t kTestSmallReqSize = 32;
 class TestContext {
  public:
   Rpc<TestTransport> *rpc = nullptr;
-  size_t num_resps = 0;
+  size_t num_req_handler_calls = 0;
 };
 
 /// The common request handler for subtests. Copies request to response.
@@ -21,7 +21,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
 
   context->rpc->enqueue_response(req_handle);
-  context->num_resps++;
+  context->num_req_handler_calls++;
 }
 
 class RpcRxTest : public RpcTest {
@@ -61,13 +61,14 @@ TEST_F(RpcRxTest, process_small_req_st) {
   pkthdr_0->req_num = Session::kSessionReqWindow;
   rpc->process_small_req_st(&srv_session->sslot_arr[0],
                             reinterpret_cast<uint8_t *>(pkthdr_0));
-  ASSERT_EQ(test_context.num_resps, 1);
-  test_context.num_resps = 0;
+  ASSERT_EQ(test_context.num_req_handler_calls, 1);
+  test_context.num_req_handler_calls = 0;
 
-  // Process the same request again. Request handler is not called.
+  // Process the same request again.
+  // Request handler is not called. Response is re-sent, and TX queue flushed.
   rpc->process_small_req_st(&srv_session->sslot_arr[0],
                             reinterpret_cast<uint8_t *>(pkthdr_0));
-  ASSERT_EQ(test_context.num_resps, 0);
+  ASSERT_EQ(test_context.num_req_handler_calls, 0);
 }
 
 }  // End erpc
