@@ -48,11 +48,8 @@ void Rpc<TTr>::process_comps_st() {
     // Process control packets, which are sent only for large RPCs
     if (pkthdr->msg_size == 0) {
       assert(pkthdr->is_expl_cr() || pkthdr->is_req_for_resp());
-      if (pkthdr->is_expl_cr()) {
-        process_expl_cr_st(sslot, pkthdr);
-      } else {
-        process_req_for_resp_st(sslot, pkthdr);
-      }
+      pkthdr->is_expl_cr() ? process_expl_cr_st(sslot, pkthdr)
+                           : process_req_for_resp_st(sslot, pkthdr);
       continue;
     }
 
@@ -61,17 +58,11 @@ void Rpc<TTr>::process_comps_st() {
 
     if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
       assert(pkthdr->pkt_num == 0);
-      if (pkthdr->is_req()) {
-        process_small_req_st(sslot, pkt);
-      } else {
-        process_small_resp_st(sslot, pkt);
-      }
+      pkthdr->is_req() ? process_small_req_st(sslot, pkt)
+                       : process_small_resp_st(sslot, pkt);
     } else {
-      if (pkthdr->is_req()) {
-        process_large_req_one_st(sslot, pkt);
-      } else {
-        process_large_resp_one_st(sslot, pkt);
-      }
+      pkthdr->is_req() ? process_large_req_one_st(sslot, pkt)
+                       : process_large_resp_one_st(sslot, pkt);
     }
   }
 
