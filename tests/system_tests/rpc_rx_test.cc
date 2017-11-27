@@ -110,9 +110,9 @@ TEST_F(RpcRxTest, process_small_req_st) {
 }
 
 //
-// process_small_resp_st() with a single-packet request
+// process_small_resp_st()
 //
-TEST_F(RpcRxTest, process_small_resp_st_small_req) {
+TEST_F(RpcRxTest, process_small_resp_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
 
@@ -140,6 +140,14 @@ TEST_F(RpcRxTest, process_small_resp_st_small_req) {
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
+  // Roll-back: Receive resp while progress is rolled back for retransmission.
+  // Response is ignored.
+  assert(sslot_0->client_info.req_sent == 1);
+  sslot_0->client_info.req_sent = 0;
+  rpc->process_small_resp_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(test_context.num_cont_func_calls, 0);
+  sslot_0->client_info.req_sent = 1;
+
   // In-order: Receive an in-order small response.
   // Continuation is invoked.
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
@@ -163,50 +171,6 @@ TEST_F(RpcRxTest, process_small_resp_st_small_req) {
   // This is an error.
   pkthdr_0->req_num += Session::kSessionReqWindow;
   ASSERT_DEATH(rpc->process_small_resp_st(sslot_0, pkthdr_0), ".*");
-}
-
-//
-// process_small_resp_st() with a multi-packet request
-//
-TEST_F(RpcRxTest, process_small_resp_st_large_req) {
-  const size_t kTestLargeReqPkts = 2;
-  const auto client = get_local_endpoint();
-  const auto server = get_remote_endpoint();
-
-  create_client_session_init(client, server);
-  Session *clt_session = rpc->session_vec[0];
-  clt_session->server.session_num = server.session_num;
-  rpc->transport->resolve_remote_routing_info(
-      &clt_session->server.routing_info);
-  clt_session->state = SessionState::kConnected;
-
-  MsgBuffer req =
-      rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt() * kTestLargeReqPkts);
-  MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
-
-  // Use enqueue_request() to do sslot formatting for the request
-  rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
-  SSlot *sslot_0 = &clt_session->sslot_arr[0];
-
-  // Construct the basic test response packet
-  MsgBuffer remote_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
-  pkthdr_t *pkthdr_0 = remote_resp.get_pkthdr_0();
-  pkthdr_0->req_type = kTestReqType;
-  pkthdr_0->msg_size = kTestSmallMsgSize;
-  pkthdr_0->dest_session_num = client.session_num;
-  pkthdr_0->pkt_type = kPktTypeResp;
-  pkthdr_0->pkt_num = 0;
-  pkthdr_0->req_num = Session::kSessionReqWindow;
-
-  // In-order: Receive response in-order
-  // Contination is invoked.
-  sslot_0->client_info.req_sent = kTestLargeReqPkts;
-  sslot_0->client_info.expl_cr_rcvd = kTestLargeReqPkts - 1;
-  clt_session->client_info.credits -= 1;
-  rpc->process_small_resp_st(sslot_0, pkthdr_0);
-  ASSERT_EQ(test_context.num_cont_func_calls, 1);
-  ASSERT_EQ(sslot_0->tx_msgbuf, nullptr);  // Response received
-  test_context.num_cont_func_calls = 0;
 }
 
 }  // End erpc
