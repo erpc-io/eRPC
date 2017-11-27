@@ -70,6 +70,20 @@ class RpcTest : public ::testing::Test {
     rpc->session_vec.push_back(session);
   }
 
+  /// Create a client session in its connected state
+  void create_client_session_connected(const SessionEndpoint client,
+                                       const SessionEndpoint server) {
+    create_client_session_init(client, server);
+    Session *session = rpc->session_vec.back();
+    session->server.session_num = server.session_num;
+
+    auto &remote_rinfo = session->server.routing_info;
+    rt_assert(rpc->transport->resolve_remote_routing_info(&remote_rinfo),
+              "Failed to resolve server routing info");
+
+    session->state = SessionState::kConnected;
+  }
+
   /// Create a client session in its initial state
   void create_server_session_init(const SessionEndpoint client,
                                   const SessionEndpoint server) {
@@ -83,6 +97,10 @@ class RpcTest : public ::testing::Test {
           rpc->alloc_msg_buffer(rpc->transport->kMaxDataPerPkt);
       rt_assert(sslot.pre_resp_msgbuf.buf != nullptr, "Prealloc failed");
     }
+
+    auto &remote_rinfo = session->client.routing_info;
+    rt_assert(rpc->transport->resolve_remote_routing_info(&remote_rinfo),
+              "Failed to resolve client routing info");
 
     rpc->recvs_available -= Session::kSessionCredits;
     rpc->session_vec.push_back(session);

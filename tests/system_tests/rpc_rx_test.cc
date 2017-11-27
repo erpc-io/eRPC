@@ -52,8 +52,6 @@ TEST_F(RpcRxTest, process_small_req_st) {
 
   create_server_session_init(client, server);
   Session *srv_session = rpc->session_vec[0];
-  rpc->transport->resolve_remote_routing_info(
-      &srv_session->client.routing_info);
   SSlot *sslot = &srv_session->sslot_arr[0];
 
   // The request packet that is recevied
@@ -116,12 +114,8 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
 
-  create_client_session_init(client, server);
+  create_client_session_connected(client, server);
   Session *clt_session = rpc->session_vec[0];
-  clt_session->server.session_num = server.session_num;
-  rpc->transport->resolve_remote_routing_info(
-      &clt_session->server.routing_info);
-  clt_session->state = SessionState::kConnected;
 
   MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
@@ -140,7 +134,7 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
-  // Roll-back: Receive resp while progress is rolled back for retransmission.
+  // Roll-back: Receive resp while request progress is rolled back.
   // Response is ignored.
   assert(sslot_0->client_info.req_sent == 1);
   sslot_0->client_info.req_sent = 0;
@@ -171,6 +165,17 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   // This is an error.
   pkthdr_0->req_num += Session::kSessionReqWindow;
   ASSERT_DEATH(rpc->process_small_resp_st(sslot_0, pkthdr_0), ".*");
+}
+
+//
+// process_expl_cr_st()
+//
+TEST_F(RpcRxTest, process_expl_cr_st) {
+  const auto client = get_local_endpoint();
+  const auto server = get_remote_endpoint();
+
+  create_client_session_init(client, server);
+  // Session *clt_session = rpc->session_vec[0];
 }
 
 }  // End erpc
