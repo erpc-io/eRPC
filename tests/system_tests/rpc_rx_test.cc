@@ -180,7 +180,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   MsgBuffer resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);  // Unused
 
   // Use enqueue_request() to do sslot formatting for the request. Large request
-  // is queued, so it doesn't use credits.
+  // is queued, so it doesn't use credits for now.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, 0);
   assert(clt_session->client_info.credits == Session::kSessionCredits);
 
@@ -193,12 +193,36 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   expl_cr.pkt_num = 0;
   expl_cr.req_num = Session::kSessionReqWindow;
 
+  // Past: Receive credit return for an old request.
+  // It's ignored.
+  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 0);
+  sslot_0->cur_req_num -= Session::kSessionReqWindow;
+
   // In-order: Receive an in-order explicit credit return.
   // This bumps sslot's expl_cr_rcvd
   sslot_0->client_info.req_sent = 1;
   clt_session->client_info.credits = Session::kSessionCredits - 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
+
+  // Duplicate: Receive the same explicit credit return again.
+  // It's ignored.
+  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
+
+  // Roll-back: Receive explicit credit return for a future packet in this req.
+  // It's ignored.
+  expl_cr.pkt_num = 1;
+  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
+  expl_cr.pkt_num = 0;
+
+  // Future: Receive explicit credit return for a future request.
+  // This is an error.
+  expl_cr.req_num += Session::kSessionReqWindow;
+  ASSERT_DEATH(rpc->process_expl_cr_st(sslot_0, &expl_cr), ".*");
 }
 
 }  // End erpc
