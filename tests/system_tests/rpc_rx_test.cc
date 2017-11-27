@@ -169,7 +169,7 @@ TEST_F(RpcRxTest, process_small_resp_st_small_req) {
 // process_small_resp_st() with a multi-packet request
 //
 TEST_F(RpcRxTest, process_small_resp_st_large_req) {
-  /*
+  const size_t kTestLargeReqPkts = 2;
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
 
@@ -180,18 +180,13 @@ TEST_F(RpcRxTest, process_small_resp_st_large_req) {
       &clt_session->server.routing_info);
   clt_session->state = SessionState::kConnected;
 
-  // One reordering test requires a multi-packet request
-  MsgBuffer req = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt() * 2);
+  MsgBuffer req =
+      rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt() * kTestLargeReqPkts);
   MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
 
   // Use enqueue_request() to do sslot formatting for the request
   rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
-  SSlot &sslot_0 = clt_session->sslot_arr[0];
-  ASSERT_NE(sslot_0.tx_msgbuf, nullptr);  // Response not received
-  sslot_0.client_info.req_sent = 2;       // All request packets sent
-
-  // Pretend as if one CR
-  sslot_0.client_info.expl_cr_rcvd = 1;       // All request packets sent
+  SSlot *sslot_0 = &clt_session->sslot_arr[0];
 
   // Construct the basic test response packet
   MsgBuffer remote_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
@@ -203,27 +198,15 @@ TEST_F(RpcRxTest, process_small_resp_st_large_req) {
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
-  // Receive an in-order small response.
-  // Continuation is invoked.
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
-                             reinterpret_cast<uint8_t *>(pkthdr_0));
+  // In-order: Receive response in-order
+  // Contination is invoked.
+  sslot_0->client_info.req_sent = kTestLargeReqPkts;
+  sslot_0->client_info.expl_cr_rcvd = kTestLargeReqPkts - 1;
+  clt_session->client_info.credits -= 1;
+  rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
-  ASSERT_EQ(sslot_0.tx_msgbuf, nullptr);  // Response received
+  ASSERT_EQ(sslot_0->tx_msgbuf, nullptr);  // Response received
   test_context.num_cont_func_calls = 0;
-
-  // Receive the same response again.
-  // It's ignored.
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
-                             reinterpret_cast<uint8_t *>(pkthdr_0));
-  ASSERT_EQ(test_context.num_cont_func_calls, 0);
-
-  // Receive an old response.
-  // It's ignored.
-  sslot_0.cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
-                             reinterpret_cast<uint8_t *>(pkthdr_0));
-  ASSERT_EQ(test_context.num_cont_func_calls, 0);
-  sslot_0.cur_req_num -= Session::kSessionReqWindow;*/
 }
 
 }  // End erpc
