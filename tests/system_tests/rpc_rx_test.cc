@@ -3,6 +3,7 @@
 namespace erpc {
 
 static constexpr size_t kTestSmallMsgSize = 32;
+static constexpr size_t kTestLargeMsgSize = MB(1);
 
 class TestContext {
  public:
@@ -113,13 +114,15 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
   Session *clt_session = create_client_session_connected(client, server);
+  SSlot *sslot_0 = &clt_session->sslot_arr[0];
 
   MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
 
-  // Use enqueue_request() to do sslot formatting for the request
+  // Use enqueue_request() to do sslot formatting for the request. Small request
+  // is sent right away, so it uses credits.
   rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
-  SSlot *sslot_0 = &clt_session->sslot_arr[0];
+  assert(clt_session->client_info.credits == Session::kSessionCredits - 1);
 
   // Construct the basic test response packet
   MsgBuffer remote_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
@@ -170,9 +173,32 @@ TEST_F(RpcRxTest, process_small_resp_st) {
 TEST_F(RpcRxTest, process_expl_cr_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
+  Session *clt_session = create_client_session_connected(client, server);
+  SSlot *sslot_0 = &clt_session->sslot_arr[0];
 
-  Session *clt_session = create_client_session_init(client, server);
-  _unused(clt_session);
+  MsgBuffer req = rpc->alloc_msg_buffer(kTestLargeMsgSize);
+  MsgBuffer resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);  // Unused
+
+  // Use enqueue_request() to do sslot formatting for the request. Large request
+  // is queued, so it doesn't use credits.
+  rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, 0);
+  assert(clt_session->client_info.credits == Session::kSessionCredits);
+
+  // Construct the basic explicit credit return packet
+  pkthdr_t expl_cr;
+  expl_cr.req_type = kTestReqType;
+  expl_cr.msg_size = 0;
+  expl_cr.dest_session_num = client.session_num;
+  expl_cr.pkt_type = kPktTypeExplCR;
+  expl_cr.pkt_num = 0;
+  expl_cr.req_num = Session::kSessionReqWindow;
+
+  // In-order: Receive an in-order explicit credit return.
+  // This bumps sslot's expl_cr_rcvd
+  sslot_0->client_info.req_sent = 1;
+  clt_session->client_info.credits = Session::kSessionCredits - 1;
+  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 }
 
 }  // End erpc
