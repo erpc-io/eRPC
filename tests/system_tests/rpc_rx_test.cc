@@ -50,7 +50,6 @@ class RpcRxTest : public RpcTest {
 TEST_F(RpcRxTest, process_small_req_st) {
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
-
   Session *srv_session = create_server_session_init(client, server);
   SSlot *sslot = &srv_session->sslot_arr[0];
 
@@ -60,7 +59,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   pkthdr_0->req_type = kTestReqType;
   pkthdr_0->msg_size = kTestSmallMsgSize;
   pkthdr_0->dest_session_num = server.session_num;
-  pkthdr_0->pkt_type = kPktTypeReq;
+  pkthdr_0->pkt_type = PktType::kPktTypeReq;
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
@@ -130,7 +129,7 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   pkthdr_0->req_type = kTestReqType;
   pkthdr_0->msg_size = kTestSmallMsgSize;
   pkthdr_0->dest_session_num = client.session_num;
-  pkthdr_0->pkt_type = kPktTypeResp;
+  pkthdr_0->pkt_type = PktType::kPktTypeResp;
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
@@ -189,7 +188,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   expl_cr.req_type = kTestReqType;
   expl_cr.msg_size = 0;
   expl_cr.dest_session_num = client.session_num;
-  expl_cr.pkt_type = kPktTypeExplCR;
+  expl_cr.pkt_type = PktType::kPktTypeExplCR;
   expl_cr.pkt_num = 0;
   expl_cr.req_num = Session::kSessionReqWindow;
 
@@ -212,7 +211,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
-  // Roll-back: Receive explicit credit return for a future packet in this req.
+  // Roll-back: Receive explicit credit return for a future pkt in this request.
   // It's ignored.
   expl_cr.pkt_num = 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
@@ -223,6 +222,40 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   // This is an error.
   expl_cr.req_num += Session::kSessionReqWindow;
   ASSERT_DEATH(rpc->process_expl_cr_st(sslot_0, &expl_cr), ".*");
+}
+
+//
+// process_req_for_resp_st()
+//
+TEST_F(RpcRxTest, process_req_for_resp_st) {
+  const auto server = get_local_endpoint();
+  const auto client = get_remote_endpoint();
+  Session *srv_session = create_server_session_init(client, server);
+  SSlot *sslot = &srv_session->sslot_arr[0];
+
+  // Use enqueue_response() to do much of sslot formatting for the response.
+  sslot->cur_req_num = Session::kSessionReqWindow;
+  sslot->server_info.req_type = kTestReqType;
+  sslot->dyn_resp_msgbuf = rpc->alloc_msg_buffer(kTestLargeMsgSize);
+  sslot->prealloc_used = false;
+  rpc->enqueue_response(reinterpret_cast<ReqHandle *>(sslot));
+  rpc->testing.pkthdr_tx_queue.pop();  // Remove the response packet
+
+  // The request-for-response packet that is recevied
+  pkthdr_t rfr;
+  rfr.req_type = kTestReqType;
+  rfr.msg_size = 0;
+  rfr.dest_session_num = server.session_num;
+  rfr.pkt_type = PktType::kPktTypeReqForResp;
+  rfr.pkt_num = 1;
+  rfr.req_num = Session::kSessionReqWindow;
+
+  // In-order: Receive an in-order RFR.
+  // Response packet #1 is sent.
+  rpc->process_req_for_resp_st(sslot, &rfr);
+  const pkthdr_t resp = rpc->testing.pkthdr_tx_queue.pop();
+  ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
+  ASSERT_EQ(resp.pkt_num, 1);
 }
 
 }  // End erpc
