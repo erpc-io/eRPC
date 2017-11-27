@@ -25,9 +25,9 @@ class RpcTest : public ::testing::Test {
   RpcTest() {
     nexus = new Nexus("localhost", kTestUdpPort);
     rt_assert(nexus != nullptr, "Failed to create nexus");
-    nexus->drop_all_rx();  // Prevent SM thread from doing any real work
     nexus->register_req_func(kTestReqType,
                              ReqFunc(req_handler, ReqFuncType::kForeground));
+    nexus->kill_switch = true;  // Kill SM thread
 
     rpc = new Rpc<TestTransport>(nexus, nullptr, kTestRpcId, sm_handler,
                                  kTestPhyPort, kTestNumaNode);

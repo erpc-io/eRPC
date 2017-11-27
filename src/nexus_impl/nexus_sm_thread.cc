@@ -18,7 +18,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
     SmPkt sm_pkt;
     ssize_t ret = udp_server.recv_blocking(sm_pkt);
 
-    if (ret >= 0 && !(*ctx.drop_all_rx_flag)) {
+    if (ret >= 0) {
       rt_assert(static_cast<size_t>(ret) == sizeof(sm_pkt),
                 "eRPC Nexus: Invalid SM packet RX size.");
 
