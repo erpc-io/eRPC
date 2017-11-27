@@ -49,7 +49,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // Fill in the sslot info
   SSlot &sslot = session->sslot_arr[sslot_i];
-  assert(sslot.tx_msgbuf == nullptr);  // Was buried before calling continuation
+  assert(sslot.tx_msgbuf == nullptr);  // Previous response was received
   sslot.tx_msgbuf = req_msgbuf;        // Mark the request as active/incomplete
 
   sslot.client_info.resp_msgbuf = resp_msgbuf;

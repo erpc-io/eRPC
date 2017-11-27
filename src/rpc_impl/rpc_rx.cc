@@ -163,7 +163,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
   // Handle reordering
-  assert(pkthdr->req_num <= sslot->cur_req_num);
+  assert(pkthdr->req_num <= sslot->cur_req_num);  // Resp from the future!!!
   bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
                   (sslot->client_info.resp_rcvd == 0);
 
@@ -198,9 +198,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
 
   sslot->client_info.resp_rcvd = 1;
   bump_credits(sslot->session);
-
-  // Bury req MsgBuffer and mark response as received ( = request completed)
-  sslot->tx_msgbuf = nullptr;  // Equivalent to bury()
+  sslot->tx_msgbuf = nullptr;  // Mark response as received
 
   // Copy the header and data
   memcpy(resp_msgbuf->get_pkthdr_0(), pkt, pkthdr->msg_size + sizeof(pkthdr_t));
@@ -510,8 +508,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
   // Invoke the continuation iff we have all the response packets
   if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) return;
 
-  // Bury req MsgBuffer and mark response as received ( = request completed)
-  sslot->tx_msgbuf = nullptr;  // Equivalent to bury()
+  sslot->tx_msgbuf = nullptr;  // Mark response as received
 
   if (sslot->client_info.cont_etid == kInvalidBgETid) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
@@ -529,7 +526,6 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
   assert(in_dispatch());
   assert(bg_etid < nexus->num_bg_threads || bg_etid == kInvalidBgETid);
   assert(nexus->num_bg_threads > 0);
-  assert(sslot->tx_msgbuf == nullptr);
 
   if (bg_etid == kInvalidBgETid) {
     // Background thread was not specified, so choose one at random

@@ -381,8 +381,6 @@ class Rpc {
   /// From a continuation, release ownership of a response handle. The response
   /// MsgBuffer is owned by the app and shouldn't be freed.
   inline void release_response(RespHandle *resp_handle) {
-    SSlot *sslot = static_cast<SSlot *>(resp_handle);
-
     // When called from a background thread, enqueue to the foreground thread
     if (!in_dispatch()) {
       bg_queues.release_response.unlocked_push(resp_handle);
@@ -390,8 +388,8 @@ class Rpc {
     }
     assert(in_dispatch());
 
-    // Request MsgBuffer (tx_msgbuf) was buried when this response was received
-    assert(sslot->tx_msgbuf == nullptr);
+    SSlot *sslot = static_cast<SSlot *>(resp_handle);
+    assert(sslot->tx_msgbuf == nullptr);  // Response was received previously
 
     Session *session = sslot->session;
     assert(session != nullptr && session->is_client());

@@ -128,6 +128,9 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
 
+  SSlot &sslot_0 = clt_session->sslot_arr[0];
+  ASSERT_NE(sslot_0.tx_msgbuf, nullptr);  // Response not received
+
   // Construct the test response packet received
   MsgBuffer remote_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   pkthdr_t *pkthdr_0 = remote_resp.get_pkthdr_0();
@@ -138,14 +141,17 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
-  // Receive an in-order small response packet. Continuation is invoked.
+  // Receive an in-order small response packet.
+  // Continuation is invoked.
   rpc->process_small_resp_st(&clt_session->sslot_arr[0],
                              reinterpret_cast<uint8_t *>(pkthdr_0));
+  ASSERT_EQ(sslot_0.tx_msgbuf, nullptr);  // Response received
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
   ASSERT_EQ(local_resp.get_data_size(), kTestSmallMsgSize);
   test_context.num_cont_func_calls = 0;
 
-  // Receive the packet again. Continution is not invoked.
+  // Receive the packet again.
+  // Continution is not invoked.
   rpc->process_small_resp_st(&clt_session->sslot_arr[0],
                              reinterpret_cast<uint8_t *>(pkthdr_0));
   ASSERT_EQ(test_context.num_cont_func_calls, 0);

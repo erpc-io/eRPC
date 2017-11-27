@@ -18,7 +18,7 @@ void Rpc<TTr>::pkt_loss_scan_st() {
       case SessionState::kConnected: {
         // Datapath packet loss detection
         for (SSlot &sslot : session->sslot_arr) {
-          if (sslot.tx_msgbuf == nullptr) continue;       // Inactive slot
+          if (sslot.tx_msgbuf == nullptr) continue;       // Response received
           if (sslot.client_info.req_sent == 0) continue;  // No packet sent
 
           assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);

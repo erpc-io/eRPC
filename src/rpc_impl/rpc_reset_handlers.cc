@@ -59,7 +59,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
                     req_txq.end());
     }
 
-    // Invoke continuation-with-failure for sslots with pending requests
+    // Invoke continuation-with-failure for sslots without complete response
     for (SSlot &sslot : session->sslot_arr) {
       if (sslot.tx_msgbuf != nullptr) {
         sslot.tx_msgbuf = nullptr;  // Invoke failure continuation only once
