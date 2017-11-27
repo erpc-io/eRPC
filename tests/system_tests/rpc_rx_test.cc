@@ -50,8 +50,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
 
-  create_server_session_init(client, server);
-  Session *srv_session = rpc->session_vec[0];
+  Session *srv_session = create_server_session_init(client, server);
   SSlot *sslot = &srv_session->sslot_arr[0];
 
   // The request packet that is recevied
@@ -113,9 +112,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
 TEST_F(RpcRxTest, process_small_resp_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
-
-  create_client_session_connected(client, server);
-  Session *clt_session = rpc->session_vec[0];
+  Session *clt_session = create_client_session_connected(client, server);
 
   MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
@@ -174,8 +171,8 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
 
-  create_client_session_init(client, server);
-  // Session *clt_session = rpc->session_vec[0];
+  Session *clt_session = create_client_session_init(client, server);
+  _unused(clt_session);
 }
 
 }  // End erpc

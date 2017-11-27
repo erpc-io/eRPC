@@ -55,9 +55,12 @@ class RpcTest : public ::testing::Test {
     delete nexus;
   }
 
+  // Note that the session creation functions below do not use the
+  // create_session SM API.
+
   /// Create a client session in its initial state
-  void create_client_session_init(const SessionEndpoint client,
-                                  const SessionEndpoint server) {
+  Session *create_client_session_init(const SessionEndpoint client,
+                                      const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kClient, kTestUniqToken);
     session->state = SessionState::kConnectInProgress;
     session->local_session_num = rpc->session_vec.size();
@@ -68,11 +71,13 @@ class RpcTest : public ::testing::Test {
 
     rpc->recvs_available -= Session::kSessionCredits;
     rpc->session_vec.push_back(session);
+
+    return session;
   }
 
   /// Create a client session in its connected state
-  void create_client_session_connected(const SessionEndpoint client,
-                                       const SessionEndpoint server) {
+  Session *create_client_session_connected(const SessionEndpoint client,
+                                           const SessionEndpoint server) {
     create_client_session_init(client, server);
     Session *session = rpc->session_vec.back();
     session->server.session_num = server.session_num;
@@ -82,11 +87,12 @@ class RpcTest : public ::testing::Test {
               "Failed to resolve server routing info");
 
     session->state = SessionState::kConnected;
+    return session;
   }
 
   /// Create a client session in its initial state
-  void create_server_session_init(const SessionEndpoint client,
-                                  const SessionEndpoint server) {
+  Session *create_server_session_init(const SessionEndpoint client,
+                                      const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kServer, kTestUniqToken);
     session->state = SessionState::kConnected;
     session->client = client;
@@ -104,6 +110,7 @@ class RpcTest : public ::testing::Test {
 
     rpc->recvs_available -= Session::kSessionCredits;
     rpc->session_vec.push_back(session);
+    return session;
   }
 
   SessionEndpoint get_local_endpoint() const { return local_endpoint; }
