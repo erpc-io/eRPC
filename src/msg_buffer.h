@@ -133,13 +133,13 @@ class MsgBuffer {
   /// Construct a single-packet "fake" MsgBuffer using a received packet,
   /// setting \p buffer to invalid so that we know not to free it.
   /// \p pkt must have space for \p max_data_bytes and one packet header.
-  MsgBuffer(const uint8_t *pkt, size_t max_data_size)
-      : buf(const_cast<uint8_t *>(pkt) + sizeof(pkthdr_t)),
+  MsgBuffer(pkthdr_t *pkthdr, size_t max_data_size)
+      : buf(reinterpret_cast<uint8_t *>(pkthdr) + sizeof(pkthdr_t)),
         max_data_size(max_data_size),
         data_size(max_data_size),
         max_num_pkts(1),
         num_pkts(1) {
-    assert(reinterpret_cast<const pkthdr_t *>(pkt)->check_magic());  // pkthdr 0
+    assert(pkthdr->check_magic());  // pkthdr is the zeroth header
     // max_data_size can be zero for control packets, so can't assert
 
     buffer.buf = nullptr;  // Mark as a non-dynamic ("fake") MsgBuffer

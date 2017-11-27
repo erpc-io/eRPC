@@ -551,8 +551,7 @@ class Rpc {
   }
 
   /// Copy the data from \p pkt to \p msgbuf
-  inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, const uint8_t *pkt) {
-    const pkthdr_t *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, const pkthdr_t *pkthdr) {
     size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
 
     size_t bytes_to_copy;
@@ -567,7 +566,9 @@ class Rpc {
     assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
     assert(offset + bytes_to_copy <= msgbuf->get_data_size());
 
-    memcpy(&msgbuf->buf[offset], pkt + sizeof(pkthdr_t), bytes_to_copy);
+    memcpy(&msgbuf->buf[offset],
+           reinterpret_cast<const uint8_t *>(pkthdr) + sizeof(pkthdr_t),
+           bytes_to_copy);
   }
 
   /**
@@ -582,22 +583,23 @@ class Rpc {
   void process_comps_st();
 
   /// Process a credit return
-  void process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr);
+  void process_expl_cr_st(SSlot *, const pkthdr_t *);
 
   /// Process a request-for-response
-  void process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr);
+  void process_req_for_resp_st(SSlot *, const pkthdr_t *);
+
+  /// Process a single-packet request message. Using (const pkthdr_t *) instead
+  /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
+  void process_small_req_st(SSlot *, pkthdr_t *);
 
   /// Process a single-packet request message
-  void process_small_req_st(SSlot *sslot, const uint8_t *pkt);
-
-  /// Process a single-packet request message
-  void process_small_resp_st(SSlot *sslot, const uint8_t *pkt);
+  void process_small_resp_st(SSlot *, const pkthdr_t *);
 
   /// Process a packet for a multi-packet request
-  void process_large_req_one_st(SSlot *sslot, const uint8_t *pkt);
+  void process_large_req_one_st(SSlot *, const pkthdr_t *);
 
   /// Process a packet for a multi-packet response
-  void process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt);
+  void process_large_resp_one_st(SSlot *, const pkthdr_t *);
 
   /**
    * @brief Submit a work item to a background thread

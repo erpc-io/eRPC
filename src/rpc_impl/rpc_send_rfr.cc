@@ -22,7 +22,7 @@ void Rpc<TTr>::send_req_for_resp_now_st(const SSlot *sslot,
   // rfr_pkthdr.magic = pkthdr->magic;
 
   // Create a "fake" static MsgBuffer for inline tx_burst
-  MsgBuffer rfr_msgbuf = MsgBuffer(reinterpret_cast<uint8_t *>(&rfr_pkthdr), 0);
+  auto rfr_msgbuf = MsgBuffer(&rfr_pkthdr, 0);
   enqueue_hdr_tx_burst_and_drain_st(sslot->session->remote_routing_info,
                                     &rfr_msgbuf);
 }

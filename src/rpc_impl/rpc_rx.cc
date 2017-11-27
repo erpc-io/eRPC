@@ -9,10 +9,9 @@ void Rpc<TTr>::process_comps_st() {
   if (num_pkts == 0) return;
 
   for (size_t i = 0; i < num_pkts; i++) {
-    uint8_t *pkt = rx_ring[rx_ring_head];
+    auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
 
-    auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
@@ -58,11 +57,11 @@ void Rpc<TTr>::process_comps_st() {
 
     if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
       assert(pkthdr->pkt_num == 0);
-      pkthdr->is_req() ? process_small_req_st(sslot, pkt)
-                       : process_small_resp_st(sslot, pkt);
+      pkthdr->is_req() ? process_small_req_st(sslot, pkthdr)
+                       : process_small_resp_st(sslot, pkthdr);
     } else {
-      pkthdr->is_req() ? process_large_req_one_st(sslot, pkt)
-                       : process_large_resp_one_st(sslot, pkt);
+      pkthdr->is_req() ? process_large_req_one_st(sslot, pkthdr)
+                       : process_large_resp_one_st(sslot, pkthdr);
     }
   }
 
@@ -72,10 +71,9 @@ void Rpc<TTr>::process_comps_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
+void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   assert(in_dispatch());
   assert(!sslot->is_client);
-  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
   // Handle reordering
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
@@ -142,7 +140,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
   if (!req_func.is_background()) {
     // For foreground request handlers, a "fake" static request MsgBuffer
     // suffices -- it's valid for the duration of req_func().
-    req_msgbuf = MsgBuffer(pkt, pkthdr->msg_size);
+    req_msgbuf = MsgBuffer(pkthdr, pkthdr->msg_size);
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
     return;
   } else {
@@ -150,17 +148,17 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, const uint8_t *pkt) {
     // the request. The allocated req_msgbuf is freed by the background thread.
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(req_msgbuf.buf != nullptr);
-    memcpy(req_msgbuf.get_pkthdr_0(), pkt, pkthdr->msg_size + sizeof(pkthdr_t));
+    memcpy(req_msgbuf.get_pkthdr_0(), pkthdr,
+           pkthdr->msg_size + sizeof(pkthdr_t));
     submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
     return;
   }
 }
 
 template <class TTr>
-void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
+void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_dispatch());
   assert(sslot->is_client);
-  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
   assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
 
   // Handle reordering
@@ -200,8 +198,9 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   bump_credits(sslot->session);
   sslot->tx_msgbuf = nullptr;  // Mark response as received
 
-  // Copy the header and data
-  memcpy(resp_msgbuf->get_pkthdr_0(), pkt, pkthdr->msg_size + sizeof(pkthdr_t));
+  // Copy header and data
+  memcpy(resp_msgbuf->get_pkthdr_0(), pkthdr,
+         pkthdr->msg_size + sizeof(pkthdr_t));
 
   if (sslot->client_info.cont_etid == kInvalidBgETid) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
@@ -304,10 +303,9 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
+void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_dispatch());
   assert(!sslot->is_client);
-  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
   MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
 
   // Handle reordering
@@ -402,7 +400,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
     send_credit_return_now_st(sslot->session, pkthdr);
   }
 
-  copy_data_to_msgbuf(&req_msgbuf, pkt);  // Header 0 was copied earlier
+  copy_data_to_msgbuf(&req_msgbuf, pkthdr);  // Header 0 was copied earlier
 
   // Invoke the request handler iff we have all the request packets
   if (sslot->server_info.req_rcvd != req_msgbuf.num_pkts) return;
@@ -426,10 +424,9 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const uint8_t *pkt) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
+void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_dispatch());
   assert(sslot->is_client);
-  auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
 
   // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
@@ -503,7 +500,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const uint8_t *pkt) {
     sslot->session->client_info.credits -= now_sending;
   }
 
-  copy_data_to_msgbuf(resp_msgbuf, pkt);  // Header 0 was copied earlier
+  copy_data_to_msgbuf(resp_msgbuf, pkthdr);  // Header 0 was copied earlier
 
   // Invoke the continuation iff we have all the response packets
   if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) return;

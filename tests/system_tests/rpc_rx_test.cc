@@ -67,16 +67,14 @@ TEST_F(RpcRxTest, process_small_req_st) {
 
   // Receive an in-order small request.
   // Response handler is called and response is sent.
-  rpc->process_small_req_st(&srv_session->sslot_arr[0],
-                            reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
   // Receive the same request again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
-  rpc->process_small_req_st(&srv_session->sslot_arr[0],
-                            reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
@@ -85,16 +83,14 @@ TEST_F(RpcRxTest, process_small_req_st) {
   // Request handler is not called and response is not re-sent.
   MsgBuffer *tx_msgbuf_save = rpc->session_vec[0]->sslot_arr[0].tx_msgbuf;
   rpc->session_vec[0]->sslot_arr[0].tx_msgbuf = nullptr;
-  rpc->process_small_req_st(&srv_session->sslot_arr[0],
-                            reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   rpc->session_vec[0]->sslot_arr[0].tx_msgbuf = tx_msgbuf_save;
 
   // Receive an old request.
   // Request handler is not called and response is not re-sent.
   rpc->session_vec[0]->sslot_arr[0].cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_req_st(&srv_session->sslot_arr[0],
-                            reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.size(), 0);
   rpc->session_vec[0]->sslot_arr[0].cur_req_num -= Session::kSessionReqWindow;
@@ -102,8 +98,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   // Receive the next in-order request.
   // Response handler is called and response is sent.
   pkthdr_0->req_num += Session::kSessionReqWindow;
-  rpc->process_small_req_st(&srv_session->sslot_arr[0],
-                            reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
@@ -143,23 +138,20 @@ TEST_F(RpcRxTest, process_small_resp_st_small_req) {
 
   // Receive an in-order small response.
   // Continuation is invoked.
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
-                             reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_resp_st(&clt_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
   ASSERT_EQ(sslot_0.tx_msgbuf, nullptr);  // Response received
   test_context.num_cont_func_calls = 0;
 
   // Receive the same response again.
   // It's ignored.
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
-                             reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_resp_st(&clt_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
 
   // Receive an old response.
   // It's ignored.
   sslot_0.cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
-                             reinterpret_cast<uint8_t *>(pkthdr_0));
+  rpc->process_small_resp_st(&clt_session->sslot_arr[0], pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
   sslot_0.cur_req_num -= Session::kSessionReqWindow;
 }
