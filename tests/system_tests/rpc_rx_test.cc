@@ -54,6 +54,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   Session *srv_session = rpc->session_vec[0];
   rpc->transport->resolve_remote_routing_info(
       &srv_session->client.routing_info);
+  SSlot *sslot = &srv_session->sslot_arr[0];
 
   // The request packet that is recevied
   MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
@@ -65,43 +66,47 @@ TEST_F(RpcRxTest, process_small_req_st) {
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
-  // Receive an in-order small request.
+  // In-order: Receive an in-order small request.
   // Response handler is called and response is sent.
-  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
+  rpc->process_small_req_st(sslot, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
-  // Receive the same request again.
+  // Duplicate: Receive the same request again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
-  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
+  rpc->process_small_req_st(sslot, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
-  // Receive the same request again, but response is not ready yet.
+  // Duplicate: Receive the same request again, but response is not ready yet.
   // Request handler is not called and response is not re-sent.
-  MsgBuffer *tx_msgbuf_save = rpc->session_vec[0]->sslot_arr[0].tx_msgbuf;
-  rpc->session_vec[0]->sslot_arr[0].tx_msgbuf = nullptr;
-  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
+  MsgBuffer *tx_msgbuf_save = sslot->tx_msgbuf;
+  sslot->tx_msgbuf = nullptr;
+  rpc->process_small_req_st(sslot, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
-  rpc->session_vec[0]->sslot_arr[0].tx_msgbuf = tx_msgbuf_save;
+  sslot->tx_msgbuf = tx_msgbuf_save;
 
-  // Receive an old request.
+  // Past: Receive an old request.
   // Request handler is not called and response is not re-sent.
-  rpc->session_vec[0]->sslot_arr[0].cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
+  sslot->cur_req_num += Session::kSessionReqWindow;
+  rpc->process_small_req_st(sslot, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.size(), 0);
-  rpc->session_vec[0]->sslot_arr[0].cur_req_num -= Session::kSessionReqWindow;
+  sslot->cur_req_num -= Session::kSessionReqWindow;
 
-  // Receive the next in-order request.
+  // In-order: Receive the next in-order request.
   // Response handler is called and response is sent.
   pkthdr_0->req_num += Session::kSessionReqWindow;
-  rpc->process_small_req_st(&srv_session->sslot_arr[0], pkthdr_0);
+  rpc->process_small_req_st(sslot, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
+
+  // Future: Receive a future request packet. This is an error.
+  pkthdr_0->req_num += 2 * Session::kSessionReqWindow;
+  ASSERT_DEATH(rpc->process_small_req_st(sslot, pkthdr_0), ".*");
 }
 
 //
