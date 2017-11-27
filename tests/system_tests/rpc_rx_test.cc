@@ -123,7 +123,7 @@ TEST_F(RpcRxTest, process_small_resp_st) {
       &clt_session->server.routing_info);
   clt_session->state = SessionState::kConnected;
 
-  // Allow enqueue_request() to do sslot formatting for the request
+  // Use enqueue_request() to do sslot formatting for the request
   MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   MsgBuffer local_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
   rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
@@ -142,6 +142,13 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   rpc->process_small_resp_st(&clt_session->sslot_arr[0],
                              reinterpret_cast<uint8_t *>(pkthdr_0));
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
+  ASSERT_EQ(local_resp.get_data_size(), kTestSmallMsgSize);
+  test_context.num_cont_func_calls = 0;
+
+  // Receive the packet again. Continution is not invoked.
+  rpc->process_small_resp_st(&clt_session->sslot_arr[0],
+                             reinterpret_cast<uint8_t *>(pkthdr_0));
+  ASSERT_EQ(test_context.num_cont_func_calls, 0);
   test_context.num_cont_func_calls = 0;
 }
 
