@@ -128,8 +128,7 @@ TEST_F(RpcRxTest, process_small_resp_st_small_req) {
 
   // Use enqueue_request() to do sslot formatting for the request
   rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
-  SSlot &sslot_0 = clt_session->sslot_arr[0];
-  assert(sslot_0.tx_msgbuf != nullptr);  // Response not received
+  SSlot *sslot_0 = &clt_session->sslot_arr[0];
 
   // Construct the basic test response packet
   MsgBuffer remote_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
@@ -141,24 +140,29 @@ TEST_F(RpcRxTest, process_small_resp_st_small_req) {
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = Session::kSessionReqWindow;
 
-  // Receive an in-order small response.
+  // In-order: Receive an in-order small response.
   // Continuation is invoked.
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0], pkthdr_0);
+  rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
-  ASSERT_EQ(sslot_0.tx_msgbuf, nullptr);  // Response received
+  ASSERT_EQ(sslot_0->tx_msgbuf, nullptr);  // Response received
   test_context.num_cont_func_calls = 0;
 
-  // Receive the same response again.
+  // Duplicate: Receive the same response again.
   // It's ignored.
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0], pkthdr_0);
+  rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
 
-  // Receive an old response.
+  // Past: Receive an old response.
   // It's ignored.
-  sslot_0.cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_resp_st(&clt_session->sslot_arr[0], pkthdr_0);
+  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
-  sslot_0.cur_req_num -= Session::kSessionReqWindow;
+  sslot_0->cur_req_num -= Session::kSessionReqWindow;
+
+  // Future: Receive a future response packet.
+  // This is an error.
+  pkthdr_0->req_num += Session::kSessionReqWindow;
+  ASSERT_DEATH(rpc->process_small_resp_st(sslot_0, pkthdr_0), ".*");
 }
 
 //
