@@ -161,9 +161,9 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const uint8_t *pkt) {
   assert(in_dispatch());
   assert(sslot->is_client);
   auto *pkthdr = reinterpret_cast<const pkthdr_t *>(pkt);
+  assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
 
   // Handle reordering
-  assert(pkthdr->req_num <= sslot->cur_req_num);  // Resp from the future!!!
   bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
                   (sslot->client_info.resp_rcvd == 0);
 
