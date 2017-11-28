@@ -231,14 +231,14 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
   Session *srv_session = create_server_session_init(client, server);
-  SSlot *sslot = &srv_session->sslot_arr[0];
+  SSlot *sslot_0 = &srv_session->sslot_arr[0];
 
   // Use enqueue_response() to do much of sslot formatting for the response.
-  sslot->cur_req_num = Session::kSessionReqWindow;
-  sslot->server_info.req_type = kTestReqType;
-  sslot->dyn_resp_msgbuf = rpc->alloc_msg_buffer(kTestLargeMsgSize);
-  sslot->prealloc_used = false;
-  rpc->enqueue_response(reinterpret_cast<ReqHandle *>(sslot));
+  sslot_0->cur_req_num = Session::kSessionReqWindow;
+  sslot_0->server_info.req_type = kTestReqType;
+  sslot_0->dyn_resp_msgbuf = rpc->alloc_msg_buffer(kTestLargeMsgSize);
+  sslot_0->prealloc_used = false;
+  rpc->enqueue_response(reinterpret_cast<ReqHandle *>(sslot_0));
   rpc->testing.pkthdr_tx_queue.pop();  // Remove the response packet
 
   // The request-for-response packet that is recevied
@@ -250,26 +250,52 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   rfr.pkt_num = 1;
   rfr.req_num = Session::kSessionReqWindow;
 
+  // Past: Receive RFR for an old request.
+  // It's dropped.
+  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  rpc->process_req_for_resp_st(sslot_0, &rfr);
+  ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 0);
+  ASSERT_TRUE(rpc->testing.pkthdr_tx_queue.size() == 0);
+  sslot_0->cur_req_num -= Session::kSessionReqWindow;
+
   // In-order: Receive an in-order RFR.
   // Response packet #1 is sent.
-  rpc->process_req_for_resp_st(sslot, &rfr);
+  rpc->process_req_for_resp_st(sslot_0, &rfr);
   pkthdr_t resp = rpc->testing.pkthdr_tx_queue.pop();
   ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(resp.pkt_num, 1);
+  ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
 
   // Duplicate: Receive the same RFR again.
   // Response packet is re-sent and TX queue is flushed.
-  rpc->process_req_for_resp_st(sslot, &rfr);
+  rpc->process_req_for_resp_st(sslot_0, &rfr);
   resp = rpc->testing.pkthdr_tx_queue.pop();
   ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(resp.pkt_num, 1);
+  ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
-  rpc->transport->testing.tx_flush_count = 0;
 
-  // Future: Receive a future RFR packet.
+  // Sensitivity: Server should use only the rfr_rcvd counter for ordering.
+  // On resetting it, behavior should be exactly like an in-order RFR.
+  sslot_0->server_info.rfr_rcvd = 0;
+  rpc->process_req_for_resp_st(sslot_0, &rfr);
+  resp = rpc->testing.pkthdr_tx_queue.pop();
+  ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
+  ASSERT_EQ(resp.pkt_num, 1);
+  ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
+
+  // Future: Receive a future RFR packet for this request.
+  // It's dropped.
+  rfr.pkt_num += 2u;
+  rpc->process_req_for_resp_st(sslot_0, &rfr);
+  ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
+  ASSERT_TRUE(rpc->testing.pkthdr_tx_queue.size() == 0);
+  rfr.pkt_num -= 2u;
+
+  // Future: Receive an RFR packet for a future request.
   // This is an error.
   rfr.req_num += Session::kSessionReqWindow;
-  ASSERT_DEATH(rpc->process_req_for_resp_st(sslot, &rfr), ".*");
+  ASSERT_DEATH(rpc->process_req_for_resp_st(sslot_0, &rfr), ".*");
 }
 
 }  // End erpc
