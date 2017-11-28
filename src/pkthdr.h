@@ -70,6 +70,10 @@ struct pkthdr_t {
     magic = kPktHdrMagic;
   }
 
+  bool matches(PktType _pkt_type, uint64_t _pkt_num) const {
+    return pkt_type == _pkt_type && pkt_num == _pkt_num;
+  }
+
   /// Return a string representation of this packet header
   std::string to_string() const {
     std::ostringstream ret;

@@ -33,6 +33,8 @@ class RpcTest : public ::testing::Test {
                                  kTestPhyPort, kTestNumaNode);
     rt_assert(rpc != nullptr, "Failed to create Rpc");
 
+    pkthdr_tx_queue = &rpc->testing.pkthdr_tx_queue;
+
     // Init local endpoint
     local_endpoint.transport_type = rpc->transport->transport_type;
     strcpy(local_endpoint.hostname, "localhost");
@@ -122,6 +124,8 @@ class RpcTest : public ::testing::Test {
   }
 
   Rpc<TestTransport> *rpc = nullptr;
+  FixedQueue<pkthdr_t, Rpc<TestTransport>::kTestingPkthdrQueueSz>
+      *pkthdr_tx_queue;
 
  private:
   Nexus *nexus = nullptr;

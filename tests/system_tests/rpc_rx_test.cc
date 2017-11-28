@@ -65,14 +65,14 @@ TEST_F(RpcRxTest, process_small_req_st) {
   // Response handler is called and response is sent.
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
-  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
+  ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
   // Duplicate: Receive the same request again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
-  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
+  ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
   // Duplicate: Receive the same request again, but response is not ready yet.
@@ -88,7 +88,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   sslot_0->cur_req_num += Session::kSessionReqWindow;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
-  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.size(), 0);
+  ASSERT_EQ(pkthdr_tx_queue->size(), 0);
   sslot_0->cur_req_num -= Session::kSessionReqWindow;
 
   // In-order: Receive the next in-order request.
@@ -96,7 +96,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   pkthdr_0->req_num += Session::kSessionReqWindow;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
-  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
+  ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
   // Future: Receive a future request packet. This is an error.
@@ -238,7 +238,7 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   sslot_0->dyn_resp_msgbuf = rpc->alloc_msg_buffer(kTestLargeMsgSize);
   sslot_0->prealloc_used = false;
   rpc->enqueue_response(reinterpret_cast<ReqHandle *>(sslot_0));
-  rpc->testing.pkthdr_tx_queue.pop();  // Remove the response packet
+  pkthdr_tx_queue->pop();  // Remove the response packet
 
   // The request-for-response packet that is recevied
   pkthdr_t rfr;
@@ -251,23 +251,19 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   sslot_0->cur_req_num += Session::kSessionReqWindow;
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 0);
-  ASSERT_TRUE(rpc->testing.pkthdr_tx_queue.size() == 0);
+  ASSERT_TRUE(pkthdr_tx_queue->size() == 0);
   sslot_0->cur_req_num -= Session::kSessionReqWindow;
 
   // In-order: Receive an in-order RFR.
   // Response packet #1 is sent.
   rpc->process_req_for_resp_st(sslot_0, &rfr);
-  pkthdr_t resp = rpc->testing.pkthdr_tx_queue.pop();
-  ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
-  ASSERT_EQ(resp.pkt_num, 1);
+  ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
 
   // Duplicate/past: Receive the same RFR again.
   // Response packet is re-sent and TX queue is flushed.
   rpc->process_req_for_resp_st(sslot_0, &rfr);
-  resp = rpc->testing.pkthdr_tx_queue.pop();
-  ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
-  ASSERT_EQ(resp.pkt_num, 1);
+  ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
@@ -275,9 +271,7 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   // On resetting it, behavior should be exactly like an in-order RFR.
   sslot_0->server_info.rfr_rcvd = 0;
   rpc->process_req_for_resp_st(sslot_0, &rfr);
-  resp = rpc->testing.pkthdr_tx_queue.pop();
-  ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
-  ASSERT_EQ(resp.pkt_num, 1);
+  ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
 
   // Future: Receive a future RFR packet for this request.
@@ -285,7 +279,7 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   rfr.pkt_num += 2u;
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
-  ASSERT_TRUE(rpc->testing.pkthdr_tx_queue.size() == 0);
+  ASSERT_TRUE(pkthdr_tx_queue->size() == 0);
   rfr.pkt_num -= 2u;
 
   // Future: Receive an RFR packet for a future request.
@@ -313,8 +307,14 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   // In-order: Receive the zeroth request packet.
   // Credit return is sent.
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
-  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type,
-            PktType::kPktTypeExplCR);
+  ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeExplCR);
+  ASSERT_EQ(sslot_0->server_info.req_rcvd, 1);
+
+  // Duplicate: Receive the same requst packet again.
+  // Credit return is re-sent
+  rpc->process_large_req_one_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeExplCR);
+  ASSERT_EQ(sslot_0->server_info.req_rcvd, 1);
 }
 
 }  // End erpc
