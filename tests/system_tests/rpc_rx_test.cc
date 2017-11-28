@@ -266,7 +266,7 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   ASSERT_EQ(resp.pkt_num, 1);
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
 
-  // Duplicate: Receive the same RFR again.
+  // Duplicate/past: Receive the same RFR again.
   // Response packet is re-sent and TX queue is flushed.
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   resp = rpc->testing.pkthdr_tx_queue.pop();
