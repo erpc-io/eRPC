@@ -304,13 +304,22 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
                    PktType::kPktTypeReq, 0 /* pkt_num */,
                    Session::kSessionReqWindow);
 
+  // Past: Receive a packet for a past request.
+  // It's dropped.
+  assert(sslot_0->cur_req_num == 0);
+  sslot_0->cur_req_num += 2 * Session::kSessionReqWindow;
+  rpc->process_large_req_one_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(pkthdr_tx_queue->size(), 0);
+  ASSERT_EQ(sslot_0->server_info.req_rcvd, 0);
+  sslot_0->cur_req_num -= 2 * Session::kSessionReqWindow;
+
   // In-order: Receive the zeroth request packet.
   // Credit return is sent.
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeExplCR);
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 1);
 
-  // Duplicate: Receive the same requst packet again.
+  // Duplicate/past: Receive the same request packet again.
   // Credit return is re-sent
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeExplCR);
