@@ -51,7 +51,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
   Session *srv_session = create_server_session_init(client, server);
-  SSlot *sslot = &srv_session->sslot_arr[0];
+  SSlot *sslot_0 = &srv_session->sslot_arr[0];
 
   // The request packet that is recevied
   MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
@@ -65,45 +65,45 @@ TEST_F(RpcRxTest, process_small_req_st) {
 
   // In-order: Receive an in-order small request.
   // Response handler is called and response is sent.
-  rpc->process_small_req_st(sslot, pkthdr_0);
+  rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
   // Duplicate: Receive the same request again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
-  rpc->process_small_req_st(sslot, pkthdr_0);
+  rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
   // Duplicate: Receive the same request again, but response is not ready yet.
   // Request handler is not called and response is not re-sent.
-  MsgBuffer *tx_msgbuf_save = sslot->tx_msgbuf;
-  sslot->tx_msgbuf = nullptr;
-  rpc->process_small_req_st(sslot, pkthdr_0);
+  MsgBuffer *tx_msgbuf_save = sslot_0->tx_msgbuf;
+  sslot_0->tx_msgbuf = nullptr;
+  rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
-  sslot->tx_msgbuf = tx_msgbuf_save;
+  sslot_0->tx_msgbuf = tx_msgbuf_save;
 
   // Past: Receive an old request.
   // Request handler is not called and response is not re-sent.
-  sslot->cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_req_st(sslot, pkthdr_0);
+  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.size(), 0);
-  sslot->cur_req_num -= Session::kSessionReqWindow;
+  sslot_0->cur_req_num -= Session::kSessionReqWindow;
 
   // In-order: Receive the next in-order request.
   // Response handler is called and response is sent.
   pkthdr_0->req_num += Session::kSessionReqWindow;
-  rpc->process_small_req_st(sslot, pkthdr_0);
+  rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
   // Future: Receive a future request packet. This is an error.
   pkthdr_0->req_num += 2 * Session::kSessionReqWindow;
-  ASSERT_DEATH(rpc->process_small_req_st(sslot, pkthdr_0), ".*");
+  ASSERT_DEATH(rpc->process_small_req_st(sslot_0, pkthdr_0), ".*");
 }
 
 //
@@ -182,6 +182,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   // is queued, so it doesn't use credits for now.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, 0);
   assert(clt_session->client_info.credits == Session::kSessionCredits);
+  sslot_0->client_info.req_sent = 1;
 
   // Construct the basic explicit credit return packet
   pkthdr_t expl_cr;
@@ -201,13 +202,19 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
 
   // In-order: Receive an in-order explicit credit return.
   // This bumps sslot's expl_cr_rcvd
-  sslot_0->client_info.req_sent = 1;
   clt_session->client_info.credits = Session::kSessionCredits - 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
   // Duplicate: Receive the same explicit credit return again.
   // It's ignored.
+  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
+
+  // Sensitivity: Client should use only the expl_cr_rcvd counter for ordering.
+  // On resetting it, behavior should be exactly like an in-order explicit CR.
+  sslot_0->client_info.expl_cr_rcvd = 0;
+  clt_session->client_info.credits = Session::kSessionCredits - 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
