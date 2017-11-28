@@ -23,6 +23,11 @@ class RpcTest : public ::testing::Test {
   static void sm_handler(int, SmEventType, SmErrType, void *) {}
 
   RpcTest() {
+    if (!kTesting) {
+      fprintf(stderr, "Cannot run tests - kTesting is disabled.\n");
+      return;
+    }
+
     nexus = new Nexus("localhost", kTestUdpPort);
     rt_assert(nexus != nullptr, "Failed to create nexus");
     nexus->register_req_func(kTestReqType,
