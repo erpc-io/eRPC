@@ -326,8 +326,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
             pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.req_rcvd);
 
     // Only past packets belonging to this request are not dropped
-    if ((pkthdr->req_num != sslot->cur_req_num) ||
-        (pkthdr->pkt_num > sslot->server_info.req_rcvd)) {
+    if (pkthdr->req_num != sslot->cur_req_num ||
+        pkthdr->pkt_num > sslot->server_info.req_rcvd) {
       LOG_DEBUG("%s: Dropping.\n", issue_msg);
       return;
     }

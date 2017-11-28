@@ -324,6 +324,23 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeExplCR);
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 1);
+
+  // Future: Receive a future packet for this request.
+  // It's dropped.
+  pkthdr_0->pkt_num += 2u;
+  rpc->process_large_req_one_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(pkthdr_tx_queue->size(), 0);
+  ASSERT_EQ(sslot_0->server_info.req_rcvd, 1);
+  pkthdr_0->pkt_num -= 2u;
+
+  // Future: Receive a pkt for a later request while this request is incomplete
+  // This is an error.
+  //
+  // This packet looks like the first packet of the next request. eRPC checks
+  // that the previous request's request msgbuf is buried, which fails.
+  pkthdr_0->req_num += Session::kSessionReqWindow;
+  ASSERT_DEATH(rpc->process_large_req_one_st(sslot_0, pkthdr_0), ".*");
+  pkthdr_0->req_num -= Session::kSessionReqWindow;
 }
 
 }  // End erpc
