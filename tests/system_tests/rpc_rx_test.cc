@@ -3,7 +3,7 @@
 namespace erpc {
 
 static constexpr size_t kTestSmallMsgSize = 32;
-static constexpr size_t kTestLargeMsgSize = MB(1);
+static constexpr size_t kTestLargeMsgSize = KB(64);
 
 class TestContext {
  public:
@@ -12,15 +12,16 @@ class TestContext {
   size_t num_cont_func_calls = 0;
 };
 
-/// The common request handler for subtests. Copies request to response.
+/// The common request handler for subtests. Works for any request size.
+/// Copies request to response.
 void req_handler(ReqHandle *req_handle, void *_context) {
   auto *context = static_cast<TestContext *>(_context);
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   const size_t resp_size = req_msgbuf->get_data_size();
 
-  req_handle->prealloc_used = true;
-  context->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
-  memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
+  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(resp_size);
+  req_handle->prealloc_used = false;
+  memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
 
   context->rpc->enqueue_response(req_handle);
   context->num_req_handler_calls++;
@@ -303,6 +304,35 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   // This is an error.
   rfr.req_num += Session::kSessionReqWindow;
   ASSERT_DEATH(rpc->process_req_for_resp_st(sslot_0, &rfr), ".*");
+}
+
+//
+// process_large_req_one_st()
+//
+TEST_F(RpcRxTest, process_large_req_one_st) {
+  /*
+  const auto server = get_local_endpoint();
+  const auto client = get_remote_endpoint();
+  Session *srv_session = create_server_session_init(client, server);
+  SSlot *sslot_0 = &srv_session->sslot_arr[0];
+
+  // The request packet that is recevied
+  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
+  pkthdr_t *pkthdr_0 = req.get_pkthdr_0();
+  pkthdr_0->req_type = kTestReqType;
+  pkthdr_0->msg_size = kTestSmallMsgSize;
+  pkthdr_0->dest_session_num = server.session_num;
+  pkthdr_0->pkt_type = PktType::kPktTypeReq;
+  pkthdr_0->pkt_num = 0;
+  pkthdr_0->req_num = Session::kSessionReqWindow;
+
+  // In-order: Receive an in-order small request.
+  // Response handler is called and response is sent.
+  rpc->process_small_req_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(test_context.num_req_handler_calls, 1);
+  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
+  test_context.num_req_handler_calls = 0;
+  */
 }
 
 }  // End erpc
