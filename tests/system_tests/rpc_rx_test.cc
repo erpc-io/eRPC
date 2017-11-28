@@ -253,9 +253,23 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   // In-order: Receive an in-order RFR.
   // Response packet #1 is sent.
   rpc->process_req_for_resp_st(sslot, &rfr);
-  const pkthdr_t resp = rpc->testing.pkthdr_tx_queue.pop();
+  pkthdr_t resp = rpc->testing.pkthdr_tx_queue.pop();
   ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(resp.pkt_num, 1);
+
+  // Duplicate: Receive the same RFR again.
+  // Response packet is re-sent and TX queue is flushed.
+  rpc->process_req_for_resp_st(sslot, &rfr);
+  resp = rpc->testing.pkthdr_tx_queue.pop();
+  ASSERT_EQ(resp.pkt_type, PktType::kPktTypeResp);
+  ASSERT_EQ(resp.pkt_num, 1);
+  ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
+  rpc->transport->testing.tx_flush_count = 0;
+
+  // Future: Receive a future RFR packet.
+  // This is an error.
+  rfr.req_num += Session::kSessionReqWindow;
+  ASSERT_DEATH(rpc->process_req_for_resp_st(sslot, &rfr), ".*");
 }
 
 }  // End erpc
