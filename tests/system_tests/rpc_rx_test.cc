@@ -55,14 +55,11 @@ TEST_F(RpcRxTest, process_small_req_st) {
   SSlot *sslot_0 = &srv_session->sslot_arr[0];
 
   // The request packet that is recevied
-  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
-  pkthdr_t *pkthdr_0 = req.get_pkthdr_0();
-  pkthdr_0->req_type = kTestReqType;
-  pkthdr_0->msg_size = kTestSmallMsgSize;
-  pkthdr_0->dest_session_num = server.session_num;
-  pkthdr_0->pkt_type = PktType::kPktTypeReq;
-  pkthdr_0->pkt_num = 0;
-  pkthdr_0->req_num = Session::kSessionReqWindow;
+  uint8_t req[sizeof(pkthdr_t) + kTestSmallMsgSize];
+  auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(req);
+  pkthdr_0->format(kTestReqType, kTestSmallMsgSize, server.session_num,
+                   PktType::kPktTypeReq, 0 /* pkt_num */,
+                   Session::kSessionReqWindow);
 
   // In-order: Receive an in-order small request.
   // Response handler is called and response is sent.
@@ -125,14 +122,11 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   assert(clt_session->client_info.credits == Session::kSessionCredits - 1);
 
   // Construct the basic test response packet
-  MsgBuffer remote_resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);
-  pkthdr_t *pkthdr_0 = remote_resp.get_pkthdr_0();
-  pkthdr_0->req_type = kTestReqType;
-  pkthdr_0->msg_size = kTestSmallMsgSize;
-  pkthdr_0->dest_session_num = client.session_num;
-  pkthdr_0->pkt_type = PktType::kPktTypeResp;
-  pkthdr_0->pkt_num = 0;
-  pkthdr_0->req_num = Session::kSessionReqWindow;
+  uint8_t remote_resp[sizeof(pkthdr_t) + kTestSmallMsgSize];
+  auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(remote_resp);
+  pkthdr_0->format(kTestReqType, kTestSmallMsgSize, client.session_num,
+                   PktType::kPktTypeResp, 0 /* pkt_num */,
+                   Session::kSessionReqWindow);
 
   // Roll-back: Receive resp while request progress is rolled back.
   // Response is ignored.
@@ -187,12 +181,9 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
 
   // Construct the basic explicit credit return packet
   pkthdr_t expl_cr;
-  expl_cr.req_type = kTestReqType;
-  expl_cr.msg_size = 0;
-  expl_cr.dest_session_num = client.session_num;
-  expl_cr.pkt_type = PktType::kPktTypeExplCR;
-  expl_cr.pkt_num = 0;
-  expl_cr.req_num = Session::kSessionReqWindow;
+  expl_cr.format(kTestReqType, 0 /* msg_size */, client.session_num,
+                 PktType::kPktTypeExplCR, 0 /* pkt_num */,
+                 Session::kSessionReqWindow);
 
   // Past: Receive credit return for an old request.
   // It's ignored.
@@ -251,12 +242,9 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
 
   // The request-for-response packet that is recevied
   pkthdr_t rfr;
-  rfr.req_type = kTestReqType;
-  rfr.msg_size = 0;
-  rfr.dest_session_num = server.session_num;
-  rfr.pkt_type = PktType::kPktTypeReqForResp;
-  rfr.pkt_num = 1;
-  rfr.req_num = Session::kSessionReqWindow;
+  rfr.format(kTestReqType, 0 /* msg_size */, server.session_num,
+             PktType::kPktTypeReqForResp, 1 /* pkt_num */,
+             Session::kSessionReqWindow);
 
   // Past: Receive RFR for an old request.
   // It's dropped.
