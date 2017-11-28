@@ -298,29 +298,23 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
 // process_large_req_one_st()
 //
 TEST_F(RpcRxTest, process_large_req_one_st) {
-  /*
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
   Session *srv_session = create_server_session_init(client, server);
   SSlot *sslot_0 = &srv_session->sslot_arr[0];
 
   // The request packet that is recevied
-  MsgBuffer req = rpc->alloc_msg_buffer(kTestSmallMsgSize);
-  pkthdr_t *pkthdr_0 = req.get_pkthdr_0();
-  pkthdr_0->req_type = kTestReqType;
-  pkthdr_0->msg_size = kTestSmallMsgSize;
-  pkthdr_0->dest_session_num = server.session_num;
-  pkthdr_0->pkt_type = PktType::kPktTypeReq;
-  pkthdr_0->pkt_num = 0;
-  pkthdr_0->req_num = Session::kSessionReqWindow;
+  uint8_t req[TestTransport::kMTU];
+  auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(req);
+  pkthdr_0->format(kTestReqType, kTestLargeMsgSize, server.session_num,
+                   PktType::kPktTypeReq, 0 /* pkt_num */,
+                   Session::kSessionReqWindow);
 
-  // In-order: Receive an in-order small request.
-  // Response handler is called and response is sent.
-  rpc->process_small_req_st(sslot_0, pkthdr_0);
-  ASSERT_EQ(test_context.num_req_handler_calls, 1);
-  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type, PktType::kPktTypeResp);
-  test_context.num_req_handler_calls = 0;
-  */
+  // In-order: Receive the zeroth request packet.
+  // Credit return is sent.
+  rpc->process_large_req_one_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(rpc->testing.pkthdr_tx_queue.pop().pkt_type,
+            PktType::kPktTypeExplCR);
 }
 
 }  // End erpc
