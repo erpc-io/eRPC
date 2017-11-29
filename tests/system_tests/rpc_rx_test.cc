@@ -81,14 +81,14 @@ TEST_F(RpcRxTest, process_small_req_st) {
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
-  // Duplicate/past: Receive the same request again.
+  // Past: Receive the same request again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
-  // Duplicate/past: Receive the same request again, but response is not ready.
+  // Past: Receive the same request again, but response is not ready.
   // Request handler is not called and response is not re-sent.
   MsgBuffer *tx_msgbuf_save = sslot_0->tx_msgbuf;
   sslot_0->tx_msgbuf = nullptr;
@@ -152,7 +152,7 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   ASSERT_EQ(sslot_0->tx_msgbuf, nullptr);  // Response received
   test_context.num_cont_func_calls = 0;
 
-  // Duplicate: Receive the same response again.
+  // Past: Receive the same response again.
   // It's dropped.
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
@@ -195,7 +195,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
-  // Duplicate: Receive the same explicit credit return again.
+  // Past: Receive the same explicit credit return again.
   // It's dropped.
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
@@ -252,7 +252,7 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
 
-  // Duplicate/past: Receive the same RFR again.
+  // Past: Receive the same RFR again.
   // Response packet is re-sent and TX queue is flushed.
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
@@ -317,11 +317,12 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeExplCR, 1));
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 2);
 
-  // Duplicate/past: Receive the same request packet again.
-  // Credit return is re-sent
+  // Past: Receive the same request packet again.
+  // Credit return is re-sent and transport is NOT flushed.
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeExplCR, 1));
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 2);
+  ASSERT_EQ(rpc->transport->testing.tx_flush_count, 0);
 
   // Future: Receive a future packet for this request.
   // It's dropped.
@@ -332,12 +333,29 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   pkthdr_0->pkt_num -= 2u;
 
   // In-order: Receive the last packet of this request.
-  // First response packet is sent.
+  // First response packet is sent, and request is buried.
   sslot_0->server_info.req_rcvd = num_pkts_in_req - 1;
   pkthdr_0->pkt_num = num_pkts_in_req - 1;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 0));
   ASSERT_EQ(sslot_0->server_info.req_rcvd, num_pkts_in_req);
+  ASSERT_TRUE(sslot_0->server_info.req_msgbuf.is_buried());
+
+  // Past: Receive the last request packet again.
+  // First response packet is sent and transport flushed.
+  rpc->process_large_req_one_st(sslot_0, pkthdr_0);
+  ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 0));
+  ASSERT_EQ(sslot_0->server_info.req_rcvd, num_pkts_in_req);
+  ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
+  rpc->transport->testing.tx_flush_count = 0;
+
+  // Past: Receive any request packet except the last.
+  // Credit return is re-sent and transport is NOT flushed.
+  pkthdr_0->pkt_num = 5;
+  rpc->process_large_req_one_st(sslot_0, pkthdr_0);
+  ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeExplCR, 5));
+  ASSERT_EQ(sslot_0->server_info.req_rcvd, num_pkts_in_req);
+  ASSERT_EQ(rpc->transport->testing.tx_flush_count, 0);
 }
 
 }  // End erpc
