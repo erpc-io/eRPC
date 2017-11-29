@@ -279,7 +279,9 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
 // process_large_req_one_st()
 //
 TEST_F(RpcRxTest, process_large_req_one_st) {
-  ASSERT_GT(TestTransport::data_size_to_num_pkts(kTestLargeMsgSize), 10);
+  const size_t num_pkts_in_req =
+      TestTransport::data_size_to_num_pkts(kTestLargeMsgSize);
+  ASSERT_GT(num_pkts_in_req, 10);
 
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
@@ -323,12 +325,19 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
 
   // Future: Receive a future packet for this request.
   // It's dropped.
-  // Receiving a pkt of a future req while this req is incomplete is an error.
   pkthdr_0->pkt_num += 2u;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->size(), 0);
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 2);
   pkthdr_0->pkt_num -= 2u;
+
+  // In-order: Receive the last packet of this request.
+  // First response packet is sent.
+  sslot_0->server_info.req_rcvd = num_pkts_in_req - 1;
+  pkthdr_0->pkt_num = num_pkts_in_req - 1;
+  rpc->process_large_req_one_st(sslot_0, pkthdr_0);
+  ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 0));
+  ASSERT_EQ(sslot_0->server_info.req_rcvd, num_pkts_in_req);
 }
 
 }  // End erpc
