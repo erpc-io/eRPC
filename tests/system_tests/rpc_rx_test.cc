@@ -1,5 +1,11 @@
 #include "system_tests.h"
 
+// Note that only real packet orderings are tested. Buggy cases are ignored. For
+// example, the server cannot receive a future request before it sends a
+// response to the current request.
+//
+// eRPC handles such buggy cases by dropping the packet or by crashing, but the
+// exact action is unspecified.
 namespace erpc {
 
 static constexpr size_t kTestSmallMsgSize = 32;
@@ -61,6 +67,13 @@ TEST_F(RpcRxTest, process_small_req_st) {
                    PktType::kPktTypeReq, 0 /* pkt_num */,
                    Session::kSessionReqWindow);
 
+  // Past: Receive an old request.
+  // It's dropped.
+  sslot_0->cur_req_num += 2 * Session::kSessionReqWindow;
+  rpc->process_small_req_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(pkthdr_tx_queue->size(), 0);
+  sslot_0->cur_req_num -= 2 * Session::kSessionReqWindow;
+
   // In-order: Receive an in-order small request.
   // Response handler is called and response is sent.
   rpc->process_small_req_st(sslot_0, pkthdr_0);
@@ -68,28 +81,20 @@ TEST_F(RpcRxTest, process_small_req_st) {
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
-  // Duplicate: Receive the same request again.
+  // Duplicate/past: Receive the same request again.
   // Request handler is not called. Response is re-sent, and TX queue flushed.
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
-  // Duplicate: Receive the same request again, but response is not ready yet.
+  // Duplicate/past: Receive the same request again, but response is not ready.
   // Request handler is not called and response is not re-sent.
   MsgBuffer *tx_msgbuf_save = sslot_0->tx_msgbuf;
   sslot_0->tx_msgbuf = nullptr;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   sslot_0->tx_msgbuf = tx_msgbuf_save;
-
-  // Past: Receive an old request.
-  // Request handler is not called and response is not re-sent.
-  sslot_0->cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_req_st(sslot_0, pkthdr_0);
-  ASSERT_EQ(test_context.num_req_handler_calls, 0);
-  ASSERT_EQ(pkthdr_tx_queue->size(), 0);
-  sslot_0->cur_req_num -= Session::kSessionReqWindow;
 
   // In-order: Receive the next in-order request.
   // Response handler is called and response is sent.
@@ -98,10 +103,6 @@ TEST_F(RpcRxTest, process_small_req_st) {
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
-
-  // Future: Receive a future request packet. This is an error.
-  pkthdr_0->req_num += 2 * Session::kSessionReqWindow;
-  ASSERT_DEATH(rpc->process_small_req_st(sslot_0, pkthdr_0), ".*");
 }
 
 //
@@ -128,8 +129,16 @@ TEST_F(RpcRxTest, process_small_resp_st) {
                    PktType::kPktTypeResp, 0 /* pkt_num */,
                    Session::kSessionReqWindow);
 
+  // Past: Receive an old response.
+  // It's dropped.
+  assert(sslot_0->cur_req_num == Session::kSessionReqWindow);
+  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  rpc->process_small_resp_st(sslot_0, pkthdr_0);
+  ASSERT_EQ(test_context.num_cont_func_calls, 0);
+  sslot_0->cur_req_num -= Session::kSessionReqWindow;
+
   // Roll-back: Receive resp while request progress is rolled back.
-  // Response is ignored.
+  // It's dropped.
   assert(sslot_0->client_info.req_sent == 1);
   sslot_0->client_info.req_sent = 0;
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
@@ -144,21 +153,9 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   test_context.num_cont_func_calls = 0;
 
   // Duplicate: Receive the same response again.
-  // It's ignored.
+  // It's dropped.
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
-
-  // Past: Receive an old response.
-  // It's ignored.
-  sslot_0->cur_req_num += Session::kSessionReqWindow;
-  rpc->process_small_resp_st(sslot_0, pkthdr_0);
-  ASSERT_EQ(test_context.num_cont_func_calls, 0);
-  sslot_0->cur_req_num -= Session::kSessionReqWindow;
-
-  // Future: Receive a future response packet.
-  // This is an error.
-  pkthdr_0->req_num += Session::kSessionReqWindow;
-  ASSERT_DEATH(rpc->process_small_resp_st(sslot_0, pkthdr_0), ".*");
 }
 
 //
@@ -186,7 +183,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
                  Session::kSessionReqWindow);
 
   // Past: Receive credit return for an old request.
-  // It's ignored.
+  // It's dropped.
   sslot_0->cur_req_num += Session::kSessionReqWindow;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 0);
@@ -199,7 +196,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
   // Duplicate: Receive the same explicit credit return again.
-  // It's ignored.
+  // It's dropped.
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
@@ -211,16 +208,11 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
   // Roll-back: Receive explicit credit return for a future pkt in this request.
-  // It's ignored.
+  // It's dropped.
   expl_cr.pkt_num = 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
   expl_cr.pkt_num = 0;
-
-  // Future: Receive explicit credit return for a future request.
-  // This is an error.
-  expl_cr.req_num += Session::kSessionReqWindow;
-  ASSERT_DEATH(rpc->process_expl_cr_st(sslot_0, &expl_cr), ".*");
 }
 
 //
@@ -281,11 +273,6 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
   ASSERT_TRUE(pkthdr_tx_queue->size() == 0);
   rfr.pkt_num -= 2u;
-
-  // Future: Receive an RFR packet for a future request.
-  // This is an error.
-  rfr.req_num += Session::kSessionReqWindow;
-  ASSERT_DEATH(rpc->process_req_for_resp_st(sslot_0, &rfr), ".*");
 }
 
 //
