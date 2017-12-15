@@ -32,3 +32,15 @@ function assert_file_exists() {
     exit 0
   fi
 }
+
+# Check if there are at least 512 hugepages. If not, exit.
+function hugepages_or_exit() {
+  num_hugepages=`cat /sys/devices/system/node/*/meminfo | \
+    grep "Node 0 HugePages_Total" | \
+    cut -d":" -f 2 | \
+    sed -e 's/ *//'`
+
+  if [ $num_hugepages -lt 512 ]; then
+    echo "Insufficient hugepages"
+  fi
+}
