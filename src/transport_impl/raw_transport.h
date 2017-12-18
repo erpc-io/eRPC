@@ -1,11 +1,11 @@
 /**
- * @file ib_transport.h
- * @brief UD transport for InfiniBand or RoCE
+ * @file raw_transport.h
+ * @brief Transport for Mellanox verbs-based raw Ethernet
  */
-#ifndef ERPC_INFINIBAND_TRANSPORT_H
-#define ERPC_INFINIBAND_TRANSPORT_H
+#ifndef ERPC_RAW_TRANSPORT_H
+#define ERPC_RAW_TRANSPORT_H
 
-#include <infiniband/verbs.h>
+#include <infiniband/verbs_exp.h>
 #include "transport.h"
 #include "util/logger.h"
 
@@ -14,20 +14,13 @@ namespace erpc {
 class IBTransport : public Transport {
  public:
   // Transport-specific constants
-  static constexpr TransportType kTransportType = TransportType::kInfiniBand;
+  static constexpr TransportType kTransportType = TransportType::kRaw;
   static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
-  static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
-  static constexpr size_t kGRHBytes = 40;
-
-  // Constants for fast RECV driver mod
-  static constexpr uint64_t kMagicWrIDForFastRecv = 3185;
-  static constexpr uint64_t kModdedProbeWrID = 3186;
-  static constexpr int kModdedProbeRet = 3187;
 
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, "");  // Capacity check
   static_assert(kPostlist <= kUnsigBatch, "");            // Postlist check

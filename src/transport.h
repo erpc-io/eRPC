@@ -68,7 +68,7 @@ class Transport {
   typedef std::function<MemRegInfo(void*, size_t)> reg_mr_func_t;
   typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
 
-  enum class TransportType { kInfiniBand, kRoCE, kOmniPath, kInvalid };
+  enum class TransportType { kInfiniBand, kRoCE, kRaw, kInvalid };
 
   static std::string get_name(TransportType transport_type) {
     switch (transport_type) {
@@ -76,8 +76,8 @@ class Transport {
         return "[InfiniBand]";
       case TransportType::kRoCE:
         return "[RoCE]";
-      case TransportType::kOmniPath:
-        return "[OmniPath]";
+      case TransportType::kRaw:
+        return "[Raw Ethernet]";
       case TransportType::kInvalid:
         return "[Invalid]";
     }
