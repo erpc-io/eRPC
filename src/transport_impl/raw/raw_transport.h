@@ -5,6 +5,7 @@
 #ifndef ERPC_RAW_TRANSPORT_H
 #define ERPC_RAW_TRANSPORT_H
 
+#include "inet_hdrs.h"
 #include "transport.h"
 #include "transport_impl/verbs_common.h"
 #include "util/logger.h"
@@ -51,16 +52,12 @@ class RawTransport : public Transport {
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
 
   static std::string routing_info_str(RoutingInfo *routing_info) {
-    auto *ib_routing_info =
-        reinterpret_cast<raw_routing_info_t *>(routing_info);
-    const auto &gid = ib_routing_info->gid.global;
+    auto *ri = reinterpret_cast<raw_routing_info_t *>(routing_info);
 
     std::ostringstream ret;
-
-    ret << "[LID: " << std::to_string(ib_routing_info->port_lid)
-        << ", QPN: " << std::to_string(ib_routing_info->qpn)
-        << ", GID interface ID " << std::to_string(gid.interface_id)
-        << ", GID subnet prefix " << std::to_string(gid.subnet_prefix) << "]";
+    ret << "[MAC " << mac_to_string(ri->mac) << ", IP "
+        << ip_to_string(ri->ip_addr) << ", UDP port "
+        << std::to_string(ri->udp_port) << "]";
 
     return std::string(ret.str());
   }
