@@ -183,11 +183,14 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
-  // Touch (and check) resp MsgBuffer
+  // Always touch (and check) the response
   if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
     fprintf(stderr, "Invalid response.\n");
     exit(-1);
   }
+
+  auto *c = static_cast<AppContext *>(_context);
+  c->rpc->release_response(resp_handle);
 
   auto tag = static_cast<tag_t>(_tag);
   if (kAppVerbose) {
@@ -195,7 +198,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
            tag.s.msgbuf_i);
   }
 
-  auto *c = static_cast<AppContext *>(_context);
   BatchContext &bc = c->batch_arr[tag.s.batch_i];
   bc.num_resps_rcvd++;
 
@@ -268,8 +270,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
-
-  c->rpc->release_response(resp_handle);
 }
 
 // The function executed by each thread in the cluster
