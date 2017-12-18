@@ -113,8 +113,8 @@ class Transport {
   /**
    * @brief Transmit a batch of packets
    *
-   * Multiple packets may belong to the same MsgBuffer. The transport determines
-   * the offset of each of these packets using \p offset_arr.
+   * Multiple packets may belong to the same msgbuf; burst items contain
+   * offsets into a msgbuf.
    *
    * @param tx_burst_arr Info about the packets to TX
    * @param num_pkts The total number of packets to transmit (<= \p kPostlist)
