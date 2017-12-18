@@ -47,8 +47,8 @@ class Rpc {
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
-  /// Duration of a packet loss detection epoch in milliseconds
-  static constexpr size_t kPktLossEpochMs = kTesting ? 1 : 10;
+  /// Duration of an RPC packet loss detection epoch in milliseconds
+  static constexpr size_t kRpcPktLossEpochMs = kTesting ? 1 : 10;
 
   /// Packet loss timeout for an RPC request in milliseconds
   static constexpr size_t kRpcPktLossTimeoutMs = kTesting ? 1 : 500;
@@ -794,7 +794,7 @@ class Rpc {
 
   // Derived consts
   const bool multi_threaded;  ///< True iff there are background threads
-  const size_t pkt_loss_epoch_cycles;  ///< Packet loss epoch in TSC cycles
+  const size_t rpc_pkt_loss_epoch_cycles;  ///< RPC packet loss epoch in cycles
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.

@@ -305,7 +305,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
       const size_t session_idx = (m_i * FLAGS_num_threads) + t_i;
-      if (session_idx == c.self_session_index) continue;  // No session to self
+      if (session_idx == c.self_session_index) continue;
 
       c.session_num_vec[session_idx] =
           rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);

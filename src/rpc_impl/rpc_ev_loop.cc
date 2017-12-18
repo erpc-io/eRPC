@@ -12,7 +12,7 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
   if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_rx_st();
 
   if (ev_loop_ticker >= kEvLoopTickerReset) {
-    if (rdtsc() - prev_epoch_ts >= pkt_loss_epoch_cycles) {
+    if (rdtsc() - prev_epoch_ts >= rpc_pkt_loss_epoch_cycles) {
       // Check for packet loss if we're in a new epoch
       prev_epoch_ts = rdtsc();
       pkt_loss_scan_st();

@@ -21,7 +21,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
       numa_node(numa_node),
       creation_tsc(rdtsc()),
       multi_threaded(nexus->num_bg_threads > 0),
-      pkt_loss_epoch_cycles(kPktLossEpochMs * 1000000 * nexus->freq_ghz),
+      rpc_pkt_loss_epoch_cycles(kRpcPktLossEpochMs * 1000000 * nexus->freq_ghz),
       req_func_arr(nexus->req_func_arr) {
   rt_assert(!getuid(), "You need to be root to use eRPC");
   rt_assert(rpc_id != kInvalidRpcId, "Invalid Rpc ID");
