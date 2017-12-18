@@ -222,7 +222,7 @@ void IBTransport::post_recvs(size_t num_recvs) {
 
   // Update RECV head: go to the last wr posted and take 1 more step
   recv_head = last_wr_i;
-  recv_head = mod_add_one<kRecvQueueDepth>(recv_head);
+  recv_head = (recv_head + 1) % kRecvQueueDepth;
 
   // Reset slack counter
   recvs_to_post = 0;

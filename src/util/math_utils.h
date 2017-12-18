@@ -8,12 +8,6 @@
 
 namespace erpc {
 
-/// Optimized (x + 1) % N
-template <size_t N>
-static constexpr size_t mod_add_one(size_t x) {
-  return (x + 1) == N ? 0 : x + 1;
-}
-
 template <typename T>
 static constexpr inline bool is_power_of_two(T x) {
   return x && ((x & T(x - 1)) == 0);

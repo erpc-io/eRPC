@@ -10,7 +10,7 @@ void Rpc<TTr>::process_comps_st() {
 
   for (size_t i = 0; i < num_pkts; i++) {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
-    rx_ring_head = mod_add_one<Transport::kRecvQueueDepth>(rx_ring_head);
+    rx_ring_head = (rx_ring_head + 1) % Transport::kRecvQueueDepth;
 
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
