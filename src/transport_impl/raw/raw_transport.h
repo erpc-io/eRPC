@@ -1,33 +1,26 @@
 /**
- * @file ib_transport.h
- * @brief UD transport for InfiniBand or RoCE
+ * @file raw_transport.h
+ * @brief Transport for Mellanox verbs-based raw Ethernet
  */
-#ifndef ERPC_INFINIBAND_TRANSPORT_H
-#define ERPC_INFINIBAND_TRANSPORT_H
+#ifndef ERPC_RAW_TRANSPORT_H
+#define ERPC_RAW_TRANSPORT_H
 
 #include "transport.h"
+#include "transport_impl/verbs_common.h"
 #include "util/logger.h"
-#include "verbs_common.h"
 
 namespace erpc {
 
-class IBTransport : public Transport {
+class RawTransport : public Transport {
  public:
   // Transport-specific constants
-  static constexpr TransportType kTransportType = TransportType::kInfiniBand;
-  static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
+  static constexpr TransportType kTransportType = TransportType::kRaw;
+  static constexpr size_t kMTU = 1500;
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
-  static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
-  static constexpr size_t kGRHBytes = 40;
-
-  // Constants for fast RECV driver mod
-  static constexpr uint64_t kMagicWrIDForFastRecv = 3185;
-  static constexpr uint64_t kModdedProbeWrID = 3186;
-  static constexpr int kModdedProbeRet = 3187;
 
   static_assert(kSendQueueDepth >= 2 * kUnsigBatch, "");  // Capacity check
   static_assert(kPostlist <= kUnsigBatch, "");            // Postlist check
@@ -38,43 +31,28 @@ class IBTransport : public Transport {
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
 
-  /**
-   * @brief Session endpoint routing info for InfiniBand.
-   *
-   * The client fills in its \p port_lid and \p qpn, which are resolved into
-   * the address handle by the server. Similarly for the server.
-   *
-   * \p port_lid, \p qpn, and \p gid have cluster-wide meaning, but \p ah is
-   * local to this machine.
-   *
-   * The \p ibv_ah struct cannot be inlined into a RoutingInfo struct because
-   * the device driver internally uses a larger struct (e.g., \p mlx4_ah for
-   * ConnectX-3) which contains \p ibv_ah.
-   */
-  struct ib_routing_info_t {
-    // Fields that are meaningful cluster-wide
-    uint16_t port_lid;
-    uint32_t qpn;
-    union ibv_gid gid;  // RoCE only
-
-    // Fields that are meaningful only locally
-    struct ibv_ah *ah;
+  /// Session endpoint routing info for raw Ethernet.
+  struct raw_routing_info_t {
+    uint8_t mac[6];
+    uint32_t ip_addr;
+    uint16_t udp_port;
   };
-  static_assert(sizeof(ib_routing_info_t) <= kMaxRoutingInfoSize, "");
+  static_assert(sizeof(raw_routing_info_t) <= kMaxRoutingInfoSize, "");
 
-  IBTransport(uint8_t phy_port, uint8_t rpc_id);
+  RawTransport(uint8_t phy_port, uint8_t rpc_id);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
-  ~IBTransport();
+  ~RawTransport();
 
   /// Create an address handle using this routing info
-  struct ibv_ah *create_ah(const ib_routing_info_t *) const;
+  struct ibv_ah *create_ah(const raw_routing_info_t *) const;
 
   void fill_local_routing_info(RoutingInfo *routing_info) const;
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
 
   static std::string routing_info_str(RoutingInfo *routing_info) {
-    auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
+    auto *ib_routing_info =
+        reinterpret_cast<raw_routing_info_t *>(routing_info);
     const auto &gid = ib_routing_info->gid.global;
 
     std::ostringstream ret;
@@ -207,6 +185,35 @@ class IBTransport : public Transport {
   }
 
   // ibverbs helper functions
+  static std::string link_layer_str(uint8_t link_layer) {
+    switch (link_layer) {
+      case IBV_LINK_LAYER_UNSPECIFIED:
+        return "[Unspecified]";
+      case IBV_LINK_LAYER_INFINIBAND:
+        return "[InfiniBand]";
+      case IBV_LINK_LAYER_ETHERNET:
+        return "[Ethernet]";
+      default:
+        return "[Invalid]";
+    }
+  }
+
+  static size_t enum_to_mtu(enum ibv_mtu mtu) {
+    switch (mtu) {
+      case IBV_MTU_256:
+        return 256;
+      case IBV_MTU_512:
+        return 512;
+      case IBV_MTU_1024:
+        return 1024;
+      case IBV_MTU_2048:
+        return 2048;
+      case IBV_MTU_4096:
+        return 4096;
+      default:
+        return 0;
+    }
+  }
 
   /// InfiniBand info resolved from \p phy_port, must be filled by constructor.
   struct {
@@ -248,4 +255,4 @@ class IBTransport : public Transport {
 
 }  // End erpc
 
-#endif  // ERPC_INFINIBAND_TRANSPORT_H
+#endif  // ERPC_RAW_TRANSPORT_H

@@ -140,8 +140,8 @@ set(SOURCES
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/transport_impl/transport.cc
-  src/transport_impl/ib_transport.cc
-  src/transport_impl/ib_transport_datapath.cc
+  src/transport_impl/infiniband/ib_transport.cc
+  src/transport_impl/infiniband/ib_transport_datapath.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 

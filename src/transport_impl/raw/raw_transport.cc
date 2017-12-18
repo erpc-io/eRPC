@@ -1,7 +1,7 @@
 #include <iomanip>
 #include <stdexcept>
 
-#include "ib_transport.h"
+#include "raw_transport.h"
 #include "util/huge_alloc.h"
 
 namespace erpc {

@@ -6,7 +6,7 @@
 #include "common.h"
 #include "session.h"
 #include "sm_types.h"
-#include "transport_impl/ib_transport.h"
+#include "util/logger.h"
 #include "util/mt_queue.h"
 #include "util/tls_registry.h"
 

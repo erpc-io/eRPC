@@ -11,7 +11,7 @@
 #include "pkthdr.h"
 #include "session.h"
 #include "transport.h"
-#include "transport_impl/ib_transport.h"
+#include "transport_impl/infiniband/ib_transport.h"
 #include "util/buffer.h"
 #include "util/fixed_queue.h"
 #include "util/huge_alloc.h"
