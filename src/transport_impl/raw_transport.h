@@ -270,4 +270,4 @@ class IBTransport : public Transport {
 
 }  // End erpc
 
-#endif  // ERPC_INFINIBAND_TRANSPORT_H
+#endif  // ERPC_RAW_TRANSPORT_H
