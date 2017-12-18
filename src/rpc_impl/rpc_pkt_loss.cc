@@ -6,6 +6,7 @@
 
 namespace erpc {
 
+// This handles both datapath and management packet loss
 template <class TTr>
 void Rpc<TTr>::pkt_loss_scan_st() {
   assert(in_dispatch());
@@ -33,12 +34,13 @@ void Rpc<TTr>::pkt_loss_scan_st() {
         break;
       }
       case SessionState::kConnectInProgress:
-      case SessionState::kDisconnectInProgress:
+      case SessionState::kDisconnectInProgress: {
         // Session management packet loss detection
-        if (rdtsc() - session->client_info.sm_req_ts > kSMTimeoutMs) {
-          send_sm_req_st(session);
-        }
+        const size_t ms_elapsed =
+            to_msec(rdtsc() - session->client_info.sm_req_ts, nexus->freq_ghz);
+        if (ms_elapsed > kSMTimeoutMs) send_sm_req_st(session);
         break;
+      }
       case SessionState::kResetInProgress:
         break;
     }
