@@ -13,7 +13,7 @@ namespace erpc {
 class IBTransport;
 class RawTransport;
 
-// Set the transport
+// Set the transport (CTransport is the compile-time transport class)
 #if defined(INFINIBAND)
 static constexpr size_t kHeadroom = 0;
 typedef IBTransport CTransport;
