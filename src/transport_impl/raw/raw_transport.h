@@ -19,7 +19,7 @@ class RawTransport : public Transport {
 
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kRaw;
-  static constexpr size_t kMTU = 1500;
+  static constexpr size_t kMTU = 1024;
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
   static constexpr size_t kMPWqeCap = 512;  ///< RECVs per multi-packet WQE
   static_assert(kNumRxRingEntries % kMPWqeCap == 0, "");

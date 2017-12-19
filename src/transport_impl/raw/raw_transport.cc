@@ -173,6 +173,11 @@ void RawTransport::resolve_phy_port() {
 
 void RawTransport::init_infiniband_structs() {
   assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
+
+  // Create protection domain, send CQ, and recv CQ
+  pd = ibv_alloc_pd(resolve.ib_ctx);
+  rt_assert(pd != nullptr, "eRPC IBTransport: Failed to allocate PD");
+
   // XXX
 }
 
