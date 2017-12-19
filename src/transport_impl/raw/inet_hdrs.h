@@ -3,8 +3,17 @@
 
 #include <arpa/inet.h>
 #include <assert.h>
+#include <dirent.h>
+#include <ifaddrs.h>
+#include <linux/if_arp.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <sstream>
 #include <string>
 #include "common.h"
@@ -44,31 +53,6 @@ struct udp_hdr_t {
 static constexpr size_t kTotHdrSz =
     sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
 static_assert(kTotHdrSz == 42, "");
-
-std::string mac_to_string(const uint8_t mac[6]) {
-  std::ostringstream ret;
-  for (size_t i = 0; i < 6; i++) {
-    ret << std::hex << static_cast<uint32_t>(mac[i]);
-    if (i != 5) ret << ":";
-  }
-  return ret.str();
-}
-
-uint32_t ip_from_str(const char* ip) {
-  uint32_t addr;
-  int ret = inet_pton(AF_INET, ip, &addr);
-  rt_assert(ret == 1, "inet_pton() failed");
-  return addr;
-}
-
-std::string ip_to_string(uint32_t addr) {
-  static_assert(INET_ADDRSTRLEN == 16, "");
-  char str[INET_ADDRSTRLEN];
-  const char* ret = inet_ntop(AF_INET, &addr, str, sizeof(str));
-  rt_assert(ret == str, "inet_ntop failed");
-  str[INET_ADDRSTRLEN - 1] = 0;  // Null-terminate
-  return str;
-}
 
 static uint16_t ip_checksum(ipv4_hdr_t* ipv4_hdr) {
   unsigned long sum = 0;
@@ -112,6 +96,87 @@ void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port, uint16_t dst_port,
   udp_hdr->dst_port = htons(dst_port);
   udp_hdr->len = htons(sizeof(udp_hdr_t) + data_size);
   udp_hdr->sum = 0;
+}
+
+std::string mac_to_string(const uint8_t* mac) {
+  std::ostringstream ret;
+  for (size_t i = 0; i < 6; i++) {
+    ret << std::hex << static_cast<uint32_t>(mac[i]);
+    if (i != 5) ret << ":";
+  }
+  return ret.str();
+}
+
+uint32_t ipv4_from_str(const char* ip) {
+  uint32_t addr;
+  int ret = inet_pton(AF_INET, ip, &addr);
+  rt_assert(ret == 1, "inet_pton() failed for " + std::string(ip));
+  return addr;
+}
+
+std::string ip_to_string(uint32_t ipv4_addr) {
+  static_assert(INET_ADDRSTRLEN == 16, "");
+  char str[INET_ADDRSTRLEN];
+  const char* ret = inet_ntop(AF_INET, &ipv4_addr, str, sizeof(str));
+  rt_assert(ret == str, "inet_ntop failed");
+  str[INET_ADDRSTRLEN - 1] = 0;  // Null-terminate
+  return str;
+}
+
+/// Return the IPv4 address of an interface
+static std::string get_interface_ipv4_str(std::string interface) {
+  struct ifaddrs *ifaddr, *ifa;
+  rt_assert(getifaddrs(&ifaddr) == 0);
+  std::string ret = "";
+
+  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr->sa_family != AF_INET) continue;  // IP address
+    if (strcmp(ifa->ifa_name, interface.c_str()) != 0) continue;
+
+    auto sin_addr = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
+    uint32_t ipv4_addr = *reinterpret_cast<uint32_t*>(&sin_addr->sin_addr);
+    ret = ip_to_string(ipv4_addr);
+  }
+
+  freeifaddrs(ifaddr);
+  return ret;
+}
+
+static std::string get_interface_mac_str(std::string interface) {
+  struct ifreq ifr;
+  ifr.ifr_addr.sa_family = AF_INET;
+  strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ - 1);
+
+  int fd = socket(AF_INET, SOCK_DGRAM, 0);
+  assert(fd >= 0);
+  int ret = ioctl(fd, SIOCGIFHWADDR, &ifr);
+  rt_assert(ret == 0, "MAC address IOCTL failed");
+
+  close(fd);
+  return mac_to_string(reinterpret_cast<uint8_t*>(ifr.ifr_hwaddr.sa_data));
+}
+
+static std::string get_ibdev_ipv4_string(std::string ibdev_name) {
+  std::string dev_dir = "/sys/class/infiniband/" + ibdev_name + "/device/net";
+
+  std::vector<std::string> net_ifaces;
+  DIR* dp;
+  struct dirent* dirp;
+  dp = opendir(dev_dir.c_str());
+  rt_assert(dp != nullptr, "Failed to open directory " + dev_dir);
+
+  while (true) {
+    dirp = readdir(dp);
+    if (dirp == nullptr) break;
+
+    if (strcmp(dirp->d_name, ".") == 0) continue;
+    if (strcmp(dirp->d_name, "..") == 0) continue;
+    net_ifaces.push_back(std::string(dirp->d_name));
+  }
+  closedir(dp);
+
+  rt_assert(net_ifaces.size() > 0, "Directory " + dev_dir + " is empty");
+  return get_interface_ipv4_str(net_ifaces[0]);
 }
 
 }  // End erpc
