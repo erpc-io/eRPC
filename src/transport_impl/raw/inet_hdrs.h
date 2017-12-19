@@ -114,7 +114,7 @@ uint32_t ipv4_from_str(const char* ip) {
   return addr;
 }
 
-std::string ip_to_string(uint32_t ipv4_addr) {
+std::string ipv4_to_string(uint32_t ipv4_addr) {
   static_assert(INET_ADDRSTRLEN == 16, "");
   char str[INET_ADDRSTRLEN];
   const char* ret = inet_ntop(AF_INET, &ipv4_addr, str, sizeof(str));
@@ -160,7 +160,7 @@ static void fill_interface_mac(std::string interface, uint8_t* mac) {
 }
 
 /// Return the net interface for a verbs device (e.g., mlx5_0 -> enp4s0f0)
-static std::string indev2netdev(std::string ibdev_name) {
+static std::string ibdev2netdev(std::string ibdev_name) {
   std::string dev_dir = "/sys/class/infiniband/" + ibdev_name + "/device/net";
 
   std::vector<std::string> net_ifaces;

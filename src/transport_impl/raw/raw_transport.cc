@@ -17,8 +17,12 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
   init_infiniband_structs();
   init_mem_reg_funcs();
 
-  LOG_INFO("eRPC RawTransport: Created for ID %u. Device %s, port %d.\n",
-           rpc_id, resolve.ib_ctx->device->name, resolve.dev_port_id);
+  LOG_INFO(
+      "eRPC RawTransport: Created for ID %u. Device (%s, %s). IPv4 %s, MAC %s. "
+      "port %d.\n",
+      rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
+      ipv4_to_string(resolve.ipv4_addr).c_str(),
+      mac_to_string(resolve.mac_addr).c_str(), resolve.dev_port_id);
 }
 
 void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
@@ -123,16 +127,9 @@ void RawTransport::resolve_phy_port() {
 
       if (ports_to_discover == 0) {
         // Resolution succeeded. Check if the link layer matches.
-        if (is_infiniband() &&
-            port_attr.link_layer != IBV_LINK_LAYER_INFINIBAND) {
+        if (port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
           throw std::runtime_error(
-              "Transport type required is InfiniBand but port link layer is " +
-              link_layer_str(port_attr.link_layer));
-        }
-
-        if (is_roce() && port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
-          throw std::runtime_error(
-              "Transport type required is RoCE but port link layer is " +
+              "Transport type required is raw Ethernet but port L2 is " +
               link_layer_str(port_attr.link_layer));
         }
 
@@ -147,13 +144,11 @@ void RawTransport::resolve_phy_port() {
         resolve.device_id = dev_i;
         resolve.ib_ctx = ib_ctx;
         resolve.dev_port_id = port_i;
-        resolve.port_lid = port_attr.lid;
 
-        // Resolve and cache the ibv_gid struct for RoCE
-        if (is_roce()) {
-          int ret = ibv_query_gid(ib_ctx, resolve.dev_port_id, 0, &resolve.gid);
-          rt_assert(ret == 0, "Failed to query GID");
-        }
+        resolve.ibdev_name = std::string(ib_ctx->device->name);
+        resolve.netdev_name = ibdev2netdev(resolve.ibdev_name);
+        resolve.ipv4_addr = get_interface_ipv4_addr(resolve.netdev_name);
+        fill_interface_mac(resolve.netdev_name, resolve.mac_addr);
 
         return;
       }
