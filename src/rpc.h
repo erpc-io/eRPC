@@ -97,7 +97,7 @@ class Rpc {
    */
   inline MsgBuffer alloc_msg_buffer(size_t max_data_size) {
     // This function avoids division for small data sizes
-    size_t max_num_pkts = TTr::data_size_to_num_pkts(max_data_size);
+    size_t max_num_pkts = data_size_to_num_pkts(max_data_size);
 
     lock_cond(&huge_alloc_lock);
     Buffer buffer =
@@ -122,7 +122,7 @@ class Rpc {
     assert(new_data_size <= msg_buffer->max_data_size);
 
     // Avoid division for single-packet data sizes
-    size_t new_num_pkts = TTr::data_size_to_num_pkts(new_data_size);
+    size_t new_num_pkts = data_size_to_num_pkts(new_data_size);
     msg_buffer->resize(new_data_size, new_num_pkts);
   }
 
@@ -558,7 +558,7 @@ class Rpc {
     if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
       bytes_to_copy = pkthdr->msg_size;
     } else {
-      size_t num_pkts_in_msg = TTr::data_size_to_num_pkts(pkthdr->msg_size);
+      size_t num_pkts_in_msg = data_size_to_num_pkts(pkthdr->msg_size);
       bytes_to_copy = (pkthdr->pkt_num == num_pkts_in_msg - 1)
                           ? (pkthdr->msg_size - offset)
                           : TTr::kMaxDataPerPkt;
@@ -690,6 +690,17 @@ class Rpc {
     rt_assert(nexus->num_bg_threads == 0,
               "Cannot extract allocator because background threads exist.");
     return huge_alloc;
+  }
+
+  /**
+   * @brief Return the number of packets required for \p data_size data bytes.
+   *
+   * This should avoid division if \p data_size fits in one packet.
+   * For \p data_size = 0, the return value need not be 0, i.e., it can be 1.
+   */
+  static size_t data_size_to_num_pkts(size_t data_size) {
+    if (data_size <= TTr::kMaxDataPerPkt) return 1;
+    return (data_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
   }
 
   /// Return the maximum *data* size in one packet for the (private) transport

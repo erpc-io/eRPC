@@ -334,7 +334,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     // req_msgbuf could be buried if we've received the entire request and
     // queued the response, so directly compute the number of packets in request
-    size_t num_pkts_in_req = TTr::data_size_to_num_pkts(pkthdr->msg_size);
+    size_t num_pkts_in_req = data_size_to_num_pkts(pkthdr->msg_size);
     if (sslot->server_info.req_rcvd != num_pkts_in_req) {
       assert(req_msgbuf.is_dynamic_and_matches(pkthdr));
     }

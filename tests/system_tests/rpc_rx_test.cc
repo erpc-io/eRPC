@@ -279,8 +279,7 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
 // process_large_req_one_st()
 //
 TEST_F(RpcRxTest, process_large_req_one_st) {
-  const size_t num_pkts_in_req =
-      TestTransport::data_size_to_num_pkts(kTestLargeMsgSize);
+  const size_t num_pkts_in_req = rpc->data_size_to_num_pkts(kTestLargeMsgSize);
   ASSERT_GT(num_pkts_in_req, 10);
 
   const auto server = get_local_endpoint();

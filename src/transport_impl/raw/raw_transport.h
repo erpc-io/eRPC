@@ -45,9 +45,6 @@ class RawTransport : public Transport {
 
   ~RawTransport();
 
-  /// Create an address handle using this routing info
-  struct ibv_ah *create_ah(const raw_routing_info_t *) const;
-
   void fill_local_routing_info(RoutingInfo *routing_info) const;
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
 
@@ -60,11 +57,6 @@ class RawTransport : public Transport {
         << std::to_string(ri->udp_port) << "]";
 
     return std::string(ret.str());
-  }
-
-  static size_t data_size_to_num_pkts(size_t data_size) {
-    if (data_size <= kMaxDataPerPkt) return 1;
-    return (data_size + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
   }
 
   // ib_transport_datapath.cc
@@ -179,37 +171,6 @@ class RawTransport : public Transport {
   static bool is_roce() { return kTransportType == TransportType::kRoCE; }
   static bool is_infiniband() {
     return kTransportType == TransportType::kInfiniBand;
-  }
-
-  // ibverbs helper functions
-  static std::string link_layer_str(uint8_t link_layer) {
-    switch (link_layer) {
-      case IBV_LINK_LAYER_UNSPECIFIED:
-        return "[Unspecified]";
-      case IBV_LINK_LAYER_INFINIBAND:
-        return "[InfiniBand]";
-      case IBV_LINK_LAYER_ETHERNET:
-        return "[Ethernet]";
-      default:
-        return "[Invalid]";
-    }
-  }
-
-  static size_t enum_to_mtu(enum ibv_mtu mtu) {
-    switch (mtu) {
-      case IBV_MTU_256:
-        return 256;
-      case IBV_MTU_512:
-        return 512;
-      case IBV_MTU_1024:
-        return 1024;
-      case IBV_MTU_2048:
-        return 2048;
-      case IBV_MTU_4096:
-        return 4096;
-      default:
-        return 0;
-    }
   }
 
   /// InfiniBand info resolved from \p phy_port, must be filled by constructor.

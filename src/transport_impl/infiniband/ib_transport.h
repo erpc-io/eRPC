@@ -87,11 +87,6 @@ class IBTransport : public Transport {
     return std::string(ret.str());
   }
 
-  static size_t data_size_to_num_pkts(size_t data_size) {
-    if (data_size <= kMaxDataPerPkt) return 1;
-    return (data_size + kMaxDataPerPkt - 1) / kMaxDataPerPkt;
-  }
-
   // ib_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
   void tx_flush();
