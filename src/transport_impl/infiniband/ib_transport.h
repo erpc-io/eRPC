@@ -143,45 +143,6 @@ class IBTransport : public Transport {
    */
   void init_infiniband_structs();
 
-  /**
-   * @brief A function wrapper whose \p pd argument is later bound to generate
-   * this transport's \p reg_mr_func
-   *
-   * @throw runtime_error if memory registration fails
-   */
-  static MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
-                                       size_t size) {
-    struct ibv_mr *mr = ibv_reg_mr(pd, buf, size, IBV_ACCESS_LOCAL_WRITE);
-    rt_assert(mr != nullptr, "eRPC IBTransport: Failed to register mr.");
-
-    LOG_INFO("eRPC IBTransport: Registered %zu MB (lkey = %u)\n", size / MB(1),
-             mr->lkey);
-    return MemRegInfo(mr, mr->lkey);
-  }
-
-  /**
-   * @brief A function wrapper used to generate this transport's
-   * \p dereg_mr_func
-   */
-  static void ibv_dereg_mr_wrapper(MemRegInfo mr) {
-    struct ibv_mr *ib_mr = reinterpret_cast<struct ibv_mr *>(mr.transport_mr);
-    size_t size = ib_mr->length;
-    uint32_t lkey = ib_mr->lkey;
-
-    int ret = ibv_dereg_mr(ib_mr);
-
-    if (ret != 0) {
-      fprintf(stderr,
-              "eRPC IBTransport: Memory deregistration failed. "
-              "size = %zu MB, lkey = %u.\n",
-              size, lkey);
-      return;
-    }
-
-    LOG_INFO("eRPC IBTransport: Deregistered %zu MB (lkey = %u)\n",
-             size / MB(1), lkey);
-  }
-
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
 
@@ -203,7 +164,7 @@ class IBTransport : public Transport {
 
   // ibverbs helper functions
 
-  /// InfiniBand info resolved from \p phy_port, must be filled by constructor.
+  /// ibverbs info resolved from \p phy_port, must be filled by constructor.
   struct {
     int device_id = -1;  ///< Device index in list of verbs devices
     struct ibv_context *ib_ctx = nullptr;  ///< The verbs device context
