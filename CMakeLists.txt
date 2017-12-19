@@ -37,6 +37,7 @@ set(COMPILE_ERPC_LIB ON)
 
 # Options exposed to the user
 option(PERF "Compile for performance" OFF)
+set(TRANSPORT "infiniband" CACHE STRING "Datapath transport (infiniband/roce/raw)")
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/debug/trace)") 
 
@@ -52,6 +53,18 @@ else(PERF)
   SET(LTO OFF)
   SET(TESTING ON)
 endif(PERF)
+
+# Datapath transport
+if(TRANSPORT STREQUAL "infiniband")
+  MESSAGE(STATUS "Using InfiniBand transport")
+  add_definitions(-DINFINIBAND=1)
+elseif(TRANSPORT STREQUAL "roce")
+  MESSAGE(STATUS "Using RoCE transport")
+  add_definitions(-DROCE=1)
+elseif(TRANSPORT STREQUAL "raw")
+  MESSAGE(STATUS "Using raw Ethernet transport")
+  add_definitions(-DRAW_ETHERNET=1)
+endif()
 
 # Profile-guided optimization
 if(PGO STREQUAL "generate")

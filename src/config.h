@@ -10,13 +10,24 @@
 
 namespace erpc {
 
+// Set the transport
+#if defined(INFINIBAND)
+static constexpr size_t kHeadroom = 0;
+#elif defined(ROCE)
+static constexpr size_t kHeadroom = 0;
+#elif defined(RAW_ETHERNET)
+static constexpr size_t kHeadroom = 40;
+#else
+static constexpr size_t kHeadroom = 40;
+#endif
+
 static constexpr bool kDatapathStats = false;
 
 static inline void dpath_stat_inc(size_t &stat, size_t val) {
   if (kDatapathStats) stat += val;
 }
 
-#ifdef TESTING
+#if defined(TESTING)
 static constexpr bool kTesting = true;
 #else
 static constexpr bool kTesting = false;

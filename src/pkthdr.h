@@ -44,6 +44,7 @@ static std::string pkt_type_str(uint64_t pkt_type) {
 }
 
 struct pkthdr_t {
+  static_assert(kHeadroom % sizeof(size_t) == 0, "");
   uint64_t req_type : 8;             ///< RPC request type
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t dest_session_num : 16;    ///< Session number of the destination
@@ -56,6 +57,9 @@ struct pkthdr_t {
   /// Request number, carried by all data and control packets for a request.
   uint64_t req_num : kReqNumBits;
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
+#ifdef RAW
+  uint8_t headroom[kHeadroom];
+#endif
 
   /// Fill in packet header fields
   void format(uint64_t _req_type, uint64_t _msg_size,
