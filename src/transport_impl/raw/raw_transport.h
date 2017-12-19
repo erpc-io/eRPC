@@ -135,11 +135,16 @@ class RawTransport : public Transport {
   /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
   void init_sends();
 
-  /// ibverbs info resolved from \p phy_port, must be filled by constructor.
+  /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
     int device_id = -1;  ///< Device index in list of verbs devices
     struct ibv_context *ib_ctx = nullptr;  ///< The verbs device context
     uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
+
+    std::string ibdev_name;   ///< Verbs device name (e.g., mlx5_0)
+    std::string netdev_name;  ///< Verbs device name (e.g., enp4s0f0, ib0 etc)
+    uint32_t ipv4_addr;       ///< The port's IPv4 address
+    uint8_t mac_addr[6];      ///< The port's MAC address
   } resolve;
 
   struct ibv_pd *pd = nullptr;

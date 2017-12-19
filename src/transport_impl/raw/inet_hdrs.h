@@ -124,39 +124,43 @@ std::string ip_to_string(uint32_t ipv4_addr) {
 }
 
 /// Return the IPv4 address of an interface
-static std::string get_interface_ipv4_str(std::string interface) {
+static uint32_t get_interface_ipv4_addr(std::string interface) {
   struct ifaddrs *ifaddr, *ifa;
   rt_assert(getifaddrs(&ifaddr) == 0);
-  std::string ret = "";
+  uint32_t ipv4_addr = 0;
 
   for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
     if (ifa->ifa_addr->sa_family != AF_INET) continue;  // IP address
     if (strcmp(ifa->ifa_name, interface.c_str()) != 0) continue;
 
     auto sin_addr = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
-    uint32_t ipv4_addr = *reinterpret_cast<uint32_t*>(&sin_addr->sin_addr);
-    ret = ip_to_string(ipv4_addr);
+    ipv4_addr = *reinterpret_cast<uint32_t*>(&sin_addr->sin_addr);
   }
 
   freeifaddrs(ifaddr);
-  return ret;
+  return ipv4_addr;
 }
 
-static std::string get_interface_mac_str(std::string interface) {
+/// Fill the MAC address of an interface
+static void fill_interface_mac(std::string interface, uint8_t* mac) {
   struct ifreq ifr;
   ifr.ifr_addr.sa_family = AF_INET;
   strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ - 1);
 
   int fd = socket(AF_INET, SOCK_DGRAM, 0);
   assert(fd >= 0);
+
   int ret = ioctl(fd, SIOCGIFHWADDR, &ifr);
   rt_assert(ret == 0, "MAC address IOCTL failed");
-
   close(fd);
-  return mac_to_string(reinterpret_cast<uint8_t*>(ifr.ifr_hwaddr.sa_data));
+
+  for (size_t i = 0; i < 6; i++) {
+    mac[i] = static_cast<uint8_t>(ifr.ifr_hwaddr.sa_data[i]);
+  }
 }
 
-static std::string get_ibdev_ipv4_string(std::string ibdev_name) {
+/// Return the net interface for a verbs device (e.g., mlx5_0 -> enp4s0f0)
+static std::string indev2netdev(std::string ibdev_name) {
   std::string dev_dir = "/sys/class/infiniband/" + ibdev_name + "/device/net";
 
   std::vector<std::string> net_ifaces;
@@ -176,7 +180,7 @@ static std::string get_ibdev_ipv4_string(std::string ibdev_name) {
   closedir(dp);
 
   rt_assert(net_ifaces.size() > 0, "Directory " + dev_dir + " is empty");
-  return get_interface_ipv4_str(net_ifaces[0]);
+  return net_ifaces[0];
 }
 
 }  // End erpc
