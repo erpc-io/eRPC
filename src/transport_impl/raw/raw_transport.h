@@ -140,16 +140,12 @@ class RawTransport : public Transport {
   struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
   struct ibv_qp *qp = nullptr;
 
-  /// An address handle for this endpoint's port. Used for tx_flush().
-  struct ibv_ah *self_ah = nullptr;
-
   Buffer recv_extent;
-  bool use_fast_recv;  ///< True iff fast RECVs are enabled
 
   // SEND
   size_t nb_tx = 0;  /// Total number of packets sent, reset to 0 on tx_flush()
   struct ibv_send_wr send_wr[kPostlist + 1];  /// +1 for unconditional ->next
-  struct ibv_sge send_sgl[kPostlist][2];      ///< SGEs for header & payload
+  struct ibv_sge send_sgl[kPostlist][2];  ///< SGEs for eRPC header & payload
 
   // RECV
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
@@ -158,9 +154,6 @@ class RawTransport : public Transport {
   struct ibv_recv_wr recv_wr[kRecvQueueDepth];
   struct ibv_sge recv_sgl[kRecvQueueDepth];
   struct ibv_wc recv_wc[kRecvQueueDepth];
-
-  // Once post_recvs_fast() is used, regular post_recv() must not be used
-  bool fast_recv_used = false;
 };
 
 }  // End erpc

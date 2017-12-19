@@ -188,7 +188,7 @@ class IBTransport : public Transport {
   // SEND
   size_t nb_tx = 0;  /// Total number of packets sent, reset to 0 on tx_flush()
   struct ibv_send_wr send_wr[kPostlist + 1];  /// +1 for unconditional ->next
-  struct ibv_sge send_sgl[kPostlist][2];      ///< SGEs for header & payload
+  struct ibv_sge send_sgl[kPostlist][2];  ///< SGEs for eRPC header & payload
 
   // RECV
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
