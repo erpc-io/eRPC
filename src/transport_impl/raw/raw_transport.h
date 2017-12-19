@@ -137,8 +137,14 @@ class RawTransport : public Transport {
   } resolve;
 
   struct ibv_pd *pd = nullptr;
-  struct ibv_cq *send_cq = nullptr, *recv_cq = nullptr;
-  struct ibv_qp *qp = nullptr;
+  struct ibv_qp *send_qp = nullptr;
+  struct ibv_cq *send_cq = nullptr;
+
+  struct ibv_qp *recv_qp;
+  struct ibv_cq *recv_cq;
+  struct ibv_exp_wq *wq;
+  struct ibv_exp_wq_family *wq_family;
+  struct ibv_exp_rwq_ind_table *ind_tbl;
 
   Buffer recv_extent;
 
