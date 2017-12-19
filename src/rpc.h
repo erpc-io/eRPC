@@ -12,6 +12,7 @@
 #include "session.h"
 #include "transport.h"
 #include "transport_impl/infiniband/ib_transport.h"
+#include "transport_impl/raw/raw_transport.h"
 #include "util/buffer.h"
 #include "util/fixed_queue.h"
 #include "util/huge_alloc.h"
@@ -893,6 +894,7 @@ class Rpc {
 
 // Instantiate required Rpc classes so they get compiled for the linker
 template class Rpc<IBTransport>;
+template class Rpc<RawTransport>;
 
 }  // End erpc
 

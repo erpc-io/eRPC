@@ -31,7 +31,7 @@ void RawTransport::poll_send_cq_for_flush(bool first) {
 
 void RawTransport::tx_flush() {}
 
-size_t RawTransport::rx_burst() {}
+size_t RawTransport::rx_burst() { return 0; }
 
 void RawTransport::post_recvs(size_t num_recvs) { _unused(num_recvs); }
 

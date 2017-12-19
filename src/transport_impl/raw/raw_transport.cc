@@ -12,7 +12,7 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
 RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
-    : Transport(TransportType::kInfiniBand, rpc_id, phy_port) {
+    : Transport(TransportType::kRaw, rpc_id, phy_port) {
   resolve_phy_port();
   init_infiniband_structs();
   init_mem_reg_funcs();

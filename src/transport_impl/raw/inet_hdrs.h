@@ -69,14 +69,15 @@ static uint16_t ip_checksum(ipv4_hdr_t* ipv4_hdr) {
   return (~sum);
 }
 
-void gen_eth_header(eth_hdr_t* eth_header, uint8_t* src_mac, uint8_t* dst_mac) {
+static void gen_eth_header(eth_hdr_t* eth_header, uint8_t* src_mac,
+                           uint8_t* dst_mac) {
   memcpy(eth_header->src_mac, src_mac, 6);
   memcpy(eth_header->dst_mac, dst_mac, 6);
   eth_header->eth_type = htons(kIPEtherType);
 }
 
-void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip, uint32_t dst_ip,
-                     uint16_t data_size) {
+static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
+                            uint32_t dst_ip, uint16_t data_size) {
   ipv4_hdr->version = 4;
   ipv4_hdr->ihl = 5;
   ipv4_hdr->tos = 0;
@@ -90,15 +91,15 @@ void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip, uint32_t dst_ip,
   ipv4_hdr->check = ip_checksum(ipv4_hdr);
 }
 
-void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port, uint16_t dst_port,
-                    uint16_t data_size) {
+static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
+                           uint16_t dst_port, uint16_t data_size) {
   udp_hdr->src_port = htons(src_port);
   udp_hdr->dst_port = htons(dst_port);
   udp_hdr->len = htons(sizeof(udp_hdr_t) + data_size);
   udp_hdr->sum = 0;
 }
 
-std::string mac_to_string(const uint8_t* mac) {
+static std::string mac_to_string(const uint8_t* mac) {
   std::ostringstream ret;
   for (size_t i = 0; i < 6; i++) {
     ret << std::hex << static_cast<uint32_t>(mac[i]);
@@ -107,14 +108,14 @@ std::string mac_to_string(const uint8_t* mac) {
   return ret.str();
 }
 
-uint32_t ipv4_from_str(const char* ip) {
+static uint32_t ipv4_from_str(const char* ip) {
   uint32_t addr;
   int ret = inet_pton(AF_INET, ip, &addr);
   rt_assert(ret == 1, "inet_pton() failed for " + std::string(ip));
   return addr;
 }
 
-std::string ipv4_to_string(uint32_t ipv4_addr) {
+static std::string ipv4_to_string(uint32_t ipv4_addr) {
   static_assert(INET_ADDRSTRLEN == 16, "");
   char str[INET_ADDRSTRLEN];
   const char* ret = inet_ntop(AF_INET, &ipv4_addr, str, sizeof(str));

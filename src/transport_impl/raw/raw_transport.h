@@ -62,7 +62,7 @@ class RawTransport : public Transport {
 
     std::ostringstream ret;
     ret << "[MAC " << mac_to_string(ri->mac) << ", IP "
-        << ip_to_string(ri->ipv4_addr) << ", UDP port "
+        << ipv4_to_string(ri->ipv4_addr) << ", UDP port "
         << std::to_string(ri->udp_port) << "]";
 
     return std::string(ret.str());
