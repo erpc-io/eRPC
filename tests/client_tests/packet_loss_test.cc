@@ -91,7 +91,7 @@ void generic_test_func(Nexus *nexus, size_t) {
   client_connect_sessions(nexus, context, config_num_sessions,
                           basic_sm_handler);
 
-  Rpc<IBTransport> *rpc = context.rpc;
+  Rpc<CTransport> *rpc = context.rpc;
   rpc->fault_inject_set_pkt_drop_prob_st(kPktDropProb);
 
   int *session_num_arr = context.session_num_arr;

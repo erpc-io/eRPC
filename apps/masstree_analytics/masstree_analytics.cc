@@ -42,8 +42,8 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   bool success = mti->get(req->point_req.key, value, ti);
 
   req_handle->prealloc_used = true;
-  erpc::Rpc<erpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                  sizeof(resp_t));
+  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                 sizeof(resp_t));
   auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
 
   resp->resp_type = success ? RespType::kFound : RespType::kNotFound;
@@ -79,8 +79,8 @@ void range_req_handler(erpc::ReqHandle *req_handle, void *_context) {
       mti->sum_in_range(req->range_req.key, req->range_req.range, ti);
 
   req_handle->prealloc_used = true;
-  erpc::Rpc<erpc::IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                  sizeof(resp_t));
+  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                 sizeof(resp_t));
   auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
   resp->resp_type = RespType::kFound;
   resp->range_count = count;
@@ -187,9 +187,9 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
 
-  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
-                                   static_cast<uint8_t>(thread_id),
-                                   basic_sm_handler, kAppPhyPort, kAppNumaNode);
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
+                                  static_cast<uint8_t>(thread_id),
+                                  basic_sm_handler, kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 
@@ -228,9 +228,9 @@ void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
   c.server.mt_index = mti;
   c.server.ti_arr = ti_arr;
 
-  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
-                                   static_cast<uint8_t>(thread_id),
-                                   basic_sm_handler, kAppPhyPort, kAppNumaNode);
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
+                                  static_cast<uint8_t>(thread_id),
+                                  basic_sm_handler, kAppPhyPort, kAppNumaNode);
   c.rpc = &rpc;
   while (ctrl_c_pressed == 0) rpc.run_event_loop(200);
 }

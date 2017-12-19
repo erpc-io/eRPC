@@ -242,16 +242,15 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
-  Rpc<IBTransport> *rpc = context.rpc;
+  Rpc<CTransport> *rpc = context.rpc;
 
   // Start by filling the request window
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
-    context.req_msgbuf[i] =
-        rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+    context.req_msgbuf[i] = rpc->alloc_msg_buffer(Rpc<CTransport>::kMaxMsgSize);
     assert(context.req_msgbuf[i].buf != nullptr);
 
     context.resp_msgbuf[i] =
-        rpc->alloc_msg_buffer(Rpc<IBTransport>::kMaxMsgSize);
+        rpc->alloc_msg_buffer(Rpc<CTransport>::kMaxMsgSize);
     assert(context.resp_msgbuf[i].buf != nullptr);
 
     client_request_helper(&context, i);

@@ -146,7 +146,7 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
       erpc::ReqFunc(client_req_handler, erpc::ReqFuncType::kForeground));
 
   // Thread ID = 0
-  c->rpc = new erpc::Rpc<erpc::IBTransport>(
+  c->rpc = new erpc::Rpc<erpc::CTransport>(
       nexus, static_cast<void *>(c), 0, sm_handler, kAppPhyPort, kAppNumaNode);
 
   c->rpc->retry_connect_on_invalid_rpc_id = true;

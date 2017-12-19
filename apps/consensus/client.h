@@ -106,7 +106,7 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
         "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f max}. "
         "Request window = %zu (best 1). Inline size = %zu (best 120).\n",
         us_min, us_median, us_99, us_999, us_max,
-        erpc::Session::kSessionReqWindow, erpc::IBTransport::kMaxInline);
+        erpc::Session::kSessionReqWindow, erpc::CTransport::kMaxInline);
     c->client.num_resps = 0;
     c->client.req_us_vec.clear();
   }
@@ -175,7 +175,7 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
   c->client.thread_id = thread_id;
   c->client.leader_idx = 0;  // Start with leader = 0
 
-  c->rpc = new erpc::Rpc<erpc::IBTransport>(
+  c->rpc = new erpc::Rpc<erpc::CTransport>(
       nexus, static_cast<void *>(c), static_cast<uint8_t>(thread_id),
       sm_handler, kAppPhyPort, kAppNumaNode);
   c->rpc->retry_connect_on_invalid_rpc_id = true;

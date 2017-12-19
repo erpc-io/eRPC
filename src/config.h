@@ -10,15 +10,22 @@
 
 namespace erpc {
 
+class IBTransport;
+class RawTransport;
+
 // Set the transport
 #if defined(INFINIBAND)
 static constexpr size_t kHeadroom = 0;
+typedef IBTransport CTransport;
 #elif defined(ROCE)
 static constexpr size_t kHeadroom = 0;
+typedef IBTransport CTransport;
 #elif defined(RAW_ETHERNET)
 static constexpr size_t kHeadroom = 40;
+typedef RawTransport CTransport;
 #else
 static constexpr size_t kHeadroom = 40;
+typedef IBTransport CTransport;
 #endif
 
 static constexpr bool kDatapathStats = false;

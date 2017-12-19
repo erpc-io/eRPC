@@ -32,7 +32,7 @@ bool server_check_all_disconnected = true;
 class BasicAppContext {
  public:
   bool is_client;
-  Rpc<IBTransport> *rpc = nullptr;
+  Rpc<CTransport> *rpc = nullptr;
   int *session_num_arr = nullptr;  ///< Sessions created as client
 
   size_t num_sm_resps = 0;   ///< Number of SM responses
@@ -124,8 +124,8 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
   BasicAppContext context;
   context.is_client = false;
 
-  Rpc<IBTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
-                       kTestPhyPort, kTestNumaNode);
+  Rpc<CTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
+                      kTestPhyPort, kTestNumaNode);
   if (kTesting) rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
 
   context.rpc = &rpc;
@@ -282,9 +282,9 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
   while (!all_servers_ready) usleep(1);
 
   context.is_client = true;
-  context.rpc = new Rpc<IBTransport>(nexus, static_cast<void *>(&context),
-                                     kTestClientRpcId, sm_handler, kTestPhyPort,
-                                     kTestNumaNode);
+  context.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&context),
+                                    kTestClientRpcId, sm_handler, kTestPhyPort,
+                                    kTestNumaNode);
 
   // Connect the sessions
   context.session_num_arr = new int[num_sessions];

@@ -167,8 +167,8 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
     resp_msgbuf.buf[0] = req_msgbuf->buf[0];
   } else {
     req_handle->prealloc_used = true;
-    erpc::Rpc<erpc::IBTransport>::resize_msg_buffer(
-        &req_handle->pre_resp_msgbuf, resp_size);
+    erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                   resp_size);
     req_handle->pre_resp_msgbuf.buf[0] = req_msgbuf->buf[0];
   }
 
@@ -278,9 +278,9 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.tmp_stat = new TmpStat("small_rpc_tput", "Mrps IPC");
   c.thread_id = thread_id;
 
-  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
-                                   static_cast<uint8_t>(thread_id),
-                                   basic_sm_handler, kAppPhyPort, kAppNumaNode);
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
+                                  static_cast<uint8_t>(thread_id),
+                                  basic_sm_handler, kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 

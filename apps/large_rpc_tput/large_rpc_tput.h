@@ -66,7 +66,7 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 class AppContext {
  public:
   TmpStat *tmp_stat = nullptr;
-  erpc::Rpc<erpc::IBTransport> *rpc = nullptr;
+  erpc::Rpc<erpc::CTransport> *rpc = nullptr;
 
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
   // >10 ms for 8MB RPCs under congestion. So erpc::Latency is insufficient

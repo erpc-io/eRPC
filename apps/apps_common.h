@@ -141,7 +141,7 @@ class TmpStat {
 class BasicAppContext {
  public:
   TmpStat *tmp_stat = nullptr;
-  erpc::Rpc<erpc::IBTransport> *rpc = nullptr;
+  erpc::Rpc<erpc::CTransport> *rpc = nullptr;
   erpc::FastRand fastrand;
 
   std::vector<int> session_num_vec;

@@ -99,7 +99,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
-  Rpc<IBTransport> *rpc = context.rpc;
+  Rpc<CTransport> *rpc = context.rpc;
 
   // Start by filling the request window
   for (size_t i = 0; i < Session::kSessionReqWindow; i++) {

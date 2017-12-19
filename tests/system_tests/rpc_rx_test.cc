@@ -13,7 +13,7 @@ static constexpr size_t kTestLargeMsgSize = KB(64);
 
 class TestContext {
  public:
-  Rpc<TestTransport> *rpc = nullptr;
+  Rpc<CTransport> *rpc = nullptr;
   size_t num_req_handler_calls = 0;
   size_t num_cont_func_calls = 0;
 };
@@ -288,7 +288,7 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   SSlot *sslot_0 = &srv_session->sslot_arr[0];
 
   // The request packet that is recevied
-  uint8_t req[TestTransport::kMTU];
+  uint8_t req[CTransport::kMTU];
   auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(req);
   pkthdr_0->format(kTestReqType, kTestLargeMsgSize, server.session_num,
                    PktType::kPktTypeReq, 0 /* pkt_num */,

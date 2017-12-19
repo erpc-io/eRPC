@@ -39,8 +39,8 @@ void req_handler(ReqHandle *req_handle, void *_context) {
     ASSERT_DEATH(delete context->rpc, ".*");
   }
 
-  Rpc<IBTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                      kTestReqSize);
+  Rpc<CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                     kTestReqSize);
   req_handle->prealloc_used = true;
   context->rpc->enqueue_response(req_handle);
 }
@@ -61,7 +61,7 @@ void test_func(Nexus *nexus, size_t num_sessions) {
   AppContext context;
   client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
 
-  Rpc<IBTransport> *rpc = context.rpc;
+  Rpc<CTransport> *rpc = context.rpc;
   int session_num = context.session_num_arr[0];
 
   // Send a message

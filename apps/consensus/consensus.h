@@ -164,7 +164,7 @@ class AppContext {
 
   // Common members
   std::vector<connection_t> conn_vec;
-  erpc::Rpc<erpc::IBTransport> *rpc = nullptr;
+  erpc::Rpc<erpc::CTransport> *rpc = nullptr;
   erpc::FastRand fast_rand;
   size_t num_sm_resps = 0;
 

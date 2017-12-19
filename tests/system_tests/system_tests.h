@@ -13,7 +13,6 @@ static constexpr size_t kTestUniqToken = 42;
 static constexpr size_t kTestRpcId = 0;  // ID of the fixture's Rpc
 static constexpr size_t kTestReqType = 1;
 
-typedef IBTransport TestTransport;
 extern void req_handler(ReqHandle *, void *);  // Defined in each test.cc
 
 /// Basic eRPC test class with an Rpc object and functions to create client
@@ -34,8 +33,8 @@ class RpcTest : public ::testing::Test {
                              ReqFunc(req_handler, ReqFuncType::kForeground));
     nexus->kill_switch = true;  // Kill SM thread
 
-    rpc = new Rpc<TestTransport>(nexus, nullptr, kTestRpcId, sm_handler,
-                                 kTestPhyPort, kTestNumaNode);
+    rpc = new Rpc<CTransport>(nexus, nullptr, kTestRpcId, sm_handler,
+                              kTestPhyPort, kTestNumaNode);
     rt_assert(rpc != nullptr, "Failed to create Rpc");
 
     pkthdr_tx_queue = &rpc->testing.pkthdr_tx_queue;
@@ -128,9 +127,8 @@ class RpcTest : public ::testing::Test {
     return se;
   }
 
-  Rpc<TestTransport> *rpc = nullptr;
-  FixedQueue<pkthdr_t, Rpc<TestTransport>::kTestingPkthdrQueueSz>
-      *pkthdr_tx_queue;
+  Rpc<CTransport> *rpc = nullptr;
+  FixedQueue<pkthdr_t, Rpc<CTransport>::kTestingPkthdrQueueSz> *pkthdr_tx_queue;
 
  private:
   Nexus *nexus = nullptr;

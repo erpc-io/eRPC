@@ -80,7 +80,7 @@ void generic_test_func(Nexus *nexus, size_t) {
   client_connect_sessions(nexus, context, config_num_sessions,
                           basic_sm_handler);
 
-  Rpc<IBTransport> *rpc = context.rpc;
+  Rpc<CTransport> *rpc = context.rpc;
   int *session_num_arr = context.session_num_arr;
 
   // Pre-create MsgBuffers so we can test reuse and resizing

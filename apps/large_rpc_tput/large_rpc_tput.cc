@@ -254,9 +254,9 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.tmp_stat = new TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
 
-  erpc::Rpc<erpc::IBTransport> rpc(nexus, static_cast<void *>(&c),
-                                   static_cast<uint8_t>(thread_id), sm_handler,
-                                   kAppPhyPort, kAppNumaNode);
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
+                                  static_cast<uint8_t>(thread_id), sm_handler,
+                                  kAppPhyPort, kAppNumaNode);
   rpc.retry_connect_on_invalid_rpc_id = true;
   if (erpc::kTesting) rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
 
