@@ -22,10 +22,10 @@ static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 /// These packet types are stored as bitfields in the packet header, so don't
 /// use an enum class here to avoid casting all over the place.
 enum PktType : uint64_t {
-  kPktTypeReq,         /// Request data. Unexpected and sent by client.
-  kPktTypeReqForResp,  ///< Request for response. Unexpected and sent by client.
-  kPktTypeExplCR,      ///< Explicit credit return. Expected and sent by server.
-  kPktTypeResp,        ///< Response data. Expected and sent by server.
+  kPktTypeReq,         ///< Request data
+  kPktTypeReqForResp,  ///< Request for response
+  kPktTypeExplCR,      ///< Explicit credit return
+  kPktTypeResp,        ///< Response data
 };
 
 static std::string pkt_type_str(uint64_t pkt_type) {
