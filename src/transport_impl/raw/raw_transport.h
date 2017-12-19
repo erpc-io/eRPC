@@ -14,6 +14,9 @@ namespace erpc {
 
 class RawTransport : public Transport {
  public:
+  ///  RPC ID i uses destination UDP port = (kBaseRawUDPPort + i)
+  static constexpr uint16_t kBaseRawUDPPort = 31850;
+
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kRaw;
   static constexpr size_t kMTU = 1500;
@@ -41,7 +44,7 @@ class RawTransport : public Transport {
   /// Session endpoint routing info for raw Ethernet.
   struct raw_routing_info_t {
     uint8_t mac[6];
-    uint32_t ip_addr;
+    uint32_t ipv4_addr;
     uint16_t udp_port;
   };
   static_assert(sizeof(raw_routing_info_t) <= kMaxRoutingInfoSize, "");
@@ -59,7 +62,7 @@ class RawTransport : public Transport {
 
     std::ostringstream ret;
     ret << "[MAC " << mac_to_string(ri->mac) << ", IP "
-        << ip_to_string(ri->ip_addr) << ", UDP port "
+        << ip_to_string(ri->ipv4_addr) << ", UDP port "
         << std::to_string(ri->udp_port) << "]";
 
     return std::string(ret.str());

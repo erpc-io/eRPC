@@ -38,8 +38,10 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 RawTransport::~RawTransport() {
   LOG_INFO("eRPC RawTransport: Destroying transport for ID %u\n", rpc_id);
 
+  // XXX: Need to destroy WQ and friends
+
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
-  if (ibv_destroy_qp(qp)) {
+  if (ibv_destroy_qp(send_qp)) {
     fprintf(stderr, "eRPC RawTransport: Failed to destroy QP.");
     exit(-1);
   }
@@ -51,12 +53,6 @@ RawTransport::~RawTransport() {
 
   if (ibv_destroy_cq(recv_cq)) {
     fprintf(stderr, "eRPC RawTransport: Failed to destroy recv CQ.");
-    exit(-1);
-  }
-
-  if (ibv_destroy_ah(self_ah)) {
-    fprintf(stderr,
-            "eRPC RawTransport: Failed to destroy self address handle.");
     exit(-1);
   }
 
@@ -73,39 +69,17 @@ RawTransport::~RawTransport() {
   }
 }
 
-struct ibv_ah *RawTransport::create_ah(
-    const ib_routing_info_t *ib_rinfo) const {
-  struct ibv_ah_attr ah_attr;
-  memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
-  ah_attr.is_global = is_roce() ? 1 : 0;
-  ah_attr.dlid = is_roce() ? 0 : ib_rinfo->port_lid;
-  ah_attr.sl = 0;
-  ah_attr.src_path_bits = 0;
-  ah_attr.port_num = resolve.dev_port_id;  // Local port
-
-  if (is_roce()) {
-    ah_attr.grh.dgid.global.interface_id = ib_rinfo->gid.global.interface_id;
-    ah_attr.grh.dgid.global.subnet_prefix = ib_rinfo->gid.global.subnet_prefix;
-    ah_attr.grh.sgid_index = 0;
-    ah_attr.grh.hop_limit = 1;
-  }
-
-  return ibv_create_ah(pd, &ah_attr);
-}
-
 void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
-  auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
-  ib_routing_info->port_lid = resolve.port_lid;
-  ib_routing_info->qpn = qp->qp_num;
-  if (is_roce()) ib_routing_info->gid = resolve.gid;
+  auto *ri = reinterpret_cast<raw_routing_info_t *>(routing_info);
+  memcpy(ri->mac, resolve.mac_addr, 6);
+  ri->ipv4_addr = resolve.ipv4_addr;
+  ri->udp_port = kBaseRawUDPPort + rpc_id;
 }
 
-bool RawTransport::resolve_remote_routing_info(
-    RoutingInfo *routing_info) const {
-  auto *ib_rinfo = reinterpret_cast<ib_routing_info_t *>(routing_info);
-  ib_rinfo->ah = create_ah(ib_rinfo);
-  return (ib_rinfo->ah != nullptr);
+bool RawTransport::resolve_remote_routing_info(RoutingInfo *) const {
+  // Raw Ethernet routing info doesn't need resolution
+  return true;
 }
 
 void RawTransport::resolve_phy_port() {
@@ -204,6 +178,7 @@ void RawTransport::resolve_phy_port() {
 
 void RawTransport::init_infiniband_structs() {
   assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
+  // XXX
 }
 
 void RawTransport::init_mem_reg_funcs() {
@@ -213,12 +188,14 @@ void RawTransport::init_mem_reg_funcs() {
   dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
 }
 
-void RawTransport::init_recvs(uint8_t **rx_ring) {}
+void RawTransport::init_recvs(uint8_t **) {
+  // XXX
+}
 
 void RawTransport::init_sends() {
+  // XXX
   for (size_t i = 0; i < kPostlist; i++) {
     send_wr[i].next = &send_wr[i + 1];
-    send_wr[i].wr.ud.remote_qkey = kQKey;
     send_wr[i].opcode = IBV_WR_SEND_WITH_IMM;
     send_wr[i].sg_list = &send_sgl[i][0];
   }
