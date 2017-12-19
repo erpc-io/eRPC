@@ -8,7 +8,6 @@
 #include "common.h"
 #include "msg_buffer.h"
 #include "ops.h"
-#include "pkthdr.h"
 #include "sm_types.h"
 #include "sslot.h"
 #include "util/buffer.h"
