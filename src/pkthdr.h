@@ -57,8 +57,8 @@ struct pkthdr_t {
   /// Request number, carried by all data and control packets for a request.
   uint64_t req_num : kReqNumBits;
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
-#ifdef RAW
-  uint8_t headroom[kHeadroom];
+#ifdef RAW_ETHERNET
+  uint8_t headroom[kHeadroom];  ///< Ethernet L2/L3/L3 headers
 #endif
 
   /// Fill in packet header fields
@@ -111,8 +111,7 @@ struct pkthdr_t {
 
 } __attribute__((packed));
 
-// pkthdr_t size should be a power of 2 for cheap multiplication
-static_assert(sizeof(pkthdr_t) == 16, "");
+static_assert(sizeof(pkthdr_t) % sizeof(size_t) == 0, "");
 }
 
 #endif  // ERPC_PKTHDR_H
