@@ -18,6 +18,7 @@ class Rpc;
 /// A message buffer with magic-ful headers at the beginning and end
 class MsgBuffer {
   friend class IBTransport;
+  friend class RawTransport;
   friend class Session;
   friend class Rpc<IBTransport>;
 

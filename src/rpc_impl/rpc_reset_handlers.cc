@@ -91,7 +91,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   if (pending_conts == 0) {
     // Act similar to handling a disconnect response
     LOG_INFO("%s: None. Session resetted.\n", issue_msg);
-    free_recvs();  // Free before SM callback to allow creating a new session
+    free_ring_entries();  // Free before callback to allow creating new session
     sm_handler(session->local_session_num, SmEventType::kDisconnected,
                SmErrType::kSrvDisconnected, context);
     bury_session_st(session);
@@ -124,7 +124,7 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
   if (pending_enqueue_resps == 0) {
     // Act similar to handling a disconnect request, but don't send SM response
     LOG_INFO("%s: None. Session resetted.\n", issue_msg);
-    free_recvs();
+    free_ring_entries();
     bury_session_st(session);
     return true;
   } else {

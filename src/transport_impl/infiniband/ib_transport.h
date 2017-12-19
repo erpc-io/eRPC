@@ -17,7 +17,8 @@ class IBTransport : public Transport {
   static constexpr TransportType kTransportType = TransportType::kInfiniBand;
   static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
-  static constexpr size_t kSQDepth = 128;           ///< Send queue depth
+  static constexpr size_t kRQDepth = kNumRxRingEntries;  ///< RECV queue depth
+  static constexpr size_t kSQDepth = 128;                ///< Send queue depth
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
@@ -195,9 +196,9 @@ class IBTransport : public Transport {
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
 
-  struct ibv_recv_wr recv_wr[kRecvQueueDepth];
-  struct ibv_sge recv_sgl[kRecvQueueDepth];
-  struct ibv_wc recv_wc[kRecvQueueDepth];
+  struct ibv_recv_wr recv_wr[kRQDepth];
+  struct ibv_sge recv_sgl[kRQDepth];
+  struct ibv_wc recv_wc[kRQDepth];
 
   // Once post_recvs_fast() is used, regular post_recv() must not be used
   bool fast_recv_used = false;

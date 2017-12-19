@@ -79,12 +79,12 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
   rpc->handle_connect_req_st(pm_conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kInvalidRemotePort);
 
-  // RECVs exhausted
-  const size_t initial_recvs_available = rpc->recvs_available;
-  rpc->recvs_available = Session::kSessionCredits - 1;
+  // Ring entries exhausted
+  const size_t initial_ring_entries_available = rpc->ring_entries_available;
+  rpc->ring_entries_available = Session::kSessionCredits - 1;
   rpc->handle_connect_req_st(conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kRecvsExhausted);
-  rpc->recvs_available = initial_recvs_available;  // Restore
+  rpc->ring_entries_available = initial_ring_entries_available;  // Restore
 
   // Too many sessions
   rpc->session_vec.resize(kMaxSessionsPerThread, nullptr);
@@ -185,7 +185,7 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
   // Process response with error. Session gets destroyed and RECVs are released.
   rpc->handle_connect_resp_st(conn_resp);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
-  ASSERT_EQ(rpc->recvs_available, rpc->get_recv_queue_depth());
+  ASSERT_EQ(rpc->ring_entries_available, rpc->get_num_rx_ring_entries());
   // No more tests here because session is destroyed
 }
 
@@ -208,7 +208,7 @@ TEST_F(RpcSmTest, handle_disconnect_req_st) {
   common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
   ASSERT_LT(rpc->huge_alloc->get_stat_user_alloc_tot(), initial_alloc);
-  ASSERT_EQ(rpc->recvs_available, rpc->get_recv_queue_depth());
+  ASSERT_EQ(rpc->ring_entries_available, rpc->get_num_rx_ring_entries());
 
   // Process disconnect request again. Response is re-sent.
   rpc->handle_disconnect_req_st(disc_req);
@@ -232,7 +232,7 @@ TEST_F(RpcSmTest, handle_disconnect_resp_st) {
   // Process first disconnect response
   rpc->handle_disconnect_resp_st(disc_resp);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
-  ASSERT_EQ(rpc->recvs_available, rpc->get_recv_queue_depth());
+  ASSERT_EQ(rpc->ring_entries_available, rpc->get_num_rx_ring_entries());
 
   // Process disconnect request again. This gets ignored.
   rpc->handle_disconnect_resp_st(disc_resp);

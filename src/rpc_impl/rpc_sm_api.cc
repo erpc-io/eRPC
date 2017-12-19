@@ -75,7 +75,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   // server_endpoint.session_num = ??
   // server_endpoint.routing_info = ??
 
-  alloc_recvs();
+  alloc_ring_entries();
   session_vec.push_back(session);  // Add to list of all sessions
 
   send_sm_req_st(session);

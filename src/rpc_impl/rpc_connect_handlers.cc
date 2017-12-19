@@ -126,7 +126,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   session->local_session_num = session->server.session_num;
   session->remote_session_num = session->client.session_num;
 
-  alloc_recvs();
+  alloc_ring_entries();
   session_vec.push_back(session);  // Add to list of all sessions
 
   // Add server endpoint info created above to resp. No need to add client info.
@@ -184,7 +184,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
     LOG_WARN("%s: Error %s.\n", issue_msg,
              sm_err_type_str(sm_pkt.err_type).c_str());
 
-    free_recvs();  // Free before SM callback to allow creating a new session
+    free_ring_entries();  // Free before callback to allow creating new session
     sm_handler(session->local_session_num, SmEventType::kConnectFailed,
                sm_pkt.err_type, context);
     bury_session_st(session);

@@ -170,8 +170,8 @@ size_t IBTransport::rx_burst() {
 }
 
 void IBTransport::post_recvs(size_t num_recvs) {
-  assert(!fast_recv_used);               // Not supported yet
-  assert(num_recvs <= kRecvQueueDepth);  // num_recvs can be 0
+  assert(!fast_recv_used);        // Not supported yet
+  assert(num_recvs <= kRQDepth);  // num_recvs can be 0
   assert(recvs_to_post < kRecvSlack);
 
   recvs_to_post += num_recvs;
@@ -202,9 +202,7 @@ void IBTransport::post_recvs(size_t num_recvs) {
   int ret;
   size_t first_wr_i = recv_head;
   size_t last_wr_i = first_wr_i + (recvs_to_post - 1);
-  if (last_wr_i >= kRecvQueueDepth) {
-    last_wr_i -= kRecvQueueDepth;
-  }
+  if (last_wr_i >= kRQDepth) last_wr_i -= kRQDepth;
 
   first_wr = &recv_wr[first_wr_i];
   last_wr = &recv_wr[last_wr_i];
@@ -222,7 +220,7 @@ void IBTransport::post_recvs(size_t num_recvs) {
 
   // Update RECV head: go to the last wr posted and take 1 more step
   recv_head = last_wr_i;
-  recv_head = (recv_head + 1) % kRecvQueueDepth;
+  recv_head = (recv_head + 1) % kRQDepth;
 
   // Reset slack counter
   recvs_to_post = 0;

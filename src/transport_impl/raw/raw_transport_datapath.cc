@@ -1,12 +1,12 @@
-#include "ib_transport.h"
+#include "raw_transport.h"
 
 namespace erpc {
 
 // Packets that are the first packet in their MsgBuffer use one DMA, and may
 // be inlined. Packets that are not the first packet use two DMAs, and are never
 // inlined for simplicity.
-void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
-                           size_t num_pkts) {
+void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
+                            size_t num_pkts) {
   for (size_t i = 0; i < num_pkts; i++) {
     const tx_burst_item_t& item = tx_burst_arr[i];
     assert(item.routing_info != nullptr);
@@ -27,7 +27,6 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     struct ibv_sge* sgl = send_sgl[i];
 
     assert(wr.next == &send_wr[i + 1]);  // +1 is valid
-    assert(wr.wr.ud.remote_qkey == kQKey);
     assert(wr.opcode == IBV_WR_SEND_WITH_IMM);
     assert(wr.sg_list == sgl);
 
@@ -90,7 +89,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 // This is a slower polling function than the one used in tx_burst: it prints
 // a warning message when the number of polling attempts gets too high. This
 // overhead is fine because the send queue is flushed rarely.
-void IBTransport::poll_send_cq_for_flush(bool first) {
+void RawTransport::poll_send_cq_for_flush(bool first) {
   struct ibv_wc wc;
   size_t num_tries = 0;
   while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
@@ -109,7 +108,7 @@ void IBTransport::poll_send_cq_for_flush(bool first) {
   }
 }
 
-void IBTransport::tx_flush() {
+void RawTransport::tx_flush() {
   testing.tx_flush_count++;
 
   if (unlikely(nb_tx == 0)) {
@@ -160,7 +159,7 @@ void IBTransport::tx_flush() {
   nb_tx = 0;                      // Reset signaling logic
 }
 
-size_t IBTransport::rx_burst() {
+size_t RawTransport::rx_burst() {
   int ret = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
 
   // XXX: When can this fail? This is similar to device failure, so it might
@@ -169,63 +168,6 @@ size_t IBTransport::rx_burst() {
   return static_cast<size_t>(ret);
 }
 
-void IBTransport::post_recvs(size_t num_recvs) {
-  assert(!fast_recv_used);               // Not supported yet
-  assert(num_recvs <= kRecvQueueDepth);  // num_recvs can be 0
-  assert(recvs_to_post < kRecvSlack);
-
-  recvs_to_post += num_recvs;
-  if (recvs_to_post < kRecvSlack) return;
-
-  if (use_fast_recv) {
-    // Construct a special RECV wr that the modded driver understands. Encode
-    // the number of required RECVs in its num_sge field.
-    struct ibv_recv_wr special_wr;
-    special_wr.wr_id = kMagicWrIDForFastRecv;
-    special_wr.num_sge = recvs_to_post;
-
-    struct ibv_recv_wr* bad_wr = &special_wr;
-    int ret = ibv_post_recv(qp, nullptr, &bad_wr);
-    if (unlikely(ret != 0)) {
-      fprintf(stderr, "eRPC IBTransport: Post RECV (fast) error %d\n", ret);
-      exit(-1);
-    }
-
-    // Reset slack counter
-    recvs_to_post = 0;
-    return;
-  }
-
-  // The recvs posted are @first_wr through @last_wr, inclusive
-  struct ibv_recv_wr *first_wr, *last_wr, *temp_wr, *bad_wr;
-
-  int ret;
-  size_t first_wr_i = recv_head;
-  size_t last_wr_i = first_wr_i + (recvs_to_post - 1);
-  if (last_wr_i >= kRecvQueueDepth) {
-    last_wr_i -= kRecvQueueDepth;
-  }
-
-  first_wr = &recv_wr[first_wr_i];
-  last_wr = &recv_wr[last_wr_i];
-  temp_wr = last_wr->next;
-
-  last_wr->next = nullptr;  // Breaker of chains
-
-  ret = ibv_post_recv(qp, first_wr, &bad_wr);
-  if (unlikely(ret != 0)) {
-    fprintf(stderr, "eRPC IBTransport: Post RECV (normal) error %d\n", ret);
-    exit(-1);
-  }
-
-  last_wr->next = temp_wr;  // Restore circularity
-
-  // Update RECV head: go to the last wr posted and take 1 more step
-  recv_head = last_wr_i;
-  recv_head = (recv_head + 1) % kRecvQueueDepth;
-
-  // Reset slack counter
-  recvs_to_post = 0;
-}
+void RawTransport::post_recvs(size_t num_recvs) { _unused(num_recvs); }
 
 }  // End erpc

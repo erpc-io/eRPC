@@ -21,11 +21,9 @@ class Transport {
  public:
   static constexpr size_t kMaxRoutingInfoSize = 32;  ///< Space for routing info
   static constexpr size_t kMaxMemRegInfoSize = 64;   ///< Space for mem reg info
+  static constexpr size_t kNumRxRingEntries = 2048;  ///< RX ring entries
 
-  // Queue depths
-  static constexpr size_t kRecvQueueDepth = 2048;  ///< RECV queue size
-
-  static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
+  static_assert(is_power_of_two<size_t>(kNumRxRingEntries), "");
 
   /**
    * @brief Generic struct to store routing info for any transport.

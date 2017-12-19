@@ -302,21 +302,21 @@ class Rpc {
   // Handle available RECVs
   //
 
-  /// Return true iff there are sufficient RECVs available for one session
+  /// Return true iff there are sufficient ring entries available for a session
   bool have_recvs() const {
-    return recvs_available >= Session::kSessionCredits;
+    return ring_entries_available >= Session::kSessionCredits;
   }
 
-  /// Allocate RECVs for one session
-  void alloc_recvs() {
+  /// Allocate ring entries for one session
+  void alloc_ring_entries() {
     assert(have_recvs());
-    recvs_available -= Session::kSessionCredits;
+    ring_entries_available -= Session::kSessionCredits;
   }
 
-  /// Free RECVs allocated for one session
-  void free_recvs() {
-    recvs_available += Session::kSessionCredits;
-    assert(recvs_available <= Transport::kRecvQueueDepth);
+  /// Free ring entries allocated for one session
+  void free_ring_entries() {
+    ring_entries_available += Session::kSessionCredits;
+    assert(ring_entries_available <= Transport::kNumRxRingEntries);
   }
 
   //
@@ -708,9 +708,9 @@ class Rpc {
     return TTr::kMaxDataPerPkt;
   }
 
-  /// Return the (private) transport's RECV queue depth
-  static inline constexpr size_t get_recv_queue_depth() {
-    return TTr::kRecvQueueDepth;
+  /// Return the (private) transport's RX ring size
+  static inline constexpr size_t get_num_rx_ring_entries() {
+    return TTr::kNumRxRingEntries;
   }
 
   /// Return the maximum message *data* size that can be sent
@@ -831,13 +831,13 @@ class Rpc {
   TTr *transport = nullptr;  ///< The unreliable transport
 
   /// Current number of RECVs available to use for sessions
-  size_t recvs_available = TTr::kRecvQueueDepth;
+  size_t ring_entries_available = TTr::kNumRxRingEntries;
 
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx batch info
   size_t tx_batch_i = 0;  ///< The batch index for TX burst array
 
   MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];  ///< Batch info for rx_burst
-  uint8_t *rx_ring[TTr::kRecvQueueDepth];       ///< The transport's RX ring
+  uint8_t *rx_ring[TTr::kNumRxRingEntries];     ///< The transport's RX ring
   size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
 
   // Allocator

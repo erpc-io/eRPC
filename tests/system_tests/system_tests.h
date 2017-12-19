@@ -76,7 +76,7 @@ class RpcTest : public ::testing::Test {
     session->server = server;
     session->server.session_num = kInvalidSessionNum;
 
-    rpc->recvs_available -= Session::kSessionCredits;
+    rpc->ring_entries_available -= Session::kSessionCredits;
     rpc->session_vec.push_back(session);
 
     return session;
@@ -115,7 +115,7 @@ class RpcTest : public ::testing::Test {
     rt_assert(rpc->transport->resolve_remote_routing_info(&remote_rinfo),
               "Failed to resolve client routing info");
 
-    rpc->recvs_available -= Session::kSessionCredits;
+    rpc->ring_entries_available -= Session::kSessionCredits;
     rpc->session_vec.push_back(session);
     return session;
   }

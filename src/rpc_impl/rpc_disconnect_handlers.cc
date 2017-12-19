@@ -45,7 +45,7 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
     }
   }
 
-  free_recvs();
+  free_ring_entries();
 
   LOG_INFO("%s. None. Sending response.\n", issue_msg);
   sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kNoError));
@@ -84,7 +84,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   assert(session->server == sm_pkt.server);
 
   LOG_INFO("%s: None. Session disconnected.\n", issue_msg);
-  free_recvs();  // Free before SM callback to allow creating a new session
+  free_ring_entries();  // Free before callback to allow creating a new session
   sm_handler(session->local_session_num, SmEventType::kDisconnected,
              SmErrType::kNoError, context);
   bury_session_st(session);

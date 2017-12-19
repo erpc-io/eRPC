@@ -209,7 +209,7 @@ void IBTransport::init_infiniband_structs() {
   send_cq = ibv_create_cq(resolve.ib_ctx, kSQDepth, nullptr, nullptr, 0);
   rt_assert(send_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
 
-  recv_cq = ibv_create_cq(resolve.ib_ctx, kRecvQueueDepth, nullptr, nullptr, 0);
+  recv_cq = ibv_create_cq(resolve.ib_ctx, kRQDepth, nullptr, nullptr, 0);
   rt_assert(recv_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
 
   // Initialize QP creation attributes
@@ -220,7 +220,7 @@ void IBTransport::init_infiniband_structs() {
   create_attr.qp_type = IBV_QPT_UD;
 
   create_attr.cap.max_send_wr = kSQDepth;
-  create_attr.cap.max_recv_wr = kRecvQueueDepth;
+  create_attr.cap.max_recv_wr = kRQDepth;
   create_attr.cap.max_send_sge = 1;
   create_attr.cap.max_recv_sge = 1;
   create_attr.cap.max_inline_data = kMaxInline;
@@ -292,7 +292,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
   std::ostringstream xmsg;  // The exception message
 
   // Initialize the memory region for RECVs
-  size_t recv_extent_size = kRecvQueueDepth * kRecvSize;
+  size_t recv_extent_size = kRQDepth * kRecvSize;
   recv_extent = huge_alloc->alloc(recv_extent_size);
   if (recv_extent.buf == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
@@ -301,7 +301,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
   }
 
   // Initialize constant fields of RECV descriptors
-  for (size_t i = 0; i < kRecvQueueDepth; i++) {
+  for (size_t i = 0; i < kRQDepth; i++) {
     uint8_t *buf = recv_extent.buf;
 
     // From each slot of size kRecvSize = (kMTU + 64), we give up the first
@@ -319,18 +319,18 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
     recv_wr[i].num_sge = 1;
 
     // Circular link
-    recv_wr[i].next = (i < kRecvQueueDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
+    recv_wr[i].next = (i < kRQDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
     rx_ring[i] = &buf[offset + kGRHBytes];  // RX ring entry
   }
 
   // Fill the RECV queu. post_recv can use fast RECV, so it's not usable here.
   struct ibv_recv_wr *bad_wr;
-  recv_wr[kRecvQueueDepth - 1].next = nullptr;  // Breaker of chains
+  recv_wr[kRQDepth - 1].next = nullptr;  // Breaker of chains
 
   int ret = ibv_post_recv(qp, &recv_wr[0], &bad_wr);
   rt_assert(ret == 0, "eRPC IBTransport: Failed to fill RECV queue.");
 
-  recv_wr[kRecvQueueDepth - 1].next = &recv_wr[0];  // Restore circularity
+  recv_wr[kRQDepth - 1].next = &recv_wr[0];  // Restore circularity
 }
 
 void IBTransport::init_sends() {

@@ -18,7 +18,12 @@ class RawTransport : public Transport {
   static constexpr TransportType kTransportType = TransportType::kRaw;
   static constexpr size_t kMTU = 1500;
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
-  static constexpr size_t kSQDepth = 128;           ///< Send queue depth
+  static constexpr size_t kMPWqeCap = 512;  ///< RECVs per multi-packet WQE
+  static_assert(kNumRxRingEntries % kMPWqeCap == 0, "");
+
+  /// Send queue depth
+  static constexpr size_t kRQDepth = (kNumRxRingEntries / kMPWqeCap);
+  static constexpr size_t kSQDepth = 128;    ///< Send queue depth
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
@@ -158,9 +163,7 @@ class RawTransport : public Transport {
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
 
-  struct ibv_recv_wr recv_wr[kRecvQueueDepth];
-  struct ibv_sge recv_sgl[kRecvQueueDepth];
-  struct ibv_wc recv_wc[kRecvQueueDepth];
+  struct ibv_sge recv_sgl[kRQDepth];
 };
 
 }  // End erpc
