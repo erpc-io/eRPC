@@ -24,10 +24,8 @@ class Transport {
 
   // Queue depths
   static constexpr size_t kRecvQueueDepth = 2048;  ///< RECV queue size
-  static constexpr size_t kSendQueueDepth = 128;   ///< SEND queue size
 
   static_assert(is_power_of_two<size_t>(kRecvQueueDepth), "");
-  static_assert(is_power_of_two<size_t>(kSendQueueDepth), "");
 
   /**
    * @brief Generic struct to store routing info for any transport.

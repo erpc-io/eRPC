@@ -17,6 +17,7 @@ class IBTransport : public Transport {
   static constexpr TransportType kTransportType = TransportType::kInfiniBand;
   static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
+  static constexpr size_t kSQDepth = 128;           ///< Send queue depth
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
@@ -29,9 +30,9 @@ class IBTransport : public Transport {
   static constexpr uint64_t kModdedProbeWrID = 3186;
   static constexpr int kModdedProbeRet = 3187;
 
-  static_assert(kSendQueueDepth >= 2 * kUnsigBatch, "");  // Capacity check
-  static_assert(kPostlist <= kUnsigBatch, "");            // Postlist check
-  static_assert(kMaxInline >= sizeof(pkthdr_t), "");      // Inline control msgs
+  static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
+  static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
+  static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
 
   // Derived constants
 

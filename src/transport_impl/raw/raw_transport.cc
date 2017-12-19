@@ -206,7 +206,7 @@ void IBTransport::init_infiniband_structs() {
   pd = ibv_alloc_pd(resolve.ib_ctx);
   rt_assert(pd != nullptr, "eRPC IBTransport: Failed to allocate PD");
 
-  send_cq = ibv_create_cq(resolve.ib_ctx, kSendQueueDepth, nullptr, nullptr, 0);
+  send_cq = ibv_create_cq(resolve.ib_ctx, kSQDepth, nullptr, nullptr, 0);
   rt_assert(send_cq != nullptr, "eRPC IBTransport: Failed to create SEND CQ");
 
   recv_cq = ibv_create_cq(resolve.ib_ctx, kRecvQueueDepth, nullptr, nullptr, 0);
@@ -219,7 +219,7 @@ void IBTransport::init_infiniband_structs() {
   create_attr.recv_cq = recv_cq;
   create_attr.qp_type = IBV_QPT_UD;
 
-  create_attr.cap.max_send_wr = kSendQueueDepth;
+  create_attr.cap.max_send_wr = kSQDepth;
   create_attr.cap.max_recv_wr = kRecvQueueDepth;
   create_attr.cap.max_send_sge = 1;
   create_attr.cap.max_recv_sge = 1;
