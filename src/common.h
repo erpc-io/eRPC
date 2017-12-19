@@ -17,7 +17,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "optlevel.h"
+#include "config.h"
 
 namespace erpc {
 

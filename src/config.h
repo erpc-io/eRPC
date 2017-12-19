@@ -1,9 +1,9 @@
 /**
- * @file optlevel.h
- * @brief Defines for compile-time optimizations
+ * @file config.h
+ * @brief Compile-time constants mostly derived from CMake
  */
-#ifndef OPTLEVEL_H
-#define OPTLEVEL_H
+#ifndef ERPC_CONFIG_H
+#define ERPC_CONFIG_H
 
 #include <assert.h>
 #include <stdlib.h>
@@ -23,4 +23,4 @@ static constexpr bool kTesting = false;
 #endif
 }
 
-#endif  // OPTLEVEL_H
+#endif  // ERPC_CONFIG_H
