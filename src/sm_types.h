@@ -40,7 +40,7 @@ enum class SmErrType : int {
   kNoError,          ///< The only non-error error type
   kSrvDisconnected,  ///< The control-path connection to the server failed
   kTooManySessions,  ///< Connect req failed because server is out of sessions
-  kRecvsExhausted,   ///< Connect req failed because server is out of RECVs
+  kRingExhausted,    ///< Connect req failed because server is out of ring bufs
   kOutOfMemory,      ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
   kInvalidRemoteRpcId,
@@ -136,7 +136,7 @@ static bool sm_err_type_is_valid(SmErrType err_type) {
     case SmErrType::kNoError:
     case SmErrType::kSrvDisconnected:
     case SmErrType::kTooManySessions:
-    case SmErrType::kRecvsExhausted:
+    case SmErrType::kRingExhausted:
     case SmErrType::kOutOfMemory:
     case SmErrType::kRoutingResolutionFailure:
     case SmErrType::kInvalidRemoteRpcId:
@@ -157,8 +157,8 @@ static std::string sm_err_type_str(SmErrType err_type) {
       return "[Server disconnected]";
     case SmErrType::kTooManySessions:
       return "[Too many sessions]";
-    case SmErrType::kRecvsExhausted:
-      return "[RECVs exhausted]";
+    case SmErrType::kRingExhausted:
+      return "[Ring buffers exhausted]";
     case SmErrType::kOutOfMemory:
       return "[Out of memory]";
     case SmErrType::kRoutingResolutionFailure:

@@ -83,7 +83,7 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
   const size_t initial_ring_entries_available = rpc->ring_entries_available;
   rpc->ring_entries_available = Session::kSessionCredits - 1;
   rpc->handle_connect_req_st(conn_req);
-  common_check(0, SmPktType::kConnectResp, SmErrType::kRecvsExhausted);
+  common_check(0, SmPktType::kConnectResp, SmErrType::kRingExhausted);
   rpc->ring_entries_available = initial_ring_entries_available;  // Restore
 
   // Too many sessions
@@ -182,7 +182,7 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
   // Make session 0 a client session in kConnectInProgress
   create_client_session_init(client, server);
 
-  // Process response with error. Session gets destroyed and RECVs are released.
+  // Process response with error. Session is destroyed and ring buffers released
   rpc->handle_connect_resp_st(conn_resp);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
   ASSERT_EQ(rpc->ring_entries_available, rpc->get_num_rx_ring_entries());

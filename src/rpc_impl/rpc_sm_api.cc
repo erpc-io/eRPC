@@ -47,9 +47,9 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
     return -ENOMEM;
   }
 
-  // Ensure that we have RECV credits for this session
-  if (!have_recvs()) {
-    LOG_WARN("%s: RECVs exhausted.\n", issue_msg);
+  // Ensure that we have ring buffers for this session
+  if (!have_ring_entries()) {
+    LOG_WARN("%s: Ring buffers exhausted.\n", issue_msg);
     return -ENOMEM;
   }
 

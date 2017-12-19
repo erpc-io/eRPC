@@ -57,9 +57,9 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   }
 
   // Check if we are allowed to create another session
-  if (!have_recvs()) {
-    LOG_WARN("%s: RECVs exhausted. Sending response.\n", issue_msg);
-    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kRecvsExhausted));
+  if (!have_ring_entries()) {
+    LOG_WARN("%s: Ring buffers exhausted. Sending response.\n", issue_msg);
+    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kRingExhausted));
     return;
   }
 

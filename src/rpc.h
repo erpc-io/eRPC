@@ -299,17 +299,17 @@ class Rpc {
   bool handle_reset_server_st(Session *session);
 
   //
-  // Handle available RECVs
+  // Handle available ring entries
   //
 
   /// Return true iff there are sufficient ring entries available for a session
-  bool have_recvs() const {
+  bool have_ring_entries() const {
     return ring_entries_available >= Session::kSessionCredits;
   }
 
   /// Allocate ring entries for one session
   void alloc_ring_entries() {
-    assert(have_recvs());
+    assert(have_ring_entries());
     ring_entries_available -= Session::kSessionCredits;
   }
 
@@ -830,7 +830,7 @@ class Rpc {
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport
 
-  /// Current number of RECVs available to use for sessions
+  /// Current number of ring buffers available to use for sessions
   size_t ring_entries_available = TTr::kNumRxRingEntries;
 
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx batch info

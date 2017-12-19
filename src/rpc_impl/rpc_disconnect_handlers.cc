@@ -53,7 +53,8 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
   bury_session_st(session);
 }
 
-// We free the session's RECVs before sending the disconnect request, not here
+// We free the session's ring bufs before sending the disconnect request, so
+// not here.
 template <class TTr>
 void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   assert(in_dispatch());

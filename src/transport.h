@@ -122,8 +122,7 @@ class Transport {
    *
    * This function returns the number of new packets available in the RX ring.
    *
-   * The Rpc layer controls posting of RECV descriptors explicitly using
-   * the post_recvs() function.
+   * The Rpc layer controls posting of RECVs explicitly using post_recvs().
    */
   size_t rx_burst();
 
