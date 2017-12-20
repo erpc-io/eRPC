@@ -6,17 +6,19 @@
 namespace erpc {
 
 // Packet header
-static constexpr size_t kMsgSizeBits = 24;  ///< Bits for message size
-static constexpr size_t kReqNumBits = 44;   ///< Bits for request number
-static constexpr size_t kPktNumBits = 13;   ///< Bits for packet number
+static constexpr size_t kHeadroomHackBits = 8;  ///< Avoid non-zero headroom
+static constexpr size_t kMsgSizeBits = 24;      ///< Bits for message size
+static constexpr size_t kReqNumBits = 44;       ///< Bits for request number
+static constexpr size_t kPktNumBits = 13;       ///< Bits for packet number
 
 /// Debug bits for packet header. Also useful for making the total size of all
 /// pkthdr_t bitfields equal to 128 bits, which makes copying faster.
 static const size_t kPktHdrMagicBits =
-    128 - (8 + kMsgSizeBits + 16 + 2 + 1 + 1 + kPktNumBits + kReqNumBits);
+    128 -
+    (kHeadroomHackBits + 8 + kMsgSizeBits + 16 + 2 + kPktNumBits + kReqNumBits);
 static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
-static_assert(kPktHdrMagicBits == 19, "");  // Just to keep track
+static_assert(kPktHdrMagicBits == 13, "");  // Just to keep track
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 
 /// These packet types are stored as bitfields in the packet header, so don't
@@ -44,10 +46,11 @@ static std::string pkt_type_str(uint64_t pkt_type) {
 }
 
 struct pkthdr_t {
-  static_assert(kHeadroom % sizeof(size_t) == 0, "");
+  static_assert(kHeadroom == 0 || kHeadroom == 40, "");
+  uint8_t headroom[kHeadroom + 1];   ///< Ethernet L2/L3/L3 headers
   uint64_t req_type : 8;             ///< RPC request type
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
-  uint64_t dest_session_num : 16;    ///< Session number of the destination
+  uint64_t dest_session_num : 16;    ///< Destination session number
   uint64_t pkt_type : 2;             ///< The packet type
   /// Packet number. For an explicit credit return packet, this is equal to the
   /// packet number of the corresponding request packet. For a
@@ -57,9 +60,6 @@ struct pkthdr_t {
   /// Request number, carried by all data and control packets for a request.
   uint64_t req_num : kReqNumBits;
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()
-#ifdef RAW_ETHERNET
-  uint8_t headroom[kHeadroom];  ///< Ethernet L2/L3/L3 headers
-#endif
 
   /// Fill in packet header fields
   void format(uint64_t _req_type, uint64_t _msg_size,

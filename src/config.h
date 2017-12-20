@@ -24,7 +24,7 @@ typedef IBTransport CTransport;
 static constexpr size_t kHeadroom = 40;
 typedef RawTransport CTransport;
 #else
-static constexpr size_t kHeadroom = 40;
+static constexpr size_t kHeadroom = 0;
 typedef IBTransport CTransport;
 #endif
 

@@ -9,18 +9,10 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
                            size_t num_pkts) {
   for (size_t i = 0; i < num_pkts; i++) {
     const tx_burst_item_t& item = tx_burst_arr[i];
-    assert(item.routing_info != nullptr);
-    assert(item.msg_buffer != nullptr);
-
     const MsgBuffer* msg_buffer = item.msg_buffer;
     assert(msg_buffer->is_valid());  // Can be fake for control packets
-
-    assert(item.data_bytes <= kMaxDataPerPkt);
+    assert(item.data_bytes <= kMaxDataPerPkt);  // Can be 0 for control packets
     assert(item.offset + item.data_bytes <= msg_buffer->data_size);
-
-    if (item.data_bytes == 0) {
-      assert(msg_buffer->is_expl_cr() || msg_buffer->is_req_for_resp());
-    }
 
     // Verify constant fields of work request
     struct ibv_send_wr& wr = send_wr[i];
