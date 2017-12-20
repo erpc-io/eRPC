@@ -87,28 +87,6 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
   send_wr[num_pkts - 1].next = &send_wr[num_pkts];  // Restore chain; safe
 }
 
-// This is a slower polling function than the one used in tx_burst: it prints
-// a warning message when the number of polling attempts gets too high. This
-// overhead is fine because the send queue is flushed rarely.
-void IBTransport::poll_send_cq_for_flush(bool first) {
-  struct ibv_wc wc;
-  size_t num_tries = 0;
-  while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
-    num_tries++;
-    if (num_tries == 1000000000) {
-      fprintf(stderr,
-              "eRPC: Warning. tx_flush stuck polling for %s signaled wr.\n",
-              first ? "first" : "second");
-      num_tries = 0;
-    }
-  }
-
-  if (unlikely(wc.status != 0)) {
-    fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n", wc.status);
-    exit(-1);
-  }
-}
-
 void IBTransport::tx_flush() {
   testing.tx_flush_count++;
 
@@ -120,7 +98,7 @@ void IBTransport::tx_flush() {
 
   // If we are here, we have posted a SEND work request. The selective signaling
   // logic guarantees that there is *exactly one* *signaled* SEND work request.
-  poll_send_cq_for_flush(true);  // Poll the one existing signaled WQE
+  poll_send_cq_for_flush(send_cq, true);  // Poll the one existing signaled WQE
 
   // Use send_wr[0] to post the second signaled flush WQE
   struct ibv_send_wr& wr = send_wr[0];
@@ -156,8 +134,8 @@ void IBTransport::tx_flush() {
 
   wr.next = &send_wr[1];  // Restore the chain
 
-  poll_send_cq_for_flush(false);  // Poll the signaled WQE posted above
-  nb_tx = 0;                      // Reset signaling logic
+  poll_send_cq_for_flush(send_cq, false);  // Poll the signaled WQE posted above
+  nb_tx = 0;                               // Reset signaling logic
 }
 
 size_t IBTransport::rx_burst() {

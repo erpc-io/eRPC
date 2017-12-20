@@ -48,7 +48,7 @@ static std::string link_layer_str(uint8_t link_layer) {
  * @throw runtime_error if memory registration fails
  */
 static Transport::MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
-                                     size_t size) {
+                                                size_t size) {
   struct ibv_mr *mr = ibv_reg_mr(pd, buf, size, IBV_ACCESS_LOCAL_WRITE);
   rt_assert(mr != nullptr, "eRPC Verbs: Failed to register mr.");
 
@@ -74,6 +74,28 @@ static void ibv_dereg_mr_wrapper(Transport::MemRegInfo mr) {
   }
 
   LOG_INFO("eRPC Verbs: Deregistered %zu B, lkey = %u\n", size, lkey);
+}
+
+// This is a slower polling function than the one used in datapaths: it prints
+// a warning message when the number of polling attempts gets too high. This
+// overhead is fine because the send queue is flushed rarely.
+static void poll_send_cq_for_flush(struct ibv_cq *send_cq, bool first) {
+  struct ibv_wc wc;
+  size_t num_tries = 0;
+  while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
+    num_tries++;
+    if (num_tries == 1000000000) {
+      fprintf(stderr,
+              "eRPC: Warning. tx_flush stuck polling for %s signaled wr.\n",
+              first ? "first" : "second");
+      num_tries = 0;
+    }
+  }
+
+  if (unlikely(wc.status != 0)) {
+    fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n", wc.status);
+    exit(-1);
+  }
 }
 
 }  // End erpc
