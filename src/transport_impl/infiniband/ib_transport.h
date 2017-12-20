@@ -156,7 +156,7 @@ class IBTransport : public Transport {
    */
   void init_recvs(uint8_t **rx_ring);
 
-  void init_sends(); ///< Initialize constant fields of SEND work requests
+  void init_sends();  ///< Initialize constant fields of SEND work requests
 
   static bool is_roce() { return kTransportType == TransportType::kRoCE; }
   static bool is_infiniband() {
@@ -183,7 +183,7 @@ class IBTransport : public Transport {
   /// An address handle for this endpoint's port. Used for tx_flush().
   struct ibv_ah *self_ah = nullptr;
 
-  Buffer recv_extent;
+  Buffer ring_extent;  ///< The ring's backing hugepage memory
   bool use_fast_recv;  ///< True iff fast RECVs are enabled
 
   // SEND

@@ -292,26 +292,26 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
   std::ostringstream xmsg;  // The exception message
 
   // Initialize the memory region for RECVs
-  size_t recv_extent_size = kRQDepth * kRecvSize;
-  recv_extent = huge_alloc->alloc(recv_extent_size);
-  if (recv_extent.buf == nullptr) {
+  size_t ring_extent_size = kNumRxRingEntries * kRecvSize;
+  ring_extent = huge_alloc->alloc(ring_extent_size);
+  if (ring_extent.buf == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
-         << 1.0 * recv_extent_size / MB(1) << "MB for RECV buffers.";
+         << 1.0 * ring_extent_size / MB(1) << "MB for RECV buffers.";
     throw std::runtime_error(xmsg.str());
   }
 
   // Initialize constant fields of RECV descriptors
   for (size_t i = 0; i < kRQDepth; i++) {
-    uint8_t *buf = recv_extent.buf;
+    uint8_t *buf = ring_extent.buf;
 
     // From each slot of size kRecvSize = (kMTU + 64), we give up the first
     // (64 - kGRHBytes) bytes. Each slot is still large enough to receive the
     // GRH and kMTU payload bytes.
     size_t offset = (i * kRecvSize) + (64 - kGRHBytes);
-    assert(offset + (kGRHBytes + kMTU) <= recv_extent_size);
+    assert(offset + (kGRHBytes + kMTU) <= ring_extent_size);
 
     recv_sgl[i].length = kRecvSize;
-    recv_sgl[i].lkey = recv_extent.lkey;
+    recv_sgl[i].lkey = ring_extent.lkey;
     recv_sgl[i].addr = reinterpret_cast<uint64_t>(&buf[offset]);
 
     recv_wr[i].wr_id = recv_sgl[i].addr + kGRHBytes;  // For quick prefetch
@@ -323,7 +323,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
     rx_ring[i] = &buf[offset + kGRHBytes];  // RX ring entry
   }
 
-  // Fill the RECV queu. post_recv can use fast RECV, so it's not usable here.
+  // Fill the RECV queue. post_recv can use fast RECV, so it's not usable here.
   struct ibv_recv_wr *bad_wr;
   recv_wr[kRQDepth - 1].next = nullptr;  // Breaker of chains
 

@@ -182,11 +182,11 @@ class RawTransport : public Transport {
   struct ibv_exp_wq_family *wq_family;
   struct ibv_exp_rwq_ind_table *ind_tbl;
 
-  Buffer recv_extent;
+  Buffer ring_extent;  ///< The ring's backing hugepage memory
 
   // SEND
-  size_t nb_tx = 0;  /// Total number of packets sent, reset to 0 on tx_flush()
-  struct ibv_send_wr send_wr[kPostlist + 1];  /// +1 for unconditional ->next
+  size_t nb_tx = 0;  ///< Total number of packets sent, reset to 0 on tx_flush()
+  struct ibv_send_wr send_wr[kPostlist + 1];  // +1 for unconditional ->next
   struct ibv_sge send_sgl[kPostlist][2];  ///< SGEs for eRPC header & payload
 
   // RECV

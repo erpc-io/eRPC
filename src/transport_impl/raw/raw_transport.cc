@@ -370,9 +370,7 @@ void RawTransport::init_mem_reg_funcs() {
   dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
 }
 
-void RawTransport::init_recvs(uint8_t **) {
-  // XXX
-}
+void RawTransport::init_recvs(uint8_t **) {}
 
 void RawTransport::init_sends() {
   for (size_t i = 0; i < kPostlist; i++) {
