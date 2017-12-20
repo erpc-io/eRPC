@@ -39,37 +39,24 @@ IBTransport::~IBTransport() {
   LOG_INFO("eRPC IBTransport: Destroying transport for ID %u\n", rpc_id);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
-  if (ibv_destroy_qp(qp)) {
-    fprintf(stderr, "eRPC IBTransport: Failed to destroy QP.");
-    exit(-1);
-  }
+  rt_exit(ibv_destroy_qp(qp) == 0,
+          "eRPC IBTransport: Failed to destroy SEND QP.");
 
-  if (ibv_destroy_cq(send_cq)) {
-    fprintf(stderr, "eRPC IBTransport: Failed to destroy send CQ.");
-    exit(-1);
-  }
+  rt_exit(ibv_destroy_cq(send_cq),
+          "eRPC IBTransport: Failed to destroy send CQ.");
 
-  if (ibv_destroy_cq(recv_cq)) {
-    fprintf(stderr, "eRPC IBTransport: Failed to destroy recv CQ.");
-    exit(-1);
-  }
+  rt_exit(ibv_destroy_cq(recv_cq),
+          "eRPC IBTransport: Failed to destroy RECV CQ.");
 
-  if (ibv_destroy_ah(self_ah)) {
-    fprintf(stderr, "eRPC IBTransport: Failed to destroy self address handle.");
-    exit(-1);
-  }
+  rt_exit(ibv_destroy_ah(self_ah) == 0,
+          "eRPC IBTransport: Failed to destroy self address handle.");
 
   // Destroy protection domain and device context
-  if (ibv_dealloc_pd(pd)) {
-    fprintf(stderr,
-            "eRPC IBTransport: Failed to deallocate protection domain.");
-    exit(-1);
-  }
+  rt_exit(ibv_dealloc_pd(pd) == 0,
+          "eRPC IBTransport: Failed to destroy protection domain.");
 
-  if (ibv_close_device(resolve.ib_ctx)) {
-    fprintf(stderr, "eRPC IBTransport: Failed to close device.");
-    exit(-1);
-  }
+  rt_exit(ibv_close_device(resolve.ib_ctx) == 0,
+          "eRPC IBTransport: Failed to close device.");
 }
 
 struct ibv_ah *IBTransport::create_ah(const ib_routing_info_t *ib_rinfo) const {

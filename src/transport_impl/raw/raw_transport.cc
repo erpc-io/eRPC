@@ -42,35 +42,37 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 RawTransport::~RawTransport() {
   LOG_INFO("eRPC RawTransport: Destroying transport for ID %u\n", rpc_id);
 
-  // XXX: Need to destroy WQ and friends
+  // Destroy QPs and CQs. QPs must be destroyed before CQs and WQs.
+  rt_exit(ibv_destroy_qp(send_qp) == 0,
+          "eRPC RawTransport: Failed to destroy SEND QP.");
 
-  // Destroy QPs and CQs. QPs must be destroyed before CQs.
-  if (ibv_destroy_qp(send_qp)) {
-    fprintf(stderr, "eRPC RawTransport: Failed to destroy QP.");
-    exit(-1);
-  }
+  rt_exit(ibv_destroy_cq(send_cq),
+          "eRPC RawTransport: Failed to destroy send CQ.");
 
-  if (ibv_destroy_cq(send_cq)) {
-    fprintf(stderr, "eRPC RawTransport: Failed to destroy send CQ.");
-    exit(-1);
-  }
+  rt_exit(ibv_destroy_qp(recv_qp) == 0,
+          "eRPC RawTransport: Failed to destroy SEND QP.");
 
-  if (ibv_destroy_cq(recv_cq)) {
-    fprintf(stderr, "eRPC RawTransport: Failed to destroy recv CQ.");
-    exit(-1);
-  }
+  rt_exit(ibv_destroy_cq(recv_cq),
+          "eRPC RawTransport: Failed to destroy RECV CQ.");
+
+  rt_exit(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
+          "eRPC RawTransport: Failed to destroy indirection table.");
+
+  struct ibv_exp_release_intf_params rel_intf_params;
+  memset(&rel_intf_params, 0, sizeof(rel_intf_params));
+  rt_exit(
+      ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
+      "eRPC RawTransport: Failed to release interface.");
+
+  rt_exit(ibv_exp_destroy_wq(wq) == 0,
+          "eRPC RawTransport: Failed to destroy WQ.");
 
   // Destroy protection domain and device context
-  if (ibv_dealloc_pd(pd)) {
-    fprintf(stderr,
-            "eRPC RawTransport: Failed to deallocate protection domain.");
-    exit(-1);
-  }
+  rt_exit(ibv_dealloc_pd(pd) == 0,
+          "eRPC RawTransport: Failed to destroy protection domain.");
 
-  if (ibv_close_device(resolve.ib_ctx)) {
-    fprintf(stderr, "eRPC RawTransport: Failed to close device.");
-    exit(-1);
-  }
+  rt_exit(ibv_close_device(resolve.ib_ctx) == 0,
+          "eRPC RawTransport: Failed to close device.");
 }
 
 void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
