@@ -56,8 +56,19 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
     const auto* raw_rinfo =
         reinterpret_cast<raw_routing_info_t*>(item.routing_info);
-    _unused(raw_rinfo);
-    // Fill L4 header
+
+    auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(&pkthdr->headroom[0]);
+    gen_eth_header(eth_hdr, &resolve.mac_addr[0], &raw_rinfo->mac[0]);
+
+    const size_t ipv4_sz = sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t) +
+                           kERpcHdrBytes + item.data_bytes;
+    auto* ipv4_hdr = reinterpret_cast<ipv4_hdr_t*>(&eth_hdr[1]);
+    gen_ipv4_header(ipv4_hdr, resolve.ipv4_addr, raw_rinfo->ipv4_addr, ipv4_sz);
+
+    const size_t udp_sz = ipv4_sz - sizeof(ipv4_hdr_t);
+    auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[0]);
+    gen_udp_header(udp_hdr, kBaseRawUDPPort + rpc_id, raw_rinfo->udp_port,
+                   udp_sz);
   }
 
   send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains

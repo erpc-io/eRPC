@@ -16,7 +16,10 @@ static constexpr size_t kPktNumBits = 13;       ///< Bits for packet number
 static const size_t kPktHdrMagicBits =
     128 -
     (kHeadroomHackBits + 8 + kMsgSizeBits + 16 + 2 + kPktNumBits + kReqNumBits);
-static const size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
+static constexpr size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
+
+/// eRPC header bytes (i.e., excluding transport-layer header bytes)
+static constexpr size_t kERpcHdrBytes = 16;
 
 static_assert(kPktHdrMagicBits == 13, "");  // Just to keep track
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
@@ -112,6 +115,7 @@ struct pkthdr_t {
 } __attribute__((packed));
 
 static_assert(sizeof(pkthdr_t) % sizeof(size_t) == 0, "");
+static_assert(sizeof(pkthdr_t) == kERpcHdrBytes + kHeadroom, "");
 }
 
 #endif  // ERPC_PKTHDR_H

@@ -54,6 +54,7 @@ static constexpr size_t kTotHdrSz =
     sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
 static_assert(kTotHdrSz == 42, "");
 
+/// Checksum the IP header in-place
 static uint16_t ip_checksum(ipv4_hdr_t* ipv4_hdr) {
   unsigned long sum = 0;
   const uint16_t* ip1 = reinterpret_cast<uint16_t*>(ipv4_hdr);
@@ -69,8 +70,8 @@ static uint16_t ip_checksum(ipv4_hdr_t* ipv4_hdr) {
   return (~sum);
 }
 
-static void gen_eth_header(eth_hdr_t* eth_header, uint8_t* src_mac,
-                           uint8_t* dst_mac) {
+static void gen_eth_header(eth_hdr_t* eth_header, const uint8_t* src_mac,
+                           const uint8_t* dst_mac) {
   memcpy(eth_header->src_mac, src_mac, 6);
   memcpy(eth_header->dst_mac, dst_mac, 6);
   eth_header->eth_type = htons(kIPEtherType);
