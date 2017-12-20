@@ -143,7 +143,7 @@ class IBTransport : public Transport {
    *
    * @throw runtime_error if initialization fails
    */
-  void init_infiniband_structs();
+  void init_verbs_structs();
 
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();

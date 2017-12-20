@@ -14,7 +14,7 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
     : Transport(TransportType::kRaw, rpc_id, phy_port) {
   resolve_phy_port();
-  init_infiniband_structs();
+  init_verbs_structs();
   init_mem_reg_funcs();
 
   LOG_INFO(
@@ -171,7 +171,7 @@ void RawTransport::resolve_phy_port() {
   throw std::runtime_error(xmsg.str());
 }
 
-void RawTransport::init_infiniband_structs() {
+void RawTransport::init_verbs_structs() {
   assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
 
   // Create protection domain, send CQ, and recv CQ

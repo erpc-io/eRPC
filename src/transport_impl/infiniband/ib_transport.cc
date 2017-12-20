@@ -14,7 +14,7 @@ constexpr size_t IBTransport::kMaxDataPerPkt;
 IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port)
     : Transport(TransportType::kInfiniBand, rpc_id, phy_port) {
   resolve_phy_port();
-  init_infiniband_structs();
+  init_verbs_structs();
   init_mem_reg_funcs();
 
   LOG_INFO("eRPC IBTransport: Created for ID %u. Device %s, port %d.\n", rpc_id,
@@ -199,7 +199,7 @@ void IBTransport::resolve_phy_port() {
   throw std::runtime_error(xmsg.str());
 }
 
-void IBTransport::init_infiniband_structs() {
+void IBTransport::init_verbs_structs() {
   assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
 
   // Create protection domain, send CQ, and recv CQ
