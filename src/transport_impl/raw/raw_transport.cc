@@ -331,10 +331,9 @@ void RawTransport::init_recvs(uint8_t **) {
 }
 
 void RawTransport::init_sends() {
-  // XXX
   for (size_t i = 0; i < kPostlist; i++) {
     send_wr[i].next = &send_wr[i + 1];
-    send_wr[i].opcode = IBV_WR_SEND_WITH_IMM;
+    send_wr[i].opcode = IBV_WR_SEND;
     send_wr[i].sg_list = &send_sgl[i][0];
   }
 }
