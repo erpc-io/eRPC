@@ -296,7 +296,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
   ring_extent = huge_alloc->alloc(ring_extent_size);
   if (ring_extent.buf == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
-         << 1.0 * ring_extent_size / MB(1) << "MB for RECV buffers.";
+         << 1.0 * ring_extent_size / MB(1) << "MB for ring buffers.";
     throw std::runtime_error(xmsg.str());
   }
 

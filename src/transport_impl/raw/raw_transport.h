@@ -20,16 +20,17 @@ class RawTransport : public Transport {
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kRaw;
   static constexpr size_t kMTU = 1024;
-  static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
 
   // Multi-packet RQ constants
   static constexpr size_t kLogNumStrides = 9;
   static constexpr size_t kLogStrideBytes = 10;
   static constexpr size_t kStridesPerWQE = (1ull << kLogNumStrides);
+  static constexpr size_t kRecvSize = (1ull << kLogStrideBytes);
+  static constexpr size_t kRingSize = (kNumRxRingEntries * kRecvSize);
   static constexpr size_t kCQESnapshotCycle = 65536 * kStridesPerWQE;
-  static constexpr size_t kAppRingSize = (kNumRxRingEntries * kMTU);
-  static_assert((1ull << kLogStrideBytes) >= kMTU, "");
+  static_assert(kRecvSize >= kMTU, "");
   static_assert(kNumRxRingEntries % kStridesPerWQE == 0, "");
+  static_assert(is_power_of_two(kCQESnapshotCycle), "");
 
   static constexpr size_t kRQDepth = (kNumRxRingEntries / kStridesPerWQE);
   static constexpr size_t kSQDepth = 128;       ///< Send queue depth
@@ -192,6 +193,7 @@ class RawTransport : public Transport {
   // RECV
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
+  struct ibv_sge recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
 
   struct ibv_sge recv_sgl[kRQDepth];
 };

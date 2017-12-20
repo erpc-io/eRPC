@@ -370,7 +370,29 @@ void RawTransport::init_mem_reg_funcs() {
   dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
 }
 
-void RawTransport::init_recvs(uint8_t **) {}
+void RawTransport::init_recvs(uint8_t **) {
+  std::ostringstream xmsg;  // The exception message
+
+  // Initialize the memory region for RECVs
+  ring_extent = huge_alloc->alloc(kRingSize);
+  if (ring_extent.buf == nullptr) {
+    xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
+         << 1.0 * kRingSize / MB(1) << "MB for ring buffers.";
+    throw std::runtime_error(xmsg.str());
+  }
+
+  // XXX: Initialize the overrunning CQE here
+
+  // Initialize constant fields of RECV descriptors
+  for (size_t i = 0; i < kRQDepth; i++) {
+    size_t mpwqe_offset = i * (kRecvSize * kStridesPerWQE);
+    recv_sge[i].addr =
+        reinterpret_cast<uint64_t>(&ring_extent.buf[mpwqe_offset]);
+    recv_sge[i].lkey = ring_extent.lkey;
+    recv_sge[i].length = (kRecvSize * kStridesPerWQE);
+    wq_family->recv_burst(wq, &recv_sge[i], 1);
+  }
+}
 
 void RawTransport::init_sends() {
   for (size_t i = 0; i < kPostlist; i++) {
