@@ -315,7 +315,8 @@ void RawTransport::init_verbs_structs() {
   pd = ibv_alloc_pd(resolve.ib_ctx);
   rt_assert(pd != nullptr, "eRPC IBTransport: Failed to allocate PD");
 
-  // XXX
+  init_send_qp();
+  init_recv_qp();
 }
 
 void RawTransport::init_mem_reg_funcs() {
