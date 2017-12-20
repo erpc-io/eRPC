@@ -416,14 +416,14 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
     rx_ring[i] = &ring_extent.buf[kRecvSize * i];
   }
 
-  // Initialize constant fields of RECV descriptors
+  // Initialize constant fields of multi-packet RECV SGEs and fill the RQ
   for (size_t i = 0; i < kRQDepth; i++) {
     size_t mpwqe_offset = i * (kRecvSize * kStridesPerWQE);
-    recv_sge[i].addr =
+    mp_recv_sge[i].addr =
         reinterpret_cast<uint64_t>(&ring_extent.buf[mpwqe_offset]);
-    recv_sge[i].lkey = ring_extent.lkey;
-    recv_sge[i].length = (kRecvSize * kStridesPerWQE);
-    wq_family->recv_burst(wq, &recv_sge[i], 1);
+    mp_recv_sge[i].lkey = ring_extent.lkey;
+    mp_recv_sge[i].length = (kRecvSize * kStridesPerWQE);
+    wq_family->recv_burst(wq, &mp_recv_sge[i], 1);
   }
 }
 

@@ -94,6 +94,13 @@ size_t RawTransport::rx_burst() {
   return get_cqe_cycle_delta(prev_snapshot, cur_snapshot);
 }
 
-void RawTransport::post_recvs(size_t num_recvs) { _unused(num_recvs); }
+void RawTransport::post_recvs(size_t num_recvs) {
+  recvs_to_post += num_recvs;
+  if (recvs_to_post < kStridesPerWQE) return;
+
+  int ret = wq_family->recv_burst(wq, &mp_recv_sge[mp_sge_idx], 1);
+  assert(ret == 0);
+  mp_sge_idx = (mp_sge_idx + 1) % kRQDepth;
+}
 
 }  // End erpc

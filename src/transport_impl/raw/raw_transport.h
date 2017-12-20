@@ -216,9 +216,9 @@ class RawTransport : public Transport {
   struct ibv_sge send_sgl[kPostlist][2];  ///< SGEs for eRPC header & payload
 
   // RECV
-  size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
-  size_t recvs_to_post = 0;  ///< Current number of RECVs to post
-  struct ibv_sge recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
+  size_t recvs_to_post = 0;              ///< Current number of RECVs to post
+  struct ibv_sge mp_recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
+  size_t mp_sge_idx = 0;  ///< Index of the multi-packet SGE to post
 
   // Overrunning RECV CQE
   cqe_snapshot_t prev_snapshot;
