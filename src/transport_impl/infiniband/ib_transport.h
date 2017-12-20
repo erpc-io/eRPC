@@ -148,12 +148,8 @@ class IBTransport : public Transport {
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
 
-  /**
-   * @brief Initialize constant fields of RECV descriptors, fill in the Rpc's
-   * RX ring, and fill the RECV queue.
-   *
-   * @throw runtime_error if RECV buffer hugepage allocation fails
-   */
+  /// Initialize constant fields of RECV descriptors, fill in the Rpc's
+  ///  RX ring, and fill the RECV queue.
   void init_recvs(uint8_t **rx_ring);
 
   void init_sends();  ///< Initialize constant fields of SEND work requests

@@ -6,8 +6,10 @@
 #define ERPC_RAW_TRANSPORT_H
 
 #include "inet_hdrs.h"
+#include "mlx5_defs.h"
 #include "transport.h"
 #include "transport_impl/verbs_common.h"
+#include "util/barrier.h"
 #include "util/logger.h"
 
 namespace erpc {
@@ -33,13 +35,13 @@ class RawTransport : public Transport {
   static_assert(is_power_of_two(kCQESnapshotCycle), "");
 
   static constexpr size_t kRQDepth = (kNumRxRingEntries / kStridesPerWQE);
-  static constexpr size_t kSQDepth = 128;       ///< Send queue depth
-  static constexpr size_t kAppRecvCQDepth = 8;  // Tweakme: The overrunning CQ
+  static constexpr size_t kSQDepth = 128;    ///< Send queue depth
+  static constexpr size_t kRecvCQDepth = 8;  // Tweakme: The overrunning CQ
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
-  static_assert(is_power_of_two(kAppRecvCQDepth), "");
+  static_assert(is_power_of_two(kRecvCQDepth), "");
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
   static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
   static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
@@ -54,6 +56,43 @@ class RawTransport : public Transport {
     uint16_t udp_port;
   };
   static_assert(sizeof(raw_routing_info_t) <= kMaxRoutingInfoSize, "");
+
+  /// A consistent snapshot of CQE fields in host endian format
+  struct cqe_snapshot_t {
+    uint16_t wqe_id;
+    uint16_t wqe_counter;
+
+    /// Return this packet's index in the CQE snapshot cycle
+    size_t get_cqe_snapshot_cycle_idx() const {
+      return wqe_id * kStridesPerWQE + wqe_counter;
+    }
+
+    std::string to_string() {
+      std::ostringstream ret;
+      ret << "[ID " << std::to_string(wqe_id) << ", counter "
+          << std::to_string(wqe_counter) << "]";
+      return ret.str();
+    }
+  };
+  static_assert(sizeof(cqe_snapshot_t) == 4, "");
+
+  /// Get a consistent snapshot of this CQE. The NIC may be concurrently DMA-ing
+  /// to this CQE.
+  inline void snapshot_cqe(volatile mlx5_cqe64 *cqe,
+                           cqe_snapshot_t &cqe_snapshot) {
+    while (true) {
+      uint16_t wqe_id_0 = cqe->wqe_id;
+      uint16_t wqe_counter_0 = cqe->wqe_counter;
+      memory_barrier();
+      uint16_t wqe_id_1 = cqe->wqe_id;
+
+      if (likely(wqe_id_0 == wqe_id_1)) {
+        cqe_snapshot.wqe_id = ntohs(wqe_id_0);
+        cqe_snapshot.wqe_counter = ntohs(wqe_counter_0);
+        return;
+      }
+    }
+  }
 
   RawTransport(uint8_t phy_port, uint8_t rpc_id);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
@@ -122,43 +161,20 @@ class RawTransport : public Transport {
    */
   void resolve_phy_port();
 
-  /**
-   * @brief Initialize structures that do not require eRPC hugepages: device
-   * context, protection domain, and queue pair.
-   *
-   * @throw runtime_error if initialization fails
-   */
-  void init_verbs_structs();
-
-  /**
-   * @brief Initialize send QP.
-   * @throw runtime_error if creation fails
-   */
-  void init_send_qp();
-
-  /**
-   * @brief Initialize recv QP and WQ.
-   * @throw runtime_error if creation fails
-   */
-  void init_recv_qp();
-
-  /**
-   * @brief Initialize the UDP destination flow rule
-   * @throw runtime_error if installation fails
-   */
-  void install_flow_rule();
-
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
 
-  /**
-   * @brief Initialize constant fields of RECV descriptors, fill in the Rpc's
-   * RX ring, and fill the RECV queue.
-   *
-   * @throw runtime_error if RECV buffer hugepage allocation fails
-   */
-  void init_recvs(uint8_t **rx_ring);
+  /// Initialize structures that do not require eRPC hugepages: device
+  /// context, protection domain, and queue pairs.
+  void init_verbs_structs();
+  void init_send_qp();                    ///< Iniitalize the SEND QP
+  void init_recv_qp();                    ///< Initialize the RECV QP
+  void install_flow_rule();               ///< Install the UDP destination flow
+  void map_mlx5_overrunning_recv_cqes();  ///< Map mlx5 RECV CQEs
 
+  /// Initialize constant fields of RECV descriptors, fill in the Rpc's
+  /// RX ring, and fill the RECV queue.
+  void init_recvs(uint8_t **rx_ring);
   void init_sends();  ///< Initialize constant fields of SEND work requests
 
   /// Info resolved from \p phy_port, must be filled by constructor.
@@ -193,9 +209,8 @@ class RawTransport : public Transport {
   // RECV
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
-  struct ibv_sge recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
-
-  struct ibv_sge recv_sgl[kRQDepth];
+  struct ibv_sge recv_sge[kRQDepth];            ///< The multi-packet RECV SGEs
+  volatile mlx5_cqe64 *recv_cqe_arr = nullptr;  ///< The overrunning RECV CQEs
 };
 
 }  // End erpc

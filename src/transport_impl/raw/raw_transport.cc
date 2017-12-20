@@ -31,7 +31,6 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
   this->numa_node = huge_alloc->get_numa_node();
 
   init_recvs(rx_ring);
-  install_flow_rule();
   init_sends();
 }
 
@@ -222,8 +221,8 @@ void RawTransport::init_recv_qp() {
   // Init CQ. Its size MUST be one so that we get two CQEs in mlx5.
   struct ibv_exp_cq_init_attr cq_init_attr;
   memset(&cq_init_attr, 0, sizeof(cq_init_attr));
-  recv_cq = ibv_exp_create_cq(resolve.ib_ctx, kAppRecvCQDepth, nullptr, nullptr,
-                              0, &cq_init_attr);
+  recv_cq = ibv_exp_create_cq(resolve.ib_ctx, kRecvCQDepth, nullptr, nullptr, 0,
+                              &cq_init_attr);
   rt_assert(recv_cq != nullptr, "Failed to create RECV CQ");
 
   // Modify the RECV CQ to ignore overrun
@@ -352,6 +351,29 @@ void RawTransport::install_flow_rule() {
   rt_assert(ibv_exp_create_flow(recv_qp, flow_attr) != nullptr);
 }
 
+void RawTransport::map_mlx5_overrunning_recv_cqes() {
+  // This cast works for mlx5 where ibv_cq is the first member of mlx5_cq.
+  auto *_mlx5_cq = reinterpret_cast<mlx5_cq *>(recv_cq);
+  recv_cqe_arr = reinterpret_cast<volatile mlx5_cqe64 *>(_mlx5_cq->buf_a.buf);
+
+  // Initialize the CQEs as if we received the last (kRecvCQDepth) packets in
+  // the CQE cycle.
+  static_assert(kStridesPerWQE >= kRecvCQDepth, "");
+  for (size_t i = 0; i < kRecvCQDepth; i++) {
+    recv_cqe_arr[i].wqe_id = htons(std::numeric_limits<uint16_t>::max());
+
+    // Last CQE gets
+    // * wqe_counter = (kAppStridesPerWQE - 1)
+    // * snapshot_cycle_idx = (kAppCQESnapshotCycle - 1)
+    recv_cqe_arr[i].wqe_counter = htons(kStridesPerWQE - (kRecvCQDepth - i));
+
+    cqe_snapshot_t snapshot;
+    snapshot_cqe(&recv_cqe_arr[i], snapshot);
+    rt_assert(snapshot.get_cqe_snapshot_cycle_idx() ==
+              kCQESnapshotCycle - (kRecvCQDepth - i));
+  }
+}
+
 void RawTransport::init_verbs_structs() {
   assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
 
@@ -361,6 +383,8 @@ void RawTransport::init_verbs_structs() {
 
   init_send_qp();
   init_recv_qp();
+  install_flow_rule();
+  map_mlx5_overrunning_recv_cqes();
 }
 
 void RawTransport::init_mem_reg_funcs() {
@@ -370,7 +394,11 @@ void RawTransport::init_mem_reg_funcs() {
   dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
 }
 
-void RawTransport::init_recvs(uint8_t **) {
+void RawTransport::init_recvs(uint8_t **rx_ring) {
+  // This function must be called after mapping and initializing the RECV CQEs.
+  // The NIC can DMA as soon as we post RECVs.dd
+  assert(recv_cqe_arr != nullptr);
+
   std::ostringstream xmsg;  // The exception message
 
   // Initialize the memory region for RECVs
@@ -381,7 +409,10 @@ void RawTransport::init_recvs(uint8_t **) {
     throw std::runtime_error(xmsg.str());
   }
 
-  // XXX: Initialize the overrunning CQE here
+  // Fill in the Rpc's RX ring
+  for (size_t i = 0; i < kNumRxRingEntries; i++) {
+    rx_ring[i] = &ring_extent.buf[kRecvSize * i];
+  }
 
   // Initialize constant fields of RECV descriptors
   for (size_t i = 0; i < kRQDepth; i++) {
