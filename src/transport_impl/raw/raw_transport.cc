@@ -372,6 +372,8 @@ void RawTransport::map_mlx5_overrunning_recv_cqes() {
     rt_assert(snapshot.get_cqe_snapshot_cycle_idx() ==
               kCQESnapshotCycle - (kRecvCQDepth - i));
   }
+
+  snapshot_cqe(&recv_cqe_arr[kRecvCQDepth - 1], prev_snapshot);
 }
 
 void RawTransport::init_verbs_structs() {

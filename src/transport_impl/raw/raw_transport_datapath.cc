@@ -86,7 +86,13 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
 void RawTransport::tx_flush() {}
 
-size_t RawTransport::rx_burst() { return 0; }
+size_t RawTransport::rx_burst() {
+  cqe_snapshot_t cur_snapshot;
+  snapshot_cqe(&recv_cqe_arr[cqe_idx], cur_snapshot);
+  cqe_idx = (cqe_idx + 1) % kRecvCQDepth;
+  prev_snapshot = cur_snapshot;
+  return get_cqe_cycle_delta(prev_snapshot, cur_snapshot);
+}
 
 void RawTransport::post_recvs(size_t num_recvs) { _unused(num_recvs); }
 

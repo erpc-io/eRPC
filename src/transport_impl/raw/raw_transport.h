@@ -94,6 +94,16 @@ class RawTransport : public Transport {
     }
   }
 
+  /// Return the CQE cycle delta between two CQE snapshots
+  static inline size_t get_cqe_cycle_delta(const cqe_snapshot_t &prev,
+                                           const cqe_snapshot_t &cur) {
+    size_t prev_idx = prev.get_cqe_snapshot_cycle_idx();
+    size_t cur_idx = cur.get_cqe_snapshot_cycle_idx();
+    assert(prev_idx < kCQESnapshotCycle && cur_idx < kCQESnapshotCycle);
+
+    return ((cur_idx + kCQESnapshotCycle) - prev_idx) % kCQESnapshotCycle;
+  }
+
   RawTransport(uint8_t phy_port, uint8_t rpc_id);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
@@ -208,8 +218,12 @@ class RawTransport : public Transport {
   // RECV
   size_t recv_head = 0;      ///< Index of current un-posted RECV buffer
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
-  struct ibv_sge recv_sge[kRQDepth];            ///< The multi-packet RECV SGEs
+  struct ibv_sge recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
+
+  // Overrunning RECV CQE
+  cqe_snapshot_t prev_snapshot;
   volatile mlx5_cqe64 *recv_cqe_arr = nullptr;  ///< The overrunning RECV CQEs
+  size_t cqe_idx = 0;
 };
 
 }  // End erpc
