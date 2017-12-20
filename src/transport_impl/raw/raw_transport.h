@@ -21,22 +21,27 @@ class RawTransport : public Transport {
   static constexpr TransportType kTransportType = TransportType::kRaw;
   static constexpr size_t kMTU = 1024;
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
-  static constexpr size_t kMPWqeCap = 512;  ///< RECVs per multi-packet WQE
-  static_assert(kNumRxRingEntries % kMPWqeCap == 0, "");
 
-  /// Send queue depth
-  static constexpr size_t kRQDepth = (kNumRxRingEntries / kMPWqeCap);
-  static constexpr size_t kSQDepth = 128;    ///< Send queue depth
+  // Multi-packet RQ constants
+  static constexpr size_t kLogNumStrides = 9;
+  static constexpr size_t kLogStrideBytes = 10;
+  static constexpr size_t kStridesPerWQE = (1ull << kLogNumStrides);
+  static constexpr size_t kCQESnapshotCycle = 65536 * kStridesPerWQE;
+  static constexpr size_t kAppRingSize = (kNumRxRingEntries * kMTU);
+  static_assert((1ull << kLogStrideBytes) >= kMTU, "");
+  static_assert(kNumRxRingEntries % kStridesPerWQE == 0, "");
+
+  static constexpr size_t kRQDepth = (kNumRxRingEntries / kStridesPerWQE);
+  static constexpr size_t kSQDepth = 128;       ///< Send queue depth
+  static constexpr size_t kAppRecvCQDepth = 8;  // Tweakme: The overrunning CQ
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
-
+  static_assert(is_power_of_two(kAppRecvCQDepth), "");
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
   static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
   static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
-
-  // Derived constants
 
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
@@ -123,6 +128,18 @@ class RawTransport : public Transport {
    * @throw runtime_error if initialization fails
    */
   void init_verbs_structs();
+
+  /**
+   * @brief Initialize send QP.
+   * @throw runtime_error if creation fails
+   */
+  void init_send_qp();
+
+  /**
+   * @brief Initialize recv QP and WQ.
+   * @throw runtime_error if creation fails
+   */
+  void init_recv_qp();
 
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();

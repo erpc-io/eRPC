@@ -171,6 +171,143 @@ void RawTransport::resolve_phy_port() {
   throw std::runtime_error(xmsg.str());
 }
 
+/// Initialize QPs used for SENDs only
+void RawTransport::init_send_qp() {
+  assert(resolve.ib_ctx != nullptr && pd != nullptr);
+
+  struct ibv_exp_cq_init_attr cq_init_attr;
+  memset(&cq_init_attr, 0, sizeof(cq_init_attr));
+  send_cq = ibv_exp_create_cq(resolve.ib_ctx, kSQDepth, nullptr, nullptr, 0,
+                              &cq_init_attr);
+  rt_assert(send_cq != nullptr, "Failed to create SEND CQ");
+  assert(send_cq != nullptr);
+
+  struct ibv_exp_qp_init_attr qp_init_attr;
+  memset(&qp_init_attr, 0, sizeof(qp_init_attr));
+  qp_init_attr.comp_mask =
+      IBV_EXP_QP_INIT_ATTR_PD | IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS;
+
+  qp_init_attr.pd = pd;
+  qp_init_attr.send_cq = send_cq;
+  qp_init_attr.recv_cq = send_cq;  // We won't post RECVs
+  qp_init_attr.cap.max_send_wr = kSQDepth;
+  qp_init_attr.cap.max_inline_data = 128;
+  qp_init_attr.qp_type = IBV_QPT_RAW_PACKET;
+  qp_init_attr.exp_create_flags |= IBV_EXP_QP_CREATE_SCATTER_FCS;
+
+  send_qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
+  rt_assert(send_qp != nullptr, "Failed to create SEND QP");
+
+  struct ibv_exp_qp_attr qp_attr;
+  memset(&qp_attr, 0, sizeof(qp_attr));
+  qp_attr.qp_state = IBV_QPS_INIT;
+  qp_attr.port_num = 1;
+  rt_assert(ibv_exp_modify_qp(send_qp, &qp_attr, IBV_QP_STATE | IBV_QP_PORT) ==
+            0);
+
+  memset(&qp_attr, 0, sizeof(qp_attr));
+  qp_attr.qp_state = IBV_QPS_RTR;
+  rt_assert(ibv_exp_modify_qp(send_qp, &qp_attr, IBV_QP_STATE) == 0);
+
+  memset(&qp_attr, 0, sizeof(qp_attr));
+  qp_attr.qp_state = IBV_QPS_RTS;
+  rt_assert(ibv_exp_modify_qp(send_qp, &qp_attr, IBV_QP_STATE) == 0);
+}
+
+/// Initialize a QP used for RECVs only
+void RawTransport::init_recv_qp() {
+  assert(resolve.ib_ctx != nullptr && pd != nullptr);
+
+  // Init CQ. Its size MUST be one so that we get two CQEs in mlx5.
+  struct ibv_exp_cq_init_attr cq_init_attr;
+  memset(&cq_init_attr, 0, sizeof(cq_init_attr));
+  recv_cq = ibv_exp_create_cq(resolve.ib_ctx, kAppRecvCQDepth, nullptr, nullptr,
+                              0, &cq_init_attr);
+  rt_assert(recv_cq != nullptr, "Failed to create RECV CQ");
+
+  // Modify the RECV CQ to ignore overrun
+  struct ibv_exp_cq_attr cq_attr;
+  memset(&cq_attr, 0, sizeof(cq_attr));
+  cq_attr.comp_mask = IBV_EXP_CQ_ATTR_CQ_CAP_FLAGS;
+  cq_attr.cq_cap_flags = IBV_EXP_CQ_IGNORE_OVERRUN;
+  rt_assert(ibv_exp_modify_cq(recv_cq, &cq_attr, IBV_EXP_CQ_CAP_FLAGS) == 0);
+
+  struct ibv_exp_wq_init_attr wq_init_attr;
+  memset(&wq_init_attr, 0, sizeof(wq_init_attr));
+
+  wq_init_attr.wq_type = IBV_EXP_WQT_RQ;
+  wq_init_attr.max_recv_wr = kRQDepth;
+  wq_init_attr.max_recv_sge = 1;
+  wq_init_attr.pd = pd;
+  wq_init_attr.cq = recv_cq;
+
+  wq_init_attr.comp_mask |= IBV_EXP_CREATE_WQ_MP_RQ;
+  wq_init_attr.mp_rq.use_shift = IBV_EXP_MP_RQ_NO_SHIFT;
+  wq_init_attr.mp_rq.single_wqe_log_num_of_strides = kLogNumStrides;
+  wq_init_attr.mp_rq.single_stride_log_num_of_bytes = kLogStrideBytes;
+  wq = ibv_exp_create_wq(resolve.ib_ctx, &wq_init_attr);
+  rt_assert(wq != nullptr, "Failed to create WQ");
+
+  // Change WQ to ready state
+  struct ibv_exp_wq_attr wq_attr;
+  memset(&wq_attr, 0, sizeof(wq_attr));
+  wq_attr.attr_mask = IBV_EXP_WQ_ATTR_STATE;
+  wq_attr.wq_state = IBV_EXP_WQS_RDY;
+  rt_assert(ibv_exp_modify_wq(wq, &wq_attr) == 0, "Failed to ready WQ");
+
+  // Get the RQ burst function
+  enum ibv_exp_query_intf_status intf_status = IBV_EXP_INTF_STAT_OK;
+  struct ibv_exp_query_intf_params query_intf_params;
+  memset(&query_intf_params, 0, sizeof(query_intf_params));
+  query_intf_params.intf_scope = IBV_EXP_INTF_GLOBAL;
+  query_intf_params.intf = IBV_EXP_INTF_WQ;
+  query_intf_params.obj = wq;
+  wq_family = reinterpret_cast<struct ibv_exp_wq_family *>(
+      ibv_exp_query_intf(resolve.ib_ctx, &query_intf_params, &intf_status));
+  rt_assert(wq_family != nullptr, "Failed to get WQ interface");
+
+  // Create indirect table
+  struct ibv_exp_rwq_ind_table_init_attr rwq_ind_table_init_attr;
+  memset(&rwq_ind_table_init_attr, 0, sizeof(rwq_ind_table_init_attr));
+  rwq_ind_table_init_attr.pd = pd;
+  rwq_ind_table_init_attr.log_ind_tbl_size = 0;  // Ignore hash
+  rwq_ind_table_init_attr.ind_tbl = &wq;         // Pointer to RECV work queue
+  rwq_ind_table_init_attr.comp_mask = 0;
+  ind_tbl =
+      ibv_exp_create_rwq_ind_table(resolve.ib_ctx, &rwq_ind_table_init_attr);
+  rt_assert(ind_tbl != nullptr, "Failed to create indirection table");
+
+  // Create rx_hash_conf and indirection table for the QP
+  uint8_t toeplitz_key[] = {0x6d, 0x5a, 0x56, 0xda, 0x25, 0x5b, 0x0e, 0xc2,
+                            0x41, 0x67, 0x25, 0x3d, 0x43, 0xa3, 0x8f, 0xb0,
+                            0xd0, 0xca, 0x2b, 0xcb, 0xae, 0x7b, 0x30, 0xb4,
+                            0x77, 0xcb, 0x2d, 0xa3, 0x80, 0x30, 0xf2, 0x0c,
+                            0x6a, 0x42, 0xb7, 0x3b, 0xbe, 0xac, 0x01, 0xfa};
+  const int TOEPLITZ_RX_HASH_KEY_LEN =
+      sizeof(toeplitz_key) / sizeof(toeplitz_key[0]);
+
+  struct ibv_exp_rx_hash_conf rx_hash_conf;
+  memset(&rx_hash_conf, 0, sizeof(rx_hash_conf));
+  rx_hash_conf.rx_hash_function = IBV_EXP_RX_HASH_FUNC_TOEPLITZ;
+  rx_hash_conf.rx_hash_key_len = TOEPLITZ_RX_HASH_KEY_LEN;
+  rx_hash_conf.rx_hash_key = toeplitz_key;
+  rx_hash_conf.rx_hash_fields_mask = IBV_EXP_RX_HASH_DST_PORT_UDP;
+  rx_hash_conf.rwq_ind_tbl = ind_tbl;
+
+  struct ibv_exp_qp_init_attr qp_init_attr;
+  memset(&qp_init_attr, 0, sizeof(qp_init_attr));
+  qp_init_attr.comp_mask = IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS |
+                           IBV_EXP_QP_INIT_ATTR_PD |
+                           IBV_EXP_QP_INIT_ATTR_RX_HASH;
+  qp_init_attr.rx_hash_conf = &rx_hash_conf;
+  qp_init_attr.pd = pd;
+  qp_init_attr.qp_type = IBV_QPT_RAW_PACKET;
+
+  // Create the QP
+  recv_qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
+  rt_assert(recv_qp != nullptr, "Failed to create RECV QP");
+}
+
 void RawTransport::init_verbs_structs() {
   assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
 
