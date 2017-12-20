@@ -156,8 +156,7 @@ class IBTransport : public Transport {
    */
   void init_recvs(uint8_t **rx_ring);
 
-  /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
-  void init_sends();
+  void init_sends(); ///< Initialize constant fields of SEND work requests
 
   static bool is_roce() { return kTransportType == TransportType::kRoCE; }
   static bool is_infiniband() {

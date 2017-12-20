@@ -152,8 +152,7 @@ class RawTransport : public Transport {
    */
   void init_recvs(uint8_t **rx_ring);
 
-  /// Initialize non-inline SEND buffers and constant fields of SEND descriptors
-  void init_sends();
+  void init_sends(); ///< Initialize constant fields of SEND work requests
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
