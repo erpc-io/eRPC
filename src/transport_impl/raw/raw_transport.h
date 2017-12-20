@@ -141,6 +141,12 @@ class RawTransport : public Transport {
    */
   void init_recv_qp();
 
+  /**
+   * @brief Initialize the UDP destination flow rule
+   * @throw runtime_error if installation fails
+   */
+  void install_flow_rule();
+
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
 
@@ -152,7 +158,7 @@ class RawTransport : public Transport {
    */
   void init_recvs(uint8_t **rx_ring);
 
-  void init_sends(); ///< Initialize constant fields of SEND work requests
+  void init_sends();  ///< Initialize constant fields of SEND work requests
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {

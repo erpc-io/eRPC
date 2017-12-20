@@ -31,6 +31,7 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
   this->numa_node = huge_alloc->get_numa_node();
 
   init_recvs(rx_ring);
+  install_flow_rule();
   init_sends();
 }
 
@@ -306,6 +307,49 @@ void RawTransport::init_recv_qp() {
   // Create the QP
   recv_qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
   rt_assert(recv_qp != nullptr, "Failed to create RECV QP");
+}
+
+void RawTransport::install_flow_rule() {
+  assert(recv_qp != nullptr);
+
+  static constexpr size_t rule_sz =
+      sizeof(ibv_exp_flow_attr) + sizeof(ibv_exp_flow_spec_eth) +
+      sizeof(ibv_exp_flow_spec_ipv4_ext) + sizeof(ibv_exp_flow_spec_tcp_udp);
+
+  uint8_t *flow_rule = new uint8_t[rule_sz];
+  memset(flow_rule, 0, rule_sz);
+  uint8_t *buf = flow_rule;
+
+  auto *flow_attr = reinterpret_cast<struct ibv_exp_flow_attr *>(flow_rule);
+  flow_attr->type = IBV_EXP_FLOW_ATTR_NORMAL;
+  flow_attr->size = rule_sz;
+  flow_attr->priority = 0;
+  flow_attr->num_of_specs = 3;
+  flow_attr->port = 1;
+  flow_attr->flags = 0;
+  flow_attr->reserved = 0;
+  buf += sizeof(struct ibv_exp_flow_attr);
+
+  // Ethernet - all wildcard
+  auto *eth_spec = reinterpret_cast<struct ibv_exp_flow_spec_eth *>(buf);
+  eth_spec->type = IBV_EXP_FLOW_SPEC_ETH;
+  eth_spec->size = sizeof(struct ibv_exp_flow_spec_eth);
+  buf += sizeof(struct ibv_exp_flow_spec_eth);
+
+  // IPv4 - all wildcard
+  auto *spec_ipv4 = reinterpret_cast<struct ibv_exp_flow_spec_ipv4_ext *>(buf);
+  spec_ipv4->type = IBV_EXP_FLOW_SPEC_IPV4_EXT;
+  spec_ipv4->size = sizeof(struct ibv_exp_flow_spec_ipv4_ext);
+  buf += sizeof(struct ibv_exp_flow_spec_ipv4_ext);
+
+  // UDP - match dst port
+  auto *udp_spec = reinterpret_cast<struct ibv_exp_flow_spec_tcp_udp *>(buf);
+  udp_spec->type = IBV_EXP_FLOW_SPEC_UDP;
+  udp_spec->size = sizeof(struct ibv_exp_flow_spec_tcp_udp);
+  udp_spec->val.dst_port = htons(kBaseRawUDPPort + rpc_id);
+  udp_spec->mask.dst_port = 0xffffu;
+
+  rt_assert(ibv_exp_create_flow(recv_qp, flow_attr) != nullptr);
 }
 
 void RawTransport::init_verbs_structs() {
