@@ -34,8 +34,8 @@ struct eth_hdr_t {
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[ETH: dst " << mac_to_string(dst_mac) << ", src "
-        << mac_to_string(src_mac) << ", eth_type " << std::to_string(eth_type)
-        << "]";
+        << mac_to_string(src_mac) << ", eth_type "
+        << std::to_string(ntohs(eth_type)) << "]";
     return ret.str();
   }
 } __attribute__((packed));
@@ -57,12 +57,12 @@ struct ipv4_hdr_t {
     std::ostringstream ret;
     ret << "[IPv4: ihl " << std::to_string(ihl) << ", version "
         << std::to_string(version) << ", tos " << std::to_string(tos)
-        << ", tot_len " << std::to_string(tot_len) << ", id "
-        << std::to_string(id) << ", frag_off " << std::to_string(frag_off)
-        << ", ttl " << std::to_string(ttl) << ", protocol "
-        << std::to_string(protocol) << ", check " << std::to_string(check)
-        << ", src IP " << ipv4_to_string(src_ip) << ", dst IP "
-        << ipv4_to_string(dst_ip) << "]";
+        << ", tot_len " << std::to_string(ntohs(tot_len)) << ", id "
+        << std::to_string(ntohs(id)) << ", frag_off "
+        << std::to_string(ntohs(frag_off)) << ", ttl " << std::to_string(ttl)
+        << ", protocol " << std::to_string(protocol) << ", check "
+        << std::to_string(check) << ", src IP " << ipv4_to_string(src_ip)
+        << ", dst IP " << ipv4_to_string(dst_ip) << "]";
     return ret.str();
   }
 } __attribute__((packed));
@@ -71,20 +71,20 @@ struct udp_hdr_t {
   uint16_t src_port;
   uint16_t dst_port;
   uint16_t len;
-  uint16_t sum;
+  // uint16_t sum; - Ignore to make L2 + L3 + L4 header size = 40 bytes % 8 == 0
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[UDP: src_port " << std::to_string(src_port) << ", dst_port "
-        << std::to_string(dst_port) << ", len " << std::to_string(len)
-        << ", sum " << std::to_string(sum) << "]";
+    ret << "[UDP: src_port " << std::to_string(ntohs(src_port)) << ", dst_port "
+        << std::to_string(ntohs(dst_port)) << ", len "
+        << std::to_string(ntohs(len)) << "]";
     return ret.str();
   }
 } __attribute__((packed));
 
 static constexpr size_t kTotHdrSz =
     sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
-static_assert(kTotHdrSz == 42, "");
+static_assert(kTotHdrSz == 40, "");
 
 static std::string frame_header_to_string(uint8_t* buf) {
   auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(buf);
@@ -138,7 +138,6 @@ static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
   udp_hdr->src_port = htons(src_port);
   udp_hdr->dst_port = htons(dst_port);
   udp_hdr->len = htons(sizeof(udp_hdr_t) + data_size);
-  udp_hdr->sum = 0;
 }
 
 static std::string mac_to_string(const uint8_t* mac) {
