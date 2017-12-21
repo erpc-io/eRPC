@@ -39,23 +39,23 @@ IBTransport::~IBTransport() {
   LOG_INFO("eRPC IBTransport: Destroying transport for ID %u\n", rpc_id);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
-  rt_exit(ibv_destroy_qp(qp) == 0,
+  exit_assert(ibv_destroy_qp(qp) == 0,
           "eRPC IBTransport: Failed to destroy SEND QP.");
 
-  rt_exit(ibv_destroy_cq(send_cq),
+  exit_assert(ibv_destroy_cq(send_cq) == 0,
           "eRPC IBTransport: Failed to destroy send CQ.");
 
-  rt_exit(ibv_destroy_cq(recv_cq),
+  exit_assert(ibv_destroy_cq(recv_cq) == 0,
           "eRPC IBTransport: Failed to destroy RECV CQ.");
 
-  rt_exit(ibv_destroy_ah(self_ah) == 0,
+  exit_assert(ibv_destroy_ah(self_ah) == 0,
           "eRPC IBTransport: Failed to destroy self address handle.");
 
   // Destroy protection domain and device context
-  rt_exit(ibv_dealloc_pd(pd) == 0,
+  exit_assert(ibv_dealloc_pd(pd) == 0,
           "eRPC IBTransport: Failed to destroy protection domain.");
 
-  rt_exit(ibv_close_device(resolve.ib_ctx) == 0,
+  exit_assert(ibv_close_device(resolve.ib_ctx) == 0,
           "eRPC IBTransport: Failed to close device.");
 }
 

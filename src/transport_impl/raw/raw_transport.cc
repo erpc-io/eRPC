@@ -43,35 +43,35 @@ RawTransport::~RawTransport() {
   LOG_INFO("eRPC RawTransport: Destroying transport for ID %u\n", rpc_id);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs and WQs.
-  rt_exit(ibv_destroy_qp(send_qp) == 0,
+  exit_assert(ibv_destroy_qp(send_qp) == 0,
           "eRPC RawTransport: Failed to destroy SEND QP.");
 
-  rt_exit(ibv_destroy_cq(send_cq),
+  exit_assert(ibv_destroy_cq(send_cq) == 0,
           "eRPC RawTransport: Failed to destroy send CQ.");
 
-  rt_exit(ibv_destroy_qp(recv_qp) == 0,
+  exit_assert(ibv_destroy_qp(recv_qp) == 0,
           "eRPC RawTransport: Failed to destroy SEND QP.");
 
-  rt_exit(ibv_destroy_cq(recv_cq),
+  exit_assert(ibv_destroy_cq(recv_cq) == 0,
           "eRPC RawTransport: Failed to destroy RECV CQ.");
 
-  rt_exit(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
+  exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
           "eRPC RawTransport: Failed to destroy indirection table.");
 
   struct ibv_exp_release_intf_params rel_intf_params;
   memset(&rel_intf_params, 0, sizeof(rel_intf_params));
-  rt_exit(
+  exit_assert(
       ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
       "eRPC RawTransport: Failed to release interface.");
 
-  rt_exit(ibv_exp_destroy_wq(wq) == 0,
+  exit_assert(ibv_exp_destroy_wq(wq) == 0,
           "eRPC RawTransport: Failed to destroy WQ.");
 
   // Destroy protection domain and device context
-  rt_exit(ibv_dealloc_pd(pd) == 0,
+  exit_assert(ibv_dealloc_pd(pd) == 0,
           "eRPC RawTransport: Failed to destroy protection domain.");
 
-  rt_exit(ibv_close_device(resolve.ib_ctx) == 0,
+  exit_assert(ibv_close_device(resolve.ib_ctx) == 0,
           "eRPC RawTransport: Failed to close device.");
 }
 
