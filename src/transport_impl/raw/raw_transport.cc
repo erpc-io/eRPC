@@ -42,37 +42,41 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 RawTransport::~RawTransport() {
   LOG_INFO("eRPC RawTransport: Destroying transport for ID %u\n", rpc_id);
 
-  // Destroy QPs and CQs. QPs must be destroyed before CQs and WQs.
+  // SEND
   exit_assert(ibv_destroy_qp(send_qp) == 0,
-          "eRPC RawTransport: Failed to destroy SEND QP.");
+              "eRPC RawTransport: Failed to destroy SEND QP.");
 
   exit_assert(ibv_destroy_cq(send_cq) == 0,
-          "eRPC RawTransport: Failed to destroy send CQ.");
+              "eRPC RawTransport: Failed to destroy send CQ.");
 
-  exit_assert(ibv_destroy_qp(recv_qp) == 0,
-          "eRPC RawTransport: Failed to destroy SEND QP.");
-
-  exit_assert(ibv_destroy_cq(recv_cq) == 0,
-          "eRPC RawTransport: Failed to destroy RECV CQ.");
-
-  exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
-          "eRPC RawTransport: Failed to destroy indirection table.");
-
+  // RECV
   struct ibv_exp_release_intf_params rel_intf_params;
   memset(&rel_intf_params, 0, sizeof(rel_intf_params));
   exit_assert(
       ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
       "eRPC RawTransport: Failed to release interface.");
 
+  exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
+              "eRPC RawTransport: Failed to destroy RECV flow");
+
+  exit_assert(ibv_destroy_qp(recv_qp) == 0,
+              "eRPC RawTransport: Failed to destroy RECV QP.");
+
+  exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
+              "eRPC RawTransport: Failed to destroy indirection table.");
+
   exit_assert(ibv_exp_destroy_wq(wq) == 0,
-          "eRPC RawTransport: Failed to destroy WQ.");
+              "eRPC RawTransport: Failed to destroy WQ.");
+
+  exit_assert(ibv_destroy_cq(recv_cq) == 0,
+              "eRPC RawTransport: Failed to destroy RECV CQ.");
 
   // Destroy protection domain and device context
   exit_assert(ibv_dealloc_pd(pd) == 0,
-          "eRPC RawTransport: Failed to destroy protection domain.");
+              "eRPC RawTransport: Failed to destroy protection domain.");
 
   exit_assert(ibv_close_device(resolve.ib_ctx) == 0,
-          "eRPC RawTransport: Failed to close device.");
+              "eRPC RawTransport: Failed to close device.");
 }
 
 void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
@@ -350,7 +354,8 @@ void RawTransport::install_flow_rule() {
   udp_spec->val.dst_port = htons(kBaseRawUDPPort + rpc_id);
   udp_spec->mask.dst_port = 0xffffu;
 
-  rt_assert(ibv_exp_create_flow(recv_qp, flow_attr) != nullptr);
+  recv_flow = ibv_exp_create_flow(recv_qp, flow_attr);
+  rt_assert(recv_flow != nullptr, "Failed to create RECV flow");
 }
 
 void RawTransport::map_mlx5_overrunning_recv_cqes() {

@@ -77,7 +77,7 @@ static inline void rt_assert(bool condition, std::string throw_str) {
 /// and exit.
 static inline void exit_assert(bool condition, std::string error_msg) {
   if (unlikely(!condition)) {
-    fprintf(stderr, "%s\n", error_msg.c_str());
+    fprintf(stderr, "%s. Exiting.\n", error_msg.c_str());
     fflush(stderr);
     exit(-1);
   }

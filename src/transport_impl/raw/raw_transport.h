@@ -202,11 +202,12 @@ class RawTransport : public Transport {
   struct ibv_qp *send_qp = nullptr;
   struct ibv_cq *send_cq = nullptr;
 
-  struct ibv_qp *recv_qp;
+  struct ibv_exp_flow *recv_flow;
   struct ibv_cq *recv_cq;
   struct ibv_exp_wq *wq;
   struct ibv_exp_wq_family *wq_family;
   struct ibv_exp_rwq_ind_table *ind_tbl;
+  struct ibv_qp *recv_qp;
 
   Buffer ring_extent;  ///< The ring's backing hugepage memory
 
