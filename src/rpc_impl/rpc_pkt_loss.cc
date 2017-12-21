@@ -80,8 +80,10 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
       // Reclaim credits, reset progress, and add to request TX queue if needed
       LOG_DEBUG("%s: Retransmitting request.\n", issue_msg);
-      credits += delta;  // Reclaim credits
+      credits += delta;
       ci.req_sent = ci.expl_cr_rcvd;
+
+      sslot->client_info.enqueue_req_ts = rdtsc();
 
       // Credits will be consumed when req_txq is processed
       if (std::find(req_txq.begin(), req_txq.end(), sslot) == req_txq.end()) {
@@ -106,8 +108,10 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
       // Reclaim credits, reset progress, and retransmit RFR
       LOG_DEBUG("%s: Retransmitting RFR.\n", issue_msg);
-      credits += delta;  // Reclaim credits
+      credits += delta;
       ci.rfr_sent = ci.resp_rcvd - 1;
+
+      sslot->client_info.enqueue_req_ts = rdtsc();
 
       assert(credits > 0);
       credits--;  // Use one credit for this RFR
