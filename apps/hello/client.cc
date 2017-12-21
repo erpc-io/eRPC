@@ -1,5 +1,5 @@
 #include "common.h"
-Rpc<CTransport> *rpc;
+Rpc<HelloTransport> *rpc;
 
 void cont_func(erpc::RespHandle *resp_handle, void *, size_t) {
   auto *resp_msgbuf = resp_handle->get_resp_msgbuf();
@@ -13,7 +13,7 @@ void sm_handler(int, SmEventType, SmErrType, void *) {}
 
 int main() {
   Nexus nexus("10.100.3.16", UDP_PORT);
-  rpc = new Rpc<CTransport>(&nexus, nullptr, CLIENT_ID, sm_handler);
+  rpc = new Rpc<HelloTransport>(&nexus, nullptr, CLIENT_ID, sm_handler);
 
   int session_num = rpc->create_session("10.100.3.13", SERVER_ID);
   while (!rpc->is_connected(session_num)) rpc->run_event_loop_once();
