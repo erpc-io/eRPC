@@ -3,7 +3,7 @@ Rpc<HelloTransport> *rpc;
 
 void req_handler(erpc::ReqHandle *req_handle, void *) {
   auto &resp = req_handle->pre_resp_msgbuf;
-  rpc->resize_msg_buffer(&resp, 4);
+  rpc->resize_msg_buffer(&resp, kMsgSize);
   sprintf(reinterpret_cast<char *>(resp.buf), "nsdi");
 
   req_handle->prealloc_used = true;
