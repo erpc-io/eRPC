@@ -88,7 +88,8 @@ struct pkthdr_t {
         << "dest session " << std::to_string(dest_session_num) << ", "
         << "req " << std::to_string(req_num) << ", "
         << "pkt " << std::to_string(pkt_num) << ", "
-        << "msg size " << std::to_string(msg_size) << "]";
+        << "msg size " << std::to_string(msg_size) << ", "
+        << "magic " << std::to_string(magic) << "]";
 
     return ret.str();
   }
@@ -100,7 +101,8 @@ struct pkthdr_t {
         << "dest session " << std::to_string(dest_session_num) << ", "
         << "req " << std::to_string(req_num) << ", "
         << "pkt " << std::to_string(_pkt_num) << ", "
-        << "msg size " << std::to_string(msg_size) << "]";
+        << "msg size " << std::to_string(msg_size) << ","
+        << "magic " << std::to_string(magic) << "]";
 
     return ret.str();
   }
