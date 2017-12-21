@@ -12,10 +12,10 @@ void cont_func(erpc::RespHandle *resp_handle, void *, size_t) {
 void sm_handler(int, SmEventType, SmErrType, void *) {}
 
 int main() {
-  Nexus nexus("128.110.96.133", UDP_PORT);
+  Nexus nexus("10.100.3.16", UDP_PORT);
   rpc = new Rpc<CTransport>(&nexus, nullptr, CLIENT_ID, sm_handler);
 
-  int session_num = rpc->create_session("128.110.96.136", SERVER_ID);
+  int session_num = rpc->create_session("10.100.3.13", SERVER_ID);
   while (!rpc->is_connected(session_num)) rpc->run_event_loop_once();
 
   auto req = rpc->alloc_msg_buffer(4);
