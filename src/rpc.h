@@ -49,13 +49,13 @@ class Rpc {
   static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
 
   /// Duration of an RPC packet loss detection epoch in milliseconds
-  static constexpr size_t kRpcPktLossEpochMs = kTesting ? 1 : 10;
+  static constexpr size_t kRpcPktLossEpochMs = kTesting ? 10 : 10;
 
   /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kRpcPktLossTimeoutMs = kTesting ? 1 : 500;
+  static constexpr size_t kRpcPktLossTimeoutMs = kTesting ? 500 : 500;
 
   /// Timeout for a session management request in milliseconds
-  static constexpr size_t kSMTimeoutMs = kTesting ? 1 : 100;
+  static constexpr size_t kSMTimeoutMs = kTesting ? 100 : 100;
 
   /// Reset threshold of the event loop ticker. Assuming each iteration of the
   /// event loop lasts 10 microseconds (it is much smaller in reality), the

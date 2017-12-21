@@ -40,7 +40,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
         printf(
             "eRPC RawTransport: Sending message in one Ethernet frame. "
             "Size = %u bytes, addr = %p, contents = \n",
-            sgl[0].length, reinterpret_cast<void *>(pkthdr));
+            sgl[0].length, reinterpret_cast<void*>(pkthdr));
         for (size_t i = 0; i < sgl[0].length; i++) {
           printf("%02x ", (reinterpret_cast<uint8_t*>(pkthdr))[i]);
         }
