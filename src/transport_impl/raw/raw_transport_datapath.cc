@@ -33,7 +33,19 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t) + item.data_bytes);
-      sgl[0].lkey = msg_buffer->buffer.lkey;
+      assert(sgl[0].lkey == 0);
+
+      if (LOG_LEVEL == LOG_LEVEL_TRACE) {
+        // Print out the Ethernet frame
+        printf(
+            "eRPC RawTransport: Sending message in one Ethernet frame. "
+            "Size = %u bytes, contents = \n",
+            sgl[0].length);
+        for (size_t i = 0; i < sgl[0].length; i++) {
+          printf("%u ", (reinterpret_cast<uint8_t*>(pkthdr))[i]);
+        }
+        printf("\n");
+      }
 
       // Only single-SGE work requests are inlined
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
@@ -44,12 +56,11 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       pkthdr = msg_buffer->get_pkthdr_n(item.offset / kMaxDataPerPkt);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
-      sgl[0].lkey = msg_buffer->buffer.lkey;
+      assert(sgl[0].lkey == 0);
 
-      send_sgl[i][1].addr =
-          reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
-      send_sgl[i][1].length = static_cast<uint32_t>(item.data_bytes);
-      send_sgl[i][1].lkey = msg_buffer->buffer.lkey;
+      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
+      sgl[1].length = static_cast<uint32_t>(item.data_bytes);
+      assert(sgl[1].lkey == 0);
 
       wr.num_sge = 2;
     }
@@ -66,7 +77,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     gen_ipv4_header(ipv4_hdr, resolve.ipv4_addr, raw_rinfo->ipv4_addr, ipv4_sz);
 
     const size_t udp_sz = ipv4_sz - sizeof(ipv4_hdr_t);
-    auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[0]);
+    auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
     gen_udp_header(udp_hdr, kBaseRawUDPPort + rpc_id, raw_rinfo->udp_port,
                    udp_sz);
   }
