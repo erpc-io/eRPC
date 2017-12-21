@@ -35,18 +35,6 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t) + item.data_bytes);
       assert(sgl[0].lkey == 0);
 
-      if (LOG_LEVEL == LOG_LEVEL_TRACE) {
-        // Print out the Ethernet frame
-        printf(
-            "eRPC RawTransport: Sending message in one Ethernet frame. "
-            "Size = %u bytes, addr = %p, contents = \n",
-            sgl[0].length, reinterpret_cast<void*>(pkthdr));
-        for (size_t i = 0; i < sgl[0].length; i++) {
-          printf("%02x ", (reinterpret_cast<uint8_t*>(pkthdr))[i]);
-        }
-        printf("\n");
-      }
-
       // Only single-SGE work requests are inlined
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
       wr.num_sge = 1;
@@ -80,6 +68,22 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
     gen_udp_header(udp_hdr, kBaseRawUDPPort + rpc_id, raw_rinfo->udp_port,
                    udp_sz);
+
+    if (LOG_LEVEL == LOG_LEVEL_TRACE && wr.num_sge == 1) {
+      // Print out the Ethernet frame
+      printf(
+          "eRPC RawTransport: Sending message in one Ethernet frame. "
+          "SGE length = %u bytes, addr = %p, pkthdr = %s, frame header = %s\n",
+          sgl[0].length, reinterpret_cast<void*>(pkthdr),
+          pkthdr->to_string().c_str(),
+          frame_header_to_string(&pkthdr->headroom[0]).c_str());
+
+      for (size_t i = 0; i < sgl[0].length; i++) {
+        printf("%02x ", (reinterpret_cast<uint8_t*>(pkthdr))[i]);
+        if (i == 39) printf("| ");
+      }
+      printf("\n");
+    }
   }
 
   send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains

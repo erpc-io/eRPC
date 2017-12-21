@@ -23,10 +23,21 @@ namespace erpc {
 static constexpr uint16_t kIPEtherType = 0x800;
 static constexpr uint16_t kIPHdrProtocol = 0x11;
 
+static std::string mac_to_string(const uint8_t*);  // Foward declaration
+static std::string ipv4_to_string(uint32_t);       // Forward declaration
+
 struct eth_hdr_t {
   uint8_t dst_mac[6];
   uint8_t src_mac[6];
   uint16_t eth_type;
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[ETH: dst " << mac_to_string(dst_mac) << ", src "
+        << mac_to_string(src_mac) << ", eth_type " << std::to_string(eth_type)
+        << "]";
+    return ret.str();
+  }
 } __attribute__((packed));
 
 struct ipv4_hdr_t {
@@ -41,6 +52,19 @@ struct ipv4_hdr_t {
   uint16_t check;
   uint32_t src_ip;
   uint32_t dst_ip;
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[IPv4: ihl " << std::to_string(ihl) << ", version "
+        << std::to_string(version) << ", tos " << std::to_string(tos)
+        << ", tot_len " << std::to_string(tot_len) << ", id "
+        << std::to_string(id) << ", frag_off " << std::to_string(frag_off)
+        << ", ttl " << std::to_string(ttl) << ", protocol "
+        << std::to_string(protocol) << ", check " << std::to_string(check)
+        << ", src IP " << ipv4_to_string(src_ip) << ", dst IP "
+        << ipv4_to_string(dst_ip) << "]";
+    return ret.str();
+  }
 } __attribute__((packed));
 
 struct udp_hdr_t {
@@ -48,11 +72,28 @@ struct udp_hdr_t {
   uint16_t dst_port;
   uint16_t len;
   uint16_t sum;
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[UDP: src_port " << std::to_string(src_port) << ", dst_port "
+        << std::to_string(dst_port) << ", len " << std::to_string(len)
+        << ", sum " << std::to_string(sum) << "]";
+    return ret.str();
+  }
 } __attribute__((packed));
 
 static constexpr size_t kTotHdrSz =
     sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
 static_assert(kTotHdrSz == 42, "");
+
+static std::string frame_header_to_string(uint8_t* buf) {
+  auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(buf);
+  auto* ipv4_hdr = reinterpret_cast<ipv4_hdr_t*>(&eth_hdr[1]);
+  auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
+
+  return eth_hdr->to_string() + ", " + ipv4_hdr->to_string() + ", " +
+         udp_hdr->to_string();
+}
 
 /// Checksum the IP header in-place
 static uint16_t ip_checksum(ipv4_hdr_t* ipv4_hdr) {
