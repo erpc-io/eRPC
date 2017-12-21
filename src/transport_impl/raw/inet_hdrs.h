@@ -118,6 +118,8 @@ static void gen_eth_header(eth_hdr_t* eth_header, const uint8_t* src_mac,
   eth_header->eth_type = htons(kIPEtherType);
 }
 
+/// Format the IPv4 header for a UDP packet. Note that \p data_size is the
+/// payload size in the UDP packet.
 static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
                             uint32_t dst_ip, uint16_t data_size) {
   ipv4_hdr->version = 4;
@@ -133,6 +135,8 @@ static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
   ipv4_hdr->check = ip_checksum(ipv4_hdr);
 }
 
+/// Format the UDP header for a UDP packet. Note that \p data_size is the
+/// payload size in the UDP packet.
 static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
                            uint16_t dst_port, uint16_t data_size) {
   udp_hdr->src_port = htons(src_port);

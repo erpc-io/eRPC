@@ -316,6 +316,9 @@ void RawTransport::init_recv_qp() {
 
 void RawTransport::install_flow_rule() {
   assert(recv_qp != nullptr);
+  LOG_INFO(
+      "eRPC RawTransport: Installing flow rule for Rpc %u, UDP port = %u.\n",
+      rpc_id, kBaseRawUDPPort + rpc_id);
 
   static constexpr size_t rule_sz =
       sizeof(ibv_exp_flow_attr) + sizeof(ibv_exp_flow_spec_eth) +
