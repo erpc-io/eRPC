@@ -13,6 +13,7 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 // allocator is provided.
 RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
     : Transport(TransportType::kRaw, rpc_id, phy_port) {
+  rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   resolve_phy_port();
   init_verbs_structs();
   init_mem_reg_funcs();

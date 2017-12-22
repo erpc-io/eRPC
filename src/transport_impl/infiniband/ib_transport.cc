@@ -13,6 +13,7 @@ constexpr size_t IBTransport::kMaxDataPerPkt;
 // allocator is provided.
 IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port)
     : Transport(TransportType::kInfiniBand, rpc_id, phy_port) {
+  rt_assert(kHeadroom == 0, "Invalid packet header headroom for InfiniBand");
   resolve_phy_port();
   init_verbs_structs();
   init_mem_reg_funcs();
@@ -40,23 +41,23 @@ IBTransport::~IBTransport() {
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
   exit_assert(ibv_destroy_qp(qp) == 0,
-          "eRPC IBTransport: Failed to destroy SEND QP.");
+              "eRPC IBTransport: Failed to destroy SEND QP.");
 
   exit_assert(ibv_destroy_cq(send_cq) == 0,
-          "eRPC IBTransport: Failed to destroy send CQ.");
+              "eRPC IBTransport: Failed to destroy send CQ.");
 
   exit_assert(ibv_destroy_cq(recv_cq) == 0,
-          "eRPC IBTransport: Failed to destroy RECV CQ.");
+              "eRPC IBTransport: Failed to destroy RECV CQ.");
 
   exit_assert(ibv_destroy_ah(self_ah) == 0,
-          "eRPC IBTransport: Failed to destroy self address handle.");
+              "eRPC IBTransport: Failed to destroy self address handle.");
 
   // Destroy protection domain and device context
   exit_assert(ibv_dealloc_pd(pd) == 0,
-          "eRPC IBTransport: Failed to destroy protection domain.");
+              "eRPC IBTransport: Failed to destroy protection domain.");
 
   exit_assert(ibv_close_device(resolve.ib_ctx) == 0,
-          "eRPC IBTransport: Failed to close device.");
+              "eRPC IBTransport: Failed to close device.");
 }
 
 struct ibv_ah *IBTransport::create_ah(const ib_routing_info_t *ib_rinfo) const {
