@@ -143,7 +143,7 @@ TEST(OneSmallRpc, Foreground) {
   config_num_sessions = 1;
   config_num_bg_threads = 0;
   config_rpcs_per_session = 1;
-  config_msg_size = 32;
+  config_msg_size = Rpc<CTransport>::get_max_data_per_pkt();
   launch_helper();
 }
 
