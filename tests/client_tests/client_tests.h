@@ -60,6 +60,8 @@ enum class ConnectServers : bool { kTrue, kFalse };
 size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
                          size_t max_msg_size) {
   assert(max_msg_size > max_data_per_pkt * 10);
+  // Hack to return some constant data:
+  // if (fast_rand != nullptr) return 141;
 
   size_t X = 50;
   if (fast_rand->next_u32() % 100 < X) {

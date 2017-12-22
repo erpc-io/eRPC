@@ -44,7 +44,7 @@ class RawTransport : public Transport {
 
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
-  static constexpr size_t kMaxInline = 512;  ///< Maximum send wr inline data
+  static constexpr size_t kMaxInline = 128;  ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
   static_assert(is_power_of_two(kRecvCQDepth), "");
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
