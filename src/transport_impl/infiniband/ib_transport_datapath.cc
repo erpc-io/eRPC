@@ -46,10 +46,9 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      send_sgl[i][1].addr =
-          reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
-      send_sgl[i][1].length = static_cast<uint32_t>(item.data_bytes);
-      send_sgl[i][1].lkey = msg_buffer->buffer.lkey;
+      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
+      sgl[1].length = static_cast<uint32_t>(item.data_bytes);
+      sgl[1].lkey = msg_buffer->buffer.lkey;
 
       wr.num_sge = 2;
     }
