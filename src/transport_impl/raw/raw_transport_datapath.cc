@@ -106,6 +106,7 @@ void RawTransport::post_recvs(size_t num_recvs) {
   if (recvs_to_post < kStridesPerWQE) return;
 
   int ret = wq_family->recv_burst(wq, &mp_recv_sge[mp_sge_idx], 1);
+  _unused(ret);
   assert(ret == 0);
   mp_sge_idx = (mp_sge_idx + 1) % kRQDepth;
 }
