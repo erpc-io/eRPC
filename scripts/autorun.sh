@@ -24,7 +24,7 @@ function get_from_config() {
 check_env "autorun_app"
 
 # Variables set by the human user
-autorun_erpc_home="/users/akalia/eRPC"
+autorun_erpc_home="$HOME/eRPC"
 
 # Variables exported by this script
 autorun_out_file="/tmp/${autorun_app}_out"
