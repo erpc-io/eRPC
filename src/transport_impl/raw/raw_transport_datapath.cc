@@ -33,7 +33,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t) + item.data_bytes);
-      assert(sgl[0].lkey == 0);
+      sgl[0].lkey = msg_buffer->buffer.lkey;
 
       // Only single-SGE work requests are inlined
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
@@ -44,11 +44,11 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       pkthdr = msg_buffer->get_pkthdr_n(item.offset / kMaxDataPerPkt);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
-      assert(sgl[0].lkey == 0);
+      sgl[0].lkey = msg_buffer->buffer.lkey;
 
       sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
       sgl[1].length = static_cast<uint32_t>(item.data_bytes);
-      assert(sgl[1].lkey == 0);
+      sgl[0].lkey = msg_buffer->buffer.lkey;
 
       wr.num_sge = 2;
     }

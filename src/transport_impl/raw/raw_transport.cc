@@ -447,8 +447,6 @@ void RawTransport::init_sends() {
     send_wr[i].next = &send_wr[i + 1];
     send_wr[i].opcode = IBV_WR_SEND;
     send_wr[i].sg_list = &send_sgl[i][0];
-    send_sgl[i][0].lkey = 0;
-    send_sgl[i][1].lkey = 0;
   }
 }
 
