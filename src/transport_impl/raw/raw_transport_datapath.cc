@@ -68,19 +68,13 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
                    kERpcHdrBytes + item.data_bytes);
 
     if (LOG_LEVEL == LOG_LEVEL_TRACE && wr.num_sge == 1) {
-      // Print out the Ethernet frame
+      // Print out the L2--L4 headers
       printf(
           "eRPC RawTransport: Sending message in one Ethernet frame. "
           "SGE length = %u bytes, addr = %p, pkthdr = %s, frame header = %s\n",
           sgl[0].length, reinterpret_cast<void*>(pkthdr),
           pkthdr->to_string().c_str(),
           frame_header_to_string(&pkthdr->headroom[0]).c_str());
-
-      for (size_t i = 0; i < sgl[0].length; i++) {
-        printf("%02x ", (reinterpret_cast<uint8_t*>(pkthdr))[i]);
-        if (i == 39) printf("| ");
-      }
-      printf("\n");
     }
   }
 
