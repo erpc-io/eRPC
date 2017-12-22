@@ -228,8 +228,8 @@ void RawTransport::init_recv_qp() {
   // Init CQ. Its size MUST be one so that we get two CQEs in mlx5.
   struct ibv_exp_cq_init_attr cq_init_attr;
   memset(&cq_init_attr, 0, sizeof(cq_init_attr));
-  recv_cq = ibv_exp_create_cq(resolve.ib_ctx, kRecvCQDepth, nullptr, nullptr, 0,
-                              &cq_init_attr);
+  recv_cq = ibv_exp_create_cq(resolve.ib_ctx, kRecvCQDepth / 2, nullptr,
+                              nullptr, 0, &cq_init_attr);
   rt_assert(recv_cq != nullptr, "Failed to create RECV CQ");
 
   // Modify the RECV CQ to ignore overrun
@@ -365,6 +365,10 @@ void RawTransport::install_flow_rule() {
 void RawTransport::map_mlx5_overrunning_recv_cqes() {
   // This cast works for mlx5 where ibv_cq is the first member of mlx5_cq.
   auto *_mlx5_cq = reinterpret_cast<mlx5_cq *>(recv_cq);
+  rt_assert(kRecvCQDepth == std::pow(2, _mlx5_cq->cq_log_size),
+            "eRPC RawTransport: mlx5 CQ depth does not match kRecvCQDepth");
+  rt_assert(_mlx5_cq->buf_a.buf != nullptr);
+
   recv_cqe_arr = reinterpret_cast<volatile mlx5_cqe64 *>(_mlx5_cq->buf_a.buf);
 
   // Initialize the CQEs as if we received the last (kRecvCQDepth) packets in
