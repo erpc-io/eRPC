@@ -96,6 +96,11 @@ size_t RawTransport::rx_burst() {
   const size_t delta = get_cqe_cycle_delta(prev_snapshot, cur_snapshot);
   if (delta == 0 || delta >= kNumRxRingEntries) return 0;
 
+  for (size_t i = 0; i < delta; i++) {
+    __builtin_prefetch(&ring_extent.buf[prefetch_ring_head * kRecvSize], 0, 0);
+    prefetch_ring_head = (prefetch_ring_head + 1) % kNumRxRingEntries;
+  }
+
   cqe_idx = (cqe_idx + 1) % kRecvCQDepth;
   prev_snapshot = cur_snapshot;
   return delta;

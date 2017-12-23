@@ -45,7 +45,6 @@ class RawTransport : public Transport {
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 128;  ///< Maximum send wr inline data
-  static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
   static_assert(is_power_of_two(kRecvCQDepth), "");
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
   static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
@@ -225,6 +224,7 @@ class RawTransport : public Transport {
   size_t recvs_to_post = 0;              ///< Current number of RECVs to post
   struct ibv_sge mp_recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
   size_t mp_sge_idx = 0;  ///< Index of the multi-packet SGE to post
+  size_t prefetch_ring_head = 0;
 
   // Overrunning RECV CQE
   cqe_snapshot_t prev_snapshot;

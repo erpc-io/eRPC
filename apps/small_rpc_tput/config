@@ -3,5 +3,5 @@
 --msg_size 32
 --num_bg_threads 0
 --num_machines 4
---num_threads 3
+--num_threads 2
 --concurrency 8
