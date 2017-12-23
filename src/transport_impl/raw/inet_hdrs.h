@@ -95,22 +95,6 @@ static std::string frame_header_to_string(uint8_t* buf) {
          udp_hdr->to_string();
 }
 
-/// Checksum the IP header in-place
-static uint16_t ip_checksum(ipv4_hdr_t* ipv4_hdr) {
-  unsigned long sum = 0;
-  const uint16_t* ip1 = reinterpret_cast<uint16_t*>(ipv4_hdr);
-
-  size_t hdr_len = sizeof(ipv4_hdr_t);
-  while (hdr_len > 1) {
-    sum += *ip1++;
-    if (sum & 0x80000000) sum = (sum & 0xFFFF) + (sum >> 16);
-    hdr_len -= 2;
-  }
-
-  while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
-  return (~sum);
-}
-
 static void gen_eth_header(eth_hdr_t* eth_header, const uint8_t* src_mac,
                            const uint8_t* dst_mac) {
   memcpy(eth_header->src_mac, src_mac, 6);
@@ -132,7 +116,7 @@ static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
   ipv4_hdr->protocol = kIPHdrProtocol;
   ipv4_hdr->src_ip = src_ip;
   ipv4_hdr->dst_ip = dst_ip;
-  ipv4_hdr->check = ip_checksum(ipv4_hdr);
+  ipv4_hdr->check = 0;
 }
 
 /// Format the UDP header for a UDP packet. Note that \p data_size is the
