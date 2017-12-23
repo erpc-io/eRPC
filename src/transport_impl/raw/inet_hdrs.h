@@ -71,20 +71,21 @@ struct udp_hdr_t {
   uint16_t src_port;
   uint16_t dst_port;
   uint16_t len;
-  // uint16_t sum; - Ignore to make L2 + L3 + L4 header size = 40 bytes % 8 == 0
+  uint16_t check;
 
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[UDP: src_port " << std::to_string(ntohs(src_port)) << ", dst_port "
         << std::to_string(ntohs(dst_port)) << ", len "
-        << std::to_string(ntohs(len)) << "]";
+        << std::to_string(ntohs(len)) << ", check " << std::to_string(check)
+        << "]";
     return ret.str();
   }
 } __attribute__((packed));
 
-static constexpr size_t kTotHdrSz =
+static constexpr size_t kInetHdrsTotSize =
     sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
-static_assert(kTotHdrSz == 40, "");
+static_assert(kInetHdrsTotSize == 42, "");
 
 static std::string frame_header_to_string(uint8_t* buf) {
   auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(buf);
@@ -126,6 +127,7 @@ static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
   udp_hdr->src_port = htons(src_port);
   udp_hdr->dst_port = htons(dst_port);
   udp_hdr->len = htons(sizeof(udp_hdr_t) + data_size);
+  udp_hdr->check = 0;
 }
 
 static std::string mac_to_string(const uint8_t* mac) {

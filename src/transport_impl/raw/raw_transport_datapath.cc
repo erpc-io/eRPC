@@ -26,13 +26,14 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     // Set signaling flag. The work request is non-inline by default.
     wr.send_flags = get_signaled_flag();
 
+    const size_t pkt_size = sizeof(pkthdr_t) + item.data_bytes;
     pkthdr_t* pkthdr;
     if (item.offset == 0) {
       // This is the first packet, so we need only 1 SGE. This can be a credit
       // return packet or an RFR.
       pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
-      sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t) + item.data_bytes);
+      sgl[0].length = static_cast<uint32_t>(pkt_size);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
       // Only single-SGE work requests are inlined
@@ -53,19 +54,22 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       wr.num_sge = 2;
     }
 
-    const auto* raw_rinfo =
-        reinterpret_cast<raw_routing_info_t*>(item.routing_info);
+    // We can do an 8-byte aligned memcpy because the two UDP checksum bytes
+    // are already zero.
+    static constexpr size_t hdr_copy_sz = kInetHdrsTotSize - 2;
+    static_assert(hdr_copy_sz == 40, "");
 
-    auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(&pkthdr->headroom[0]);
-    gen_eth_header(eth_hdr, &resolve.mac_addr[0], &raw_rinfo->mac[0]);
+    memcpy(&pkthdr->headroom[0], reinterpret_cast<uint8_t*>(item.routing_info),
+           hdr_copy_sz);
 
-    auto* ipv4_hdr = reinterpret_cast<ipv4_hdr_t*>(&eth_hdr[1]);
-    gen_ipv4_header(ipv4_hdr, resolve.ipv4_addr, raw_rinfo->ipv4_addr,
-                    kERpcHdrBytes + item.data_bytes);
+    auto* ipv4_hdr =
+        reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
+    assert(ipv4_hdr->check == 0);
+    ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
 
     auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
-    gen_udp_header(udp_hdr, kBaseRawUDPPort + rpc_id, raw_rinfo->udp_port,
-                   kERpcHdrBytes + item.data_bytes);
+    assert(udp_hdr->check == 0);
+    udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
 
     LOG_TRACE(
         "eRPC RawTransport: Sending packet. SGE #1 = %u bytes, "

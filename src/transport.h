@@ -19,7 +19,7 @@ class HugeAlloc;  // Forward declaration: HugeAlloc needs MemRegInfo
 /// Generic mostly-reliable transport
 class Transport {
  public:
-  static constexpr size_t kMaxRoutingInfoSize = 32;  ///< Space for routing info
+  static constexpr size_t kMaxRoutingInfoSize = 48;  ///< Space for routing info
   static constexpr size_t kMaxMemRegInfoSize = 64;   ///< Space for mem reg info
   static constexpr size_t kNumRxRingEntries = 2048;  ///< RX ring entries
 
@@ -140,6 +140,8 @@ class Transport {
    * @brief Try to resolve routing information received from a remote host. The
    * remote, cluster-wide meaningful info is available in \p routing_info. The
    * resolved, locally-meaningful info is also stored in \p routing_info.
+   *
+   * Overwriting the original contents of \p routing_info is allowed.
    *
    * For example, for InfiniBand, this involves creating the address handle
    * using the remote port LID.

@@ -14,6 +14,8 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
     : Transport(TransportType::kRaw, rpc_id, phy_port) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
+  rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
+
   resolve_phy_port();
   init_verbs_structs();
   init_mem_reg_funcs();
@@ -88,8 +90,29 @@ void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   ri->udp_port = kBaseRawUDPPort + rpc_id;
 }
 
-bool RawTransport::resolve_remote_routing_info(RoutingInfo *) const {
-  // Raw Ethernet routing info doesn't need resolution
+// Generate most fields of the L2--L4 headers now to avoid recomputation.
+bool RawTransport::resolve_remote_routing_info(
+    RoutingInfo *routing_info) const {
+  auto *ri = reinterpret_cast<raw_routing_info_t *>(routing_info);
+  uint8_t remote_mac[6];
+  memcpy(remote_mac, ri->mac, 6);
+  uint32_t remote_ipv4_addr = ri->ipv4_addr;
+  uint16_t remote_udp_port = ri->udp_port;
+
+  static_assert(kMaxRoutingInfoSize >= kInetHdrsTotSize, "");
+
+  auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(ri);
+  gen_eth_header(eth_hdr, &resolve.mac_addr[0], remote_mac);
+
+  auto *ipv4_hdr = reinterpret_cast<ipv4_hdr_t *>(&eth_hdr[1]);
+  gen_ipv4_header(ipv4_hdr, resolve.ipv4_addr, remote_ipv4_addr, 0);
+
+  auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
+  gen_udp_header(udp_hdr, kBaseRawUDPPort + rpc_id, remote_udp_port, 0);
+
+  LOG_DEBUG("eRPC RawTransport: Resolved routinf info to frame header %s.\n",
+            frame_header_to_string(reinterpret_cast<uint8_t *>(ri)).c_str());
+
   return true;
 }
 

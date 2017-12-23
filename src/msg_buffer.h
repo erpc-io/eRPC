@@ -131,6 +131,11 @@ class MsgBuffer {
 
     pkthdr_t *pkthdr_0 = reinterpret_cast<pkthdr_t *>(buffer.buf);
     pkthdr_0->magic = kPktHdrMagic;
+
+    // UDP checksum for raw Ethernet. Useless for other transports.
+    static_assert(sizeof(pkthdr_t::headroom) == kHeadroom + 2, "");
+    pkthdr_0->headroom[kHeadroom] = 0;
+    pkthdr_0->headroom[kHeadroom + 1] = 0;
   }
 
   /// Construct a single-packet "fake" MsgBuffer using a received packet,

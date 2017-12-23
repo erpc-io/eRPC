@@ -5,11 +5,14 @@
 
 namespace erpc {
 
-// Packet header
-static constexpr size_t kHeadroomHackBits = 8;  ///< Avoid non-zero headroom
-static constexpr size_t kMsgSizeBits = 24;      ///< Bits for message size
-static constexpr size_t kReqNumBits = 44;       ///< Bits for request number
-static constexpr size_t kPktNumBits = 13;       ///< Bits for packet number
+/// We need a non-zero array size for headroom, even when kHeadroom is zero.
+/// We could use (kHeadroom + 1) bytes, but using (kHeadroom + 2) bytes allows
+/// space for the two-byte UDP checksum.
+static constexpr size_t kHeadroomHackBits = 16;
+
+static constexpr size_t kMsgSizeBits = 24;  ///< Bits for message size
+static constexpr size_t kReqNumBits = 44;   ///< Bits for request number
+static constexpr size_t kPktNumBits = 13;   ///< Bits for packet number
 
 /// Debug bits for packet header. Also useful for making the total size of all
 /// pkthdr_t bitfields equal to 128 bits, which makes copying faster.
@@ -18,10 +21,7 @@ static const size_t kPktHdrMagicBits =
     (kHeadroomHackBits + 8 + kMsgSizeBits + 16 + 2 + kPktNumBits + kReqNumBits);
 static constexpr size_t kPktHdrMagic = 11;  ///< Magic number for packet headers
 
-/// eRPC header bytes (i.e., excluding transport-layer header bytes)
-static constexpr size_t kERpcHdrBytes = 16;
-
-static_assert(kPktHdrMagicBits == 13, "");  // Just to keep track
+static_assert(kPktHdrMagicBits == 5, "");  // Just to keep track
 static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 
 /// These packet types are stored as bitfields in the packet header, so don't
@@ -50,7 +50,7 @@ static std::string pkt_type_str(uint64_t pkt_type) {
 
 struct pkthdr_t {
   static_assert(kHeadroom == 0 || kHeadroom == 40, "");
-  uint8_t headroom[kHeadroom + 1];   ///< Ethernet L2/L3/L3 headers
+  uint8_t headroom[kHeadroom + 2];   ///< Ethernet L2/L3/L3 headers
   uint64_t req_type : 8;             ///< RPC request type
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t dest_session_num : 16;    ///< Destination session number
@@ -117,7 +117,6 @@ struct pkthdr_t {
 } __attribute__((packed));
 
 static_assert(sizeof(pkthdr_t) % sizeof(size_t) == 0, "");
-static_assert(sizeof(pkthdr_t) == kERpcHdrBytes + kHeadroom, "");
 }
 
 #endif  // ERPC_PKTHDR_H
