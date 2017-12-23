@@ -18,7 +18,7 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
   init_verbs_structs();
   init_mem_reg_funcs();
 
-  LOG_INFO(
+  LOG_WARN(
       "eRPC RawTransport: Created for ID %u. Device (%s, %s). IPv4 %s, MAC %s. "
       "port %d.\n",
       rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
