@@ -173,7 +173,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   // Handle special error cases for which we retry the connect request
   if (sm_pkt.err_type == SmErrType::kInvalidRemoteRpcId) {
     if (retry_connect_on_invalid_rpc_id) {
-      LOG_WARN("%s: Invalid remote Rpc ID. Dropping. Scan will retry later.\n",
+      LOG_INFO("%s: Invalid remote Rpc ID. Dropping. Scan will retry later.\n",
                issue_msg);
       return;
     }
