@@ -353,7 +353,7 @@ int main(int argc, char **argv) {
   std::vector<std::thread> threads(FLAGS_num_threads);
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
-    erpc::bind_to_core(threads[i], i);
+    erpc::bind_to_core(threads[i], 2 * i);
   }
 
   for (auto &thread : threads) thread.join();
