@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Requirement: A file named autorun_process_file in this script's directory
-# that contains neprocessseparated, DNS-resolvable node names.
+# that contains newline-separated process names, formatted like like so:
+# <DNS name> <UDP port> <NUMA node>
 source $(dirname $0)/utils.sh
 
 # Get the config parameter specified in $1 for app = $autorun_app
