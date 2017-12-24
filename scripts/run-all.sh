@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 source $(dirname $0)/utils.sh
-source $(dirname $0)/autorun.sh
+source $(dirname $0)/autorun_parse.sh
 
-# Print the generated nodes (one per line)
-blue "run-all: app = $autorun_app, nodes = [["
-echo $autorun_nodes | tr ' ' '\n'
-blue "]]"
+# Print the generated processes
+echo "autorun processes: ["
+for i in `seq 1 $autorun_num_processes`; do
+  echo ${autorun_name_list[$i]} ${autorun_udp_port_list[$i]} ${autorun_numa_list[$i]}
+done
+echo "]"
+
+echo "eRPC home = $autorun_erpc_home"
 
 # Check that the app has been built
 assert_file_exists $autorun_erpc_home/build/$autorun_app
@@ -15,18 +19,23 @@ app_config=$autorun_erpc_home/apps/$autorun_app/config
 assert_file_exists $app_config
 app_args=`cat $app_config | tr '\n' ' '`
 
-server_id=0
-for node in $autorun_nodes; do
-	echo "run-all: Starting machine-$server_id on $node"
-	ssh -oStrictHostKeyChecking=no $node "\
+for i in `seq 1 $autorun_num_processes`; do
+  name=${autorun_name_list[$i]}
+  udp_port=${autorun_udp_port_list[$i]}
+  numa=${autorun_numa_list[$i]}
+
+  out_file="$autorun_out_prefix-$i"
+  err_file="$autorun_err_prefix-$i"
+
+  echo "run-all: Starting process-$i on $name (port $udp_port, NUMA $numa)"
+	ssh -oStrictHostKeyChecking=no $name "\
     /users/akalia/libmlx4-1.2.1mlnx1/update_driver.sh; \
     cd $autorun_erpc_home; \
     source scripts/utils.sh; \
     drop_shm; \
-    sudo nohup ./build/$autorun_app $app_args --machine_id $server_id \
-    > $autorun_out_file 2> $autorun_err_file < /dev/null &" &
-
-	server_id=`expr $server_id + 1`
+    sudo nohup numactl --physcpubind $numa --membind $numa \
+    ./build/$autorun_app $app_args --machine_id $i --udp_port $udp_port --numa $numa \
+    > $out_file 2> $err_file < /dev/null &" &
 done
 wait
 
@@ -36,13 +45,15 @@ sleep_sec=`echo "scale=1; $app_sec + 10" | bc -l`
 blue "run-all: Sleeping for $sleep_sec seconds. App will run for $app_sec seconds."
 sleep $sleep_sec
 
-# Print nodes on which the app is still running
-blue "run-all: Printing nodes on which $autorun_app is still running..."
-for node in $autorun_nodes; do
+# Print machines on which the app is still running
+blue "run-all: Printing machines on which $autorun_app is still running..."
+for i in `seq 1 $autorun_num_processes`; do
   (
-	ret=`ssh -oStrictHostKeyChecking=no $node "pgrep -x $autorun_app"`
+	ret=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} \
+    "pgrep -x $autorun_app"`
+
   if [ -n "$ret" ]; then
-    echo "run-all: $autorun_app still running on $node"
+    echo "run-all: $autorun_app still running on $autorun_name_list[$i]"
   fi
   )&
 done
@@ -50,4 +61,4 @@ wait
 blue "...Done"
 
 # Process each machine's output and print the result. This is optional.
-$(dirname $0)/proc-out.sh
+#$(dirname $0)/proc-out.sh
