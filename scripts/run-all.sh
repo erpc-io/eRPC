@@ -46,7 +46,7 @@ blue "run-all: Sleeping for $sleep_sec seconds. App will run for $app_sec second
 sleep $sleep_sec
 
 # Print processes that are still running
-blue "run-all: Printing $autorun_app that are still running..."
+blue "run-all: Printing $autorun_app processes that are still running..."
 for i in `seq 1 $autorun_num_processes`; do
   (
 	ret=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} \

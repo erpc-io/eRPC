@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# Kill autorun_app on all autorun_nodes
-source $(dirname $0)/autorun.sh
+# Kill autorun_app on all machines in autorun process file
+source $(dirname $0)/autorun_parse.sh
 
-blue "Killing $autorun_app on all autorun nodes"
+blue "Killing $autorun_app everywhere"
 
-for node in $autorun_nodes; do
-	ssh -oStrictHostKeyChecking=no $node "sudo killall $autorun_app 1>/dev/null 2>/dev/null" &
+for i in `seq 1 $autorun_num_processes`; do
+  name=${autorun_name_list[$i]}
+	ssh -oStrictHostKeyChecking=no $name "sudo killall $autorun_app 1>/dev/null 2>/dev/null" &
 done
 wait
 
-blue "Checking if $autorun_app is still running on any node"
-for node in $autorun_nodes; do
+blue "Printing $autorun_app processes that are still running..."
+for i in `seq 1 $autorun_num_processes`; do
   (
-	ret=`ssh -oStrictHostKeyChecking=no $node "pgrep -x $autorun_app"`
+	ret=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} "pgrep -x $autorun_app"`
   if [ -n "$ret" ]; then
-    echo "$autorun_app still running on $node"
+    echo "$autorun_app still running on ${autorun_name_list[$i]}"
   fi
   ) &
 done
