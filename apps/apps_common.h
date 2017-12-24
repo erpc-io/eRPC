@@ -15,12 +15,12 @@
 // Gflags
 //
 
-// Flags that must be used in every app. test_ms and num_machines required in
-// the app's config file by the autorun scripts.
+// Flags that must be used in every app. test_ms and num_processes are required
+// in the app's config file by the autorun scripts.
 DEFINE_uint64(test_ms, 0, "Test milliseconds");
-DEFINE_uint64(num_machines, 0, "Number of machines in the cluster");
-DEFINE_uint64(machine_id, std::numeric_limits<size_t>::max(),
-              "The ID of this machine");
+DEFINE_uint64(num_processes, 0, "Number of eRPC processes in the cluster");
+DEFINE_uint64(process_id, std::numeric_limits<size_t>::max(),
+              "The global ID of this process");
 
 static bool validate_test_ms(const char *, uint64_t test_ms) {
   return test_ms >= 1000;
@@ -50,24 +50,42 @@ float papi_get_ipc() {
   return ipc;
 }
 
-// Return the control net IP address of the machine with index server_i,
-// from the autorun nodes file.
-static std::string get_hostname_for_machine(size_t server_i) {
-  std::string autorun_node_file = "../eRPC/scripts/autorun_node_file";
-  std::ifstream in(autorun_node_file.c_str());
+// Return line with index \p n from \p filename. Throw exception if it doesn't
+// exist.
+static std::string get_line_n(std::string filename, size_t n) {
+  std::ifstream in(filename.c_str());
 
   std::string s;
   s.reserve(100);  // For performance
 
-  for (size_t i = 0; i < server_i; i++) {
+  for (size_t i = 0; i < n; i++) {
     std::getline(in, s);
-    erpc::rt_assert(!s.empty(), "Insufficient node names in autorun node file");
+    erpc::rt_assert(!s.empty(), "Insufficient lines in " + filename);
   }
 
   std::getline(in, s);
-  erpc::rt_assert(!s.empty(), "Insufficient node names in autorun node file");
+  erpc::rt_assert(!s.empty(), "Insufficient lines in " + filename);
 
-  return s;
+}
+
+// Return the hostname of the process with index process_i, from the autorun
+// processes file.
+static std::string get_hostname_for_process(size_t process_i) {
+  std::string process_file = "../eRPC/scripts/autorun_process_file";
+  std::string line = get_line_n(process_file, process_i);
+
+  // Extract the hostname (column 0)
+  return line.substr(0, line.find(" "));
+}
+
+// Return the UDP port of the process with index process_i, from the autorun
+// processes file.
+static std::string get_udp_port_for_process(size_t process_i) {
+  std::string process_file = "../eRPC/scripts/autorun_process_file";
+  std::string line = get_line_n(process_file, process_i);
+
+  // Extract the UDP port (column 1)
+  return line.substr(1, line.find(" "));
 }
 
 // A basic mempool for preallocated objects of type T
