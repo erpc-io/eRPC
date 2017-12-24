@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 source $(dirname $0)/utils.sh
-
-# Request autorun to generate a new randomized list of nodes. This saves the
-# node-to-machine-ID mapping to a nodemap file.
-autorun_gen_nodes=1
-overwrite_nodemap=1
 source $(dirname $0)/autorun.sh
 
 # Print the generated nodes (one per line)
