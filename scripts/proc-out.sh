@@ -17,14 +17,12 @@ tmpdir="/tmp/${autorun_app}_proc"
 rm -rf $tmpdir
 mkdir $tmpdir
 
-node_index=0
-for node in $autorun_nodes; do
-  # Keeping destination file name = node name helps in debugging.
-	echo "proc-out: Fetching $autorun_stat_file from $node to $tmpdir/$node"
-  scp $node:$autorun_stat_file $tmpdir/$node \
-		1>/dev/null 2>/dev/null &
+for i in `seq 1 $autorun_num_processes`; do
+  name=${autorun_name_list[$i]}
+  stat_file="$autorun_stat_prefix-$i"
 
-  ((node_index+=1))
+	echo "proc-out: Fetching $stat_file from $name to $tmpdir/$stat_file"
+  scp $name:$stat_file $tmpdir/$stat_file 1>/dev/null 2>/dev/null &
 done
 wait
 echo "proc-out: Finished fetching files."
