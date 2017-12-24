@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Requirement: A file named autorun_process_file in this script's directory
 # that contains newline-separated process names, formatted like like so:
-# <DNS name> <UDP port> <NUMA node>
+# <DNS name> <UDP port> <NUMA>
 source $(dirname $0)/utils.sh
 
 # Get the config parameter specified in $1 for app = $autorun_app
@@ -35,13 +35,6 @@ autorun_stat_prefix="/tmp/${autorun_app}_stats"
 autorun_test_ms=`get_from_config "test_ms"`
 autorun_num_processes=`get_from_config "num_processes"`
 
-# Create autorun process arrays using the first $autorun_num_processes process
-# names in autorun_process_file.
-autorun_process_name_list[0]=""
-autorun_process_udp_port_list[0]=""
-autorun_process_numa_node_list[0]=""
-server_idx="0"
-
 autorun_process_file=$(dirname $0)/autorun_process_file
 if [ ! -f $autorun_process_file ]; then
   blue "autorun: Server file not found. Exiting."
@@ -55,11 +48,14 @@ if [ "$autorun_process_file_num_processes" -lt  "$autorun_num_processes" ]; then
   exit
 fi
 
-while read dns_name udp_port numa_node; do
-  autorun_process_name_list[$server_idx]=$dns_name
-  autorun_process_udp_port_list[$server_idx]=$udp_port
-  autorun_process_numa_node_list[$server_idx]=$numa_node
-  ((col_index+=1))
+# Create autorun process arrays using the first $autorun_num_processes process
+# names in autorun_process_file.
+process_idx="1"
+while read dns_name udp_port numa; do
+  autorun_name_list[$process_idx]=$dns_name
+  autorun_udp_port_list[$process_idx]=$udp_port
+  autorun_numa_list[$process_idx]=$numa
+  ((process_idx+=1))
 done < $autorun_process_file
 
 blue "autorun: app = $autorun_app, test ms = $autorun_test_ms, num_processes = $autorun_num_processes"
