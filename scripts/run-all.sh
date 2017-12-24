@@ -34,7 +34,7 @@ for i in `seq 1 $autorun_num_processes`; do
     source scripts/utils.sh; \
     drop_shm; \
     sudo nohup numactl --physcpubind $numa --membind $numa \
-    ./build/$autorun_app $app_args --machine_id $i --udp_port $udp_port --numa $numa \
+    ./build/$autorun_app $app_args --process_id $i --udp_port $udp_port --numa $numa \
     > $out_file 2> $err_file < /dev/null &" &
 done
 wait
@@ -45,8 +45,8 @@ sleep_sec=`echo "scale=1; $app_sec + 10" | bc -l`
 blue "run-all: Sleeping for $sleep_sec seconds. App will run for $app_sec seconds."
 sleep $sleep_sec
 
-# Print machines on which the app is still running
-blue "run-all: Printing machines on which $autorun_app is still running..."
+# Print processes that are still running
+blue "run-all: Printing $autorun_app that are still running..."
 for i in `seq 1 $autorun_num_processes`; do
   (
 	ret=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} \
@@ -60,5 +60,5 @@ done
 wait
 blue "...Done"
 
-# Process each machine's output and print the result. This is optional.
+# Retrieve each process's output and print the result. This is optional.
 #$(dirname $0)/proc-out.sh

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Process the output of each machine in /tmp/autorun_stat_file
+# Process the output of each process in /tmp/autorun_stat_file
 #
 # Each stat file begins with the name of the stats like so:
 # stat_name_1 stat_name_2 ... stat_name_N

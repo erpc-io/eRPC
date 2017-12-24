@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Generate a basic autorun server file for Apt.
+# Generate a basic autorun process list file for Apt.
 
 if [ "$#" -ne 1 ]; then
   echo "Illegal number of parameters"
-	echo "Usage: ./gen_autorun_server_file.sh.sh <number of servers to generate>"
+	echo "Usage: ./gen_autorun_process_file.sh.sh <number of processes to generate>"
 	exit
 fi
 
-# Generate server names for Apt
-# $1: The number of servers to generate
+# Generate process names for Apt
+# $1: The number of processes to generate
 function gen_apt() {
-  server_id_list=`seq 1 $1`
-  for server_i in $server_id_list; do
-    echo akalianode-$server_i.RDMA.fawn.apt.emulab.net port:31850 numa:0 >> autorun_server_file
+  process_ids=`seq 1 $1`
+  for process_i in $process_ids; do
+    echo akalianode-$process_i.RDMA.fawn.apt.emulab.net 31850 0 >> autorun_process_file
   done
 }
 
-rm -f autorun_server_file
+rm -f autorun_process_file
 gen_apt $1
