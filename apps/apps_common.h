@@ -94,10 +94,6 @@ class TmpStat {
   }
 
   TmpStat(std::string app_name, std::string header) {
-    if (app_name != "small_rpc_tput" && app_name != "large_rpc_tput") {
-      throw std::runtime_error("Invalid app.");
-    }
-
     if (contains_newline(header)) {
       throw std::runtime_error("Stats header contains newline.");
     }
