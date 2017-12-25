@@ -50,44 +50,6 @@ float papi_get_ipc() {
   return ipc;
 }
 
-// Return line with index \p n from \p filename. Throw exception if it doesn't
-// exist.
-static std::string get_line_n(std::string filename, size_t n) {
-  std::ifstream in(filename.c_str());
-
-  std::string s;
-  s.reserve(100);  // For performance
-
-  for (size_t i = 0; i < n; i++) {
-    std::getline(in, s);
-    erpc::rt_assert(!s.empty(), "Insufficient lines in " + filename);
-  }
-
-  std::getline(in, s);
-  erpc::rt_assert(!s.empty(), "Insufficient lines in " + filename);
-
-}
-
-// Return the hostname of the process with index process_i, from the autorun
-// processes file.
-static std::string get_hostname_for_process(size_t process_i) {
-  std::string process_file = "../eRPC/scripts/autorun_process_file";
-  std::string line = get_line_n(process_file, process_i);
-
-  // Extract the hostname (column 0)
-  return line.substr(0, line.find(" "));
-}
-
-// Return the UDP port of the process with index process_i, from the autorun
-// processes file.
-static std::string get_udp_port_for_process(size_t process_i) {
-  std::string process_file = "../eRPC/scripts/autorun_process_file";
-  std::string line = get_line_n(process_file, process_i);
-
-  // Extract the UDP port (column 1)
-  return line.substr(1, line.find(" "));
-}
-
 // A basic mempool for preallocated objects of type T
 template <class T>
 class MemPool {
