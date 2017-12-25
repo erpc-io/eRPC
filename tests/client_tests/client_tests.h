@@ -9,7 +9,6 @@
 
 using namespace erpc;
 
-static constexpr uint16_t kTestNexusUdpPort = 31851;
 static constexpr size_t kTestEventLoopMs = 200;
 static constexpr size_t kTestMaxEventLoopMs = 20000;  // 20 seconds
 static constexpr uint8_t kTestClientRpcId = 100;
@@ -134,9 +133,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
   num_servers_up++;
 
   // Wait for all servers to come up
-  while (num_servers_up < num_srv_threads) {
-    usleep(1);
-  }
+  while (num_servers_up < num_srv_threads) usleep(1);
   all_servers_ready = true;
 
   // Connect to all other server threads if needed
@@ -151,12 +148,10 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
     // Create the sessions
     for (size_t i = 0; i < num_srv_threads; i++) {
       uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
-      if (other_rpc_id == rpc_id) {
-        continue;
-      }
+      if (other_rpc_id == rpc_id) continue;
 
       context.session_num_arr[i] = context.rpc->create_session(
-          "localhost", kTestServerRpcId + static_cast<uint8_t>(i),
+          "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i),
           kTestPhyPort);
       assert(context.session_num_arr[i] >= 0);
     }
@@ -180,9 +175,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
 
     for (size_t i = 0; i < num_srv_threads; i++) {
       uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
-      if (other_rpc_id == rpc_id) {
-        continue;
-      }
+      if (other_rpc_id == rpc_id) continue;
 
       context.rpc->destroy_session(context.session_num_arr[i]);
     }
@@ -227,7 +220,7 @@ void launch_server_client_threads(
     void (*client_thread_func)(Nexus *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers, double srv_pkt_drop_prob) {
-  Nexus nexus("localhost", kTestNexusUdpPort, num_bg_threads);
+  Nexus nexus("localhost", 31850, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
@@ -256,9 +249,7 @@ void launch_server_client_threads(
   }
 
   // Wait for all servers to be ready before launching client thread
-  while (!all_servers_ready) {
-    usleep(1);
-  }
+  while (!all_servers_ready) usleep(1);
 
   std::thread client_thread(client_thread_func, &nexus, num_sessions);
 
@@ -292,7 +283,8 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
-        "localhost", kTestServerRpcId + static_cast<uint8_t>(i), kTestPhyPort);
+        "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i),
+        kTestPhyPort);
   }
 
   while (context.num_sm_resps < num_sessions) {
@@ -321,9 +313,7 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &context,
     context.rpc->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
-    if (ms_elapsed > kTestMaxEventLoopMs) {
-      break;
-    }
+    if (ms_elapsed > kTestMaxEventLoopMs) break;
   }
 }
 
@@ -344,8 +334,6 @@ void wait_for_rpc_resps_or_timeout(BasicAppContext &context,
     context.rpc->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
-    if (ms_elapsed > kTestMaxEventLoopMs) {
-      break;
-    }
+    if (ms_elapsed > kTestMaxEventLoopMs) break;
   }
 }

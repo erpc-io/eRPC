@@ -27,7 +27,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 
   // Try to create a session
   int session_num =
-      context->rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
+      context->rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort);
   ASSERT_EQ(session_num, -EPERM);
 
   // Try to destroy a valid session number

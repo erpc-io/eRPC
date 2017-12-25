@@ -37,7 +37,7 @@ void simple_connect(Nexus *nexus, size_t) {
   // Connect the session
   context.exp_err = SmErrType::kNoError;
   context.session_num =
-      context.rpc->create_session("localhost", kTestServerRpcId, kTestPhyPort);
+      context.rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort);
   ASSERT_GE(context.session_num, 0);
 
   context.rpc->run_event_loop(kTestEventLoopMs);
@@ -70,7 +70,7 @@ void invalid_remote_port(Nexus *nexus, size_t) {
   // Connect the session
   context.exp_err = SmErrType::kInvalidRemotePort;
   context.session_num = context.rpc->create_session(
-      "localhost", kTestServerRpcId, kTestPhyPort + 1);
+      "localhost:31850", kTestServerRpcId, kTestPhyPort + 1);
   ASSERT_GE(context.session_num, 0);  // Local session creation works
 
   context.rpc->run_event_loop(kTestEventLoopMs);

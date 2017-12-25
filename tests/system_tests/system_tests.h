@@ -6,7 +6,6 @@
 // These tests never run event loop, so SM pkts sent by Rpc have no consequence
 namespace erpc {
 
-static constexpr size_t kTestUdpPort = 3185;
 static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
@@ -27,7 +26,7 @@ class RpcTest : public ::testing::Test {
       return;
     }
 
-    nexus = new Nexus("localhost", kTestUdpPort);
+    nexus = new Nexus("localhost", 31850);
     rt_assert(nexus != nullptr, "Failed to create nexus");
     nexus->register_req_func(kTestReqType,
                              ReqFunc(req_handler, ReqFuncType::kForeground));
@@ -42,6 +41,7 @@ class RpcTest : public ::testing::Test {
     // Init local endpoint
     local_endpoint.transport_type = rpc->transport->transport_type;
     strcpy(local_endpoint.hostname, "localhost");
+    local_endpoint.sm_udp_port = 31850;
     local_endpoint.phy_port = kTestPhyPort;
     local_endpoint.rpc_id = kTestRpcId;
     local_endpoint.session_num = 0;
@@ -50,6 +50,7 @@ class RpcTest : public ::testing::Test {
     // Init remote endpoint. Reusing local routing info & hostname is fine.
     remote_endpoint.transport_type = rpc->transport->transport_type;
     strcpy(remote_endpoint.hostname, "localhost");
+    remote_endpoint.sm_udp_port = 31850;
     remote_endpoint.phy_port = kTestPhyPort;
     remote_endpoint.rpc_id = kTestRpcId + 1;
     remote_endpoint.session_num = 1;
