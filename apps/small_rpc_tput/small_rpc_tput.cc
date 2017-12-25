@@ -248,11 +248,12 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     if (FLAGS_num_threads == 1 && is_papi_usable) ipc = papi_get_ipc();
 
     printf(
-        "Thread %zu: Throughput = %.2f Mrps. Average TX batch size = %.2f. "
+        "Process %zu, thread %zu: %.2f Mrps. Average TX batch size = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
         "Resps/concurrent batch: min %zu, max %zu. IPC = %.2f. "
         "Latency: %.2f us median, %.2f us 99 perc.\n",
-        c->thread_id, c->stat_resp_rx_tot / (seconds * 1000000),
+        FLAGS_process_id, c->thread_id,
+        c->stat_resp_rx_tot / (seconds * 1000000),
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
         c->stat_req_rx_tot, min_resps, max_resps, ipc,
         c->latency.perc(.50) / 10.0, c->latency.perc(.99) / 10.0);
@@ -274,7 +275,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 // The function executed by each thread in the cluster
 void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
-  c.tmp_stat = new TmpStat("small_rpc_tput", "Mrps IPC");
+  auto stat_filename = "small_rpc_tput" + std::to_string(FLAGS_process_id);
+  c.tmp_stat = new TmpStat(stat_filename.c_str(), "Mrps IPC");
   c.thread_id = thread_id;
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
@@ -319,8 +321,10 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
     if (ctrl_c_pressed == 1) return;
   }
 
-  fprintf(stderr, "Thread %zu: All sessions connected. Running event loop.\n",
-          thread_id);
+  fprintf(stderr,
+          "small_rpc_tput: Process %zu, thread %zu: "
+          "All sessions connected. Running event loop.\n",
+          FLAGS_process_id, thread_id);
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
   // Initialize PAPI measurement if we're running one thread
