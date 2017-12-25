@@ -3,6 +3,7 @@
  * @brief Rpc session functions that are exposed to the user.
  */
 #include <algorithm>
+#include "util/autorun_helpers.h"
 
 #include "rpc.h"
 
@@ -11,7 +12,7 @@ namespace erpc {
 // This function is not on the critical path and is exposed to the user,
 // so the args checking is always enabled.
 template <class TTr>
-int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
+int Rpc<TTr>::create_session_st(std::string remote, uint8_t rem_rpc_id,
                                 uint8_t rem_phy_port) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
@@ -27,6 +28,10 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
     LOG_WARN("%s: Invalid remote fabric port %u.\n", issue_msg, rem_phy_port);
     return -EINVAL;
   }
+
+  std::string rem_hostname = extract_hostname_from_remote(remote);
+  std::string rem_sm_udp_port_str = extract_udp_port_from_remote(remote);
+  uint16_t rem_sm_udp_port = std::stoi(rem_sm_udp_port_str);
 
   // Check remote hostname
   if (rem_hostname.length() == 0 || rem_hostname.length() > kMaxHostnameLen) {
@@ -62,6 +67,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   SessionEndpoint &client_endpoint = session->client;
   client_endpoint.transport_type = transport->transport_type;
   strcpy(client_endpoint.hostname, nexus->hostname.c_str());
+  client_endpoint.sm_udp_port = nexus->sm_udp_port;
   client_endpoint.phy_port = phy_port;
   client_endpoint.rpc_id = rpc_id;
   client_endpoint.session_num = session->local_session_num;
@@ -70,6 +76,7 @@ int Rpc<TTr>::create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
   SessionEndpoint &server_endpoint = session->server;
   server_endpoint.transport_type = transport->transport_type;
   strcpy(server_endpoint.hostname, rem_hostname.c_str());
+  server_endpoint.sm_udp_port = rem_sm_udp_port;
   server_endpoint.phy_port = rem_phy_port;
   server_endpoint.rpc_id = rem_rpc_id;
   // server_endpoint.session_num = ??

@@ -7,11 +7,10 @@
 
 namespace erpc {
 
-Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
-             size_t num_bg_threads)
+Nexus::Nexus(std::string hostname, uint16_t sm_udp_port, size_t num_bg_threads)
     : freq_ghz(measure_rdtsc_freq()),
       hostname(hostname),
-      mgmt_udp_port(mgmt_udp_port),
+      sm_udp_port(sm_udp_port),
       num_bg_threads(num_bg_threads) {
   if (kTesting) LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
@@ -40,7 +39,7 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   // Launch the session management thread
   SmThreadCtx sm_thread_ctx;
   sm_thread_ctx.hostname = hostname;
-  sm_thread_ctx.mgmt_udp_port = mgmt_udp_port;
+  sm_thread_ctx.sm_udp_port = sm_udp_port;
   sm_thread_ctx.kill_switch = &kill_switch;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
@@ -50,8 +49,8 @@ Nexus::Nexus(std::string hostname, uint16_t mgmt_udp_port,
   sm_thread = std::thread(sm_thread_func, sm_thread_ctx);
   bind_to_core(sm_thread, kNexusSmThreadCore);
 
-  LOG_INFO("eRPC Nexus: Created with global UDP port %u, hostname %s.\n",
-           mgmt_udp_port, hostname.c_str());
+  LOG_INFO("eRPC Nexus: Created with UDP port %u, hostname %s.\n", sm_udp_port,
+           hostname.c_str());
 }
 
 Nexus::~Nexus() {

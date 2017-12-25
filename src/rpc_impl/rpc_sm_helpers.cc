@@ -57,7 +57,10 @@ void Rpc<TTr>::sm_pkt_udp_tx_st(const SmPkt &sm_pkt) {
            sm_pkt.to_string().c_str());
   const std::string rem_hostname =
       sm_pkt.is_req() ? sm_pkt.server.hostname : sm_pkt.client.hostname;
-  udp_client.send(rem_hostname, nexus->mgmt_udp_port, sm_pkt);
+  const uint16_t rem_sm_udp_port =
+      sm_pkt.is_req() ? sm_pkt.server.sm_udp_port : sm_pkt.client.sm_udp_port;
+
+  udp_client.send(rem_hostname, rem_sm_udp_port, sm_pkt);
 }
 
 template <class TTr>

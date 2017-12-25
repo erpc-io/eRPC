@@ -52,6 +52,7 @@ static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
 static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
 static constexpr uint8_t kInvalidReqType = kReqTypeArraySize - 1;
 static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
+static constexpr uint8_t kInvalidSmUdpPort = 0;
 
 /// Invalid eRPC thread ID of a background thread
 static constexpr size_t kInvalidBgETid = kMaxBgThreads;

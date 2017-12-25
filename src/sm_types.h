@@ -192,14 +192,16 @@ static std::string sm_event_type_str(SmEventType event_type) {
 class SessionEndpoint {
  public:
   Transport::TransportType transport_type;
-  char hostname[kMaxHostnameLen];  ///< Hostname of this endpoint
-  uint8_t phy_port;                ///< Fabric port used by this endpoint
-  uint8_t rpc_id;                  ///< ID of the Rpc that created this endpoint
+  char hostname[kMaxHostnameLen];  ///< DNS-resolvable hostname
+  uint16_t sm_udp_port;            ///< Management UDP port
+  uint8_t phy_port;                ///< Fabric port used
+  uint8_t rpc_id;                  ///< ID of the owner
   uint16_t session_num;  ///< The session number of this endpoint in its Rpc
   Transport::RoutingInfo routing_info;  ///< Endpoint's routing info
 
   SessionEndpoint() {
     memset(static_cast<void *>(hostname), 0, sizeof(hostname));
+    sm_udp_port = kInvalidSmUdpPort;
     phy_port = kInvalidPhyPort;
     rpc_id = kInvalidRpcId;
     session_num = kInvalidSessionNum;
@@ -214,17 +216,18 @@ class SessionEndpoint {
                                       ? "XX"
                                       : std::to_string(session_num);
 
-    ret << "[H: " << trim_hostname(hostname)
-        << ", R: " << std::to_string(rpc_id) << ", S: " << session_num_str
-        << "]";
+    ret << "[H: " << trim_hostname(hostname) << ":"
+        << std::to_string(sm_udp_port) << ", R: " << std::to_string(rpc_id)
+        << ", S: " << session_num_str << "]";
     return ret.str();
   }
 
   /// Return a string with the name of the Rpc hosting this session endpoint.
   inline std::string rpc_name() const {
     std::ostringstream ret;
-    ret << "[H: " << trim_hostname(hostname)
-        << ", R: " << std::to_string(rpc_id) << "]";
+    ret << "[H: " << trim_hostname(hostname) << ":"
+        << std::to_string(sm_udp_port) << ", R: " << std::to_string(rpc_id)
+        << "]";
     return ret.str();
   }
 
@@ -233,8 +236,8 @@ class SessionEndpoint {
   bool operator==(const SessionEndpoint &other) const {
     return transport_type == other.transport_type &&
            strcmp(hostname, other.hostname) == 0 &&
-           phy_port == other.phy_port && rpc_id == other.rpc_id &&
-           session_num == other.session_num;
+           sm_udp_port == other.sm_udp_port && phy_port == other.phy_port &&
+           rpc_id == other.rpc_id && session_num == other.session_num;
   }
 };
 

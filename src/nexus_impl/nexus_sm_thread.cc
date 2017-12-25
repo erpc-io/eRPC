@@ -9,7 +9,7 @@ static constexpr size_t kSmThreadRxBlockMs = 20;
 static constexpr size_t kUDPBufferSz = MB(4);
 
 void Nexus::sm_thread_func(SmThreadCtx ctx) {
-  UDPServer<SmPkt> udp_server(ctx.mgmt_udp_port, kSmThreadRxBlockMs,
+  UDPServer<SmPkt> udp_server(ctx.sm_udp_port, kSmThreadRxBlockMs,
                               kUDPBufferSz);
   UDPClient<SmPkt> udp_client;
 
@@ -46,8 +46,8 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
           const SmPkt resp_sm_pkt =
               sm_construct_resp(sm_pkt, SmErrType::kInvalidRemoteRpcId);
 
-          udp_client.send(resp_sm_pkt.client.hostname, ctx.mgmt_udp_port,
-                          resp_sm_pkt);
+          udp_client.send(resp_sm_pkt.client.hostname,
+                          resp_sm_pkt.client.sm_udp_port, resp_sm_pkt);
         } else {
           LOG_WARN(
               "eRPC Nexus: Received session management response for invalid "

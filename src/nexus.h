@@ -50,16 +50,13 @@ class Nexus {
    *
    * @param hostname The IP host name of this host
    *
-   * @param mgmt_udp_port The UDP port used by all Nexus-es in the cluster to
-   * listen for session management packets
-   *
+   * @param sm_udp_port The UDP port used by this Nexus for session management
    * @param num_bg_threads The number of background RPC request processing
    * threads to launch.
    *
    * @throw runtime_error if Nexus creation fails.
    */
-  Nexus(std::string hostname, uint16_t mgmt_udp_port,
-        size_t num_bg_threads = 0);
+  Nexus(std::string hostname, uint16_t sm_udp_port, size_t num_bg_threads = 0);
 
   ~Nexus();
 
@@ -103,7 +100,7 @@ class Nexus {
    public:
     // Installed by the Nexus
     std::string hostname;           ///< User-provided hostname of this node
-    uint16_t mgmt_udp_port;         ///< The Nexus's session management port
+    uint16_t sm_udp_port;           ///< The Nexus's session management port
     volatile bool *kill_switch;     ///< The Nexus's kill switch
     volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
     std::mutex *nexus_lock;
@@ -120,11 +117,11 @@ class Nexus {
 
  public:
   /// Read-mostly members exposed to Rpc threads
-  const double freq_ghz;         ///< TSC frequncy
-  const std::string hostname;    ///< The local host
-  const uint16_t mgmt_udp_port;  ///< UDP port for session management
-  const size_t num_bg_threads;   ///< Background threads to process Rpc reqs
-  TlsRegistry tls_registry;      ///< A thread-local registry
+  const double freq_ghz;        ///< TSC frequncy
+  const std::string hostname;   ///< The local host
+  const uint16_t sm_udp_port;   ///< UDP port for session management
+  const size_t num_bg_threads;  ///< Background threads to process Rpc reqs
+  TlsRegistry tls_registry;     ///< A thread-local registry
 
   /// The ground truth for registered request functions
   std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
