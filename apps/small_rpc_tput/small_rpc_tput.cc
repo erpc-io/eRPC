@@ -4,6 +4,7 @@
 #include <cstring>
 #include "../apps_common.h"
 #include "rpc.h"
+#include "util/autorun_helpers.h"
 #include "util/latency.h"
 #include "util/misc.h"
 
@@ -14,7 +15,6 @@ static constexpr size_t kAppMeasureLatency = false;
 static constexpr bool kAppOptDisablePreallocResp = false;
 static constexpr bool kAppOptDisableRxRingReq = false;
 
-static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;    // eRPC request type
@@ -24,7 +24,6 @@ static constexpr size_t kMaxConcurrency = 128;
 
 DEFINE_uint64(batch_size, 0, "Request batch size");
 DEFINE_uint64(msg_size, 0, "Request and response size");
-DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 
@@ -296,24 +295,26 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
     }
   }
 
-  c.session_num_vec.resize(FLAGS_num_machines * FLAGS_num_threads);
-  c.self_session_index = FLAGS_machine_id * FLAGS_num_threads + thread_id;
+  c.session_num_vec.resize(FLAGS_num_processes * FLAGS_num_threads);
+  c.self_session_index = FLAGS_process_id * FLAGS_num_threads + thread_id;
 
   // Create a session to each thread in the cluster except self
-  for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
-    std::string hostname = get_hostname_for_machine(m_i);
+  for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
+    std::string rem_hostname = erpc::get_hostname_for_process(p_i);
+    std::string rem_udp_port = erpc::get_udp_port_for_process(p_i);
+    std::string remote = rem_hostname + ":" + rem_udp_port;
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      const size_t session_idx = (m_i * FLAGS_num_threads) + t_i;
+      const size_t session_idx = (p_i * FLAGS_num_threads) + t_i;
       if (session_idx == c.self_session_index) continue;
 
       c.session_num_vec[session_idx] =
-          rpc.create_session(hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
+          rpc.create_session(remote, static_cast<uint8_t>(t_i), kAppPhyPort);
       assert(c.session_num_vec[session_idx] >= 0);
     }
   }
 
-  while (c.num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
+  while (c.num_sm_resps != FLAGS_num_processes * FLAGS_num_threads - 1) {
     rpc.run_event_loop(200);  // 200 milliseconds
     if (ctrl_c_pressed == 1) return;
   }
@@ -336,7 +337,6 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 }
 
 int main(int argc, char **argv) {
-  assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
 
   // Work around g++-5's unused variable warning for validators
@@ -344,9 +344,9 @@ int main(int argc, char **argv) {
   _unused(concurrency_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  erpc::Nexus nexus(machine_name.c_str(), kAppNexusUdpPort,
-                    FLAGS_num_bg_threads);
+  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
+  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
+  erpc::Nexus nexus(hostname, std::stoi(udp_port_str));
   nexus.register_req_func(
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 
