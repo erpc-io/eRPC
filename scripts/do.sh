@@ -25,26 +25,26 @@ fi
 
 # Check arguments
 if [ "$#" -gt 2 ]; then
-  blue "Illegal number of arguments. Usage: do.sh <machine_id>, or do.sh gdb <machine_id>"
+  blue "Illegal number of arguments. Usage: do.sh <process_id>, or do.sh gdb <process_id>"
 	exit
 fi
 
 if [ "$#" -eq 0 ]; then
-  blue "Illegal number of arguments. Usage: do.sh <machine_id>, or do.sh gdb <machine_id>"
+  blue "Illegal number of arguments. Usage: do.sh <process_id>, or do.sh gdb <process_id>"
 	exit
 fi
 
 # Check for non-gdb mode
 if [ "$#" -eq 1 ]; then
   blue "do.sh: machine ID = $1"
-  sudo ./build/$autorun_app $(cat apps/$autorun_app/config) --machine_id $1
+  sudo ./build/$autorun_app $(cat apps/$autorun_app/config) --process_id $1
 fi
 
 # Check for gdb mode
 if [ "$#" -eq 2 ]; then
   if [ "$1" == "gdb" ]; then
     blue "do.sh: machine ID = $1. Launching gdb."
-    sudo gdb -ex run --args ./build/$autorun_app $(cat apps/$autorun_app/config) --machine_id $2
+    sudo gdb -ex run --args ./build/$autorun_app $(cat apps/$autorun_app/config) --process_id $2
   else
     blue "do.sh: Invalid parameter 1. Expected = gdb."
   fi
