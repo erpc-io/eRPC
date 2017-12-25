@@ -36,8 +36,8 @@ void simple_connect(Nexus *nexus, size_t) {
 
   // Connect the session
   context.exp_err = SmErrType::kNoError;
-  context.session_num =
-      context.rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort);
+  context.session_num = context.rpc->create_session(
+      "localhost:31850", kTestServerRpcId, kTestPhyPort);
   ASSERT_GE(context.session_num, 0);
 
   context.rpc->run_event_loop(kTestEventLoopMs);

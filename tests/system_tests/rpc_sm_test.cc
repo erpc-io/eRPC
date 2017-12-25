@@ -250,11 +250,13 @@ TEST_F(RpcSmTest, create_session_st) {
   ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnectInProgress);
 
   // Invalid remote port, which can be detected locally
-  session_num = rpc->create_session("localhost:31850", kTestRpcId + 1, kMaxPhyPorts);
+  session_num =
+      rpc->create_session("localhost:31850", kTestRpcId + 1, kMaxPhyPorts);
   ASSERT_LT(session_num, 0);
 
   // Try to create session to self
-  session_num = rpc->create_session("localhost:31850", kTestRpcId, kTestPhyPort);
+  session_num =
+      rpc->create_session("localhost:31850", kTestRpcId, kTestPhyPort);
   ASSERT_LT(session_num, 0);
 }
 

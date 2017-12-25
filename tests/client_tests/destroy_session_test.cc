@@ -96,8 +96,8 @@ void disconnect_multi(Nexus *nexus, size_t) {
 
   for (size_t iter = 0; iter < 3; iter++) {
     for (size_t i = 0; i < num_sessions; i++) {
-      int session_num =
-          rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort);
+      int session_num = rpc->create_session("localhost:31850", kTestServerRpcId,
+                                            kTestPhyPort);
       ASSERT_GE(session_num, 0);
       context.session_num_arr[i] = session_num;
     }
@@ -146,8 +146,8 @@ void disconnect_remote_error(Nexus *nexus, size_t) {
   auto *rpc = context.rpc;
 
   // Create a session that uses an invalid remote port
-  int session_num =
-      rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort + 1);
+  int session_num = rpc->create_session("localhost:31850", kTestServerRpcId,
+                                        kTestPhyPort + 1);
   ASSERT_GE(session_num, 0);
   context.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemotePort);
   wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
