@@ -27,6 +27,7 @@
 #include "profile_random.h"
 #include "profile_timely_small.h"
 #include "profile_victim.h"
+#include "util/autorun_helpers.h"
 
 static constexpr bool kAppVerbose = false;
 
@@ -291,7 +292,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   // In these cases, by not injecting any requests now, we ensure that machine 0
   // *never* sends requests.
   bool _send_reqs = true;
-  if (FLAGS_machine_id == 0) {
+  if (FLAGS_process_id == 0) {
     if (FLAGS_profile == "timely_small" || FLAGS_profile == "victim") {
       _send_reqs = false;
     }
@@ -332,8 +333,8 @@ void setup_profile() {
   }
 
   if (FLAGS_profile == "victim") {
-    erpc::rt_assert(FLAGS_num_machines >= 3,
-                    "victim profile needs 3 or more machines.");
+    erpc::rt_assert(FLAGS_num_processes >= 3,
+                    "victim profile needs 3 or more processes.");
     erpc::rt_assert(FLAGS_concurrency >= 2,
                     "victim profile needs concurrency >= 2.");
     connect_sessions_func = connect_sessions_func_victim;
@@ -357,8 +358,9 @@ int main(int argc, char **argv) {
   erpc::rt_assert(get_session_idx_func != nullptr, "No session index getter");
   erpc::rt_assert(connect_sessions_func != nullptr, "No connect_sessions_func");
 
-  std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  erpc::Nexus nexus(machine_name, kAppNexusUdpPort, FLAGS_num_bg_threads);
+  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
+  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
+  erpc::Nexus nexus(hostname, std::stoi(udp_port_str), FLAGS_num_bg_threads);
   nexus.register_req_func(
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 

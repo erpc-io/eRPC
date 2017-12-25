@@ -12,7 +12,7 @@
 #include "consensus.h"
 #include "requestvote.h"
 
-// Raft callback for applying an entry to the finite state machine
+// Raft callback for applying an entry to the FSM
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            int) {
   assert(udata != nullptr && ety != nullptr);

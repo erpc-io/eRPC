@@ -10,7 +10,6 @@
 #include "util/misc.h"
 
 static constexpr bool kAppVerbose = false;
-static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppPointReqType = 1;
@@ -35,7 +34,7 @@ static bool validate_req_window(const char *, uint64_t req_window) {
 DEFINE_validator(req_window, &validate_req_window);
 
 // Return true iff this machine is the one server
-bool is_server() { return FLAGS_machine_id == 0; }
+bool is_server() { return FLAGS_process_id == 0; }
 
 struct req_t {
   size_t req_type;

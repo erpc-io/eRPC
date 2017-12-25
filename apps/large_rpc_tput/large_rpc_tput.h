@@ -7,7 +7,6 @@
 #include "rpc.h"
 #include "util/misc.h"
 
-static constexpr size_t kAppNexusUdpPort = 31851;
 static constexpr size_t kAppPhyPort = 0;
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;

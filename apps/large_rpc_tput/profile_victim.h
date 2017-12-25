@@ -4,12 +4,12 @@
 #include "large_rpc_tput.h"
 
 bool machine_in_victim_pair() {
-  return (FLAGS_machine_id == FLAGS_num_machines - 1) ||
-         (FLAGS_machine_id == FLAGS_num_machines - 2);
+  return (FLAGS_process_id == FLAGS_num_processes - 1) ||
+         (FLAGS_process_id == FLAGS_num_processes - 2);
 }
 
 size_t get_session_idx_func_victim(AppContext *, size_t resp_session_idx) {
-  erpc::rt_assert(FLAGS_machine_id != 0, "Machine 0 cannot send reqs.");
+  erpc::rt_assert(FLAGS_process_id != 0, "Machine 0 cannot send reqs.");
 
   // During initialization, alternate between machine 0 and the other victim
   static size_t initial_call_index = 0;
@@ -34,7 +34,7 @@ size_t get_session_idx_func_victim(AppContext *, size_t resp_session_idx) {
 void connect_sessions_func_victim(AppContext *c) {
   assert(c->self_session_idx == std::numeric_limits<size_t>::max());
 
-  if (FLAGS_machine_id == 0) return;
+  if (FLAGS_process_id == 0) return;
 
   // Allocate per-session info
   c->session_num_vec.resize(2);
@@ -47,9 +47,9 @@ void connect_sessions_func_victim(AppContext *c) {
     printf("large_rpc_tput: Thread %zu: Creating 2 session. Profile 'victim'.",
            c->thread_id);
 
-    size_t other_victim = FLAGS_machine_id == FLAGS_num_machines - 1
-                              ? FLAGS_num_machines - 2
-                              : FLAGS_num_machines - 1;
+    size_t other_victim = FLAGS_process_id == FLAGS_num_processes - 1
+                              ? FLAGS_num_processes - 2
+                              : FLAGS_num_processes - 1;
 
     std::string hostname_0 = get_hostname_for_machine(0);
     std::string hostname_other = get_hostname_for_machine(other_victim);

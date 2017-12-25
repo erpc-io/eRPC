@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <cstring>
 #include "cityhash/city.h"
+#include "util/autorun_helpers.h"
 
 // The keys in the index are 64-bit hashes of keys {0, ..., FLAGS_num_keys}.
 // This gives us random-ish 64-bit keys, without requiring actually maintaining
@@ -182,7 +183,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
-  assert(FLAGS_machine_id > 0);
+  assert(FLAGS_process_id > 0);
 
   AppContext c;
   c.thread_id = thread_id;
@@ -194,8 +195,8 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.rpc = &rpc;
 
   // Each client creates a session to only one server thread
-  auto server_hostname = get_hostname_for_machine(0);
-  size_t client_gid = (FLAGS_machine_id * FLAGS_num_client_threads) + thread_id;
+  auto server_hostname = get_hostname_for_process(0);
+  size_t client_gid = (FLAGS_process_id * FLAGS_num_client_threads) + thread_id;
   size_t server_tid = client_gid % FLAGS_num_server_fg_threads;  // eRPC TID
 
   c.session_num_vec.resize(1);
@@ -221,7 +222,7 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
 void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
                         threadinfo_t **ti_arr) {
-  assert(FLAGS_machine_id == 0);
+  assert(FLAGS_process_id == 0);
 
   AppContext c;
   c.thread_id = thread_id;
@@ -265,8 +266,9 @@ int main(int argc, char **argv) {
     }
 
     // eRPC stuff
-    std::string machine_name = get_hostname_for_machine(0);
-    erpc::Nexus nexus(machine_name, kAppNexusUdpPort,
+    std::string hostname = erpc::get_hostname_for_process(0);
+    std::string udp_port_str = erpc::get_udp_port_for_process(0);
+    erpc::Nexus nexus(hostname, std::stoi(udp_port_str),
                       FLAGS_num_server_bg_threads);
 
     nexus.register_req_func(
@@ -286,8 +288,9 @@ int main(int argc, char **argv) {
     for (auto &thread : thread_arr) thread.join();
     delete[] ti_arr;
   } else {
-    std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-    erpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
+    std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
+    std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
+    erpc::Nexus nexus(hostname, std::stoi(udp_port_str));
 
     std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {

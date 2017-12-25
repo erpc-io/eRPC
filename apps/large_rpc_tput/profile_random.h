@@ -16,19 +16,19 @@ size_t get_session_idx_func_random(AppContext *c, size_t) {
 }
 
 void connect_sessions_func_random(AppContext *c) {
-  c->self_session_idx = FLAGS_machine_id * FLAGS_num_threads + c->thread_id;
+  c->self_session_idx = FLAGS_process_id * FLAGS_num_threads + c->thread_id;
 
   // Allocate per-session info
-  size_t num_sessions = FLAGS_num_machines * FLAGS_num_threads;
+  size_t num_sessions = FLAGS_num_processes * FLAGS_num_threads;
   c->session_num_vec.resize(num_sessions);
   std::fill(c->session_num_vec.begin(), c->session_num_vec.end(), -1);
 
   // Initiate connection for sessions
   fprintf(stderr,
-          "large_rpc_tput: Thread %zu: Creating %zu sessions. "
+          "large_rpc_tput: Process %zu, thread %zu: Creating %zu sessions. "
           "Profile = 'random'.\n",
-          c->thread_id, num_sessions);
-  for (size_t m_i = 0; m_i < FLAGS_num_machines; m_i++) {
+          FLAGS_process_id, c->thread_id, num_sessions);
+  for (size_t m_i = 0; m_i < FLAGS_num_processes; m_i++) {
     std::string hostname = get_hostname_for_machine(m_i);
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
@@ -45,7 +45,7 @@ void connect_sessions_func_random(AppContext *c) {
     }
   }
 
-  while (c->num_sm_resps != FLAGS_num_machines * FLAGS_num_threads - 1) {
+  while (c->num_sm_resps != FLAGS_num_processes * FLAGS_num_threads - 1) {
     c->rpc->run_event_loop(200);  // 200 milliseconds
     if (ctrl_c_pressed == 1) return;
   }

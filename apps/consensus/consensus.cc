@@ -1,4 +1,5 @@
 #include "consensus.h"
+#include <util/autorun_helpers.h>
 #include "appendentries.h"
 #include "callbacks.h"
 #include "client.h"
@@ -87,7 +88,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
   msg_entry_t entry;
   entry.type = RAFT_LOGTYPE_NORMAL;
-  entry.id = FLAGS_machine_id;
+  entry.id = FLAGS_process_id;
   entry.data.buf = static_cast<void *>(rsm_cmd_buf);
   entry.data.len = sizeof(client_req_t);
 
@@ -113,7 +114,7 @@ void init_raft(AppContext *c) {
 
   set_raft_callbacks(c);
 
-  std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
+  std::string machine_name = get_hostname_for_machine(FLAGS_process_id);
   c->server.node_id = get_raft_node_id_from_hostname(machine_name);
   printf("consensus: Created Raft node with ID = %d.\n", c->server.node_id);
 
@@ -121,7 +122,7 @@ void init_raft(AppContext *c) {
     std::string node_i_hostname = get_hostname_for_machine(i);
     int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
 
-    if (i == FLAGS_machine_id) {
+    if (i == FLAGS_process_id) {
       // Add self. user_data = nullptr, peer_is_self = 1
       raft_add_node(c->server.raft, nullptr, c->server.node_id, 1);
     } else {
@@ -153,7 +154,7 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
 
   // Create a session to each Raft server, excluding self
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    if (i == FLAGS_machine_id) continue;
+    if (i == FLAGS_process_id) continue;
     std::string hostname = get_hostname_for_machine(i);
     printf("consensus: Creating session to %s, index = %zu.\n",
            hostname.c_str(), i);
@@ -193,8 +194,9 @@ int main(int argc, char **argv) {
   c.conn_vec.resize(FLAGS_num_raft_servers);  // Both clients and servers
   for (auto &peer_conn : c.conn_vec) peer_conn.c = &c;
 
-  std::string machine_name = get_hostname_for_machine(FLAGS_machine_id);
-  erpc::Nexus nexus(machine_name, kAppNexusUdpPort, 0);
+  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
+  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
+  erpc::Nexus nexus(hostname, std::stoi(udp_port_str));
 
   // Both server and client need this map, so init it before launching client
   init_node_id_to_name_map();
