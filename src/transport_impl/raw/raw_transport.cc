@@ -110,10 +110,6 @@ bool RawTransport::resolve_remote_routing_info(
 
   auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
   gen_udp_header(udp_hdr, rx_flow_udp_port, remote_udp_port, 0);
-
-  LOG_DEBUG("eRPC RawTransport: Resolved routinf info to frame header %s.\n",
-            frame_header_to_string(reinterpret_cast<uint8_t *>(ri)).c_str());
-
   return true;
 }
 
