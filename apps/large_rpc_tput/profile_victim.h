@@ -51,15 +51,15 @@ void connect_sessions_func_victim(AppContext *c) {
                               ? FLAGS_num_processes - 2
                               : FLAGS_num_processes - 1;
 
-    std::string hostname_0 = get_hostname_for_machine(0);
-    std::string hostname_other = get_hostname_for_machine(other_victim);
+    std::string hostname_0 = erpc::get_hostname_for_process(0);
+    std::string hostname_other = erpc::get_hostname_for_process(other_victim);
 
-    c->session_num_vec[0] = c->rpc->create_session(
-        hostname_0, static_cast<uint8_t>(c->thread_id), kAppPhyPort);
+    c->session_num_vec[0] =
+        c->rpc->create_session(hostname_0, static_cast<uint8_t>(c->thread_id));
     erpc::rt_assert(c->session_num_vec[0] >= 0, "create_session failed.");
 
     c->session_num_vec[1] = c->rpc->create_session(
-        hostname_other, static_cast<uint8_t>(c->thread_id), kAppPhyPort);
+        hostname_other, static_cast<uint8_t>(c->thread_id));
     erpc::rt_assert(c->session_num_vec[1] >= 0, "create_session failed.");
 
     while (c->num_sm_resps != 2) {
@@ -76,10 +76,9 @@ void connect_sessions_func_victim(AppContext *c) {
         "large_rpc_tput: Thread %zu: Creating 1 session. Profile = 'victim'.\n",
         c->thread_id);
 
-    std::string hostname = get_hostname_for_machine(0);
-
-    c->session_num_vec[0] = c->rpc->create_session(
-        hostname, static_cast<uint8_t>(c->thread_id), kAppPhyPort);
+    std::string hostname = erpc::get_hostname_for_process(0);
+    c->session_num_vec[0] =
+        c->rpc->create_session(hostname, static_cast<uint8_t>(c->thread_id));
 
     if (c->session_num_vec[0] < 0) {
       throw std::runtime_error("Failed to create session.");

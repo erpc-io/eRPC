@@ -152,8 +152,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
       if (other_rpc_id == rpc_id) continue;
 
       context.session_num_arr[i] = context.rpc->create_session(
-          "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i),
-          kTestPhyPort);
+          "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
       assert(context.session_num_arr[i] >= 0);
     }
 
@@ -283,8 +282,7 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
   context.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     context.session_num_arr[i] = context.rpc->create_session(
-        "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i),
-        kTestPhyPort);
+        "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
   }
 
   while (context.num_sm_resps < num_sessions) {

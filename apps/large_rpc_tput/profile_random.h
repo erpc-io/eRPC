@@ -36,8 +36,8 @@ void connect_sessions_func_random(AppContext *c) {
       // Do not create a session to self
       if (session_idx == c->self_session_idx) continue;
 
-      c->session_num_vec[session_idx] = c->rpc->create_session(
-          hostname, static_cast<uint8_t>(t_i), kAppPhyPort);
+      c->session_num_vec[session_idx] =
+          c->rpc->create_session(hostname, static_cast<uint8_t>(t_i));
 
       if (c->session_num_vec[session_idx] < 0) {
         throw std::runtime_error("Failed to create session.");

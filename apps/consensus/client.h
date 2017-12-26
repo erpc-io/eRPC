@@ -189,14 +189,12 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
 
   // Raft client: Create session to each Raft server
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string hostname = get_hostname_for_machine(i);
-
+    std::string hostname = erpc::get_hostname_for_process(i);
     printf("consensus: Client %zu creating session to %s, index = %zu.\n",
            thread_id, hostname.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num =
-        c->rpc->create_session(hostname, 0, kAppPhyPort);
+    c->conn_vec[i].session_num = c->rpc->create_session(hostname, 0);
     assert(c->conn_vec[i].session_num >= 0);
   }
 

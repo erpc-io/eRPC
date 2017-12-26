@@ -36,8 +36,8 @@ void simple_connect(Nexus *nexus, size_t) {
 
   // Connect the session
   context.exp_err = SmErrType::kNoError;
-  context.session_num = context.rpc->create_session(
-      "localhost:31850", kTestServerRpcId, kTestPhyPort);
+  context.session_num =
+      context.rpc->create_session("localhost:31850", kTestServerRpcId);
   ASSERT_GE(context.session_num, 0);
 
   context.rpc->run_event_loop(kTestEventLoopMs);
@@ -53,39 +53,6 @@ TEST(Base, SimpleConnect) {
                                       ReqFuncType::kForeground)};
 
   launch_server_client_threads(1, 0, simple_connect, reg_info_vec,
-                               ConnectServers::kFalse, 0.0);
-}
-
-//
-// Create (and connect) a session with an invalid remote port. The server should
-// reply with the error code
-//
-void invalid_remote_port(Nexus *nexus, size_t) {
-  // We're testing session connection, so can't use client_connect_sessions
-  AppContext context;
-  context.rpc =
-      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &test_sm_handler, kTestPhyPort);
-
-  // Connect the session
-  context.exp_err = SmErrType::kInvalidRemotePort;
-  context.session_num = context.rpc->create_session(
-      "localhost:31850", kTestServerRpcId, kTestPhyPort + 1);
-  ASSERT_GE(context.session_num, 0);  // Local session creation works
-
-  context.rpc->run_event_loop(kTestEventLoopMs);
-  ASSERT_EQ(context.num_sm_resps, 1);
-
-  // Free resources
-  delete context.rpc;
-  client_done = true;
-}
-
-TEST(Base, InvalidRemotePort) {
-  auto reg_info_vec = {ReqFuncRegInfo(kTestReqType, basic_empty_req_handler,
-                                      ReqFuncType::kForeground)};
-
-  launch_server_client_threads(1, 0, invalid_remote_port, reg_info_vec,
                                ConnectServers::kFalse, 0.0);
 }
 

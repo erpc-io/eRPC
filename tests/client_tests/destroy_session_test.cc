@@ -44,8 +44,7 @@ void simple_disconnect(Nexus *nexus, size_t) {
   auto *rpc = context.rpc;
 
   // Create the session
-  int session_num =
-      rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort);
+  int session_num = rpc->create_session("localhost:31850", kTestServerRpcId);
   ASSERT_GE(session_num, 0);
   ASSERT_NE(rpc->destroy_session(session_num), 0);  // Try early disconnect
 
@@ -96,15 +95,14 @@ void disconnect_multi(Nexus *nexus, size_t) {
 
   for (size_t iter = 0; iter < 3; iter++) {
     for (size_t i = 0; i < num_sessions; i++) {
-      int session_num = rpc->create_session("localhost:31850", kTestServerRpcId,
-                                            kTestPhyPort);
+      int session_num =
+          rpc->create_session("localhost:31850", kTestServerRpcId);
       ASSERT_GE(session_num, 0);
       context.session_num_arr[i] = session_num;
     }
 
     // Try to create one more session. This should fail.
-    int session_num =
-        rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort);
+    int session_num = rpc->create_session("localhost:31850", kTestServerRpcId);
     ASSERT_LT(session_num, 0);
 
     // Connect the sessions
@@ -146,10 +144,10 @@ void disconnect_remote_error(Nexus *nexus, size_t) {
   auto *rpc = context.rpc;
 
   // Create a session that uses an invalid remote port
-  int session_num = rpc->create_session("localhost:31850", kTestServerRpcId,
-                                        kTestPhyPort + 1);
+  int session_num =
+      rpc->create_session("localhost:31850", kTestServerRpcId + 1);
   ASSERT_GE(session_num, 0);
-  context.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemotePort);
+  context.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemoteRpcId);
   wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
   ASSERT_EQ(context.num_sm_resps, 1);  // The connect failed event
 
@@ -181,8 +179,7 @@ void disconnect_local_error(Nexus *nexus, size_t) {
   // Force Rpc to fail remote routing info resolution at client
   rpc->fault_inject_fail_resolve_rinfo_st();
 
-  int session_num =
-      rpc->create_session("localhost:31850", kTestServerRpcId, kTestPhyPort);
+  int session_num = rpc->create_session("localhost:31850", kTestServerRpcId);
   ASSERT_GE(session_num, 0);
 
   context.arm(SmEventType::kDisconnected, SmErrType::kNoError);

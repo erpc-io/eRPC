@@ -190,18 +190,17 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
-                                  basic_sm_handler, kAppPhyPort, kAppNumaNode);
+                                  basic_sm_handler, kAppPhyPort);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 
   // Each client creates a session to only one server thread
-  auto server_hostname = get_hostname_for_process(0);
+  auto server_hostname = erpc::get_hostname_for_process(0);
   size_t client_gid = (FLAGS_process_id * FLAGS_num_client_threads) + thread_id;
   size_t server_tid = client_gid % FLAGS_num_server_fg_threads;  // eRPC TID
 
   c.session_num_vec.resize(1);
-  c.session_num_vec[0] =
-      rpc.create_session(server_hostname, server_tid, kAppPhyPort);
+  c.session_num_vec[0] = rpc.create_session(server_hostname, server_tid);
   assert(c.session_num_vec[0] >= 0);
 
   while (c.num_sm_resps != 1) {

@@ -213,9 +213,8 @@ class Rpc {
    *
    * @param remote_uri The remote Nexus's URI, formatted as hostname:udp_port
    */
-  int create_session(std::string remote_uri, uint8_t rem_rpc_id,
-                     uint8_t rem_phy_port = 0) {
-    return create_session_st(remote_uri, rem_rpc_id, rem_phy_port);
+  int create_session(std::string remote_uri, uint8_t rem_rpc_id) {
+    return create_session_st(remote_uri, rem_rpc_id);
   }
 
   /**
@@ -248,8 +247,7 @@ class Rpc {
   }
 
  private:
-  int create_session_st(std::string remote_uri, uint8_t rem_rpc_id,
-                        uint8_t rem_phy_port = 0);
+  int create_session_st(std::string remote_uri, uint8_t rem_rpc_id);
   int destroy_session_st(int session_num);
   size_t num_active_sessions_st();
 

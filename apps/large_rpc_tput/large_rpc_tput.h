@@ -5,6 +5,7 @@
 #include <signal.h>
 #include "../apps_common.h"
 #include "rpc.h"
+#include "util/autorun_helpers.h"
 #include "util/misc.h"
 
 static constexpr size_t kAppPhyPort = 0;

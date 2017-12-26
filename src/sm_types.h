@@ -15,7 +15,6 @@ static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(), "");
 // Invalid metadata values for session endpoint initialization
 static constexpr uint16_t kInvalidSessionNum =
     std::numeric_limits<uint16_t>::max();
-static constexpr uint32_t kInvalidSecret = 0;
 
 // A cluster-wide unique token for each session, generated on session creation
 typedef size_t conn_req_uniq_token_t;
@@ -44,7 +43,6 @@ enum class SmErrType : int {
   kOutOfMemory,      ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
   kInvalidRemoteRpcId,
-  kInvalidRemotePort,
   kInvalidTransport
 };
 
@@ -140,7 +138,6 @@ static bool sm_err_type_is_valid(SmErrType err_type) {
     case SmErrType::kOutOfMemory:
     case SmErrType::kRoutingResolutionFailure:
     case SmErrType::kInvalidRemoteRpcId:
-    case SmErrType::kInvalidRemotePort:
     case SmErrType::kInvalidTransport:
       return true;
   }
@@ -165,8 +162,6 @@ static std::string sm_err_type_str(SmErrType err_type) {
       return "[Routing resolution failure]";
     case SmErrType::kInvalidRemoteRpcId:
       return "[Invalid remote Rpc ID]";
-    case SmErrType::kInvalidRemotePort:
-      return "[Invalid remote port]";
     case SmErrType::kInvalidTransport:
       return "[Invalid transport]";
   }
@@ -194,7 +189,6 @@ class SessionEndpoint {
   Transport::TransportType transport_type;
   char hostname[kMaxHostnameLen];  ///< DNS-resolvable hostname
   uint16_t sm_udp_port;            ///< Management UDP port
-  uint8_t phy_port;                ///< Fabric port used
   uint8_t rpc_id;                  ///< ID of the owner
   uint16_t session_num;  ///< The session number of this endpoint in its Rpc
   Transport::RoutingInfo routing_info;  ///< Endpoint's routing info
@@ -202,7 +196,6 @@ class SessionEndpoint {
   SessionEndpoint() {
     memset(static_cast<void *>(hostname), 0, sizeof(hostname));
     sm_udp_port = kInvalidSmUdpPort;
-    phy_port = kInvalidPhyPort;
     rpc_id = kInvalidRpcId;
     session_num = kInvalidSessionNum;
     memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));
@@ -236,8 +229,8 @@ class SessionEndpoint {
   bool operator==(const SessionEndpoint &other) const {
     return transport_type == other.transport_type &&
            strcmp(hostname, other.hostname) == 0 &&
-           sm_udp_port == other.sm_udp_port && phy_port == other.phy_port &&
-           rpc_id == other.rpc_id && session_num == other.session_num;
+           sm_udp_port == other.sm_udp_port && rpc_id == other.rpc_id &&
+           session_num == other.session_num;
   }
 };
 

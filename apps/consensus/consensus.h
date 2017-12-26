@@ -17,6 +17,8 @@ extern "C" {
 #include "mica/table/fixedtable.h"
 #include "mica/util/hash.h"
 
+#include "util/autorun_helpers.h"
+
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
 static_assert(erpc::is_power_of_two(kAppNumKeys), "");

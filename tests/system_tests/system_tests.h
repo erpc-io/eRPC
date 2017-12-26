@@ -44,7 +44,6 @@ class RpcTest : public ::testing::Test {
     local_endpoint.transport_type = rpc->transport->transport_type;
     strcpy(local_endpoint.hostname, "localhost");
     local_endpoint.sm_udp_port = 31850;
-    local_endpoint.phy_port = kTestPhyPort;
     local_endpoint.rpc_id = kTestRpcId;
     local_endpoint.session_num = 0;
     rpc->transport->fill_local_routing_info(&local_endpoint.routing_info);
@@ -53,7 +52,6 @@ class RpcTest : public ::testing::Test {
     remote_endpoint.transport_type = rpc->transport->transport_type;
     strcpy(remote_endpoint.hostname, "localhost");
     remote_endpoint.sm_udp_port = 31850;
-    remote_endpoint.phy_port = kTestPhyPort;
     remote_endpoint.rpc_id = kTestRpcId + 1;
     remote_endpoint.session_num = 1;
     rpc->transport->fill_local_routing_info(&remote_endpoint.routing_info);

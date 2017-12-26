@@ -12,8 +12,7 @@ namespace erpc {
 // This function is not on the critical path and is exposed to the user,
 // so the args checking is always enabled.
 template <class TTr>
-int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id,
-                                uint8_t rem_phy_port) {
+int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
 
@@ -21,12 +20,6 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id,
   if (!in_dispatch()) {
     LOG_WARN("%s: Caller thread is not the creator thread.\n", issue_msg);
     return -EPERM;
-  }
-
-  // Check remote fabric port
-  if (rem_phy_port >= kMaxPhyPorts) {
-    LOG_WARN("%s: Invalid remote fabric port %u.\n", issue_msg, rem_phy_port);
-    return -EINVAL;
   }
 
   std::string rem_hostname = extract_hostname_from_uri(remote_uri);
@@ -69,7 +62,6 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id,
   client_endpoint.transport_type = transport->transport_type;
   strcpy(client_endpoint.hostname, nexus->hostname.c_str());
   client_endpoint.sm_udp_port = nexus->sm_udp_port;
-  client_endpoint.phy_port = phy_port;
   client_endpoint.rpc_id = rpc_id;
   client_endpoint.session_num = session->local_session_num;
   transport->fill_local_routing_info(&client_endpoint.routing_info);
@@ -78,7 +70,6 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id,
   server_endpoint.transport_type = transport->transport_type;
   strcpy(server_endpoint.hostname, rem_hostname.c_str());
   server_endpoint.sm_udp_port = rem_sm_udp_port;
-  server_endpoint.phy_port = rem_phy_port;
   server_endpoint.rpc_id = rem_rpc_id;
   // server_endpoint.session_num = ??
   // server_endpoint.routing_info = ??

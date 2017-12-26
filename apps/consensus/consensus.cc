@@ -147,21 +147,20 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
       erpc::ReqFunc(client_req_handler, erpc::ReqFuncType::kForeground));
 
   // Thread ID = 0
-  c->rpc = new erpc::Rpc<erpc::CTransport>(
-      nexus, static_cast<void *>(c), 0, sm_handler, kAppPhyPort, kAppNumaNode);
+  c->rpc = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(c), 0,
+                                           sm_handler, kAppPhyPort);
 
   c->rpc->retry_connect_on_invalid_rpc_id = true;
 
   // Create a session to each Raft server, excluding self
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     if (i == FLAGS_process_id) continue;
-    std::string hostname = get_hostname_for_machine(i);
+    std::string hostname = erpc::get_hostname_for_process(i);
     printf("consensus: Creating session to %s, index = %zu.\n",
            hostname.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num =
-        c->rpc->create_session(hostname, 0, kAppPhyPort);
+    c->conn_vec[i].session_num = c->rpc->create_session(hostname, 0);
     assert(c->conn_vec[i].session_num >= 0);
   }
 

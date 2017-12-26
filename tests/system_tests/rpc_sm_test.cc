@@ -73,12 +73,6 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
   rpc->handle_connect_req_st(ttm_conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kInvalidTransport);
 
-  // Transport type mismatch
-  SmPkt pm_conn_req = conn_req;
-  pm_conn_req.server.phy_port = kInvalidPhyPort;
-  rpc->handle_connect_req_st(pm_conn_req);
-  common_check(0, SmPktType::kConnectResp, SmErrType::kInvalidRemotePort);
-
   // Ring entries exhausted
   const size_t initial_ring_entries_available = rpc->ring_entries_available;
   rpc->ring_entries_available = Session::kSessionCredits - 1;
@@ -243,20 +237,13 @@ TEST_F(RpcSmTest, handle_disconnect_resp_st) {
 //
 TEST_F(RpcSmTest, create_session_st) {
   // Correct args
-  int session_num =
-      rpc->create_session("localhost:31850", kTestRpcId + 1, kTestPhyPort);
+  int session_num = rpc->create_session("localhost:31850", kTestRpcId + 1);
   ASSERT_EQ(session_num, 0);
   common_check(1, SmPktType::kConnectReq, SmErrType::kNoError);
   ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnectInProgress);
 
-  // Invalid remote port, which can be detected locally
-  session_num =
-      rpc->create_session("localhost:31850", kTestRpcId + 1, kMaxPhyPorts);
-  ASSERT_LT(session_num, 0);
-
   // Try to create session to self
-  session_num =
-      rpc->create_session("localhost:31850", kTestRpcId, kTestPhyPort);
+  session_num = rpc->create_session("localhost:31850", kTestRpcId);
   ASSERT_LT(session_num, 0);
 }
 

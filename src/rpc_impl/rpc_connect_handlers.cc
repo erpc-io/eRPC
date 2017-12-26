@@ -48,14 +48,6 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
     return;
   }
 
-  // Check if the requested physical port is correct
-  if (sm_pkt.server.phy_port != phy_port) {
-    LOG_WARN("%s: Invalid server port %u. Sending response.\n", issue_msg,
-             sm_pkt.server.phy_port);
-    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kInvalidRemotePort));
-    return;
-  }
-
   // Check if we are allowed to create another session
   if (!have_ring_entries()) {
     LOG_WARN("%s: Ring buffers exhausted. Sending response.\n", issue_msg);
