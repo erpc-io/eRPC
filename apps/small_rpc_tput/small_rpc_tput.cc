@@ -16,27 +16,16 @@ static constexpr bool kAppOptDisablePreallocResp = false;
 static constexpr bool kAppOptDisableRxRingReq = false;
 
 static constexpr size_t kAppPhyPort = 0;
-static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;    // eRPC request type
 static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
 static constexpr size_t kAppMaxBatchSize = 32;
-static constexpr size_t kMaxConcurrency = 128;
+static constexpr size_t kAppMaxConcurrency = 128;
 
+DEFINE_uint64(numa_node, 0, "NUMA node");
 DEFINE_uint64(batch_size, 0, "Request batch size");
 DEFINE_uint64(msg_size, 0, "Request and response size");
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
-
-static bool validate_batch_size(const char *, uint64_t batch_size) {
-  return batch_size <= kAppMaxBatchSize;
-}
-
-static bool validate_concurrency(const char *, uint64_t concurrency) {
-  return concurrency <= kMaxConcurrency;
-}
-
-DEFINE_validator(batch_size, &validate_batch_size);
-DEFINE_validator(concurrency, &validate_concurrency);
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
@@ -76,11 +65,11 @@ class AppContext : public BasicAppContext {
   size_t self_session_index;
   struct timespec tput_t0;  // Start time for throughput measurement
 
-  size_t stat_resp_rx[kMaxConcurrency] = {0};  // Resps received for batch i
+  size_t stat_resp_rx[kAppMaxConcurrency] = {0};  // Resps received for batch i
   size_t stat_resp_rx_tot = 0;  // Total responses received (all batches)
   size_t stat_req_rx_tot = 0;   // Total requests received (all batches)
 
-  std::array<BatchContext, kMaxConcurrency> batch_arr;  // Per-batch context
+  std::array<BatchContext, kAppMaxConcurrency> batch_arr;  // Per-batch context
   erpc::Latency latency;  // Cold if latency measurement disabled
 
   ~AppContext() {}
@@ -117,8 +106,9 @@ void send_reqs(AppContext *c, size_t batch_i) {
     size_t rand_session_index = get_rand_session_index(c);
     size_t msgbuf_index = initial_num_reqs_sent + i;
     if (kAppVerbose) {
-      printf("Sending request for batch %zu, msgbuf_index = %zu.\n", batch_i,
-             msgbuf_index);
+      printf(
+          "Process %zu, Rpc %u: Sending request for batch %zu, msgbuf %zu.\n",
+          FLAGS_process_id, c->rpc->get_rpc_id(), batch_i, msgbuf_index);
     }
 
     bc.req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;  // Touch req MsgBuffer
@@ -182,13 +172,14 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf != nullptr);
 
+  auto *c = static_cast<AppContext *>(_context);
+
   // Always touch (and check) the response
   if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
     fprintf(stderr, "Invalid response.\n");
     exit(-1);
   }
 
-  auto *c = static_cast<AppContext *>(_context);
   c->rpc->release_response(resp_handle);
 
   auto tag = static_cast<tag_t>(_tag);
@@ -279,9 +270,9 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.tmp_stat = new TmpStat(stat_filename.c_str(), "Mrps IPC");
   c.thread_id = thread_id;
 
-  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
-                                  static_cast<uint8_t>(thread_id),
-                                  basic_sm_handler, kAppPhyPort, kAppNumaNode);
+  erpc::Rpc<erpc::CTransport> rpc(
+      nexus, static_cast<void *>(&c), static_cast<uint8_t>(thread_id),
+      basic_sm_handler, kAppPhyPort, FLAGS_numa_node);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 
@@ -310,6 +301,9 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
       const size_t session_idx = (p_i * FLAGS_num_threads) + t_i;
       if (session_idx == c.self_session_index) continue;
 
+      fprintf(stderr, "Process %zu, thread %zu: Creating session to %s\n",
+              FLAGS_process_id, thread_id, remote.c_str());
+
       c.session_num_vec[session_idx] =
           rpc.create_session(remote, static_cast<uint8_t>(t_i), kAppPhyPort);
       assert(c.session_num_vec[session_idx] >= 0);
@@ -322,8 +316,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   }
 
   fprintf(stderr,
-          "small_rpc_tput: Process %zu, thread %zu: "
-          "All sessions connected. Running event loop.\n",
+          "Process %zu, thread %zu: All sessions connected. Running ev loop.\n",
           FLAGS_process_id, thread_id);
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
@@ -342,11 +335,12 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
-
-  // Work around g++-5's unused variable warning for validators
-  _unused(batch_size_validator_registered);
-  _unused(concurrency_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  erpc::rt_assert(FLAGS_batch_size <= kAppMaxBatchSize, "Invalid batch size");
+  erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency,
+                  "Invalid concurrency");
+  erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");  // 0 or 1
 
   std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
   std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
@@ -357,7 +351,9 @@ int main(int argc, char **argv) {
   std::vector<std::thread> threads(FLAGS_num_threads);
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
-    erpc::bind_to_core(threads[i], 2 * i);
+    // Assume even threads are on NUMA 0, odd are on NUMA 1
+    if (FLAGS_numa_node == 0) erpc::bind_to_core(threads[i], 2 * i);
+    if (FLAGS_numa_node == 1) erpc::bind_to_core(threads[i], 2 * i + 1);
   }
 
   for (auto &thread : threads) thread.join();

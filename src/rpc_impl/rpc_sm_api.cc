@@ -40,7 +40,8 @@ int Rpc<TTr>::create_session_st(std::string remote, uint8_t rem_rpc_id,
   }
 
   // Creating a session to one's own Rpc as the client is not allowed
-  if (rem_hostname == nexus->hostname && rem_rpc_id == rpc_id) {
+  if (rem_hostname == nexus->hostname && rem_rpc_id == rpc_id &&
+      rem_sm_udp_port == nexus->sm_udp_port) {
     LOG_WARN("%s: Remote Rpc is same as local.\n", issue_msg);
     return -EINVAL;
   }

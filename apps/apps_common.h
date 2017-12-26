@@ -152,9 +152,9 @@ void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
                   "Invalid session number");
 
   fprintf(stderr,
-          "apps_common: Rpc %u: Session number %d (index %zu) %s. Error = %s. "
+          "Process %zu, Rpc %u: Session number %d (index %zu) %s. Error = %s. "
           "Time elapsed = %.3f s.\n",
-          c->rpc->get_rpc_id(), session_num, session_idx,
+          FLAGS_process_id, c->rpc->get_rpc_id(), session_num, session_idx,
           erpc::sm_event_type_str(sm_event_type).c_str(),
           erpc::sm_err_type_str(sm_err_type).c_str(),
           c->rpc->sec_since_creation());
