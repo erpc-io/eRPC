@@ -129,9 +129,6 @@ void send_reqs(AppContext *c, size_t batch_i) {
 }
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *c = static_cast<AppContext *>(_context);
   c->stat_req_rx_tot++;
 
@@ -272,7 +269,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
-                                  basic_sm_handler, kAppPhyPort);
+                                  basic_sm_handler, FLAGS_process_id % 2);
 
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
