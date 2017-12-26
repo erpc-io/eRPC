@@ -32,9 +32,11 @@ class UDPClient {
 
   ssize_t send(const std::string rem_hostname, uint16_t rem_port,
                const T &msg) {
+    std::string remote_uri = rem_hostname + ":" + std::to_string(rem_port);
     struct addrinfo *rem_addrinfo = nullptr;
-    if (addrinfo_map.count(rem_hostname) != 0) {
-      rem_addrinfo = addrinfo_map.at(rem_hostname);
+
+    if (addrinfo_map.count(remote_uri) != 0) {
+      rem_addrinfo = addrinfo_map.at(remote_uri);
     } else {
       char port_str[16];
       snprintf(port_str, sizeof(port_str), "%u", rem_port);
@@ -48,10 +50,10 @@ class UDPClient {
       int r =
           getaddrinfo(rem_hostname.c_str(), port_str, &hints, &rem_addrinfo);
       if (r != 0 || rem_addrinfo == nullptr) {
-        throw std::runtime_error("UDPClient: Failed to resolve remote.");
+        throw std::runtime_error("UDPClient: Failed to resolve " + remote_uri);
       }
 
-      addrinfo_map[rem_hostname] = rem_addrinfo;
+      addrinfo_map[remote_uri] = rem_addrinfo;
     }
 
     ssize_t ret = sendto(sock_fd, &msg, sizeof(T), 0, rem_addrinfo->ai_addr,
@@ -70,6 +72,8 @@ class UDPClient {
 
  private:
   int sock_fd = -1;
+
+  /// A cache mapping hostname:udp_port to addrinfo
   std::map<std::string, struct addrinfo *> addrinfo_map;
 
   /// The list of all packets sent, maintained if recording is enabled
