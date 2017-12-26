@@ -21,20 +21,20 @@ app_args=`cat $app_config | tr '\n' ' '`
 
 for i in `seq 1 $autorun_num_processes`; do
   name=${autorun_name_list[$i]}
-  udp_port=${autorun_udp_port_list[$i]}
-  numa=${autorun_numa_list[$i]}
+  # We don't need the UDP port - the C++ code figures it out
+  numa_node=${autorun_numa_list[$i]}
 
   out_file="$autorun_out_prefix-$i"
   err_file="$autorun_err_prefix-$i"
 
-  echo "run-all: Starting process-$i on $name (port $udp_port, NUMA $numa)"
+  echo "run-all: Starting process-$i on $name (port $udp_port, NUMA $numa_node)"
 	ssh -oStrictHostKeyChecking=no $name "\
     /users/akalia/libmlx4-1.2.1mlnx1/update_driver.sh; \
     cd $autorun_erpc_home; \
     source scripts/utils.sh; \
     drop_shm; \
-    sudo nohup numactl --physcpubind $numa --membind $numa \
-    ./build/$autorun_app $app_args --process_id $i --udp_port $udp_port --numa $numa \
+    sudo nohup numactl --physcpubind $numa_node --membind $numa_node \
+    ./build/$autorun_app $app_args --process_id $i --numa_node $numa_node \
     > $out_file 2> $err_file < /dev/null &" &
 done
 wait
