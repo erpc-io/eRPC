@@ -46,7 +46,10 @@ class UDPServer {
 
     int r = bind(sock_fd, reinterpret_cast<struct sockaddr *>(&serveraddr),
                  sizeof(serveraddr));
-    if (r != 0) throw std::runtime_error("UDPServer: Failed to bind socket.");
+    if (r != 0) {
+      throw std::runtime_error("UDPServer: Failed to bind socket to port " +
+                               std::to_string(port));
+    }
   }
 
   UDPServer() {}
