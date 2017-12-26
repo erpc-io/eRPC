@@ -11,8 +11,10 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
-RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
-    : Transport(TransportType::kRaw, rpc_id, phy_port) {
+RawTransport::RawTransport(uint8_t epid, uint8_t rpc_id, uint8_t phy_port,
+                           size_t numa_node)
+    : Transport(TransportType::kRaw, epid, rpc_id, phy_port, numa_node),
+      rx_flow_udp_port(kBaseRawUDPPort + (256u * epid) + rpc_id) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
@@ -31,7 +33,6 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port)
 void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
                                             uint8_t **rx_ring) {
   this->huge_alloc = huge_alloc;
-  this->numa_node = huge_alloc->get_numa_node();
 
   init_recvs(rx_ring);
   init_sends();
@@ -87,7 +88,7 @@ void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   auto *ri = reinterpret_cast<raw_routing_info_t *>(routing_info);
   memcpy(ri->mac, resolve.mac_addr, 6);
   ri->ipv4_addr = resolve.ipv4_addr;
-  ri->udp_port = kBaseRawUDPPort + rpc_id;
+  ri->udp_port = rx_flow_udp_port;
 }
 
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
@@ -108,7 +109,7 @@ bool RawTransport::resolve_remote_routing_info(
   gen_ipv4_header(ipv4_hdr, resolve.ipv4_addr, remote_ipv4_addr, 0);
 
   auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
-  gen_udp_header(udp_hdr, kBaseRawUDPPort + rpc_id, remote_udp_port, 0);
+  gen_udp_header(udp_hdr, rx_flow_udp_port, remote_udp_port, 0);
 
   LOG_DEBUG("eRPC RawTransport: Resolved routinf info to frame header %s.\n",
             frame_header_to_string(reinterpret_cast<uint8_t *>(ri)).c_str());
@@ -340,9 +341,11 @@ void RawTransport::init_recv_qp() {
 
 void RawTransport::install_flow_rule() {
   assert(recv_qp != nullptr);
-  LOG_INFO(
-      "eRPC RawTransport: Installing flow rule for Rpc %u, UDP port = %u.\n",
-      rpc_id, kBaseRawUDPPort + rpc_id);
+
+  LOG_WARN(
+      "eRPC RawTransport: Installing flow rule for Rpc %u. NUMA node = %zu. "
+      "Flow RX UDP port = %u.\n",
+      rpc_id, numa_node, rx_flow_udp_port);
 
   static constexpr size_t rule_sz =
       sizeof(ibv_exp_flow_attr) + sizeof(ibv_exp_flow_spec_eth) +
@@ -378,7 +381,7 @@ void RawTransport::install_flow_rule() {
   auto *udp_spec = reinterpret_cast<struct ibv_exp_flow_spec_tcp_udp *>(buf);
   udp_spec->type = IBV_EXP_FLOW_SPEC_UDP;
   udp_spec->size = sizeof(struct ibv_exp_flow_spec_tcp_udp);
-  udp_spec->val.dst_port = htons(kBaseRawUDPPort + rpc_id);
+  udp_spec->val.dst_port = htons(rx_flow_udp_port);
   udp_spec->mask.dst_port = 0xffffu;
 
   recv_flow = ibv_exp_create_flow(recv_qp, flow_attr);

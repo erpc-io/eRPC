@@ -71,7 +71,7 @@ class Rpc {
    * @throw runtime_error if construction fails
    */
   Rpc(Nexus *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,
-      uint8_t phy_port = 0, size_t numa_node = 0);
+      uint8_t phy_port = 0);
 
   /// Destroy the Rpc from a foreground thread
   ~Rpc();
@@ -211,11 +211,11 @@ class Rpc {
    * A callback of type \p kConnected or \p kConnectFailed will be invoked if
    * this call is successful.
    *
-   * @param remote The remote Nexus's URI, formatted as hostname:udp_port
+   * @param remote_uri The remote Nexus's URI, formatted as hostname:udp_port
    */
-  int create_session(std::string remote, uint8_t rem_rpc_id,
+  int create_session(std::string remote_uri, uint8_t rem_rpc_id,
                      uint8_t rem_phy_port = 0) {
-    return create_session_st(remote, rem_rpc_id, rem_phy_port);
+    return create_session_st(remote_uri, rem_rpc_id, rem_phy_port);
   }
 
   /**
@@ -248,7 +248,7 @@ class Rpc {
   }
 
  private:
-  int create_session_st(std::string rem_hostname, uint8_t rem_rpc_id,
+  int create_session_st(std::string remote_uri, uint8_t rem_rpc_id,
                         uint8_t rem_phy_port = 0);
   int destroy_session_st(int session_num);
   size_t num_active_sessions_st();
@@ -799,7 +799,8 @@ class Rpc {
  private:
   // Constructor args
   Nexus *nexus;
-  void *context;  ///< The application context
+  void *context;       ///< The application context
+  const uint8_t epid;  ///< The eRPC process ID of the parent Nexus
   const uint8_t rpc_id;
   const sm_handler_t sm_handler;
   const uint8_t phy_port;  ///< Zero-based physical port specified by app

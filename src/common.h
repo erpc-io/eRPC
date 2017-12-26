@@ -39,6 +39,7 @@ static constexpr size_t kMaxRpcId = std::numeric_limits<uint8_t>::max() - 1;
 static constexpr size_t kReqTypeArraySize =
     std::numeric_limits<uint8_t>::max() + 1ull;
 
+static constexpr size_t kMaxEPid = 8;       ///< Max eRPC processes on a machine
 static constexpr size_t kMaxPhyPorts = 16;  ///< Max fabric device ports
 static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
 static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
@@ -49,6 +50,7 @@ static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
     (240 + kMaxHostnameLen * 2);           // Three lines and two hostnames
 
 // Invalid values
+static constexpr uint8_t kInvalidNUMANode = 2;  ///< 0/1 only for now
 static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
 static constexpr uint8_t kInvalidReqType = kReqTypeArraySize - 1;
 static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;

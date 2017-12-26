@@ -86,7 +86,8 @@ class Transport {
    *
    * @throw runtime_error if creation fails
    */
-  Transport(TransportType transport_type, uint8_t rpc_id, uint8_t phy_port);
+  Transport(TransportType, uint8_t epid, uint8_t rpc_id, uint8_t phy_port,
+            size_t numa_node);
 
   /**
    * @brief Initialize transport structures that require hugepages, and fill
@@ -155,8 +156,10 @@ class Transport {
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
-  const uint8_t rpc_id;    // Debug-only
+  const uint8_t epid;      ///< The parent Nexus's local eRPC process ID
+  const uint8_t rpc_id;    ///< The parent Rpc's ID
   const uint8_t phy_port;  ///< 0-based physical port specified by application
+  const size_t numa_node;  ///< Derived from \p huge_alloc
 
   // Other members
   reg_mr_func_t reg_mr_func;      ///< The memory registration function
@@ -164,7 +167,6 @@ class Transport {
 
   // Members initialized after the hugepage allocator is provided
   HugeAlloc* huge_alloc;  ///< The parent Rpc's hugepage allocator
-  size_t numa_node;       ///< Derived from \p huge_alloc
 
   struct {
     size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called

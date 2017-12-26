@@ -16,8 +16,8 @@ namespace erpc {
 
 class RawTransport : public Transport {
  public:
-  ///  RPC ID i uses destination UDP port = (kBaseRawUDPPort + i)
-  static constexpr uint16_t kBaseRawUDPPort = 31850;
+  /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and epid.
+  static constexpr uint16_t kBaseRawUDPPort = 10000;
 
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kRaw;
@@ -108,7 +108,8 @@ class RawTransport : public Transport {
     return ((cur_idx + kCQESnapshotCycle) - prev_idx) % kCQESnapshotCycle;
   }
 
-  RawTransport(uint8_t phy_port, uint8_t rpc_id);
+  RawTransport(uint8_t epid, uint8_t rpc_id, uint8_t phy_port,
+               size_t numa_node);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
   ~RawTransport();
@@ -221,6 +222,7 @@ class RawTransport : public Transport {
   struct ibv_sge send_sgl[kPostlist][2];  ///< SGEs for eRPC header & payload
 
   // RECV
+  const uint16_t rx_flow_udp_port;
   size_t recvs_to_post = 0;              ///< Current number of RECVs to post
   struct ibv_sge mp_recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
   size_t mp_sge_idx = 0;  ///< Index of the multi-packet SGE to post

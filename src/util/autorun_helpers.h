@@ -28,24 +28,24 @@ static std::string get_line_n(std::string filename, size_t n) {
   return s;
 }
 
-/// Extract the hostname from a remote URI formatted as hostname:udp_port
-static std::string extract_hostname_from_remote(std::string remote) {
+/// Extract the hostname from a URI formatted as hostname:udp_port
+static std::string extract_hostname_from_uri(std::string uri) {
   std::vector<std::string> split_vec;
-  boost::split(split_vec, remote, boost::is_any_of(":"));
+  boost::split(split_vec, uri, boost::is_any_of(":"));
   erpc::rt_assert(split_vec.size() == 2 && split_vec[0].length() > 0 &&
                       split_vec[1].length() > 0,
-                  "Invalid remote " + remote);
+                  "Invalid URI " + uri);
 
   return split_vec[0];
 }
 
-/// Extract the UDP port from a remote URI formatted as hostname:udp_port
-static std::string extract_udp_port_from_remote(std::string remote) {
+/// Extract the UDP port from a URI formatted as hostname:udp_port
+static std::string extract_udp_port_from_uri(std::string uri) {
   std::vector<std::string> split_vec;
-  boost::split(split_vec, remote, boost::is_any_of(":"));
+  boost::split(split_vec, uri, boost::is_any_of(":"));
   erpc::rt_assert(split_vec.size() == 2 && split_vec[0].length() > 0 &&
                       split_vec[1].length() > 0,
-                  "Invalid remote " + remote);
+                  "Invalid URI " + uri);
 
   return split_vec[1];
 }
@@ -80,6 +80,13 @@ static std::string get_udp_port_for_process(size_t process_i) {
                       split_vec[1].length() > 0 && split_vec[2].length() > 0,
                   "Invalid process file line: " + line);
   return split_vec[1];
+}
+
+/// Return the URI of the process with index process_i
+static std::string get_uri_for_process(size_t process_i) {
+  std::string hostname = erpc::get_hostname_for_process(process_i);
+  std::string udp_port_str = erpc::get_udp_port_for_process(process_i);
+  return hostname + ":" + udp_port_str;
 }
 
 }  // End erpc

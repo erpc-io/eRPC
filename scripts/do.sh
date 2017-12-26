@@ -43,5 +43,6 @@ fi
 if [ "$#" -eq 3 ]; then
   blue "do.sh: Launching process $epid with GDB"
   sudo gdb -ex run --args \
-    ./build/$autorun_app $(cat apps/$autorun_app/config) --process_id $epid
+    ./build/$autorun_app $(cat apps/$autorun_app/config) \
+    --process_id $epid --numa_node $numa_node
 fi

@@ -9,6 +9,7 @@
 
 using namespace erpc;
 
+static constexpr size_t kTestEPid = 0;
 static constexpr size_t kTestEventLoopMs = 200;
 static constexpr size_t kTestMaxEventLoopMs = 20000;  // 20 seconds
 static constexpr uint8_t kTestClientRpcId = 100;
@@ -126,7 +127,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
   context.is_client = false;
 
   Rpc<CTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
-                      kTestPhyPort, kTestNumaNode);
+                      kTestPhyPort);
   if (kTesting) rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
 
   context.rpc = &rpc;
@@ -220,7 +221,7 @@ void launch_server_client_threads(
     void (*client_thread_func)(Nexus *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers, double srv_pkt_drop_prob) {
-  Nexus nexus("localhost", 31850, num_bg_threads);
+  Nexus nexus("localhost:31850", kTestEPid, kTestNumaNode, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
@@ -276,8 +277,7 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
 
   context.is_client = true;
   context.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                                    kTestClientRpcId, sm_handler, kTestPhyPort,
-                                    kTestNumaNode);
+                                    kTestClientRpcId, sm_handler, kTestPhyPort);
 
   // Connect the sessions
   context.session_num_arr = new int[num_sessions];

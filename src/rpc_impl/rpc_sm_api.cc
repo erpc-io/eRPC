@@ -12,7 +12,7 @@ namespace erpc {
 // This function is not on the critical path and is exposed to the user,
 // so the args checking is always enabled.
 template <class TTr>
-int Rpc<TTr>::create_session_st(std::string remote, uint8_t rem_rpc_id,
+int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id,
                                 uint8_t rem_phy_port) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
@@ -29,8 +29,8 @@ int Rpc<TTr>::create_session_st(std::string remote, uint8_t rem_rpc_id,
     return -EINVAL;
   }
 
-  std::string rem_hostname = extract_hostname_from_remote(remote);
-  std::string rem_sm_udp_port_str = extract_udp_port_from_remote(remote);
+  std::string rem_hostname = extract_hostname_from_uri(remote_uri);
+  std::string rem_sm_udp_port_str = extract_udp_port_from_uri(remote_uri);
   uint16_t rem_sm_udp_port = std::stoi(rem_sm_udp_port_str);
 
   // Check remote hostname

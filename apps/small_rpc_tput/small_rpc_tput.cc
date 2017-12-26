@@ -270,9 +270,10 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.tmp_stat = new TmpStat(stat_filename.c_str(), "Mrps IPC");
   c.thread_id = thread_id;
 
-  erpc::Rpc<erpc::CTransport> rpc(
-      nexus, static_cast<void *>(&c), static_cast<uint8_t>(thread_id),
-      basic_sm_handler, kAppPhyPort, FLAGS_numa_node);
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
+                                  static_cast<uint8_t>(thread_id),
+                                  basic_sm_handler, kAppPhyPort);
+
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 
@@ -295,17 +296,17 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
     std::string rem_hostname = erpc::get_hostname_for_process(p_i);
     std::string rem_udp_port = erpc::get_udp_port_for_process(p_i);
-    std::string remote = rem_hostname + ":" + rem_udp_port;
+    std::string remote_uri = rem_hostname + ":" + rem_udp_port;
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
       const size_t session_idx = (p_i * FLAGS_num_threads) + t_i;
       if (session_idx == c.self_session_index) continue;
 
       fprintf(stderr, "Process %zu, thread %zu: Creating session to %s\n",
-              FLAGS_process_id, thread_id, remote.c_str());
+              FLAGS_process_id, thread_id, remote_uri.c_str());
 
-      c.session_num_vec[session_idx] =
-          rpc.create_session(remote, static_cast<uint8_t>(t_i), kAppPhyPort);
+      c.session_num_vec[session_idx] = rpc.create_session(
+          remote_uri, static_cast<uint8_t>(t_i), kAppPhyPort);
       assert(c.session_num_vec[session_idx] >= 0);
     }
   }
@@ -342,9 +343,8 @@ int main(int argc, char **argv) {
                   "Invalid concurrency");
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");  // 0 or 1
 
-  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
-  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
-  erpc::Nexus nexus(hostname, std::stoi(udp_port_str));
+  erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
+                    FLAGS_process_id, FLAGS_numa_node, 0);
   nexus.register_req_func(
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 

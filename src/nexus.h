@@ -48,15 +48,16 @@ class Nexus {
   /**
    * @brief Create the one-per-process Nexus object.
    *
-   * @param hostname The IP host name of this host
-   *
-   * @param sm_udp_port The UDP port used by this Nexus for session management
+   * @param hostname The local URI formatted as hostname:udp_port
+   * @param epid A small process ID
+   * @param numa_node NUMA node for this eRPC process
    * @param num_bg_threads The number of background RPC request processing
    * threads to launch.
    *
    * @throw runtime_error if Nexus creation fails.
    */
-  Nexus(std::string hostname, uint16_t sm_udp_port, size_t num_bg_threads = 0);
+  Nexus(std::string local_uri, uint8_t epid, size_t numa_node,
+        size_t num_bg_threads);
 
   ~Nexus();
 
@@ -120,6 +121,8 @@ class Nexus {
   const double freq_ghz;        ///< TSC frequncy
   const std::string hostname;   ///< The local host
   const uint16_t sm_udp_port;   ///< UDP port for session management
+  const uint8_t epid;           ///< The eRPC machine-local process ID
+  const size_t numa_node;       ///< The NUMA node for this process
   const size_t num_bg_threads;  ///< Background threads to process Rpc reqs
   TlsRegistry tls_registry;     ///< A thread-local registry
 
