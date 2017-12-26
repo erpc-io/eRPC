@@ -9,7 +9,7 @@
 #include "util/misc.h"
 
 static constexpr bool kAppVerbose = false;
-static constexpr size_t kAppMeasureLatency = false;
+static constexpr bool kAppMeasureLatency = false;
 
 // Optimization knobs. Set to true to disable optimization.
 static constexpr bool kAppOptDisablePreallocResp = false;
@@ -236,15 +236,16 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     if (FLAGS_num_threads == 1 && is_papi_usable) ipc = papi_get_ipc();
 
     printf(
-        "Process %zu, thread %zu: %.2f Mrps. Average TX batch size = %.2f. "
+        "Process %zu, thread %zu: %.2f Mrps. Average TX batch = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
         "Resps/concurrent batch: min %zu, max %zu. IPC = %.2f. "
-        "Latency: %.2f us median, %.2f us 99 perc.\n",
+        "Latency: {%.2f, %.2f} us.\n",
         FLAGS_process_id, c->thread_id,
         c->stat_resp_rx_tot / (seconds * 1000000),
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
         c->stat_req_rx_tot, min_resps, max_resps, ipc,
-        c->latency.perc(.50) / 10.0, c->latency.perc(.99) / 10.0);
+        kAppMeasureLatency ? c->latency.perc(.50) / 10.0 : -1,
+        kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1);
 
     // Stats: throughput ipc
     c->tmp_stat->write(
