@@ -1,4 +1,4 @@
---test_ms 20000
+--test_ms 50000
 --batch_size 7
 --msg_size 32
 --num_processes 8

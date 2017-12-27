@@ -46,7 +46,7 @@ class Rpc {
   static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
 
   /// Initial capacity of the hugepage allocator
-  static constexpr size_t kInitialHugeAllocSize = (128 * MB(1));
+  static constexpr size_t kInitialHugeAllocSize = (8 * MB(1));
 
   /// Duration of an RPC packet loss detection epoch in milliseconds
   static constexpr size_t kRpcPktLossEpochMs = kTesting ? 10 : 10;
