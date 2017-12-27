@@ -18,6 +18,7 @@
 // Flags that must be used in every app. test_ms and num_processes are required
 // in the app's config file by the autorun scripts.
 DEFINE_uint64(test_ms, 0, "Test milliseconds");
+DEFINE_bool(sm_verbose, false, "Print session management debug info");
 DEFINE_uint64(num_processes, 0, "Number of eRPC processes in the cluster");
 DEFINE_uint64(process_id, std::numeric_limits<size_t>::max(),
               "The global ID of this process");
@@ -151,13 +152,15 @@ void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
   erpc::rt_assert(session_idx < c->session_num_vec.size(),
                   "Invalid session number");
 
-  fprintf(stderr,
-          "Process %zu, Rpc %u: Session number %d (index %zu) %s. Error = %s. "
-          "Time elapsed = %.3f s.\n",
-          FLAGS_process_id, c->rpc->get_rpc_id(), session_num, session_idx,
-          erpc::sm_event_type_str(sm_event_type).c_str(),
-          erpc::sm_err_type_str(sm_err_type).c_str(),
-          c->rpc->sec_since_creation());
+  if (FLAGS_sm_verbose) {
+    fprintf(stderr,
+            "Process %zu, Rpc %u: Session number %d (index %zu) %s. Error %s. "
+            "Time elapsed = %.3f s.\n",
+            FLAGS_process_id, c->rpc->get_rpc_id(), session_num, session_idx,
+            erpc::sm_event_type_str(sm_event_type).c_str(),
+            erpc::sm_err_type_str(sm_err_type).c_str(),
+            c->rpc->sec_since_creation());
+  }
 }
 
 #endif  // APPS_COMMON_H

@@ -300,8 +300,10 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
       const size_t session_idx = (p_i * FLAGS_num_threads) + t_i;
       if (session_idx == c.self_session_index) continue;
 
-      fprintf(stderr, "Process %zu, thread %zu: Creating session to %s\n",
-              FLAGS_process_id, thread_id, remote_uri.c_str());
+      if (FLAGS_sm_verbose) {
+        fprintf(stderr, "Process %zu, thread %zu: Creating session to %s.\n",
+                FLAGS_process_id, thread_id, remote_uri.c_str());
+      }
 
       c.session_num_vec[session_idx] =
           rpc.create_session(remote_uri, static_cast<uint8_t>(t_i));

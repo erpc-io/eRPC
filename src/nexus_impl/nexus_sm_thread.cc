@@ -38,7 +38,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
         // We don't have an Rpc object for the target Rpc. Send a response iff
         // it's a request packet.
         if (sm_pkt.is_req()) {
-          LOG_WARN(
+          LOG_INFO(
               "eRPC Nexus: Received session management request for invalid "
               "Rpc %u from %s. Sending response.\n",
               target_rpc_id, sm_pkt.client.name().c_str());
@@ -49,7 +49,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
           udp_client.send(resp_sm_pkt.client.hostname,
                           resp_sm_pkt.client.sm_udp_port, resp_sm_pkt);
         } else {
-          LOG_WARN(
+          LOG_INFO(
               "eRPC Nexus: Received session management response for invalid "
               "Rpc %u from %s. Dropping.\n",
               target_rpc_id, sm_pkt.client.name().c_str());
