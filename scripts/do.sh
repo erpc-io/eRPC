@@ -10,6 +10,12 @@ fi
 
 chmod +x build/$autorun_app # Fix permissions messed up by lsyncd
 
+export MLX4_SINGLE_THREADED=1
+export MLX5_SINGLE_THREADED=1
+export MLX5_SHUT_UP_BF=1
+export MLX_QP_ALLOC_TYPE="HUGE"
+export MLX_CQ_ALLOC_TYPE="HUGE"
+
 # Install modded driver - this is not a requirement
 if [ "$autorun_app" != "consensus" ]; then
   blue "Installing modded driver"
@@ -34,7 +40,7 @@ numa_node=$2
 if [ "$#" -eq 2 ]; then
   blue "do.sh: Launching process $epid on NUMA node $numa_node"
 
-  sudo numactl --cpunodebind=$numa_node --membind=$numa_node \
+  sudo -E numactl --cpunodebind=$numa_node --membind=$numa_node \
     ./build/$autorun_app $(cat apps/$autorun_app/config) \
     --process_id $epid --numa_node $numa_node
 fi

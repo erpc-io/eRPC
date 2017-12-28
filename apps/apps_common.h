@@ -18,7 +18,7 @@
 // Flags that must be used in every app. test_ms and num_processes are required
 // in the app's config file by the autorun scripts.
 DEFINE_uint64(test_ms, 0, "Test milliseconds");
-DEFINE_bool(sm_verbose, false, "Print session management debug info");
+DEFINE_uint64(sm_verbose, 0, "Print session management debug info");
 DEFINE_uint64(num_processes, 0, "Number of eRPC processes in the cluster");
 DEFINE_uint64(process_id, std::numeric_limits<size_t>::max(),
               "The global ID of this process");
@@ -152,7 +152,7 @@ void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
   erpc::rt_assert(session_idx < c->session_num_vec.size(),
                   "Invalid session number");
 
-  if (FLAGS_sm_verbose) {
+  if (FLAGS_sm_verbose == 1) {
     fprintf(stderr,
             "Process %zu, Rpc %u: Session number %d (index %zu) %s. Error %s. "
             "Time elapsed = %.3f s.\n",

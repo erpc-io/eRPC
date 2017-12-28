@@ -268,9 +268,16 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.tmp_stat = new TmpStat(stat_filename.c_str(), "Mrps IPC");
   c.thread_id = thread_id;
 
+  uint8_t numa_0_ports[2] = {0, 2};
+  uint8_t numa_1_ports[2] = {1, 3};
+  uint8_t phy_port;
+
+  if (FLAGS_numa_node == 0) phy_port = numa_0_ports[thread_id % 2];
+  if (FLAGS_numa_node == 1) phy_port = numa_1_ports[thread_id % 2];
+
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
-                                  basic_sm_handler, FLAGS_process_id % 2);
+                                  basic_sm_handler, phy_port);
 
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
@@ -300,7 +307,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
       const size_t session_idx = (p_i * FLAGS_num_threads) + t_i;
       if (session_idx == c.self_session_index) continue;
 
-      if (FLAGS_sm_verbose) {
+      if (FLAGS_sm_verbose == 1) {
         fprintf(stderr, "Process %zu, thread %zu: Creating session to %s.\n",
                 FLAGS_process_id, thread_id, remote_uri.c_str());
       }
