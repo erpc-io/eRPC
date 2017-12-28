@@ -1,7 +1,0 @@
-{
-	global:
-		openib_driver_init;
-		mlx5dv_query_device;
-		mlx5dv_init_obj;
-	local: *;
-};
