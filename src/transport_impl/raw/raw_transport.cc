@@ -218,7 +218,8 @@ void RawTransport::init_send_qp() {
   qp_init_attr.send_cq = send_cq;
   qp_init_attr.recv_cq = send_cq;  // We won't post RECVs
   qp_init_attr.cap.max_send_wr = kSQDepth;
-  qp_init_attr.cap.max_inline_data = 128;
+  qp_init_attr.cap.max_send_sge = 2;
+  qp_init_attr.cap.max_inline_data = kMaxInline;
   qp_init_attr.qp_type = IBV_QPT_RAW_PACKET;
   qp_init_attr.exp_create_flags |= IBV_EXP_QP_CREATE_SCATTER_FCS;
 
