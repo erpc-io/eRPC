@@ -12,7 +12,7 @@ chmod +x build/$autorun_app # Fix permissions messed up by lsyncd
 
 export MLX4_SINGLE_THREADED=1
 export MLX5_SINGLE_THREADED=1
-export MLX5_SHUT_UP_BF=1
+export MLX5_SHUT_UP_BF=0
 export MLX_QP_ALLOC_TYPE="HUGE"
 export MLX_CQ_ALLOC_TYPE="HUGE"
 
