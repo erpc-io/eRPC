@@ -2125,10 +2125,6 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 	int size;
 	unsigned idx;
 	uint64_t exp_send_flags;
-#ifdef MLX5_DEBUG
-	FILE *fp = to_mctx(ibqp->context)->dbg_fp;
-#endif
-	mlx5_lock(&qp->sq.lock);
 
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
 		idx = qp->gen_data.scur_post & (qp->sq.wqe_cnt - 1);
@@ -2136,66 +2132,25 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 
 		exp_send_flags = is_exp_wr ? wr->exp_send_flags : ((struct ibv_send_wr *)wr)->send_flags;
 
-		if (unlikely(!(qp->gen_data.create_flags & IBV_EXP_QP_CREATE_IGNORE_SQ_OVERFLOW) &&
-			     mlx5_wq_overflow(0, nreq, qp))) {
-			mlx5_dbg(fp, MLX5_DBG_QP_SEND, "work queue overflow\n");
-			errno = ENOMEM;
-			err = errno;
-			*bad_wr = wr;
-			goto out;
-		}
-
-		if (unlikely(wr->num_sge > qp->sq.max_gs)) {
-			mlx5_dbg(fp, MLX5_DBG_QP_SEND, "max gs exceeded %d (max = %d)\n",
-				 wr->num_sge, qp->sq.max_gs);
-			errno = ENOMEM;
-			err = errno;
-			*bad_wr = wr;
-			goto out;
-		}
-
-
-
-		err = qp->gen_data.post_send_one(wr, qp, exp_send_flags, seg, &size);
+		err = __mlx5_post_send_one_raw_packet(wr, qp, exp_send_flags, seg, &size);
 		if (unlikely(err)) {
 			errno = err;
 			*bad_wr = wr;
 			goto out;
 		}
 
-
-
 		qp->sq.wrid[idx] = wr->wr_id;
 		qp->gen_data.wqe_head[idx] = qp->sq.head + nreq;
 		qp->gen_data.scur_post += DIV_ROUND_UP(size * 16, MLX5_SEND_WQE_BB);
 
 		wqe2ring = seg;
-
-#ifdef MLX5_DEBUG
-		if (mlx5_debug_mask & MLX5_DBG_QP_SEND)
-			dump_wqe(to_mctx(ibqp->context)->dbg_fp, idx, size, qp);
-#endif
 	}
 
 out:
 	if (likely(nreq)) {
 		qp->sq.head += nreq;
-
-		if (unlikely(qp->gen_data.create_flags
-					& CREATE_FLAG_NO_DOORBELL)) {
-			/* Controlled or peer-direct qp */
-			wmb();
-			if (qp->peer_enabled)
-				qp->peer_ctrl_seg = wqe2ring;
-			goto post_send_no_db;
-		}
-
 		__ring_db(qp, qp->gen_data.bf->db_method, qp->gen_data.scur_post & 0xffff, wqe2ring, (size + 3) / 4);
 	}
-
-post_send_no_db:
-
-	mlx5_unlock(&qp->sq.lock);
 
 	return err;
 }
