@@ -10,7 +10,7 @@
 # The bash maps in this scripts are indexed from one !!!!
 
 source $(dirname $0)/utils.sh
-source $(dirname $0)/autorun.sh
+source $(dirname $0)/autorun_parse.sh
 
 # Temporary directory for storing scp-ed files
 tmpdir="/tmp/${autorun_app}_proc"

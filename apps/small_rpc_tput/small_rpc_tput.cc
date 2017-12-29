@@ -56,12 +56,19 @@ class BatchContext {
   erpc::MsgBuffer resp_msgbuf[kAppMaxBatchSize];
 };
 
+struct app_stats_t {
+  double tput_mrps;
+  size_t pad[7];
+};
+static_assert(sizeof(app_stats_t) == 64, "");
+
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
   // The entry in session_num_vec for this thread, to avoid self-request
   size_t self_session_index;
   struct timespec tput_t0;  // Start time for throughput measurement
+  app_stats_t *app_stats;
 
   size_t stat_resp_rx[kAppMaxConcurrency] = {0};  // Resps received for batch i
   size_t stat_resp_rx_tot = 0;  // Total responses received (all batches)
@@ -242,7 +249,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_resp_rx_tot++;
   c->stat_resp_rx[tag.s.batch_i]++;
 
-  if (c->stat_resp_rx_tot == 1000000) {
+  if (unlikely(c->stat_resp_rx_tot == 1000000)) {
+    size_t thread_id = c->rpc->get_rpc_id();
     double seconds = erpc::sec_since(c->tput_t0);
 
     // Min/max responses for a concurrent batch, to check for stagnated batches.
@@ -253,7 +261,9 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->stat_resp_rx[i] = 0;
     }
 
-    const double tput_mrps = c->stat_resp_rx_tot / (seconds * 1000000);
+    double tput_mrps = c->stat_resp_rx_tot / (seconds * 1000000);
+    c->app_stats[thread_id].tput_mrps = tput_mrps;
+
     printf(
         "Process %zu, thread %zu: %.2f Mrps. Average TX batch = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
@@ -266,7 +276,13 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1);
 
     // Thread 1 records stats: throughput
-    if (c->tmp_stat != nullptr) c->tmp_stat->write(std::to_string(tput_mrps));
+    if (thread_id == 0) {
+      double tot_tput_mrps = 0;
+      for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
+        tot_tput_mrps += c->app_stats[t_i].tput_mrps;
+      }
+      c->tmp_stat->write(std::to_string(tot_tput_mrps));
+    }
 
     c->rpc->reset_dpath_stats_st();
     c->stat_resp_rx_tot = 0;
@@ -278,9 +294,10 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 // The function executed by each thread in the cluster
-void thread_func(size_t thread_id, erpc::Nexus *nexus) {
+void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
+  c.app_stats = app_stats;
 
   if (thread_id == 0) {
     auto stat_filename = "small_rpc_tput" + std::to_string(FLAGS_process_id);
@@ -370,12 +387,15 @@ int main(int argc, char **argv) {
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 
   std::vector<std::thread> threads(FLAGS_num_threads);
+  auto *app_stats = new app_stats_t[FLAGS_num_threads];
+
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
-    threads[i] = std::thread(thread_func, i, &nexus);
+    threads[i] = std::thread(thread_func, i, app_stats, &nexus);
     // Assume even threads are on NUMA 0, odd are on NUMA 1
     if (FLAGS_numa_node == 0) erpc::bind_to_core(threads[i], 2 * i);
     if (FLAGS_numa_node == 1) erpc::bind_to_core(threads[i], 2 * i + 1);
   }
 
   for (auto &thread : threads) thread.join();
+  delete[] app_stats;
 }
