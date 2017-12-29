@@ -145,105 +145,17 @@ static inline int __ring_db(struct mlx5_qp *qp, const int db_method, uint32_t cu
 	qp->gen_data.last_post = curr_post;
 	qp->mpw.state = MLX5_MPW_STATE_CLOSED;
 
-	switch (db_method) {
-	case MLX5_DB_METHOD_DEDIC_BF_1_THREAD:
-		/* This QP is used by one thread and it uses dedicated blue-flame */
+  /* This QP is used by one thread and it uses dedicated blue-flame */
 
-		/* Use wc_wmb to make sure old BF-copy is not passing current DB record */
-		wc_wmb();
-		qp->gen_data.db[MLX5_SND_DBR] = htonl(curr_post);
+  /* Use wc_wmb to make sure old BF-copy is not passing current DB record */
+  wc_wmb();
+  qp->gen_data.db[MLX5_SND_DBR] = htonl(curr_post);
 
-		/* This wc_wmb ensures ordering between DB record and BF copy */
-		wc_wmb();
-		if (size <= bf->buf_size / 64) {
-			mlx5_bf_copy(bf->reg + bf->offset, seg,
-				     size * 64, qp);
+  /* This wc_wmb ensures ordering between DB record and BF copy */
+  wc_wmb();
+  mlx5_bf_copy(bf->reg + bf->offset, seg, size * 64, qp);
 
-			/* No need for wc_wmb since cpu arch support auto WC buffer eviction */
-		} else {
-			mlx5_write_db(bf->reg + bf->offset, seg);
-			wc_wmb();
-		}
-		bf->offset ^= bf->buf_size;
-		break;
-
-	case MLX5_DB_METHOD_DEDIC_BF:
-		/* The QP has dedicated blue-flame */
-
-		/*
-		 * Make sure that descriptors are written before
-		 * updating doorbell record and ringing the doorbell
-		 */
-		wmb();
-		qp->gen_data.db[MLX5_SND_DBR] = htonl(curr_post);
-
-		/* This wc_wmb ensures ordering between DB record and BF copy */
-		wc_wmb();
-		if (size <= bf->buf_size / 64)
-			mlx5_bf_copy(bf->reg + bf->offset, seg,
-				     size * 64, qp);
-		else
-			mlx5_write_db(bf->reg + bf->offset, seg);
-		/*
-		 * use wc_wmb to ensure write combining buffers are flushed out
-		 * of the running CPU. This must be carried inside the spinlock.
-		 * Otherwise, there is a potential race. In the race, CPU A
-		 * writes doorbell 1, which is waiting in the WC buffer. CPU B
-		 * writes doorbell 2, and it's write is flushed earlier. Since
-		 * the wc_wmb is CPU local, this will result in the HCA seeing
-		 * doorbell 2, followed by doorbell 1.
-		 */
-		wc_wmb();
-		bf->offset ^= bf->buf_size;
-		break;
-
-	case MLX5_DB_METHOD_BF:
-		/* The QP has blue-flame that may be shared by other QPs */
-
-		/*
-		 * Make sure that descriptors are written before
-		 * updating doorbell record and ringing the doorbell
-		 */
-		wmb();
-		qp->gen_data.db[MLX5_SND_DBR] = htonl(curr_post);
-
-		/* This wc_wmb ensures ordering between DB record and BF copy */
-		wc_wmb();
-		mlx5_lock(&bf->lock);
-		if (size <= bf->buf_size / 64)
-			mlx5_bf_copy(bf->reg + bf->offset, seg,
-				     size * 64, qp);
-		else
-			mlx5_write_db(bf->reg + bf->offset, seg);
-		/*
-		 * use wc_wmb to ensure write combining buffers are flushed out
-		 * of the running CPU. This must be carried inside the spinlock.
-		 * Otherwise, there is a potential race. In the race, CPU A
-		 * writes doorbell 1, which is waiting in the WC buffer. CPU B
-		 * writes doorbell 2, and it's write is flushed earlier. Since
-		 * the wc_wmb is CPU local, this will result in the HCA seeing
-		 * doorbell 2, followed by doorbell 1.
-		 */
-		wc_wmb();
-		bf->offset ^= bf->buf_size;
-		mlx5_unlock(&bf->lock);
-		break;
-
-	case MLX5_DB_METHOD_DB:
-		/* doorbell mapped to non-cached memory */
-
-		/*
-		 * Make sure that descriptors are written before
-		 * updating doorbell record and ringing the doorbell
-		 */
-		wmb();
-		qp->gen_data.db[MLX5_SND_DBR] = htonl(curr_post);
-
-		/* This wmb ensures ordering between DB record and DB ringing */
-		wmb();
-		mlx5_write64((__be32 *)seg, bf->reg + bf->offset, &bf->lock);
-		break;
-	}
+  bf->offset ^= bf->buf_size;
 
 	return 0;
 }
