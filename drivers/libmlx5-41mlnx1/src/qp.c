@@ -480,31 +480,6 @@ static int set_dci_seg(struct mlx5_wqe_datagram_seg *dseg,
 	return size;
 }
 
-static int set_odp_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sge *sg,
-				struct mlx5_qp *qp) __attribute__((noinline));
-static int set_odp_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sge *sg,
-				struct mlx5_qp *qp)
-{
-	uint32_t lkey;
-	if (sg->lkey == ODP_GLOBAL_R_LKEY) {
-		if (mlx5_get_real_lkey_from_implicit_lkey(qp->odp_data.pd, &qp->odp_data.pd->r_ilkey,
-							  sg->addr, sg->length,
-							  &lkey))
-			return ENOMEM;
-	} else {
-		if (mlx5_get_real_lkey_from_implicit_lkey(qp->odp_data.pd, &qp->odp_data.pd->w_ilkey,
-							  sg->addr, sg->length,
-							  &lkey))
-			return ENOMEM;
-	}
-
-	dseg->byte_count = htonl(sg->length);
-	dseg->lkey       = htonl(lkey);
-	dseg->addr       = htonll(sg->addr);
-
-	return 0;
-}
-
 static inline int set_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sge *sg,
 			    struct mlx5_qp *qp,
 			    int offset) __attribute__((always_inline));
@@ -512,13 +487,9 @@ static inline int set_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sg
 			    struct mlx5_qp *qp,
 			    int offset)
 {
-	if (unlikely(sg->lkey == ODP_GLOBAL_R_LKEY || sg->lkey == ODP_GLOBAL_W_LKEY))
-		return set_odp_data_ptr_seg(dseg, sg, qp);
-
 	dseg->byte_count = htonl(sg->length - offset);
 	dseg->lkey       = htonl(sg->lkey);
 	dseg->addr       = htonll(sg->addr + offset);
-
 	return 0;
 }
 
@@ -586,41 +557,20 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 			 void *wqe, int *sz,
 			 int idx, int offset, int is_tso)
 {
-	struct mlx5_context *ctx = to_mctx(qp->verbs_qp.qp.context);
 	struct mlx5_wqe_data_seg *dpseg = wqe;
 	struct ibv_sge *psge;
 	int i;
-#ifdef MLX5_DEBUG
-	FILE *fp = to_mctx(qp->verbs_qp.qp.context)->dbg_fp;
-#endif
-	uint32_t max_tso = ctx->max_tso;
 
 	for (i = idx; i < num_sge; ++i) {
-		if (unlikely(is_tso)) {
-			if (unlikely(max_tso < sg_list[i].length)) {
-				mlx5_dbg(fp, MLX5_DBG_QP_SEND,
-					 "max tso payload length is %d\n",
-					 ctx->max_tso);
-				return EINVAL;
-			}
-			max_tso -= sg_list[i].length;
-		}
-
 		if (unlikely(dpseg == qp->gen_data.sqend))
 			dpseg = mlx5_get_send_wqe(qp, 0);
 
-		if (likely(sg_list[i].length)) {
-			psge = sg_list + i;
+    psge = sg_list + i;
 
-			if (unlikely(set_data_ptr_seg(dpseg, psge, qp,
-						      offset))) {
-				mlx5_dbg(fp, MLX5_DBG_QP_SEND, "failed allocating memory for implicit lkey structure\n");
-				return ENOMEM;
-			}
-			++dpseg;
-			offset = 0;
-			*sz += sizeof(struct mlx5_wqe_data_seg) / 16;
-		}
+    set_data_ptr_seg(dpseg, psge, qp, offset);
+    ++dpseg;
+    offset = 0;
+    *sz += sizeof(struct mlx5_wqe_data_seg) / 16;
 	}
 
 	return 0;
@@ -1289,24 +1239,14 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 					   int *total_size)
 {
 	void *ctrl = seg;
-	struct mlx5_wqe_eth_seg *eseg;
 	int err = 0;
 	int size = 0;
 	int num_sge = wr->num_sge;
 	int i = 0;
 	uint8_t fm_ce_se;
-#ifdef MLX5_DEBUG
-	FILE *fp = to_mctx(qp->verbs_qp.qp.context)->dbg_fp;
-#endif
 
 	seg += sizeof(struct mlx5_wqe_ctrl_seg);
 	size = sizeof(struct mlx5_wqe_ctrl_seg) / 16;
-
-	eseg = seg;
-	*((uint64_t *)eseg) = 0;
-	eseg->rsvd2 = 0;
-
-  eseg->inline_hdr_sz = 0;
 
   seg += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr)) & ~0xf;
   size += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr)) >> 4;
@@ -1320,11 +1260,10 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 					     (IBV_SEND_SOLICITED |
 					      IBV_SEND_SIGNALED |
 					      IBV_SEND_FENCE)];
-	fm_ce_se |= get_fence(qp->gen_data.fm_cache, wr);
+	//fm_ce_se |= get_fence(qp->gen_data.fm_cache, wr);
 	set_ctrl_seg_sig(ctrl, &qp->ctrl_seg,
-			 MLX5_IB_OPCODE_GET_OP(mlx5_ib_opcode[wr->exp_opcode]),
-			 qp->gen_data.scur_post, 0, size, fm_ce_se,
-			 send_ieth(wr));
+			 MLX5_IB_OPCODE_GET_OP(mlx5_ib_opcode[IBV_WR_SEND]),
+			 qp->gen_data.scur_post, 0, size, fm_ce_se, 0);
 
 	qp->gen_data.fm_cache = 0;
 	*total_size = size;
@@ -2045,7 +1984,7 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 		idx = qp->gen_data.scur_post & (qp->sq.wqe_cnt - 1);
 		seg = mlx5_get_send_wqe(qp, idx);
 
-		exp_send_flags = is_exp_wr ? wr->exp_send_flags : ((struct ibv_send_wr *)wr)->send_flags;
+		exp_send_flags = ((struct ibv_send_wr *)wr)->send_flags;
 
 		err = __mlx5_post_send_one_raw_packet(wr, qp, exp_send_flags, seg, &size);
 		if (unlikely(err)) {
@@ -2145,22 +2084,6 @@ int mlx5_exp_rollback_send(struct ibv_qp *ibqp,
 int mlx5_post_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 		   struct ibv_send_wr **bad_wr)
 {
-
-#ifdef MW_DEBUG
-	if (wr->opcode == IBV_WR_BIND_MW) {
-		if (wr->bind_mw.mw->type == IBV_MW_TYPE_1)
-			return EINVAL;
-
-		if (!wr->bind_mw.bind_info.mr ||
-		    !wr->bind_mw.bind_info.addr ||
-		    !wr->bind_mw.bind_info.length)
-			return EINVAL;
-
-		if (wr->bind_mw.bind_info.mr->pd != wr->bind_mw.mw->pd)
-			return EINVAL;
-	}
-#endif
-
 	return __mlx5_post_send(ibqp, (struct ibv_exp_send_wr *)wr,
 				(struct ibv_exp_send_wr **)bad_wr, 0);
 }
