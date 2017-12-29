@@ -626,39 +626,6 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 	return 0;
 }
 
-static int set_data_atom_seg(struct mlx5_qp *qp, int num_sge, struct ibv_sge *sg_list,
-			     void *wqe, int *sz, int atom_arg) __MLX5_ALGN_F__;
-static int set_data_atom_seg(struct mlx5_qp *qp, int num_sge, struct ibv_sge *sg_list,
-			     void *wqe, int *sz, int atom_arg)
-{
-	struct mlx5_wqe_data_seg *dpseg = wqe;
-	struct ibv_sge *psge;
-	struct ibv_sge sge;
-	int i;
-#ifdef MLX5_DEBUG
-	FILE *fp = to_mctx(qp->verbs_qp.qp.context)->dbg_fp;
-#endif
-
-	for (i = 0; i < num_sge; ++i) {
-		if (unlikely(dpseg == qp->gen_data.sqend))
-			dpseg = mlx5_get_send_wqe(qp, 0);
-
-		if (likely(sg_list[i].length)) {
-			sge = sg_list[i];
-			sge.length = atom_arg;
-			psge = &sge;
-			if (unlikely(set_data_ptr_seg(dpseg, psge, qp, 0))) {
-				mlx5_dbg(fp, MLX5_DBG_QP_SEND, "failed allocating memory for implicit lkey structure\n");
-				return ENOMEM;
-			}
-			++dpseg;
-			*sz += sizeof(struct mlx5_wqe_data_seg) / 16;
-		}
-	}
-
-	return 0;
-}
-
 static inline int set_data_seg(struct mlx5_qp *qp, void *seg, int *sz, int is_inl,
 		 int num_sge, struct ibv_sge *sg_list, int atom_arg,
 		 int idx, int offset, int is_tso) __attribute__((always_inline));
@@ -666,12 +633,6 @@ static inline int set_data_seg(struct mlx5_qp *qp, void *seg, int *sz, int is_in
 		 int num_sge, struct ibv_sge *sg_list, int atom_arg,
 		 int idx, int offset, int is_tso)
 {
-	if (is_inl)
-		return set_data_inl_seg(qp, num_sge, sg_list, seg, sz, idx,
-					offset);
-	if (unlikely(atom_arg))
-		return set_data_atom_seg(qp, num_sge, sg_list, seg, sz, atom_arg);
-
 	return set_data_non_inl_seg(qp, num_sge, sg_list, seg, sz, idx, offset, is_tso);
 }
 
@@ -1332,8 +1293,6 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	int err = 0;
 	int size = 0;
 	int num_sge = wr->num_sge;
-	int inl_hdr_size = to_mctx(qp->verbs_qp.qp.context)->eth_min_inline_size;
-	int inl_hdr_copy_size = 0;
 	int i = 0;
 	uint8_t fm_ce_se;
 #ifdef MLX5_DEBUG
@@ -1347,56 +1306,12 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	*((uint64_t *)eseg) = 0;
 	eseg->rsvd2 = 0;
 
-	if (exp_send_flags & IBV_EXP_SEND_IP_CSUM)
-		eseg->cs_flags = MLX5_ETH_WQE_L3_CSUM | MLX5_ETH_WQE_L4_CSUM;
+  eseg->inline_hdr_sz = 0;
 
-	if (wr->exp_opcode == IBV_EXP_WR_TSO) {
-		err = set_tso_eth_seg(&seg, wr, qp, &size);
-	} else {
-		/* The first bytes of the headers should be copied to the
-		 * inline-headers of the ETH segment.
-		 */
-		if (likely(wr->sg_list[0].length >= MLX5_ETH_INLINE_HEADER_SIZE)) {
-			inl_hdr_copy_size = inl_hdr_size;
-			memcpy(eseg->inline_hdr_start,
-			       (void *)(uintptr_t)wr->sg_list[0].addr,
-			       inl_hdr_copy_size);
-		} else {
-			for (i = 0; i < num_sge && inl_hdr_size > 0; ++i) {
-				inl_hdr_copy_size = min(wr->sg_list[i].length,
-							inl_hdr_size);
-				memcpy(eseg->inline_hdr_start +
-				       (MLX5_ETH_INLINE_HEADER_SIZE - inl_hdr_size),
-				       (void *)(uintptr_t)wr->sg_list[i].addr,
-				       inl_hdr_copy_size);
-				inl_hdr_size -= inl_hdr_copy_size;
-			}
-			--i;
-			if (unlikely(inl_hdr_size)) {
-				mlx5_dbg(fp, MLX5_DBG_QP_SEND, "Ethernet headers < %d bytes\n",
-					 MLX5_ETH_INLINE_HEADER_SIZE);
-				return EINVAL;
-			}
-		}
+  seg += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr)) & ~0xf;
+  size += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr)) >> 4;
 
-		eseg->inline_hdr_sz = htons(inl_hdr_size);
-
-		seg += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr) + inl_hdr_size) & ~0xf;
-		size += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr) + inl_hdr_size) >> 4;
-
-		/* If we copied all the sge into the inline-headers, then we need to
-		 * start copying from the next sge into the data-segment.
-		 */
-		if (unlikely(wr->sg_list[i].length == inl_hdr_copy_size)) {
-			++i;
-			inl_hdr_copy_size = 0;
-		}
-
-		/* The copied headers should be excluded from the data segment */
-		err = set_data_seg(qp, seg, &size,
-				   !!(exp_send_flags & IBV_EXP_SEND_INLINE),
-				   num_sge, wr->sg_list, 0, i, inl_hdr_copy_size, 0);
-	}
+  err = set_data_seg(qp, seg, &size, 0, num_sge, wr->sg_list, 0, i, 0, 0);
 
 	if (unlikely(err))
 		return err;
