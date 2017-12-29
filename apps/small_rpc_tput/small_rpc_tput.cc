@@ -1,5 +1,4 @@
 #include <gflags/gflags.h>
-#include <papi.h>
 #include <signal.h>
 #include <cstring>
 #include "../apps_common.h"
@@ -29,7 +28,6 @@ DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
-bool is_papi_usable = false;  // PAPI seems to not work on Ubuntu 17.04
 
 union tag_t {
   struct {
@@ -232,25 +230,21 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->stat_resp_rx[i] = 0;
     }
 
-    float ipc = -1;
-    if (FLAGS_num_threads == 1 && is_papi_usable) ipc = papi_get_ipc();
-
     printf(
         "Process %zu, thread %zu: %.2f Mrps. Average TX batch = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
-        "Resps/concurrent batch: min %zu, max %zu. IPC = %.2f. "
+        "Resps/concurrent batch: min %zu, max %zu. "
         "Latency: {%.2f, %.2f} us.\n",
         FLAGS_process_id, c->thread_id,
         c->stat_resp_rx_tot / (seconds * 1000000),
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
-        c->stat_req_rx_tot, min_resps, max_resps, ipc,
+        c->stat_req_rx_tot, min_resps, max_resps,
         kAppMeasureLatency ? c->latency.perc(.50) / 10.0 : -1,
         kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1);
 
-    // Stats: throughput ipc
+    // Stats: throughput
     c->tmp_stat->write(
-        std::to_string(c->stat_resp_rx_tot / (seconds * 1000000)) + " " +
-        std::to_string(ipc));
+        std::to_string(c->stat_resp_rx_tot / (seconds * 1000000)));
 
     c->rpc->reset_dpath_stats_st();
     c->stat_resp_rx_tot = 0;
@@ -265,7 +259,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
   auto stat_filename = "small_rpc_tput" + std::to_string(FLAGS_process_id);
-  c.tmp_stat = new TmpStat(stat_filename.c_str(), "Mrps IPC");
+  c.tmp_stat = new TmpStat(stat_filename.c_str(), "Mrps");
   c.thread_id = thread_id;
 
   uint8_t numa_0_ports[2] = {0, 2};
@@ -327,11 +321,6 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
           "Process %zu, thread %zu: All sessions connected. Running ev loop.\n",
           FLAGS_process_id, thread_id);
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
-
-  // Initialize PAPI measurement if we're running one thread
-  if (FLAGS_num_threads == 1) {
-    is_papi_usable = (papi_init() == PAPI_OK);
-  }
 
   for (size_t i = 0; i < FLAGS_concurrency; i++) send_reqs(&c, i);
 
