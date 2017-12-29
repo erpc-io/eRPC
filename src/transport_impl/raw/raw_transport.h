@@ -35,20 +35,20 @@ class RawTransport : public Transport {
   static_assert(is_power_of_two(kCQESnapshotCycle), "");
 
   static constexpr size_t kRQDepth = (kNumRxRingEntries / kStridesPerWQE);
-  static constexpr size_t kSQDepth = 32;  ///< Send queue depth
+  static constexpr size_t kSQDepth = 128;  ///< Send queue depth
 
   /// The CQ size allocated by the mlx5 driver. We request a CQ of half this
   /// size, and the mlx5 driver doubles it.
   static constexpr size_t kRecvCQDepth = 8;
   static_assert(kRecvCQDepth >= 2 && is_power_of_two(kRecvCQDepth), "");
 
-  static constexpr size_t kUnsigBatch = 16;  ///< Selective signaling for SENDs
+  static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
-  static constexpr size_t kMaxInline = 76;   ///< Maximum send wr inline data
+  static constexpr size_t kMaxInline = 0;    ///< Maximum send wr inline data
   static_assert(is_power_of_two(kRecvCQDepth), "");
-  static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
-  static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
-  static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
+  static_assert(kSQDepth >= 2 * kUnsigBatch, "");  // Queue capacity check
+  static_assert(kPostlist <= kUnsigBatch, "");     // Postlist check
+  // static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
 
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
@@ -142,10 +142,9 @@ class RawTransport : public Transport {
     // * nb_tx = 2: no poll, unsignaled
     // * nb_tx = 3: no poll, unsignaled
     // * nb_tx = 4: poll, signaled
-    static_assert(is_power_of_two(kUnsigBatch), "");
 
     int flag;
-    if ((nb_tx & (kUnsigBatch - 1)) == 0) {
+    if (nb_tx % kUnsigBatch == 0) {
       flag = IBV_SEND_SIGNALED;
 
       if (likely(nb_tx != 0)) {
