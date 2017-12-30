@@ -11,6 +11,12 @@
 #include "util/logger.h"
 
 namespace erpc {
+
+// Constants for fast RECV driver mod
+static constexpr uint64_t kMagicWrIDForFastRecv = 3185;
+static constexpr uint64_t kModdedProbeWrID = 3186;
+static constexpr int kModdedProbeRet = 3187;
+
 static size_t enum_to_mtu(enum ibv_mtu mtu) {
   switch (mtu) {
     case IBV_MTU_256:

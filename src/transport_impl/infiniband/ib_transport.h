@@ -26,11 +26,6 @@ class IBTransport : public Transport {
   static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
   static constexpr size_t kGRHBytes = 40;
 
-  // Constants for fast RECV driver mod
-  static constexpr uint64_t kMagicWrIDForFastRecv = 3185;
-  static constexpr uint64_t kModdedProbeWrID = 3186;
-  static constexpr int kModdedProbeRet = 3187;
-
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
   static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
   static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
