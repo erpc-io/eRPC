@@ -46,26 +46,22 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 RawTransport::~RawTransport() {
   LOG_INFO("eRPC RawTransport: Destroying transport for ID %u\n", rpc_id);
 
-  // SEND
-  exit_assert(ibv_destroy_qp(qp) == 0,
-              "eRPC RawTransport: Failed to destroy QP.");
-
-  exit_assert(ibv_destroy_cq(send_cq) == 0,
-              "eRPC RawTransport: Failed to destroy send CQ.");
-
-  // RECV
   if (kDumb) {
+    exit_assert(ibv_destroy_qp(qp) == 0,
+                "eRPC RawTransport: Failed to destroy QP.");
+
+    exit_assert(ibv_destroy_cq(send_cq) == 0,
+                "eRPC RawTransport: Failed to destroy send CQ.");
+
     struct ibv_exp_release_intf_params rel_intf_params;
     memset(&rel_intf_params, 0, sizeof(rel_intf_params));
     exit_assert(
         ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
         "eRPC RawTransport: Failed to release interface.");
-  }
 
-  exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
-              "eRPC RawTransport: Failed to destroy RECV flow");
+    exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
+                "eRPC RawTransport: Failed to destroy RECV flow");
 
-  if (kDumb) {
     exit_assert(ibv_destroy_qp(mp_recv_qp) == 0,
                 "eRPC RawTransport: Failed to destroy RECV QP.");
 
@@ -74,6 +70,15 @@ RawTransport::~RawTransport() {
 
     exit_assert(ibv_exp_destroy_wq(wq) == 0,
                 "eRPC RawTransport: Failed to destroy WQ.");
+  } else {
+    exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
+                "eRPC RawTransport: Failed to destroy RECV flow");
+
+    exit_assert(ibv_destroy_qp(qp) == 0,
+                "eRPC RawTransport: Failed to destroy QP.");
+
+    exit_assert(ibv_destroy_cq(send_cq) == 0,
+                "eRPC RawTransport: Failed to destroy send CQ.");
   }
 
   exit_assert(ibv_destroy_cq(recv_cq) == 0,
@@ -229,6 +234,7 @@ void RawTransport::init_send_qp() {
   qp_init_attr.recv_cq = kDumb ? send_cq : recv_cq;  // recv_cq comment above
   qp_init_attr.cap.max_send_wr = kSQDepth;
   qp_init_attr.cap.max_send_sge = 2;
+  qp_init_attr.cap.max_recv_wr = kDumb ? 0 : kRQDepth;
   qp_init_attr.cap.max_inline_data = kMaxInline;
   qp_init_attr.qp_type = IBV_QPT_RAW_PACKET;
   qp_init_attr.exp_create_flags |= IBV_EXP_QP_CREATE_SCATTER_FCS;
