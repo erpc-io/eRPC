@@ -396,7 +396,7 @@ void RawTransport::map_mlx5_overrunning_recv_cqes() {
 
   // Initialize the CQEs as if we received the last (kRecvCQDepth) packets in
   // the CQE cycle.
-  static_assert(kStridesPerWQE >= kRecvCQDepth, "");
+  rt_assert(kStridesPerWQE >= kRecvCQDepth, "");
   for (size_t i = 0; i < kRecvCQDepth; i++) {
     recv_cqe_arr[i].wqe_id = htons(std::numeric_limits<uint16_t>::max());
 
@@ -424,7 +424,7 @@ void RawTransport::init_verbs_structs() {
   init_send_qp();
   init_recv_qp();
   install_flow_rule();
-  map_mlx5_overrunning_recv_cqes();
+  if (kDumb) map_mlx5_overrunning_recv_cqes();
 }
 
 void RawTransport::init_mem_reg_funcs() {
@@ -435,9 +435,9 @@ void RawTransport::init_mem_reg_funcs() {
 }
 
 void RawTransport::init_recvs(uint8_t **rx_ring) {
-  // This function must be called after mapping and initializing the RECV CQEs.
-  // The NIC can DMA as soon as we post RECVs.dd
-  assert(recv_cqe_arr != nullptr);
+  // In the dumbpipe mode, this function must be called only after mapping and
+  // initializing the RECV CQEs. The NIC can DMA as soon as we post RECVs.
+  if (kDumb) assert(recv_cqe_arr != nullptr);
 
   std::ostringstream xmsg;  // The exception message
 
@@ -456,12 +456,29 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
 
   // Initialize constant fields of multi-packet RECV SGEs and fill the RQ
   for (size_t i = 0; i < kRQDepth; i++) {
-    size_t mpwqe_offset = i * (kRecvSize * kStridesPerWQE);
-    mp_recv_sge[i].addr =
-        reinterpret_cast<uint64_t>(&ring_extent.buf[mpwqe_offset]);
-    mp_recv_sge[i].lkey = ring_extent.lkey;
-    mp_recv_sge[i].length = (kRecvSize * kStridesPerWQE);
-    wq_family->recv_burst(wq, &mp_recv_sge[i], 1);
+    if (kDumb) {
+      // In dumbpipe mode, we initialize SGEs, not RECV wr's
+      size_t mpwqe_offset = i * (kRecvSize * kStridesPerWQE);
+      mp_recv_sge[i].addr =
+          reinterpret_cast<uint64_t>(&ring_extent.buf[mpwqe_offset]);
+      mp_recv_sge[i].lkey = ring_extent.lkey;
+      mp_recv_sge[i].length = (kRecvSize * kStridesPerWQE);
+      wq_family->recv_burst(wq, &mp_recv_sge[i], 1);
+    } else {
+      // In non-dumbpipe mode, we initialize wr's similar to IBTransport
+      size_t offset = (i * kRecvSize);
+
+      recv_sgl[i].length = kRecvSize;
+      recv_sgl[i].lkey = ring_extent.lkey;
+      recv_sgl[i].addr = reinterpret_cast<uint64_t>(&ring_extent.buf[offset]);
+
+      recv_wr[i].wr_id = recv_sgl[i].addr;  // For quick prefetch
+      recv_wr[i].sg_list = &recv_sgl[i];
+      recv_wr[i].num_sge = 1;
+
+      // Circular link
+      recv_wr[i].next = (i < kRQDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
+    }
   }
 }
 

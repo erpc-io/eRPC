@@ -16,6 +16,9 @@ namespace erpc {
 
 class RawTransport : public Transport {
  public:
+  /// Enable the dumbpipe optimizations (multi-packet RECVs, overrunning CQ)
+  static constexpr bool kDumb = false;
+
   /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and epid.
   static constexpr uint16_t kBaseRawUDPPort = 10000;
 
@@ -27,19 +30,21 @@ class RawTransport : public Transport {
   static constexpr size_t kLogNumStrides = 9;
   static constexpr size_t kLogStrideBytes = 10;
   static constexpr size_t kStridesPerWQE = (1ull << kLogNumStrides);
-  static constexpr size_t kRecvSize = (1ull << kLogStrideBytes);
-  static constexpr size_t kRingSize = (kNumRxRingEntries * kRecvSize);
   static constexpr size_t kCQESnapshotCycle = 65536 * kStridesPerWQE;
-  static_assert(kRecvSize >= kMTU, "");
+  static_assert((1ull << kLogStrideBytes) >= kMTU, "");
   static_assert(kNumRxRingEntries % kStridesPerWQE == 0, "");
   static_assert(is_power_of_two(kCQESnapshotCycle), "");
 
-  static constexpr size_t kRQDepth = (kNumRxRingEntries / kStridesPerWQE);
+  static constexpr size_t kRecvSize = kDumb ? (1ull << kLogStrideBytes) : kMTU;
+  static constexpr size_t kRingSize = (kNumRxRingEntries * kRecvSize);
+  static constexpr size_t kRQDepth =
+      kDumb ? (kNumRxRingEntries / kStridesPerWQE) : kNumRxRingEntries;
   static constexpr size_t kSQDepth = 128;  ///< Send queue depth
 
-  /// The CQ size allocated by the mlx5 driver. We request a CQ of half this
-  /// size, and the mlx5 driver doubles it.
-  static constexpr size_t kRecvCQDepth = 8;
+  /// In the dumb mode, this is the CQ size allocated by the mlx5 driver. We
+  /// request a CQ of half this size, and the mlx5 driver doubles it.
+  /// In the non-dumb mode, this is the CQ size passed to create_cq().
+  static constexpr size_t kRecvCQDepth = kDumb ? 8 : kRQDepth;
   static_assert(kRecvCQDepth >= 2 && is_power_of_two(kRecvCQDepth), "");
 
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
@@ -61,7 +66,8 @@ class RawTransport : public Transport {
   };
   static_assert(sizeof(raw_routing_info_t) <= kMaxRoutingInfoSize, "");
 
-  /// A consistent snapshot of CQE fields in host endian format
+  /// A consistent snapshot of CQE fields in host endian format. Used only with
+  /// the dumbpipe optimization.
   struct cqe_snapshot_t {
     uint16_t wqe_id;
     uint16_t wqe_counter;
@@ -220,17 +226,24 @@ class RawTransport : public Transport {
   struct ibv_send_wr send_wr[kPostlist + 1];  // +1 for unconditional ->next
   struct ibv_sge send_sgl[kPostlist][2];  ///< SGEs for eRPC header & payload
 
-  // RECV
-  const uint16_t rx_flow_udp_port;
-  size_t recvs_to_post = 0;              ///< Current number of RECVs to post
-  struct ibv_sge mp_recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
-  size_t mp_sge_idx = 0;  ///< Index of the multi-packet SGE to post
-  size_t prefetch_ring_head = 0;
-
   // Overrunning RECV CQE
   cqe_snapshot_t prev_snapshot;
   volatile mlx5_cqe64 *recv_cqe_arr = nullptr;  ///< The overrunning RECV CQEs
   size_t cqe_idx = 0;
+
+  // RECV
+  const uint16_t rx_flow_udp_port;
+  size_t recvs_to_post = 0;  ///< Current number of RECVs to post
+  size_t ring_head = 0;
+
+  // Multi-packet RECV fields. Used only in dumbpipe mode.
+  struct ibv_sge mp_recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
+  size_t mp_sge_idx = 0;  ///< Index of the multi-packet SGE to post
+  size_t prefetch_ring_head = 0;
+
+  // Non-multi-packet RECV fields
+  struct ibv_recv_wr recv_wr[kRQDepth];
+  struct ibv_sge recv_sgl[kRQDepth];
 };
 
 }  // End erpc
