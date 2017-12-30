@@ -30,7 +30,6 @@ autorun_erpc_home="$HOME/eRPC"
 # Variables exported by this script
 autorun_out_prefix="/tmp/${autorun_app}_out"
 autorun_err_prexif="/tmp/${autorun_app}_err"
-autorun_stat_prefix="/tmp/${autorun_app}_stats"
 
 autorun_test_ms=`get_from_config "test_ms"`
 autorun_num_processes=`get_from_config "num_processes"`
@@ -50,7 +49,7 @@ fi
 
 # Create autorun process arrays using the first $autorun_num_processes process
 # names in autorun_process_file.
-process_idx="1"
+process_idx="0"
 while read dns_name udp_port numa; do
   autorun_name_list[$process_idx]=$dns_name
   autorun_udp_port_list[$process_idx]=$udp_port

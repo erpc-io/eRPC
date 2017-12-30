@@ -299,10 +299,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   c.thread_id = thread_id;
   c.app_stats = app_stats;
 
-  if (thread_id == 0) {
-    auto stat_filename = "small_rpc_tput" + std::to_string(FLAGS_process_id);
-    c.tmp_stat = new TmpStat(stat_filename.c_str(), "Mrps");
-  }
+  if (thread_id == 0) c.tmp_stat = new TmpStat("Mrps");
 
   uint8_t numa_0_ports[2] = {0, 2};
   uint8_t numa_1_ports[2] = {1, 3};

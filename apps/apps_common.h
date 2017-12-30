@@ -94,24 +94,28 @@ class TmpStat {
     return false;
   }
 
-  TmpStat(std::string app_name, std::string header) {
-    if (contains_newline(header)) {
-      throw std::runtime_error("Stats header contains newline.");
-    }
+  TmpStat(std::string header) {
+    erpc::rt_assert(!contains_newline(header), "Invalid stat file header");
+    char *autorun_app = std::getenv("autorun_app");
+    erpc::rt_assert(autorun_app != nullptr, "autorun_app environment invalid");
 
-    output_file = std::ofstream(std::string("/tmp/") + app_name + "_stats");
-    output_file << header << std::endl;
+    auto filename = std::string("/tmp/") + autorun_app + "_stats_" +
+                    std::to_string(FLAGS_process_id);
+
+    printf("Writing stats to file %s\n", filename.c_str());
+    stat_file = std::ofstream(filename);
+    stat_file << header << std::endl;
   }
 
   ~TmpStat() {
-    output_file.flush();
-    output_file.close();
+    stat_file.flush();
+    stat_file.close();
   }
 
-  void write(std::string stat) { output_file << stat << std::endl; }
+  void write(std::string stat) { stat_file << stat << std::endl; }
 
  private:
-  std::ofstream output_file;
+  std::ofstream stat_file;
 };
 
 // Per-thread application context

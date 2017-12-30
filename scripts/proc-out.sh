@@ -7,7 +7,6 @@
 # val_1 val_2 ... val_N
 #
 # The names and values must be space-separated. Names should be a single word.
-# The bash maps in this scripts are indexed from one !!!!
 
 source $(dirname $0)/utils.sh
 source $(dirname $0)/autorun_parse.sh
@@ -17,35 +16,38 @@ tmpdir="/tmp/${autorun_app}_proc"
 rm -rf $tmpdir
 mkdir $tmpdir
 
-for i in `seq 1 $autorun_num_processes`; do
-  name=${autorun_name_list[$i]}
-  stat_file="$autorun_stat_prefix-$i"
+process_idx=0
+while [ $process_idx -lt $autorun_num_processes ]; do
+  name=${autorun_name_list[$process_idx]}
+  stat_file=${autorun_app}_stats_${process_idx}
 
-	echo "proc-out: Fetching $stat_file from $name to $tmpdir/$stat_file"
-  scp $name:$stat_file $tmpdir/$stat_file 1>/dev/null 2>/dev/null &
+	echo "proc-out: Fetching /tmp/$stat_file from $name to $tmpdir/$stat_file"
+  scp $name:/tmp/$stat_file $tmpdir/$stat_file 1>/dev/null 2>/dev/null &
+  ((process_idx+=1))
 done
+
 wait
 echo "proc-out: Finished fetching files."
 
 header_line=`cat $tmpdir/* | head -1`
 blue "proc-out: Header = [$header_line]"
 
-# Create a map of column names in the stats file, indexed from 1
-col_name[1]=""
-col_index="1"
+# Create a map of column names in the stats file
+col_idx="0"
 for name in $header_line; do
-  col_name[$col_index]=$name
-  echo "Column $col_index = ${col_name[$col_index]}"
-  ((col_index+=1))
+  col_name[$col_idx]=$name
+  echo "Column $col_idx = ${col_name[$col_idx]}"
+  ((col_idx+=1))
 done
 
 num_columns=`echo $header_line | wc -w`
 echo "proc-out: Detected $num_columns columns"
 
 # Sum of per-file average for each column. Averaging rows is incorrect.
-col_sum_of_avgs[1]=""
-for col in `seq 1 $num_columns`; do
-  col_sum_of_avgs[$col]="0.0"
+col_idx="0"
+while [ $col_idx -lt $num_columns ]; do
+  col_sum_of_avgs[$col_idx]="0.0"
+  ((col_idx+=1))
 done
 
 # Process the fetched stats files
@@ -67,21 +69,24 @@ for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
   remaining_rows=`cat proc_out_tmp | wc -l`
 
   file_avg_str=""  # Average of each column for this file
-  for col in `seq 1 $num_columns`; do
-    file_avg=`awk -v col=$col '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
-    col_sum_of_avgs[$col]=`echo "scale=3; ${col_sum_of_avgs[$col]} + $file_avg" | bc -l`
-    file_avg_str=`echo $file_avg_str ${col_name[$col]}:$file_avg, `
+  col_idx="0"
+  while [ $col_idx -lt $num_columns ]; do
+    file_avg=`awk -v col=$col_idx '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
+    col_sum_of_avgs[$col_idx]=`echo "scale=3; ${col_sum_of_avgs[$col_idx]} + $file_avg" | bc -l`
+    file_avg_str=`echo $file_avg_str ${col_name[$col_idx]}:$file_avg, `
+    ((col_idx+=1))
   done
 
   echo "proc-out: Column averages for $filename = $file_avg_str"
   ((processed_files+=1))
 done
 
-for col in `seq 1 $num_columns`; do
-  col_avg=`echo "scale=3; ${col_sum_of_avgs[$col]} / $processed_files" | bc -l`
-  blue "proc-out: Final column ${col_name[$col]} average = $col_avg"
+col_idx="0"
+while [ $col_idx -lt $num_columns ]; do
+  col_avg=`echo "scale=3; ${col_sum_of_avgs[$col_idx]} / $processed_files" | bc -l`
+  blue "proc-out: Final column ${col_name[$col_idx]} average = $col_avg"
+  ((col_idx+=1))
 done
 
 blue "proc-out: Processed files = $processed_files, ignored files = $ignored_files"
-
 rm -f proc_out_tmp
