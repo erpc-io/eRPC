@@ -17,7 +17,7 @@ namespace erpc {
 class RawTransport : public Transport {
  public:
   /// Enable the dumbpipe optimizations (multi-packet RECVs, overrunning CQ)
-  static constexpr bool kDumb = false;
+  static constexpr bool kDumb = true;
 
   /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and epid.
   static constexpr uint16_t kBaseRawUDPPort = 10000;
@@ -31,7 +31,7 @@ class RawTransport : public Transport {
   static constexpr size_t kLogStrideBytes = 10;
   static constexpr size_t kStridesPerWQE = (1ull << kLogNumStrides);
   static constexpr size_t kCQESnapshotCycle = 65536 * kStridesPerWQE;
-  static_assert((1ull << kLogStrideBytes) >= kMTU, "");
+  static_assert((1ull << kLogStrideBytes) == kMTU, "");
   static_assert(kNumRxRingEntries % kStridesPerWQE == 0, "");
   static_assert(is_power_of_two(kCQESnapshotCycle), "");
 
