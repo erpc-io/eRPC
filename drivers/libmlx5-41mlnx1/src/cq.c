@@ -917,8 +917,6 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	enum mlx5_rsc_type type = MLX5_RSC_TYPE_INVAL;
 	int cqe_format;
 	uint8_t l3_hdr;
-	int timestamp_en = cq->creation_flags &
-		MLX5_CQ_CREATION_FLAG_COMPLETION_TIMESTAMP;
 
 	cqe64 = get_next_cqe(cq, cq->cqe_sz);
 	if (!cqe64)
@@ -927,7 +925,6 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	cqe_format = mlx5_get_cqe_format(cqe64);
 	if (unlikely(cqe_format == MLX5_COMPRESSED)) {
 		cqe64 = mlx5_decompress_cqe(cq);
-		timestamp_en = 0;
 	}
 	++cq->cons_index;
 
@@ -936,15 +933,6 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	 * ownership bit.
 	 */
 	rmb();
-
-#ifdef MLX5_DEBUG
-	if (mlx5_debug_mask & MLX5_DBG_CQ_CQE) {
-		FILE *fp = mctx->dbg_fp;
-
-		mlx5_dbg(fp, MLX5_DBG_CQ_CQE, "dump cqe for cqn 0x%x:\n", cq->cqn);
-		dump_cqe(fp, cqe64);
-	}
-#endif
 
 	((struct ibv_wc *)wc)->wc_flags = 0;
 	opcode = cqe64->op_own >> 4;
@@ -1131,11 +1119,6 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		}
 		break;
 		}
-	}
-
-	if (unlikely(timestamp_en)) {
-		wc->timestamp = ntohll(cqe64->timestamp);
-		exp_wc_flags |= IBV_EXP_WC_WITH_TIMESTAMP;
 	}
 
 	if (likely(offsetof(struct ibv_exp_wc, exp_wc_flags) < wc_size))
