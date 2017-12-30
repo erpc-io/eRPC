@@ -208,7 +208,7 @@ void IBTransport::init_verbs_structs() {
 
   create_attr.cap.max_send_wr = kSQDepth;
   create_attr.cap.max_recv_wr = kRQDepth;
-  create_attr.cap.max_send_sge = 1;
+  create_attr.cap.max_send_sge = 1;  // XXX: WHY DOES THIS WORK!!
   create_attr.cap.max_recv_sge = 1;
   create_attr.cap.max_inline_data = kMaxInline;
 
