@@ -45,6 +45,7 @@
 #include "mlx5.h"
 #include "doorbell.h"
 #include "wqe.h"
+#include "modded_drivers.h"
 
 enum {
 	MLX5_OPCODE_BASIC	= 0x00010000,
@@ -2172,6 +2173,17 @@ int mlx5_post_recv(struct ibv_qp *ibqp, struct ibv_recv_wr *wr,
 #ifdef MLX5_DEBUG
 	FILE *fp = to_mctx(ibqp->context)->dbg_fp;
 #endif
+
+  if (wr == NULL && (*bad_wr) != NULL && (*bad_wr)->wr_id == ERPC_MAGIC_WRID_FOR_FAST_RECV) {
+    /* Handle fast RECV */
+    struct mlx5_qp *qp = to_mqp(ibqp);
+    int nreq = (*bad_wr)->num_sge;
+    qp->rq.head += nreq;
+
+    wmb();
+    qp->gen_data.db[MLX5_RCV_DBR] = htonl(qp->rq.head & 0xffff);
+    return 0;
+  }
 
 	mlx5_lock(&qp->rq.lock);
 
