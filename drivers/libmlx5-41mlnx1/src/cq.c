@@ -145,28 +145,8 @@ static inline void *get_sw_cqe(struct mlx5_cq *cq, int n, int cqe_mask)
 static inline struct mlx5_cqe64 *get_next_cqe(struct mlx5_cq *cq, const int cqe_sz)
 {
 	unsigned idx = cq->cons_index & cq->ibv_cq.cqe;
-	void *cqe = cq->active_buf->buf + idx * cqe_sz;
-	struct mlx5_cqe64 *cqe64;
-
-	if (unlikely(cq->compressed_left))
-		return &cq->next_decomp_cqe64;
-
-	if (unlikely(cq->peer_enabled)) {
-		struct mlx5_peek_entry *tmp;
-
-		while (cq->peer_peek_table[idx]) {
-			if (cq->peer_peek_table[idx]->busy) {
-				errno = EBUSY;
-				return NULL;
-			}
-			tmp = cq->peer_peek_table[idx];
-			cq->peer_peek_table[idx] = PEEK_ENTRY(cq, tmp->next);
-			tmp->next = PEEK_ENTRY_N(cq, cq->peer_peek_free);
-			cq->peer_peek_free = tmp;
-		}
-	}
-
-	cqe64 = (cqe_sz == 64) ? cqe : cqe + 64;
+	void *cqe = cq->active_buf->buf + idx * 64;
+	struct mlx5_cqe64 *cqe64 = cqe;
 
 	if (likely((cqe64->op_own) >> 4 != MLX5_CQE_INVALID) &&
 	    !((cqe64->op_own & MLX5_CQE_OWNER_MASK) ^ !!(cq->cons_index & (cq->ibv_cq.cqe + 1)))) {
@@ -186,9 +166,7 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 
   wq	  = &qp->rq;
   wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
-  wc->wr_id = wq->wrid[wqe_ctr];
-  printf("prefetch %zu\n", wc->wr_id);
-  __builtin_prefetch((void *)wc->wr_id, 0, 0);
+  __builtin_prefetch((void *)(wq->wrid[wqe_ctr]), 0, 0);
   ++wq->tail;
 
 	return IBV_WC_SUCCESS;
@@ -683,7 +661,6 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	uint32_t rsn;
 	int idx;
 	uint8_t opcode;
-	int err;
 	int requestor;
 	int responder;
 	struct mlx5_context *mctx = to_mctx(cq->ibv_cq.context);
@@ -744,25 +721,19 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		wq = &mqp->sq;
 		wqe_ctr = ntohs(cqe64->wqe_counter);
 		idx = wqe_ctr & (wq->wqe_cnt - 1);
-		err = 0;
 
 		wc->wr_id = wq->wrid[idx];
 		wq->tail = mqp->gen_data.wqe_head[idx] + 1;
-		wc->status = err;
+		wc->status = 0;
 		break;
 	case MLX5_CQE_RESP_SEND:
     // post_recv() completion
-		wc->status = handle_responder((struct ibv_wc *)wc, cqe64, mqp,
-					      NULL, type,
-					      &exp_wc_flags);
+		handle_responder((struct ibv_wc *)wc, cqe64, mqp, NULL, type, &exp_wc_flags);
 		break;
   default:
     return CQ_POLL_ERR;
 
 	}
-
-	if (likely(offsetof(struct ibv_exp_wc, exp_wc_flags) < wc_size))
-		wc->exp_wc_flags = exp_wc_flags | (uint64_t)((struct ibv_wc *)wc)->wc_flags;
 
 	return CQ_OK;
 }
