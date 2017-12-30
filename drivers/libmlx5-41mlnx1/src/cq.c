@@ -45,6 +45,7 @@
 
 #include <infiniband/opcode.h>
 
+#include <assert.h>
 #include "mlx5.h"
 #include "wqe.h"
 #include "doorbell.h"
@@ -782,17 +783,18 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 				uint32_t wc_size,
 				int cqe_ver)
 {
+  assert(cqe_ver == 1);
+  assert(*cur_srq == NULL);
+
 	struct mlx5_cqe64 *cqe64;
 	struct mlx5_wq *wq;
 	uint16_t wqe_ctr;
 	uint32_t rsn;
-	uint32_t srqn_uidx;
 	int idx;
 	uint8_t opcode;
 	int err;
 	int requestor;
 	int responder;
-	int is_srq = 0;
 	struct mlx5_context *mctx = to_mctx(cq->ibv_cq.context);
 	struct mlx5_qp *mqp = NULL;
 	uint64_t exp_wc_flags = 0;
@@ -818,29 +820,11 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		return CQ_POLL_ERR;
 
 	rsn = ntohl(cqe64->sop_drop_qpn) & 0xffffff;
-	srqn_uidx = ntohl(cqe64->srqn_uidx) & 0xffffff;
-	if (cqe_ver) {
-		if (!*cur_rsc || (srqn_uidx != (*cur_rsc)->rsn)) {
-			*cur_rsc = mlx5_find_uidx(mctx, srqn_uidx);
-			if (unlikely(!*cur_rsc))
-				return CQ_POLL_ERR;
-		}
-	} else {
-		if (responder && srqn_uidx) {
-			is_srq = 1;
-			if (!*cur_srq || (srqn_uidx != (*cur_srq)->srqn)) {
-				*cur_srq = mlx5_find_srq(mctx, srqn_uidx);
-				if (unlikely(!*cur_srq))
-					return CQ_POLL_ERR;
-			}
-		}
+  if (!*cur_rsc) {
+    *cur_rsc = mlx5_find_uidx(mctx, 0);
+  }
 
-		if (!*cur_rsc || (rsn != (*cur_rsc)->rsn)) {
-			*cur_rsc = mlx5_find_rsc(mctx, rsn);
-			if (unlikely(!*cur_rsc && !srqn_uidx))
-				return CQ_POLL_ERR;
-		}
-	}
+  if (unlikely(!*cur_rsc)) return CQ_POLL_ERR;
 
 	if (*cur_rsc) {
 		switch ((*cur_rsc)->type) {
@@ -850,20 +834,11 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 				wc->qp = &mqp->verbs_qp.qp;
 				exp_wc_flags |= IBV_EXP_WC_QP;
 			}
-			if (cqe_ver && responder && mqp->verbs_qp.qp.srq) {
-				*cur_srq = to_msrq(mqp->verbs_qp.qp.srq);
-				is_srq = 1;
-			}
 			break;
 		default:
 			return CQ_POLL_ERR;
 		}
 		type = (*cur_rsc)->type;
-	}
-
-	if (is_srq && likely(offsetof(struct ibv_exp_wc, srq) < wc_size)) {
-		wc->srq = &(*cur_srq)->vsrq.srq;
-		exp_wc_flags |= IBV_EXP_WC_SRQ;
 	}
 
 	wc->qp_num = rsn;
@@ -884,12 +859,9 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		wq->tail = mqp->gen_data.wqe_head[idx] + 1;
 		wc->status = err;
 		break;
-	case MLX5_CQE_RESP_WR_IMM:
 	case MLX5_CQE_RESP_SEND:
-	case MLX5_CQE_RESP_SEND_IMM:
-	case MLX5_CQE_RESP_SEND_INV:
 		wc->status = handle_responder((struct ibv_wc *)wc, cqe64, mqp,
-					      is_srq ? *cur_srq : NULL, type,
+					      NULL, type,
 					      &exp_wc_flags);
 		break;
   default:
