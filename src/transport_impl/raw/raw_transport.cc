@@ -438,7 +438,7 @@ void RawTransport::init_verbs_structs() {
 
   // Create protection domain, send CQ, and recv CQ
   pd = ibv_alloc_pd(resolve.ib_ctx);
-  rt_assert(pd != nullptr, "eRPC IBTransport: Failed to allocate PD");
+  rt_assert(pd != nullptr, "eRPC RawTransport: Failed to allocate PD");
 
   init_send_qp();
   if (kDumb) init_mp_recv_qp();
@@ -463,7 +463,7 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
   // Initialize the memory region for RECVs
   ring_extent = huge_alloc->alloc(kRingSize);
   if (ring_extent.buf == nullptr) {
-    xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
+    xmsg << "eRPC RawTransport: Failed to allocate " << std::setprecision(2)
          << 1.0 * kRingSize / MB(1) << "MB for ring buffers.";
     throw std::runtime_error(xmsg.str());
   }
@@ -474,22 +474,22 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
   }
 
   // Initialize constant fields of multi-packet RECV SGEs and fill the RQ
-  for (size_t i = 0; i < kRQDepth; i++) {
-    if (kDumb) {
-      // In dumbpipe mode, we initialize SGEs, not RECV wr's
+  if (kDumb) {
+    // In dumbpipe mode, we initialize SGEs, not RECV wr's
+    for (size_t i = 0; i < kRQDepth; i++) {
       size_t mpwqe_offset = i * (kRecvSize * kStridesPerWQE);
       mp_recv_sge[i].addr =
           reinterpret_cast<uint64_t>(&ring_extent.buf[mpwqe_offset]);
       mp_recv_sge[i].lkey = ring_extent.lkey;
       mp_recv_sge[i].length = (kRecvSize * kStridesPerWQE);
       wq_family->recv_burst(wq, &mp_recv_sge[i], 1);
-    } else {
-      // In non-dumbpipe mode, we initialize wr's similar to IBTransport
-      size_t offset = (i * kRecvSize);
-
+    }
+  } else {
+    for (size_t i = 0; i < kRQDepth; i++) {
       recv_sgl[i].length = kRecvSize;
       recv_sgl[i].lkey = ring_extent.lkey;
-      recv_sgl[i].addr = reinterpret_cast<uint64_t>(&ring_extent.buf[offset]);
+      recv_sgl[i].addr =
+          reinterpret_cast<uint64_t>(&ring_extent.buf[i * kRecvSize]);
 
       recv_wr[i].wr_id = recv_sgl[i].addr;  // For quick prefetch
       recv_wr[i].sg_list = &recv_sgl[i];
@@ -498,6 +498,16 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
       // Circular link
       recv_wr[i].next = (i < kRQDepth - 1) ? &recv_wr[i + 1] : &recv_wr[0];
     }
+
+    // Fill the RECV queue. post_recvs() can use fast RECV and therefore not
+    // actually fill the RQ, so post_recvs() isn't usable here.
+    struct ibv_recv_wr *bad_wr;
+    recv_wr[kRQDepth - 1].next = nullptr;  // Breaker of chains
+
+    int ret = ibv_post_recv(qp, &recv_wr[0], &bad_wr);
+    rt_assert(ret == 0, "eRPC RawTransport: Failed to fill RECV queue.");
+
+    recv_wr[kRQDepth - 1].next = &recv_wr[0];  // Restore circularity
   }
 }
 

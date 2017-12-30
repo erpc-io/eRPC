@@ -310,7 +310,8 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
     rx_ring[i] = &buf[offset + kGRHBytes];  // RX ring entry
   }
 
-  // Fill the RECV queue. post_recv can use fast RECV, so it's not usable here.
+  // Fill the RECV queue. post_recvs() can use fast RECV and therefore not
+  // actually fill the RQ, so post_recvs() isn't usable here.
   struct ibv_recv_wr *bad_wr;
   recv_wr[kRQDepth - 1].next = nullptr;  // Breaker of chains
 
