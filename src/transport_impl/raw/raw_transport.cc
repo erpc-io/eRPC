@@ -47,30 +47,34 @@ RawTransport::~RawTransport() {
   LOG_INFO("eRPC RawTransport: Destroying transport for ID %u\n", rpc_id);
 
   // SEND
-  exit_assert(ibv_destroy_qp(send_qp) == 0,
-              "eRPC RawTransport: Failed to destroy SEND QP.");
+  exit_assert(ibv_destroy_qp(qp) == 0,
+              "eRPC RawTransport: Failed to destroy QP.");
 
   exit_assert(ibv_destroy_cq(send_cq) == 0,
               "eRPC RawTransport: Failed to destroy send CQ.");
 
   // RECV
-  struct ibv_exp_release_intf_params rel_intf_params;
-  memset(&rel_intf_params, 0, sizeof(rel_intf_params));
-  exit_assert(
-      ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
-      "eRPC RawTransport: Failed to release interface.");
+  if (kDumb) {
+    struct ibv_exp_release_intf_params rel_intf_params;
+    memset(&rel_intf_params, 0, sizeof(rel_intf_params));
+    exit_assert(
+        ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
+        "eRPC RawTransport: Failed to release interface.");
+  }
 
   exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
               "eRPC RawTransport: Failed to destroy RECV flow");
 
-  exit_assert(ibv_destroy_qp(recv_qp) == 0,
-              "eRPC RawTransport: Failed to destroy RECV QP.");
+  if (kDumb) {
+    exit_assert(ibv_destroy_qp(mp_recv_qp) == 0,
+                "eRPC RawTransport: Failed to destroy RECV QP.");
 
-  exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
-              "eRPC RawTransport: Failed to destroy indirection table.");
+    exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
+                "eRPC RawTransport: Failed to destroy indirection table.");
 
-  exit_assert(ibv_exp_destroy_wq(wq) == 0,
-              "eRPC RawTransport: Failed to destroy WQ.");
+    exit_assert(ibv_exp_destroy_wq(wq) == 0,
+                "eRPC RawTransport: Failed to destroy WQ.");
+  }
 
   exit_assert(ibv_destroy_cq(recv_cq) == 0,
               "eRPC RawTransport: Failed to destroy RECV CQ.");
@@ -207,7 +211,13 @@ void RawTransport::init_send_qp() {
   send_cq = ibv_exp_create_cq(resolve.ib_ctx, kSQDepth, nullptr, nullptr, 0,
                               &cq_init_attr);
   rt_assert(send_cq != nullptr, "Failed to create SEND CQ");
-  assert(send_cq != nullptr);
+
+  // In dumbpipe mode, we don't need a RECV CQ for this QP
+  if (!kDumb) {
+    recv_cq = ibv_exp_create_cq(resolve.ib_ctx, kRQDepth, nullptr, nullptr, 0,
+                                &cq_init_attr);
+    rt_assert(send_cq != nullptr, "Failed to create RECV CQ");
+  }
 
   struct ibv_exp_qp_init_attr qp_init_attr;
   memset(&qp_init_attr, 0, sizeof(qp_init_attr));
@@ -216,35 +226,34 @@ void RawTransport::init_send_qp() {
 
   qp_init_attr.pd = pd;
   qp_init_attr.send_cq = send_cq;
-  qp_init_attr.recv_cq = send_cq;  // We won't post RECVs
+  qp_init_attr.recv_cq = kDumb ? send_cq : recv_cq;  // recv_cq comment above
   qp_init_attr.cap.max_send_wr = kSQDepth;
   qp_init_attr.cap.max_send_sge = 2;
   qp_init_attr.cap.max_inline_data = kMaxInline;
   qp_init_attr.qp_type = IBV_QPT_RAW_PACKET;
   qp_init_attr.exp_create_flags |= IBV_EXP_QP_CREATE_SCATTER_FCS;
 
-  send_qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
-  rt_assert(send_qp != nullptr, "Failed to create SEND QP");
+  qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
+  rt_assert(qp != nullptr, "Failed to create QP");
 
   struct ibv_exp_qp_attr qp_attr;
   memset(&qp_attr, 0, sizeof(qp_attr));
   qp_attr.qp_state = IBV_QPS_INIT;
   qp_attr.port_num = 1;
-  rt_assert(ibv_exp_modify_qp(send_qp, &qp_attr, IBV_QP_STATE | IBV_QP_PORT) ==
-            0);
+  rt_assert(ibv_exp_modify_qp(qp, &qp_attr, IBV_QP_STATE | IBV_QP_PORT) == 0);
 
   memset(&qp_attr, 0, sizeof(qp_attr));
   qp_attr.qp_state = IBV_QPS_RTR;
-  rt_assert(ibv_exp_modify_qp(send_qp, &qp_attr, IBV_QP_STATE) == 0);
+  rt_assert(ibv_exp_modify_qp(qp, &qp_attr, IBV_QP_STATE) == 0);
 
   memset(&qp_attr, 0, sizeof(qp_attr));
   qp_attr.qp_state = IBV_QPS_RTS;
-  rt_assert(ibv_exp_modify_qp(send_qp, &qp_attr, IBV_QP_STATE) == 0);
+  rt_assert(ibv_exp_modify_qp(qp, &qp_attr, IBV_QP_STATE) == 0);
 }
 
-/// Initialize a QP used for RECVs only
-void RawTransport::init_recv_qp() {
-  assert(resolve.ib_ctx != nullptr && pd != nullptr);
+/// Initialize a multi-packet RECV QP
+void RawTransport::init_mp_recv_qp() {
+  assert(kDumb && resolve.ib_ctx != nullptr && pd != nullptr);
 
   // Init CQ. Its size MUST be one so that we get two CQEs in mlx5.
   struct ibv_exp_cq_init_attr cq_init_attr;
@@ -332,12 +341,13 @@ void RawTransport::init_recv_qp() {
   qp_init_attr.qp_type = IBV_QPT_RAW_PACKET;
 
   // Create the QP
-  recv_qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
-  rt_assert(recv_qp != nullptr, "Failed to create RECV QP");
+  mp_recv_qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
+  rt_assert(mp_recv_qp != nullptr, "Failed to create RECV QP");
 }
 
 void RawTransport::install_flow_rule() {
-  assert(recv_qp != nullptr);
+  struct ibv_qp *qp_for_flow = kDumb ? mp_recv_qp : qp;
+  assert(qp_for_flow != nullptr);
 
   LOG_WARN(
       "eRPC RawTransport: Installing flow rule for Rpc %u. NUMA node = %zu. "
@@ -381,11 +391,13 @@ void RawTransport::install_flow_rule() {
   udp_spec->val.dst_port = htons(rx_flow_udp_port);
   udp_spec->mask.dst_port = 0xffffu;
 
-  recv_flow = ibv_exp_create_flow(recv_qp, flow_attr);
+  recv_flow = ibv_exp_create_flow(qp_for_flow, flow_attr);
   rt_assert(recv_flow != nullptr, "Failed to create RECV flow");
 }
 
 void RawTransport::map_mlx5_overrunning_recv_cqes() {
+  assert(kDumb);
+
   // This cast works for mlx5 where ibv_cq is the first member of mlx5_cq.
   auto *_mlx5_cq = reinterpret_cast<mlx5_cq *>(recv_cq);
   rt_assert(kRecvCQDepth == std::pow(2, _mlx5_cq->cq_log_size),
@@ -422,7 +434,7 @@ void RawTransport::init_verbs_structs() {
   rt_assert(pd != nullptr, "eRPC IBTransport: Failed to allocate PD");
 
   init_send_qp();
-  init_recv_qp();
+  if (kDumb) init_mp_recv_qp();
   install_flow_rule();
   if (kDumb) map_mlx5_overrunning_recv_cqes();
 }

@@ -186,8 +186,10 @@ class RawTransport : public Transport {
   /// Initialize structures that do not require eRPC hugepages: device
   /// context, protection domain, and queue pairs.
   void init_verbs_structs();
-  void init_send_qp();                    ///< Iniitalize the SEND QP
-  void init_recv_qp();                    ///< Initialize the RECV QP
+  void init_send_qp();  ///< Iniitalize the SEND QP
+
+  /// In the dumbpipe mode, initialze the multi-packet RECV QP
+  void init_mp_recv_qp();
   void install_flow_rule();               ///< Install the UDP destination flow
   void map_mlx5_overrunning_recv_cqes();  ///< Map mlx5 RECV CQEs
 
@@ -209,15 +211,16 @@ class RawTransport : public Transport {
   } resolve;
 
   struct ibv_pd *pd = nullptr;
-  struct ibv_qp *send_qp = nullptr;
+  struct ibv_qp *qp = nullptr;  ///< In dumbpipe mode, used for only SENDs
   struct ibv_cq *send_cq = nullptr;
-
+  struct ibv_cq *recv_cq = nullptr;
   struct ibv_exp_flow *recv_flow;
-  struct ibv_cq *recv_cq;
+
+  // Multi-packet RQ members
   struct ibv_exp_wq *wq;
   struct ibv_exp_wq_family *wq_family;
   struct ibv_exp_rwq_ind_table *ind_tbl;
-  struct ibv_qp *recv_qp;
+  struct ibv_qp *mp_recv_qp;
 
   Buffer ring_extent;  ///< The ring's backing hugepage memory
 
