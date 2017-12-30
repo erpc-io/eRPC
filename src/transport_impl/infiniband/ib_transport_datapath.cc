@@ -131,9 +131,6 @@ void IBTransport::tx_flush() {
 
 size_t IBTransport::rx_burst() {
   int ret = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
-
-  // XXX: When can this fail? This is similar to device failure, so it might
-  // be OK to destroy the owner Rpc object.
   assert(ret >= 0);
   return static_cast<size_t>(ret);
 }

@@ -80,7 +80,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
   send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains
 
   struct ibv_send_wr* bad_wr;
-  int ret = ibv_post_send(send_qp, &send_wr[0], &bad_wr);
+  int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
   assert(ret == 0);
   if (unlikely(ret != 0)) {
     fprintf(stderr, "eRPC: Fatal error. ibv_post_send failed. ret = %d\n", ret);
@@ -93,29 +93,69 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 void RawTransport::tx_flush() {}
 
 size_t RawTransport::rx_burst() {
-  cqe_snapshot_t cur_snapshot;
-  snapshot_cqe(&recv_cqe_arr[cqe_idx], cur_snapshot);
-  const size_t delta = get_cqe_cycle_delta(prev_snapshot, cur_snapshot);
-  if (delta == 0 || delta >= kNumRxRingEntries) return 0;
+  if (kDumb) {
+    cqe_snapshot_t cur_snapshot;
+    snapshot_cqe(&recv_cqe_arr[cqe_idx], cur_snapshot);
+    const size_t delta = get_cqe_cycle_delta(prev_snapshot, cur_snapshot);
+    if (delta == 0 || delta >= kNumRxRingEntries) return 0;
 
-  for (size_t i = 0; i < delta; i++) {
-    __builtin_prefetch(&ring_extent.buf[prefetch_ring_head * kRecvSize], 0, 0);
-    prefetch_ring_head = (prefetch_ring_head + 1) % kNumRxRingEntries;
+    for (size_t i = 0; i < delta; i++) {
+      __builtin_prefetch(&ring_extent.buf[recv_head * kRecvSize], 0, 0);
+      recv_head = (recv_head + 1) % kNumRxRingEntries;
+    }
+
+    cqe_idx = (cqe_idx + 1) % kRecvCQDepth;
+    prev_snapshot = cur_snapshot;
+    return delta;
+  } else {
+    int ret = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
+    assert(ret >= 0);
+    return static_cast<size_t>(ret);
   }
-
-  cqe_idx = (cqe_idx + 1) % kRecvCQDepth;
-  prev_snapshot = cur_snapshot;
-  return delta;
 }
 
 void RawTransport::post_recvs(size_t num_recvs) {
+  assert(num_recvs <= kRQDepth);  // num_recvs can be 0
   recvs_to_post += num_recvs;
-  if (recvs_to_post < kStridesPerWQE) return;
 
-  int ret = wq_family->recv_burst(wq, &mp_recv_sge[mp_sge_idx], 1);
-  _unused(ret);
-  assert(ret == 0);
-  mp_sge_idx = (mp_sge_idx + 1) % kRQDepth;
+  if (kDumb) {
+    if (recvs_to_post < kStridesPerWQE) return;
+
+    int ret = wq_family->recv_burst(wq, &mp_recv_sge[mp_sge_idx], 1);
+    _unused(ret);
+    assert(ret == 0);
+    mp_sge_idx = (mp_sge_idx + 1) % kRQDepth;
+    recvs_to_post -= kStridesPerWQE;  // Reset slack counter
+  } else {
+    if (recvs_to_post < kRecvSlack) return;
+
+    // The recvs posted are @first_wr through @last_wr, inclusive
+    struct ibv_recv_wr *first_wr, *last_wr, *temp_wr, *bad_wr;
+
+    size_t first_wr_i = recv_head;
+    size_t last_wr_i = first_wr_i + (recvs_to_post - 1);
+    if (last_wr_i >= kRQDepth) last_wr_i -= kRQDepth;
+
+    first_wr = &recv_wr[first_wr_i];
+    last_wr = &recv_wr[last_wr_i];
+    temp_wr = last_wr->next;
+
+    last_wr->next = nullptr;  // Breaker of chains
+
+    int ret = ibv_post_recv(qp, first_wr, &bad_wr);
+    if (unlikely(ret != 0)) {
+      fprintf(stderr, "eRPC IBTransport: Post RECV (normal) error %d\n", ret);
+      exit(-1);
+    }
+
+    last_wr->next = temp_wr;  // Restore circularity
+
+    // Update RECV head: go to the last wr posted and take 1 more step
+    recv_head = last_wr_i;
+    recv_head = (recv_head + 1) % kRQDepth;
+    recvs_to_post = 0;  // Reset slack counter
+  }
+
+  // Nothing should be here
 }
-
 }  // End erpc

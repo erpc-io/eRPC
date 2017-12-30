@@ -58,6 +58,9 @@ class RawTransport : public Transport {
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
 
+  /// RECVs batched before posting. Relevant only for non-dumbpipe mode.
+  static constexpr size_t kRecvSlack = 32;
+
   /// Session endpoint routing info for raw Ethernet.
   struct raw_routing_info_t {
     uint8_t mac[6];
@@ -237,16 +240,16 @@ class RawTransport : public Transport {
   // RECV
   const uint16_t rx_flow_udp_port;
   size_t recvs_to_post = 0;  ///< Current number of RECVs to post
-  size_t ring_head = 0;
+  size_t recv_head = 0;      ///< In dumbpipe mode, used only to prefetch
 
   // Multi-packet RECV fields. Used only in dumbpipe mode.
   struct ibv_sge mp_recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
   size_t mp_sge_idx = 0;  ///< Index of the multi-packet SGE to post
-  size_t prefetch_ring_head = 0;
 
   // Non-multi-packet RECV fields
   struct ibv_recv_wr recv_wr[kRQDepth];
   struct ibv_sge recv_sgl[kRQDepth];
+  struct ibv_wc recv_wc[kRQDepth];
 };
 
 }  // End erpc
