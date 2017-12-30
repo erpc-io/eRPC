@@ -175,130 +175,21 @@ static inline struct mlx5_cqe64 *get_next_cqe(struct mlx5_cq *cq, const int cqe_
 	return NULL;
 }
 
-static inline void handle_good_req(struct ibv_wc *wc, struct mlx5_cqe64 *cqe, struct mlx5_wq *wq, int idx)
-{
-	switch (ntohl(cqe->sop_drop_qpn) >> 24) {
-	case MLX5_OPCODE_RDMA_WRITE_IMM:
-		wc->wc_flags |= IBV_WC_WITH_IMM;
-	case MLX5_OPCODE_RDMA_WRITE:
-		wc->opcode    = IBV_WC_RDMA_WRITE;
-		break;
-	case MLX5_OPCODE_SEND_IMM:
-		wc->wc_flags |= IBV_WC_WITH_IMM;
-	case MLX5_OPCODE_SEND:
-	case MLX5_OPCODE_SEND_INVAL:
-		wc->opcode    = IBV_WC_SEND;
-		break;
-	case MLX5_OPCODE_RDMA_READ:
-		wc->opcode    = IBV_WC_RDMA_READ;
-		wc->byte_len  = ntohl(cqe->byte_cnt);
-		break;
-	case MLX5_OPCODE_ATOMIC_CS:
-		wc->opcode    = IBV_WC_COMP_SWAP;
-		wc->byte_len  = 8;
-		break;
-	case MLX5_OPCODE_ATOMIC_FA:
-		wc->opcode    = IBV_WC_FETCH_ADD;
-		wc->byte_len  = 8;
-		break;
-	case MLX5_OPCODE_UMR:
-		wc->opcode    = wq->wr_data[idx];
-		break;
-
-	case MLX5_OPCODE_ATOMIC_MASKED_CS:
-		wc->opcode    = IBV_EXP_WC_MASKED_COMP_SWAP;
-		wc->byte_len  = ntohl(cqe->byte_cnt);
-		break;
-
-	case MLX5_OPCODE_ATOMIC_MASKED_FA:
-		wc->opcode    = IBV_EXP_WC_MASKED_FETCH_ADD;
-		wc->byte_len  = ntohl(cqe->byte_cnt);
-		break;
-	case MLX5_OPCODE_TSO:
-		wc->opcode    = IBV_EXP_WC_TSO;
-		break;
-	}
-}
-
 static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 			    struct mlx5_qp *qp, struct mlx5_srq *srq,
 			    enum mlx5_rsc_type type,
 			    uint64_t *exp_wc_flags)
 {
+  //assert(srq == NULL);  Commented for perf, but true
 	uint16_t	wqe_ctr;
 	struct mlx5_wq *wq;
-	uint8_t g;
-	int err = 0;
-	int cqe_format = mlx5_get_cqe_format(cqe);
 
-	wc->byte_len = ntohl(cqe->byte_cnt);
-	if (srq) {
-		wqe_ctr = ntohs(cqe->wqe_counter);
-		wc->wr_id = srq->wrid[wqe_ctr];
-		mlx5_free_srq_wqe(srq, wqe_ctr);
-		if (cqe_format == MLX5_INLINE_DATA32_SEG)
-			err = mlx5_copy_to_recv_srq(srq, wqe_ctr, cqe,
-						    wc->byte_len);
-		else if (cqe_format == MLX5_INLINE_DATA64_SEG)
-			err = mlx5_copy_to_recv_srq(srq, wqe_ctr, cqe - 1,
-						    wc->byte_len);
-	} else {
-		wq	  = &qp->rq;
-		wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
-		wc->wr_id = wq->wrid[wqe_ctr];
-		++wq->tail;
-		if (cqe_format == MLX5_INLINE_DATA32_SEG)
-			err = mlx5_copy_to_recv_wqe(qp, wqe_ctr, cqe,
-						    wc->byte_len);
-		else if (cqe_format == MLX5_INLINE_DATA64_SEG)
-			err = mlx5_copy_to_recv_wqe(qp, wqe_ctr, cqe - 1,
-						    wc->byte_len);
-	}
-	if (err)
-		return err;
-
-	wc->byte_len = ntohl(cqe->byte_cnt);
-
-	switch (cqe->op_own >> 4) {
-	case MLX5_CQE_RESP_WR_IMM:
-		wc->opcode	= IBV_WC_RECV_RDMA_WITH_IMM;
-		wc->wc_flags	|= IBV_WC_WITH_IMM;
-		wc->imm_data = cqe->imm_inval_pkey;
-		break;
-	case MLX5_CQE_RESP_SEND:
-		wc->opcode   = IBV_WC_RECV;
-		break;
-	case MLX5_CQE_RESP_SEND_IMM:
-		wc->opcode	= IBV_WC_RECV;
-		wc->wc_flags	|= IBV_WC_WITH_IMM;
-		wc->imm_data = cqe->imm_inval_pkey;
-		break;
-	case MLX5_CQE_RESP_SEND_INV:
-		wc->opcode = IBV_WC_RECV;
-		wc->wc_flags	|= IBV_WC_WITH_INV;
-		wc->imm_data = ntohl(cqe->imm_inval_pkey);
-		break;
-	}
-	wc->slid	   = ntohs(cqe->slid);
-	wc->sl		   = (ntohl(cqe->flags_rqpn) >> 24) & 0xf;
-	if (srq && (type != MLX5_RSC_TYPE_DCT) &&
-	    ((type == MLX5_RSC_TYPE_INVAL) || (type == MLX5_RSC_TYPE_XSRQ) ||
-	     ((qp->verbs_qp.qp.qp_type == IBV_QPT_XRC_RECV) ||
-	      (qp->verbs_qp.qp.qp_type == IBV_QPT_XRC))))
-		wc->src_qp	   = srq->srqn;
-	else
-		wc->src_qp	   = ntohl(cqe->flags_rqpn) & 0xffffff;
-
-
-	wc->dlid_path_bits = cqe->ml_path & 0x7f;
-
-	if ((qp && qp->verbs_qp.qp.qp_type == IBV_QPT_UD) ||
-	    (type == MLX5_RSC_TYPE_DCT)) {
-		g = (ntohl(cqe->flags_rqpn) >> 28) & 3;
-		wc->wc_flags |= g ? IBV_WC_GRH : 0;
-	}
-
-	wc->pkey_index     = ntohl(cqe->imm_inval_pkey) & 0xffff;
+  wq	  = &qp->rq;
+  wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
+  wc->wr_id = wq->wrid[wqe_ctr];
+  printf("prefetch %zu\n", wc->wr_id);
+  __builtin_prefetch((void *)wc->wr_id, 0, 0);
+  ++wq->tail;
 
 	return IBV_WC_SUCCESS;
 }
@@ -783,8 +674,8 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 				uint32_t wc_size,
 				int cqe_ver)
 {
-  assert(cqe_ver == 1);
-  assert(*cur_srq == NULL);
+  // assert(cqe_ver == 1);  // Commented for perf, but true
+  // assert(*cur_srq == NULL);  // Commented for perf, but true
 
 	struct mlx5_cqe64 *cqe64;
 	struct mlx5_wq *wq;
@@ -845,6 +736,7 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 
 	switch (opcode) {
 	case MLX5_CQE_REQ:
+    // post_send() completion
 		if (unlikely(!mqp)) {
 			fprintf(stderr, "all requestors are kinds of QPs\n");
 			return CQ_POLL_ERR;
@@ -852,7 +744,6 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		wq = &mqp->sq;
 		wqe_ctr = ntohs(cqe64->wqe_counter);
 		idx = wqe_ctr & (wq->wqe_cnt - 1);
-		handle_good_req((struct ibv_wc *)wc, cqe64, wq, idx);
 		err = 0;
 
 		wc->wr_id = wq->wrid[idx];
@@ -860,6 +751,7 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		wc->status = err;
 		break;
 	case MLX5_CQE_RESP_SEND:
+    // post_recv() completion
 		wc->status = handle_responder((struct ibv_wc *)wc, cqe64, mqp,
 					      NULL, type,
 					      &exp_wc_flags);
