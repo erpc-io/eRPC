@@ -302,120 +302,6 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 	return IBV_WC_SUCCESS;
 }
 
-static void dump_cqe(FILE *fp, void *buf)
-{
-	uint32_t *p = buf;
-	int i;
-
-	for (i = 0; i < 16; i += 4)
-		fprintf(fp, "%08x %08x %08x %08x\n", ntohl(p[i]), ntohl(p[i + 1]),
-			ntohl(p[i + 2]), ntohl(p[i + 3]));
-}
-
-static void mlx5_set_bad_wc_opcode(struct ibv_exp_wc *wc,
-				   struct mlx5_err_cqe *cqe,
-				   uint8_t is_req,
-				   uint8_t *is_umr)
-{
-	if (is_req) {
-		switch (ntohl(cqe->s_wqe_opcode_qpn) >> 24) {
-		case MLX5_OPCODE_RDMA_WRITE_IMM:
-		case MLX5_OPCODE_RDMA_WRITE:
-			wc->exp_opcode    = IBV_EXP_WC_RDMA_WRITE;
-			break;
-		case MLX5_OPCODE_SEND_IMM:
-		case MLX5_OPCODE_SEND:
-		case MLX5_OPCODE_SEND_INVAL:
-			wc->exp_opcode    = IBV_EXP_WC_SEND;
-			break;
-		case MLX5_OPCODE_RDMA_READ:
-			wc->exp_opcode    = IBV_EXP_WC_RDMA_READ;
-			break;
-		case MLX5_OPCODE_ATOMIC_CS:
-			wc->exp_opcode    = IBV_EXP_WC_COMP_SWAP;
-			break;
-		case MLX5_OPCODE_ATOMIC_FA:
-			wc->exp_opcode    = IBV_EXP_WC_FETCH_ADD;
-			break;
-		case MLX5_OPCODE_UMR:
-			*is_umr = 1;
-			break;
-		case MLX5_OPCODE_ATOMIC_MASKED_CS:
-			wc->exp_opcode    = IBV_EXP_WC_MASKED_COMP_SWAP;
-			break;
-		case MLX5_OPCODE_ATOMIC_MASKED_FA:
-			wc->exp_opcode    = IBV_EXP_WC_MASKED_FETCH_ADD;
-			break;
-		case MLX5_OPCODE_TSO:
-			wc->exp_opcode    = IBV_EXP_WC_TSO;
-			break;
-		}
-	} else {
-		switch (cqe->op_own >> 4) {
-		case MLX5_CQE_RESP_WR_IMM:
-			wc->exp_opcode	= IBV_EXP_WC_RECV_RDMA_WITH_IMM;
-			break;
-		case MLX5_CQE_RESP_SEND:
-			wc->exp_opcode   = IBV_EXP_WC_RECV;
-			break;
-		case MLX5_CQE_RESP_SEND_IMM:
-			wc->exp_opcode	= IBV_EXP_WC_RECV;
-			break;
-		}
-	}
-}
-
-static void mlx5_handle_error_cqe(struct mlx5_err_cqe *cqe,
-				  struct ibv_exp_wc *wc)
-{
-	switch (cqe->syndrome) {
-	case MLX5_CQE_SYNDROME_LOCAL_LENGTH_ERR:
-		wc->status = IBV_WC_LOC_LEN_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_LOCAL_QP_OP_ERR:
-		wc->status = IBV_WC_LOC_QP_OP_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_LOCAL_PROT_ERR:
-		wc->status = IBV_WC_LOC_PROT_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_WR_FLUSH_ERR:
-		wc->status = IBV_WC_WR_FLUSH_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_MW_BIND_ERR:
-		wc->status = IBV_WC_MW_BIND_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_BAD_RESP_ERR:
-		wc->status = IBV_WC_BAD_RESP_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_LOCAL_ACCESS_ERR:
-		wc->status = IBV_WC_LOC_ACCESS_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_REMOTE_INVAL_REQ_ERR:
-		wc->status = IBV_WC_REM_INV_REQ_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_REMOTE_ACCESS_ERR:
-		wc->status = IBV_WC_REM_ACCESS_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_REMOTE_OP_ERR:
-		wc->status = IBV_WC_REM_OP_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_TRANSPORT_RETRY_EXC_ERR:
-		wc->status = IBV_WC_RETRY_EXC_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_RNR_RETRY_EXC_ERR:
-		wc->status = IBV_WC_RNR_RETRY_EXC_ERR;
-		break;
-	case MLX5_CQE_SYNDROME_REMOTE_ABORTED_ERR:
-		wc->status = IBV_WC_REM_ABORT_ERR;
-		break;
-	default:
-		wc->status = IBV_WC_GENERAL_ERR;
-		break;
-	}
-
-	wc->vendor_err = cqe->vendor_err_synd;
-}
-
 #if defined(__x86_64__) || defined (__i386__)
 static inline unsigned long get_cycles()
 {
@@ -899,33 +785,23 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	struct mlx5_cqe64 *cqe64;
 	struct mlx5_wq *wq;
 	uint16_t wqe_ctr;
-	void *cqe;
 	uint32_t rsn;
 	uint32_t srqn_uidx;
 	int idx;
 	uint8_t opcode;
-	struct mlx5_err_cqe *ecqe;
 	int err;
 	int requestor;
 	int responder;
 	int is_srq = 0;
 	struct mlx5_context *mctx = to_mctx(cq->ibv_cq.context);
 	struct mlx5_qp *mqp = NULL;
-	struct mlx5_rwq *rwq = NULL;
-	struct mlx5_dct *mdct;
 	uint64_t exp_wc_flags = 0;
 	enum mlx5_rsc_type type = MLX5_RSC_TYPE_INVAL;
-	int cqe_format;
-	uint8_t l3_hdr;
 
 	cqe64 = get_next_cqe(cq, cq->cqe_sz);
 	if (!cqe64)
 		return CQ_EMPTY;
 
-	cqe_format = mlx5_get_cqe_format(cqe64);
-	if (unlikely(cqe_format == MLX5_COMPRESSED)) {
-		cqe64 = mlx5_decompress_cqe(cq);
-	}
 	++cq->cons_index;
 
 	/*
@@ -979,25 +855,6 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 				is_srq = 1;
 			}
 			break;
-		case MLX5_RSC_TYPE_DCT:
-			mdct = (struct mlx5_dct *)*cur_rsc;
-			is_srq = 1;
-			if (likely(offsetof(struct ibv_exp_wc, dct) < wc_size)) {
-				wc->dct = &mdct->ibdct;
-				exp_wc_flags |= IBV_EXP_WC_DCT;
-			}
-
-			if (cqe_ver)
-				*cur_srq = to_msrq(mdct->ibdct.srq);
-			break;
-		case MLX5_RSC_TYPE_XSRQ:
-			*cur_srq = (struct mlx5_srq *)*cur_rsc;
-			is_srq = 1;
-			break;
-		case MLX5_RSC_TYPE_RWQ:
-		case MLX5_RSC_TYPE_MP_RWQ:
-			rwq = (struct mlx5_rwq *)*cur_rsc;
-			break;
 		default:
 			return CQ_POLL_ERR;
 		}
@@ -1021,17 +878,7 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		wqe_ctr = ntohs(cqe64->wqe_counter);
 		idx = wqe_ctr & (wq->wqe_cnt - 1);
 		handle_good_req((struct ibv_wc *)wc, cqe64, wq, idx);
-		if (cqe_format == MLX5_INLINE_DATA32_SEG) {
-			cqe = cqe64;
-			err = mlx5_copy_to_send_wqe(mqp, wqe_ctr, cqe,
-						    wc->byte_len);
-		} else if (cqe_format == MLX5_INLINE_DATA64_SEG) {
-			cqe = cqe64 - 1;
-			err = mlx5_copy_to_send_wqe(mqp, wqe_ctr, cqe,
-						    wc->byte_len);
-		} else {
-			err = 0;
-		}
+		err = 0;
 
 		wc->wr_id = wq->wrid[idx];
 		wq->tail = mqp->gen_data.wqe_head[idx] + 1;
@@ -1041,94 +888,17 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	case MLX5_CQE_RESP_SEND:
 	case MLX5_CQE_RESP_SEND_IMM:
 	case MLX5_CQE_RESP_SEND_INV:
-		if (cqe64->app == MLX5_CQE_APP_TAG_MATCHING) {
-			if (!is_srq)
-				return CQ_POLL_ERR;
-
-			handle_tag_matching(wc, cqe64, *cur_srq, &exp_wc_flags);
-			break;
-		}
-
 		wc->status = handle_responder((struct ibv_wc *)wc, cqe64, mqp,
 					      is_srq ? *cur_srq : NULL, type,
 					      &exp_wc_flags);
-		if (mqp &&
-		    (mqp->gen_data.model_flags & MLX5_QP_MODEL_RX_CSUM_IP_OK_IP_NON_TCP_UDP)) {
-			l3_hdr = (cqe64->l4_hdr_type_etc) & MLX5_CQE_L3_HDR_TYPE_MASK;
-			exp_wc_flags |=
-				(!!(cqe64->hds_ip_ext & MLX5_CQE_L4_OK) *
-				 (uint64_t)IBV_EXP_WC_RX_TCP_UDP_CSUM_OK) |
-				(!!(cqe64->hds_ip_ext & MLX5_CQE_L3_OK) *
-				 (uint64_t)IBV_EXP_WC_RX_IP_CSUM_OK) |
-				((l3_hdr == MLX5_CQE_L3_HDR_TYPE_IPV4) *
-				 (uint64_t)IBV_EXP_WC_RX_IPV4_PACKET) |
-				((l3_hdr == MLX5_CQE_L3_HDR_TYPE_IPV6) *
-				 (uint64_t)IBV_EXP_WC_RX_IPV6_PACKET);
-		}
 		break;
+  default:
+    return CQ_POLL_ERR;
 
-	case MLX5_CQE_NO_PACKET:
-		if (cqe64->app != MLX5_CQE_APP_TAG_MATCHING || !is_srq)
-			return CQ_POLL_ERR;
-		handle_tag_matching(wc, cqe64, *cur_srq, &exp_wc_flags);
-		break;
-
-	case MLX5_CQE_RESIZE_CQ:
-		break;
-	case MLX5_CQE_REQ_ERR:
-	case MLX5_CQE_RESP_ERR:
-		{
-		uint8_t is_umr = 0;
-		ecqe = (struct mlx5_err_cqe *)cqe64;
-		mlx5_handle_error_cqe(ecqe, wc);
-		mlx5_set_bad_wc_opcode(wc, ecqe, (opcode == MLX5_CQE_REQ_ERR), &is_umr);
-		if (unlikely(ecqe->syndrome != MLX5_CQE_SYNDROME_WR_FLUSH_ERR &&
-			     ecqe->syndrome != MLX5_CQE_SYNDROME_TRANSPORT_RETRY_EXC_ERR)) {
-			FILE *fp = mctx->dbg_fp;
-			fprintf(fp, PFX "%s: got completion with error:\n",
-				mctx->hostname);
-			dump_cqe(fp, ecqe);
-			if (mlx5_freeze_on_error_cqe) {
-				fprintf(fp, PFX "freezing at poll cq...");
-				while (1)
-					sleep(10);
-			}
-		}
-
-		if (opcode == MLX5_CQE_REQ_ERR) {
-			wq = &mqp->sq;
-			wqe_ctr = ntohs(cqe64->wqe_counter);
-			idx = wqe_ctr & (wq->wqe_cnt - 1);
-			wc->wr_id = wq->wrid[idx];
-			wq->tail = mqp->gen_data.wqe_head[idx] + 1;
-			if (is_umr)
-				wc->exp_opcode = wq->wr_data[idx];
-		} else {
-			if (*cur_srq) {
-				wqe_ctr = ntohs(cqe64->wqe_counter);
-				wc->wr_id = (*cur_srq)->wrid[wqe_ctr];
-				mlx5_free_srq_wqe(*cur_srq, wqe_ctr);
-			} else {
-				if (rwq)
-					wq = &rwq->rq;
-				else
-					wq = &mqp->rq;
-				wc->wr_id = wq->wrid[wq->tail & (wq->wqe_cnt - 1)];
-				++wq->tail;
-			}
-		}
-		break;
-		}
 	}
 
 	if (likely(offsetof(struct ibv_exp_wc, exp_wc_flags) < wc_size))
 		wc->exp_wc_flags = exp_wc_flags | (uint64_t)((struct ibv_wc *)wc)->wc_flags;
-
-	if (unlikely(cq->peer_enabled &&
-	    !(cq->peer_ctx->caps & IBV_EXP_PEER_OP_POLL_NOR_DWORD_CAP))) {
-		cqe64->op_own = MLX5_CQE_INVALID << 4;
-		wmb();
-	}
 
 	return CQ_OK;
 }
