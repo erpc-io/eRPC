@@ -44,10 +44,8 @@ num_columns=`echo $header_line | wc -w`
 echo "proc-out: Detected $num_columns columns"
 
 # Sum of per-file average for each column. Averaging rows is incorrect.
-col_idx="0"
-while [ $col_idx -lt $num_columns ]; do
+for ((col_idx = 0; col_idx < $num_columns; col_idx++)); do
   col_sum_of_avgs[$col_idx]="0.0"
-  ((col_idx+=1))
 done
 
 # Process the fetched stats files
@@ -69,23 +67,19 @@ for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
   remaining_rows=`cat proc_out_tmp | wc -l`
 
   file_avg_str=""  # Average of each column for this file
-  col_idx="0"
-  while [ $col_idx -lt $num_columns ]; do
+  for ((col_idx = 0; col_idx < $num_columns; col_idx++)); do
     file_avg=`awk -v col=$col_idx '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
     col_sum_of_avgs[$col_idx]=`echo "scale=3; ${col_sum_of_avgs[$col_idx]} + $file_avg" | bc -l`
     file_avg_str=`echo $file_avg_str ${col_name[$col_idx]}:$file_avg, `
-    ((col_idx+=1))
   done
 
   echo "proc-out: Column averages for $filename = $file_avg_str"
   ((processed_files+=1))
 done
 
-col_idx="0"
-while [ $col_idx -lt $num_columns ]; do
+for ((col_idx = 0; col_idx < $num_columns; col_idx++)); do
   col_avg=`echo "scale=3; ${col_sum_of_avgs[$col_idx]} / $processed_files" | bc -l`
   blue "proc-out: Final column ${col_name[$col_idx]} average = $col_avg"
-  ((col_idx+=1))
 done
 
 blue "proc-out: Processed files = $processed_files, ignored files = $ignored_files"
