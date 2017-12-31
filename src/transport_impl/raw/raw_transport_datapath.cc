@@ -100,7 +100,7 @@ size_t RawTransport::rx_burst() {
     if (delta == 0 || delta >= kNumRxRingEntries) return 0;
 
     for (size_t i = 0; i < delta; i++) {
-      __builtin_prefetch(&ring_extent.buf[recv_head * kRecvSize], 0, 0);
+      __builtin_prefetch(&ring_extent.buf[recv_head * kRecvSize], 0, 3);
       recv_head = (recv_head + 1) % kNumRxRingEntries;
     }
 

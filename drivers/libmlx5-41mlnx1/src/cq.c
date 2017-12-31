@@ -166,7 +166,7 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 
   wq	  = &qp->rq;
   wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
-  __builtin_prefetch((void *)(wq->wrid[wqe_ctr]), 0, 0);
+  __builtin_prefetch((void *)(wq->wrid[wqe_ctr]), 0, 3);
   ++wq->tail;
 
 	return IBV_WC_SUCCESS;
