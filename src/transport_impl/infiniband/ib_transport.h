@@ -163,8 +163,7 @@ class IBTransport : public Transport {
     uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
     uint16_t port_lid = 0;    ///< LID of phy_port. 0 is invalid.
 
-    // GID for RoCE
-    union ibv_gid gid;
+    union ibv_gid gid;  ///< GID, used only for RoCE
   } resolve;
 
   struct ibv_pd *pd = nullptr;

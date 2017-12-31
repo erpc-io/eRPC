@@ -106,8 +106,7 @@ void IBTransport::resolve_phy_port() {
 
   for (int dev_i = 0; dev_i < num_devices; dev_i++) {
     struct ibv_context *ib_ctx = ibv_open_device(dev_list[dev_i]);
-    rt_assert(ib_ctx != nullptr,
-              "eRPC IBTransport: Failed to open dev " + std::to_string(dev_i));
+    rt_assert(ib_ctx != nullptr, "Failed to open dev " + std::to_string(dev_i));
 
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
@@ -121,8 +120,8 @@ void IBTransport::resolve_phy_port() {
       // Count this port only if it is enabled
       struct ibv_port_attr port_attr;
       if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
-        xmsg << "eRPC IBTransport: Failed to query port "
-             << std::to_string(port_i) << " on device " << ib_ctx->device->name;
+        xmsg << "Failed to query port " << std::to_string(port_i)
+             << " on device " << ib_ctx->device->name;
         throw std::runtime_error(xmsg.str());
       }
 
@@ -173,8 +172,7 @@ void IBTransport::resolve_phy_port() {
 
     // Thank you Mario, but our port is in another device
     if (ibv_close_device(ib_ctx) != 0) {
-      xmsg << "eRPC IBTransport: Failed to close InfiniBand device "
-           << ib_ctx->device->name;
+      xmsg << "eRPC Failed to close device" << ib_ctx->device->name;
       throw std::runtime_error(xmsg.str());
     }
   }
