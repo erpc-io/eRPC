@@ -94,7 +94,7 @@ req_t generate_request(AppContext *c) {
   req_t req;
   size_t key = get_random_key(c);
 
-  if (c->fastrand.next_u32() % 100 == 0) {
+  if (c->fastrand.next_u32() % 100 < FLAGS_range_req_percent) {
     // Generate a range request
     req.req_type = kAppRangeReqType;
     req.range_req.key = key;
@@ -183,8 +183,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
-  assert(FLAGS_process_id > 0);
-
+  erpc::rt_assert(FLAGS_process_id > 0, "Invalid process ID");
   AppContext c;
   c.thread_id = thread_id;
 
@@ -221,7 +220,7 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
 void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
                         threadinfo_t **ti_arr) {
-  assert(FLAGS_process_id == 0);
+  erpc::rt_assert(FLAGS_process_id == 0, "Invalid server process ID");
 
   AppContext c;
   c.thread_id = thread_id;
@@ -230,17 +229,22 @@ void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
-                                  basic_sm_handler, kAppPhyPort, kAppNumaNode);
+                                  basic_sm_handler, kAppPhyPort);
   c.rpc = &rpc;
   while (ctrl_c_pressed == 0) rpc.run_event_loop(200);
 }
 
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
-
-  // Work around g++-5's unused variable warning for validators
-  _unused(req_window_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  erpc::rt_assert(FLAGS_req_window <= kAppMaxReqWindow, "Invalid req window");
+  erpc::rt_assert(FLAGS_range_req_percent <= 100, "Invalid range req percent");
+
+  if (FLAGS_num_server_bg_threads == 0) {
+    printf(
+        "main: Warning: No background threads. "
+        "Range queries will run in foreground.\n");
+  }
 
   if (is_server()) {
     // Create the Masstree using the main thread and insert keys
@@ -267,15 +271,18 @@ int main(int argc, char **argv) {
     // eRPC stuff
     std::string hostname = erpc::get_hostname_for_process(0);
     std::string udp_port_str = erpc::get_udp_port_for_process(0);
-    erpc::Nexus nexus(hostname, std::stoi(udp_port_str),
+    erpc::Nexus nexus(hostname + ":" + udp_port_str, kAppEPid, kAppNumaNode,
                       FLAGS_num_server_bg_threads);
 
     nexus.register_req_func(
         kAppPointReqType,
         erpc::ReqFunc(point_req_handler, erpc::ReqFuncType::kForeground));
+
+    auto range_handler_type = FLAGS_num_server_bg_threads > 0
+                                  ? erpc::ReqFuncType::kForeground
+                                  : erpc::ReqFuncType::kBackground;
     nexus.register_req_func(
-        kAppRangeReqType,
-        erpc::ReqFunc(range_req_handler, erpc::ReqFuncType::kBackground));
+        kAppRangeReqType, erpc::ReqFunc(range_req_handler, range_handler_type));
 
     std::vector<std::thread> thread_arr(FLAGS_num_server_fg_threads);
     for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) {
@@ -289,7 +296,8 @@ int main(int argc, char **argv) {
   } else {
     std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
     std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
-    erpc::Nexus nexus(hostname, std::stoi(udp_port_str));
+    erpc::Nexus nexus(hostname + ":" + udp_port_str, kAppEPid, kAppNumaNode,
+                      FLAGS_num_server_bg_threads);
 
     std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {

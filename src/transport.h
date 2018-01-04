@@ -84,6 +84,9 @@ class Transport {
    * This function must initialize \p reg_mr_func and \p dereg_mr_func, which
    * will be used to construct the allocator.
    *
+   * @param epid The small local process ID of the eRPC process
+   * @param rpc_id The RPC ID of the parent RPC
+   *
    * @throw runtime_error if creation fails
    */
   Transport(TransportType, uint8_t epid, uint8_t rpc_id, uint8_t phy_port,
@@ -156,7 +159,7 @@ class Transport {
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
-  const uint8_t epid;      ///< The parent Nexus's local eRPC process ID
+  const uint8_t epid;      ///< The small local eRPC process ID
   const uint8_t rpc_id;    ///< The parent Rpc's ID
   const uint8_t phy_port;  ///< 0-based physical port specified by application
   const size_t numa_node;  ///< Derived from \p huge_alloc

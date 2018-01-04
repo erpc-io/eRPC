@@ -11,10 +11,13 @@
 
 static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppPhyPort = 0;
+static constexpr size_t kAppEPid = 0;  // Small local eRPC process ID
 static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppPointReqType = 1;
 static constexpr size_t kAppRangeReqType = 2;
-static constexpr size_t kMaxReqWindow = 8;  // Max pending reqs per client
+
+// Workload params
+static constexpr size_t kAppMaxReqWindow = 8;  // Max pending reqs per client
 
 // Globals
 volatile sig_atomic_t ctrl_c_pressed = 0;
@@ -27,11 +30,7 @@ DEFINE_uint64(num_client_threads, 0, "Number of client threads");
 DEFINE_uint64(req_window, 0, "Outstanding requests per client thread");
 DEFINE_uint64(num_keys, 0, "Number of keys in the server's Masstree");
 DEFINE_uint64(range_size, 0, "Size of range to scan");
-
-static bool validate_req_window(const char *, uint64_t req_window) {
-  return req_window <= kMaxReqWindow;
-}
-DEFINE_validator(req_window, &validate_req_window);
+DEFINE_uint64(range_req_percent, 0, "Percentage of range scans");
 
 // Return true iff this machine is the one server
 bool is_server() { return FLAGS_process_id == 0; }
@@ -71,10 +70,10 @@ class AppContext : public BasicAppContext {
     erpc::Latency point_latency;  // Latency of point requests (factor = 10)
     erpc::Latency range_latency;  // Latency of point requests (factor = 1)
 
-    struct timespec tput_t0;         // Throughput measurement start
-    uint64_t req_ts[kMaxReqWindow];  // Per-request timestamps
-    erpc::MsgBuffer req_msgbuf[kMaxReqWindow];
-    erpc::MsgBuffer resp_msgbuf[kMaxReqWindow];
+    struct timespec tput_t0;            // Throughput measurement start
+    uint64_t req_ts[kAppMaxReqWindow];  // Per-request timestamps
+    erpc::MsgBuffer req_msgbuf[kAppMaxReqWindow];
+    erpc::MsgBuffer resp_msgbuf[kAppMaxReqWindow];
 
     erpc::FastRand fast_rand;
     size_t num_resps_tot = 0;  // Total responses received (range & point reqs)
