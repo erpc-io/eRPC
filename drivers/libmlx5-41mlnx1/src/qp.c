@@ -585,6 +585,7 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 			 int idx, int offset, int is_tso)
 {
 	struct mlx5_wqe_data_seg *dpseg = wqe;
+	struct ibv_sge *psge;
 	int i;
 
 	for (i = idx; i < num_sge; ++i) {
@@ -592,6 +593,9 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 			dpseg = mlx5_get_send_wqe(qp, 0);
 
 		if (1) {
+			psge = sg_list + i;
+
+			set_data_ptr_seg(dpseg, psge, qp, offset);
 			++dpseg;
 			offset = 0;
 			*sz += sizeof(struct mlx5_wqe_data_seg) / 16;
