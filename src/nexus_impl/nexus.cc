@@ -16,7 +16,9 @@ Nexus::Nexus(std::string local_uri, uint8_t epid, size_t numa_node,
       epid(epid),
       numa_node(numa_node),
       num_bg_threads(num_bg_threads) {
-  if (kTesting) LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
+  if (kTesting) {
+    LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
+  }
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
   rt_assert(epid <= kMaxEPid, "Invalid eRPC PID");
   rt_assert(numa_node < kInvalidNUMANode, "Invalid NUMA node");
