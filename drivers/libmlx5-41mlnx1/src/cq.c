@@ -155,6 +155,51 @@ static inline struct mlx5_cqe64 *get_next_cqe(struct mlx5_cq *cq, const int cqe_
 	return NULL;
 }
 
+static inline void handle_good_req(struct ibv_wc *wc, struct mlx5_cqe64 *cqe, struct mlx5_wq *wq, int idx)
+{
+	switch (ntohl(cqe->sop_drop_qpn) >> 24) {
+	case MLX5_OPCODE_RDMA_WRITE_IMM:
+		wc->wc_flags |= IBV_WC_WITH_IMM;
+	case MLX5_OPCODE_RDMA_WRITE:
+		wc->opcode    = IBV_WC_RDMA_WRITE;
+		break;
+	case MLX5_OPCODE_SEND_IMM:
+		wc->wc_flags |= IBV_WC_WITH_IMM;
+	case MLX5_OPCODE_SEND:
+	case MLX5_OPCODE_SEND_INVAL:
+		wc->opcode    = IBV_WC_SEND;
+		break;
+	case MLX5_OPCODE_RDMA_READ:
+		wc->opcode    = IBV_WC_RDMA_READ;
+		wc->byte_len  = ntohl(cqe->byte_cnt);
+		break;
+	case MLX5_OPCODE_ATOMIC_CS:
+		wc->opcode    = IBV_WC_COMP_SWAP;
+		wc->byte_len  = 8;
+		break;
+	case MLX5_OPCODE_ATOMIC_FA:
+		wc->opcode    = IBV_WC_FETCH_ADD;
+		wc->byte_len  = 8;
+		break;
+	case MLX5_OPCODE_UMR:
+		wc->opcode    = wq->wr_data[idx];
+		break;
+
+	case MLX5_OPCODE_ATOMIC_MASKED_CS:
+		wc->opcode    = IBV_EXP_WC_MASKED_COMP_SWAP;
+		wc->byte_len  = ntohl(cqe->byte_cnt);
+		break;
+
+	case MLX5_OPCODE_ATOMIC_MASKED_FA:
+		wc->opcode    = IBV_EXP_WC_MASKED_FETCH_ADD;
+		wc->byte_len  = ntohl(cqe->byte_cnt);
+		break;
+	case MLX5_OPCODE_TSO:
+		wc->opcode    = IBV_EXP_WC_TSO;
+		break;
+	}
+}
+
 static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 			    struct mlx5_qp *qp, struct mlx5_srq *srq,
 			    enum mlx5_rsc_type type,
@@ -164,12 +209,130 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 	uint16_t	wqe_ctr;
 	struct mlx5_wq *wq;
 
-  wq	  = &qp->rq;
-  wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
-  __builtin_prefetch((void *)(wq->wrid[wqe_ctr]), 0, 3);
-  ++wq->tail;
+	wc->byte_len = ntohl(cqe->byte_cnt);
+	if (0) {
+	} else {
+		wq	  = &qp->rq;
+		wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
+    __builtin_prefetch((void *)(wq->wrid[wqe_ctr]), 0, 3);
+		++wq->tail;
+	}
 
 	return IBV_WC_SUCCESS;
+}
+
+static void dump_cqe(FILE *fp, void *buf)
+{
+	uint32_t *p = buf;
+	int i;
+
+	for (i = 0; i < 16; i += 4)
+		fprintf(fp, "%08x %08x %08x %08x\n", ntohl(p[i]), ntohl(p[i + 1]),
+			ntohl(p[i + 2]), ntohl(p[i + 3]));
+}
+
+static void mlx5_set_bad_wc_opcode(struct ibv_exp_wc *wc,
+				   struct mlx5_err_cqe *cqe,
+				   uint8_t is_req,
+				   uint8_t *is_umr)
+{
+	if (is_req) {
+		switch (ntohl(cqe->s_wqe_opcode_qpn) >> 24) {
+		case MLX5_OPCODE_RDMA_WRITE_IMM:
+		case MLX5_OPCODE_RDMA_WRITE:
+			wc->exp_opcode    = IBV_EXP_WC_RDMA_WRITE;
+			break;
+		case MLX5_OPCODE_SEND_IMM:
+		case MLX5_OPCODE_SEND:
+		case MLX5_OPCODE_SEND_INVAL:
+			wc->exp_opcode    = IBV_EXP_WC_SEND;
+			break;
+		case MLX5_OPCODE_RDMA_READ:
+			wc->exp_opcode    = IBV_EXP_WC_RDMA_READ;
+			break;
+		case MLX5_OPCODE_ATOMIC_CS:
+			wc->exp_opcode    = IBV_EXP_WC_COMP_SWAP;
+			break;
+		case MLX5_OPCODE_ATOMIC_FA:
+			wc->exp_opcode    = IBV_EXP_WC_FETCH_ADD;
+			break;
+		case MLX5_OPCODE_UMR:
+			*is_umr = 1;
+			break;
+		case MLX5_OPCODE_ATOMIC_MASKED_CS:
+			wc->exp_opcode    = IBV_EXP_WC_MASKED_COMP_SWAP;
+			break;
+		case MLX5_OPCODE_ATOMIC_MASKED_FA:
+			wc->exp_opcode    = IBV_EXP_WC_MASKED_FETCH_ADD;
+			break;
+		case MLX5_OPCODE_TSO:
+			wc->exp_opcode    = IBV_EXP_WC_TSO;
+			break;
+		}
+	} else {
+		switch (cqe->op_own >> 4) {
+		case MLX5_CQE_RESP_WR_IMM:
+			wc->exp_opcode	= IBV_EXP_WC_RECV_RDMA_WITH_IMM;
+			break;
+		case MLX5_CQE_RESP_SEND:
+			wc->exp_opcode   = IBV_EXP_WC_RECV;
+			break;
+		case MLX5_CQE_RESP_SEND_IMM:
+			wc->exp_opcode	= IBV_EXP_WC_RECV;
+			break;
+		}
+	}
+}
+
+static void mlx5_handle_error_cqe(struct mlx5_err_cqe *cqe,
+				  struct ibv_exp_wc *wc)
+{
+	switch (cqe->syndrome) {
+	case MLX5_CQE_SYNDROME_LOCAL_LENGTH_ERR:
+		wc->status = IBV_WC_LOC_LEN_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_LOCAL_QP_OP_ERR:
+		wc->status = IBV_WC_LOC_QP_OP_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_LOCAL_PROT_ERR:
+		wc->status = IBV_WC_LOC_PROT_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_WR_FLUSH_ERR:
+		wc->status = IBV_WC_WR_FLUSH_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_MW_BIND_ERR:
+		wc->status = IBV_WC_MW_BIND_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_BAD_RESP_ERR:
+		wc->status = IBV_WC_BAD_RESP_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_LOCAL_ACCESS_ERR:
+		wc->status = IBV_WC_LOC_ACCESS_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_REMOTE_INVAL_REQ_ERR:
+		wc->status = IBV_WC_REM_INV_REQ_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_REMOTE_ACCESS_ERR:
+		wc->status = IBV_WC_REM_ACCESS_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_REMOTE_OP_ERR:
+		wc->status = IBV_WC_REM_OP_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_TRANSPORT_RETRY_EXC_ERR:
+		wc->status = IBV_WC_RETRY_EXC_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_RNR_RETRY_EXC_ERR:
+		wc->status = IBV_WC_RNR_RETRY_EXC_ERR;
+		break;
+	case MLX5_CQE_SYNDROME_REMOTE_ABORTED_ERR:
+		wc->status = IBV_WC_REM_ABORT_ERR;
+		break;
+	default:
+		wc->status = IBV_WC_GENERAL_ERR;
+		break;
+	}
+
+	wc->vendor_err = cqe->vendor_err_synd;
 }
 
 #if defined(__x86_64__) || defined (__i386__)
@@ -183,6 +346,22 @@ static inline unsigned long get_cycles()
 	return val;
 }
 
+static void mlx5_stall_poll_cq()
+{
+	int i;
+
+	for (i = 0; i < mlx5_stall_num_loop; i++)
+		(void)get_cycles();
+}
+static void mlx5_stall_cycles_poll_cq(uint64_t cycles)
+{
+	while (get_cycles()  <  cycles)
+		; /* Nothing */
+}
+static void mlx5_get_cycles(uint64_t *cycles)
+{
+	*cycles = get_cycles();
+}
 #else
 static void mlx5_stall_poll_cq()
 {
