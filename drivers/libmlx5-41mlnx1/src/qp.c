@@ -481,6 +481,31 @@ static int set_dci_seg(struct mlx5_wqe_datagram_seg *dseg,
 	return size;
 }
 
+static int set_odp_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sge *sg,
+				struct mlx5_qp *qp) __attribute__((noinline));
+static int set_odp_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sge *sg,
+				struct mlx5_qp *qp)
+{
+	uint32_t lkey;
+	if (sg->lkey == ODP_GLOBAL_R_LKEY) {
+		if (mlx5_get_real_lkey_from_implicit_lkey(qp->odp_data.pd, &qp->odp_data.pd->r_ilkey,
+							  sg->addr, sg->length,
+							  &lkey))
+			return ENOMEM;
+	} else {
+		if (mlx5_get_real_lkey_from_implicit_lkey(qp->odp_data.pd, &qp->odp_data.pd->w_ilkey,
+							  sg->addr, sg->length,
+							  &lkey))
+			return ENOMEM;
+	}
+
+	dseg->byte_count = htonl(sg->length);
+	dseg->lkey       = htonl(lkey);
+	dseg->addr       = htonll(sg->addr);
+
+	return 0;
+}
+
 static inline int set_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sge *sg,
 			    struct mlx5_qp *qp,
 			    int offset) __attribute__((always_inline));
@@ -491,6 +516,7 @@ static inline int set_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sg
 	dseg->byte_count = htonl(sg->length - offset);
 	dseg->lkey       = htonl(sg->lkey);
 	dseg->addr       = htonll(sg->addr + offset);
+
 	return 0;
 }
 
@@ -559,19 +585,50 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 			 int idx, int offset, int is_tso)
 {
 	struct mlx5_wqe_data_seg *dpseg = wqe;
-	struct ibv_sge *psge;
 	int i;
 
 	for (i = idx; i < num_sge; ++i) {
 		if (unlikely(dpseg == qp->gen_data.sqend))
 			dpseg = mlx5_get_send_wqe(qp, 0);
 
-    psge = sg_list + i;
+		if (1) {
+			++dpseg;
+			offset = 0;
+			*sz += sizeof(struct mlx5_wqe_data_seg) / 16;
+		}
+	}
 
-    set_data_ptr_seg(dpseg, psge, qp, offset);
-    ++dpseg;
-    offset = 0;
-    *sz += sizeof(struct mlx5_wqe_data_seg) / 16;
+	return 0;
+}
+
+static int set_data_atom_seg(struct mlx5_qp *qp, int num_sge, struct ibv_sge *sg_list,
+			     void *wqe, int *sz, int atom_arg) __MLX5_ALGN_F__;
+static int set_data_atom_seg(struct mlx5_qp *qp, int num_sge, struct ibv_sge *sg_list,
+			     void *wqe, int *sz, int atom_arg)
+{
+	struct mlx5_wqe_data_seg *dpseg = wqe;
+	struct ibv_sge *psge;
+	struct ibv_sge sge;
+	int i;
+#ifdef MLX5_DEBUG
+	FILE *fp = to_mctx(qp->verbs_qp.qp.context)->dbg_fp;
+#endif
+
+	for (i = 0; i < num_sge; ++i) {
+		if (unlikely(dpseg == qp->gen_data.sqend))
+			dpseg = mlx5_get_send_wqe(qp, 0);
+
+		if (likely(sg_list[i].length)) {
+			sge = sg_list[i];
+			sge.length = atom_arg;
+			psge = &sge;
+			if (unlikely(set_data_ptr_seg(dpseg, psge, qp, 0))) {
+				mlx5_dbg(fp, MLX5_DBG_QP_SEND, "failed allocating memory for implicit lkey structure\n");
+				return ENOMEM;
+			}
+			++dpseg;
+			*sz += sizeof(struct mlx5_wqe_data_seg) / 16;
+		}
 	}
 
 	return 0;
@@ -584,6 +641,9 @@ static inline int set_data_seg(struct mlx5_qp *qp, void *seg, int *sz, int is_in
 		 int num_sge, struct ibv_sge *sg_list, int atom_arg,
 		 int idx, int offset, int is_tso)
 {
+	if (ENABLE_INLINING && is_inl)
+		return set_data_inl_seg(qp, num_sge, sg_list, seg, sz, idx,
+					offset);
 	return set_data_non_inl_seg(qp, num_sge, sg_list, seg, sz, idx, offset, is_tso);
 }
 
@@ -1240,19 +1300,47 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 					   int *total_size)
 {
 	void *ctrl = seg;
+	struct mlx5_wqe_eth_seg *eseg;
 	int err = 0;
 	int size = 0;
 	int num_sge = wr->num_sge;
+	int inl_hdr_size = ENABLE_INLINING ? MLX5_ETH_INLINE_HEADER_SIZE : 0;  // 18 B
+	int inl_hdr_copy_size = 0;
 	int i = 0;
 	uint8_t fm_ce_se;
+#ifdef MLX5_DEBUG
+	FILE *fp = to_mctx(qp->verbs_qp.qp.context)->dbg_fp;
+#endif
 
 	seg += sizeof(struct mlx5_wqe_ctrl_seg);
 	size = sizeof(struct mlx5_wqe_ctrl_seg) / 16;
 
-  seg += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr)) & ~0xf;
-  size += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr)) >> 4;
+	eseg = seg;
+	*((uint64_t *)eseg) = 0;
+	eseg->rsvd2 = 0;
 
-  err = set_data_seg(qp, seg, &size, 0, num_sge, wr->sg_list, 0, i, 0, 0);
+	if (0) {
+	} else {
+		/* The first bytes of the headers should be copied to the
+		 * inline-headers of the ETH segment.
+		 */
+		if (ENABLE_INLINING) {
+			inl_hdr_copy_size = inl_hdr_size;
+			memcpy(eseg->inline_hdr_start,
+			       (void *)(uintptr_t)wr->sg_list[0].addr,
+			       inl_hdr_copy_size);
+		}
+
+		eseg->inline_hdr_sz = htons(inl_hdr_size);
+
+		seg += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr) + inl_hdr_size) & ~0xf;
+		size += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr) + inl_hdr_size) >> 4;
+
+		/* The copied headers should be excluded from the data segment */
+		err = set_data_seg(qp, seg, &size,
+				   !!(exp_send_flags & IBV_EXP_SEND_INLINE),
+				   num_sge, wr->sg_list, 0, i, inl_hdr_copy_size, 0);
+	}
 
 	if (unlikely(err))
 		return err;
@@ -1264,7 +1352,8 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	//fm_ce_se |= get_fence(qp->gen_data.fm_cache, wr);
 	set_ctrl_seg_sig(ctrl, &qp->ctrl_seg,
 			 MLX5_IB_OPCODE_GET_OP(mlx5_ib_opcode[IBV_WR_SEND]),
-			 qp->gen_data.scur_post, 0, size, fm_ce_se, 0);
+			 qp->gen_data.scur_post, 0, size, fm_ce_se,
+       0);  // Immediate data is 0
 
 	qp->gen_data.fm_cache = 0;
 	*total_size = size;
