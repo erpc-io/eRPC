@@ -24,9 +24,7 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
          etid < FLAGS_num_server_bg_threads + FLAGS_num_server_fg_threads);
 
   if (kAppVerbose) {
-    printf(
-        "masstree_analytics: Running point_req_handler() in eRPC thread %zu.\n",
-        etid);
+    printf("main: Handling point request in eRPC thread %zu.\n", etid);
   }
 
   MtIndex *mti = c->server.mt_index;
@@ -61,9 +59,7 @@ void range_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(etid < FLAGS_num_server_bg_threads);
 
   if (kAppVerbose) {
-    printf(
-        "masstree_analytics: Running range_req_handler() in eRPC thread %zu.\n",
-        etid);
+    printf("main: Handling range request in eRPC thread %zu.\n", etid);
   }
 
   MtIndex *mti = c->server.mt_index;
@@ -117,8 +113,7 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
   *reinterpret_cast<req_t *>(req_msgbuf.buf) = req;
 
   if (kAppVerbose) {
-    printf("masstree_analytics: Trying to send request with msgbuf_idx %zu.\n",
-           msgbuf_idx);
+    printf("main: Enqueuing request with msgbuf_idx %zu.\n", msgbuf_idx);
   }
 
   c->client.req_ts[msgbuf_idx] = erpc::rdtsc();
@@ -131,8 +126,7 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   size_t msgbuf_idx = _tag;
   if (kAppVerbose) {
-    printf("masstree_analytics: Received response for msgbuf %zu.\n",
-           msgbuf_idx);
+    printf("main: Received response for msgbuf %zu.\n", msgbuf_idx);
   }
 
   auto *c = static_cast<AppContext *>(_context);
@@ -141,8 +135,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   erpc::rt_assert(resp_msgbuf->get_data_size() == sizeof(resp_t),
                   "Invalid response size");
   c->rpc->release_response(resp_handle);
-
-  assert(resp_msgbuf->get_data_size() > 0);  // Check that the Rpc succeeded
 
   double usec = erpc::to_usec(erpc::rdtsc() - c->client.req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
@@ -168,7 +160,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double tput = kMeasurement / (seconds * 1000000);
 
     printf(
-        "masstree_analytics: Client %zu. Tput = %.3f Mrps. "
+        "main: Client %zu. Tput = %.3f Mrps. "
         "Point latency (us) = {%.2f 50, %.2f 99}. "
         "Range latency (us) = %.2f 90.\n",
         c->thread_id, tput, point_us_median, point_us_99, range_us_90);
@@ -211,8 +203,7 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
     if (ctrl_c_pressed == 1) return;
   }
   assert(c.rpc->is_connected(c.session_num_vec[0]));
-  fprintf(stderr,
-          "masstree_analytics: Thread %zu: Connected. Sending requests.\n",
+  fprintf(stderr, "main: Thread %zu: Connected. Sending requests.\n",
           thread_id);
 
   alloc_req_resp_msg_buffers(&c);
