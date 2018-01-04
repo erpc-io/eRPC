@@ -183,7 +183,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
-  erpc::rt_assert(FLAGS_process_id > 0, "Invalid process ID");
   AppContext c;
   c.thread_id = thread_id;
 
@@ -195,11 +194,13 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
   // Each client creates a session to only one server thread
   auto server_hostname = erpc::get_hostname_for_process(0);
+  auto server_udp_str = erpc::get_udp_port_for_process(0);
   size_t client_gid = (FLAGS_process_id * FLAGS_num_client_threads) + thread_id;
   size_t server_tid = client_gid % FLAGS_num_server_fg_threads;  // eRPC TID
 
   c.session_num_vec.resize(1);
-  c.session_num_vec[0] = rpc.create_session(server_hostname, server_tid);
+  c.session_num_vec[0] =
+      rpc.create_session(server_hostname + ":" + server_udp_str, server_tid);
   assert(c.session_num_vec[0] >= 0);
 
   while (c.num_sm_resps != 1) {
@@ -220,8 +221,6 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
 void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
                         threadinfo_t **ti_arr) {
-  erpc::rt_assert(FLAGS_process_id == 0, "Invalid server process ID");
-
   AppContext c;
   c.thread_id = thread_id;
   c.server.mt_index = mti;
@@ -246,7 +245,12 @@ int main(int argc, char **argv) {
         "Range queries will run in foreground.\n");
   }
 
+  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
+  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
+
   if (is_server()) {
+    erpc::rt_assert(FLAGS_process_id == 0, "Invalid server process ID");
+
     // Create the Masstree using the main thread and insert keys
     threadinfo_t *ti = threadinfo::make(threadinfo::TI_MAIN, -1);
     MtIndex mti;
@@ -269,8 +273,6 @@ int main(int argc, char **argv) {
     }
 
     // eRPC stuff
-    std::string hostname = erpc::get_hostname_for_process(0);
-    std::string udp_port_str = erpc::get_udp_port_for_process(0);
     erpc::Nexus nexus(hostname + ":" + udp_port_str, kAppEPid, kAppNumaNode,
                       FLAGS_num_server_bg_threads);
 
@@ -294,8 +296,7 @@ int main(int argc, char **argv) {
     for (auto &thread : thread_arr) thread.join();
     delete[] ti_arr;
   } else {
-    std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
-    std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
+    erpc::rt_assert(FLAGS_process_id > 0, "Invalid process ID");
     erpc::Nexus nexus(hostname + ":" + udp_port_str, kAppEPid, kAppNumaNode,
                       FLAGS_num_server_bg_threads);
 
