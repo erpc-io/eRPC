@@ -288,7 +288,7 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) {
       thread_arr[i] = std::thread(server_thread_func, i, &nexus, &mti,
                                   static_cast<threadinfo_t **>(ti_arr));
-      erpc::bind_to_core(thread_arr[i], i);
+      erpc::bind_to_core(thread_arr[i], 2 * i);
     }
 
     for (auto &thread : thread_arr) thread.join();
@@ -302,7 +302,7 @@ int main(int argc, char **argv) {
     std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {
       thread_arr[i] = std::thread(client_thread_func, i, &nexus);
-      erpc::bind_to_core(thread_arr[i], i);
+      erpc::bind_to_core(thread_arr[i], 2 * i);
     }
 
     for (auto &thread : thread_arr) thread.join();

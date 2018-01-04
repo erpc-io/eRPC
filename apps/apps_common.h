@@ -22,6 +22,7 @@ DEFINE_uint64(sm_verbose, 0, "Print session management debug info");
 DEFINE_uint64(num_processes, 0, "Number of eRPC processes in the cluster");
 DEFINE_uint64(process_id, std::numeric_limits<size_t>::max(),
               "The global ID of this process");
+DEFINE_uint64(numa_node, 0, "NUMA node for this process");
 
 static bool validate_test_ms(const char *, uint64_t test_ms) {
   return test_ms >= 1000;

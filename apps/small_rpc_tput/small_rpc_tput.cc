@@ -20,7 +20,6 @@ static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
 static constexpr size_t kAppMaxBatchSize = 32;
 static constexpr size_t kAppMaxConcurrency = 128;
 
-DEFINE_uint64(numa_node, 0, "NUMA node");
 DEFINE_uint64(batch_size, 0, "Request batch size");
 DEFINE_uint64(msg_size, 0, "Request and response size");
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
