@@ -98,7 +98,7 @@ class HugeAlloc {
    *
    * @throw runtime_error if hugepage reservation failure is catastrophic
    */
-  uint8_t *alloc_raw(size_t size, size_t numa_node, bool do_register = false);
+  Buffer alloc_raw(size_t size, size_t numa_node, bool do_register = false);
 
   /**
    * @brief Allocate a Buffer using the allocator's freelists, i.e., the max

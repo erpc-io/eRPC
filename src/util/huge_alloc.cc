@@ -77,7 +77,7 @@ void HugeAlloc::print_stats() {
   }
 }
 
-uint8_t *HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
+Buffer HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
   std::ostringstream xmsg;  // The exception message
   size = round_up<kHugepageSize>(size);
   int shm_key, shm_id;
@@ -112,7 +112,7 @@ uint8_t *HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
           LOG_WARN(
               "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB.\n",
               size / MB(1));
-          return nullptr;
+          return Buffer(nullptr, 0, 0);
 
         default:
           xmsg << "eRPC HugeAlloc: Unexpected SHM malloc error "
@@ -143,23 +143,22 @@ uint8_t *HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
   shm_list.push_back(
       shm_region_t(shm_key, shm_buf, size, do_register, reg_info));
   stats.shm_reserved += size;
-  return shm_buf;
+
+  // buffer.class_size is invalid because we didn't allocate from a class
+  return Buffer(shm_buf, SIZE_MAX, do_register ? reg_info.lkey : UINT32_MAX);
 }
 
 bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   assert(size >= kMaxClassSize);  // We need at least one max-sized buffer
-  uint8_t *shm_buf = alloc_raw(size, numa_node, true);  // do_register = true
-  if (shm_buf == nullptr) return false;
-
-  // The caller must hold the allocator lock, so we can peek at shm_list's back
-  Transport::MemRegInfo &reg_info = shm_list.back().mem_reg_info;
+  Buffer buffer = alloc_raw(size, numa_node, true);  // do_register = true
+  if (buffer.buf == nullptr) return false;
 
   // Add Buffers to the largest class
   size_t num_buffers = size / kMaxClassSize;
   assert(num_buffers >= 1);
   for (size_t i = 0; i < num_buffers; i++) {
-    uint8_t *buf = shm_buf + (i * kMaxClassSize);
-    uint32_t lkey = reg_info.lkey;
+    uint8_t *buf = buffer.buf + (i * kMaxClassSize);
+    uint32_t lkey = buffer.lkey;
 
     freelist[kNumClasses - 1].push_back(Buffer(buf, kMaxClassSize, lkey));
   }
