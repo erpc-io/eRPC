@@ -1,5 +1,5 @@
 --test_ms 20000
---num_server_fg_threads 8
+--num_server_fg_threads 1
 --num_server_bg_threads 0
 --num_client_threads 8
 --req_window 8

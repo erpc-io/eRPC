@@ -27,6 +27,16 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
     printf("main: Handling point request in eRPC thread %zu.\n", etid);
   }
 
+  req_handle->prealloc_used = true;
+  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                 sizeof(resp_t));
+
+  if (kBypassMasstree) {
+    // Send a garbage response
+    c->rpc->enqueue_response(req_handle);
+    return;
+  }
+
   MtIndex *mti = c->server.mt_index;
   threadinfo_t *ti = c->server.ti_arr[etid];
   assert(mti != nullptr && ti != nullptr);
@@ -40,9 +50,6 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   size_t value = 0;
   bool success = mti->get(req->point_req.key, value, ti);
 
-  req_handle->prealloc_used = true;
-  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                 sizeof(resp_t));
   auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
 
   resp->resp_type = success ? RespType::kFound : RespType::kNotFound;
