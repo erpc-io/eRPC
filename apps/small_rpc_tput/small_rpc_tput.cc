@@ -387,9 +387,7 @@ int main(int argc, char **argv) {
 
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, app_stats, &nexus);
-    // Assume even threads are on NUMA 0, odd are on NUMA 1
-    if (FLAGS_numa_node == 0) erpc::bind_to_core(threads[i], 2 * i);
-    if (FLAGS_numa_node == 1) erpc::bind_to_core(threads[i], 2 * i + 1);
+    erpc::bind_to_core(threads[i], FLAGS_numa_node, i);
   }
 
   for (auto &thread : threads) thread.join();

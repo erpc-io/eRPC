@@ -53,7 +53,7 @@ Nexus::Nexus(std::string local_uri, uint8_t epid, size_t numa_node,
   LOG_INFO("eRPC Nexus: Launching session management thread on core %zu.\n",
            kNexusSmThreadCore);
   sm_thread = std::thread(sm_thread_func, sm_thread_ctx);
-  bind_to_core(sm_thread, kNexusSmThreadCore);
+  bind_to_core(sm_thread, 0, kNexusSmThreadCore);  // NUMA 0
 
   LOG_INFO("eRPC Nexus: Created with UDP port %u, hostname %s.\n", sm_udp_port,
            hostname.c_str());
