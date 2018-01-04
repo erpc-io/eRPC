@@ -94,8 +94,7 @@ uint8_t *HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
     if (shm_id == -1) {
       switch (errno) {
         case EEXIST:
-          // shm_key already exists. Try again.
-          break;
+          continue;  // shm_key already exists. Try again.
 
         case EACCES:
           xmsg << "eRPC HugeAlloc: SHM allocation error. "
