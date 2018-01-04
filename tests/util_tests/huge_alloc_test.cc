@@ -235,19 +235,20 @@ TEST(HugeAllocTest, RawAlloc) {
   // Try reserving max memory multiple times to test allocator destructor
   for (size_t i = 0; i < 5; i++) {
     auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
-    void *buf = alloc->alloc_raw(max_alloc_size, 0);
-    ASSERT_NE(buf, nullptr);
+    Buffer buffer = alloc->alloc_raw(max_alloc_size, 0);
+    ASSERT_NE(buffer.buf, nullptr);
+    ASSERT_EQ(buffer.class_size, SIZE_MAX);
     delete alloc;
   }
 
   // Try some corner cases
   auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
-  void *buf = alloc->alloc_raw(1, 0);  // 1 byte
-  ASSERT_NE(buf, nullptr);
+  Buffer buffer = alloc->alloc_raw(1, 0);  // 1 byte
+  ASSERT_NE(buffer.buf, nullptr);
+  ASSERT_EQ(buffer.class_size, SIZE_MAX);
 
-  // 16 TB allocation should fail for now
-  buf = alloc->alloc_raw(MB(16) * 1024 * 1024, 0);
-  ASSERT_EQ(buf, nullptr);
+  buffer = alloc->alloc_raw(MB(16) * 1024 * 1024, 0);  // Many RAM
+  ASSERT_EQ(buffer.buf, nullptr);
 }
 
 int main(int argc, char **argv) {

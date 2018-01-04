@@ -87,14 +87,13 @@ class HugeAlloc {
    * Optionally, the caller can bypass memory registration. Allocated memory is
    * freed when this allocator is destroyed.
    *
-   * This function is used only outside eRPC's core code (e.g., for MICA and
-   * testing).
-   *
    * @param size The minimum size of the allocated memory
    * @param numa_node The NUMA node to allocate hugepages on
    * @param do_register True iff the hugepages should be registered
    *
-   * @return The allocated hugepage buffer, nullptr if we ran out of memory.
+   * @return The allocated hugepage-backed Buffer. buffer.buf is nullptr if we
+   * ran out of memory. buffer.class_size is set to SIZE_MAX to indicate that
+   * allocator classes were not used.
    *
    * @throw runtime_error if hugepage reservation failure is catastrophic
    */
