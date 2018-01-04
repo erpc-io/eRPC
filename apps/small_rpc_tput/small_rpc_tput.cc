@@ -300,10 +300,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
 
   if (thread_id == 0) c.tmp_stat = new TmpStat("Mrps");
 
-  uint8_t numa_0_ports[2] = {0, 2};
-  uint8_t numa_1_ports[2] = {1, 3};
   uint8_t phy_port;
-
   if (FLAGS_numa_node == 0) phy_port = numa_0_ports[thread_id % 2];
   if (FLAGS_numa_node == 1) phy_port = numa_1_ports[thread_id % 2];
 

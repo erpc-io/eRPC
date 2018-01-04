@@ -10,9 +10,6 @@
 #include "util/misc.h"
 
 static constexpr bool kAppVerbose = false;
-static constexpr size_t kAppPhyPort = 0;
-static constexpr size_t kAppEPid = 0;  // Small local eRPC process ID
-static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppPointReqType = 1;
 static constexpr size_t kAppRangeReqType = 2;
 

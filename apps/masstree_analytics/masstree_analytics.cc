@@ -186,9 +186,12 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
 
+  uint8_t phy_port;
+  if (FLAGS_numa_node == 0) phy_port = numa_0_ports[thread_id % 2];
+  if (FLAGS_numa_node == 1) phy_port = numa_1_ports[thread_id % 2];
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
-                                  basic_sm_handler, kAppPhyPort);
+                                  basic_sm_handler, phy_port);
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
 
@@ -226,9 +229,12 @@ void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
   c.server.mt_index = mti;
   c.server.ti_arr = ti_arr;
 
+  uint8_t phy_port;
+  if (FLAGS_numa_node == 0) phy_port = numa_0_ports[thread_id % 2];
+  if (FLAGS_numa_node == 1) phy_port = numa_1_ports[thread_id % 2];
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
-                                  basic_sm_handler, kAppPhyPort);
+                                  basic_sm_handler, phy_port);
   c.rpc = &rpc;
   while (ctrl_c_pressed == 0) rpc.run_event_loop(200);
 }
@@ -273,8 +279,8 @@ int main(int argc, char **argv) {
     }
 
     // eRPC stuff
-    erpc::Nexus nexus(hostname + ":" + udp_port_str, kAppEPid, kAppNumaNode,
-                      FLAGS_num_server_bg_threads);
+    erpc::Nexus nexus(hostname + ":" + udp_port_str, FLAGS_process_id,
+                      FLAGS_numa_node, FLAGS_num_server_bg_threads);
 
     nexus.register_req_func(
         kAppPointReqType,
@@ -297,8 +303,8 @@ int main(int argc, char **argv) {
     delete[] ti_arr;
   } else {
     erpc::rt_assert(FLAGS_process_id > 0, "Invalid process ID");
-    erpc::Nexus nexus(hostname + ":" + udp_port_str, kAppEPid, kAppNumaNode,
-                      FLAGS_num_server_bg_threads);
+    erpc::Nexus nexus(hostname + ":" + udp_port_str, FLAGS_process_id,
+                      FLAGS_numa_node, FLAGS_num_server_bg_threads);
 
     std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {

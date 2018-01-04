@@ -11,6 +11,9 @@
 #include "rpc.h"
 #include "util/latency.h"
 
+static uint8_t numa_0_ports[2] = {0, 2};
+static uint8_t numa_1_ports[2] = {1, 3};
+
 //
 // Gflags
 //
