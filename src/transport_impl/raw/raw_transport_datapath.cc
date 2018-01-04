@@ -36,6 +36,9 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       sgl[0].length = static_cast<uint32_t>(pkt_size);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
+      if (sgl[0].length <= kMaxInline + MLX5_ETH_INLINE_HEADER_SIZE) {
+        wr.send_flags |= IBV_SEND_INLINE;
+      }
       wr.num_sge = 1;
     } else {
       // This is not the first packet, so we need 2 SGEs. This involves a
