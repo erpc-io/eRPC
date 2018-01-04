@@ -1,4 +1,4 @@
-AM_CFLAGS = -g -Wall -Werror -D_GNU_SOURCE -I$(includedir)
+AM_CFLAGS = -g -Wall -Werror -Wno-unused-function -D_GNU_SOURCE -I$(includedir)
 LDFLAGS += @NUMA_LIB@
 EXTRA_DIST = src/mlx5.map libmlx5.spec.in mlx5.driver
 EXTRA_DIST += debian
