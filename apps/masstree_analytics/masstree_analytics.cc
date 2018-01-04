@@ -158,7 +158,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->client.range_latency.update(static_cast<size_t>(usec));
   }
 
-  constexpr size_t kMeasurement = 1000000;
+  constexpr size_t kMeasurement = 200000;
   if (c->client.num_resps_tot++ == kMeasurement) {
     double point_us_median = c->client.point_latency.perc(.5) / 10.0;
     double point_us_99 = c->client.point_latency.perc(.99) / 10.0;

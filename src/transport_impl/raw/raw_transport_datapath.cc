@@ -115,7 +115,7 @@ size_t RawTransport::rx_burst() {
 }
 
 void RawTransport::post_recvs(size_t num_recvs) {
-  assert(num_recvs <= kRQDepth);  // num_recvs can be 0
+  assert(num_recvs <= kNumRxRingEntries);  // num_recvs can be 0
   recvs_to_post += num_recvs;
 
   if (kDumb) {
