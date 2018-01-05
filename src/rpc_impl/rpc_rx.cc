@@ -198,7 +198,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   bump_credits(sslot->session);
   sslot->tx_msgbuf = nullptr;  // Mark response as received
 
-  // Copy header and data
+  // Copy header and data: XXX - can we avoid copying headroom
   memcpy(resp_msgbuf->get_pkthdr_0(), pkthdr,
          pkthdr->msg_size + sizeof(pkthdr_t));
 
