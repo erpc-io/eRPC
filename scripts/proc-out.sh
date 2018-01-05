@@ -54,16 +54,16 @@ ignored_files="0"
 for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
   echo "proc-out: Processing file $filename."
 
-  # Ignore files with less than 12 lines. This takes care of empty files.
+  # Ignore files with less than 8 lines. This takes care of empty files.
   lines_in_file=`cat $filename | wc -l`
-  if [ $lines_in_file -le 12 ]; then
+  if [ $lines_in_file -le 8 ]; then
     blue "proc-out: Ignoring $filename. Too short ($lines_in_file lines), 12 required."
     ((ignored_files+=1))
     continue;
   fi
 
-  # Strip out first 6 and last 6 lines, and save rest for processing to tmp file
-  awk -v nr="$(wc -l < $filename)" 'NR > 6 && NR < (nr - 6)' $filename > proc_out_tmp
+  # Strip out first 4 and last 4 lines, and save rest for processing to tmp file
+  awk -v nr="$(wc -l < $filename)" 'NR > 4 && NR < (nr - 4)' $filename > proc_out_tmp
   remaining_rows=`cat proc_out_tmp | wc -l`
 
   file_avg_str=""  # Average of each column for this file
