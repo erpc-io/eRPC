@@ -43,7 +43,8 @@ struct eth_hdr_t {
 struct ipv4_hdr_t {
   uint8_t ihl : 4;
   uint8_t version : 4;
-  uint8_t tos;
+  uint8_t ecn : 2;
+  uint8_t dscp : 6;
   uint16_t tot_len;
   uint16_t id;
   uint16_t frag_off;
@@ -56,7 +57,7 @@ struct ipv4_hdr_t {
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[IPv4: ihl " << std::to_string(ihl) << ", version "
-        << std::to_string(version) << ", tos " << std::to_string(tos)
+        << std::to_string(version) << ", ecn " << (ecn == 1 ? "ECT" : "CE")
         << ", tot_len " << std::to_string(ntohs(tot_len)) << ", id "
         << std::to_string(ntohs(id)) << ", frag_off "
         << std::to_string(ntohs(frag_off)) << ", ttl " << std::to_string(ttl)
@@ -109,7 +110,8 @@ static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
                             uint32_t dst_ip, uint16_t data_size) {
   ipv4_hdr->version = 4;
   ipv4_hdr->ihl = 5;
-  ipv4_hdr->tos = 0;
+  ipv4_hdr->ecn = 1;  // ECN supported
+  ipv4_hdr->dscp = 0;
   ipv4_hdr->tot_len = htons(sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t) + data_size);
   ipv4_hdr->id = htons(0);
   ipv4_hdr->frag_off = htons(0);
