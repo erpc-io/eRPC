@@ -19,11 +19,11 @@ class HugeAlloc;  // Forward declaration: HugeAlloc needs MemRegInfo
 /// Generic mostly-reliable transport
 class Transport {
  public:
+  static constexpr size_t kNumRxRingEntries = 4096;
+  static_assert(is_power_of_two<size_t>(kNumRxRingEntries), "");
+
   static constexpr size_t kMaxRoutingInfoSize = 48;  ///< Space for routing info
   static constexpr size_t kMaxMemRegInfoSize = 64;   ///< Space for mem reg info
-  static constexpr size_t kNumRxRingEntries = 4096;  ///< RX ring entries
-
-  static_assert(is_power_of_two<size_t>(kNumRxRingEntries), "");
 
   /**
    * @brief Generic struct to store routing info for any transport.
