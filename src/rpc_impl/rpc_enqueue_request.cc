@@ -25,7 +25,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   assert(resp_msgbuf->max_num_pkts > 0);
 
   // When called from a background thread, enqueue to the foreground thread
-  if (!in_dispatch()) {
+  if (unlikely(!in_dispatch())) {
     assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
     auto req_args =
         enqueue_request_args_t(session_num, req_type, req_msgbuf, resp_msgbuf,
@@ -64,7 +64,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   sslot.client_info.enqueue_req_ts = rdtsc();
 
-  if (cont_etid != kInvalidBgETid) {
+  if (unlikely(cont_etid != kInvalidBgETid)) {
     // We need to run the continuation in a background thread
     sslot.client_info.cont_etid = cont_etid;
   }

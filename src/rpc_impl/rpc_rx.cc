@@ -137,7 +137,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   sslot->server_info.req_type = pkthdr->req_type;
   sslot->server_info.req_func_type = req_func.req_func_type;
 
-  if (!req_func.is_background()) {
+  if (likely(!req_func.is_background())) {
     // For foreground request handlers, a "fake" static request MsgBuffer
     // suffices -- it's valid for the duration of req_func().
     req_msgbuf = MsgBuffer(pkthdr, pkthdr->msg_size);
@@ -202,7 +202,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   memcpy(resp_msgbuf->get_pkthdr_0(), pkthdr,
          pkthdr->msg_size + sizeof(pkthdr_t));
 
-  if (sslot->client_info.cont_etid == kInvalidBgETid) {
+  if (likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
                                  sslot->client_info.tag);
   } else {

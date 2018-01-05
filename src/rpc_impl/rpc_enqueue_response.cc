@@ -12,7 +12,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(req_handle != nullptr);
 
   // When called from a background thread, enqueue to the foreground thread
-  if (!in_dispatch()) {
+  if (unlikely(!in_dispatch())) {
     bg_queues.enqueue_response.unlocked_push(req_handle);
     return;
   }
