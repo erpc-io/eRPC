@@ -36,8 +36,8 @@
  * @brief C++ port of rte_memcpy from DPDK. Taken from hlim's mica code.
  */
 
-#ifndef ERPC_RTE_MEMCPY_MOD_H
-#define ERPC_RTE_MEMCPY_MOD_H
+#ifndef RTE_MEMCPY_MOD_H
+#define RTE_MEMCPY_MOD_H
 
 /**
  * @file
@@ -52,8 +52,6 @@
 // #ifdef __cplusplus
 // extern "C" {
 // #endif
-
-namespace erpc {
 
 #ifdef __INTEL_COMPILER
 #pragma warning(disable:593) /* Stop unused variable warning (reg_a etc). */
@@ -378,10 +376,8 @@ rte_memcpy_func(void *dst, const void *src, size_t n)
 	return ret;
 }
 
-}  // End erpc
-
 // #ifdef __cplusplus
 // }
 // #endif
 
-#endif /* ERPC_RTE_MEMCPY_MOD_H */
+#endif /* RTE_MEMCPY_MOD_H */
