@@ -16,9 +16,9 @@
  *     threads, excluding itself.
  *   o timely_small: The small-scale incast experiment in TIMELY
  *     (SIGCOMM 15, Section 6.1).
- *   o victim: With N machines {0, ..., N - 1}, where N >= 3, machines 1 through
- *     (N - 1) incast to machine 0. In addition, machines (N - 2) and (N - 1)
- *     send data to each other.
+ *   o victim: With N processes {0, ..., N - 1}, where N >= 3, processes 1
+ *     through (N - 1) incast to process 0. In addition, processes (N - 2) and
+ *     (N - 1) send data to each other.
  */
 
 #include "large_rpc_tput.h"
@@ -277,8 +277,8 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
-  // Send requests. For some profiles, machine 0 does not send requests.
-  // In these cases, by not injecting any requests now, we ensure that machine 0
+  // Send requests. For some profiles, process 0 does not send requests.
+  // In these cases, by not injecting any requests now, we ensure that process 0
   // *never* sends requests.
   bool _send_reqs = true;
   if (FLAGS_process_id == 0) {

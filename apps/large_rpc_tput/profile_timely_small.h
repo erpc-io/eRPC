@@ -3,9 +3,9 @@
 
 #include "large_rpc_tput.h"
 
-// All threads create one session to machine 0
+// All threads create one session to process 0
 size_t get_session_idx_func_timely_small(AppContext *, size_t) {
-  erpc::rt_assert(FLAGS_process_id != 0, "Machine 0 cannot send reqs.");
+  erpc::rt_assert(FLAGS_process_id != 0, "Process 0 cannot send reqs.");
   return 0;
 }
 

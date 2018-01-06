@@ -1,8 +1,7 @@
 --test_ms 20000
 --req_size 32
 --resp_size 4000000
---num_bg_threads 0
---num_machines 2
+--num_processes 2
 --num_threads 1
 --concurrency 1
 --drop_prob 0.0

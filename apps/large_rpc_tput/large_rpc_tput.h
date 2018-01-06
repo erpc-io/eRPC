@@ -17,7 +17,7 @@ volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 // Flags
-DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
+DEFINE_uint64(num_threads, 0, "Number of foreground threads per process");
 DEFINE_uint64(req_size, 0, "Request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
