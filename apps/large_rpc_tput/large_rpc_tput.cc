@@ -46,14 +46,11 @@ bool is_papi_usable = false;  // Not usable on Ubuntu 17.04
 // A basic session management handler that expects successful responses
 void sm_handler(int session_num, erpc::SmEventType sm_event_type,
                 erpc::SmErrType sm_err_type, void *_context) {
-  assert(_context != nullptr);
-
   auto *c = static_cast<AppContext *>(_context);
   c->num_sm_resps++;
 
-  if (sm_err_type != erpc::SmErrType::kNoError) {
-    throw std::runtime_error("Received SM response with error.");
-  }
+  erpc::rt_assert(sm_err_type != erpc::SmErrType::kNoError,
+                  "SM response with error");
 
   if (!(sm_event_type == erpc::SmEventType::kConnected ||
         sm_event_type == erpc::SmEventType::kDisconnected)) {
@@ -68,9 +65,8 @@ void sm_handler(int session_num, erpc::SmEventType sm_event_type,
     }
   }
 
-  if (session_idx == c->session_num_vec.size()) {
-    throw std::runtime_error("SM callback for invalid session number.");
-  }
+  erpc::rt_assert(session_idx < c->session_num_vec.size(),
+                  "SM callback for invalid session number.");
 
   fprintf(stderr,
           "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s. "
@@ -86,7 +82,6 @@ void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 // Send requests (i.e., msgbuf indexes) queued in req_vec. Requests that cannot
 // be sent are req-queued into req_vec.
 void send_reqs(AppContext *c) {
-  assert(c != nullptr);
   size_t write_index = 0;
 
   for (size_t i = 0; i < c->req_vec.size(); i++) {
@@ -125,11 +120,7 @@ void send_reqs(AppContext *c) {
 }
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr);
-  assert(_context != nullptr);
-
   auto *c = static_cast<AppContext *>(_context);
-
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   uint8_t resp_byte = req_msgbuf->buf[0];
 
@@ -153,12 +144,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 }
 
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
-  assert(resp_handle != nullptr);
-  assert(_context != nullptr);
-
   const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf != nullptr);
-
   size_t msgbuf_idx = static_cast<tag_t>(_tag).s.msgbuf_idx;
   size_t session_idx = static_cast<tag_t>(_tag).s.session_idx;
   if (kAppVerbose) {
