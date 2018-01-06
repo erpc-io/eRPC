@@ -812,7 +812,6 @@ class Rpc {
 
   // Rpc metadata
   size_t creator_etid;        ///< eRPC thread ID of the creator thread
-  Nexus::Hook nexus_hook;     ///< A hook shared with the Nexus
   TlsRegistry *tls_registry;  ///< Pointer to the Nexus's thread-local registry
 
   // Sessions
@@ -821,10 +820,6 @@ class Rpc {
   /// Disconnected sessions are denoted by null pointers. This grows as sessions
   /// are repeatedly connected and disconnected, but 8 bytes per session is OK.
   std::vector<Session *> session_vec;
-
-  /// The insert-only map of unique tokens received in session connect
-  /// requests, to the session's index in the session vector.
-  std::map<conn_req_uniq_token_t, uint16_t> conn_req_token_map;
 
   // Transport
   TTr *transport = nullptr;  ///< The unreliable transport
@@ -835,9 +830,8 @@ class Rpc {
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx batch info
   size_t tx_batch_i = 0;  ///< The batch index for TX burst array
 
-  MsgBuffer rx_msg_buffer_arr[TTr::kPostlist];  ///< Batch info for rx_burst
-  uint8_t *rx_ring[TTr::kNumRxRingEntries];     ///< The transport's RX ring
-  size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
+  uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
+  size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
@@ -864,6 +858,11 @@ class Rpc {
   SlowRand slow_rand;         ///< A slow random generator for "real" randomness
   FastRand fast_rand;         ///< A fast random generator
   UDPClient<SmPkt> udp_client;  ///< UDP endpoint used to send SM packets
+  Nexus::Hook nexus_hook;       ///< A hook shared with the Nexus
+
+  /// The insert-only map of unique tokens received in session connect
+  /// requests, to the session's index in the session vector.
+  std::map<conn_req_uniq_token_t, uint16_t> conn_req_token_map;
 
   /// All the faults that can be injected into eRPC for testing
   struct {
