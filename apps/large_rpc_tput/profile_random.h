@@ -28,20 +28,18 @@ void connect_sessions_func_random(AppContext *c) {
           "large_rpc_tput: Process %zu, thread %zu: Creating %zu sessions. "
           "Profile = 'random'.\n",
           FLAGS_process_id, c->thread_id, num_sessions);
-  for (size_t m_i = 0; m_i < FLAGS_num_processes; m_i++) {
-    std::string hostname = get_hostname_for_machine(m_i);
+  for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
+    const std::string rem_uri = erpc::get_uri_for_process(p_i);
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      size_t session_idx = (m_i * FLAGS_num_threads) + t_i;
-      // Do not create a session to self
-      if (session_idx == c->self_session_idx) continue;
+      size_t session_idx = (p_i * FLAGS_num_threads) + t_i;
+      if (session_idx == c->self_session_idx) continue;  // No session to self
 
       c->session_num_vec[session_idx] =
-          c->rpc->create_session(hostname, static_cast<uint8_t>(t_i));
+          c->rpc->create_session(rem_uri, static_cast<uint8_t>(t_i));
 
-      if (c->session_num_vec[session_idx] < 0) {
-        throw std::runtime_error("Failed to create session.");
-      }
+      erpc::rt_assert(c->session_num_vec[session_idx] >= 0,
+                      "Failed to create session.");
     }
   }
 

@@ -252,12 +252,15 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 // The function executed by each thread in the cluster
 void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
-  c.tmp_stat = new TmpStat("large_rpc_tput", "rx_GBps tx_GBps avg_us 99_us");
+  c.tmp_stat = new TmpStat("rx_GBps tx_GBps avg_us 99_us");
   c.thread_id = thread_id;
 
+  uint8_t phy_port;
+  if (FLAGS_numa_node == 0) phy_port = numa_0_ports[thread_id % 2];
+  if (FLAGS_numa_node == 1) phy_port = numa_1_ports[thread_id % 2];
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id), sm_handler,
-                                  kAppPhyPort, kAppNumaNode);
+                                  phy_port);
   rpc.retry_connect_on_invalid_rpc_id = true;
   if (erpc::kTesting) rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
 
@@ -344,30 +347,32 @@ void setup_profile() {
 }
 
 int main(int argc, char **argv) {
-  assert(FLAGS_num_bg_threads == 0);  // XXX: Need to change ReqFuncType below
   signal(SIGINT, ctrl_c_handler);
-
-  // Work around g++-5's unused variable warning for validators
-  _unused(concurrency_validator_registered);
-  _unused(profile_validator_registered);
-  _unused(drop_prob_validator_registered);
-
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid conc");
+  erpc::rt_assert(FLAGS_profile == "random" ||
+                      FLAGS_profile == "timely_small" ||
+                      FLAGS_profile == "victim",
+                  "Invalid profile");
+  if (!erpc::kTesting) {
+    erpc::rt_assert(FLAGS_drop_prob == 0.0, "Invalid drop prob");
+  } else {
+    erpc::rt_assert(FLAGS_drop_prob < 1, "Invalid drop prob");
+  }
 
   setup_profile();
   erpc::rt_assert(get_session_idx_func != nullptr, "No session index getter");
   erpc::rt_assert(connect_sessions_func != nullptr, "No connect_sessions_func");
 
-  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
-  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
-  erpc::Nexus nexus(hostname, std::stoi(udp_port_str), FLAGS_num_bg_threads);
+  erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
+                    FLAGS_process_id, FLAGS_numa_node, 0);
   nexus.register_req_func(
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 
   std::vector<std::thread> threads(FLAGS_num_threads);
   for (size_t i = 0; i < FLAGS_num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
-    erpc::bind_to_core(threads[i], i);
+    erpc::bind_to_core(threads[i], FLAGS_numa_node, i);
   }
 
   for (auto &thread : threads) thread.join();

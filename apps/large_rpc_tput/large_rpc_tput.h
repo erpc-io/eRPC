@@ -8,11 +8,9 @@
 #include "util/autorun_helpers.h"
 #include "util/misc.h"
 
-static constexpr size_t kAppPhyPort = 0;
-static constexpr size_t kAppNumaNode = 0;
 static constexpr size_t kAppReqType = 1;
-static constexpr uint8_t kAppDataByte = 3;     // Data transferred in req & resp
-static constexpr size_t kMaxConcurrency = 32;  // Outstanding reqs per thread
+static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
+static constexpr size_t kAppMaxConcurrency = 32;  // Outstanding reqs per thread
 
 // Globals
 volatile sig_atomic_t ctrl_c_pressed = 0;
@@ -20,29 +18,16 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 // Flags
 DEFINE_uint64(num_threads, 0, "Number of foreground threads per machine");
-DEFINE_uint64(num_bg_threads, 0, "Number of background threads per machine");
 DEFINE_uint64(req_size, 0, "Request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 DEFINE_double(drop_prob, 0, "Packet drop probability");
 DEFINE_string(profile, "", "Experiment profile to use");
 
-static bool validate_concurrency(const char *, uint64_t concurrency) {
-  return concurrency <= kMaxConcurrency;
-}
-DEFINE_validator(concurrency, &validate_concurrency);
-
 static bool validate_drop_prob(const char *, double p) {
   if (!erpc::kTesting) return p == 0.0;
   return p >= 0 && p < 1;
 }
-DEFINE_validator(drop_prob, &validate_drop_prob);
-
-static bool validate_profile(const char *, const std::string &profile) {
-  return profile == "random" || profile == "timely_small" ||
-         profile == "victim";
-}
-DEFINE_validator(profile, &validate_profile);
 
 // Request tag, which doubles up as the request descriptor for the request queue
 union tag_t {
@@ -69,8 +54,7 @@ class AppContext {
   erpc::Rpc<erpc::CTransport> *rpc = nullptr;
 
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
-  // >10 ms for 8MB RPCs under congestion. So erpc::Latency is insufficient
-  // here
+  // >10 ms for 8MB RPCs under congestion. So erpc::Latency doesn't work here.
   std::vector<double> latency_vec;
 
   std::vector<int> session_num_vec;
@@ -89,9 +73,9 @@ class AppContext {
   std::vector<size_t> stat_req_vec;  // Number of requests sent on a session
   std::vector<tag_t> req_vec;        // Request queue
 
-  uint64_t req_ts[kMaxConcurrency];  // Per-request timestamps
-  erpc::MsgBuffer req_msgbuf[kMaxConcurrency];
-  erpc::MsgBuffer resp_msgbuf[kMaxConcurrency];
+  uint64_t req_ts[kAppMaxConcurrency];  // Per-request timestamps
+  erpc::MsgBuffer req_msgbuf[kAppMaxConcurrency];
+  erpc::MsgBuffer resp_msgbuf[kAppMaxConcurrency];
 
   ~AppContext() {
     if (tmp_stat != nullptr) delete tmp_stat;

@@ -43,23 +43,22 @@ void connect_sessions_func_victim(AppContext *c) {
 
   // Initiate connection for sessions
   if (machine_in_victim_pair()) {
-    // Create two session: to machine 0 and to the victim peer
+    // Create two session: to process 0 and to the victim peer
     printf("large_rpc_tput: Thread %zu: Creating 2 session. Profile 'victim'.",
            c->thread_id);
 
+    // Process 0
+    c->session_num_vec[0] = c->rpc->create_session(
+        erpc::get_uri_for_process(0), static_cast<uint8_t>(c->thread_id));
+    erpc::rt_assert(c->session_num_vec[0] >= 0, "create_session failed.");
+
+    // Victim peer
     size_t other_victim = FLAGS_process_id == FLAGS_num_processes - 1
                               ? FLAGS_num_processes - 2
                               : FLAGS_num_processes - 1;
-
-    std::string hostname_0 = erpc::get_hostname_for_process(0);
-    std::string hostname_other = erpc::get_hostname_for_process(other_victim);
-
-    c->session_num_vec[0] =
-        c->rpc->create_session(hostname_0, static_cast<uint8_t>(c->thread_id));
-    erpc::rt_assert(c->session_num_vec[0] >= 0, "create_session failed.");
-
-    c->session_num_vec[1] = c->rpc->create_session(
-        hostname_other, static_cast<uint8_t>(c->thread_id));
+    c->session_num_vec[1] =
+        c->rpc->create_session(erpc::get_uri_for_process(other_victim),
+                               static_cast<uint8_t>(c->thread_id));
     erpc::rt_assert(c->session_num_vec[1] >= 0, "create_session failed.");
 
     while (c->num_sm_resps != 2) {
@@ -76,13 +75,9 @@ void connect_sessions_func_victim(AppContext *c) {
         "large_rpc_tput: Thread %zu: Creating 1 session. Profile = 'victim'.\n",
         c->thread_id);
 
-    std::string hostname = erpc::get_hostname_for_process(0);
-    c->session_num_vec[0] =
-        c->rpc->create_session(hostname, static_cast<uint8_t>(c->thread_id));
-
-    if (c->session_num_vec[0] < 0) {
-      throw std::runtime_error("Failed to create session.");
-    }
+    c->session_num_vec[0] = c->rpc->create_session(
+        erpc::get_uri_for_process(0), static_cast<uint8_t>(c->thread_id));
+    erpc::rt_assert(c->session_num_vec[0] >= 0, "create_session failed.");
 
     while (c->num_sm_resps != 1) {
       c->rpc->run_event_loop(200);  // 200 milliseconds

@@ -195,14 +195,12 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.rpc = &rpc;
 
   // Each client creates a session to only one server thread
-  auto server_hostname = erpc::get_hostname_for_process(0);
-  auto server_udp_str = erpc::get_udp_port_for_process(0);
   size_t client_gid = (FLAGS_process_id * FLAGS_num_client_threads) + thread_id;
   size_t server_tid = client_gid % FLAGS_num_server_fg_threads;  // eRPC TID
 
   c.session_num_vec.resize(1);
   c.session_num_vec[0] =
-      rpc.create_session(server_hostname + ":" + server_udp_str, server_tid);
+      rpc.create_session(erpc::get_uri_for_process(0), server_tid);
   assert(c.session_num_vec[0] >= 0);
 
   while (c.num_sm_resps != 1) {
@@ -249,9 +247,6 @@ int main(int argc, char **argv) {
         "Range queries will run in foreground.\n");
   }
 
-  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
-  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
-
   if (is_server()) {
     erpc::rt_assert(FLAGS_process_id == 0, "Invalid server process ID");
 
@@ -277,8 +272,9 @@ int main(int argc, char **argv) {
     }
 
     // eRPC stuff
-    erpc::Nexus nexus(hostname + ":" + udp_port_str, FLAGS_process_id,
-                      FLAGS_numa_node, FLAGS_num_server_bg_threads);
+    erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
+                      FLAGS_process_id, FLAGS_numa_node,
+                      FLAGS_num_server_bg_threads);
 
     nexus.register_req_func(
         kAppPointReqType,
@@ -301,8 +297,9 @@ int main(int argc, char **argv) {
     delete[] ti_arr;
   } else {
     erpc::rt_assert(FLAGS_process_id > 0, "Invalid process ID");
-    erpc::Nexus nexus(hostname + ":" + udp_port_str, FLAGS_process_id,
-                      FLAGS_numa_node, FLAGS_num_server_bg_threads);
+    erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
+                      FLAGS_process_id, FLAGS_numa_node,
+                      FLAGS_num_server_bg_threads);
 
     std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {

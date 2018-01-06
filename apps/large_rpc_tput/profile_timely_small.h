@@ -24,13 +24,10 @@ void connect_sessions_func_timely_small(AppContext *c) {
           "Profile = 'timely_small'.\n",
           c->thread_id);
 
-  std::string hostname = erpc::get_hostname_for_process(0);
-  c->session_num_vec[0] =
-      c->rpc->create_session(hostname, static_cast<uint8_t>(c->thread_id));
+  c->session_num_vec[0] = c->rpc->create_session(
+      erpc::get_uri_for_process(0), static_cast<uint8_t>(c->thread_id));
 
-  if (c->session_num_vec[0] < 0) {
-    throw std::runtime_error("Failed to create session.");
-  }
+  erpc::rt_assert(c->session_num_vec[0] >= 0, "create_session() failed");
 
   while (c->num_sm_resps != 1) {
     c->rpc->run_event_loop(200);  // 200 milliseconds
