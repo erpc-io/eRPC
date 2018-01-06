@@ -833,15 +833,19 @@ class Rpc {
   uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
 
+  /// Request sslots that need TX. Response sslots are not queued because they
+  /// never stall for credits (or congestion, if CC is implemented).
+  std::vector<SSlot *> req_txq;
+
+  size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
+  size_t prev_epoch_ts;       ///< Timestamp of the previous event loop epoch
+
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
   std::mutex huge_alloc_lock;       ///< A lock to guard the huge allocator
 
-  // RPC work queues
-
-  /// Request sslots that need TX. Response sslots are not queued because they
-  /// never stall for credits (or congestion, if CC is implemented).
-  std::vector<SSlot *> req_txq;
+  MsgBuffer ctrl_msgbufs[2 * TTr::kUnsigBatch];  ///< Buffers for RFR/CR
+  size_t ctrl_msgbuf_head = 0;
 
   /// Queues for datapath API requests from background threads
   struct {
@@ -850,13 +854,9 @@ class Rpc {
     MtQueue<RespHandle *> release_response;
   } bg_queues;
 
-  // Packet loss
-  size_t prev_epoch_ts;  ///< Timestamp of the previous event loop epoch
-
   // Misc
-  size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
-  SlowRand slow_rand;         ///< A slow random generator for "real" randomness
-  FastRand fast_rand;         ///< A fast random generator
+  SlowRand slow_rand;  ///< A slow random generator for "real" randomness
+  FastRand fast_rand;  ///< A fast random generator
   UDPClient<SmPkt> udp_client;  ///< UDP endpoint used to send SM packets
   Nexus::Hook nexus_hook;       ///< A hook shared with the Nexus
 
