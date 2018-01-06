@@ -31,10 +31,10 @@
 
 static constexpr bool kAppVerbose = false;
 
-// Experiement control flags
-static constexpr bool kAppClientMemsetReq = true;   // Fill entire request
-static constexpr bool kAppServerMemsetResp = true;  // Fill entire response
-static constexpr bool kAppClientCheckResp = false;  // Check entire response
+// Experiment control flags
+static constexpr bool kAppClientMemsetReq = false;   // Fill entire request
+static constexpr bool kAppServerMemsetResp = false;  // Fill entire response
+static constexpr bool kAppClientCheckResp = false;   // Check entire response
 
 // Profile controls
 std::function<size_t(AppContext *, size_t resp_session_idx)>

@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(eRPC)
 
-if(NOT DEFINED ENV{autorun_app})
-  MESSAGE(FATAL_ERROR "Please set environment variable autorun_app")
-endif()
-
 set(CMAKE_CXX_COMPILER g++-7)
 set(CMAKE_C_LINK_EXECUTABLE g++-7)
 
@@ -218,8 +214,9 @@ if(COMPILE_ERPC_LIB)
   endforeach()
 endif()
 
-# The app to compile (small_rpc_tput, large_rpc_tput, consensus, masstree_analytics)
-set(APP $ENV{autorun_app})
+# The app to compile. Only one app is compiled to reduce compile time.
+file(STRINGS "scripts/autorun_app_file" APP)
+message(STATUS "Compiling app = " ${APP})
 
 # Add app-specific defines now, isolating them from the tests
 if(APP STREQUAL "consensus")

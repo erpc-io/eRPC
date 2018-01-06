@@ -21,11 +21,12 @@ function get_from_config() {
   echo $config_param
 }
 
-# autorun_app must be defined
-check_env "autorun_app"
-
 # Variables set by the human user
 autorun_erpc_home="$HOME/eRPC"
+
+# Check autorun_app
+assert_file_exists $autorun_erpc_home/scripts/autorun_app_file
+export autorun_app=`cat $autorun_erpc_home/scripts/autorun_app_file`
 
 # Variables exported by this script
 autorun_out_prefix="/tmp/${autorun_app}_out"

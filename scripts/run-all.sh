@@ -11,6 +11,10 @@ echo "]"
 
 echo "eRPC home = $autorun_erpc_home"
 
+# Check autorun_app
+assert_file_exists $autorun_erpc_home/scripts/autorun_app_file
+export autorun_app=`cat $autorun_erpc_home/scripts/autorun_app_file`
+
 # Check that the app has been built
 assert_file_exists $autorun_erpc_home/build/$autorun_app
 

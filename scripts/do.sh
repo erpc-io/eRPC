@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-# Run an eRPC app on this machine
+# Run an eRPC app on this machine. This script must be run from eRPC homedir.
 source $(dirname $0)/utils.sh
-check_env "autorun_app"
 
-# Check the executable
-if [ ! -f build/$autorun_app ]; then
-  blue "$autorun_app executable not found in build/"
-fi
+assert_file_exists scripts/autorun_app_file
+export autorun_app=`cat scripts/autorun_app_file`
 
+assert_file_exists build/$autorun_app
 chmod +x build/$autorun_app # Fix permissions messed up by lsyncd
 
 export MLX4_SINGLE_THREADED=1
