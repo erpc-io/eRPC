@@ -49,7 +49,7 @@ void sm_handler(int session_num, erpc::SmEventType sm_event_type,
   auto *c = static_cast<AppContext *>(_context);
   c->num_sm_resps++;
 
-  erpc::rt_assert(sm_err_type != erpc::SmErrType::kNoError,
+  erpc::rt_assert(sm_err_type == erpc::SmErrType::kNoError,
                   "SM response with error");
 
   if (!(sm_event_type == erpc::SmEventType::kConnected ||
