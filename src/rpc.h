@@ -94,6 +94,8 @@ class Rpc {
    * if allocation fails simply because we ran out of memory.
    */
   inline MsgBuffer alloc_msg_buffer(size_t max_data_size) {
+    assert(max_data_size > 0);  // Doesn't work for max_data_size = 0
+
     // This function avoids division for small data sizes
     size_t max_num_pkts = data_size_to_num_pkts(max_data_size);
 
@@ -465,22 +467,22 @@ class Rpc {
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
   }
 
-  /// Transmit a header-only packet for TX burst, and drain the TX batch.
-  /// This handles fault injection for dropping control packets.
-  inline void enqueue_hdr_tx_burst_and_drain_st(
-      Transport::RoutingInfo *routing_info, MsgBuffer *tx_msgbuf) {
+  /// Enqueue a control packet for tx_burst. This handles fault injection
+  /// for dropping control packets.
+  inline void enqueue_hdr_tx_burst_st(Transport::RoutingInfo *routing_info,
+                                      MsgBuffer *ctrl_msgbuf) {
     assert(in_dispatch());
     assert(tx_batch_i < TTr::kPostlist);
-    assert(tx_msgbuf->is_expl_cr() || tx_msgbuf->is_req_for_resp());
+    assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_req_for_resp());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = routing_info;
-    item.msg_buffer = tx_msgbuf;
+    item.msg_buffer = ctrl_msgbuf;
     item.offset = 0;
     item.data_bytes = 0;
 
     if (kTesting) {
-      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_0());
+      testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
       item.drop = roll_pkt_drop();
       if (item.drop) {
         LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
@@ -492,7 +494,7 @@ class Rpc {
               tx_msgbuf->get_pkthdr_str().c_str());
 
     tx_batch_i++;
-    do_tx_burst_st();
+    if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
   }
 
   /// Transmit packets in the TX batch

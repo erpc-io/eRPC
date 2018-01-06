@@ -46,9 +46,18 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     // Complete transport initialization using the hugepage allocator
     transport->init_hugepage_structures(huge_alloc, rx_ring);
   } catch (std::runtime_error e) {
-    // Free any huge pages that \p transport might have created
+    // Free any huge pages that the transport might have created
     delete huge_alloc;
     throw e;
+  }
+
+  // Create msgbufs for control packets
+  for (MsgBuffer &ctrl_msgbuf : ctrl_msgbufs) {
+    ctrl_msgbuf = alloc_msg_buffer(8);  // alloc_msg_buffer() requires size > 0
+    if (ctrl_msgbuf.buf == nullptr) {
+      delete huge_alloc;
+      throw std::runtime_error("Failed to allocate control msgbufs");
+    }
   }
 
   // Register the hook with the Nexus. This installs SM and bg command queues.

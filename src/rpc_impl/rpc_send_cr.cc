@@ -9,19 +9,21 @@ void Rpc<TTr>::send_credit_return_now_st(const Session *session,
   assert(session->is_server());
   assert(req_pkthdr->is_req() && req_pkthdr->check_magic());
 
-  // Fill in the CR packet header. Commented fields are copied from req_pkthdr.
-  pkthdr_t cr_pkthdr = *req_pkthdr;
-  // cr_pkthdr.req_type = pkthdr->req_type;
-  cr_pkthdr.msg_size = 0;
-  cr_pkthdr.dest_session_num = session->remote_session_num;
-  cr_pkthdr.pkt_type = kPktTypeExplCR;
-  // cr_pkthdr.pkt_num = pkthdr->pkt_num;
-  // cr_pkthdr.req_num = pkthdr->req_num;
-  // cr_pkthdr.magic = pkthdr->magic;
+  MsgBuffer *ctrl_msgbuf = &ctrl_msgbufs[ctrl_msgbuf_head];
+  ctrl_msgbuf_head++;
+  if (ctrl_msgbuf_head == 2 * TTr::kUnsigBatch) ctrl_msgbuf_head = 0;
 
-  // Create a "fake" static MsgBuffer for inline tx_burst
-  auto cr_msgbuf = MsgBuffer(&cr_pkthdr, 0);
-  enqueue_hdr_tx_burst_and_drain_st(session->remote_routing_info, &cr_msgbuf);
+  // Fill in the CR packet header. Avoid copying req_pkthdr's headroom.
+  pkthdr_t *cr_pkthdr = ctrl_msgbuf->get_pkthdr_0();
+  cr_pkthdr->req_type = req_pkthdr->req_type;
+  cr_pkthdr->msg_size = 0;
+  cr_pkthdr->dest_session_num = session->remote_session_num;
+  cr_pkthdr->pkt_type = kPktTypeExplCR;
+  cr_pkthdr->pkt_num = req_pkthdr->pkt_num;
+  cr_pkthdr->req_num = req_pkthdr->req_num;
+  cr_pkthdr->magic = req_pkthdr->magic;
+
+  enqueue_hdr_tx_burst_st(session->remote_routing_info, ctrl_msgbuf);
 }
 
 }  // End erpc
