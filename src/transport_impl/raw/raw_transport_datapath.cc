@@ -106,12 +106,13 @@ size_t RawTransport::rx_burst() {
       auto* pkthdr =
           reinterpret_cast<pkthdr_t*>(&ring_extent.buf[recv_head * kRecvSize]);
       __builtin_prefetch(pkthdr, 0, 3);
-      recv_head = (recv_head + 1) % kNumRxRingEntries;
 
       LOG_TRACE(
           "eRPC RawTransport: Received pkt. pkthdr = %s. Frame header = %s.\n",
           pkthdr->to_string().c_str(),
           frame_header_to_string(&pkthdr->headroom[0]).c_str());
+
+      recv_head = (recv_head + 1) % kNumRxRingEntries;
     }
 
     cqe_idx = (cqe_idx + 1) % kRecvCQDepth;
