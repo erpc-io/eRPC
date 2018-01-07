@@ -486,12 +486,12 @@ class Rpc {
       item.drop = roll_pkt_drop();
       if (item.drop) {
         LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
-                  tx_msgbuf->get_pkthdr_str(0).c_str());
+                  ctrl_msgbuf->get_pkthdr_str().c_str());
       }
     }
 
     LOG_TRACE("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
-              tx_msgbuf->get_pkthdr_str().c_str());
+              ctrl_msgbuf->get_pkthdr_str().c_str());
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
