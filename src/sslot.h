@@ -54,7 +54,6 @@ class SSlot {
   size_t cur_req_num;
 
   union {
-    // Info saved only at the client
     struct {
       MsgBuffer *resp_msgbuf;      ///< User-supplied response buffer
       erpc_cont_func_t cont_func;  ///< Continuation function for the request
@@ -66,7 +65,7 @@ class SSlot {
       size_t resp_rcvd;     ///< Number of response packets received
 
       size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
-      size_t cont_etid;       ///< Thread ID to run the continuation on
+      size_t cont_etid;       ///< eRPC thread ID to run the continuation on
 
       /// Return a string representation of the progress made by this sslot.
       /// Progress fields that are zero are not included in the string.
@@ -80,7 +79,6 @@ class SSlot {
         ret << "]";
         return ret.str();
       }
-
     } client_info;
 
     struct {
