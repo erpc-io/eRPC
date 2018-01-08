@@ -33,17 +33,15 @@ namespace erpc {
 // General constants
 
 /// The max Rpc ID. 256 threads per machine is enough.
-static constexpr size_t kMaxRpcId = std::numeric_limits<uint8_t>::max() - 1;
+static constexpr size_t kMaxRpcId = UINT8_MAX - 1;
 
 /// Array size to hold registered request handler functions
-static constexpr size_t kReqTypeArraySize =
-    std::numeric_limits<uint8_t>::max() + 1ull;
+static constexpr size_t kReqTypeArraySize = 1ull + UINT8_MAX;
 
 static constexpr size_t kMaxEPid = 8;       ///< Max eRPC processes on a machine
 static constexpr size_t kMaxPhyPorts = 16;  ///< Max fabric device ports
 static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
 static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
-static constexpr size_t kPageSize = 4096;   ///< Page size in bytes
 static constexpr size_t kHugepageSize = (2 * 1024 * 1024);  ///< Hugepage size
 static constexpr size_t kMaxHostnameLen = 128;  ///< Max hostname length
 static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length

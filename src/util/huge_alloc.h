@@ -60,9 +60,7 @@ class HugeAlloc {
   static_assert((kMinClassSize >> kMinClassBitShift) == 1, "");
 
   static const size_t kMaxClassSize = MB(8);  /// Max allocation size
-  static_assert(kMaxClassSize <= std::numeric_limits<int>::max(), "");
-
-  static const size_t kNumClasses = 18;  /// 64 B (2^6), ..., 8 MB (2^23)
+  static const size_t kNumClasses = 18;       /// 64 B (2^6), ..., 8 MB (2^23)
   static_assert(kMaxClassSize == kMinClassSize << (kNumClasses - 1), "");
 
   /// Return the maximum size of a class

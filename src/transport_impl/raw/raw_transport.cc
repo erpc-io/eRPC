@@ -417,7 +417,7 @@ void RawTransport::map_mlx5_overrunning_recv_cqes() {
   // the CQE cycle.
   rt_assert(kStridesPerWQE >= kRecvCQDepth, "");
   for (size_t i = 0; i < kRecvCQDepth; i++) {
-    recv_cqe_arr[i].wqe_id = htons(std::numeric_limits<uint16_t>::max());
+    recv_cqe_arr[i].wqe_id = htons(UINT16_MAX);
 
     // Last CQE gets
     // * wqe_counter = (kAppStridesPerWQE - 1)

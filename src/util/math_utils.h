@@ -30,7 +30,7 @@ static inline size_t lsb_index(int x) {
 /// Return the index of the most significant bit of x. The index of the 2^0
 /// bit is 1. (x = 0 returns 0, x = 1 returns 1.)
 static inline size_t msb_index(int x) {
-  assert(x < std::numeric_limits<int>::max() / 2);
+  assert(x < INT32_MAX / 2);
   int index;
   asm("bsrl %1, %0" : "=r"(index) : "r"(x << 1));
   return static_cast<size_t>(index);

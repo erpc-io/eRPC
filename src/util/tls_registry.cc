@@ -4,7 +4,7 @@
 namespace erpc {
 
 thread_local bool tls_initialized = false;
-thread_local size_t etid = std::numeric_limits<size_t>::max();
+thread_local size_t etid = SIZE_MAX;
 
 void TlsRegistry::init() {
   assert(!tls_initialized);
@@ -14,7 +14,7 @@ void TlsRegistry::init() {
 
 void TlsRegistry::reset() {
   tls_initialized = false;
-  etid = std::numeric_limits<size_t>::max();
+  etid = SIZE_MAX;
   cur_etid = 0;
 }
 

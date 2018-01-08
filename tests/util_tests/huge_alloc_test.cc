@@ -203,7 +203,7 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
       new_app_memory = (num_hugepages * erpc::kHugepageSize);
     } else {
       buffer = alloc->alloc(KB(4));
-      new_app_memory = erpc::kPageSize;
+      new_app_memory = KB(4);
     }
 
     if (buffer.buf == nullptr) {

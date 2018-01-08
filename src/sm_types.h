@@ -10,11 +10,10 @@ namespace erpc {
 /// Maximum number of sessions (both as client and server) that can be created
 /// by an Rpc through its lifetime. Increase this for more sessions.
 static constexpr size_t kMaxSessionsPerThread = 4096;
-static_assert(kMaxSessionsPerThread < std::numeric_limits<uint16_t>::max(), "");
+static_assert(kMaxSessionsPerThread < UINT16_MAX, "");
 
 // Invalid metadata values for session endpoint initialization
-static constexpr uint16_t kInvalidSessionNum =
-    std::numeric_limits<uint16_t>::max();
+static constexpr uint16_t kInvalidSessionNum = UINT16_MAX;
 
 // A cluster-wide unique token for each session, generated on session creation
 typedef size_t conn_req_uniq_token_t;
