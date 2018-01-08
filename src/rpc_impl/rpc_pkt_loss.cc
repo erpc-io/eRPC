@@ -76,7 +76,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       LOG_DEBUG("%s: False positive. Ignoring.\n", issue_msg);
     } else {
       size_t delta = ci.req_sent - ci.expl_cr_rcvd;
-      assert(credits + delta <= Session::kSessionCredits);
+      assert(credits + delta <= kSessionCredits);
 
       // Reclaim credits, reset progress, and add to request TX queue if needed
       LOG_DEBUG("%s: Retransmitting request.\n", issue_msg);
@@ -104,7 +104,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
       assert(resp_msgbuf->is_dynamic_and_matches(sslot->tx_msgbuf));
       size_t delta = ci.rfr_sent - (ci.resp_rcvd - 1);
-      assert(credits + delta <= Session::kSessionCredits);
+      assert(credits + delta <= kSessionCredits);
 
       // Reclaim credits, reset progress, and retransmit RFR
       LOG_DEBUG("%s: Retransmitting RFR.\n", issue_msg);

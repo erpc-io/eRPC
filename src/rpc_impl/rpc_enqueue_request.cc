@@ -45,7 +45,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   // Try to grab a free session slot
   if (unlikely(session->client_info.sslot_free_vec.size() == 0)) return -EBUSY;
   size_t sslot_i = session->client_info.sslot_free_vec.pop_back();
-  assert(sslot_i < Session::kSessionReqWindow);
+  assert(sslot_i < kSessionReqWindow);
 
   // Fill in the sslot info
   SSlot &sslot = session->sslot_arr[sslot_i];
@@ -69,7 +69,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     sslot.client_info.cont_etid = cont_etid;
   }
 
-  sslot.cur_req_num += Session::kSessionReqWindow;  // Generate req num
+  sslot.cur_req_num += kSessionReqWindow;  // Generate req num
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();

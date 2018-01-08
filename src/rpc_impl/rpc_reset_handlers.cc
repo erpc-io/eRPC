@@ -78,7 +78,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 
   // We can free the session after all continutions call enqueue_response()
   size_t pending_conts =
-      Session::kSessionReqWindow - session->client_info.sslot_free_vec.size();
+      kSessionReqWindow - session->client_info.sslot_free_vec.size();
 
   if (session->state == SessionState::kConnectInProgress ||
       session->state == SessionState::kDisconnectInProgress) {

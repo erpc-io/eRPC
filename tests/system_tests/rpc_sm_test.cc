@@ -75,7 +75,7 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
 
   // Ring entries exhausted
   const size_t initial_ring_entries_available = rpc->ring_entries_available;
-  rpc->ring_entries_available = Session::kSessionCredits - 1;
+  rpc->ring_entries_available = kSessionCredits - 1;
   rpc->handle_connect_req_st(conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kRingExhausted);
   rpc->ring_entries_available = initial_ring_entries_available;  // Restore

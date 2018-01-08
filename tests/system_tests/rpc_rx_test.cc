@@ -64,15 +64,14 @@ TEST_F(RpcRxTest, process_small_req_st) {
   uint8_t req[sizeof(pkthdr_t) + kTestSmallMsgSize];
   auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(req);
   pkthdr_0->format(kTestReqType, kTestSmallMsgSize, server.session_num,
-                   PktType::kPktTypeReq, 0 /* pkt_num */,
-                   Session::kSessionReqWindow);
+                   PktType::kPktTypeReq, 0 /* pkt_num */, kSessionReqWindow);
 
   // Past: Receive an old request.
   // It's dropped.
-  sslot_0->cur_req_num += 2 * Session::kSessionReqWindow;
+  sslot_0->cur_req_num += 2 * kSessionReqWindow;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->size(), 0);
-  sslot_0->cur_req_num -= 2 * Session::kSessionReqWindow;
+  sslot_0->cur_req_num -= 2 * kSessionReqWindow;
 
   // In-order: Receive an in-order small request.
   // Response handler is called and response is sent.
@@ -98,7 +97,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
 
   // In-order: Receive the next in-order request.
   // Response handler is called and response is sent.
-  pkthdr_0->req_num += Session::kSessionReqWindow;
+  pkthdr_0->req_num += kSessionReqWindow;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
@@ -120,22 +119,21 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   // Use enqueue_request() to do sslot formatting for the request. Small request
   // is sent right away, so it uses credits.
   rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
-  assert(clt_session->client_info.credits == Session::kSessionCredits - 1);
+  assert(clt_session->client_info.credits == kSessionCredits - 1);
 
   // Construct the basic test response packet
   uint8_t remote_resp[sizeof(pkthdr_t) + kTestSmallMsgSize];
   auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(remote_resp);
   pkthdr_0->format(kTestReqType, kTestSmallMsgSize, client.session_num,
-                   PktType::kPktTypeResp, 0 /* pkt_num */,
-                   Session::kSessionReqWindow);
+                   PktType::kPktTypeResp, 0 /* pkt_num */, kSessionReqWindow);
 
   // Past: Receive an old response.
   // It's dropped.
-  assert(sslot_0->cur_req_num == Session::kSessionReqWindow);
-  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  assert(sslot_0->cur_req_num == kSessionReqWindow);
+  sslot_0->cur_req_num += kSessionReqWindow;
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
-  sslot_0->cur_req_num -= Session::kSessionReqWindow;
+  sslot_0->cur_req_num -= kSessionReqWindow;
 
   // Roll-back: Receive resp while request progress is rolled back.
   // It's dropped.
@@ -173,25 +171,24 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   // Use enqueue_request() to do sslot formatting for the request. Large request
   // is queued, so it doesn't use credits for now.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, 0);
-  assert(clt_session->client_info.credits == Session::kSessionCredits);
+  assert(clt_session->client_info.credits == kSessionCredits);
   sslot_0->client_info.req_sent = 1;
 
   // Construct the basic explicit credit return packet
   pkthdr_t expl_cr;
   expl_cr.format(kTestReqType, 0 /* msg_size */, client.session_num,
-                 PktType::kPktTypeExplCR, 0 /* pkt_num */,
-                 Session::kSessionReqWindow);
+                 PktType::kPktTypeExplCR, 0 /* pkt_num */, kSessionReqWindow);
 
   // Past: Receive credit return for an old request.
   // It's dropped.
-  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  sslot_0->cur_req_num += kSessionReqWindow;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 0);
-  sslot_0->cur_req_num -= Session::kSessionReqWindow;
+  sslot_0->cur_req_num -= kSessionReqWindow;
 
   // In-order: Receive an in-order explicit credit return.
   // This bumps sslot's expl_cr_rcvd
-  clt_session->client_info.credits = Session::kSessionCredits - 1;
+  clt_session->client_info.credits = kSessionCredits - 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
@@ -203,7 +200,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   // Sensitivity: Client should use only the expl_cr_rcvd counter for ordering.
   // On resetting it, behavior should be exactly like an in-order explicit CR.
   sslot_0->client_info.expl_cr_rcvd = 0;
-  clt_session->client_info.credits = Session::kSessionCredits - 1;
+  clt_session->client_info.credits = kSessionCredits - 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
@@ -225,7 +222,7 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   SSlot *sslot_0 = &srv_session->sslot_arr[0];
 
   // Use enqueue_response() to do much of sslot formatting for the response.
-  sslot_0->cur_req_num = Session::kSessionReqWindow;
+  sslot_0->cur_req_num = kSessionReqWindow;
   sslot_0->server_info.req_type = kTestReqType;
   sslot_0->dyn_resp_msgbuf = rpc->alloc_msg_buffer(kTestLargeMsgSize);
   sslot_0->prealloc_used = false;
@@ -235,16 +232,15 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   // The request-for-response packet that is recevied
   pkthdr_t rfr;
   rfr.format(kTestReqType, 0 /* msg_size */, server.session_num,
-             PktType::kPktTypeReqForResp, 1 /* pkt_num */,
-             Session::kSessionReqWindow);
+             PktType::kPktTypeReqForResp, 1 /* pkt_num */, kSessionReqWindow);
 
   // Past: Receive RFR for an old request.
   // It's dropped.
-  sslot_0->cur_req_num += Session::kSessionReqWindow;
+  sslot_0->cur_req_num += kSessionReqWindow;
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 0);
   ASSERT_TRUE(pkthdr_tx_queue->size() == 0);
-  sslot_0->cur_req_num -= Session::kSessionReqWindow;
+  sslot_0->cur_req_num -= kSessionReqWindow;
 
   // In-order: Receive an in-order RFR.
   // Response packet #1 is sent.
@@ -291,17 +287,16 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   uint8_t req[CTransport::kMTU];
   auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(req);
   pkthdr_0->format(kTestReqType, kTestLargeMsgSize, server.session_num,
-                   PktType::kPktTypeReq, 0 /* pkt_num */,
-                   Session::kSessionReqWindow);
+                   PktType::kPktTypeReq, 0 /* pkt_num */, kSessionReqWindow);
 
   // Past: Receive a packet for a past request.
   // It's dropped.
   assert(sslot_0->cur_req_num == 0);
-  sslot_0->cur_req_num += 2 * Session::kSessionReqWindow;
+  sslot_0->cur_req_num += 2 * kSessionReqWindow;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->size(), 0);
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 0);
-  sslot_0->cur_req_num -= 2 * Session::kSessionReqWindow;
+  sslot_0->cur_req_num -= 2 * kSessionReqWindow;
 
   // In-order: Receive the zeroth request packet.
   // Credit return is sent.

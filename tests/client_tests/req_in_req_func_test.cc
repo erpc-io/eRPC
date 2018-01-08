@@ -12,7 +12,7 @@ bool primary_bg, backup_bg;
 
 static constexpr uint8_t kTestDataByte = 10;
 static constexpr size_t kTestNumReqs = 33;
-static_assert(kTestNumReqs > Session::kSessionReqWindow, "");
+static_assert(kTestNumReqs > kSessionReqWindow, "");
 
 /// Request type used for client to primary
 static constexpr uint8_t kTestReqTypeCP = kTestReqType + 1;
@@ -47,8 +47,8 @@ static_assert(sizeof(client_tag_t) == sizeof(size_t), "");
 class AppContext : public BasicAppContext {
  public:
   FastRand fast_rand;
-  MsgBuffer req_msgbuf[Session::kSessionReqWindow];
-  MsgBuffer resp_msgbuf[Session::kSessionReqWindow];
+  MsgBuffer req_msgbuf[kSessionReqWindow];
+  MsgBuffer resp_msgbuf[kSessionReqWindow];
   size_t num_reqs_sent = 0;
 };
 
@@ -179,7 +179,7 @@ void client_cont_func(RespHandle *, void *, size_t);  // Forward declaration
 
 /// Enqueue a request to server 0 using the request MsgBuffer index msgbuf_i
 void client_request_helper(AppContext *context, size_t msgbuf_i) {
-  assert(msgbuf_i < Session::kSessionReqWindow);
+  assert(msgbuf_i < kSessionReqWindow);
 
   size_t req_size = get_rand_msg_size(&context->fast_rand,
                                       context->rpc->get_max_data_per_pkt(),
@@ -245,7 +245,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   Rpc<CTransport> *rpc = context.rpc;
 
   // Start by filling the request window
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+  for (size_t i = 0; i < kSessionReqWindow; i++) {
     context.req_msgbuf[i] = rpc->alloc_msg_buffer(Rpc<CTransport>::kMaxMsgSize);
     assert(context.req_msgbuf[i].buf != nullptr);
 
@@ -259,7 +259,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   wait_for_rpc_resps_or_timeout(context, kTestNumReqs, nexus->freq_ghz);
   assert(context.num_rpc_resps == kTestNumReqs);
 
-  for (size_t i = 0; i < Session::kSessionReqWindow; i++) {
+  for (size_t i = 0; i < kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
   }
 

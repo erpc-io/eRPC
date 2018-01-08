@@ -31,16 +31,6 @@ class Session {
  public:
   enum class Role : int { kServer, kClient };
 
-  static constexpr size_t kSessionReqWindow = 8;  ///< Request window size
-  static constexpr size_t kSessionCredits = 8;    ///< Packet credits
-
-  /// Controls printing of credit exhausted alerts
-  static constexpr size_t kCreditsExhaustedWarnLim = 1000000000;
-
-  // Required for fast multiplication and modulo calculation during request
-  // number assignment and slot number decoding, respectively.
-  static_assert(is_power_of_two(kSessionReqWindow), "");
-
  private:
   Session(Role role, conn_req_uniq_token_t uniq_token)
       : role(role), uniq_token(uniq_token) {

@@ -110,8 +110,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   }
 
   // A session can be destroyed only when all its sslots are free
-  if (session->client_info.sslot_free_vec.size() !=
-      Session::kSessionReqWindow) {
+  if (session->client_info.sslot_free_vec.size() != kSessionReqWindow) {
     LOG_WARN("%s: Session has pending RPC requests.\n", issue_msg);
     return -EBUSY;
   }

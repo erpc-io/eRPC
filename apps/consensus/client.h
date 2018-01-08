@@ -105,8 +105,8 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
         "consensus: Latency us = "
         "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f max}. "
         "Request window = %zu (best 1). Inline size = %zu (best 120).\n",
-        us_min, us_median, us_99, us_999, us_max,
-        erpc::Session::kSessionReqWindow, erpc::CTransport::kMaxInline);
+        us_min, us_median, us_99, us_999, us_max, erpc::kSessionReqWindow,
+        erpc::CTransport::kMaxInline);
     c->client.num_resps = 0;
     c->client.req_us_vec.clear();
   }

@@ -304,18 +304,18 @@ class Rpc {
 
   /// Return true iff there are sufficient ring entries available for a session
   bool have_ring_entries() const {
-    return ring_entries_available >= Session::kSessionCredits;
+    return ring_entries_available >= kSessionCredits;
   }
 
   /// Allocate ring entries for one session
   void alloc_ring_entries() {
     assert(have_ring_entries());
-    ring_entries_available -= Session::kSessionCredits;
+    ring_entries_available -= kSessionCredits;
   }
 
   /// Free ring entries allocated for one session
   void free_ring_entries() {
-    ring_entries_available += Session::kSessionCredits;
+    ring_entries_available += kSessionCredits;
     assert(ring_entries_available <= Transport::kNumRxRingEntries);
   }
 
@@ -546,7 +546,7 @@ class Rpc {
   /// Return a credit to this session
   inline void bump_credits(Session *session) {
     assert(session->is_client());
-    assert(session->client_info.credits < Session::kSessionCredits);
+    assert(session->client_info.credits < kSessionCredits);
     session->client_info.credits++;
   }
 

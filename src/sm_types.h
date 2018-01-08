@@ -7,6 +7,14 @@
 
 namespace erpc {
 
+static constexpr size_t kSessionCredits = 8;  ///< Packet credits
+
+/// Request window size. This must be a power of two for fast multiplication and
+/// modulo calculation during request number assignment and slot number
+/// decoding, respectively.
+static constexpr size_t kSessionReqWindow = 8;
+static_assert(is_power_of_two(kSessionReqWindow), "");
+
 /// Maximum number of sessions (both as client and server) that can be created
 /// by an Rpc through its lifetime. Increase this for more sessions.
 static constexpr size_t kMaxSessionsPerThread = 4096;

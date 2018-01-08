@@ -41,7 +41,7 @@ void Rpc<TTr>::process_comps_st() {
               pkthdr->to_string().c_str());
 
     // Locate the session slot
-    size_t sslot_i = pkthdr->req_num % Session::kSessionReqWindow;  // Bit shift
+    size_t sslot_i = pkthdr->req_num % kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
     // Process control packets, which are sent only for large RPCs
@@ -114,7 +114,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   }
 
   // If we're here, this is the first (and only) packet of this new request
-  assert(pkthdr->req_num == sslot->cur_req_num + Session::kSessionReqWindow);
+  assert(pkthdr->req_num == sslot->cur_req_num + kSessionReqWindow);
 
   auto &req_msgbuf = sslot->server_info.req_msgbuf;
   assert(req_msgbuf.is_buried());  // Buried on prev req's enqueue_response()
@@ -313,7 +313,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
       (pkthdr->req_num == sslot->cur_req_num) &&
       (pkthdr->pkt_num == sslot->server_info.req_rcvd);
   bool is_first_pkt_next_req =  // Is this the first packet in the next request?
-      (pkthdr->req_num == sslot->cur_req_num + Session::kSessionReqWindow) &&
+      (pkthdr->req_num == sslot->cur_req_num + kSessionReqWindow) &&
       (pkthdr->pkt_num == 0);
 
   bool in_order = is_next_pkt_same_req || is_first_pkt_next_req;
