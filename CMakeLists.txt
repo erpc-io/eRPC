@@ -190,7 +190,8 @@ set(SYSTEM_TESTS
 set(UTIL_TESTS
   huge_alloc_test
   rand_test
-  fixed_vector_test)
+  fixed_vector_test
+  timely_test)
 
 # Compile the tests
 if(COMPILE_ERPC_LIB)

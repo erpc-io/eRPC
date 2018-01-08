@@ -22,7 +22,7 @@ void Timely::update_rate(double sample_rtt, double cur_time) {
     // Additive increase
     new_rate = rate + (kTimelyAddRate * delta_factor);
   } else {
-    if (unlikely(sample_rtt < kTimelyTHigh)) {
+    if (unlikely(sample_rtt > kTimelyTHigh)) {
       // Multiplicative decrease based on current RTT sample, not average
       new_rate = rate * (1 - (delta_factor * kTimelyDecreaseFactor *
                               (1 - (kTimelyTHigh / sample_rtt))));

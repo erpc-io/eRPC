@@ -35,6 +35,12 @@ class Timely {
  public:
   double rate = kTimelyMaxRate;
   void update_rate(double sample_rtt, double cur_time);
+  double get_avg_rtt_diff() { return avg_rtt_diff; }
+
+  /// Convert a bytes/second rate to Gbps
+  static double rate_to_gbps(double r) {
+    return (r / (1000 * 1000 * 1000)) * 8;
+  }
 };
 }  // End erpc
 
