@@ -33,7 +33,8 @@ void Timely::update_rate(double sample_rtt, double cur_time) {
         new_rate = rate + (N * kTimelyAddRate * delta_factor);
       } else {
         // Multiplicative decrease based on moving average gradient
-        new_rate = rate * (1.0 - (kTimelyDecreaseFactor * normalized_gradient));
+        new_rate = rate * (1.0 - (delta_factor * kTimelyDecreaseFactor *
+                                  normalized_gradient));
       }
     }
   }
