@@ -3,6 +3,7 @@
 
 #include "msg_buffer.h"
 #include "ops.h"
+#include "sm_types.h"
 
 namespace erpc {
 
@@ -66,6 +67,9 @@ class SSlot {
 
       size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
       size_t cont_etid;       ///< eRPC thread ID to run the continuation on
+
+      /// Packet transmission timestamps. Cold if CC is disabled.
+      std::array<size_t, kSessionCredits> tx_ts;
 
       /// Return a string representation of the progress made by this sslot.
       /// Progress fields that are zero are not included in the string.

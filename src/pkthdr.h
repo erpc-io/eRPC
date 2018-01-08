@@ -55,11 +55,12 @@ struct pkthdr_t {
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t dest_session_num : 16;    ///< Destination session number
   uint64_t pkt_type : 2;             ///< The packet type
-  /// Packet number. For an explicit credit return packet, this is equal to the
-  /// packet number of the corresponding request packet. For a
-  /// request-for-response packet, this is equal to the packet number of the
-  /// corresponding response packet.
+
+  /// Packet number. For an explicit credit return, this is equal to the packet
+  /// number of the corresponding request packet. For a request-for-response,
+  /// this is equal to the packet number of the corresponding response packet.
   uint64_t pkt_num : kPktNumBits;
+
   /// Request number, carried by all data and control packets for a request.
   uint64_t req_num : kReqNumBits;
   uint64_t magic : kPktHdrMagicBits;  ///< Magic from alloc_msg_buffer()

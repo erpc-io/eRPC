@@ -10,6 +10,7 @@
 #include "ops.h"
 #include "sm_types.h"
 #include "sslot.h"
+#include "timely.h"
 #include "util/buffer.h"
 #include "util/fixed_vector.h"
 
@@ -84,12 +85,13 @@ class Session {
 
   /// Information that is required only at the client endpoint
   struct {
-    /// Free session slots. We could use a vector of SSlot pointers, but indices
-    /// are useful in request number calculations.
+    /// Free session slots. We could use sslot pointers, but indices are useful
+    /// in request number calculations.
     FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
     size_t credits = kSessionCredits;  ///< Currently available credits
     size_t sm_req_ts;  ///< Timestamp of the last session management request
+    Timely timely;
   } client_info;
 
   struct {
