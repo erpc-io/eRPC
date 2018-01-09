@@ -444,9 +444,7 @@ class Rpc {
     return ((fast_rand.next_u32() % billion) < faults.pkt_drop_thresh_billion);
   }
 
-  /// Enqueue a packet starting at \p offset in \p sslot's \p tx_msgbuf,
-  /// possibly deferring transmission. This handles fault injection for dropping
-  /// data packets.
+  /// Enqueue a data packet from sslot's tx_msgbuf for tx_burst
   inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t pkt_num) {
     assert(in_dispatch());
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
@@ -470,8 +468,7 @@ class Rpc {
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
   }
 
-  /// Enqueue a control packet for tx_burst. This handles fault injection
-  /// for dropping control packets.
+  /// Enqueue a control packet for tx_burst
   inline void enqueue_hdr_tx_burst_st(Transport::RoutingInfo *routing_info,
                                       MsgBuffer *ctrl_msgbuf) {
     assert(in_dispatch());
