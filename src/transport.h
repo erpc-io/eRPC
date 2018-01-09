@@ -46,14 +46,16 @@ class Transport {
     MemRegInfo() : transport_mr(nullptr), lkey(0xffffffff) {}
   };
 
-  /// Info about a packet that needs TX. Using void* instead of MsgBuffer* is
-  /// not straightforward since we need to locate packet headers.
+  /// Info about a packet to transmit
   struct tx_burst_item_t {
     RoutingInfo* routing_info;  ///< Routing info for this packet
     MsgBuffer* msg_buffer;      ///< MsgBuffer for this packet
     size_t offset;              ///< Offset for this packet in the MsgBuffer
     size_t data_bytes;          ///< Number of data bytes to TX from \p offset
-    bool drop;                  ///< Drop this packet. Only used with kTesting.
+
+    /// TX timestamp is recorded here, iff congestion control is enabled.
+    size_t* data_tx_ts = nullptr;
+    bool drop;  ///< Drop this packet. Used only with kTesting.
   };
 
   /// Generic types for memory registration and deregistration functions.
