@@ -445,7 +445,7 @@ class Rpc {
   }
 
   /// Enqueue a data packet from sslot's tx_msgbuf for tx_burst
-  inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t pkt_num) {
+  inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t pkt_num) {
     assert(in_dispatch());
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
     assert(tx_msgbuf->is_req() || tx_msgbuf->is_resp());
@@ -454,6 +454,7 @@ class Rpc {
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
     item.pkt_num = pkt_num;
+    if (kCC) item.data_tx_ts = &sslot->data_tx_ts[pkt_num % kSessionCredits];
 
     if (kTesting) {
       testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_num));

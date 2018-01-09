@@ -9,8 +9,6 @@ namespace erpc {
 // So sslot->rx_msgbuf may or may not be valid at this point.
 template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
-  assert(req_handle != nullptr);
-
   // When called from a background thread, enqueue to the foreground thread
   if (unlikely(!in_dispatch())) {
     bg_queues.enqueue_response.unlocked_push(req_handle);
@@ -118,9 +116,10 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   bump_credits(sslot->session);
   sslot->tx_msgbuf = nullptr;  // Mark response as received
 
-  // Copy header and data: XXX - can we avoid copying headroom
-  memcpy(resp_msgbuf->get_pkthdr_0(), pkthdr,
-         pkthdr->msg_size + sizeof(pkthdr_t));
+  // Copy header and data, but not headroom
+  memcpy(reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
+         reinterpret_cast<const uint8_t *>(pkthdr) + kHeadroom,
+         pkthdr->msg_size + sizeof(pkthdr_t) - kHeadroom);
 
   if (likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,

@@ -10,6 +10,7 @@ namespace erpc {
 /// Packet credits. This must be a power of two for fast matching of packet
 /// numbers to their position in the TX timestamp array.
 static constexpr size_t kSessionCredits = 8;
+static_assert(is_power_of_two(kSessionCredits), "");
 
 /// Request window size. This must be a power of two for fast multiplication and
 /// modulo calculation during request number assignment and slot number
