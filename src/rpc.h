@@ -527,9 +527,8 @@ class Rpc {
     tx_batch_i = 0;
   }
 
-  /// Try to transmit packets for sslots in the datapath TX queue. SSlots for
-  /// which all packets can be sent are removed from the queue.
-  void process_req_txq_st();
+  /// Try to transmit request packets from sslots that are stalled for credits.
+  void process_credit_stall_queue_st();
 
   //
   // rpc_rx.cc
@@ -822,9 +821,7 @@ class Rpc {
   uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
 
-  /// Request sslots that need TX. Response sslots are not queued because they
-  /// never stall for credits (or congestion, if CC is implemented).
-  std::vector<SSlot *> req_txq;
+  std::vector<SSlot *> crd_stall_txq;  ///< Request sslots stalled for credits
 
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
   size_t prev_epoch_ts;       ///< Timestamp of the previous event loop epoch

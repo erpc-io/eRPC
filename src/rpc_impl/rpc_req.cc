@@ -93,7 +93,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   try_req_sslot_tx_st(&sslot);
   if (sslot.client_info.req_sent != req_msgbuf->num_pkts) {
-    req_txq.push_back(&sslot);
+    crd_stall_txq.push_back(&sslot);
   }
 
   return 0;

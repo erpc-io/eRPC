@@ -84,11 +84,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       ci.req_sent = ci.expl_cr_rcvd;
 
       sslot->client_info.enqueue_req_ts = rdtsc();
-
-      // Credits will be consumed when req_txq is processed
-      if (std::find(req_txq.begin(), req_txq.end(), sslot) == req_txq.end()) {
-        req_txq.push_back(sslot);
-      }
+      try_req_sslot_tx_st(sslot);
     }
   } else {
     // We have received the first response packet
