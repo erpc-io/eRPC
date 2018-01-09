@@ -93,11 +93,12 @@ class RpcTest : public ::testing::Test {
     rt_assert(rpc->transport->resolve_remote_routing_info(&remote_rinfo),
               "Failed to resolve server routing info");
 
+    session->remote_session_num = session->server.session_num;
     session->state = SessionState::kConnected;
     return session;
   }
 
-  /// Create a client session in its initial state
+  /// Create a server session in its initial state
   Session *create_server_session_init(const SessionEndpoint client,
                                       const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kServer, kTestUniqToken);
@@ -114,6 +115,9 @@ class RpcTest : public ::testing::Test {
     auto &remote_rinfo = session->client.routing_info;
     rt_assert(rpc->transport->resolve_remote_routing_info(&remote_rinfo),
               "Failed to resolve client routing info");
+
+    session->local_session_num = session->server.session_num;
+    session->remote_session_num = session->client.session_num;
 
     rpc->ring_entries_available -= kSessionCredits;
     rpc->session_vec.push_back(session);
