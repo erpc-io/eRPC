@@ -2,10 +2,6 @@
 
 namespace erpc {
 
-// Packets that are the first packet in their MsgBuffer use one DMA, and may
-// be inlined. Packets that are not the first packet use two DMAs, and are never
-// inlined for simplicity.
-
 void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
                             size_t num_pkts) {
   for (size_t i = 0; i < num_pkts; i++) {
