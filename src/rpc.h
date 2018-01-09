@@ -458,9 +458,7 @@ class Rpc {
     item.pkt_num = pkt_num;
 
     if (kTesting) {
-      const pkthdr_t pkthdr = pkt_num == 0 ? *tx_msgbuf->get_pkthdr_0()
-                                           : *tx_msgbuf->get_pkthdr_n(pkt_num);
-      testing.pkthdr_tx_queue.push(pkthdr);
+      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_num));
       item.drop = roll_pkt_drop();
     }
 
@@ -483,8 +481,8 @@ class Rpc {
     item.routing_info = routing_info;
     item.msg_buffer = ctrl_msgbuf;
     item.pkt_num = 0;
-
     if (kCC) item.data_tx_ts = nullptr;
+
     if (kTesting) {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
       item.drop = roll_pkt_drop();

@@ -33,10 +33,11 @@ class MsgBuffer {
     return reinterpret_cast<pkthdr_t *>(buf - sizeof(pkthdr_t));
   }
 
-  /// Return a pointer to the nth (n >= 1) packet header of this MsgBuffer.
-  /// This must use \p max_data_size, not \p data_size.
+  /// Return a pointer to the nth packet header of this MsgBuffer. This must use
+  /// \p max_data_size, not \p data_size.
+  /// get_pkthdr_0() is more efficient for retrieving the zeroth header.
   inline pkthdr_t *get_pkthdr_n(size_t n) const {
-    assert(n >= 1);
+    if (unlikely(n == 0)) return get_pkthdr_0();
     return reinterpret_cast<pkthdr_t *>(
         buf + round_up<sizeof(size_t)>(max_data_size) +
         (n - 1) * sizeof(pkthdr_t));
