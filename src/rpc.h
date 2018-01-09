@@ -437,10 +437,6 @@ class Rpc {
   /// Actually run one iteration of the event loop
   void run_event_loop_do_one_st();
 
-  //
-  // TX (rpc_tx.cc)
-  //
-
  private:
   /// Return true iff a packet should be dropped
   inline bool roll_pkt_drop() {
@@ -525,9 +521,6 @@ class Rpc {
     tx_batch_i = 0;
   }
 
-  /// Try to transmit request packets from sslots that are stalled for credits.
-  void process_credit_stall_queue_st();
-
   //
   // rpc_rx.cc
   //
@@ -590,9 +583,12 @@ class Rpc {
                             size_t bg_etid = kMaxBgThreads);
 
   //
-  // Background queue handlers (rpc_bg_queues.cc)
+  // Queue handlers (rpc_queues.cc)
   //
  private:
+  /// Try to transmit request packets from sslots that are stalled for credits.
+  void process_credit_stall_queue_st();
+
   /// Process the requests enqueued by background threads
   void process_bg_queues_enqueue_request_st();
 

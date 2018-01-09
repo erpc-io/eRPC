@@ -133,7 +133,7 @@ set(SOURCES
   src/nexus_impl/nexus_bg_thread.cc
   src/nexus_impl/nexus_sm_thread.cc
   src/rpc_impl/rpc.cc
-  src/rpc_impl/rpc_bg_queues.cc
+  src/rpc_impl/rpc_queues.cc
   src/rpc_impl/rpc_rfr.cc
   src/rpc_impl/rpc_cr.cc
   src/rpc_impl/rpc_req.cc
@@ -142,7 +142,6 @@ set(SOURCES
   src/rpc_impl/rpc_fault_inject.cc
   src/rpc_impl/rpc_pkt_loss.cc
   src/rpc_impl/rpc_rx.cc
-  src/rpc_impl/rpc_tx.cc
   src/rpc_impl/rpc_connect_handlers.cc
   src/rpc_impl/rpc_disconnect_handlers.cc
   src/rpc_impl/rpc_reset_handlers.cc
