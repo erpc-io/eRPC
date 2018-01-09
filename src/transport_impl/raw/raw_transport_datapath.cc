@@ -102,7 +102,11 @@ size_t RawTransport::rx_burst() {
     const size_t delta = get_cqe_cycle_delta(prev_snapshot, cur_snapshot);
     if (delta == 0 || delta >= kNumRxRingEntries) return 0;
 
-    for (size_t i = 0; i < delta; i++) {
+    recv_backlog += delta;
+    size_t num_comps_clamped = std::min(recv_backlog, kPostlist);
+    recv_backlog -= num_comps_clamped;
+
+    for (size_t i = 0; i < num_comps_clamped; i++) {
       auto* pkthdr =
           reinterpret_cast<pkthdr_t*>(&ring_extent.buf[recv_head * kRecvSize]);
       __builtin_prefetch(pkthdr, 0, 3);
@@ -117,7 +121,7 @@ size_t RawTransport::rx_burst() {
 
     cqe_idx = (cqe_idx + 1) % kRecvCQDepth;
     prev_snapshot = cur_snapshot;
-    return delta;
+    return num_comps_clamped;
   } else {
     int ret = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
     assert(ret >= 0);
