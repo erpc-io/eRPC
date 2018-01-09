@@ -373,6 +373,10 @@ class Rpc {
   };
 
  private:
+  /// Try transmitting packets for a request sslot. If not all packets can be
+  /// sent, add the packet to the credit stall TX queue.
+  void try_req_sslot_tx_st(SSlot *);
+
   /// Process a single-packet request message. Using (const pkthdr_t *) instead
   /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
   void process_small_req_st(SSlot *, pkthdr_t *);

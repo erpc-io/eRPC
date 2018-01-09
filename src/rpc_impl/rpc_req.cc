@@ -81,7 +81,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   pkthdr_0->req_num = sslot.cur_req_num;
 
   // Fill in non-zeroth packet headers, if any
-  if (req_msgbuf->num_pkts > 1) {
+  if (unlikely(req_msgbuf->num_pkts > 1)) {
     // Headers for non-zeroth packets are created by copying the 0th header,
     // changing only the required fields. All request packets are Unexpected.
     for (size_t i = 1; i < req_msgbuf->num_pkts; i++) {
@@ -91,18 +91,47 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  // Try to place small requests in the TX batch right now, avoiding queueing.
-  // Large requests, and small requests that cannot be transmitted (e.g., due
-  // to lack of credits) are queued in req_txq.
-  if (req_msgbuf->num_pkts == 1 && session->client_info.credits > 0) {
-    session->client_info.credits--;
-    enqueue_pkt_tx_burst_st(&sslot, 0, req_msgbuf->data_size);
-    sslot.client_info.req_sent++;
-  } else {
+  try_req_sslot_tx_st(&sslot);
+  if (sslot.client_info.req_sent != req_msgbuf->num_pkts) {
     req_txq.push_back(&sslot);
   }
 
   return 0;
+}
+
+template <class TTr>
+void Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
+  MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
+  Session *session = sslot->session;
+  assert(session->is_client() && session->is_connected());
+  assert(req_msgbuf->is_valid_dynamic() && req_msgbuf->is_req());
+  assert(sslot->client_info.req_sent < req_msgbuf->num_pkts);
+
+  if (session->client_info.credits > 0) {
+    if (likely(req_msgbuf->num_pkts == 1)) {
+      // Small request
+      session->client_info.credits--;
+      enqueue_pkt_tx_burst_st(sslot, 0, req_msgbuf->data_size);
+      sslot->client_info.req_sent++;
+    } else {
+      // Large request
+      size_t now_sending =
+          std::min(session->client_info.credits,
+                   req_msgbuf->num_pkts - sslot->client_info.req_sent);
+      assert(now_sending > 0);
+      session->client_info.credits -= now_sending;
+
+      for (size_t _x = 0; _x < now_sending; _x++) {
+        size_t offset = sslot->client_info.req_sent * TTr::kMaxDataPerPkt;
+        size_t data_bytes =
+            std::min(req_msgbuf->data_size - offset, TTr::kMaxDataPerPkt);
+        enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+        sslot->client_info.req_sent++;
+      }
+    }
+  } else {
+    dpath_stat_inc(session->dpath_stats.credits_exhaused, 1);
+  }
 }
 
 template <class TTr>
