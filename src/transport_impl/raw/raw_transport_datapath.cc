@@ -63,15 +63,16 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
         reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
     assert(ipv4_hdr->check == 0);
     ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
+    if (kTesting && item.drop) ipv4_hdr->dst_ip = 0;  // Dropped by switch, fast
 
     auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
     assert(udp_hdr->check == 0);
     udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
 
     LOG_TRACE(
-        "eRPC RawTransport: Sending packet. SGE #1 = %u bytes, "
+        "eRPC RawTransport: Sending packet (drop = %u). SGE #1 = %u bytes, "
         "SGE #2 = %u bytes. pkthdr = %s. Frame header = %s.\n",
-        sgl[0].length, (wr.num_sge == 2 ? sgl[1].length : 0),
+        item.drop, sgl[0].length, (wr.num_sge == 2 ? sgl[1].length : 0),
         pkthdr->to_string().c_str(),
         frame_header_to_string(&pkthdr->headroom[0]).c_str());
   }
