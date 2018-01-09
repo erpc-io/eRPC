@@ -527,24 +527,6 @@ class Rpc {
   /// which all packets can be sent are removed from the queue.
   void process_req_txq_st();
 
-  /**
-   * @brief Try to enqueue a single-packet request to the TX batch
-   *
-   * @param sslot The session slot to send the request for
-   * @param req_msgbuf A valid single-packet request MsgBuffer that still needs
-   * the packet to be queued
-   */
-  void tx_small_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf);
-
-  /**
-   * @brief Try to enqueue packets of a multi-packet request to the TX batch
-   *
-   * @param sslot The session slot to send the request for
-   * @param req_msgbuf A valid multi-packet request MsgBuffer that still needs
-   * one or more packets to be queued
-   */
-  void tx_large_req_one_st(SSlot *sslot, MsgBuffer *req_msgbuf);
-
   //
   // rpc_rx.cc
   //
@@ -749,12 +731,12 @@ class Rpc {
 
   /// Lock the mutex if the Rpc is accessible from multiple threads
   inline void lock_cond(std::mutex *mutex) {
-    if (multi_threaded) mutex->lock();
+    if (unlikely(multi_threaded)) mutex->lock();
   }
 
   /// Unlock the mutex if the Rpc is accessible from multiple threads
   inline void unlock_cond(std::mutex *mutex) {
-    if (multi_threaded) mutex->unlock();
+    if (unlikely(multi_threaded)) mutex->unlock();
   }
 
   // rpc_cr.cc
