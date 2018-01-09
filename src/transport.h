@@ -51,10 +51,8 @@ class Transport {
     RoutingInfo* routing_info;  ///< Routing info for this packet
     MsgBuffer* msg_buffer;      ///< MsgBuffer for this packet
     size_t pkt_num;             ///< The packet number in msg_buffer to transmit
-
-    /// TX timestamp is recorded here, iff congestion control is enabled.
-    size_t* data_tx_ts = nullptr;
-    bool drop;  ///< Drop this packet. Used only with kTesting.
+    size_t* tx_ts = nullptr;    ///< TX timestamp, only with kCC
+    bool drop;                  ///< Drop this packet. Used only with kTesting.
   };
 
   /// Generic types for memory registration and deregistration functions.

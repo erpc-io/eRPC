@@ -3,8 +3,8 @@
 namespace erpc {
 
 template <class TTr>
-void Rpc<TTr>::send_credit_return_now_st(const Session *session,
-                                         const pkthdr_t *req_pkthdr) {
+void Rpc<TTr>::enqueue_cr_st(const Session *session,
+                             const pkthdr_t *req_pkthdr) {
   assert(in_dispatch());
   assert(session->is_server());
   assert(req_pkthdr->is_req() && req_pkthdr->check_magic());

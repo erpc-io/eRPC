@@ -454,7 +454,9 @@ class Rpc {
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
     item.pkt_num = pkt_num;
-    if (kCC) item.data_tx_ts = &sslot->data_tx_ts[pkt_num % kSessionCredits];
+    if (kCC && sslot->is_client) {
+      item.tx_ts = &sslot->client_info.tx_ts[pkt_num % kSessionCredits];
+    }
 
     if (kTesting) {
       testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_num));
@@ -479,7 +481,7 @@ class Rpc {
     item.routing_info = routing_info;
     item.msg_buffer = ctrl_msgbuf;
     item.pkt_num = 0;
-    if (kCC) item.data_tx_ts = nullptr;
+    if (kCC) item.tx_ts = nullptr;
 
     if (kTesting) {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
@@ -504,8 +506,8 @@ class Rpc {
     if (kCC) {
       // Record TX timestamps here to avoid duplication in all transports
       for (size_t i = 0; i < tx_batch_i; i++) {
-        if (tx_burst_arr[i].data_tx_ts != nullptr) {
-          *tx_burst_arr[i].data_tx_ts = rdtsc();
+        if (tx_burst_arr[i].tx_ts != nullptr) {
+          *tx_burst_arr[i].tx_ts = rdtsc();
         }
       }
     }
@@ -732,14 +734,13 @@ class Rpc {
   // rpc_cr.cc
 
   /**
-   * @brief Send a credit return immediately (i.e., no TX burst queueing)
+   * @brief Enqueue a credit return
    *
    * @param session The session to send the credit return on
    * @param req_pkthdr The packet header of the request packet that triggered
    * this credit return
    */
-  void send_credit_return_now_st(const Session *session,
-                                 const pkthdr_t *req_pkthdr);
+  void enqueue_cr_st(const Session *session, const pkthdr_t *req_pkthdr);
 
   /// Process a credit return
   void process_expl_cr_st(SSlot *, const pkthdr_t *);
@@ -747,14 +748,13 @@ class Rpc {
   // rpc_rfr.cc
 
   /**
-   * @brief Send a request-for-response immediately (i.e. no TX burst queueing)
+   * @brief Enqueue a request-for-response
    *
    * @param sslot The session slot to send the request-for-response for
    * @param req_pkthdr The packet header of the response packet that triggered
    * this request-for-response
    */
-  void send_req_for_resp_now_st(const SSlot *sslot,
-                                const pkthdr_t *resp_pkthdr);
+  void enqueue_rfr_st(const SSlot *sslot, const pkthdr_t *resp_pkthdr);
 
   /// Process a request-for-response
   void process_req_for_resp_st(SSlot *, const pkthdr_t *);

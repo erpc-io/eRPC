@@ -256,8 +256,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
       // This is not the last packet in the request => send a credit return
       LOG_DEBUG("%s: Re-sending credit return.\n", issue_msg);
 
-      // We don't need to flush the transport's send queue here
-      send_credit_return_now_st(sslot->session, pkthdr);
+      enqueue_cr_st(sslot->session, pkthdr);  // tx_flush uneeded. XXX: why?
       return;
     }
 
@@ -309,7 +308,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
   // Send a credit return for every request packet except the last in sequence
   if (pkthdr->pkt_num != req_msgbuf.num_pkts - 1) {
-    send_credit_return_now_st(sslot->session, pkthdr);
+    enqueue_cr_st(sslot->session, pkthdr);
   }
 
   copy_data_to_msgbuf(&req_msgbuf, pkthdr);  // Header 0 was copied earlier

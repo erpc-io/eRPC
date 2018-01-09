@@ -3,8 +3,7 @@
 namespace erpc {
 
 template <class TTr>
-void Rpc<TTr>::send_req_for_resp_now_st(const SSlot *sslot,
-                                        const pkthdr_t *resp_pkthdr) {
+void Rpc<TTr>::enqueue_rfr_st(const SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   assert(in_dispatch());
   assert(sslot->is_client);
   assert(sslot->client_info.resp_msgbuf->is_valid_dynamic() &&

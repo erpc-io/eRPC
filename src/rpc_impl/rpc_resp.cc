@@ -201,7 +201,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     assert(now_sending > 0);
 
     for (size_t i = 0; i < now_sending; i++) {
-      send_req_for_resp_now_st(sslot, pkthdr);
+      enqueue_rfr_st(sslot, pkthdr);
       rfr_sent++;
       assert(rfr_sent <= resp_msgbuf->num_pkts - 1);
     }
@@ -209,13 +209,12 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     sslot->session->client_info.credits -= now_sending;
   }
 
-  copy_data_to_msgbuf(resp_msgbuf, pkthdr);  // Header 0 was copied earlier
+  // Header 0 was copied earlier, other headers are unneeded, so copy just data
+  copy_data_to_msgbuf(resp_msgbuf, pkthdr);
 
-  // Invoke the continuation iff we have all the response packets
   if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) return;
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
-
   if (sslot->client_info.cont_etid == kInvalidBgETid) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
                                  sslot->client_info.tag);

@@ -111,7 +111,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
       assert(credits > 0);
       credits--;  // Use one credit for this RFR
-      send_req_for_resp_now_st(sslot, resp_msgbuf->get_pkthdr_0());
+      enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
       sslot->client_info.rfr_sent++;
     }
   }

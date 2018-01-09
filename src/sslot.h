@@ -68,6 +68,9 @@ class SSlot {
       size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
       size_t cont_etid;       ///< eRPC thread ID to run the continuation on
 
+      /// Transmission timestamps for request and RFRs. Cold if CC is disabled.
+      std::array<size_t, kSessionCredits> tx_ts;
+
       /// Return a string representation of the progress made by this sslot.
       /// Progress fields that are zero are not included in the string.
       std::string progress_str(size_t req_num) const {
@@ -102,9 +105,6 @@ class SSlot {
       size_t req_rcvd;  ///< Number of request packets received
       size_t rfr_rcvd;  ///< Number of request-for-response packets received
     } server_info;
-
-    /// Transmission timestamps for data packets. Cold if CC is disabled.
-    std::array<size_t, kSessionCredits> data_tx_ts;
   };
 };
 
