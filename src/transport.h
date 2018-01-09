@@ -50,8 +50,7 @@ class Transport {
   struct tx_burst_item_t {
     RoutingInfo* routing_info;  ///< Routing info for this packet
     MsgBuffer* msg_buffer;      ///< MsgBuffer for this packet
-    size_t offset;              ///< Offset for this packet in the MsgBuffer
-    size_t data_bytes;          ///< Number of data bytes to TX from \p offset
+    size_t pkt_num;             ///< The packet number in msg_buffer to transmit
 
     /// TX timestamp is recorded here, iff congestion control is enabled.
     size_t* data_tx_ts = nullptr;

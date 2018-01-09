@@ -8,8 +8,6 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     const tx_burst_item_t& item = tx_burst_arr[i];
     const MsgBuffer* msg_buffer = item.msg_buffer;
     assert(msg_buffer->is_valid());  // Can be fake for control packets
-    assert(item.data_bytes <= kMaxDataPerPkt);  // Can be 0 for control packets
-    assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
     // Verify constant fields of work request
     struct ibv_send_wr& wr = send_wr[i];
@@ -22,32 +20,37 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     // Set signaling flag. The work request is non-inline by default.
     wr.send_flags = get_signaled_flag();
 
-    const size_t pkt_size = sizeof(pkthdr_t) + item.data_bytes;
+    size_t pkt_size;
     pkthdr_t* pkthdr;
-    if (item.offset == 0) {
+    if (item.pkt_num == 0) {
       // This is the first packet, so we need only 1 SGE. This can be a credit
       // return packet or an RFR.
       pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
-      sgl[0].length = static_cast<uint32_t>(pkt_size);
+      sgl[0].length =
+          sizeof(pkthdr_t) + std::min(kMaxDataPerPkt, msg_buffer->data_size);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      if (sgl[0].length <= kMaxInline + MLX5_ETH_INLINE_HEADER_SIZE) {
+      if (kMaxInline > 0 &&
+          sgl[0].length <= kMaxInline + MLX5_ETH_INLINE_HEADER_SIZE) {
         wr.send_flags |= IBV_SEND_INLINE;
       }
+
+      pkt_size = sgl[0].length;
       wr.num_sge = 1;
     } else {
-      // This is not the first packet, so we need 2 SGEs. This involves a
-      // a division, which is OK because it is a large message.
-      pkthdr = msg_buffer->get_pkthdr_n(item.offset / kMaxDataPerPkt);
+      // This is not the first packet, so we need 2 SGEs
+      pkthdr = msg_buffer->get_pkthdr_n(item.pkt_num);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
-      sgl[1].length = static_cast<uint32_t>(item.data_bytes);
+      size_t offset = item.pkt_num * kMaxDataPerPkt;
+      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[offset]);
+      sgl[1].length = std::min(kMaxDataPerPkt, msg_buffer->data_size - offset);
       sgl[1].lkey = msg_buffer->buffer.lkey;
 
+      pkt_size = sgl[0].length + sgl[1].length;
       wr.num_sge = 2;
     }
 

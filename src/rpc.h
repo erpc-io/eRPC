@@ -447,8 +447,7 @@ class Rpc {
   /// Enqueue a packet starting at \p offset in \p sslot's \p tx_msgbuf,
   /// possibly deferring transmission. This handles fault injection for dropping
   /// data packets.
-  inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t offset,
-                                      size_t data_bytes) {
+  inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t pkt_num) {
     assert(in_dispatch());
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
     assert(tx_msgbuf->is_req() || tx_msgbuf->is_resp());
@@ -456,11 +455,9 @@ class Rpc {
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
-    item.offset = offset;
-    item.data_bytes = data_bytes;
+    item.pkt_num = pkt_num;
 
     if (kTesting) {
-      size_t pkt_num = offset / TTr::kMaxDataPerPkt;
       const pkthdr_t pkthdr = pkt_num == 0 ? *tx_msgbuf->get_pkthdr_0()
                                            : *tx_msgbuf->get_pkthdr_n(pkt_num);
       testing.pkthdr_tx_queue.push(pkthdr);
@@ -485,9 +482,9 @@ class Rpc {
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = routing_info;
     item.msg_buffer = ctrl_msgbuf;
-    item.offset = 0;
-    item.data_bytes = 0;
+    item.pkt_num = 0;
 
+    if (kCC) item.data_tx_ts = nullptr;
     if (kTesting) {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
       item.drop = roll_pkt_drop();
@@ -511,7 +508,7 @@ class Rpc {
     if (kCC) {
       // Record TX timestamps here to avoid duplication in all transports
       for (size_t i = 0; i < tx_batch_i; i++) {
-        if (tx_burst_arr[i].data_bytes > 0) {
+        if (tx_burst_arr[i].data_tx_ts != nullptr) {
           *tx_burst_arr[i].data_tx_ts = rdtsc();
         }
       }

@@ -65,12 +65,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
 
     // Re-send the response packet with index = pkthdr->pkt_num (same as below)
-    size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
-    assert(offset < sslot->tx_msgbuf->data_size);
-    size_t data_bytes =
-        std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
-
-    enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+    enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num);
 
     // Release all transport-owned buffers before re-entering event loop
     if (tx_batch_i > 0) do_tx_burst_st();
@@ -82,10 +77,6 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   sslot->server_info.rfr_rcvd++;
 
   // Send the response packet with index = pkthdr->pktnum (same as above)
-  size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
-  assert(offset < sslot->tx_msgbuf->data_size);
-  size_t data_bytes =
-      std::min(TTr::kMaxDataPerPkt, sslot->tx_msgbuf->data_size - offset);
-  enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+  enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num);
 }
 }  // End erpc

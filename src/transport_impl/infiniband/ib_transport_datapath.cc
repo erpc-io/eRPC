@@ -11,8 +11,6 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     const tx_burst_item_t& item = tx_burst_arr[i];
     const MsgBuffer* msg_buffer = item.msg_buffer;
     assert(msg_buffer->is_valid());  // Can be fake for control packets
-    assert(item.data_bytes <= kMaxDataPerPkt);  // Can be 0 for control packets
-    assert(item.offset + item.data_bytes <= msg_buffer->data_size);
 
     // Verify constant fields of work request
     struct ibv_send_wr& wr = send_wr[i];
@@ -26,12 +24,13 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     // Set signaling flag. The work request is non-inline by default.
     wr.send_flags = get_signaled_flag();
 
-    if (item.offset == 0) {
+    if (item.pkt_num == 0) {
       // This is the first packet, so we need only 1 SGE. This can be a credit
       // return packet or an RFR.
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
-      sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t) + item.data_bytes);
+      sgl[0].length =
+          sizeof(pkthdr_t) + std::min(kMaxDataPerPkt, msg_buffer->data_size);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
       // Only single-SGE work requests are inlined
@@ -40,14 +39,14 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     } else {
       // This is not the first packet, so we need 2 SGEs. This involves a
       // a division, which is OK because it is a large message.
-      const pkthdr_t* pkthdr =
-          msg_buffer->get_pkthdr_n(item.offset / kMaxDataPerPkt);
+      const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(item.pkt_num);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[item.offset]);
-      sgl[1].length = static_cast<uint32_t>(item.data_bytes);
+      size_t offset = item.pkt_num * kMaxDataPerPkt;
+      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[offset]);
+      sgl[1].length = std::min(kMaxDataPerPkt, msg_buffer->data_size - offset);
       sgl[1].lkey = msg_buffer->buffer.lkey;
 
       wr.num_sge = 2;

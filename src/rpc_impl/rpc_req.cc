@@ -111,7 +111,7 @@ void Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
     if (likely(req_msgbuf->num_pkts == 1)) {
       // Small request
       session->client_info.credits--;
-      enqueue_pkt_tx_burst_st(sslot, 0, req_msgbuf->data_size);
+      enqueue_pkt_tx_burst_st(sslot, 0);
       sslot->client_info.req_sent++;
     } else {
       // Large request
@@ -122,10 +122,7 @@ void Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
       session->client_info.credits -= now_sending;
 
       for (size_t _x = 0; _x < now_sending; _x++) {
-        size_t offset = sslot->client_info.req_sent * TTr::kMaxDataPerPkt;
-        size_t data_bytes =
-            std::min(req_msgbuf->data_size - offset, TTr::kMaxDataPerPkt);
-        enqueue_pkt_tx_burst_st(sslot, offset, data_bytes);
+        enqueue_pkt_tx_burst_st(sslot, sslot->client_info.req_sent);
         sslot->client_info.req_sent++;
       }
     }
@@ -163,8 +160,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
         assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
         LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
-        enqueue_pkt_tx_burst_st(sslot, 0, std::min(sslot->tx_msgbuf->data_size,
-                                                   TTr::kMaxDataPerPkt));
+        enqueue_pkt_tx_burst_st(sslot, 0);
 
         // Release all transport-owned buffers before re-entering event loop
         if (tx_batch_i > 0) do_tx_burst_st();
@@ -273,8 +269,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
       assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
       LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
-      enqueue_pkt_tx_burst_st(
-          sslot, 0, std::min(sslot->tx_msgbuf->data_size, TTr::kMaxDataPerPkt));
+      enqueue_pkt_tx_burst_st(sslot, 0);
 
       // Release all transport-owned buffers before re-entering event loop
       if (tx_batch_i > 0) do_tx_burst_st();
