@@ -454,10 +454,8 @@ class Rpc {
   inline void enqueue_pkt_tx_burst_st(const SSlot *sslot, size_t offset,
                                       size_t data_bytes) {
     assert(in_dispatch());
-    assert(sslot->tx_msgbuf != nullptr);
-    assert(tx_batch_i < TTr::kPostlist);
-
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
+    assert(tx_msgbuf->is_req() || tx_msgbuf->is_resp());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
@@ -470,16 +468,12 @@ class Rpc {
       const pkthdr_t pkthdr = pkt_num == 0 ? *tx_msgbuf->get_pkthdr_0()
                                            : *tx_msgbuf->get_pkthdr_n(pkt_num);
       testing.pkthdr_tx_queue.push(pkthdr);
-
       item.drop = roll_pkt_drop();
-      if (item.drop) {
-        LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
-                  tx_msgbuf->get_pkthdr_str(pkt_num).c_str());
-      }
     }
 
-    LOG_TRACE("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
-              tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str());
+    LOG_TRACE("eRPC Rpc %u: Enqueing packet %s, drop = %u.\n", rpc_id,
+              tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str(),
+              drop);
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -490,7 +484,6 @@ class Rpc {
   inline void enqueue_hdr_tx_burst_st(Transport::RoutingInfo *routing_info,
                                       MsgBuffer *ctrl_msgbuf) {
     assert(in_dispatch());
-    assert(tx_batch_i < TTr::kPostlist);
     assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_req_for_resp());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
@@ -502,14 +495,10 @@ class Rpc {
     if (kTesting) {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
       item.drop = roll_pkt_drop();
-      if (item.drop) {
-        LOG_DEBUG("eRPC Rpc %u: Marking packet %s for drop.\n", rpc_id,
-                  ctrl_msgbuf->get_pkthdr_str().c_str());
-      }
     }
 
-    LOG_TRACE("eRPC Rpc %u: Sending packet %s.\n", rpc_id,
-              ctrl_msgbuf->get_pkthdr_str().c_str());
+    LOG_TRACE("eRPC Rpc %u: Enqueueing packet %s, drop = %u.\n", rpc_id,
+              ctrl_msgbuf->get_pkthdr_str().c_str(), drop);
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -522,6 +511,15 @@ class Rpc {
 
     dpath_stat_inc(dpath_stats.post_send_calls, 1);
     dpath_stat_inc(dpath_stats.pkts_sent, tx_batch_i);
+
+    if (kCC) {
+      // Record TX timestamps here to avoid duplication in all transports
+      for (size_t i = 0; i < tx_batch_i; i++) {
+        if (tx_burst_arr[i].data_bytes > 0) {
+          *tx_burst_arr[i].data_tx_ts = rdtsc();
+        }
+      }
+    }
 
     transport->tx_burst(tx_burst_arr, tx_batch_i);
     tx_batch_i = 0;
