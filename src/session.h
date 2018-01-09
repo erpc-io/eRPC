@@ -85,11 +85,12 @@ class Session {
 
   /// Information that is required only at the client endpoint
   struct {
+    size_t credits = kSessionCredits;  ///< Currently available credits
+
     /// Free session slots. We could use sslot pointers, but indices are useful
     /// in request number calculations.
     FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
-    size_t credits = kSessionCredits;  ///< Currently available credits
     size_t sm_req_ts;  ///< Timestamp of the last session management request
     Timely timely;
   } client_info;
