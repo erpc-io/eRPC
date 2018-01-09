@@ -134,10 +134,10 @@ set(SOURCES
   src/nexus_impl/nexus_sm_thread.cc
   src/rpc_impl/rpc.cc
   src/rpc_impl/rpc_bg_queues.cc
-  src/rpc_impl/rpc_send_rfr.cc
-  src/rpc_impl/rpc_send_cr.cc
-  src/rpc_impl/rpc_enqueue_request.cc
-  src/rpc_impl/rpc_enqueue_response.cc
+  src/rpc_impl/rpc_rfr.cc
+  src/rpc_impl/rpc_cr.cc
+  src/rpc_impl/rpc_req.cc
+  src/rpc_impl/rpc_resp.cc
   src/rpc_impl/rpc_ev_loop.cc
   src/rpc_impl/rpc_fault_inject.cc
   src/rpc_impl/rpc_pkt_loss.cc

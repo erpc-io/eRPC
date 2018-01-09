@@ -319,10 +319,7 @@ class Rpc {
     assert(ring_entries_available <= Transport::kNumRxRingEntries);
   }
 
-  //
-  // Rpc datapath (rpc_enqueue_request.cc and rpc_enqueue_response.cc)
-  //
-
+  // rpc_req.cc
  public:
   /**
    * @brief Try to enqueue a request for transmission.
@@ -375,6 +372,16 @@ class Rpc {
           cont_etid(cont_etid) {}
   };
 
+ private:
+  /// Process a single-packet request message. Using (const pkthdr_t *) instead
+  /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
+  void process_small_req_st(SSlot *, pkthdr_t *);
+
+  /// Process a packet for a multi-packet request
+  void process_large_req_one_st(SSlot *, const pkthdr_t *);
+
+  // rpc_resp.cc
+ public:
   /// Enqueue a response for transmission at the server
   void enqueue_response(ReqHandle *req_handle);
 
@@ -382,7 +389,7 @@ class Rpc {
   /// MsgBuffer is owned by the app and shouldn't be freed.
   inline void release_response(RespHandle *resp_handle) {
     // When called from a background thread, enqueue to the foreground thread
-    if (!in_dispatch()) {
+    if (unlikely(!in_dispatch())) {
       bg_queues.release_response.unlocked_push(resp_handle);
       return;
     }
@@ -395,6 +402,13 @@ class Rpc {
     assert(session != nullptr && session->is_client());
     session->client_info.sslot_free_vec.push_back(sslot->index);
   }
+
+ private:
+  /// Process a single-packet request message
+  void process_small_resp_st(SSlot *, const pkthdr_t *);
+
+  /// Process a packet for a multi-packet response
+  void process_large_resp_one_st(SSlot *, const pkthdr_t *);
 
   //
   // Event loop
@@ -582,25 +596,6 @@ class Rpc {
    */
   void process_comps_st();
 
-  /// Process a credit return
-  void process_expl_cr_st(SSlot *, const pkthdr_t *);
-
-  /// Process a request-for-response
-  void process_req_for_resp_st(SSlot *, const pkthdr_t *);
-
-  /// Process a single-packet request message. Using (const pkthdr_t *) instead
-  /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
-  void process_small_req_st(SSlot *, pkthdr_t *);
-
-  /// Process a single-packet request message
-  void process_small_resp_st(SSlot *, const pkthdr_t *);
-
-  /// Process a packet for a multi-packet request
-  void process_large_req_one_st(SSlot *, const pkthdr_t *);
-
-  /// Process a packet for a multi-packet response
-  void process_large_resp_one_st(SSlot *, const pkthdr_t *);
-
   /**
    * @brief Submit a work item to a background thread
    *
@@ -762,7 +757,7 @@ class Rpc {
     if (multi_threaded) mutex->unlock();
   }
 
-  // rpc_send_cr.cc
+  // rpc_cr.cc
 
   /**
    * @brief Send a credit return immediately (i.e., no TX burst queueing)
@@ -774,7 +769,10 @@ class Rpc {
   void send_credit_return_now_st(const Session *session,
                                  const pkthdr_t *req_pkthdr);
 
-  // rpc_send_rfr.cc
+  /// Process a credit return
+  void process_expl_cr_st(SSlot *, const pkthdr_t *);
+
+  // rpc_rfr.cc
 
   /**
    * @brief Send a request-for-response immediately (i.e. no TX burst queueing)
@@ -785,6 +783,9 @@ class Rpc {
    */
   void send_req_for_resp_now_st(const SSlot *sslot,
                                 const pkthdr_t *resp_pkthdr);
+
+  /// Process a request-for-response
+  void process_req_for_resp_st(SSlot *, const pkthdr_t *);
 
  public:
   // Hooks for apps to modify eRPC behavior
