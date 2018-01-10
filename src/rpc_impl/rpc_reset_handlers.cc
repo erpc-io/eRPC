@@ -55,9 +55,9 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   if (session->is_connected()) {
     // Erase session slots from credit stall TX queue
     for (const SSlot &sslot : session->sslot_arr) {
-      crd_stall_txq.erase(
-          std::remove(crd_stall_txq.begin(), crd_stall_txq.end(), &sslot),
-          crd_stall_txq.end());
+      credit_stall_txq.erase(
+          std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), &sslot),
+          credit_stall_txq.end());
     }
 
     // Invoke continuation-with-failure for sslots without complete response

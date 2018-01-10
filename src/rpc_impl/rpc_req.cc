@@ -91,16 +91,13 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  try_req_sslot_tx_st(&sslot);
-  if (sslot.client_info.req_sent != req_msgbuf->num_pkts) {
-    crd_stall_txq.push_back(&sslot);
-  }
-
+  bool all_pkts_tx = try_req_sslot_tx_st(&sslot);
+  if (!all_pkts_tx) credit_stall_txq.push_back(&sslot);
   return 0;
 }
 
 template <class TTr>
-void Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
+bool Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
   MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
   Session *session = sslot->session;
   assert(session->is_client() && session->is_connected());
@@ -113,6 +110,7 @@ void Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
       session->client_info.credits--;
       enqueue_pkt_tx_burst_st(sslot, 0);
       sslot->client_info.req_sent++;
+      return true;
     } else {
       // Large request
       size_t now_sending =
@@ -125,10 +123,12 @@ void Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
         enqueue_pkt_tx_burst_st(sslot, sslot->client_info.req_sent);
         sslot->client_info.req_sent++;
       }
+
+      if (sslot->client_info.req_sent == req_msgbuf->num_pkts) return true;
     }
-  } else {
-    dpath_stat_inc(session->dpath_stats.credits_exhaused, 1);
   }
+
+  return false;
 }
 
 template <class TTr>

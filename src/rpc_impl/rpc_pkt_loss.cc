@@ -83,8 +83,15 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       credits += delta;
       ci.req_sent = ci.expl_cr_rcvd;
 
+      // sslot may be in dispatch queues, but not in background queues since
+      // we don't have the full response.
+      credit_stall_txq.erase(
+          std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), sslot),
+          credit_stall_txq.end());
+
       sslot->client_info.enqueue_req_ts = rdtsc();
-      try_req_sslot_tx_st(sslot);
+      bool all_pkts_tx = try_req_sslot_tx_st(sslot);
+      if (!all_pkts_tx) credit_stall_txq.push_back(sslot);
     }
   } else {
     // We have received the first response packet

@@ -382,9 +382,11 @@ class Rpc {
   };
 
  private:
-  /// Try transmitting packets for a request sslot. If not all packets can be
-  /// sent, add the packet to the credit stall TX queue.
-  void try_req_sslot_tx_st(SSlot *);
+  /// Try transmitting packets for a request sslot. Return true if all packets
+  /// were sent, false if packet TX had to be stalled because of credits.
+  /// If this returns false, the caller should add the sslot to the credit
+  /// stalled queue.
+  bool try_req_sslot_tx_st(SSlot *);
 
   /// Process a single-packet request message. Using (const pkthdr_t *) instead
   /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
@@ -826,7 +828,7 @@ class Rpc {
   uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
 
-  std::vector<SSlot *> crd_stall_txq;  ///< Request sslots stalled for credits
+  std::vector<SSlot *> credit_stall_txq;  ///< Req slots stalled for credits
 
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
   size_t prev_epoch_ts;       ///< Timestamp of the previous event loop epoch

@@ -99,10 +99,6 @@ class Session {
     size_t sm_req_ts;  ///< Timestamp of the last session management request
     Timely timely_tx, timely_rx;
   } client_info;
-
-  struct {
-    size_t credits_exhaused = 0;
-  } dpath_stats;
 };
 
 }  // End erpc
