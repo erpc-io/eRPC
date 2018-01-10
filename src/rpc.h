@@ -483,7 +483,6 @@ class Rpc {
     item.pkt_index = 0;
 
     if (kCC && sslot->is_client) {
-      assert(ctrl_msgbuf->is_req_for_resp());
       size_t rfr_pkt_num = ctrl_msgbuf->get_pkthdr_0()->pkt_num;
       item.tx_ts = &sslot->client_info.tx_ts[rfr_pkt_num % kSessionCredits];
     }
@@ -512,6 +511,8 @@ class Rpc {
       // Record TX timestamps here to avoid duplication in all transports
       for (size_t i = 0; i < tx_batch_i; i++) {
         if (tx_burst_arr[i].tx_ts != nullptr) {
+          assert(tx_burst_arr[i].msg_buffer->is_req() ||
+                 tx_burst_arr[i].msg_buffer->is_req_for_resp());
           *tx_burst_arr[i].tx_ts = rdtsc();
         }
       }
