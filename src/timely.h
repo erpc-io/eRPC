@@ -33,6 +33,7 @@ class Timely {
   double avg_rtt_diff = 0.0;
   size_t last_update_tsc = 0;
   double min_rtt_tsc = 0.0;
+  double freq_ghz = 0.0;
 
  public:
   double rate = kTimelyMaxRate;
@@ -40,9 +41,10 @@ class Timely {
   Timely() {}
   Timely(double freq_ghz)
       : last_update_tsc(rdtsc()),
-        min_rtt_tsc(kTimelyMinRTT * freq_ghz * 1000) {}
+        min_rtt_tsc(kTimelyMinRTT * freq_ghz * 1000),
+        freq_ghz(freq_ghz) {}
 
-  void update_rate(double sample_rtt);
+  void update_rate(size_t sample_rtt_tsc);
   double get_avg_rtt_diff() { return avg_rtt_diff; }
 
   /// Convert a bytes/second rate to Gbps

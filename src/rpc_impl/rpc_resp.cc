@@ -105,6 +105,11 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     return;
   }
 
+  if (kCC) {
+    size_t rtt_tsc = rdtsc() - sslot->client_info.tx_ts[0];
+    sslot->session->client_info.timely_tx.update_rate(rtt_tsc);
+  }
+
   // If we're here, this is the first (and only) packet of the response
   assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
 
@@ -174,6 +179,11 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   }
 
   bump_credits(sslot->session);
+  if (kCC) {
+    size_t rtt_tsc =
+        rdtsc() - sslot->client_info.tx_ts[pkthdr->pkt_num % kSessionCredits];
+    sslot->session->client_info.timely_tx.update_rate(rtt_tsc);
+  }
 
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
   if (pkthdr->pkt_num == 0) {
@@ -184,7 +194,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     sslot->client_info.resp_rcvd = 1;
   } else {
-    // We've already resized the response MsgBuffer
+    // We've already resized resp msgbuf and copied pkthdr_0
     assert(resp_msgbuf->is_dynamic_and_matches(pkthdr));
     assert(sslot->client_info.resp_rcvd >= 1);
 
