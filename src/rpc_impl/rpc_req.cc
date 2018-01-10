@@ -7,10 +7,10 @@ namespace erpc {
 // The cont_etid parameter is passed only when the event loop processes the
 // background threads' queue of enqueue_request calls.
 template <class TTr>
-int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
-                              MsgBuffer *req_msgbuf, MsgBuffer *resp_msgbuf,
-                              erpc_cont_func_t cont_func, size_t tag,
-                              size_t cont_etid) {
+void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
+                               MsgBuffer *req_msgbuf, MsgBuffer *resp_msgbuf,
+                               erpc_cont_func_t cont_func, size_t tag,
+                               size_t cont_etid) {
   // Since this can be called from a background thread, only do basic checks
   // that don't require accessing the session.
   assert(req_msgbuf->is_valid_dynamic());
@@ -30,7 +30,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     auto req_args = enq_req_args_t(session_num, req_type, req_msgbuf,
                                    resp_msgbuf, cont_func, tag, get_etid());
     bg_queues.enqueue_request.unlocked_push(req_args);
-    return 0;
+    return;
   }
 
   // If we're here, we're in the dispatch thread
@@ -46,7 +46,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     session->client_info.enq_req_backlog.emplace(
         session_num, req_type, req_msgbuf, resp_msgbuf, cont_func, tag,
         kInvalidBgETid);
-    return 0;
+    return;
   }
 
   size_t sslot_i = session->client_info.sslot_free_vec.pop_back();
@@ -98,7 +98,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   bool all_pkts_tx = try_req_sslot_tx_st(&sslot);
   if (!all_pkts_tx) credit_stall_txq.push_back(&sslot);
-  return 0;
+  return;
 }
 
 template <class TTr>

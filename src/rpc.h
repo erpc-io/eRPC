@@ -351,9 +351,9 @@ class Rpc {
    *
    * @return Currently this function always returns 0
    */
-  int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
-                      MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
-                      size_t tag, size_t cont_etid = kInvalidBgETid);
+  void enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
+                       MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
+                       size_t tag, size_t cont_etid = kInvalidBgETid);
 
  private:
   /// Try transmitting packets for a request sslot. Return true if all packets
@@ -395,11 +395,9 @@ class Rpc {
       // We just got a new sslot, and we should have no more if there's backlog
       assert(session->client_info.sslot_free_vec.size() == 1);
       enq_req_args_t &args = session->client_info.enq_req_backlog.front();
-      int ret = enqueue_request(args.session_num, args.req_type,
-                                args.req_msgbuf, args.resp_msgbuf,
-                                args.cont_func, args.tag, args.cont_etid);
-      _unused(ret);
-      assert(ret == 0);
+      enqueue_request(args.session_num, args.req_type, args.req_msgbuf,
+                      args.resp_msgbuf, args.cont_func, args.tag,
+                      args.cont_etid);
       session->client_info.enq_req_backlog.pop();
     }
   }

@@ -116,11 +116,9 @@ void generic_test_func(Nexus *nexus, size_t) {
           cur_req_msgbuf.buf[i] = static_cast<uint8_t>(iter_req_i);
         }
 
-        int ret = rpc->enqueue_request(
-            session_num_arr[sess_i], kTestReqType, &cur_req_msgbuf,
-            &resp_msgbufs[iter_req_i], cont_func, iter_req_i);
-        _unused(ret);
-        assert(ret == 0);
+        rpc->enqueue_request(session_num_arr[sess_i], kTestReqType,
+                             &cur_req_msgbuf, &resp_msgbufs[iter_req_i],
+                             cont_func, iter_req_i);
 
         iter_req_i++;
       }

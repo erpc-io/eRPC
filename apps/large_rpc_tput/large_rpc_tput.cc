@@ -101,10 +101,9 @@ void send_reqs(AppContext *c) {
     // Timestamp before trying enqueue_request(). If enqueue_request() fails,
     // we'll timestamp again on the next try.
     c->req_ts[msgbuf_idx] = erpc::rdtsc();
-    int ret = c->rpc->enqueue_request(
-        c->session_num_vec[session_idx], kAppReqType, &req_msgbuf,
-        &c->resp_msgbuf[msgbuf_idx], app_cont_func, c->req_vec[i]._tag);
-    assert(ret == 0);
+    c->rpc->enqueue_request(c->session_num_vec[session_idx], kAppReqType,
+                            &req_msgbuf, &c->resp_msgbuf[msgbuf_idx],
+                            app_cont_func, c->req_vec[i]._tag);
 
     c->stat_req_vec[session_idx]++;
     c->stat_tx_bytes_tot += FLAGS_req_size;

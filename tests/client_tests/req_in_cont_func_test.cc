@@ -66,11 +66,9 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
   test_printf("Client: Sending request %zu of size %zu\n", c->num_reqs_sent,
               req_size);
 
-  int ret = c->rpc->enqueue_request(
-      c->session_num_arr[0], kTestReqType, &c->req_msgbuf[msgbuf_i],
-      &c->resp_msgbuf[msgbuf_i], cont_func, *reinterpret_cast<size_t *>(&tag));
-  _unused(ret);
-  assert(ret == 0);
+  c->rpc->enqueue_request(c->session_num_arr[0], kTestReqType,
+                          &c->req_msgbuf[msgbuf_i], &c->resp_msgbuf[msgbuf_i],
+                          cont_func, *reinterpret_cast<size_t *>(&tag));
 
   c->num_reqs_sent++;
 }

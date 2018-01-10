@@ -189,11 +189,10 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
         TimeEntry(TimeEntryType::kSendAeReq, erpc::rdtsc()));
   }
 
-  int ret = c->rpc->enqueue_request(
-      conn->session_num, static_cast<uint8_t>(ReqType::kAppendEntries),
-      &rrt->req_msgbuf, &rrt->resp_msgbuf, appendentries_cont,
-      reinterpret_cast<size_t>(rrt));
-  assert(ret == 0);  // We checked is_connected above
+  c->rpc->enqueue_request(conn->session_num,
+                          static_cast<uint8_t>(ReqType::kAppendEntries),
+                          &rrt->req_msgbuf, &rrt->resp_msgbuf,
+                          appendentries_cont, reinterpret_cast<size_t>(rrt));
   return 0;
 }
 

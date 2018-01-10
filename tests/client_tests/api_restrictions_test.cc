@@ -72,10 +72,8 @@ void test_func(Nexus *nexus, size_t num_sessions) {
   assert(resp_msgbuf.buf != nullptr);
 
   // Run continuation in foreground thread
-  int ret = rpc->enqueue_request(session_num, kTestReqType, &req_msgbuf,
-                                 &resp_msgbuf, cont_func, 0);
-  _unused(ret);
-  assert(ret == 0);
+  rpc->enqueue_request(session_num, kTestReqType, &req_msgbuf, &resp_msgbuf,
+                       cont_func, 0);
 
   wait_for_rpc_resps_or_timeout(context, 1, nexus->freq_ghz);
   assert(context.num_rpc_resps == 1);

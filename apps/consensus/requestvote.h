@@ -91,12 +91,11 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   erpc_requestvote->node_id = c->server.node_id;
   erpc_requestvote->rv = *m;
 
-  int ret = c->rpc->enqueue_request(
-      conn->session_num, static_cast<uint8_t>(ReqType::kRequestVote),
-      &rrt->req_msgbuf, &rrt->resp_msgbuf, requestvote_cont,
-      reinterpret_cast<size_t>(rrt));
+  c->rpc->enqueue_request(conn->session_num,
+                          static_cast<uint8_t>(ReqType::kRequestVote),
+                          &rrt->req_msgbuf, &rrt->resp_msgbuf, requestvote_cont,
+                          reinterpret_cast<size_t>(rrt));
 
-  assert(ret == 0);  // We checked is_connected above
   return 0;
 }
 

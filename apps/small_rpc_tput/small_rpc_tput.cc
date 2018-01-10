@@ -110,11 +110,9 @@ void send_reqs(AppContext *c, size_t batch_i) {
     if (kAppMeasureLatency) bc.req_tsc[i] = erpc::rdtsc();
 
     tag_t tag(batch_i, i);
-    int ret = c->rpc->enqueue_request(get_rand_session_num(c), kAppReqType,
-                                      &bc.req_msgbuf[i], &bc.resp_msgbuf[i],
-                                      app_cont_func, tag._tag);
-    _unused(ret);
-    assert(ret == 0);
+    c->rpc->enqueue_request(get_rand_session_num(c), kAppReqType,
+                            &bc.req_msgbuf[i], &bc.resp_msgbuf[i],
+                            app_cont_func, tag._tag);
   }
 }
 

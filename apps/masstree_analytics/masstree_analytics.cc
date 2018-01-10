@@ -124,11 +124,9 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
   }
 
   c->client.req_ts[msgbuf_idx] = erpc::rdtsc();
-  int ret = c->rpc->enqueue_request(0, req.req_type, &req_msgbuf,
-                                    &c->client.resp_msgbuf[msgbuf_idx],
-                                    app_cont_func, msgbuf_idx);
-  _unused(ret);
-  assert(ret == 0);
+  c->rpc->enqueue_request(0, req.req_type, &req_msgbuf,
+                          &c->client.resp_msgbuf[msgbuf_idx], app_cont_func,
+                          msgbuf_idx);
 }
 
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {

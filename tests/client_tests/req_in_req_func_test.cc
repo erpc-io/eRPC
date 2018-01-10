@@ -90,12 +90,10 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
   }
 
   // Backup is server thread #1
-  int ret = context->rpc->enqueue_request(
+  context->rpc->enqueue_request(
       context->session_num_arr[1], kTestReqTypePB, &srv_req_info->req_msgbuf_pb,
       &srv_req_info->resp_msgbuf_pb, primary_cont_func,
       reinterpret_cast<size_t>(srv_req_info));
-  _unused(ret);
-  assert(ret == 0);
 }
 
 /// The backups' request handler for primary-to-backup to requests. Echoes the
@@ -198,12 +196,10 @@ void client_request_helper(AppContext *context, size_t msgbuf_i) {
   test_printf("Client [Rpc %u]: Sending request %zu of size %zu\n",
               context->rpc->get_rpc_id(), context->num_reqs_sent, req_size);
 
-  int ret = context->rpc->enqueue_request(
+  context->rpc->enqueue_request(
       context->session_num_arr[0], kTestReqTypeCP,
       &context->req_msgbuf[msgbuf_i], &context->resp_msgbuf[msgbuf_i],
       client_cont_func, *reinterpret_cast<size_t *>(&tag));
-  _unused(ret);
-  assert(ret == 0);
 
   context->num_reqs_sent++;
 }
