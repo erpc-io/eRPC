@@ -56,9 +56,9 @@ struct pkthdr_t {
   uint64_t dest_session_num : 16;    ///< Destination session number
   uint64_t pkt_type : 2;             ///< The packet type
 
-  /// Packet number. For an explicit credit return, this is equal to the packet
-  /// number of the corresponding request packet. For a request-for-response,
-  /// this is equal to the packet number of the corresponding response packet.
+  /// Packet number. For any credit return, this is equal to the packet number
+  /// of the corresponding request packet. For a request-for-response, this is
+  /// equal to the packet number of the corresponding response packet.
   uint64_t pkt_num : kPktNumBits;
 
   /// Request number, carried by all data and control packets for a request.

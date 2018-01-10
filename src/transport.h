@@ -50,9 +50,12 @@ class Transport {
   struct tx_burst_item_t {
     RoutingInfo* routing_info;  ///< Routing info for this packet
     MsgBuffer* msg_buffer;      ///< MsgBuffer for this packet
-    size_t pkt_num;             ///< The packet number in msg_buffer to transmit
-    size_t* tx_ts = nullptr;    ///< TX timestamp, only with kCC
-    bool drop;                  ///< Drop this packet. Used only with kTesting.
+
+    /// The packet index in msg_buffer to transmit. For control packets, this
+    /// (being zero) is different from packet's transport-level pkt_num.
+    size_t pkt_index;
+    size_t* tx_ts = nullptr;  ///< TX timestamp, only with kCC
+    bool drop;                ///< Drop this packet. Used only with kTesting.
   };
 
   /// Generic types for memory registration and deregistration functions.

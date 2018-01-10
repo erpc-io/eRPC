@@ -453,14 +453,15 @@ class Rpc {
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
-    item.pkt_num = pkt_num;
+    item.pkt_index = pkt_num;
+
     if (kCC && sslot->is_client) {
       item.tx_ts = &sslot->client_info.tx_ts[pkt_num % kSessionCredits];
     }
 
     if (kTesting) {
-      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_num));
       item.drop = roll_pkt_drop();
+      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_num));
     }
 
     LOG_TRACE("eRPC Rpc %u: Enqueing packet %s, drop = %u.\n", rpc_id,
@@ -479,12 +480,17 @@ class Rpc {
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = ctrl_msgbuf;
-    item.pkt_num = 0;
-    if (kCC) item.tx_ts = nullptr;
+    item.pkt_index = 0;
+
+    if (kCC && sslot->is_client) {
+      assert(ctrl_msgbuf->is_req_for_resp());
+      size_t rfr_pkt_num = ctrl_msgbuf->get_pkthdr_0()->pkt_num;
+      item.tx_ts = &sslot->client_info.tx_ts[rfr_pkt_num % kSessionCredits];
+    }
 
     if (kTesting) {
-      testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
       item.drop = roll_pkt_drop();
+      testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
     }
 
     LOG_TRACE("eRPC Rpc %u: Enqueueing packet %s, drop = %u.\n", rpc_id,
