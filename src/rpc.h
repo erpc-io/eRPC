@@ -472,13 +472,12 @@ class Rpc {
   }
 
   /// Enqueue a control packet for tx_burst
-  inline void enqueue_hdr_tx_burst_st(Transport::RoutingInfo *routing_info,
-                                      MsgBuffer *ctrl_msgbuf) {
+  inline void enqueue_hdr_tx_burst_st(SSlot *sslot, MsgBuffer *ctrl_msgbuf) {
     assert(in_dispatch());
     assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_req_for_resp());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
-    item.routing_info = routing_info;
+    item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = ctrl_msgbuf;
     item.pkt_num = 0;
     if (kCC) item.tx_ts = nullptr;
@@ -736,11 +735,11 @@ class Rpc {
   /**
    * @brief Enqueue a credit return
    *
-   * @param session The session to send the credit return on
+   * @param sslot The session slot to send the credit return for
    * @param req_pkthdr The packet header of the request packet that triggered
    * this credit return
    */
-  void enqueue_cr_st(const Session *session, const pkthdr_t *req_pkthdr);
+  void enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
 
   /// Process a credit return
   void process_expl_cr_st(SSlot *, const pkthdr_t *);
@@ -754,7 +753,7 @@ class Rpc {
    * @param req_pkthdr The packet header of the response packet that triggered
    * this request-for-response
    */
-  void enqueue_rfr_st(const SSlot *sslot, const pkthdr_t *resp_pkthdr);
+  void enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
 
   /// Process a request-for-response
   void process_req_for_resp_st(SSlot *, const pkthdr_t *);

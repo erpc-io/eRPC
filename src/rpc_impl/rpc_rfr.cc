@@ -3,7 +3,7 @@
 namespace erpc {
 
 template <class TTr>
-void Rpc<TTr>::enqueue_rfr_st(const SSlot *sslot, const pkthdr_t *resp_pkthdr) {
+void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   assert(in_dispatch());
   assert(sslot->is_client);
   assert(sslot->client_info.resp_msgbuf->is_valid_dynamic() &&
@@ -24,7 +24,7 @@ void Rpc<TTr>::enqueue_rfr_st(const SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   rfr_pkthdr->req_num = resp_pkthdr->req_num;
   rfr_pkthdr->magic = resp_pkthdr->magic;
 
-  enqueue_hdr_tx_burst_st(sslot->session->remote_routing_info, ctrl_msgbuf);
+  enqueue_hdr_tx_burst_st(sslot, ctrl_msgbuf);
 }
 
 template <class TTr>
