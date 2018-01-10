@@ -252,12 +252,25 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     size_t thread_id = c->rpc->get_rpc_id();
     double seconds = erpc::sec_since(c->tput_t0);
 
-    // Min/max responses for a concurrent batch, to check for stagnated batches.
-    size_t max_resps = 0, min_resps = std::numeric_limits<size_t>::max();
+    // Min/max responses for a concurrent batch, to check for stagnated batches
+    size_t max_resps = 0, min_resps = SIZE_MAX;
     for (size_t i = 0; i < FLAGS_concurrency; i++) {
       min_resps = std::min(min_resps, c->stat_resp_rx[i]);
       max_resps = std::max(max_resps, c->stat_resp_rx[i]);
       c->stat_resp_rx[i] = 0;
+    }
+
+    // Min/max throughput for sessions
+    double max_tput = 0, min_tput = DBL_MAX;
+    if (erpc::kCC) {
+      for (size_t session_idx = 0; session_idx < c->session_num_vec.size();
+           session_idx++) {
+        if (session_idx == c->self_session_index) continue;
+        int session_num = c->session_num_vec[session_idx];
+        double session_tput = c->rpc->get_session_tx_rate_gbps(session_num);
+        max_tput = std::max(session_tput, max_tput);
+        min_tput = std::min(session_tput, min_tput);
+      }
     }
 
     double tput_mrps = c->stat_resp_rx_tot / (seconds * 1000000);
@@ -267,12 +280,13 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         "Process %zu, thread %zu: %.2f Mrps. Average TX batch = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
         "Resps/concurrent batch: min %zu, max %zu. "
-        "Latency: {%.2f, %.2f} us.\n",
+        "Latency: {%.2f, %.2f} us, tput = {%.2f, %.2f} Gbps.\n",
         FLAGS_process_id, c->thread_id, tput_mrps,
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
         c->stat_req_rx_tot, min_resps, max_resps,
         kAppMeasureLatency ? c->latency.perc(.50) / 10.0 : -1,
-        kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1);
+        kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1,
+        erpc::kCC ? min_tput : -1, erpc::kCC ? max_tput : -1);
 
     // Thread 1 records stats: throughput
     if (thread_id == 0) {
