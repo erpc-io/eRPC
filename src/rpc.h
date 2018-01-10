@@ -390,6 +390,17 @@ class Rpc {
     Session *session = sslot->session;
     assert(session != nullptr && session->is_client());
     session->client_info.sslot_free_vec.push_back(sslot->index);
+
+    if (!session->client_info.enq_req_backlog.empty()) {
+      // We just got a new sslot, and we should have no more if there's backlog
+      assert(session->client_info.sslot_free_vec.size() == 1);
+      enq_req_args_t &args = session->client_info.enq_req_backlog.front();
+      int ret = enqueue_request(args.session_num, args.req_type,
+                                args.req_msgbuf, args.resp_msgbuf,
+                                args.cont_func, args.tag, args.cont_etid);
+      assert(ret == 0);
+      session->client_info.enq_req_backlog.pop();
+    }
   }
 
  private:

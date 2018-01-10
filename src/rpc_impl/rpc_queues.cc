@@ -28,11 +28,10 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
   size_t cmds_to_process = queue.size;  // We might re-add to the queue
 
   for (size_t i = 0; i < cmds_to_process; i++) {
-    enq_req_args_t req_args = queue.unlocked_pop();
-    int ret =
-        enqueue_request(req_args.session_num, req_args.req_type,
-                        req_args.req_msgbuf, req_args.resp_msgbuf,
-                        req_args.cont_func, req_args.tag, req_args.cont_etid);
+    enq_req_args_t args = queue.unlocked_pop();
+    int ret = enqueue_request(args.session_num, args.req_type, args.req_msgbuf,
+                              args.resp_msgbuf, args.cont_func, args.tag,
+                              args.cont_etid);
     assert(ret == 0);
   }
 }
