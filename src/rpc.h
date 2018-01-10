@@ -700,9 +700,6 @@ class Rpc {
   /// Return the eRPC thread ID of the caller
   inline size_t get_etid() const { return tls_registry->get_etid(); }
 
-  /// Busy-sleep for \p ns nanoseconds
-  void nano_sleep(size_t ns);
-
   /// Return RDTSC frequency in GHz
   inline double get_freq_ghz() const { return nexus->freq_ghz; }
 

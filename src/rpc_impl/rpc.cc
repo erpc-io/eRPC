@@ -100,14 +100,6 @@ Rpc<TTr>::~Rpc() {
 }
 
 template <class TTr>
-void Rpc<TTr>::nano_sleep(size_t ns) {
-  size_t start = rdtsc();
-  size_t end = start;
-  size_t upp = static_cast<size_t>(nexus->freq_ghz * ns);
-  while (end - start < upp) end = rdtsc();
-}
-
-template <class TTr>
 double Rpc<TTr>::sec_since_creation() {
   return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
 }

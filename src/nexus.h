@@ -107,9 +107,6 @@ class Nexus {
     std::mutex *nexus_lock;
   };
 
-  /// Measure RDTSC frequency. This is expensive and only done once per process.
-  double measure_rdtsc_freq();
-
   /// The background thread
   static void bg_thread_func(BgThreadCtx ctx);
 

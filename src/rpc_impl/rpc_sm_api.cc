@@ -52,7 +52,8 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
     return -ENOMEM;
   }
 
-  auto *session = new Session(Session::Role::kClient, slow_rand.next_u64());
+  auto *session =
+      new Session(Session::Role::kClient, slow_rand.next_u64(), get_freq_ghz());
   session->state = SessionState::kConnectInProgress;
   session->local_session_num = session_vec.size();
 

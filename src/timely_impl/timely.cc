@@ -1,10 +1,10 @@
 #include "timely.h"
 
 namespace erpc {
-void Timely::update_rate(double sample_rtt, double cur_time) {
+void Timely::update_rate(double sample_rtt) {
   assert(sample_rtt >= kTimelyMinRTT);
-  assert(cur_time > last_update_time);
-  assert(cur_time < 100 * MB(1));  // Sanity-check units (100 seconds)
+  size_t cur_tsc = rdtsc();
+  assert(cur_tsc > last_update_tsc);
 
   if (unlikely(prev_rtt == 0.0)) prev_rtt = sample_rtt;
 
@@ -14,7 +14,7 @@ void Timely::update_rate(double sample_rtt, double cur_time) {
       ((1 - kTimelyEwmaAlpha) * avg_rtt_diff) + (kTimelyEwmaAlpha * rtt_diff);
 
   double normalized_gradient = avg_rtt_diff / kTimelyMinRTT;
-  double delta_factor = (cur_time - last_update_time) / kTimelyMinRTT;
+  double delta_factor = (cur_tsc - last_update_tsc) / min_rtt_tsc;
   delta_factor = std::min(delta_factor, 1.0);
 
   double new_rate;
@@ -40,7 +40,7 @@ void Timely::update_rate(double sample_rtt, double cur_time) {
   }
 
   prev_rtt = sample_rtt;
-  last_update_time = cur_time;
+  last_update_tsc = cur_tsc;
 
   rate = std::max(new_rate, rate * 0.5);
   rate = std::min(rate, kTimelyMaxRate);

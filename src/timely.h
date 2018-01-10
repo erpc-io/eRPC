@@ -9,11 +9,12 @@
 #define ERPC_TIMELY_H
 
 #include "common.h"
+#include "util/timer.h"
 
 namespace erpc {
 static constexpr double kTimelyEwmaAlpha = 0.02;
 
-static constexpr double kTimelyMinRTT = 2.0;
+static constexpr double kTimelyMinRTT = 2.5;
 static constexpr double kTimelyTLow = 50;
 static constexpr double kTimelyTHigh = 1000;
 
@@ -30,11 +31,18 @@ class Timely {
   size_t neg_gradient_count = 0;
   double prev_rtt = 0.0;
   double avg_rtt_diff = 0.0;
-  double last_update_time = 0.0;
+  size_t last_update_tsc = 0;
+  double min_rtt_tsc = 0.0;
 
  public:
   double rate = kTimelyMaxRate;
-  void update_rate(double sample_rtt, double cur_time);
+
+  Timely() {}
+  Timely(double freq_ghz)
+      : last_update_tsc(rdtsc()),
+        min_rtt_tsc(kTimelyMinRTT * freq_ghz * 1000) {}
+
+  void update_rate(double sample_rtt);
   double get_avg_rtt_diff() { return avg_rtt_diff; }
 
   /// Convert a bytes/second rate to Gbps

@@ -33,10 +33,12 @@ class Session {
   enum class Role : int { kServer, kClient };
 
  private:
-  Session(Role role, conn_req_uniq_token_t uniq_token)
+  Session(Role role, conn_req_uniq_token_t uniq_token, double freq_ghz)
       : role(role), uniq_token(uniq_token) {
     remote_routing_info =
         is_client() ? &server.routing_info : &client.routing_info;
+
+    if (kCC && is_client()) client_info.timely = Timely(freq_ghz);
 
     // Arrange the free slot vector so that slots are popped in order
     for (size_t i = 0; i < kSessionReqWindow; i++) {

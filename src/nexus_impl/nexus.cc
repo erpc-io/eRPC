@@ -154,30 +154,4 @@ int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   arr_req_func = app_req_func;
   return 0;
 }
-
-double Nexus::measure_rdtsc_freq() {
-  struct timespec start, end;
-  clock_gettime(CLOCK_REALTIME, &start);
-  uint64_t rdtsc_start = rdtsc();
-
-  // Do not change this loop! The hardcoded value below depends on this loop
-  // and prevents it from being optimized out.
-  uint64_t sum = 5;
-  for (uint64_t i = 0; i < 1000000; i++) {
-    sum += i + (sum + i) * (i % sum);
-  }
-  rt_assert(sum == 13580802877818827968ull, "Error in RDTSC freq measurement");
-
-  clock_gettime(CLOCK_REALTIME, &end);
-  uint64_t clock_ns =
-      static_cast<uint64_t>(end.tv_sec - start.tv_sec) * 1000000000 +
-      static_cast<uint64_t>(end.tv_nsec - start.tv_nsec);
-  uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
-
-  double _freq_ghz = rdtsc_cycles * 1.0 / clock_ns;
-  rt_assert(_freq_ghz >= 0.5 && _freq_ghz <= 5.0, "Invalid RDTSC frequency");
-
-  return _freq_ghz;
-}
-
 }  // End erpc

@@ -68,7 +68,8 @@ class RpcTest : public ::testing::Test {
   /// Create a client session in its initial state
   Session *create_client_session_init(const SessionEndpoint client,
                                       const SessionEndpoint server) {
-    auto *session = new Session(Session::Role::kClient, kTestUniqToken);
+    auto *session = new Session(Session::Role::kClient, kTestUniqToken,
+                                rpc->get_freq_ghz());
     session->state = SessionState::kConnectInProgress;
     session->local_session_num = rpc->session_vec.size();
 
@@ -101,7 +102,8 @@ class RpcTest : public ::testing::Test {
   /// Create a server session in its initial state
   Session *create_server_session_init(const SessionEndpoint client,
                                       const SessionEndpoint server) {
-    auto *session = new Session(Session::Role::kServer, kTestUniqToken);
+    auto *session = new Session(Session::Role::kServer, kTestUniqToken,
+                                rpc->get_freq_ghz());
     session->state = SessionState::kConnected;
     session->client = client;
     session->server = server;
