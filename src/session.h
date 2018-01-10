@@ -97,7 +97,7 @@ class Session {
     FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
 
     /// Requests that spill over kSessionReqWindow are queued here
-    std::vector<enq_req_args_t> enq_req_backlog;
+    std::queue<enq_req_args_t> enq_req_backlog;
 
     size_t sm_req_ts;  ///< Timestamp of the last session management request
     Timely timely_tx, timely_rx;

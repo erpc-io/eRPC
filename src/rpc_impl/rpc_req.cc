@@ -43,7 +43,7 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // If a free sslot is unavailable, save to session backlog
   if (unlikely(session->client_info.sslot_free_vec.size() == 0)) {
-    session->client_info.enq_req_backlog.emplace_back(
+    session->client_info.enq_req_backlog.emplace(
         session_num, req_type, req_msgbuf, resp_msgbuf, cont_func, tag,
         kInvalidBgETid);
     return 0;
