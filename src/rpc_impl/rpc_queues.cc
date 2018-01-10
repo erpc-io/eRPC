@@ -32,6 +32,7 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
     int ret = enqueue_request(args.session_num, args.req_type, args.req_msgbuf,
                               args.resp_msgbuf, args.cont_func, args.tag,
                               args.cont_etid);
+    _unused(ret);
     assert(ret == 0);
   }
 }

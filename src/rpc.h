@@ -398,6 +398,7 @@ class Rpc {
       int ret = enqueue_request(args.session_num, args.req_type,
                                 args.req_msgbuf, args.resp_msgbuf,
                                 args.cont_func, args.tag, args.cont_etid);
+      _unused(ret);
       assert(ret == 0);
       session->client_info.enq_req_backlog.pop();
     }
