@@ -13,7 +13,7 @@ namespace erpc {
 class IBTransport;
 class RawTransport;
 
-static constexpr bool kCC = false;  ///< Enable congestion control
+static constexpr bool kCC = true;  ///< Enable congestion control
 
 // static constexpr size_t kHeadroom = 0;
 // typedef IBTransport CTransport;

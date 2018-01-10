@@ -464,8 +464,10 @@ class Rpc {
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
     item.pkt_index = pkt_num;
 
-    if (kCC && sslot->is_client) {
-      item.tx_ts = &sslot->client_info.tx_ts[pkt_num % kSessionCredits];
+    if (kCC) {
+      item.tx_ts = sslot->is_client
+                       ? &sslot->client_info.tx_ts[pkt_num % kSessionCredits]
+                       : nullptr;
     }
 
     if (kTesting) {
@@ -491,9 +493,12 @@ class Rpc {
     item.msg_buffer = ctrl_msgbuf;
     item.pkt_index = 0;
 
-    if (kCC && sslot->is_client) {
+    if (kCC) {
       size_t rfr_pkt_num = ctrl_msgbuf->get_pkthdr_0()->pkt_num;
-      item.tx_ts = &sslot->client_info.tx_ts[rfr_pkt_num % kSessionCredits];
+      item.tx_ts =
+          sslot->is_client
+              ? &sslot->client_info.tx_ts[rfr_pkt_num % kSessionCredits]
+              : nullptr;
     }
 
     if (kTesting) {
