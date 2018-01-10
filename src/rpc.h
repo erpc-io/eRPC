@@ -406,8 +406,8 @@ class Rpc {
       bg_queues.release_response.unlocked_push(resp_handle);
       return;
     }
-    assert(in_dispatch());
 
+    // If we're here, we're in the dispatch thread
     SSlot *sslot = static_cast<SSlot *>(resp_handle);
     assert(sslot->tx_msgbuf == nullptr);  // Response was received previously
 
