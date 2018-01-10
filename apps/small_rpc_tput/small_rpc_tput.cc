@@ -48,7 +48,6 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 // Per-batch context
 class BatchContext {
  public:
-  size_t num_reqs_sent = 0;          // Number of requests sent
   size_t num_resps_rcvd = 0;         // Number of responses received
   size_t req_tsc[kAppMaxBatchSize];  // Timestamp when request was issued
   erpc::MsgBuffer req_msgbuf[kAppMaxBatchSize];
@@ -77,10 +76,12 @@ class AppContext : public BasicAppContext {
   ~AppContext() {}
 };
 
-size_t get_rand_session_index(AppContext *c) {
+int get_rand_session_num(AppContext *c) {
   // Lemire's trick
   uint32_t x = c->fastrand.next_u32();
-  return (static_cast<size_t>(x) * c->session_num_vec.size()) >> 32;
+  size_t rand_index =
+      (static_cast<size_t>(x) * c->session_num_vec.size()) >> 32;
+  return c->session_num_vec[rand_index];
 }
 
 void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
@@ -89,41 +90,31 @@ void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 // increment the batch's num_reqs_sent.
 void send_reqs(AppContext *c, size_t batch_i) {
   assert(batch_i < FLAGS_concurrency);
-
   BatchContext &bc = c->batch_arr[batch_i];
-  assert(bc.num_reqs_sent < FLAGS_batch_size);
 
-  size_t initial_num_reqs_sent = bc.num_reqs_sent;
-  for (size_t i = 0; i < FLAGS_batch_size - initial_num_reqs_sent; i++) {
-    size_t rand_session_index = get_rand_session_index(c);
-    size_t msgbuf_index = initial_num_reqs_sent + i;
+  for (size_t i = 0; i < FLAGS_batch_size; i++) {
     if (kAppVerbose) {
-      printf(
-          "Process %zu, Rpc %u: Sending request for batch %zu, msgbuf %zu.\n",
-          FLAGS_process_id, c->rpc->get_rpc_id(), batch_i, msgbuf_index);
+      printf("Process %zu, Rpc %u: Sending request for batch %zu.\n",
+             FLAGS_process_id, c->rpc->get_rpc_id(), batch_i);
     }
 
     if (!kAppPayloadCheck) {
-      bc.req_msgbuf[msgbuf_index].buf[0] = kAppDataByte;  // Touch req MsgBuffer
+      bc.req_msgbuf[i].buf[0] = kAppDataByte;  // Touch req MsgBuffer
     } else {
       // Fill the request MsgBuffer with a checkable sequence
-      uint8_t *buf = bc.req_msgbuf[msgbuf_index].buf;
+      uint8_t *buf = bc.req_msgbuf[i].buf;
       buf[0] = c->fastrand.next_u32();
       for (size_t j = 1; j < FLAGS_msg_size; j++) buf[j] = buf[0] + j;
     }
 
-    if (kAppMeasureLatency) bc.req_tsc[msgbuf_index] = erpc::rdtsc();
-    tag_t tag(batch_i, msgbuf_index);
-    int ret = c->rpc->enqueue_request(c->session_num_vec[rand_session_index],
-                                      kAppReqType, &bc.req_msgbuf[msgbuf_index],
-                                      &bc.resp_msgbuf[msgbuf_index],
+    if (kAppMeasureLatency) bc.req_tsc[i] = erpc::rdtsc();
+
+    tag_t tag(batch_i, i);
+    int ret = c->rpc->enqueue_request(get_rand_session_num(c), kAppReqType,
+                                      &bc.req_msgbuf[i], &bc.resp_msgbuf[i],
                                       app_cont_func, tag._tag);
-    assert(ret == 0 || ret == -EBUSY);
-    if (ret == -EBUSY) {
-      return;
-    } else {
-      bc.num_reqs_sent++;
-    }
+    _unused(ret);
+    assert(ret == 0);
   }
 }
 
@@ -214,25 +205,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   if (bc.num_resps_rcvd == FLAGS_batch_size) {
     // If we have a full batch, reset batch progress and send more requests
-    assert(bc.num_reqs_sent == FLAGS_batch_size);
-    bc.num_reqs_sent = 0;
     bc.num_resps_rcvd = 0;
     send_reqs(c, tag.s.batch_i);
-  } else if (bc.num_reqs_sent != FLAGS_batch_size) {
-    // If we haven't sent a full batch, send more requests
-    send_reqs(c, tag.s.batch_i);
-  }
-
-  // Try to send more requests for stagnated batches. This happens when we
-  // are unable to send requests for a batch because a session is clogged.
-  for (size_t batch_j = 0; batch_j < FLAGS_concurrency; batch_j++) {
-    if (batch_j == tag.s.batch_i) continue;
-
-    if (c->batch_arr[batch_j].num_resps_rcvd ==
-        c->batch_arr[batch_j].num_reqs_sent) {
-      assert(c->batch_arr[batch_j].num_reqs_sent != FLAGS_batch_size);
-      send_reqs(c, batch_j);
-    }
   }
 
   c->stat_resp_rx_tot++;
@@ -369,9 +343,8 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   erpc::rt_assert(FLAGS_batch_size <= kAppMaxBatchSize, "Invalid batch size");
-  erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency,
-                  "Invalid concurrency");
-  erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");  // 0 or 1
+  erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid concur.");
+  erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_process_id, FLAGS_numa_node, 0);
