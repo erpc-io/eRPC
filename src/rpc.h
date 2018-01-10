@@ -701,7 +701,7 @@ class Rpc {
   inline size_t get_etid() const { return tls_registry->get_etid(); }
 
   /// Return RDTSC frequency in GHz
-  inline double get_freq_ghz() const { return nexus->freq_ghz; }
+  inline double get_freq_ghz() const { return freq_ghz; }
 
   /// Return the number of seconds elapsed since this Rpc was created
   double sec_since_creation();
@@ -782,6 +782,7 @@ class Rpc {
 
   // Derived consts
   const bool multi_threaded;  ///< True iff there are background threads
+  const double freq_ghz;      ///< RDTSC frequency, derived from Nexus
   const size_t rpc_pkt_loss_epoch_cycles;  ///< RPC packet loss epoch in cycles
 
   /// A copy of the request/response handlers from the Nexus. We could use
