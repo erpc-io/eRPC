@@ -64,8 +64,6 @@ static_assert(sizeof(app_stats_t) == 64, "");
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
-  // The entry in session_num_vec for this thread, to avoid self-request
-  size_t self_session_index;
   struct timespec tput_t0;  // Start time for throughput measurement
   app_stats_t *app_stats;
 
@@ -80,17 +78,9 @@ class AppContext : public BasicAppContext {
 };
 
 size_t get_rand_session_index(AppContext *c) {
-  const size_t num_sessions = c->session_num_vec.size();
-
-  // Use Lemire's trick to compute random numbers modulo c->num_sessions
+  // Lemire's trick
   uint32_t x = c->fastrand.next_u32();
-  size_t rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
-  while (rand_session_index == c->self_session_index) {
-    x = c->fastrand.next_u32();
-    rand_session_index = (static_cast<size_t>(x) * num_sessions) >> 32;
-  }
-
-  return rand_session_index;
+  return (static_cast<size_t>(x) * c->session_num_vec.size()) >> 32;
 }
 
 void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
@@ -262,12 +252,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
     // Session throughput percentiles, used if congestion control is enabled
     std::vector<double> session_tput;
-    size_t num_sessions = c->session_num_vec.size() - 1;
     if (erpc::kCC) {
-      for (size_t session_idx = 0; session_idx < c->session_num_vec.size();
-           session_idx++) {
-        if (session_idx == c->self_session_index) continue;
-        int session_num = c->session_num_vec[session_idx];
+      for (int session_num : c->session_num_vec) {
         session_tput.push_back(c->rpc->get_session_tx_rate_gbps(session_num));
       }
       std::sort(session_tput.begin(), session_tput.end());
@@ -276,18 +262,21 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double tput_mrps = c->stat_resp_rx_tot / (seconds * 1000000);
     c->app_stats[thread_id].tput_mrps = tput_mrps;
 
+    size_t num_sessions = c->session_num_vec.size();
     printf(
         "Process %zu, thread %zu: %.2f Mrps. Average TX batch = %.2f. "
         "Resps RX = %zu, requests RX = %zu. "
         "Resps/concurrent batch: min %zu, max %zu. "
-        "Latency: {%.2f, %.2f} us, tput = {%.2f, %.2f} Gbps.\n",
+        "Latency: {%.2f, %.2f} us, tput = {%.2f, %.2f, %.2f, %.2f} Gbps.\n",
         FLAGS_process_id, c->thread_id, tput_mrps,
         c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
         c->stat_req_rx_tot, min_resps, max_resps,
         kAppMeasureLatency ? c->latency.perc(.50) / 10.0 : -1,
         kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1,
-        erpc::kCC ? session_tput.at(0) : -1,
-        erpc::kCC ? session_tput.at(num_sessions - 1) : -1);
+        erpc::kCC ? session_tput.at(num_sessions * 0.00) : -1,
+        erpc::kCC ? session_tput.at(num_sessions * 0.05) : -1,
+        erpc::kCC ? session_tput.at(num_sessions * 0.50) : -1,
+        erpc::kCC ? session_tput.at(num_sessions * 0.95) : -1);
 
     // Thread 1 records stats: throughput
     if (thread_id == 0) {
@@ -337,29 +326,27 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     }
   }
 
-  c.session_num_vec.resize(FLAGS_num_processes * FLAGS_num_threads);
-  c.self_session_index = FLAGS_process_id * FLAGS_num_threads + thread_id;
-
   // Create a session to each thread in the cluster except self
   for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
     std::string remote_uri = erpc::get_uri_for_process(p_i);
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      const size_t session_idx = (p_i * FLAGS_num_threads) + t_i;
-      if (session_idx == c.self_session_index) continue;
-
+      if (FLAGS_process_id == p_i && thread_id == t_i) continue;
       if (FLAGS_sm_verbose == 1) {
         fprintf(stderr, "Process %zu, thread %zu: Creating session to %s.\n",
                 FLAGS_process_id, thread_id, remote_uri.c_str());
       }
 
-      c.session_num_vec[session_idx] =
-          rpc.create_session(remote_uri, static_cast<uint8_t>(t_i));
-      assert(c.session_num_vec[session_idx] >= 0);
+      int session_num = rpc.create_session(remote_uri, t_i);
+      assert(session_num >= 0);
+      c.session_num_vec.push_back(session_num);
     }
   }
 
-  while (c.num_sm_resps != FLAGS_num_processes * FLAGS_num_threads - 1) {
+  erpc::rt_assert(c.session_num_vec.size() ==
+                  FLAGS_num_processes * FLAGS_num_threads - 1);
+
+  while (c.num_sm_resps != c.session_num_vec.size()) {
     rpc.run_event_loop(200);  // 200 milliseconds
     if (ctrl_c_pressed == 1) return;
   }
