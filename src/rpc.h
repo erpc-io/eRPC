@@ -239,10 +239,19 @@ class Rpc {
   /// Return true iff this session is connected. The session must not have
   /// been disconnected.
   bool is_connected(int session_num) {
-    assert(session_num >= 0 &&
-           static_cast<size_t>(session_num) < session_vec.size());
-
     return session_vec[static_cast<size_t>(session_num)]->is_connected();
+  }
+
+  /// Return the TX rate of a client session
+  double get_session_tx_rate_gbps(int session_num) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    return session->client_info.timely_tx.get_rate_gbps();
+  }
+
+  /// Return the RX rate of a client session
+  double get_session_rx_rate_gbps(int session_num) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    return session->client_info.timely_rx.get_rate_gbps();
   }
 
  private:

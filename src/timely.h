@@ -45,7 +45,8 @@ class Timely {
         freq_ghz(freq_ghz) {}
 
   void update_rate(size_t sample_rtt_tsc);
-  double get_avg_rtt_diff() { return avg_rtt_diff; }
+  double get_avg_rtt_diff() const { return avg_rtt_diff; }
+  double get_rate_gbps() const { return rate_to_gbps(rate); }
 
   /// Convert a bytes/second rate to Gbps
   static double rate_to_gbps(double r) {

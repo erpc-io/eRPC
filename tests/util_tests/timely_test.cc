@@ -12,6 +12,6 @@ int main() {
     timely.update_rate(rtt);
     nano_sleep(1000, freq_ghz);  // Update every one microsecond
     printf("RTT = %.2f, tput = %.2f Gbps, avg_rtt_diff = %.2f us\n", rtt,
-           Timely::rate_to_gbps(timely.rate), timely.get_avg_rtt_diff());
+           timely.get_rate_gbps(), timely.get_avg_rtt_diff());
   }
 }
