@@ -349,37 +349,11 @@ class Rpc {
    * continuation runs in the foreground. This argument is meant only for
    * internal use by eRPC (i.e., user calls must ignore it).
    *
-   * @return 0 on success (i.e., if the request was queued). Negative errno is
-   * returned if the request was not queued. -ENOMEM is returned iff the request
-   * cannot be enqueued because the session is out of slots.
+   * @return Currently this function always returns 0
    */
   int enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
                       MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
                       size_t tag, size_t cont_etid = kInvalidBgETid);
-
-  /// The arguments to enqueue_request
-  struct enqueue_request_args_t {
-    int session_num;
-    uint8_t req_type;
-    MsgBuffer *req_msgbuf;
-    MsgBuffer *resp_msgbuf;
-    erpc_cont_func_t cont_func;
-    size_t tag;
-    size_t cont_etid;
-
-    enqueue_request_args_t() {}
-    enqueue_request_args_t(int session_num, uint8_t req_type,
-                           MsgBuffer *req_msgbuf, MsgBuffer *resp_msgbuf,
-                           erpc_cont_func_t cont_func, size_t tag,
-                           size_t cont_etid)
-        : session_num(session_num),
-          req_type(req_type),
-          req_msgbuf(req_msgbuf),
-          resp_msgbuf(resp_msgbuf),
-          cont_func(cont_func),
-          tag(tag),
-          cont_etid(cont_etid) {}
-  };
 
  private:
   /// Try transmitting packets for a request sslot. Return true if all packets
@@ -842,7 +816,7 @@ class Rpc {
 
   /// Queues for datapath API requests from background threads
   struct {
-    MtQueue<enqueue_request_args_t> enqueue_request;
+    MtQueue<enq_req_args_t> enqueue_request;
     MtQueue<ReqHandle *> enqueue_response;
     MtQueue<RespHandle *> release_response;
   } bg_queues;

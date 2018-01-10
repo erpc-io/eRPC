@@ -127,7 +127,8 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
   int ret = c->rpc->enqueue_request(0, req.req_type, &req_msgbuf,
                                     &c->client.resp_msgbuf[msgbuf_idx],
                                     app_cont_func, msgbuf_idx);
-  erpc::rt_assert(ret == 0, "Failed to enqueue_request()");
+  _unused(ret);
+  assert(ret == 0);
 }
 
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {

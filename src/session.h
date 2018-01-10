@@ -93,8 +93,11 @@ class Session {
     size_t credits = kSessionCredits;  ///< Currently available credits
 
     /// Free session slots. We could use sslot pointers, but indices are useful
-    /// in request number calculations.
+    /// in request number calculation.
     FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
+
+    /// Requests that spill over kSessionReqWindow are queued here
+    std::vector<enq_req_args_t> enq_req_backlog;
 
     size_t sm_req_ts;  ///< Timestamp of the last session management request
     Timely timely_tx, timely_rx;

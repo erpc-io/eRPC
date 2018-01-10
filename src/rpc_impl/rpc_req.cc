@@ -27,9 +27,8 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   // When called from a background thread, enqueue to the foreground thread
   if (unlikely(!in_dispatch())) {
     assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
-    auto req_args =
-        enqueue_request_args_t(session_num, req_type, req_msgbuf, resp_msgbuf,
-                               cont_func, tag, get_etid());
+    auto req_args = enq_req_args_t(session_num, req_type, req_msgbuf,
+                                   resp_msgbuf, cont_func, tag, get_etid());
     bg_queues.enqueue_request.unlocked_push(req_args);
     return 0;
   }
@@ -42,8 +41,14 @@ int Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   // need to catch this behavior
   assert(session != nullptr && session->is_client() && session->is_connected());
 
-  // Try to grab a free session slot
-  if (unlikely(session->client_info.sslot_free_vec.size() == 0)) return -EBUSY;
+  // If a free sslot is unavailable, save to session backlog
+  if (unlikely(session->client_info.sslot_free_vec.size() == 0)) {
+    session->client_info.enq_req_backlog.emplace_back(
+        session_num, req_type, req_msgbuf, resp_msgbuf, cont_func, tag,
+        kInvalidBgETid);
+    return 0;
+  }
+
   size_t sslot_i = session->client_info.sslot_free_vec.pop_back();
   assert(sslot_i < kSessionReqWindow);
 

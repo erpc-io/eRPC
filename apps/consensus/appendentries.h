@@ -193,12 +193,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
       conn->session_num, static_cast<uint8_t>(ReqType::kAppendEntries),
       &rrt->req_msgbuf, &rrt->resp_msgbuf, appendentries_cont,
       reinterpret_cast<size_t>(rrt));
-  assert(ret == 0 || ret == -EBUSY);  // We checked is_connected above
-  if (ret == -EBUSY) c->server.stat_appendentries_enq_fail++;
-
-  // If we failed to send a request, pretend as if we sent it. Raft will retry
-  // when it times out, but this must be *extremely* rare since we care about
-  // perf of appendentries Rpcs.
+  assert(ret == 0);  // We checked is_connected above
   return 0;
 }
 

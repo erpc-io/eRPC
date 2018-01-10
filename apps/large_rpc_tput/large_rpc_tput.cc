@@ -82,7 +82,7 @@ void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 // Send requests (i.e., msgbuf indexes) queued in req_vec. Requests that cannot
 // be sent are req-queued into req_vec.
 void send_reqs(AppContext *c) {
-  size_t write_index = 0;
+  size_t write_index = 0;  // XXX: This is unused
 
   for (size_t i = 0; i < c->req_vec.size(); i++) {
     size_t msgbuf_idx = c->req_vec[i].s.msgbuf_idx;
@@ -104,16 +104,10 @@ void send_reqs(AppContext *c) {
     int ret = c->rpc->enqueue_request(
         c->session_num_vec[session_idx], kAppReqType, &req_msgbuf,
         &c->resp_msgbuf[msgbuf_idx], app_cont_func, c->req_vec[i]._tag);
-    assert(ret == 0 || ret == -EBUSY);
+    assert(ret == 0);
 
-    if (ret == -EBUSY) {
-      c->req_vec[write_index] = c->req_vec[i];
-      write_index++;
-      // Try other requests
-    } else {
-      c->stat_req_vec[session_idx]++;
-      c->stat_tx_bytes_tot += FLAGS_req_size;
-    }
+    c->stat_req_vec[session_idx]++;
+    c->stat_tx_bytes_tot += FLAGS_req_size;
   }
 
   c->req_vec.resize(write_index);  // Pending requests = write_index

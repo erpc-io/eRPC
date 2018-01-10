@@ -28,14 +28,12 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
   size_t cmds_to_process = queue.size;  // We might re-add to the queue
 
   for (size_t i = 0; i < cmds_to_process; i++) {
-    enqueue_request_args_t req_args = queue.unlocked_pop();
+    enq_req_args_t req_args = queue.unlocked_pop();
     int ret =
         enqueue_request(req_args.session_num, req_args.req_type,
                         req_args.req_msgbuf, req_args.resp_msgbuf,
                         req_args.cont_func, req_args.tag, req_args.cont_etid);
-
-    assert(ret == 0 || ret == -ENOMEM);  // XXX: Handle other failures
-    if (ret == -ENOMEM) queue.unlocked_push(req_args);  // Session out of sslots
+    assert(ret == 0);
   }
 }
 

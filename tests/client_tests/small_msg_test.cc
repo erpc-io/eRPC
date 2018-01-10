@@ -102,9 +102,7 @@ void generic_test_func(Nexus *nexus, size_t) {
         int ret = rpc->enqueue_request(
             session_num_arr[sess_i], kTestReqType, &cur_req_msgbuf,
             &resp_msgbufs[iter_req_i], cont_func, iter_req_i);
-        if (ret != 0) {
-          test_printf("Client: enqueue_request error %s\n", std::strerror(ret));
-        }
+        _unused(ret);
         assert(ret == 0);
 
         iter_req_i++;

@@ -96,12 +96,7 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
       &rrt->req_msgbuf, &rrt->resp_msgbuf, requestvote_cont,
       reinterpret_cast<size_t>(rrt));
 
-  assert(ret == 0 || ret == -EBUSY);  // We checked is_connected above
-  if (ret == -EBUSY) c->server.stat_requestvote_enq_fail++;
-
-  // If we failed to send a request, pretend as if we sent it. Raft will retry
-  // when it times out. A large timeout is OK, since we don't care much about
-  // perf for requestvote Rpcs.
+  assert(ret == 0);  // We checked is_connected above
   return 0;
 }
 
