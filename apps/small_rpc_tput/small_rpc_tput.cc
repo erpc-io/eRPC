@@ -260,17 +260,17 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->stat_resp_rx[i] = 0;
     }
 
-    // Min/max throughput for sessions
-    double max_tput = 0, min_tput = DBL_MAX;
+    // Session throughput percentiles, used if congestion control is enabled
+    std::vector<double> session_tput;
+    size_t num_sessions = c->session_num_vec.size() - 1;
     if (erpc::kCC) {
       for (size_t session_idx = 0; session_idx < c->session_num_vec.size();
            session_idx++) {
         if (session_idx == c->self_session_index) continue;
         int session_num = c->session_num_vec[session_idx];
-        double session_tput = c->rpc->get_session_tx_rate_gbps(session_num);
-        max_tput = std::max(session_tput, max_tput);
-        min_tput = std::min(session_tput, min_tput);
+        session_tput.push_back(c->rpc->get_session_tx_rate_gbps(session_num));
       }
+      std::sort(session_tput.begin(), session_tput.end());
     }
 
     double tput_mrps = c->stat_resp_rx_tot / (seconds * 1000000);
@@ -286,7 +286,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         c->stat_req_rx_tot, min_resps, max_resps,
         kAppMeasureLatency ? c->latency.perc(.50) / 10.0 : -1,
         kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1,
-        erpc::kCC ? min_tput : -1, erpc::kCC ? max_tput : -1);
+        erpc::kCC ? session_tput.at(0) : -1,
+        erpc::kCC ? session_tput.at(num_sessions - 1) : -1);
 
     // Thread 1 records stats: throughput
     if (thread_id == 0) {
