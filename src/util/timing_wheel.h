@@ -8,14 +8,10 @@
 
 namespace erpc {
 
-static constexpr size_t kWheelBucketCap = 5;  /// Wheel entries per bucket
+static constexpr size_t kWheelBucketCap = 4;  /// Wheel entries per bucket
 
 /// One entry in a timing wheel bucket
 struct wheel_ent_t {
-  /// Number of entries in this entry's bucket. This field is valid only for
-  /// the first entry in each bucket.
-  uint8_t num_entries;
-
   bool is_rfr;  ///< True iff this entry is an RFR
   SSlot *sslot;
   union {
@@ -34,11 +30,12 @@ struct wheel_ent_t {
 static_assert(sizeof(wheel_ent_t) == 24, "");
 
 struct wheel_bkt_t {
-  wheel_ent_t entry[kWheelBucketCap];
+  size_t num_entries;
   wheel_bkt_t *next;
   wheel_bkt_t *last;
+  wheel_ent_t entry[kWheelBucketCap];
 };
-static_assert(sizeof(wheel_bkt_t) % 8 == 0, "");
+static_assert(sizeof(wheel_bkt_t) == 120, "");
 
 class TimingWheel {
  public:
@@ -60,45 +57,40 @@ class TimingWheel {
   /// reset in the process
   void reap(std::queue<wheel_ent_t> &q, size_t ws_i) {
     wheel_bkt_t *bkt = &wheel[ws_i];
-    size_t level = 0;  // Level 0 buckets are not returned to pool
-    while (true) {
-      size_t n_entries = bkt->entry[0].num_entries;
-      for (size_t i = 0; i < n_entries; i++) q.push(bkt->entry[i]);
-      if (bkt->next == nullptr) break;
+
+    while (bkt != nullptr) {
+      for (size_t i = 0; i < bkt->num_entries; i++) q.push(bkt->entry[i]);
 
       wheel_bkt_t *_tmp_next = bkt->next;
 
       reset_bkt(bkt);
-      if (level != 0) bkt_pool.free(bkt);
-
+      if (bkt != &wheel[ws_i]) bkt_pool.free(bkt);
       bkt = _tmp_next;
-      level++;
     }
 
-    wheel[ws_i].last = &wheel[ws_i];
+    wheel[ws_i].last = &wheel[ws_i];  // Reset last pointer
   }
 
   void insert(size_t ws_i, wheel_ent_t ent) {
     wheel_bkt_t *last_bkt = wheel[ws_i].last;
     assert(last_bkt->next == nullptr);
 
-    uint8_t &n_entries = last_bkt->entry[0].num_entries;
-    assert(n_entries < kWheelBucketCap);
-    last_bkt->entry[n_entries] = ent;
-    n_entries++;
+    assert(last_bkt->num_entries < kWheelBucketCap);
+    last_bkt->entry[last_bkt->num_entries] = ent;
+    last_bkt->num_entries++;
 
     // If last_bkt is full, allocate a new one and make it the last
-    if (n_entries == kWheelBucketCap) {
-      wheel_bkt_t *bkt = alloc_bkt();
-      last_bkt->next = bkt;
-      wheel[ws_i].last = bkt;
+    if (last_bkt->num_entries == kWheelBucketCap) {
+      wheel_bkt_t *new_bkt = alloc_bkt();
+      last_bkt->next = new_bkt;
+      wheel[ws_i].last = new_bkt;
     }
   }
 
  private:
   inline void reset_bkt(wheel_bkt_t *bkt) {
     bkt->next = nullptr;
-    bkt->entry[0].num_entries = 0;
+    bkt->num_entries = 0;
   }
 
   wheel_bkt_t *alloc_bkt() {
