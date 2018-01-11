@@ -55,9 +55,10 @@ float papi_get_ipc() {
   return ipc;
 }
 
-// A basic mempool for preallocated objects of type T
+// A basic mempool for preallocated objects of type T. eRPC has a faster,
+// hugepage-backed one.
 template <class T>
-class MemPool {
+class AppMemPool {
  public:
   size_t num_to_alloc = 1;
   std::vector<T *> backing_ptr_vec;
@@ -79,8 +80,8 @@ class MemPool {
 
   void free(T *t) { pool.push_back(t); }
 
-  MemPool() {}
-  ~MemPool() {
+  AppMemPool() {}
+  ~AppMemPool() {
     for (T *ptr : backing_ptr_vec) delete[] ptr;
   }
 };

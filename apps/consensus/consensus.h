@@ -138,8 +138,8 @@ class AppContext {
     std::vector<TimeEntry> time_entry_vec;
 
     // Pools
-    MemPool<client_req_t> rsm_cmd_buf_pool;  // Pool for SMR commands
-    MemPool<raft_req_tag_t> raft_req_tag_pool;
+    AppMemPool<client_req_t> rsm_cmd_buf_pool;  // Pool for SMR commands
+    AppMemPool<raft_req_tag_t> raft_req_tag_pool;
 
     // App state
     FixedTable *table = nullptr;
