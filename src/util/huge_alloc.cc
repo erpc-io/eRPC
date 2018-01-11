@@ -77,7 +77,7 @@ void HugeAlloc::print_stats() {
   }
 }
 
-Buffer HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
+Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   std::ostringstream xmsg;  // The exception message
   size = round_up<kHugepageSize>(size);
   int shm_key, shm_id;
@@ -136,16 +136,18 @@ Buffer HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
             "eRPC HugeAlloc: mbind() failed. Key " + std::to_string(shm_key));
 
   // If we are here, the allocation succeeded.  Register if needed.
+  bool do_register_bool = (do_register == DoRegister::kTrue);
   Transport::MemRegInfo reg_info;
-  if (do_register) reg_info = reg_mr_func(shm_buf, size);
+  if (do_register_bool) reg_info = reg_mr_func(shm_buf, size);
 
   // Save the SHM region so we can free it later
   shm_list.push_back(
-      shm_region_t(shm_key, shm_buf, size, do_register, reg_info));
+      shm_region_t(shm_key, shm_buf, size, do_register_bool, reg_info));
   stats.shm_reserved += size;
 
   // buffer.class_size is invalid because we didn't allocate from a class
-  return Buffer(shm_buf, SIZE_MAX, do_register ? reg_info.lkey : UINT32_MAX);
+  return Buffer(shm_buf, SIZE_MAX,
+                do_register_bool ? reg_info.lkey : UINT32_MAX);
 }
 
 Buffer HugeAlloc::alloc(size_t size) {
@@ -168,7 +170,7 @@ Buffer HugeAlloc::alloc(size_t size) {
       // There's no larger size class with free pages, we we need to allocate
       // more hugepages. This adds some Buffers to the largest class.
       prev_allocation_size *= 2;
-      bool success = reserve_hugepages(prev_allocation_size, numa_node);
+      bool success = reserve_hugepages(prev_allocation_size);
       if (!success) {
         prev_allocation_size /= 2;  // Restore the previous allocation
         return Buffer(nullptr, 0, 0);
@@ -193,9 +195,9 @@ Buffer HugeAlloc::alloc(size_t size) {
   return Buffer(nullptr, 0, 0);
 }
 
-bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
+bool HugeAlloc::reserve_hugepages(size_t size) {
   assert(size >= kMaxClassSize);  // We need at least one max-sized buffer
-  Buffer buffer = alloc_raw(size, numa_node, true);  // do_register = true
+  Buffer buffer = alloc_raw(size, DoRegister::kTrue);
   if (buffer.buf == nullptr) return false;
 
   // Add Buffers to the largest class

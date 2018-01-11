@@ -29,7 +29,6 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
 
   bool concurrent_read = config.get("concurrent_read").get_bool();
   bool concurrent_write = config.get("concurrent_write").get_bool();
-  size_t numa_node = config.get("numa_node").get_uint64();
 
   size_t log_num_buckets = 0;
   while ((1ull << log_num_buckets) < num_buckets) log_num_buckets++;
@@ -49,7 +48,9 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
     // TODO: Extend num_extra_buckets_ to meet shm_size.
 
     // Zeroes out everything
-    buckets_ = reinterpret_cast<Bucket*>(alloc->alloc_raw(shm_size, numa_node));
+    erpc::Buffer bucket_buffer =
+        alloc->alloc_raw(shm_size, erpc::DoRegister::kFalse);
+    buckets_ = reinterpret_cast<Bucket*>(bucket_buffer.buf);
     assert(buckets_ != NULL);
     memset(buckets_, 0, shm_size);  // alloc_raw does not give zeroed memory
   }

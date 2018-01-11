@@ -103,7 +103,7 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
   // We hoard hugepages in two steps. First in large chunks for speed, then
   // until MTU-sized pages cannot be allocated.
   while (true) {
-    Buffer buffer = rpc->huge_alloc->alloc_raw(MB(16), kTestNumaNode, false);
+    Buffer buffer = rpc->huge_alloc->alloc_raw(MB(16), DoRegister::kFalse);
     if (buffer.buf == nullptr) break;
   }
 

@@ -38,6 +38,8 @@ struct shm_region_t {
   }
 };
 
+enum class DoRegister { kTrue, kFalse };
+
 /**
  * A hugepage allocator that uses per-class freelists. The minimum class size
  * is kMinClassSize, and class size increases by a factor of 2 until
@@ -82,11 +84,11 @@ class HugeAlloc {
    * allocator's freelists. Unlike \p alloc(), the size of the allocated memory
    * need not fit in the allocator's max class size.
    *
-   * Optionally, the caller can bypass memory registration. Allocated memory is
-   * freed when this allocator is destroyed.
+   * Optionally, the caller can bypass memory registration. Allocated memory can
+   * be freed only when this allocator is destroyed, i.e., free_buf() cannot be
+   * used.
    *
    * @param size The minimum size of the allocated memory
-   * @param numa_node The NUMA node to allocate hugepages on
    * @param do_register True iff the hugepages should be registered
    *
    * @return The allocated hugepage-backed Buffer. buffer.buf is nullptr if we
@@ -95,7 +97,7 @@ class HugeAlloc {
    *
    * @throw runtime_error if hugepage reservation failure is catastrophic
    */
-  Buffer alloc_raw(size_t size, size_t numa_node, bool do_register = false);
+  Buffer alloc_raw(size_t size, DoRegister do_register);
 
   /**
    * @brief Allocate a Buffer using the allocator's freelists, i.e., the max
@@ -209,9 +211,9 @@ class HugeAlloc {
   }
 
   /**
-   * @brief Try to reserve \p size (rounded to 2MB) bytes as huge pages on
-   * \p numa_node by adding hugepage-backed Buffers to freelists. The
-   * allocated hugepages are registered with the NIC.
+   * @brief Try to reserve \p size (rounded to 2MB) bytes as huge pages by
+   * adding hugepage-backed Buffers to freelists. The allocated hugepages are
+   * registered with the NIC.
    *
    * @return True if the allocation succeeds. False if the allocation fails
    * because no more hugepages are available.
@@ -219,7 +221,7 @@ class HugeAlloc {
    * @throw runtime_error if allocation is \a catastrophic (i.e., it fails
    * due to reasons other than out-of-memory).
    */
-  bool reserve_hugepages(size_t size, size_t numa_node);
+  bool reserve_hugepages(size_t size);
 
   /// Delete the SHM region specified by \p shm_key and \p shm_buf
   void delete_shm(int shm_key, const uint8_t *shm_buf);
@@ -227,8 +229,8 @@ class HugeAlloc {
   std::vector<shm_region_t> shm_list;  /// SHM regions by increasing alloc size
   std::vector<Buffer> freelist[kNumClasses];  /// Per-class freelist
 
-  SlowRand slow_rand;  /// RNG to generate SHM keys
-  size_t numa_node;    /// NUMA node on which all memory is allocated
+  SlowRand slow_rand;      /// RNG to generate SHM keys
+  const size_t numa_node;  /// NUMA node on which all memory is allocated
 
   Transport::reg_mr_func_t reg_mr_func;
   Transport::dereg_mr_func_t dereg_mr_func;

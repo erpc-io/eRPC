@@ -235,7 +235,7 @@ TEST(HugeAllocTest, RawAlloc) {
   // Try reserving max memory multiple times to test allocator destructor
   for (size_t i = 0; i < 5; i++) {
     auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
-    Buffer buffer = alloc->alloc_raw(max_alloc_size, 0);
+    Buffer buffer = alloc->alloc_raw(max_alloc_size, DoRegister::kFalse);
     ASSERT_NE(buffer.buf, nullptr);
     ASSERT_EQ(buffer.class_size, SIZE_MAX);
     delete alloc;
@@ -243,11 +243,11 @@ TEST(HugeAllocTest, RawAlloc) {
 
   // Try some corner cases
   auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
-  Buffer buffer = alloc->alloc_raw(1, 0);  // 1 byte
+  Buffer buffer = alloc->alloc_raw(1, DoRegister::kFalse);  // 1 byte
   ASSERT_NE(buffer.buf, nullptr);
   ASSERT_EQ(buffer.class_size, SIZE_MAX);
 
-  buffer = alloc->alloc_raw(MB(16) * 1024 * 1024, 0);  // Many RAM
+  buffer = alloc->alloc_raw(MB(16) * 1024 * 1024, DoRegister::kFalse);
   ASSERT_EQ(buffer.buf, nullptr);
 }
 

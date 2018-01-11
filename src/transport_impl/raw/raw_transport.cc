@@ -461,7 +461,7 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
   std::ostringstream xmsg;  // The exception message
 
   // Initialize the memory region for RECVs
-  ring_extent = huge_alloc->alloc_raw(kRingSize, numa_node, true);
+  ring_extent = huge_alloc->alloc_raw(kRingSize, DoRegister::kTrue);
   if (ring_extent.buf == nullptr) {
     xmsg << "eRPC RawTransport: Failed to allocate " << std::setprecision(2)
          << 1.0 * kRingSize / MB(1) << "MB for ring buffers.";
