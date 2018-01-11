@@ -47,15 +47,16 @@ TEST(TimingWheelTest, Stress) {
   const size_t dummy_pkt_num = 5;
   std::queue<wheel_ent_t> ret;
 
-  for (size_t iter = 0; iter < 100; iter++) {
-    size_t num_insertions = 1 + (static_cast<size_t>(rand()) % 1000);
+  for (size_t iter = 0; iter < 1000; iter++) {
+    size_t ws_slot = static_cast<size_t>(rand() % 10);
+    size_t num_insertions = 1 + (static_cast<size_t>(rand()) % 10000);
 
     // Overflow a bucket and check the order of returned entries
     for (size_t ent_i = 0; ent_i < num_insertions; ent_i++) {
-      wheel.insert(2, wheel_ent_t(nullptr, iter + dummy_pkt_num + ent_i));
+      wheel.insert(ws_slot, wheel_ent_t(nullptr, iter + dummy_pkt_num + ent_i));
     }
 
-    wheel.reap(ret, 2);
+    wheel.reap(ret, ws_slot);
     ASSERT_EQ(ret.size(), num_insertions);
 
     for (size_t ent_i = 0; ent_i < num_insertions; ent_i++) {
