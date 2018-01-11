@@ -148,6 +148,51 @@ Buffer HugeAlloc::alloc_raw(size_t size, size_t numa_node, bool do_register) {
   return Buffer(shm_buf, SIZE_MAX, do_register ? reg_info.lkey : UINT32_MAX);
 }
 
+Buffer HugeAlloc::alloc(size_t size) {
+  assert(size <= kMaxClassSize);
+
+  size_t size_class = get_class(size);
+  assert(size_class < kNumClasses);
+
+  if (!freelist[size_class].empty()) {
+    return alloc_from_class(size_class);
+  } else {
+    // There is no free Buffer in this class. Find the first larger class with
+    // free Buffers.
+    size_t next_class = size_class + 1;
+    for (; next_class < kNumClasses; next_class++) {
+      if (!freelist[next_class].empty()) break;
+    }
+
+    if (next_class == kNumClasses) {
+      // There's no larger size class with free pages, we we need to allocate
+      // more hugepages. This adds some Buffers to the largest class.
+      prev_allocation_size *= 2;
+      bool success = reserve_hugepages(prev_allocation_size, numa_node);
+      if (!success) {
+        prev_allocation_size /= 2;  // Restore the previous allocation
+        return Buffer(nullptr, 0, 0);
+      } else {
+        next_class = kNumClasses - 1;
+      }
+    }
+
+    // If we're here, \p next_class has free Buffers
+    assert(next_class < kNumClasses);
+    while (next_class != size_class) {
+      split(next_class);
+      next_class--;
+    }
+
+    assert(!freelist[size_class].empty());
+    return alloc_from_class(size_class);
+  }
+
+  assert(false);
+  exit(-1);  // We should never get here
+  return Buffer(nullptr, 0, 0);
+}
+
 bool HugeAlloc::reserve_hugepages(size_t size, size_t numa_node) {
   assert(size >= kMaxClassSize);  // We need at least one max-sized buffer
   Buffer buffer = alloc_raw(size, numa_node, true);  // do_register = true
