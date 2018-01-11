@@ -142,10 +142,6 @@ class HugeAlloc {
     return stats.user_alloc_tot;
   }
 
-  /// Create a cache of at lease \p num_buffers Buffers of size at least
-  /// \p size. Return true if creation succeeds.
-  bool create_cache(size_t size, size_t num_buffers);
-
   /// Print a summary of this allocator
   void print_stats();
 

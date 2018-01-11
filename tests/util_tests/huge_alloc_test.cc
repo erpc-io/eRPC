@@ -31,8 +31,7 @@ typename Transport::reg_mr_func_t reg_mr_func =
 typename Transport::dereg_mr_func_t dereg_mr_func =
     std::bind(dereg_mr_wrapper, _1);
 
-/// Measure performance of 4k-page allocation where all pages are allocated
-/// without first creating a page cache.
+/// Measure performance of 4k-page allocation
 TEST(HugeAllocTest, PageAllocPerf) {
   // Reserve all memory for high perf
   erpc::HugeAlloc *alloc = new erpc::HugeAlloc(
@@ -58,38 +57,6 @@ TEST(HugeAllocTest, PageAllocPerf) {
       "Fraction of pages allocated = %.2f (best = 1.0)\n",
       nanoseconds / num_pages_allocated,
       1.0 * num_pages_allocated / SYSTEM_4K_PAGES);
-
-  delete alloc;
-}
-
-/// Measure performance of page allocation with a cache
-TEST(HugeAllocTest, PageAllocPerfWithCache) {
-  // Reserve all memory for high perf
-  erpc::HugeAlloc *alloc = new erpc::HugeAlloc(
-      SYSTEM_HUGEPAGES * erpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
-
-  size_t page_cache_size = SYSTEM_4K_PAGES / 2;
-  alloc->create_cache(KB(4), page_cache_size);
-
-  struct timespec start, end;
-  clock_gettime(CLOCK_REALTIME, &start);
-
-  size_t num_pages_allocated = 0;
-  for (size_t i = 0; i < page_cache_size; i++) {
-    erpc::Buffer buffer = alloc->alloc(KB(4));
-    if (buffer.buf == nullptr) break;
-    num_pages_allocated++;
-  }
-
-  clock_gettime(CLOCK_REALTIME, &end);
-  double nanoseconds =
-      (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
-
-  test_printf(
-      "Time per page allocation with page cache = %.2f ns. "
-      "Fraction of pages allocated = %.2f (best = 1.0)\n",
-      nanoseconds / page_cache_size,
-      1.0 * num_pages_allocated / page_cache_size);
 
   delete alloc;
 }

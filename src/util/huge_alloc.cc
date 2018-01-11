@@ -24,29 +24,6 @@ HugeAlloc::~HugeAlloc() {
   }
 }
 
-// To create a cache of Buffers, we first allocate the required number of
-// Buffers and then free them.
-bool HugeAlloc::create_cache(size_t size, size_t num_buffers) {
-  size_t size_class = get_class(size);
-  size_t reqd_buffers = num_buffers - freelist[size_class].size();
-  if (reqd_buffers <= 0) return true;
-
-  std::vector<Buffer> free_buffer_vec;
-
-  for (size_t i = 0; i < reqd_buffers; i++) {
-    Buffer buffer = alloc(size);
-    if (buffer.buf == nullptr) return false;
-
-    free_buffer_vec.push_back(buffer);
-  }
-
-  for (size_t i = 0; i < reqd_buffers; i++) {
-    free_buf(free_buffer_vec[i]);
-  }
-
-  return true;
-}
-
 void HugeAlloc::print_stats() {
   fprintf(stderr, "eRPC HugeAlloc stats:\n");
   fprintf(stderr, "Total reserved SHM = %zu bytes (%.2f MB)\n",
