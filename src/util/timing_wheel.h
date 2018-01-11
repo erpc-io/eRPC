@@ -60,14 +60,19 @@ class TimingWheel {
   /// reset in the process
   void reap(std::queue<wheel_ent_t> &q, size_t ws_i) {
     wheel_bkt_t *bkt = &wheel[ws_i];
+    size_t level = 0;  // Level 0 buckets are not returned to pool
     while (true) {
       size_t n_entries = bkt->entry[0].num_entries;
       for (size_t i = 0; i < n_entries; i++) q.push(bkt->entry[i]);
       if (bkt->next == nullptr) break;
 
       wheel_bkt_t *_tmp_next = bkt->next;
+
       reset_bkt(bkt);
+      if (level != 0) bkt_pool.free(bkt);
+
       bkt = _tmp_next;
+      level++;
     }
 
     wheel[ws_i].last = &wheel[ws_i];

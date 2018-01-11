@@ -22,7 +22,7 @@ class MemPool {
     rt_assert(b.buf != nullptr, "Hugepage allocation failed");
 
     for (size_t i = 0; i < num_to_alloc; i++) {
-      pool.push_back(&b.buf[sizeof(T) * i]);
+      pool.push_back(reinterpret_cast<T *>(&b.buf[sizeof(T) * i]));
     }
     num_to_alloc *= 2;
   }
