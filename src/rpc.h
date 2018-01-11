@@ -469,7 +469,8 @@ class Rpc {
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
   }
 
-  /// Enqueue a control packet for tx_burst
+  /// Enqueue a control packet for tx_burst. ctrl_msgbuf can be reused after
+  /// (2 * unsig_batch) calls to this function.
   inline void enqueue_hdr_tx_burst_st(SSlot *sslot, MsgBuffer *ctrl_msgbuf) {
     assert(in_dispatch());
     assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_req_for_resp());

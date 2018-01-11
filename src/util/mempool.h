@@ -27,6 +27,7 @@ class MemPool {
     num_to_alloc *= 2;
   }
 
+ public:
   T *alloc() {
     if (pool.empty()) extend_pool();
     T *ret = pool.back();
