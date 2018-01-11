@@ -5,8 +5,8 @@
 #include <vector>
 #include "util/test_printf.h"
 
-#define SYSTEM_HUGEPAGES (512)  // The number of hugepages available
-#define SYSTEM_4K_PAGES (SYSTEM_HUGEPAGES * 512)  // Number of 4K pages
+static constexpr size_t kSystemHugepages = 512;
+static constexpr size_t kSystem4KPages = kSystemHugepages * 512;
 
 #define DUMMY_MR_PTR (reinterpret_cast<void *>(0x3185))
 #define DUMMY_LKEY (3186)
@@ -35,7 +35,7 @@ typename Transport::dereg_mr_func_t dereg_mr_func =
 TEST(HugeAllocTest, PageAllocPerf) {
   // Reserve all memory for high perf
   erpc::HugeAlloc *alloc = new erpc::HugeAlloc(
-      SYSTEM_HUGEPAGES * erpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
+      kSystemHugepages * erpc::kHugepageSize, 0, reg_mr_func, dereg_mr_func);
 
   size_t num_pages_allocated = 0;
   struct timespec start, end;
@@ -56,7 +56,7 @@ TEST(HugeAllocTest, PageAllocPerf) {
       "Time per page allocation = %.2f ns. "
       "Fraction of pages allocated = %.2f (best = 1.0)\n",
       nanoseconds / num_pages_allocated,
-      1.0 * num_pages_allocated / SYSTEM_4K_PAGES);
+      1.0 * num_pages_allocated / kSystem4KPages);
 
   delete alloc;
 }
@@ -68,14 +68,14 @@ TEST(HugeAllocTest, 2MBChunksSingleRun) {
   alloc = new erpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
   size_t num_hugepages_allocated = 0;
 
-  for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
+  for (size_t i = 0; i < kSystemHugepages; i++) {
     erpc::Buffer buffer = alloc->alloc(MB(2));
     if (buffer.buf != nullptr) {
       EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
       num_hugepages_allocated++;
     } else {
       test_printf("Allocated %zu of %zu hugepages\n", num_hugepages_allocated,
-                  SYSTEM_HUGEPAGES);
+                  kSystemHugepages);
       break;
     }
   }
@@ -88,9 +88,9 @@ TEST(HugeAllocTest, 2MBChunksSingleRun) {
 TEST(HugeAllocTest, 2MBChunksMultiRun) {
   erpc::HugeAlloc *alloc;
 
-  for (int iters = 0; iters < 20; iters++) {
+  for (size_t iters = 0; iters < 20; iters++) {
     alloc = new erpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
-    for (int i = 0; i < SYSTEM_HUGEPAGES; i++) {
+    for (size_t i = 0; i < kSystemHugepages; i++) {
       erpc::Buffer buffer = alloc->alloc(MB(2));
       if (buffer.buf == nullptr) break;
 
@@ -125,7 +125,7 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
             "Fraction of system memory reserved by alloc at "
             "failure = %.2f (best = 1.0)\n",
             1.0 * alloc->get_stat_shm_reserved() /
-                (SYSTEM_HUGEPAGES * erpc::kHugepageSize));
+                (kSystemHugepages * erpc::kHugepageSize));
 
         test_printf(
             "Fraction of memory reserved allocated to user = %.2f "
@@ -178,7 +178,7 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
           "Fraction of system memory reserved by alloc at "
           "failure = %.2f\n",
           1.0 * alloc->get_stat_shm_reserved() /
-              (SYSTEM_HUGEPAGES * erpc::kHugepageSize));
+              (kSystemHugepages * erpc::kHugepageSize));
 
       test_printf("Fraction of memory reserved allocated to user = %.2f\n",
                   (1.0 * app_memory / alloc->get_stat_shm_reserved()));
@@ -197,7 +197,7 @@ TEST(HugeAllocTest, RawAlloc) {
   // kMaxClassSize gets reserved by the allocator on initialization, so thi
   // is the max size we can hope to get.
   size_t max_alloc_size =
-      SYSTEM_HUGEPAGES * MB(2) - erpc::HugeAlloc::kMaxClassSize;
+      kSystemHugepages * MB(2) - erpc::HugeAlloc::kMaxClassSize;
 
   // Try reserving max memory multiple times to test allocator destructor
   for (size_t i = 0; i < 5; i++) {

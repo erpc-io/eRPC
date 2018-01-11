@@ -188,6 +188,7 @@ set(SYSTEM_TESTS
 # These are not run using ctest
 set(UTIL_TESTS
   huge_alloc_test
+  timing_wheel_test
   rand_test
   fixed_vector_test
   timely_test)
