@@ -69,6 +69,9 @@ TEST(TimingWheelTest, RateTest) {
 
   TimingWheel wheel(args);
   const auto dummy_ent = wheel_ent_t(nullptr, 1);
+  const size_t num_pkts = 10000;
+  size_t num_pkts_sent = 0;
+  size_t last_tsc = rdtsc();
 
   std::uniform_real_distribution<double> unif(kTimelyMinRate, kTimelyMaxRate);
   std::default_random_engine re;
