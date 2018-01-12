@@ -2,6 +2,8 @@
  * @file timing_wheel.h
  * @brief Timing wheel implementation from Carousel [SIGCOMM 17]
  * Units: Microseconds or TSC for time, bytes/sec for throughput
+ *
+ * For clarity and testing, the timing wheel must not call rdtsc() directly.
  */
 
 #ifndef ERPC_TIMING_WHEEL_H
@@ -39,25 +41,32 @@ static_assert(sizeof(wheel_ent_t) == 24, "");
 
 struct wheel_bkt_t {
   size_t num_entries : 8;
-  size_t max_tsc : 56;
+  size_t max_tsc : 56;  // Upper bound timestamp, advanced by wslot_width_tsc
   wheel_bkt_t *last;
   wheel_bkt_t *next;
   wheel_ent_t entry[kWheelBucketCap];
 };
 static_assert(sizeof(wheel_bkt_t) == 120, "");
 
+struct timing_wheel_args_t {
+  size_t mtu;
+  double freq_ghz;
+  size_t base_tsc;
+  double wslot_width;
+  HugeAlloc *huge_alloc;
+};
+
 class TimingWheel {
  public:
-  TimingWheel(size_t mtu, double freq_ghz, double wslot_width,
-              HugeAlloc *huge_alloc)
-      : mtu(mtu),
-        freq_ghz(freq_ghz),
-        wslot_width(wslot_width),
+  TimingWheel(timing_wheel_args_t args)
+      : mtu(args.mtu),
+        freq_ghz(args.freq_ghz),
+        wslot_width(args.wslot_width),
         wslot_width_tsc(us_to_cycles(wslot_width, freq_ghz)),
         horizon(1000000 * (kSessionCredits * mtu) / kTimelyMinRate),
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
         num_wslots(round_up(horizon / wslot_width)),
-        huge_alloc(huge_alloc),
+        huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
     rt_assert(wslot_width > .1 && wslot_width < 8.0, "Invalid wslot width");
     rt_assert(num_wslots > 100, "Too few wheel slots");
@@ -68,11 +77,10 @@ class TimingWheel {
         num_wslots * sizeof(wheel_bkt_t), DoRegister::kFalse);
     rt_assert(wheel_buffer.buf != nullptr, "Failed to allocate wheel");
 
-    size_t base_tsc = rdtsc();
     wheel = reinterpret_cast<wheel_bkt_t *>(wheel_buffer.buf);
     for (size_t ws_i = 0; ws_i < num_wslots; ws_i++) {
       reset_bkt(&wheel[ws_i]);
-      wheel[ws_i].max_tsc = base_tsc + (ws_i + 1) * wslot_width_tsc;
+      wheel[ws_i].max_tsc = args.base_tsc + (ws_i + 1) * wslot_width_tsc;
       wheel[ws_i].last = &wheel[ws_i];
     }
 
@@ -92,27 +100,16 @@ class TimingWheel {
   }
 
   /// Queue an entry for transmission at timestamp = abs_tsc
-  void insert(const wheel_ent_t &ent, size_t abs_tsc) {
-    size_t cur_tsc = rdtsc();
-    if (unlikely(abs_tsc <= cur_tsc)) {
-      // If abs_tsc is in the past, add directly to ready queue
-      ready_queue.push(ent);
-      return;
-    }
+  /// compute_tsc is a timestamp in the past at which abs_tsc was computed by
+  /// the rate controller.
+  void insert(const wheel_ent_t &ent, size_t compute_tsc, size_t abs_tsc) {
+    assert(abs_tsc - compute_tsc <= horizon_tsc);
 
-    assert(abs_tsc > cur_tsc);
+    // Advance the wheel to the compute_tsc
+    reap(compute_tsc);
+    assert(wheel[cur_wslot].max_tsc > compute_tsc);
 
-    // - abs_tsc was computed at compute_tsc.
-    // - cur_tsc > compute_tsc holds because of rdtsc() ordering
-    //   - So we have: abs_tsc > cur_tsc > compute_tsc
-    // - By horizon definiton: abs_tsc - compute_tsc <= horizon_tsc  So:
-    assert(abs_tsc - cur_tsc < horizon_tsc);
-
-    // Advance the wheel to the current time
-    reap(cur_tsc);
-    assert(wheel[cur_wslot].max_tsc > cur_tsc);
-
-    size_t wslot_delta = (abs_tsc - cur_tsc) / wslot_width_tsc;
+    size_t wslot_delta = (abs_tsc - compute_tsc) / wslot_width_tsc;
     assert(wslot_delta < num_wslots);
 
     size_t dst_wslot = (cur_wslot + wslot_delta);
@@ -169,7 +166,7 @@ class TimingWheel {
   }
 
   const size_t mtu;
-  const double freq_ghz;
+  const double freq_ghz;         ///< TSC freq, used only for us/tsc conversion
   const double wslot_width;      ///< Time-granularity of a slot
   const double wslot_width_tsc;  ///< Time-granularity in TSC units
   const double horizon;          ///< Timespan of one wheel rotation
@@ -180,6 +177,8 @@ class TimingWheel {
   wheel_bkt_t *wheel;
   size_t cur_wslot;
   MemPool<wheel_bkt_t> bkt_pool;
+
+ public:
   std::queue<wheel_ent_t> ready_queue;
 };
 }
