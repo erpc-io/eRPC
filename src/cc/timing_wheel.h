@@ -96,8 +96,10 @@ class TimingWheel {
     debug_max_user_tsc = reap_tsc;
 
     while (wheel[cur_wslot].tx_tsc <= reap_tsc) {
+      /*
       printf("cur_wslot = %zu, slot tx_tsc = %zu, reap_tsc = %zu\n", cur_wslot,
              wheel[cur_wslot].tx_tsc, reap_tsc);
+      */
 
       reap_wslot(cur_wslot);
       wheel[cur_wslot].tx_tsc += wslot_width_tsc;
@@ -107,22 +109,22 @@ class TimingWheel {
     }
   }
 
-  /// Queue an entry for transmission at timestamp = abs_tsc
-  /// compute_tsc is a timestamp in the past at which abs_tsc was computed by
+  /// Queue an entry for transmission at timestamp = abs_tx_tsc
+  /// compute_tsc is a timestamp in the past at which abs_tx_tsc was computed by
   /// the rate controller.
   ///
   /// This function must be called with non-decreasing values of compute_tsc.
-  void insert(const wheel_ent_t &ent, size_t compute_tsc, size_t abs_tsc) {
+  void insert(const wheel_ent_t &ent, size_t compute_tsc, size_t abs_tx_tsc) {
     assert(compute_tsc >= debug_max_user_tsc);
     debug_max_user_tsc = compute_tsc;
 
-    assert(abs_tsc - compute_tsc <= horizon_tsc);
+    assert(abs_tx_tsc - compute_tsc <= horizon_tsc);
 
     // Advance the wheel to the compute_tsc
     reap(compute_tsc);
     assert(wheel[cur_wslot].tx_tsc > compute_tsc);
 
-    size_t wslot_delta = (abs_tsc - compute_tsc) / wslot_width_tsc;
+    size_t wslot_delta = (abs_tx_tsc - compute_tsc) / wslot_width_tsc;
     assert(wslot_delta < num_wslots);
 
     size_t dst_wslot = (cur_wslot + wslot_delta);

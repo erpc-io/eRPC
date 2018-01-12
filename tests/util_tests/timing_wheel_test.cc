@@ -3,13 +3,15 @@
 #include <algorithm>
 #include <vector>
 
+#include "util/huge_alloc.h"
+#include "util/test_printf.h"
+
 #define private public
 #include "cc/timing_wheel.h"
-#include "util/huge_alloc.h"
 
 using namespace erpc;
 
-static constexpr size_t kTestMTU = 32;         // Few wheel slots
+static constexpr size_t kTestMTU = 1024;       // Few wheel slots
 static constexpr double kTestWslotWidth = .5;  // .5 microseconds per wheel slot
 
 // Dummy registration and deregistration functions
@@ -27,7 +29,6 @@ typename Transport::dereg_mr_func_t dereg_mr_func =
 
 TEST(TimingWheelTest, Basic) {
   HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
-
   timing_wheel_args_t args;
   args.mtu = kTestMTU;
   args.freq_ghz = measure_rdtsc_freq();
@@ -36,15 +37,14 @@ TEST(TimingWheelTest, Basic) {
   args.huge_alloc = &alloc;
 
   TimingWheel wheel(args);
-  const size_t dummy_pkt_num = 5;
+  const auto dummy_ent = wheel_ent_t(nullptr, 1);
 
   // Empty wheel
   wheel.reap(args.base_tsc);
   ASSERT_EQ(wheel.ready_queue.size(), 0);
 
   // One entry that will be transmitted at base_tsc + wslot_width_tsc
-  wheel.insert(wheel_ent_t(nullptr, dummy_pkt_num), args.base_tsc,
-               args.base_tsc);
+  wheel.insert(dummy_ent, args.base_tsc, args.base_tsc);
   ASSERT_EQ(wheel.ready_queue.size(), 0);
 
   printf("reap at wslot_width_tsc - 1\n");
@@ -58,32 +58,41 @@ TEST(TimingWheelTest, Basic) {
   wheel.ready_queue.pop();
 }
 
-TEST(TimingWheelTest, Stress) {
-  /*
+TEST(TimingWheelTest, RateTest) {
   HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
-  TimingWheel wheel(10, &alloc);  // 10 wheel slots
-  const size_t dummy_pkt_num = 5;
-  std::queue<wheel_ent_t> ret;
+  timing_wheel_args_t args;
+  args.mtu = kTestMTU;
+  args.freq_ghz = measure_rdtsc_freq();
+  args.base_tsc = rdtsc();
+  args.wslot_width = kTestWslotWidth;
+  args.huge_alloc = &alloc;
 
-  for (size_t iter = 0; iter < 1000; iter++) {
-    size_t ws_slot = static_cast<size_t>(rand() % 10);
-    size_t num_insertions = 1 + (static_cast<size_t>(rand()) % 10000);
+  TimingWheel wheel(args);
+  const auto dummy_ent = wheel_ent_t(nullptr, 1);
 
-    // Overflow a bucket and check the order of returned entries
-    for (size_t ent_i = 0; ent_i < num_insertions; ent_i++) {
-      wheel.insert(ws_slot, wheel_ent_t(nullptr, iter + dummy_pkt_num + ent_i));
+  std::uniform_real_distribution<double> unif(kTimelyMinRate, kTimelyMaxRate);
+  std::default_random_engine re;
+
+  for (size_t iters = 0; iters < 5; iters++) {
+    double target_rate = unif(re);
+    test_printf("Target rate = %.2f Gbps\n", Timely::rate_to_gbps(target_rate));
+
+    double ns_per_pkt = 1000000000 * (kTestMTU / target_rate);
+    size_t cycles_per_pkt = round_up(args.freq_ghz * ns_per_pkt);
+
+    size_t start_tsc = rdtsc();
+    for (size_t i = 0; i < kSessionCredits; i++) {
+      wheel.insert(dummy_ent, start_tsc, start_tsc + (i * cycles_per_pkt));
     }
 
-    wheel.reap(ret, ws_slot);
-    ASSERT_EQ(ret.size(), num_insertions);
+    while (wheel.ready_queue.size() != kSessionCredits) wheel.reap(rdtsc());
+    double seconds = to_sec(rdtsc() - start_tsc, args.freq_ghz);
+    double achieved_rate = kSessionCredits * kTestMTU / seconds;
 
-    for (size_t ent_i = 0; ent_i < num_insertions; ent_i++) {
-      const wheel_ent_t &ent = ret.front();
-      ASSERT_EQ(ent.pkt_num, iter + dummy_pkt_num + ent_i);
-      ret.pop();
-    }
+    test_printf("Achieved rate = %.2f Gbps\n",
+                Timely::rate_to_gbps(achieved_rate));
+    while (!wheel.ready_queue.empty()) wheel.ready_queue.pop();
   }
-  */
 }
 
 int main(int argc, char **argv) {
