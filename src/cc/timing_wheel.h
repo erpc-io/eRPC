@@ -54,6 +54,8 @@ struct timing_wheel_args_t {
 };
 
 class TimingWheel {
+  static constexpr bool kVerbose = false;
+
  public:
   TimingWheel(timing_wheel_args_t args)
       : mtu(args.mtu),
@@ -63,6 +65,7 @@ class TimingWheel {
         horizon(1000000 * (kSessionCredits * mtu) / kTimelyMinRate),
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
         num_wslots(round_up(horizon / wslot_width)),
+        console_ref_tsc(rdtsc()),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
     rt_assert(wslot_width > .1 && wslot_width < 8.0, "Invalid wslot width");
@@ -90,13 +93,14 @@ class TimingWheel {
   /// This function must be called with non-decreasing values of reap_tsc
   void reap(size_t reap_tsc) {
     while (wheel[cur_wslot].tx_tsc <= reap_tsc) {
-      /*
-      printf("cur_wslot = %zu, slot tx_tsc = %zu, reap_tsc = %zu\n", cur_wslot,
-             wheel[cur_wslot].tx_tsc, reap_tsc);
-      */
+      if (kVerbose) {
+        printf("timing_wheel: Reaping slot %zu with TX time = %.3f us\n",
+               cur_wslot,
+               to_usec(wheel[cur_wslot].tx_tsc - console_ref_tsc, freq_ghz));
+      }
 
       reap_wslot(cur_wslot);
-      wheel[cur_wslot].tx_tsc += wslot_width_tsc;
+      wheel[cur_wslot].tx_tsc += (wslot_width_tsc * num_wslots);
 
       cur_wslot++;
       if (cur_wslot == num_wslots) cur_wslot = 0;
@@ -109,6 +113,15 @@ class TimingWheel {
     if (unlikely(abs_tx_tsc <= cur_tsc)) {
       // If abs_tx_tsc is in the past, add directly to ready queue
       ready_queue.push(ent);
+
+      if (kVerbose) {
+        printf(
+            "timing_wheel: Inserting packet %zu (time %.3f us) directly to "
+            "ready queue. cur_time = %.3f us\n",
+            ent.pkt_num, to_usec(abs_tx_tsc - console_ref_tsc, freq_ghz),
+            to_usec(cur_tsc - console_ref_tsc, freq_ghz));
+      }
+
       return;
     }
 
@@ -129,6 +142,12 @@ class TimingWheel {
 
     size_t dst_wslot = (cur_wslot + wslot_delta);
     if (dst_wslot >= num_wslots) dst_wslot -= num_wslots;
+
+    if (kVerbose) {
+      printf(
+          "timing_wheel: Inserting packet %zu (time %.3f us) into slot %zu\n",
+          ent.pkt_num, to_usec(abs_tx_tsc, freq_ghz), dst_wslot);
+    }
 
     insert_into_wslot(dst_wslot, ent);
   }
@@ -187,6 +206,7 @@ class TimingWheel {
   const double horizon;          ///< Timespan of one wheel rotation
   const size_t horizon_tsc;      ///< Horizon in TSC units
   const size_t num_wslots;
+  const size_t console_ref_tsc;  ///< Reference TSC for console logging
   HugeAlloc *huge_alloc;
 
   wheel_bkt_t *wheel;

@@ -87,6 +87,7 @@ TEST(TimingWheelTest, RateTest) {
       printf("while: num_pkts_sent = %zu\n", num_pkts_sent);
       wheel.reap(rdtsc());
       size_t num_ready = wheel.ready_queue.size();
+      assert(num_ready <= kSessionCredits);
 
       if (num_ready > 0) {
         num_pkts_sent += num_ready;
