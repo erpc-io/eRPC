@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "common.h"
+#include "math_utils.h"
 
 namespace erpc {
 
@@ -66,6 +67,10 @@ static double to_msec(size_t cycles, double freq_ghz) {
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to usec
 static double to_usec(size_t cycles, double freq_ghz) {
   return (cycles / (freq_ghz * 1000));
+}
+
+static size_t us_to_cycles(double us, double freq_ghz) {
+  return round_up(us * 1000 * freq_ghz);
 }
 
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to nsec

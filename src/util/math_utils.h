@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <cmath>
 #include <limits>
 
 namespace erpc {
@@ -35,6 +36,8 @@ static inline size_t msb_index(int x) {
   asm("bsrl %1, %0" : "=r"(index) : "r"(x << 1));
   return static_cast<size_t>(index);
 }
+
+static inline size_t round_up(double x) { return std::round(.5 + x); }
 
 }  /// End erpc
 
