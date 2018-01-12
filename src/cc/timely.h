@@ -1,8 +1,8 @@
 /**
  * @file timely.h
- * @brief TIMELY congestion control
+ * @brief TIMELY congestion control [SIGCOMM 15]
  * From: http://people.eecs.berkeley.edu/~radhika/timely-code-snippet.cc
- * Units: Microseconds for time, bytes/sec for throughput
+ * Units: Microseconds or TSC for time, bytes/sec for throughput
  */
 
 #ifndef ERPC_TIMELY_H

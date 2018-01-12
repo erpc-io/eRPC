@@ -1,8 +1,16 @@
+/**
+ * @file timing_wheel.h
+ * @brief Timing wheel implementation from Carousel [SIGCOMM 17]
+ * Units: Microseconds or TSC for time, bytes/sec for throughput
+ */
+
 #ifndef ERPC_TIMING_WHEEL_H
 #define ERPC_TIMING_WHEEL_H
 
 #include <queue>
+#include "cc/timely.h"
 #include "common.h"
+#include "sm_types.h"
 #include "sslot.h"
 #include "util/mempool.h"
 
@@ -39,8 +47,18 @@ static_assert(sizeof(wheel_bkt_t) == 120, "");
 
 class TimingWheel {
  public:
-  TimingWheel(size_t num_wslots, HugeAlloc *huge_alloc)
-      : num_wslots(num_wslots), huge_alloc(huge_alloc), bkt_pool(huge_alloc) {
+  TimingWheel(size_t mtu, double freq_ghz, double wslot_granularity,
+              HugeAlloc *huge_alloc)
+      : mtu(mtu),
+        freq_ghz(freq_ghz),
+        wslot_granularity(wslot_granularity),
+        horizon((kSessionCredits * mtu / kTimelyMinRate) * 100000.0),
+        num_wslots(std::round(horizon / wslot_granularity) + 0.5),
+        huge_alloc(huge_alloc),
+        bkt_pool(huge_alloc) {
+    rt_assert(num_wslots > 100, "Too few wheel slots");
+    rt_assert(num_wslots < 500000, "Too many wheel slots");
+
     // wheel_buffer is leaked, and deleted later with the allocator
     Buffer wheel_buffer = huge_alloc->alloc_raw(
         num_wslots * sizeof(wheel_bkt_t), DoRegister::kFalse);
@@ -99,11 +117,16 @@ class TimingWheel {
     return bkt;
   }
 
+  const size_t mtu;
+  const double freq_ghz;
+  const double wslot_granularity;  ///< Time-granularity of a slot
+  const double horizon;            ///< Time horizon of the wheel
   const size_t num_wslots;
   HugeAlloc *huge_alloc;
 
-  MemPool<wheel_bkt_t> bkt_pool;
   wheel_bkt_t *wheel;
+  size_t cur_wslot = 0;
+  MemPool<wheel_bkt_t> bkt_pool;
 };
 }
 
