@@ -824,6 +824,9 @@ class Rpc {
 
   MsgBuffer ctrl_msgbufs[2 * TTr::kUnsigBatch];  ///< Buffers for RFR/CR
   size_t ctrl_msgbuf_head = 0;
+  FastRand fast_rand;  ///< A fast random generator
+
+  // Cold members live below, in order of coolness
 
   /// Queues for datapath API requests from background threads
   struct {
@@ -834,7 +837,6 @@ class Rpc {
 
   // Misc
   SlowRand slow_rand;  ///< A slow random generator for "real" randomness
-  FastRand fast_rand;  ///< A fast random generator
   UDPClient<SmPkt> udp_client;  ///< UDP endpoint used to send SM packets
   Nexus::Hook nexus_hook;       ///< A hook shared with the Nexus
 
