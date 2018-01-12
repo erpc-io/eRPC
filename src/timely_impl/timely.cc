@@ -1,4 +1,4 @@
-#include "timely.h"
+#include "cc/timely.h"
 
 namespace erpc {
 void Timely::update_rate(size_t _sample_rtt_tsc) {

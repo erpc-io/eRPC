@@ -5,12 +5,12 @@
 #include <mutex>
 #include <queue>
 
+#include "cc/timely.h"
 #include "common.h"
 #include "msg_buffer.h"
 #include "ops.h"
 #include "sm_types.h"
 #include "sslot.h"
-#include "timely.h"
 #include "util/buffer.h"
 #include "util/fixed_vector.h"
 

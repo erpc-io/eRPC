@@ -1,4 +1,4 @@
-#include "timely.h"
+#include "cc/timely.h"
 using namespace erpc;
 
 int main() {
