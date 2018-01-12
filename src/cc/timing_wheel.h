@@ -41,7 +41,7 @@ static_assert(sizeof(wheel_ent_t) == 24, "");
 
 struct wheel_bkt_t {
   size_t num_entries : 8;
-  size_t max_tsc : 56;  // Upper bound timestamp, advanced by wslot_width_tsc
+  size_t tx_tsc : 56;  // Timestamp at which it is safe to transmit
   wheel_bkt_t *last;
   wheel_bkt_t *next;
   wheel_ent_t entry[kWheelBucketCap];
@@ -67,7 +67,8 @@ class TimingWheel {
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
         num_wslots(round_up(horizon / wslot_width)),
         huge_alloc(args.huge_alloc),
-        bkt_pool(huge_alloc) {
+        bkt_pool(huge_alloc),
+        debug_max_user_tsc(args.base_tsc) {
     rt_assert(wslot_width > .1 && wslot_width < 8.0, "Invalid wslot width");
     rt_assert(num_wslots > 100, "Too few wheel slots");
     rt_assert(num_wslots < 500000, "Too many wheel slots");
@@ -80,19 +81,26 @@ class TimingWheel {
     wheel = reinterpret_cast<wheel_bkt_t *>(wheel_buffer.buf);
     for (size_t ws_i = 0; ws_i < num_wslots; ws_i++) {
       reset_bkt(&wheel[ws_i]);
-      wheel[ws_i].max_tsc = args.base_tsc + (ws_i + 1) * wslot_width_tsc;
+      wheel[ws_i].tx_tsc = args.base_tsc + (ws_i + 1) * wslot_width_tsc;
       wheel[ws_i].last = &wheel[ws_i];
     }
 
     cur_wslot = 0;
   }
 
-  /// Move entries from all wheel slots older than cur_tsc to the ready queue.
+  /// Move entries from all wheel slots older than reap_tsc to the ready queue.
   /// The max_tsc of all these wheel slots is advanced.
-  void reap(size_t cur_tsc) {
-    while (wheel[cur_wslot].max_tsc <= cur_tsc) {
+  /// This function must be called with non-decreasing values of reap_tsc
+  void reap(size_t reap_tsc) {
+    assert(reap_tsc >= debug_max_user_tsc);
+    debug_max_user_tsc = reap_tsc;
+
+    while (wheel[cur_wslot].tx_tsc <= reap_tsc) {
+      printf("cur_wslot = %zu, slot tx_tsc = %zu, reap_tsc = %zu\n", cur_wslot,
+             wheel[cur_wslot].tx_tsc, reap_tsc);
+
       reap_wslot(cur_wslot);
-      wheel[cur_wslot].max_tsc += wslot_width_tsc;
+      wheel[cur_wslot].tx_tsc += wslot_width_tsc;
 
       cur_wslot++;
       if (cur_wslot == num_wslots) cur_wslot = 0;
@@ -102,12 +110,17 @@ class TimingWheel {
   /// Queue an entry for transmission at timestamp = abs_tsc
   /// compute_tsc is a timestamp in the past at which abs_tsc was computed by
   /// the rate controller.
+  ///
+  /// This function must be called with non-decreasing values of compute_tsc.
   void insert(const wheel_ent_t &ent, size_t compute_tsc, size_t abs_tsc) {
+    assert(compute_tsc >= debug_max_user_tsc);
+    debug_max_user_tsc = compute_tsc;
+
     assert(abs_tsc - compute_tsc <= horizon_tsc);
 
     // Advance the wheel to the compute_tsc
     reap(compute_tsc);
-    assert(wheel[cur_wslot].max_tsc > compute_tsc);
+    assert(wheel[cur_wslot].tx_tsc > compute_tsc);
 
     size_t wslot_delta = (abs_tsc - compute_tsc) / wslot_width_tsc;
     assert(wslot_delta < num_wslots);
@@ -168,15 +181,16 @@ class TimingWheel {
   const size_t mtu;
   const double freq_ghz;         ///< TSC freq, used only for us/tsc conversion
   const double wslot_width;      ///< Time-granularity of a slot
-  const double wslot_width_tsc;  ///< Time-granularity in TSC units
+  const size_t wslot_width_tsc;  ///< Time-granularity in TSC units
   const double horizon;          ///< Timespan of one wheel rotation
-  const double horizon_tsc;      ///< Horizon in TSC units
+  const size_t horizon_tsc;      ///< Horizon in TSC units
   const size_t num_wslots;
   HugeAlloc *huge_alloc;
 
   wheel_bkt_t *wheel;
   size_t cur_wslot;
   MemPool<wheel_bkt_t> bkt_pool;
+  size_t debug_max_user_tsc;  ///< Max TSC ever provided by the caller
 
  public:
   std::queue<wheel_ent_t> ready_queue;

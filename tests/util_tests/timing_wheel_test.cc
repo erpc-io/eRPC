@@ -1,14 +1,16 @@
-#include "cc/timing_wheel.h"
 #include <gtest/gtest.h>
 #include <time.h>
 #include <algorithm>
 #include <vector>
+
+#define private public
+#include "cc/timing_wheel.h"
 #include "util/huge_alloc.h"
 
 using namespace erpc;
 
-static constexpr size_t kTestMTU = 1024;
-static constexpr double kTestWslotWidth = .5;  // .5 microseconds
+static constexpr size_t kTestMTU = 32;         // Few wheel slots
+static constexpr double kTestWslotWidth = .5;  // .5 microseconds per wheel slot
 
 // Dummy registration and deregistration functions
 Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
@@ -24,23 +26,36 @@ typename Transport::dereg_mr_func_t dereg_mr_func =
     std::bind(dereg_mr_wrapper, _1);
 
 TEST(TimingWheelTest, Basic) {
-  double freq_ghz = measure_rdtsc_freq();
   HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
-  TimingWheel wheel(kTestMTU, freq_ghz, kTestWslotWidth, &alloc);
+
+  timing_wheel_args_t args;
+  args.mtu = kTestMTU;
+  args.freq_ghz = measure_rdtsc_freq();
+  args.base_tsc = rdtsc();
+  args.wslot_width = kTestWslotWidth;
+  args.huge_alloc = &alloc;
+
+  TimingWheel wheel(args);
   const size_t dummy_pkt_num = 5;
 
   // Empty wheel
-  wheel.reap(rdtsc());
+  wheel.reap(args.base_tsc);
   ASSERT_EQ(wheel.ready_queue.size(), 0);
 
-  // One entry in the past (tsc = 0 is in the past)
-  wheel.insert(wheel_ent_t(nullptr, dummy_pkt_num), 0);
+  // One entry that will be transmitted at base_tsc + wslot_width_tsc
+  wheel.insert(wheel_ent_t(nullptr, dummy_pkt_num), args.base_tsc,
+               args.base_tsc);
+  ASSERT_EQ(wheel.ready_queue.size(), 0);
+
+  printf("reap at wslot_width_tsc - 1\n");
+  wheel.reap(args.base_tsc + wheel.wslot_width_tsc - 1);
+  ASSERT_EQ(wheel.ready_queue.size(), 0);
+  ASSERT_EQ(wheel.cur_wslot, 0);
+
+  printf("reap at wslot_width_tsc\n");
+  wheel.reap(args.base_tsc + wheel.wslot_width_tsc);
   ASSERT_EQ(wheel.ready_queue.size(), 1);
   wheel.ready_queue.pop();
-
-  // Reap again - this should be empty
-  wheel.reap(ret, 2);
-  ASSERT_EQ(ret.size(), 0);
 }
 
 TEST(TimingWheelTest, Stress) {
