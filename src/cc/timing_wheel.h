@@ -68,9 +68,9 @@ class TimingWheel {
         console_ref_tsc(rdtsc()),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
-    rt_assert(wslot_width > .1 && wslot_width < 8.0, "Invalid wslot width");
-    rt_assert(num_wslots > 100, "Too few wheel slots");
-    rt_assert(num_wslots < 500000, "Too many wheel slots");
+    rt_assert(wslot_width > .01 && wslot_width < 8.0, "Invalid wslot width");
+    rt_assert(num_wslots > 10, "Too few wheel slots");
+    rt_assert(num_wslots < 10000000, "Too many wheel slots");
 
     // wheel_buffer is leaked, and deleted later with the allocator
     Buffer wheel_buffer = huge_alloc->alloc_raw(

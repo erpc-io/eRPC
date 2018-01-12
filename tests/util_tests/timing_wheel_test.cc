@@ -11,7 +11,8 @@
 
 using namespace erpc;
 
-static constexpr size_t kTestMTU = 1024;       // Few wheel slots
+static constexpr size_t kTestMTU = 1024;
+static constexpr size_t kTestNumPkts = 10000;
 static constexpr double kTestWslotWidth = .5;  // .5 microseconds per wheel slot
 
 // Dummy registration and deregistration functions
@@ -52,39 +53,41 @@ TEST(TimingWheelTest, Basic) {
 }
 
 TEST(TimingWheelTest, RateTest) {
-  HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
-  timing_wheel_args_t args;
-  args.mtu = kTestMTU;
-  args.freq_ghz = measure_rdtsc_freq();
-  args.wslot_width = kTestWslotWidth;
-  args.huge_alloc = &alloc;
-
-  TimingWheel wheel(args);
-  const auto dummy_ent = wheel_ent_t(nullptr, 1);
-  const size_t num_pkts = 10000;
-  size_t num_pkts_sent = 0;
-
   std::uniform_real_distribution<double> unif(kTimelyMinRate, kTimelyMaxRate);
   std::default_random_engine re;
 
   for (size_t iters = 0; iters < 5; iters++) {
+    // Create the a new wheel so we automatically clean up extra packets from
+    // each iteration
+    HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
+    timing_wheel_args_t args;
+    args.mtu = kTestMTU;
+    args.freq_ghz = measure_rdtsc_freq();
+    args.wslot_width = kTestWslotWidth;
+    args.huge_alloc = &alloc;
+
+    TimingWheel wheel(args);
+    const auto dummy_ent = wheel_ent_t(nullptr, 1);
+
+    // Choose a target rate
     double target_rate = unif(re);
     test_printf("Target rate = %.2f Gbps\n", Timely::rate_to_gbps(target_rate));
 
-    size_t msr_start_tsc = rdtsc();  // Measurement start
-
     const double ns_per_pkt = 1000000000 * (kTestMTU / target_rate);
     const size_t cycles_per_pkt = round_up(args.freq_ghz * ns_per_pkt);
-    size_t last_tsc = rdtsc();
 
+    // Start measurement
+    size_t msr_start_tsc = rdtsc();
+
+    size_t last_tsc = rdtsc();  // Last TSC used by this session
     // Send one window
     for (size_t i = 0; i < kSessionCredits; i++) {
       wheel.insert(dummy_ent, last_tsc);
       last_tsc += cycles_per_pkt;
     }
 
-    while (num_pkts_sent < num_pkts) {
-      printf("while: num_pkts_sent = %zu\n", num_pkts_sent);
+    size_t num_pkts_sent = 0;
+    while (num_pkts_sent < kTestNumPkts) {
       wheel.reap(rdtsc());
       size_t num_ready = wheel.ready_queue.size();
       assert(num_ready <= kSessionCredits);
@@ -101,11 +104,10 @@ TEST(TimingWheelTest, RateTest) {
     }
 
     double seconds = to_sec(rdtsc() - msr_start_tsc, args.freq_ghz);
-    double achieved_rate = kSessionCredits * kTestMTU / seconds;
+    double achieved_rate = num_pkts_sent * kTestMTU / seconds;
 
     test_printf("Achieved rate = %.2f Gbps\n",
                 Timely::rate_to_gbps(achieved_rate));
-    while (!wheel.ready_queue.empty()) wheel.ready_queue.pop();
   }
 }
 
