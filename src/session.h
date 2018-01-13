@@ -38,10 +38,7 @@ class Session {
     remote_routing_info =
         is_client() ? &server.routing_info : &client.routing_info;
 
-    if (kCC && is_client()) {
-      client_info.timely_tx = Timely(freq_ghz);
-      client_info.timely_rx = Timely(freq_ghz);
-    }
+    if (kCC && is_client()) client_info.cc.timely = Timely(freq_ghz);
 
     // Arrange the free slot vector so that slots are popped in order
     for (size_t i = 0; i < kSessionReqWindow; i++) {
@@ -99,8 +96,14 @@ class Session {
     /// Requests that spill over kSessionReqWindow are queued here
     std::queue<enq_req_args_t> enq_req_backlog;
 
+    // Congestion control
+    struct {
+      Timely timely;
+      size_t abs_tx_tsc;  ///< Last absolute TX timestamp
+      size_t abs_rx_tsc;  ///< Last absolute RX timestamp
+    } cc;
+
     size_t sm_req_ts;  ///< Timestamp of the last session management request
-    Timely timely_tx, timely_rx;
   } client_info;
 };
 

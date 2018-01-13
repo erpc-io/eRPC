@@ -242,16 +242,11 @@ class Rpc {
     return session_vec[static_cast<size_t>(session_num)]->is_connected();
   }
 
-  /// Return the TX rate of a client session
-  double get_session_tx_rate_gbps(int session_num) {
+  /// Return session bandwidth computed by the congestion control
+  double get_session_rate_gbps(int session_num) {
+    if (!kCC) return -1.0;
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.timely_tx.get_rate_gbps();
-  }
-
-  /// Return the RX rate of a client session
-  double get_session_rx_rate_gbps(int session_num) {
-    Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.timely_rx.get_rate_gbps();
+    return session->client_info.cc.timely.get_rate_gbps();
   }
 
  private:

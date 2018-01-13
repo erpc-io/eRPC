@@ -107,7 +107,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
   if (kCC) {
     size_t rtt_tsc = rdtsc() - sslot->client_info.tx_ts[0];
-    sslot->session->client_info.timely_tx.update_rate(rtt_tsc);
+    sslot->session->client_info.cc.timely.update_rate(rtt_tsc);
   }
 
   // If we're here, this is the first (and only) packet of the response
@@ -182,7 +182,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   if (kCC) {
     size_t rtt_tsc =
         rdtsc() - sslot->client_info.tx_ts[pkthdr->pkt_num % kSessionCredits];
-    sslot->session->client_info.timely_tx.update_rate(rtt_tsc);
+    sslot->session->client_info.cc.timely.update_rate(rtt_tsc);
   }
 
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;

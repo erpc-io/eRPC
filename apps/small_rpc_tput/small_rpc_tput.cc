@@ -226,7 +226,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     std::vector<double> session_tput;
     if (erpc::kCC) {
       for (int session_num : c->session_num_vec) {
-        session_tput.push_back(c->rpc->get_session_tx_rate_gbps(session_num));
+        session_tput.push_back(c->rpc->get_session_rate_gbps(session_num));
       }
       std::sort(session_tput.begin(), session_tput.end());
     }
