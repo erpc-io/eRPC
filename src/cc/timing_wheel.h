@@ -7,6 +7,7 @@
 #ifndef ERPC_TIMING_WHEEL_H
 #define ERPC_TIMING_WHEEL_H
 
+#include <iomanip>
 #include <queue>
 #include "cc/timely.h"
 #include "common.h"
@@ -17,6 +18,36 @@
 namespace erpc {
 
 static constexpr size_t kWheelBucketCap = 4;  /// Wheel entries per bucket
+static constexpr bool kWheelRecord = true;    /// Record wheel actions
+
+struct wheel_record_t {
+  bool direct_to_ready_queue;  ///< Did we place entry directly to ready queue?
+  size_t abs_tx_tsc;           ///< User's requested TX timestamp
+  size_t wslot_tx_tsc;         ///< TX timestamp of the alloted wheel slot
+
+  wheel_record_t(size_t abs_tx_tsc)
+      : direct_to_ready_queue(true), abs_tx_tsc(abs_tx_tsc){};
+
+  wheel_record_t(size_t abs_tx_tsc, size_t wslot_tx_tsc)
+      : direct_to_ready_queue(false),
+        abs_tx_tsc(abs_tx_tsc),
+        wslot_tx_tsc(wslot_tx_tsc){};
+
+  std::string to_string(size_t baseline_tsc, double freq_ghz) {
+    std::ostringstream ret;
+    if (direct_to_ready_queue) {
+      ret << "[Direct, abs " << std::setprecision(3)
+          << to_usec(abs_tx_tsc - baseline_tsc, freq_ghz) << " us]";
+    } else {
+      ret << "[Non-direct, abs " << std::setprecision(3)
+          << to_usec(abs_tx_tsc - baseline_tsc, freq_ghz) << " us, wslot "
+          << std::setprecision(3)
+          << to_usec(wslot_tx_tsc - baseline_tsc, freq_ghz) << " us]";
+    }
+
+    return ret.str();
+  }
+};
 
 /// One entry in a timing wheel bucket
 struct wheel_ent_t {
@@ -54,8 +85,6 @@ struct timing_wheel_args_t {
 };
 
 class TimingWheel {
-  static constexpr bool kVerbose = false;
-
  public:
   TimingWheel(timing_wheel_args_t args)
       : mtu(args.mtu),
@@ -93,12 +122,6 @@ class TimingWheel {
   /// This function must be called with non-decreasing values of reap_tsc
   void reap(size_t reap_tsc) {
     while (wheel[cur_wslot].tx_tsc <= reap_tsc) {
-      if (kVerbose) {
-        printf("timing_wheel: Reaping slot %zu with TX time = %.3f us\n",
-               cur_wslot,
-               to_usec(wheel[cur_wslot].tx_tsc - console_ref_tsc, freq_ghz));
-      }
-
       reap_wslot(cur_wslot);
       wheel[cur_wslot].tx_tsc += (wslot_width_tsc * num_wslots);
 
@@ -114,14 +137,7 @@ class TimingWheel {
       // If abs_tx_tsc is in the past, add directly to ready queue
       ready_queue.push(ent);
 
-      if (kVerbose) {
-        printf(
-            "timing_wheel: Inserting packet %zu (time %.3f us) directly to "
-            "ready queue. cur_time = %.3f us\n",
-            ent.pkt_num, to_usec(abs_tx_tsc - console_ref_tsc, freq_ghz),
-            to_usec(cur_tsc - console_ref_tsc, freq_ghz));
-      }
-
+      if (kWheelRecord) record_vec.emplace_back(abs_tx_tsc);
       return;
     }
 
@@ -143,10 +159,9 @@ class TimingWheel {
     size_t dst_wslot = (cur_wslot + wslot_delta);
     if (dst_wslot >= num_wslots) dst_wslot -= num_wslots;
 
-    if (kVerbose) {
-      printf(
-          "timing_wheel: Inserting packet %zu (time %.3f us) into slot %zu\n",
-          ent.pkt_num, to_usec(abs_tx_tsc, freq_ghz), dst_wslot);
+    if (kWheelRecord) {
+      record_vec.emplace_back(abs_tx_tsc,
+                              static_cast<size_t>(wheel[dst_wslot].tx_tsc));
     }
 
     insert_into_wslot(dst_wslot, ent);
@@ -214,6 +229,7 @@ class TimingWheel {
   MemPool<wheel_bkt_t> bkt_pool;
 
  public:
+  std::vector<wheel_record_t> record_vec;  ///< Used only with kWheelRecord
   std::queue<wheel_ent_t> ready_queue;
 };
 }
