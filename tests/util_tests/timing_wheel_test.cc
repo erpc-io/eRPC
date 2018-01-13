@@ -13,7 +13,7 @@ using namespace erpc;
 
 static constexpr size_t kTestMTU = 1024;
 static constexpr size_t kTestPktSize = 88;
-static constexpr size_t kTestNumPkts = 1000000;
+static constexpr size_t kTestNumPkts = 100000;
 static constexpr double kTestWslotWidth = .1;  // us per wheel slot
 
 // Dummy registration and deregistration functions
@@ -54,7 +54,7 @@ TEST(TimingWheelTest, Basic) {
 }
 
 TEST(TimingWheelTest, RateTest) {
-  const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0};
+  const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0, 80.0};
   const double freq_ghz = measure_rdtsc_freq();
 
   for (size_t iters = 0; iters < target_gbps.size(); iters++) {
