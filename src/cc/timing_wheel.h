@@ -167,7 +167,11 @@ class TimingWheel {
     insert_into_wslot(dst_wslot, ent);
   }
 
-  size_t get_cur_wslot_tx_tsc() const { return wheel[cur_wslot].tx_tsc; }
+  /// Roll the wheel forward until it catches up with current time. Hopefully
+  /// this is needed only during initialization.
+  void catchup() {
+    while (wheel[cur_wslot].tx_tsc < rdtsc()) reap(rdtsc());
+  }
 
  private:
   void insert_into_wslot(size_t ws_i, const wheel_ent_t &ent) {

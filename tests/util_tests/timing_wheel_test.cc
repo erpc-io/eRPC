@@ -14,7 +14,7 @@ using namespace erpc;
 static constexpr size_t kTestMTU = 1024;
 static constexpr size_t kTestPktSize = 88;
 static constexpr size_t kTestNumPkts = 1000000;
-static constexpr double kTestWslotWidth = 1;  // .5 microseconds per wheel slot
+static constexpr double kTestWslotWidth = .1;  // us per wheel slot
 
 // Dummy registration and deregistration functions
 Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
@@ -57,9 +57,9 @@ TEST(TimingWheelTest, RateTest) {
   const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0};
   const double freq_ghz = measure_rdtsc_freq();
 
-  for (size_t iters = 0; iters < 1; iters++) {
-    const double target_rate = Timely::gbps_to_rate(target_gbps[3]);
-    test_printf("Target rate = %.2f Gbps\n", target_gbps[3]);
+  for (size_t iters = 0; iters < target_gbps.size(); iters++) {
+    const double target_rate = Timely::gbps_to_rate(target_gbps[iters]);
+    test_printf("Target rate = %.2f Gbps\n", target_gbps[iters]);
     const double ns_per_pkt = 1000000000 * (kTestPktSize / target_rate);
     const size_t cycles_per_pkt = round_up(freq_ghz * ns_per_pkt);
 
@@ -78,7 +78,7 @@ TEST(TimingWheelTest, RateTest) {
     const auto dummy_ent = wheel_ent_t(nullptr, 1);
 
     // Update the wheel and start measurement
-    while (wheel.get_cur_wslot_tx_tsc() < rdtsc()) wheel.reap(rdtsc());
+    wheel.catchup();
 
     rate_timer.start();
 
