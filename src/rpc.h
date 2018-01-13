@@ -509,12 +509,13 @@ class Rpc {
     dpath_stat_inc(dpath_stats.pkts_sent, tx_batch_i);
 
     if (kCC) {
+      size_t batch_tsc = rdtsc();  // Reduce rdtsc() overhead
       // Record TX timestamps here to avoid duplication in all transports
       for (size_t i = 0; i < tx_batch_i; i++) {
         if (tx_burst_arr[i].tx_ts != nullptr) {
           assert(tx_burst_arr[i].msg_buffer->is_req() ||
                  tx_burst_arr[i].msg_buffer->is_req_for_resp());
-          *tx_burst_arr[i].tx_ts = rdtsc();
+          *tx_burst_arr[i].tx_ts = batch_tsc;
         }
       }
     }
