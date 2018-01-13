@@ -276,9 +276,8 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
 
   if (thread_id == 0) c.tmp_stat = new TmpStat("Mrps");
 
-  uint8_t phy_port;
-  if (FLAGS_numa_node == 0) phy_port = numa_0_ports[thread_id % 2];
-  if (FLAGS_numa_node == 1) phy_port = numa_1_ports[thread_id % 2];
+  uint8_t phy_port = (FLAGS_numa_node == 0) ? numa_0_ports[thread_id % 2]
+                                            : numa_1_ports[thread_id % 2];
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
                                   basic_sm_handler, phy_port);

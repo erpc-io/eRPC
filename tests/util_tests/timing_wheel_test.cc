@@ -12,8 +12,9 @@
 using namespace erpc;
 
 static constexpr size_t kTestMTU = 1024;
+static constexpr size_t kTestPktSize = 88;
 static constexpr size_t kTestNumPkts = 10000;
-static constexpr double kTestWslotWidth = .5;  // .5 microseconds per wheel slot
+static constexpr double kTestWslotWidth = .1;  // .5 microseconds per wheel slot
 
 // Dummy registration and deregistration functions
 Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
@@ -73,7 +74,7 @@ TEST(TimingWheelTest, RateTest) {
     double target_rate = unif(re);
     test_printf("Target rate = %.2f Gbps\n", Timely::rate_to_gbps(target_rate));
 
-    const double ns_per_pkt = 1000000000 * (kTestMTU / target_rate);
+    const double ns_per_pkt = 1000000000 * (kTestPktSize / target_rate);
     const size_t cycles_per_pkt = round_up(args.freq_ghz * ns_per_pkt);
 
     // Start measurement
@@ -104,7 +105,7 @@ TEST(TimingWheelTest, RateTest) {
     }
 
     double seconds = to_sec(rdtsc() - msr_start_tsc, args.freq_ghz);
-    double achieved_rate = num_pkts_sent * kTestMTU / seconds;
+    double achieved_rate = num_pkts_sent * kTestPktSize / seconds;
 
     test_printf("Achieved rate = %.2f Gbps\n",
                 Timely::rate_to_gbps(achieved_rate));
