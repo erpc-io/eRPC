@@ -19,7 +19,7 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
     }
   }
 
-  process_comps_st();
+  process_comps_st();  // RX
   process_credit_stall_queue_st();
 
   if (unlikely(multi_threaded)) {

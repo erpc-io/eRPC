@@ -1,6 +1,7 @@
 #ifndef ERPC_RPC_H
 #define ERPC_RPC_H
 
+#include "cc/timing_wheel.h"
 #include "common.h"
 #include "msg_buffer.h"
 #include "nexus.h"
@@ -238,12 +239,12 @@ class Rpc {
 
   /// Return true iff this session is connected. The session must not have
   /// been disconnected.
-  bool is_connected(int session_num) {
+  bool is_connected(int session_num) const {
     return session_vec[static_cast<size_t>(session_num)]->is_connected();
   }
 
   /// Return session bandwidth computed by the congestion control
-  double get_session_rate_gbps(int session_num) {
+  double get_session_rate_gbps(int session_num) const {
     if (!kCC) return -1.0;
     Session *session = session_vec[static_cast<size_t>(session_num)];
     return session->client_info.cc.timely.get_rate_gbps();
@@ -823,6 +824,7 @@ class Rpc {
   FastRand fast_rand;  ///< A fast random generator
 
   // Cold members live below, in order of coolness
+  TimingWheel wheel;
 
   /// Queues for datapath API requests from background threads
   struct {

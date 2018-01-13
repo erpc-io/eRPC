@@ -43,14 +43,18 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
                              transport->reg_mr_func, transport->dereg_mr_func);
 
-  try {
-    // Complete transport initialization using the hugepage allocator
-    transport->init_hugepage_structures(huge_alloc, rx_ring);
-  } catch (std::runtime_error e) {
-    // Free any huge pages that the transport might have created
-    delete huge_alloc;
-    throw e;
+  if (kCC) {
+    timing_wheel_args_t args;
+    args.mtu = TTr::kMTU;
+    args.freq_ghz = freq_ghz;
+    args.wslot_width = kWheelDefWslotWidth;
+    args.huge_alloc = huge_alloc;
+
+    wheel = TimingWheel(args);
   }
+
+  // Complete transport initialization using the hugepage allocator
+  transport->init_hugepage_structures(huge_alloc, rx_ring);
 
   // Create msgbufs for control packets
   for (MsgBuffer &ctrl_msgbuf : ctrl_msgbufs) {
@@ -69,6 +73,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
            creator_etid);
 
   pkt_loss_epoch_tsc = rdtsc();  // Assign epoch timestamp as late as possible
+  if (kCC) wheel.catchup();      // Wheel could be lagging, so catch up
 }
 
 template <class TTr>

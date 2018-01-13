@@ -17,8 +17,9 @@
 
 namespace erpc {
 
-static constexpr size_t kWheelBucketCap = 4;  /// Wheel entries per bucket
-static constexpr bool kWheelRecord = false;   /// Record wheel actions
+static constexpr size_t kWheelBucketCap = 4;       /// Wheel entries per bucket
+static constexpr bool kWheelRecord = false;        /// Fast-record wheel actions
+static constexpr double kWheelDefWslotWidth = .2;  // 200 ns
 
 struct wheel_record_t {
   bool direct_to_ready_queue;  ///< Did we place entry directly to ready queue?
