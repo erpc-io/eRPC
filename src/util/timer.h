@@ -92,6 +92,38 @@ static double ns_since(const struct timespec &t0) {
   return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
 }
 
+/// Simple time that uses RDTSC
+class TscTimer {
+ public:
+  size_t start_tsc = 0;
+  size_t tsc_sum = 0;
+  size_t num_calls = 0;
+
+  inline void start() { start_tsc = rdtsc(); }
+  inline void stop() {
+    tsc_sum += (rdtsc() - start_tsc);
+    num_calls++;
+  }
+
+  void reset() {
+    start_tsc = 0;
+    tsc_sum = 0;
+    num_calls = 0;
+  }
+
+  size_t avg_cycles() const { return tsc_sum / num_calls; }
+  double avg_sec(double freq_ghz) const {
+    return to_sec(avg_cycles(), freq_ghz);
+  }
+
+  double avg_usec(double freq_ghz) const {
+    return to_usec(avg_cycles(), freq_ghz);
+  }
+
+  double avg_nsec(double freq_ghz) const {
+    return to_nsec(avg_cycles(), freq_ghz);
+  }
+};
 }  /// End erpc
 
 #endif  // ERPC_TIMER_H
