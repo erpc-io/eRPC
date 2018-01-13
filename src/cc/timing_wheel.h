@@ -18,7 +18,7 @@
 namespace erpc {
 
 static constexpr size_t kWheelBucketCap = 4;  /// Wheel entries per bucket
-static constexpr bool kWheelRecord = false;    /// Record wheel actions
+static constexpr bool kWheelRecord = false;   /// Record wheel actions
 
 struct wheel_record_t {
   bool direct_to_ready_queue;  ///< Did we place entry directly to ready queue?
@@ -166,6 +166,8 @@ class TimingWheel {
 
     insert_into_wslot(dst_wslot, ent);
   }
+
+  size_t get_cur_wslot_tx_tsc() const { return wheel[cur_wslot].tx_tsc; }
 
  private:
   void insert_into_wslot(size_t ws_i, const wheel_ent_t &ent) {

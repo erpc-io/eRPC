@@ -13,8 +13,8 @@ using namespace erpc;
 
 static constexpr size_t kTestMTU = 1024;
 static constexpr size_t kTestPktSize = 88;
-static constexpr size_t kTestNumPkts = 100;
-static constexpr double kTestWslotWidth = .1;  // .5 microseconds per wheel slot
+static constexpr size_t kTestNumPkts = 1000000;
+static constexpr double kTestWslotWidth = 1;  // .5 microseconds per wheel slot
 
 // Dummy registration and deregistration functions
 Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
@@ -55,40 +55,37 @@ TEST(TimingWheelTest, Basic) {
 
 TEST(TimingWheelTest, RateTest) {
   const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0};
+  const double freq_ghz = measure_rdtsc_freq();
 
-  for (size_t iters = 0; iters < target_gbps.size(); iters++) {
-    double target_rate = Timely::gbps_to_rate(target_gbps[3]);
+  for (size_t iters = 0; iters < 1; iters++) {
+    const double target_rate = Timely::gbps_to_rate(target_gbps[3]);
     test_printf("Target rate = %.2f Gbps\n", target_gbps[3]);
+    const double ns_per_pkt = 1000000000 * (kTestPktSize / target_rate);
+    const size_t cycles_per_pkt = round_up(freq_ghz * ns_per_pkt);
+
+    TscTimer rate_timer;
 
     // Create the a new wheel so we automatically clean up extra packets from
     // each iteration
     HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
     timing_wheel_args_t args;
     args.mtu = kTestMTU;
-    args.freq_ghz = measure_rdtsc_freq();
+    args.freq_ghz = freq_ghz;
     args.wslot_width = kTestWslotWidth;
     args.huge_alloc = &alloc;
 
     TimingWheel wheel(args);
     const auto dummy_ent = wheel_ent_t(nullptr, 1);
 
-    const double ns_per_pkt = 1000000000 * (kTestPktSize / target_rate);
-    const size_t cycles_per_pkt = round_up(args.freq_ghz * ns_per_pkt);
+    // Update the wheel and start measurement
+    while (wheel.get_cur_wslot_tx_tsc() < rdtsc()) wheel.reap(rdtsc());
 
-    std::vector<size_t> target_tsc_vec;  // Requested timestamp for a packet
-    std::vector<size_t> actual_tsc_vec;  // Actual timestamp when pkt is TX-ed
-    target_tsc_vec.reserve(kTestNumPkts);
-    actual_tsc_vec.reserve(kTestNumPkts);
-
-    // Start measurement
-    size_t msr_start_tsc = rdtsc();
+    rate_timer.start();
 
     // Send one window
     size_t last_tsc = rdtsc();  // Last TSC used by this session for pacing
     for (size_t i = 0; i < kSessionCredits; i++) {
       wheel.insert(dummy_ent, last_tsc);
-      target_tsc_vec.push_back(last_tsc);
-
       last_tsc += cycles_per_pkt;
     }
 
@@ -106,26 +103,17 @@ TEST(TimingWheelTest, RateTest) {
         // Send more packets
         for (size_t i = 0; i < num_ready; i++) {
           wheel.insert(dummy_ent, last_tsc);
-          target_tsc_vec.push_back(last_tsc);
-          actual_tsc_vec.push_back(cur_tsc);
-
           last_tsc += cycles_per_pkt;
           wheel.ready_queue.pop();
         }
       }
     }
 
-    double seconds = to_sec(rdtsc() - msr_start_tsc, args.freq_ghz);
+    rate_timer.stop();
+    double seconds = rate_timer.avg_sec(freq_ghz);
     double achieved_rate = num_pkts_sent * kTestPktSize / seconds;
-
     test_printf("Achieved rate = %.2f Gbps\n",
                 Timely::rate_to_gbps(achieved_rate));
-
-    for (size_t i = 0; i < kTestNumPkts; i++) {
-      wheel_record_t wrecord = wheel.record_vec.at(i);
-      printf("Packet %zu: %s\n", i,
-             wrecord.to_string(msr_start_tsc, args.freq_ghz).c_str());
-    }
   }
 }
 
