@@ -18,7 +18,7 @@
 namespace erpc {
 
 static constexpr size_t kWheelBucketCap = 4;  /// Wheel entries per bucket
-static constexpr bool kWheelRecord = true;    /// Record wheel actions
+static constexpr bool kWheelRecord = false;    /// Record wheel actions
 
 struct wheel_record_t {
   bool direct_to_ready_queue;  ///< Did we place entry directly to ready queue?
@@ -131,9 +131,9 @@ class TimingWheel {
   }
 
   /// Queue an entry for transmission at timestamp = abs_tx_tsc
-  void insert(const wheel_ent_t &ent, size_t abs_tx_tsc) {
+  inline void insert(const wheel_ent_t &ent, size_t abs_tx_tsc) {
     size_t cur_tsc = rdtsc();
-    if (unlikely(abs_tx_tsc <= cur_tsc)) {
+    if (abs_tx_tsc <= cur_tsc) {
       // If abs_tx_tsc is in the past, add directly to ready queue
       ready_queue.push(ent);
 
