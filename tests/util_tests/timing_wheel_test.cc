@@ -54,9 +54,9 @@ TEST(TimingWheelTest, Basic) {
 }
 
 TEST(TimingWheelTest, RateTest) {
-  const std::vector<double> target_rates = {1.0, 5.0, 10.0, 20.0, 40.0};
+  const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0};
 
-  for (size_t iters = 0; iters < target_rates.size(); iters++) {
+  for (size_t iters = 0; iters < target_gbps.size(); iters++) {
     // Create the a new wheel so we automatically clean up extra packets from
     // each iteration
     HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
@@ -69,8 +69,8 @@ TEST(TimingWheelTest, RateTest) {
     TimingWheel wheel(args);
     const auto dummy_ent = wheel_ent_t(nullptr, 1);
 
-    double target_rate = target_rates[iters];
-    test_printf("Target rate = %.2f Gbps\n", Timely::rate_to_gbps(target_rate));
+    double target_rate = Timely::gbps_to_rate(target_gbps[iters]);
+    test_printf("Target rate = %.2f Gbps\n", target_gbps[iters]);
 
     const double ns_per_pkt = 1000000000 * (kTestPktSize / target_rate);
     const size_t cycles_per_pkt = round_up(args.freq_ghz * ns_per_pkt);

@@ -48,9 +48,14 @@ class Timely {
   double get_avg_rtt_diff() const { return avg_rtt_diff; }
   double get_rate_gbps() const { return rate_to_gbps(rate); }
 
-  /// Convert a bytes/second rate to Gbps
+  /// Convert a bytes/second rate to Gbit/s
   static double rate_to_gbps(double r) {
     return (r / (1000 * 1000 * 1000)) * 8;
+  }
+
+  /// Convert a Gbit/s rate to bytes/second
+  static double gbps_to_rate(double r) {
+    return (r / 8) * (1000 * 1000 * 1000);
   }
 };
 }  // End erpc
