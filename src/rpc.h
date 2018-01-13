@@ -814,10 +814,10 @@ class Rpc {
   uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
 
-  std::vector<SSlot *> credit_stall_txq;  ///< Req slots stalled for credits
+  std::vector<SSlot *> credit_stall_txq;  ///< Req sslots stalled for credits
 
   size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
-  size_t prev_epoch_ts;       ///< Timestamp of the previous event loop epoch
+  size_t pkt_loss_epoch_tsc;  ///< Timestamp of the packet loss epoch
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator

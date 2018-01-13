@@ -67,7 +67,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   sslot.client_info.rfr_sent = 0;
   sslot.client_info.expl_cr_rcvd = 0;
 
-  sslot.client_info.enqueue_req_ts = rdtsc();
+  sslot.client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
 
   if (unlikely(cont_etid != kInvalidBgETid)) {
     // We need to run the continuation in a background thread

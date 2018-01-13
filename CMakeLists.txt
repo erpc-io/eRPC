@@ -104,7 +104,6 @@ endif()
 if(DEBUG)
   MESSAGE(STATUS "Debugging is enabled. Perf will be low.")
   add_definitions(-g)
-  add_definitions(-O3)
 else(DEBUG)
   MESSAGE(STATUS "Debugging is disabled.")
   add_definitions(-DNDEBUG)
@@ -148,7 +147,6 @@ set(SOURCES
   src/rpc_impl/rpc_reset_handlers.cc
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
-  src/timely_impl/timely.cc
   src/transport_impl/transport.cc
   src/transport_impl/infiniband/ib_transport.cc
   src/transport_impl/infiniband/ib_transport_datapath.cc

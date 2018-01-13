@@ -12,9 +12,9 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
   if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_rx_st();
 
   if (ev_loop_ticker >= kEvLoopTickerReset) {
-    if (rdtsc() - prev_epoch_ts >= rpc_pkt_loss_epoch_cycles) {
+    if (rdtsc() - pkt_loss_epoch_tsc >= rpc_pkt_loss_epoch_cycles) {
       // Check for packet loss if we're in a new epoch
-      prev_epoch_ts = rdtsc();
+      pkt_loss_epoch_tsc = rdtsc();
       pkt_loss_scan_st();
     }
   }
@@ -44,7 +44,7 @@ template <class TTr>
 void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
   assert(in_dispatch());
 
-  uint64_t start_tsc = rdtsc();
+  uint64_t start_tsc = rdtsc();  // For counting timeout_ms
   while (true) {
     ev_loop_ticker++;
     run_event_loop_do_one_st();  // Run at least once even if timeout_ms is 0

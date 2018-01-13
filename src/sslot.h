@@ -65,8 +65,8 @@ class SSlot {
       size_t rfr_sent;      ///< Number of request-for-response packets sent
       size_t resp_rcvd;     ///< Number of response packets received
 
-      size_t enqueue_req_ts;  ///< Timestamp taken when request is enqueued
-      size_t cont_etid;       ///< eRPC thread ID to run the continuation on
+      size_t enqueue_req_tsc;  ///< Approx epoch-based TSC of enqueue_request()
+      size_t cont_etid;        ///< eRPC thread ID to run the continuation on
 
       /// Transmission timestamps for request and RFRs. Cold if CC is disabled.
       std::array<size_t, kSessionCredits> tx_ts;

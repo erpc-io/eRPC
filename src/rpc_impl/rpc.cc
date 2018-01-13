@@ -68,7 +68,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   LOG_INFO("eRPC Rpc: Created with ID = %u, eRPC TID = %zu.\n", rpc_id,
            creator_etid);
 
-  prev_epoch_ts = rdtsc();  // Assign epoch timestamp as late as possible
+  pkt_loss_epoch_tsc = rdtsc();  // Assign epoch timestamp as late as possible
 }
 
 template <class TTr>

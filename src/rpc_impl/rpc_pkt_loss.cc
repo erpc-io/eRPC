@@ -24,7 +24,7 @@ void Rpc<TTr>::pkt_loss_scan_st() {
 
           assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
 
-          size_t cycles_elapsed = rdtsc() - sslot.client_info.enqueue_req_ts;
+          size_t cycles_elapsed = rdtsc() - sslot.client_info.enqueue_req_tsc;
           size_t ms_elapsed = to_msec(cycles_elapsed, nexus->freq_ghz);
           if (ms_elapsed >= kRpcPktLossTimeoutMs) {
             pkt_loss_retransmit_st(&sslot);
@@ -89,7 +89,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
           std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), sslot),
           credit_stall_txq.end());
 
-      sslot->client_info.enqueue_req_ts = rdtsc();
+      sslot->client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
       bool all_pkts_tx = try_req_sslot_tx_st(sslot);
       if (!all_pkts_tx) credit_stall_txq.push_back(sslot);
     }
@@ -114,7 +114,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       credits += delta;
       ci.rfr_sent = ci.resp_rcvd - 1;
 
-      sslot->client_info.enqueue_req_ts = rdtsc();
+      sslot->client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
 
       assert(credits > 0);
       credits--;  // Use one credit for this RFR
