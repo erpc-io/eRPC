@@ -8,12 +8,21 @@ static constexpr size_t kTestNumReqs = 1000;
 static_assert(kTestNumReqs > kSessionReqWindow, "");
 static_assert(kTestNumReqs < std::numeric_limits<uint16_t>::max(), "");
 
-struct tag_t {
-  uint16_t req_i;
-  uint16_t msgbuf_i;
-  uint32_t req_size;
-  tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
-      : req_i(req_i), msgbuf_i(msgbuf_i), req_size(req_size) {}
+union tag_t {
+  struct {
+    uint16_t req_i;
+    uint16_t msgbuf_i;
+    uint32_t req_size;
+  } s;
+  size_t _tag;
+
+  tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size) {
+    s.req_i = req_i;
+    s.msgbuf_i = msgbuf_i;
+    s.req_size = req_size;
+  }
+
+  tag_t(size_t _tag) : _tag(_tag) {}
 };
 static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
@@ -68,7 +77,7 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
 
   c->rpc->enqueue_request(c->session_num_arr[0], kTestReqType,
                           &c->req_msgbuf[msgbuf_i], &c->resp_msgbuf[msgbuf_i],
-                          cont_func, *reinterpret_cast<size_t *>(&tag));
+                          cont_func, tag._tag);
 
   c->num_reqs_sent++;
 }
@@ -80,15 +89,15 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   auto tag = *reinterpret_cast<tag_t *>(&_tag);
 
   test_printf("Client: Received response for req %u, length = %zu.\n",
-              tag.req_i, resp_msgbuf->get_data_size());
+              tag.s.req_i, resp_msgbuf->get_data_size());
 
-  ASSERT_EQ(resp_msgbuf->get_data_size(), static_cast<tag_t>(tag).req_size);
+  ASSERT_EQ(resp_msgbuf->get_data_size(), static_cast<tag_t>(tag).s.req_size);
 
   context->num_rpc_resps++;
   context->rpc->release_response(resp_handle);
 
   if (context->num_reqs_sent < kTestNumReqs) {
-    enqueue_request_helper(context, static_cast<tag_t>(tag).msgbuf_i);
+    enqueue_request_helper(context, static_cast<tag_t>(tag).s.msgbuf_i);
   }
 }
 

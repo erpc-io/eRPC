@@ -33,13 +33,21 @@ class PrimaryReqInfo {
       : req_size_cp(req_size_cp), req_handle_cp(req_handle_cp), etid(etid) {}
 };
 
-struct client_tag_t {
-  uint16_t req_i;
-  uint16_t msgbuf_i;
-  uint32_t req_size;
+union client_tag_t {
+  struct {
+    uint16_t req_i;
+    uint16_t msgbuf_i;
+    uint32_t req_size;
+  } s;
+  size_t _tag;
 
-  client_tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size)
-      : req_i(req_i), msgbuf_i(msgbuf_i), req_size(req_size) {}
+  client_tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size) {
+    s.req_i = req_i;
+    s.msgbuf_i = msgbuf_i;
+    s.req_size = req_size;
+  }
+
+  client_tag_t(size_t _tag) : _tag(_tag) {}
 };
 static_assert(sizeof(client_tag_t) == sizeof(size_t), "");
 
@@ -211,12 +219,12 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
 
   // Extract info from tag
-  auto tag = *reinterpret_cast<client_tag_t *>(&_tag);
-  size_t req_size = static_cast<size_t>(tag.req_size);
-  size_t msgbuf_i = static_cast<size_t>(tag.msgbuf_i);
+  auto tag = static_cast<client_tag_t>(_tag);
+  size_t req_size = tag.s.req_size;
+  size_t msgbuf_i = tag.s.msgbuf_i;
 
   test_printf("Client [Rpc %u]: Received response for req %u, length = %zu.\n",
-              context->rpc->get_rpc_id(), tag.req_i,
+              context->rpc->get_rpc_id(), tag.s.req_i,
               resp_msgbuf->get_data_size());
 
   // Check the response
