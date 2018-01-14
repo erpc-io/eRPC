@@ -352,11 +352,15 @@ class Rpc {
                        size_t tag, size_t cont_etid = kInvalidBgETid);
 
  private:
-  /// Try transmitting packets for a request sslot. Return true if all packets
-  /// were sent, false if packet TX had to be stalled because of credits.
-  /// If this returns false, the caller should add the sslot to the credit
-  /// stalled queue.
-  bool try_req_sslot_tx_st(SSlot *);
+  /**
+   * @brief Enqueue packets for a request sslot, while handling credits and
+   * congestion control.
+   *
+   * @return True if there were sufficient credits to send all request packets
+   * in the sslot. Otherwise false is returned, and the caller should add the
+   * sslot to the credit stalled queue.
+   */
+  bool req_sslot_tx_credits_cc_st(SSlot *);
 
   /// Process a single-packet request message. Using (const pkthdr_t *) instead
   /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.

@@ -14,7 +14,7 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
       continue;
     }
 
-    bool all_pkts_tx = try_req_sslot_tx_st(sslot);
+    bool all_pkts_tx = req_sslot_tx_credits_cc_st(sslot);
     if (!all_pkts_tx) credit_stall_txq[write_index++] = sslot;
   }
 

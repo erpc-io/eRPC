@@ -90,7 +90,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
           credit_stall_txq.end());
 
       sslot->client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
-      bool all_pkts_tx = try_req_sslot_tx_st(sslot);
+      bool all_pkts_tx = req_sslot_tx_credits_cc_st(sslot);
       if (!all_pkts_tx) credit_stall_txq.push_back(sslot);
     }
   } else {

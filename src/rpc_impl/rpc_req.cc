@@ -96,13 +96,13 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  bool all_pkts_tx = try_req_sslot_tx_st(&sslot);
+  bool all_pkts_tx = req_sslot_tx_credits_cc_st(&sslot);
   if (!all_pkts_tx) credit_stall_txq.push_back(&sslot);
   return;
 }
 
 template <class TTr>
-bool Rpc<TTr>::try_req_sslot_tx_st(SSlot *sslot) {
+bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
   MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
   Session *session = sslot->session;
   assert(session->is_client() && session->is_connected());
