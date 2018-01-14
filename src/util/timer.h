@@ -22,6 +22,9 @@ static inline size_t rdtsc() {
   return static_cast<size_t>((rdx << 32) | rax);
 }
 
+/// An alias for rdtsc() to distinguish calls on the critical path
+static const auto &dpath_rdtsc = rdtsc;
+
 static void nano_sleep(size_t ns, double freq_ghz) {
   size_t start = rdtsc();
   size_t end = start;

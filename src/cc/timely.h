@@ -58,7 +58,7 @@ class Timely {
 
     double normalized_gradient = avg_rtt_diff / kTimelyMinRTT;
 
-    size_t cur_tsc = rdtsc();
+    size_t cur_tsc = dpath_rdtsc();
     assert(cur_tsc > last_update_tsc);
     double delta_factor = (cur_tsc - last_update_tsc) / min_rtt_tsc;  // fdiv
     delta_factor = std::min(delta_factor, 1.0);

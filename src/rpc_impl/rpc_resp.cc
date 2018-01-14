@@ -106,7 +106,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   }
 
   if (kCC) {
-    size_t rtt_tsc = rdtsc() - sslot->client_info.tx_ts[0];
+    size_t rtt_tsc = dpath_rdtsc() - sslot->client_info.tx_ts[0];
     sslot->session->client_info.cc.timely.update_rate(rtt_tsc);
   }
 
@@ -181,7 +181,8 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   bump_credits(sslot->session);
   if (kCC) {
     size_t rtt_tsc =
-        rdtsc() - sslot->client_info.tx_ts[pkthdr->pkt_num % kSessionCredits];
+        dpath_rdtsc() -
+        sslot->client_info.tx_ts[pkthdr->pkt_num % kSessionCredits];
     sslot->session->client_info.cc.timely.update_rate(rtt_tsc);
   }
 

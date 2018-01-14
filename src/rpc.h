@@ -500,7 +500,7 @@ class Rpc {
     dpath_stat_inc(dpath_stats.pkts_sent, tx_batch_i);
 
     if (kCC) {
-      size_t batch_tsc = rdtsc();  // Reduce rdtsc() overhead
+      size_t batch_tsc = dpath_rdtsc();  // Once per batch => low overhead
       for (size_t i = 0; i < tx_batch_i; i++) {
         if (tx_burst_arr[i].tx_ts != nullptr) {
           *tx_burst_arr[i].tx_ts = batch_tsc;
@@ -773,7 +773,7 @@ class Rpc {
   const size_t numa_node;
   const uint64_t creation_tsc;  ///< Timestamp of creation of this Rpc endpoint
 
-  // Derived consts
+  // Derived
   const bool multi_threaded;  ///< True iff there are background threads
   const double freq_ghz;      ///< RDTSC frequency, derived from Nexus
   const size_t rpc_pkt_loss_epoch_cycles;  ///< RPC packet loss epoch in cycles
