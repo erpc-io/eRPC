@@ -30,6 +30,8 @@ void connect_sessions_func_incast(AppContext *c) {
     c->rpc->run_event_loop(200);  // 200 milliseconds
     if (ctrl_c_pressed == 1) return;
   }
+
+  c->rpc->set_session_rate_gbps(c->session_num_vec[0], FLAGS_session_gbps);
 }
 
 #endif

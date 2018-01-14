@@ -1,3 +1,6 @@
+#ifndef LARGE_RPC_TPUT_H
+#define LARGE_RPC_TPUT_H
+
 #include <gflags/gflags.h>
 #include <signal.h>
 #include "../apps_common.h"
@@ -83,3 +86,5 @@ void alloc_req_resp_msg_buffers(AppContext *c) {
     memset(c->req_msgbuf[i].buf, kAppDataByte, FLAGS_req_size);
   }
 }
+
+#endif

@@ -252,6 +252,9 @@ class Rpc {
 
   /// Set bandwidth for a session. This may get modified by Timely later.
   void set_session_rate_gbps(int session_num, double rate_gbps) {
+    assert(rate_gbps >= Timely::rate_to_gbps(kTimelyMinRate) &&
+           rate_gbps <= Timely::rate_to_gbps(kTimelyMaxRate));
+
     Session *session = session_vec[static_cast<size_t>(session_num)];
     session->client_info.cc.timely.rate = Timely::gbps_to_rate(rate_gbps);
   }
