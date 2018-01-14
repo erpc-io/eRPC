@@ -14,7 +14,7 @@
  * available profiles are:
  *   o random: Each thread sends requests and responses to randomly chosen
  *     threads, excluding itself.
- *   o timely_small: The small-scale incast experiment in TIMELY
+ *   o incast: The small-scale incast experiment in TIMELY
  *     (SIGCOMM 15, Section 6.1).
  *   o victim: With N processes {0, ..., N - 1}, where N >= 3, processes 1
  *     through (N - 1) incast to process 0. In addition, processes (N - 2) and
@@ -24,8 +24,8 @@
 #include "large_rpc_tput.h"
 #include <signal.h>
 #include <cstring>
+#include "profile_incast.h"
 #include "profile_random.h"
-#include "profile_timely_small.h"
 #include "profile_victim.h"
 #include "util/autorun_helpers.h"
 
@@ -174,8 +174,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     if (FLAGS_num_threads == 1 && is_papi_usable) ipc = papi_get_ipc();
 
     double ns = erpc::ns_since(c->tput_t0);
-    double rx_GBps = c->stat_rx_bytes_tot / ns;
-    double tx_GBps = c->stat_tx_bytes_tot / ns;
+    double rx_gbps = c->stat_rx_bytes_tot * 8 / ns;
+    double tx_gbps = c->stat_tx_bytes_tot * 8 / ns;
 
     // Compute latency stats
     std::sort(c->latency_vec.begin(), c->latency_vec.end());
@@ -192,15 +192,15 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
 
     printf(
-        "large_rpc_tput: Thread %zu: Response tput: RX %.3f GB/s, "
-        "TX %.3f GB/s, avg latency = %.1f us, 99%% latency = %.1f us. "
+        "large_rpc_tput: Thread %zu: Response tput: RX %.3f Gbps, "
+        "TX %.3f Gbps, avg latency = %.1f us, 99%% latency = %.1f us. "
         "RX = %.3f MB, TX = %.3f MB. IPC = %.3f. Requests on sessions = %s.\n",
-        c->thread_id, rx_GBps, tx_GBps, avg_us, _99_us,
+        c->thread_id, rx_gbps, tx_gbps, avg_us, _99_us,
         c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0, ipc,
         session_req_count_str.c_str());
 
-    // Stats: rx_GBps tx_GBps avg_us 99_us
-    c->tmp_stat->write(std::to_string(rx_GBps) + " " + std::to_string(tx_GBps) +
+    // Stats: rx_gbps tx_gbps avg_us 99_us
+    c->tmp_stat->write(std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) +
                        " " + std::to_string(avg_us) + " " +
                        std::to_string(_99_us));
 
@@ -231,7 +231,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 // The function executed by each thread in the cluster
 void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   AppContext c;
-  c.tmp_stat = new TmpStat("rx_GBps tx_GBps avg_us 99_us");
+  c.tmp_stat = new TmpStat("rx_gbps tx_gbps avg_us 99_us");
   c.thread_id = thread_id;
 
   uint8_t phy_port;
@@ -275,7 +275,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   // *never* sends requests.
   bool _send_reqs = true;
   if (FLAGS_process_id == 0) {
-    if (FLAGS_profile == "timely_small" || FLAGS_profile == "victim") {
+    if (FLAGS_profile == "incast" || FLAGS_profile == "victim") {
       _send_reqs = false;
     }
   }
@@ -308,9 +308,9 @@ void setup_profile() {
     return;
   }
 
-  if (FLAGS_profile == "timely_small") {
-    connect_sessions_func = connect_sessions_func_timely_small;
-    get_session_idx_func = get_session_idx_func_timely_small;
+  if (FLAGS_profile == "incast") {
+    connect_sessions_func = connect_sessions_func_incast;
+    get_session_idx_func = get_session_idx_func_incast;
     return;
   }
 
@@ -329,8 +329,7 @@ int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid conc");
-  erpc::rt_assert(FLAGS_profile == "random" ||
-                      FLAGS_profile == "timely_small" ||
+  erpc::rt_assert(FLAGS_profile == "random" || FLAGS_profile == "incast" ||
                       FLAGS_profile == "victim",
                   "Invalid profile");
   if (!erpc::kTesting) {

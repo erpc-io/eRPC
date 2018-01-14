@@ -1,8 +1,8 @@
 --test_ms 20000
---req_size 32
---resp_size 4000000
---num_processes 3
+--req_size 4000000
+--resp_size 32
+--num_processes 2
 --num_threads 1
 --concurrency 4
 --drop_prob 0.0
---profile timely_small
+--profile incast
