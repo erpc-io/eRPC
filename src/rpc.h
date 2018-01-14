@@ -459,8 +459,7 @@ class Rpc {
     }
 
     LOG_TRACE("eRPC Rpc %u: Enqueing packet %s, drop = %u.\n", rpc_id,
-              tx_msgbuf->get_pkthdr_str(offset / TTr::kMaxDataPerPkt).c_str(),
-              drop);
+              tx_msgbuf->get_pkthdr_str(pkt_index).c_str(), item.drop);
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -485,7 +484,7 @@ class Rpc {
     }
 
     LOG_TRACE("eRPC Rpc %u: Enqueueing packet %s, drop = %u.\n", rpc_id,
-              ctrl_msgbuf->get_pkthdr_str().c_str(), drop);
+              ctrl_msgbuf->get_pkthdr_str().c_str(), item.drop);
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
