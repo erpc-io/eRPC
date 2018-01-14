@@ -845,7 +845,6 @@ class Rpc {
 
   // Datapath stats
   struct {
-    size_t ev_loop_calls = 0;
     size_t pkts_sent = 0;
     size_t post_send_calls = 0;
   } dpath_stats;
