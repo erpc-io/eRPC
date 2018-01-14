@@ -22,6 +22,24 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
 }
 
 template <class TTr>
+void Rpc<TTr>::process_wheel_st() {
+  assert(in_dispatch());
+  wheel->reap(rdtsc());
+
+  size_t num_ready = wheel->ready_queue.size();
+  for (size_t i = 0; i < num_ready; i++) {
+    wheel_ent_t &ent = wheel->ready_queue.front();
+    assert(!ent.is_rfr);  // For now
+
+    enqueue_pkt_tx_burst_st(
+        ent.sslot, ent.pkt_num,
+        &ent.sslot->client_info.tx_ts[ent.pkt_num % kSessionCredits]);
+
+    wheel->ready_queue.pop();
+  }
+}
+
+template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
   assert(in_dispatch());
   auto &queue = bg_queues.enqueue_request;

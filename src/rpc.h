@@ -580,6 +580,9 @@ class Rpc {
   /// Try to transmit request packets from sslots that are stalled for credits.
   void process_credit_stall_queue_st();
 
+  /// Process the wheel. We have already paid credits for sslots in the wheel.
+  void process_wheel_st();
+
   /// Process the requests enqueued by background threads
   void process_bg_queues_enqueue_request_st();
 

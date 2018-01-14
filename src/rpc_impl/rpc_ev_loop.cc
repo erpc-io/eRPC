@@ -24,8 +24,9 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
     }
   }
 
-  process_comps_st();  // RX
-  process_credit_stall_queue_st();
+  process_comps_st();               // RX
+  process_credit_stall_queue_st();  // TX
+  if (kCC) process_wheel_st();      // TX
 
   // Drain all packets
   if (tx_batch_i > 0) do_tx_burst_st();
