@@ -243,9 +243,9 @@ class Rpc {
     return session_vec[static_cast<size_t>(session_num)]->is_connected();
   }
 
-  /// Return session bandwidth computed by the congestion control
+  /// Return session bandwidth computed by the congestion control. If congestion
+  /// control is disabled, this returns the max rate.
   double get_session_rate_gbps(int session_num) const {
-    if (!kCC) return -1.0;
     Session *session = session_vec[static_cast<size_t>(session_num)];
     return session->client_info.cc.timely.get_rate_gbps();
   }

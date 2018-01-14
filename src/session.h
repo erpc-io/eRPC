@@ -38,7 +38,7 @@ class Session {
     remote_routing_info =
         is_client() ? &server.routing_info : &client.routing_info;
 
-    if (kCC && is_client()) client_info.cc.timely = Timely(freq_ghz);
+    if (is_client()) client_info.cc.timely = Timely(freq_ghz);
 
     // Arrange the free slot vector so that slots are popped in order
     for (size_t i = 0; i < kSessionReqWindow; i++) {
