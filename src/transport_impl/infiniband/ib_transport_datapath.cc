@@ -29,8 +29,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       // return packet or an RFR.
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
-      sgl[0].length =
-          sizeof(pkthdr_t) + std::min(kMaxDataPerPkt, msg_buffer->data_size);
+      sgl[0].length = msg_buffer->get_pkt_size<kMaxDataPerPkt>(0);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
       // Only single-SGE work requests are inlined

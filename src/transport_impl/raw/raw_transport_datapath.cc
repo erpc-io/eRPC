@@ -26,8 +26,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       // This is the first packet, so we need only 1 SGE. This can be CR/RFR.
       pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
-      sgl[0].length =
-          sizeof(pkthdr_t) + std::min(kMaxDataPerPkt, msg_buffer->data_size);
+      sgl[0].length = msg_buffer->get_pkt_size<kMaxDataPerPkt>(0);
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
       if (kMaxInline > 0 &&

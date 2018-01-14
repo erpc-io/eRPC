@@ -116,7 +116,7 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
   if (likely(req_msgbuf->num_pkts == 1)) {
     // Small request
     if (kCC) {
-      size_t pkt_size = sizeof(pkthdr_t) + req_msgbuf->get_data_size();
+      size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(0);
       size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(pkt_size);
       wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(0)), abs_tx_tsc);
     } else {
@@ -132,8 +132,15 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
     assert(sending > 0);
 
     for (size_t _x = 0; _x < sending; _x++) {
-      enqueue_pkt_tx_burst_st(sslot, ci.req_sent,
-                              &ci.tx_ts[ci.req_sent % kSessionCredits]);
+      if (kCC) {
+        size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(ci.req_sent);
+        size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(psz);
+        wheel->insert(wheel_ent_t(sslot, ci.req_sent), abs_tx_tsc);
+      } else {
+        enqueue_pkt_tx_burst_st(sslot, ci.req_sent,
+                                &ci.tx_ts[ci.req_sent % kSessionCredits]);
+      }
+
       credits--;
       ci.req_sent++;
     }

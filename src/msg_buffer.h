@@ -102,6 +102,13 @@ class MsgBuffer {
   /// than the maximum data capacity of the MsgBuffer.
   inline size_t get_data_size() const { return data_size; }
 
+  /// Get the packet size (i.e., including packet header) of a packet
+  template <size_t kMaxDataPerPkt>
+  inline size_t get_pkt_size(size_t pkt_num) const {
+    size_t offset = pkt_num * kMaxDataPerPkt;
+    return sizeof(pkthdr_t) + std::min(kMaxDataPerPkt, data_size - offset);
+  }
+
   /// Return a string representation of this MsgBuffer
   std::string to_string() const {
     if (buf == nullptr) return "[Invalid]";
