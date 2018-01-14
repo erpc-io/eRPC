@@ -44,11 +44,18 @@ class Timely {
         min_rtt_tsc(kTimelyMinRTT * freq_ghz * 1000),
         freq_ghz(freq_ghz) {}
 
-  void update_rate(size_t _sample_rtt_tsc) {
-    assert(_sample_rtt_tsc >= min_rtt_tsc);
+  /**
+   * @brief Perform a rate update
+   *
+   * @param _rdtsc A recently sampled RDTSC. This can reduce calls to rdtsc().
+   * @param sample_rtt_tsc The RTT sample in RDTSC cycles
+   */
+  void update_rate(size_t _rdtsc, size_t sample_rtt_tsc) {
+    assert(_rdtsc >= 1000000000);  // Sanity check
+    assert(sample_rtt_tsc >= min_rtt_tsc);
 
     // Convert the sample RTT to usec, and don't use _sample_rtt_tsc from now
-    double sample_rtt = to_usec(_sample_rtt_tsc, freq_ghz);
+    double sample_rtt = to_usec(sample_rtt_tsc, freq_ghz);
     if (unlikely(prev_rtt == 0.0)) prev_rtt = sample_rtt;
 
     double rtt_diff = sample_rtt - prev_rtt;
@@ -58,9 +65,8 @@ class Timely {
 
     double normalized_gradient = avg_rtt_diff / kTimelyMinRTT;
 
-    size_t cur_tsc = dpath_rdtsc();
-    assert(cur_tsc > last_update_tsc);
-    double delta_factor = (cur_tsc - last_update_tsc) / min_rtt_tsc;  // fdiv
+    assert(_rdtsc >= last_update_tsc);
+    double delta_factor = (_rdtsc - last_update_tsc) / min_rtt_tsc;  // fdiv
     delta_factor = std::min(delta_factor, 1.0);
 
     double new_rate;
@@ -86,7 +92,7 @@ class Timely {
     }
 
     prev_rtt = sample_rtt;
-    last_update_tsc = cur_tsc;
+    last_update_tsc = _rdtsc;
 
     rate = std::max(new_rate, rate * 0.5);
     rate = std::min(rate, kTimelyMaxRate);
