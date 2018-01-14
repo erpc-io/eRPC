@@ -354,7 +354,8 @@ class Rpc {
  private:
   /**
    * @brief Enqueue packets for a request sslot, while handling credits and
-   * congestion control.
+   * congestion control. If congestion control is enabled, packets are added to
+   * the timing wheel, otherwise to the TX burst.
    *
    * @return True if there were sufficient credits to send all request packets
    * in the sslot. Otherwise false is returned, and the caller should add the

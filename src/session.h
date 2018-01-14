@@ -34,7 +34,7 @@ class Session {
 
  private:
   Session(Role role, conn_req_uniq_token_t uniq_token, double freq_ghz)
-      : role(role), uniq_token(uniq_token) {
+      : role(role), uniq_token(uniq_token), freq_ghz(freq_ghz) {
     remote_routing_info =
         is_client() ? &server.routing_info : &client.routing_info;
 
@@ -72,8 +72,19 @@ class Session {
   inline bool is_server() const { return role == Role::kServer; }
   inline bool is_connected() const { return state == SessionState::kConnected; }
 
+  /// Get the absolute TX timestamp for transmission, and update abs_tx_tsc
+  inline size_t cc_getupdate_tx_tsc(size_t pkt_size) {
+    assert(is_client());
+    double ns_delta = 1000000000 * (pkt_size / client_info.cc.timely.rate);
+    size_t cycle_delta = ns_to_cycles(ns_delta, freq_ghz);
+    size_t abs_tx_tsc = client_info.cc.abs_tx_tsc + cycle_delta;
+    client_info.cc.abs_tx_tsc = abs_tx_tsc;
+    return abs_tx_tsc;
+  }
+
   const Role role;  ///< The role (server/client) of this session endpoint
   const conn_req_uniq_token_t uniq_token;  ///< A cluster-wide unique token
+  const double freq_ghz;                   ///< TSC frequency
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 

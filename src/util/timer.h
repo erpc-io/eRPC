@@ -70,7 +70,11 @@ static double to_usec(size_t cycles, double freq_ghz) {
 }
 
 static size_t us_to_cycles(double us, double freq_ghz) {
-  return round_up(us * 1000 * freq_ghz);
+  return static_cast<size_t>(us * 1000 * freq_ghz);
+}
+
+static size_t ns_to_cycles(double ns, double freq_ghz) {
+  return static_cast<size_t>(ns * freq_ghz);
 }
 
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to nsec

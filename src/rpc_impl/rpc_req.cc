@@ -117,19 +117,26 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
 
   if (likely(req_msgbuf->num_pkts == 1)) {
     // Small request
+    if (kCC) {
+      size_t pkt_size = sizeof(pkthdr_t) + req_msgbuf->get_data_size();
+      size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(pkt_size);
+      wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(0)), abs_tx_tsc);
+    } else {
+      enqueue_pkt_tx_burst_st(sslot, 0, &ci.tx_ts[0]);
+    }
+
     credits--;
-    enqueue_pkt_tx_burst_st(sslot, 0, &ci.tx_ts[0]);
     ci.req_sent++;
     return true;
   } else {
     // Large request
     size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.req_sent);
     assert(sending > 0);
-    credits -= sending;
 
     for (size_t _x = 0; _x < sending; _x++) {
       enqueue_pkt_tx_burst_st(sslot, ci.req_sent,
                               &ci.tx_ts[ci.req_sent % kSessionCredits]);
+      credits--;
       ci.req_sent++;
     }
 
