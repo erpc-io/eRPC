@@ -532,23 +532,11 @@ class Rpc {
 
   /// Copy the data from \p pkt to \p msgbuf
   inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, const pkthdr_t *pkthdr) {
-    size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;  // rx_msgbuf offset
+    assert(msgbuf->data_size == pkthdr->msg_size);
 
-    size_t bytes_to_copy;
-    if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
-      bytes_to_copy = pkthdr->msg_size;
-    } else {
-      size_t num_pkts_in_msg = data_size_to_num_pkts(pkthdr->msg_size);
-      bytes_to_copy = (pkthdr->pkt_num == num_pkts_in_msg - 1)
-                          ? (pkthdr->msg_size - offset)
-                          : TTr::kMaxDataPerPkt;
-    }
-    assert(bytes_to_copy <= TTr::kMaxDataPerPkt);
-    assert(offset + bytes_to_copy <= msgbuf->get_data_size());
-
-    memcpy(&msgbuf->buf[offset],
-           reinterpret_cast<const uint8_t *>(pkthdr) + sizeof(pkthdr_t),
-           bytes_to_copy);
+    size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
+    size_t to_copy = std::min(TTr::kMaxDataPerPkt, pkthdr->msg_size - offset);
+    memcpy(&msgbuf->buf[offset], pkthdr + 1, to_copy);  // From end of pkthdr
   }
 
   /**

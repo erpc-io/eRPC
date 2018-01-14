@@ -23,8 +23,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     size_t pkt_size;
     pkthdr_t* pkthdr;
     if (item.pkt_index == 0) {
-      // This is the first packet, so we need only 1 SGE. This can be a credit
-      // return packet or an RFR.
+      // This is the first packet, so we need only 1 SGE. This can be CR/RFR.
       pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length =
