@@ -250,6 +250,12 @@ class Rpc {
     return session->client_info.cc.timely.get_rate_gbps();
   }
 
+  /// Set bandwidth for a session. This may get modified by Timely later.
+  void set_session_rate_gbps(int session_num, double rate_gbps) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    session->client_info.cc.timely.rate = Timely::gbps_to_rate(rate_gbps);
+  }
+
  private:
   int create_session_st(std::string remote_uri, uint8_t rem_rpc_id);
   int destroy_session_st(int session_num);
