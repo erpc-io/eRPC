@@ -50,7 +50,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     args.wslot_width = kWheelDefWslotWidth;
     args.huge_alloc = huge_alloc;
 
-    wheel = TimingWheel(args);
+    wheel = new TimingWheel(args);
   }
 
   // Complete transport initialization using the hugepage allocator
@@ -73,7 +73,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
            creator_etid);
 
   pkt_loss_epoch_tsc = rdtsc();  // Assign epoch timestamp as late as possible
-  if (kCC) wheel.catchup();      // Wheel could be lagging, so catch up
+  if (kCC) wheel->catchup();     // Wheel could be lagging, so catch up
 }
 
 template <class TTr>

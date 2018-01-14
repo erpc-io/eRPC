@@ -436,7 +436,8 @@ class Rpc {
   }
 
   /// Enqueue a data packet from sslot's tx_msgbuf for tx_burst
-  inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t pkt_num) {
+  inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t pkt_index,
+                                      size_t *tx_ts) {
     assert(in_dispatch());
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
     assert(tx_msgbuf->is_req() || tx_msgbuf->is_resp());
@@ -444,17 +445,12 @@ class Rpc {
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
-    item.pkt_index = pkt_num;
-
-    if (kCC) {
-      item.tx_ts = sslot->is_client
-                       ? &sslot->client_info.tx_ts[pkt_num % kSessionCredits]
-                       : nullptr;
-    }
+    item.pkt_index = pkt_index;
+    if (kCC) item.tx_ts = tx_ts;
 
     if (kTesting) {
       item.drop = roll_pkt_drop();
-      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_num));
+      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_index));
     }
 
     LOG_TRACE("eRPC Rpc %u: Enqueing packet %s, drop = %u.\n", rpc_id,
@@ -467,7 +463,8 @@ class Rpc {
 
   /// Enqueue a control packet for tx_burst. ctrl_msgbuf can be reused after
   /// (2 * unsig_batch) calls to this function.
-  inline void enqueue_hdr_tx_burst_st(SSlot *sslot, MsgBuffer *ctrl_msgbuf) {
+  inline void enqueue_hdr_tx_burst_st(SSlot *sslot, MsgBuffer *ctrl_msgbuf,
+                                      size_t *tx_ts) {
     assert(in_dispatch());
     assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_req_for_resp());
 
@@ -475,14 +472,7 @@ class Rpc {
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = ctrl_msgbuf;
     item.pkt_index = 0;
-
-    if (kCC) {
-      size_t rfr_pkt_num = ctrl_msgbuf->get_pkthdr_0()->pkt_num;
-      item.tx_ts =
-          sslot->is_client
-              ? &sslot->client_info.tx_ts[rfr_pkt_num % kSessionCredits]
-              : nullptr;
-    }
+    if (kCC) item.tx_ts = tx_ts;
 
     if (kTesting) {
       item.drop = roll_pkt_drop();
@@ -506,11 +496,8 @@ class Rpc {
 
     if (kCC) {
       size_t batch_tsc = rdtsc();  // Reduce rdtsc() overhead
-      // Record TX timestamps here to avoid duplication in all transports
       for (size_t i = 0; i < tx_batch_i; i++) {
         if (tx_burst_arr[i].tx_ts != nullptr) {
-          assert(tx_burst_arr[i].msg_buffer->is_req() ||
-                 tx_burst_arr[i].msg_buffer->is_req_for_resp());
           *tx_burst_arr[i].tx_ts = batch_tsc;
         }
       }
@@ -824,7 +811,7 @@ class Rpc {
   FastRand fast_rand;  ///< A fast random generator
 
   // Cold members live below, in order of coolness
-  TimingWheel wheel;
+  TimingWheel *wheel;
 
   /// Queues for datapath API requests from background threads
   struct {

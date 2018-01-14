@@ -70,7 +70,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   assert(sslot->server_info.req_type != kInvalidReqType);
   sslot->server_info.req_type = kInvalidReqType;
 
-  enqueue_pkt_tx_burst_st(sslot, 0);  // Enqueue zeroth response packet
+  enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Enqueue zeroth response packet
 }
 
 template <class TTr>

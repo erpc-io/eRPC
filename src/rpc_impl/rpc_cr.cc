@@ -22,7 +22,7 @@ void Rpc<TTr>::enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr) {
   cr_pkthdr->req_num = req_pkthdr->req_num;
   cr_pkthdr->magic = req_pkthdr->magic;
 
-  enqueue_hdr_tx_burst_st(sslot, ctrl_msgbuf);
+  enqueue_hdr_tx_burst_st(sslot, ctrl_msgbuf, nullptr);
 }
 
 template <class TTr>

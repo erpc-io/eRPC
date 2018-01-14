@@ -24,7 +24,9 @@ void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   rfr_pkthdr->req_num = resp_pkthdr->req_num;
   rfr_pkthdr->magic = resp_pkthdr->magic;
 
-  enqueue_hdr_tx_burst_st(sslot, ctrl_msgbuf);
+  enqueue_hdr_tx_burst_st(
+      sslot, ctrl_msgbuf,
+      &sslot->client_info.tx_ts[rfr_pkthdr->pkt_num % kSessionCredits]);
 }
 
 template <class TTr>
@@ -64,7 +66,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
 
     // Re-send the response packet with index = pkthdr->pkt_num (same as below)
-    enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num);
+    enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num, nullptr);
 
     // Release all transport-owned buffers before re-entering event loop
     if (tx_batch_i > 0) do_tx_burst_st();
@@ -76,6 +78,6 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   sslot->server_info.rfr_rcvd++;
 
   // Send the response packet with index = pkthdr->pktnum (same as above)
-  enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num);
+  enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num, nullptr);
 }
 }  // End erpc
