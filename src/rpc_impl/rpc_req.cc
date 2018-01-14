@@ -112,27 +112,28 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
   size_t &credits = session->client_info.credits;
   auto &ci = sslot->client_info;
 
-  if (credits > 0) {
-    if (likely(req_msgbuf->num_pkts == 1)) {
-      // Small request
-      credits--;
-      enqueue_pkt_tx_burst_st(sslot, 0, &ci.tx_ts[0]);
+  // Proceed if we have at least one credit
+  if (credits == 0) return false;
+
+  if (likely(req_msgbuf->num_pkts == 1)) {
+    // Small request
+    credits--;
+    enqueue_pkt_tx_burst_st(sslot, 0, &ci.tx_ts[0]);
+    ci.req_sent++;
+    return true;
+  } else {
+    // Large request
+    size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.req_sent);
+    assert(sending > 0);
+    credits -= sending;
+
+    for (size_t _x = 0; _x < sending; _x++) {
+      enqueue_pkt_tx_burst_st(sslot, ci.req_sent,
+                              &ci.tx_ts[ci.req_sent % kSessionCredits]);
       ci.req_sent++;
-      return true;
-    } else {
-      // Large request
-      size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.req_sent);
-      assert(sending > 0);
-      credits -= sending;
-
-      for (size_t _x = 0; _x < sending; _x++) {
-        enqueue_pkt_tx_burst_st(sslot, ci.req_sent,
-                                &ci.tx_ts[ci.req_sent % kSessionCredits]);
-        ci.req_sent++;
-      }
-
-      if (ci.req_sent == req_msgbuf->num_pkts) return true;
     }
+
+    if (ci.req_sent == req_msgbuf->num_pkts) return true;
   }
 
   return false;
