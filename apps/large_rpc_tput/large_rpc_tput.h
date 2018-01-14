@@ -1,6 +1,3 @@
-#ifndef LARGE_RPC_TPUT_H
-#define LARGE_RPC_TPUT_H
-
 #include <gflags/gflags.h>
 #include <signal.h>
 #include "../apps_common.h"
@@ -23,6 +20,7 @@ DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 DEFINE_double(drop_prob, 0, "Packet drop probability");
 DEFINE_string(profile, "", "Experiment profile to use");
+DEFINE_double(session_gbps, erpc::kTimelyMaxRate, "Non-CC session throughput");
 
 static bool validate_drop_prob(const char *, double p) {
   if (!erpc::kTesting) return p == 0.0;
@@ -48,24 +46,16 @@ union tag_t {
 static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
 // Per-thread application context
-class AppContext {
+class AppContext : public BasicAppContext {
  public:
-  TmpStat *tmp_stat = nullptr;
-  erpc::Rpc<erpc::CTransport> *rpc = nullptr;
-
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
   // >10 ms for 8MB RPCs under congestion. So erpc::Latency doesn't work here.
   std::vector<double> latency_vec;
 
-  std::vector<int> session_num_vec;
-
   // Index in session_num_vec that represents a self connection, *if it exists*
-  size_t self_session_idx = std::numeric_limits<size_t>::max();
+  size_t self_session_idx = SIZE_MAX;
 
-  size_t thread_id;         // The ID of the thread that owns this context
-  size_t num_sm_resps = 0;  // Number of SM responses
   struct timespec tput_t0;  // Start time for throughput measurement
-  erpc::FastRand fastrand;
 
   size_t stat_rx_bytes_tot = 0;  // Total bytes received
   size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
@@ -76,27 +66,18 @@ class AppContext {
   uint64_t req_ts[kAppMaxConcurrency];  // Per-request timestamps
   erpc::MsgBuffer req_msgbuf[kAppMaxConcurrency];
   erpc::MsgBuffer resp_msgbuf[kAppMaxConcurrency];
-
-  ~AppContext() {
-    if (tmp_stat != nullptr) delete tmp_stat;
-  }
 };
 
 // Allocate request and response MsgBuffers
 void alloc_req_resp_msg_buffers(AppContext *c) {
-  assert(c != nullptr);
-  assert(c->rpc != nullptr);
+  for (size_t i = 0; i < FLAGS_concurrency; i++) {
+    c->resp_msgbuf[i] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
+    erpc::rt_assert(c->resp_msgbuf[i].buf != nullptr, "Alloc failed");
 
-  for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
-    c->resp_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
-    erpc::rt_assert(c->resp_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
-
-    c->req_msgbuf[msgbuf_idx] = c->rpc->alloc_msg_buffer(FLAGS_req_size);
-    erpc::rt_assert(c->req_msgbuf[msgbuf_idx].buf != nullptr, "Alloc failed");
+    c->req_msgbuf[i] = c->rpc->alloc_msg_buffer(FLAGS_req_size);
+    erpc::rt_assert(c->req_msgbuf[i].buf != nullptr, "Alloc failed");
 
     // Fill the request regardless of kAppMemset. This is a one-time thing.
-    memset(c->req_msgbuf[msgbuf_idx].buf, kAppDataByte, FLAGS_req_size);
+    memset(c->req_msgbuf[i].buf, kAppDataByte, FLAGS_req_size);
   }
 }
-
-#endif

@@ -13,7 +13,7 @@ size_t get_session_idx_func_victim(AppContext *, size_t resp_session_idx) {
 
   // During initialization, alternate between process 0 and the other victim
   static size_t initial_call_index = 0;
-  if (unlikely(resp_session_idx == std::numeric_limits<size_t>::max())) {
+  if (unlikely(resp_session_idx == SIZE_MAX)) {
     if (process_in_victim_pair()) {
       size_t ret = initial_call_index % 2;
       initial_call_index++;
@@ -32,7 +32,7 @@ size_t get_session_idx_func_victim(AppContext *, size_t resp_session_idx) {
 }
 
 void connect_sessions_func_victim(AppContext *c) {
-  assert(c->self_session_idx == std::numeric_limits<size_t>::max());
+  assert(c->self_session_idx == SIZE_MAX);
 
   if (FLAGS_process_id == 0) return;
 

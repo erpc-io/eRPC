@@ -6,3 +6,4 @@
 --concurrency 4
 --drop_prob 0.0
 --profile incast
+--session_gbps 8.0

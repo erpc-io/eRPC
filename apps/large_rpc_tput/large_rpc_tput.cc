@@ -285,8 +285,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
                     "Cannot send requests without sessions");
 
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
-      size_t session_idx =
-          get_session_idx_func(&c, std::numeric_limits<size_t>::max());
+      size_t session_idx = get_session_idx_func(&c, SIZE_MAX);
       c.req_vec.push_back(tag_t(session_idx, msgbuf_idx));
     }
     send_reqs(&c);

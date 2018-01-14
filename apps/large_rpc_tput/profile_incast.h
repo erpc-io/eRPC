@@ -10,7 +10,7 @@ size_t get_session_idx_func_incast(AppContext *, size_t) {
 }
 
 void connect_sessions_func_incast(AppContext *c) {
-  assert(c->self_session_idx == std::numeric_limits<size_t>::max());
+  assert(c->self_session_idx == SIZE_MAX);
   if (FLAGS_process_id == 0) return;
 
   // Allocate per-session info
