@@ -46,13 +46,15 @@ union tag_t {
 static_assert(sizeof(tag_t) == sizeof(size_t), "");
 
 // Per-thread application context
+// session_num_vec contains a hole at self_session_idx. We need for simplicity
+// in the "victim" profile.
 class AppContext : public BasicAppContext {
  public:
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
   // >10 ms for 8MB RPCs under congestion. So erpc::Latency doesn't work here.
   std::vector<double> latency_vec;
 
-  // Index in session_num_vec that represents a self connection, *if it exists*
+  // Index in session_num_vec that represents a self connection, if it exists
   size_t self_session_idx = SIZE_MAX;
 
   struct timespec tput_t0;  // Start time for throughput measurement

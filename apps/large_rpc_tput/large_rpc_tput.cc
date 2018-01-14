@@ -14,8 +14,7 @@
  * available profiles are:
  *   o random: Each thread sends requests and responses to randomly chosen
  *     threads, excluding itself.
- *   o incast: The small-scale incast experiment in TIMELY
- *     (SIGCOMM 15, Section 6.1).
+ *   o incast: Incast
  *   o victim: With N processes {0, ..., N - 1}, where N >= 3, processes 1
  *     through (N - 1) incast to process 0. In addition, processes (N - 2) and
  *     (N - 1) send data to each other.
