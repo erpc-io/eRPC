@@ -14,7 +14,7 @@
 namespace erpc {
 static constexpr double kTimelyEwmaAlpha = 0.02;
 
-static constexpr double kTimelyMinRTT = 2.5;
+static constexpr double kTimelyMinRTT = 1;  // Loopback can be ~1 us (?)
 static constexpr double kTimelyTLow = 50;
 static constexpr double kTimelyTHigh = 1000;
 

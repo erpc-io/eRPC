@@ -85,13 +85,11 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   pkthdr_0->pkt_num = 0;
   pkthdr_0->req_num = sslot.cur_req_num;
 
-  // Fill in non-zeroth packet headers, if any
+  // Fill in any non-zeroth packet headers, using pkthdr_0 as the base.
   if (unlikely(req_msgbuf->num_pkts > 1)) {
-    // Headers for non-zeroth packets are created by copying the 0th header,
-    // changing only the required fields. All request packets are Unexpected.
     for (size_t i = 1; i < req_msgbuf->num_pkts; i++) {
       pkthdr_t *pkthdr_i = req_msgbuf->get_pkthdr_n(i);
-      *pkthdr_i = *pkthdr_0;
+      memcpy(pkthdr_i, pkthdr_0, sizeof(pkthdr_t));
       pkthdr_i->pkt_num = i;
     }
   }
