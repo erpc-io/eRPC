@@ -14,7 +14,7 @@
 namespace erpc {
 static constexpr double kTimelyEwmaAlpha = 0.02;
 
-static constexpr double kTimelyMinRTT = 1;  // Loopback can be ~1 us (?)
+static constexpr double kTimelyMinRTT = 2;
 static constexpr double kTimelyTLow = 50;
 static constexpr double kTimelyTHigh = 1000;
 
@@ -29,7 +29,7 @@ static constexpr double kTimelyAddRate = 5.0 * 1000 * 1000;
 class Timely {
  private:
   size_t neg_gradient_count = 0;
-  double prev_rtt = 0.0;
+  double prev_rtt = kTimelyMinRTT;
   double avg_rtt_diff = 0.0;
   size_t last_update_tsc = 0;
   double min_rtt_tsc = 0.0;
@@ -51,12 +51,13 @@ class Timely {
    * @param sample_rtt_tsc The RTT sample in RDTSC cycles
    */
   void update_rate(size_t _rdtsc, size_t sample_rtt_tsc) {
-    assert(_rdtsc >= 1000000000);  // Sanity check
-    assert(sample_rtt_tsc >= min_rtt_tsc);
+    assert(_rdtsc >= 1000000000 && _rdtsc >= last_update_tsc);  // Sanity check
+
+    // Sample RTT can be lower than min RTT during retransmissions
+    if (unlikely(sample_rtt_tsc < min_rtt_tsc)) return;
 
     // Convert the sample RTT to usec, and don't use _sample_rtt_tsc from now
     double sample_rtt = to_usec(sample_rtt_tsc, freq_ghz);
-    if (unlikely(prev_rtt == 0.0)) prev_rtt = sample_rtt;
 
     double rtt_diff = sample_rtt - prev_rtt;
     neg_gradient_count = (rtt_diff < 0) ? neg_gradient_count + 1 : 0;
@@ -65,7 +66,6 @@ class Timely {
 
     double normalized_gradient = avg_rtt_diff / kTimelyMinRTT;
 
-    assert(_rdtsc >= last_update_tsc);
     double delta_factor = (_rdtsc - last_update_tsc) / min_rtt_tsc;  // fdiv
     delta_factor = std::min(delta_factor, 1.0);
 
