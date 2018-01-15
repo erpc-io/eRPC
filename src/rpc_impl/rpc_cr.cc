@@ -41,7 +41,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   in_order &= (pkthdr->pkt_num < sslot->client_info.req_sent);
 
   if (unlikely(!in_order)) {
-    LOG_DEBUG(
+    LOG_REORDER(
         "eRPC Rpc %u: Received out-of-order explicit CR for session %u. "
         "Pkt = %zu/%zu. cur_req_num = %zu, expl_cr_rcvd = %zu. Dropping.\n",
         rpc_id, sslot->session->local_session_num, pkthdr->req_num,

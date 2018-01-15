@@ -73,13 +73,13 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
            ci.expl_cr_rcvd < sslot->tx_msgbuf->num_pkts);
 
     if (ci.expl_cr_rcvd == ci.req_sent) {
-      LOG_DEBUG("%s: False positive. Ignoring.\n", issue_msg);
+      LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
     } else {
       size_t delta = ci.req_sent - ci.expl_cr_rcvd;
       assert(credits + delta <= kSessionCredits);
 
       // Reclaim credits, reset progress, and add to request TX queue if needed
-      LOG_DEBUG("%s: Retransmitting request.\n", issue_msg);
+      LOG_REORDER("%s: Retransmitting request.\n", issue_msg);
       credits += delta;
       ci.req_sent = ci.expl_cr_rcvd;
 
@@ -100,7 +100,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       // It's possible (but not certain) that we've received all response
       // packets, and that a background thread currently owns sslot, but it
       // cannot modify resp_rcvd or num_pkts
-      LOG_DEBUG("%s: False positive. Ignoring.\n", issue_msg);
+      LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
     } else {
       // We don't have the full response (which must be multi-packet), so
       // the background thread can't bury rx_msgbuf
@@ -110,7 +110,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
       assert(credits + delta <= kSessionCredits);
 
       // Reclaim credits, reset progress, and retransmit RFR
-      LOG_DEBUG("%s: Retransmitting RFR.\n", issue_msg);
+      LOG_REORDER("%s: Retransmitting RFR.\n", issue_msg);
       credits += delta;
       ci.rfr_sent = ci.resp_rcvd - 1;
 

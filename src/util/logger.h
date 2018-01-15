@@ -66,12 +66,12 @@ static void output_log_header(int level);
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_DEBUG
-#define LOG_DEBUG(...)                     \
+#define LOG_REORDER(...)                   \
   output_log_header(LOG_LEVEL_DEBUG);      \
   fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
   fflush(stdout)
 #else
-#define LOG_DEBUG(...) ((void)0)
+#define LOG_REORDER(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_TRACE

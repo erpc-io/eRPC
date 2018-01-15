@@ -48,13 +48,13 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     if (pkthdr->req_num < sslot->cur_req_num) {
       // Reject RFR for old requests
-      LOG_DEBUG("%s: Dropping.\n", issue_msg);
+      LOG_REORDER("%s: Dropping.\n", issue_msg);
       return;
     }
 
     if (pkthdr->pkt_num > sslot->server_info.rfr_rcvd + 1) {
       // Reject future packets
-      LOG_DEBUG("%s: Dropping.\n", issue_msg);
+      LOG_REORDER("%s: Dropping.\n", issue_msg);
       return;
     }
 
@@ -63,7 +63,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
            pkthdr->pkt_num < sslot->server_info.rfr_rcvd + 1);
     assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
 
-    LOG_DEBUG("%s: Re-sending response.\n", issue_msg);
+    LOG_REORDER("%s: Re-sending response.\n", issue_msg);
 
     // Re-send the response packet with index = pkthdr->pkt_num (same as below)
     enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num, nullptr);
