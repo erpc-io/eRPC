@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include "common.h"
-#include "math_utils.h"
 
 namespace erpc {
 

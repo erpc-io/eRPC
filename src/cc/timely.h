@@ -47,7 +47,8 @@ class Timely {
   /**
    * @brief Perform a rate update
    *
-   * @param _rdtsc A recently sampled RDTSC. This can reduce calls to rdtsc().
+   * @param _rdtsc A recently sampled RDTSC. This can reduce calls to rdtsc()
+   * when the caller can reuse a sampled RDTSC.
    * @param sample_rtt_tsc The RTT sample in RDTSC cycles
    */
   void update_rate(size_t _rdtsc, size_t sample_rtt_tsc) {

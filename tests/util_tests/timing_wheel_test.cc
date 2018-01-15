@@ -45,7 +45,7 @@ TEST(TimingWheelTest, Basic) {
   ASSERT_EQ(wheel.ready_queue.size(), 0);
 
   // One entry. Check that it's eventually sent.
-  wheel.insert(dummy_ent, rdtsc() + wheel.wslot_width_tsc);
+  wheel.insert(dummy_ent, rdtsc(), rdtsc() + wheel.wslot_width_tsc);
 
   while (true) {
     wheel.reap(rdtsc());
@@ -83,10 +83,10 @@ TEST(TimingWheelTest, RateTest) {
     rate_timer.start();
 
     // Send one window
-    size_t last_tsc = rdtsc();  // Last TSC used by this session for pacing
+    size_t abs_tx_tsc = rdtsc();  // TX tsc for this session
     for (size_t i = 0; i < kSessionCredits; i++) {
-      wheel.insert(dummy_ent, last_tsc);
-      last_tsc += cycles_per_pkt;
+      wheel.insert(dummy_ent, rdtsc(), abs_tx_tsc);
+      abs_tx_tsc += cycles_per_pkt;
     }
 
     size_t num_pkts_sent = 0;
@@ -102,8 +102,8 @@ TEST(TimingWheelTest, RateTest) {
 
         // Send more packets
         for (size_t i = 0; i < num_ready; i++) {
-          wheel.insert(dummy_ent, last_tsc);
-          last_tsc += cycles_per_pkt;
+          wheel.insert(dummy_ent, rdtsc(), abs_tx_tsc);
+          abs_tx_tsc += cycles_per_pkt;
           wheel.ready_queue.pop();
         }
       }

@@ -132,9 +132,8 @@ class TimingWheel {
   }
 
   /// Add an entry for transmission at timestamp = abs_tx_tsc
-  inline void insert(const wheel_ent_t &ent, size_t abs_tx_tsc) {
-    size_t cur_tsc = dpath_rdtsc();
-    if (abs_tx_tsc <= cur_tsc) {
+  inline void insert(const wheel_ent_t &ent, size_t _rdtsc, size_t abs_tx_tsc) {
+    if (abs_tx_tsc <= _rdtsc) {
       // If abs_tx_tsc is in the past, add directly to ready queue
       ready_queue.push(ent);
 
@@ -142,19 +141,19 @@ class TimingWheel {
       return;
     }
 
-    assert(abs_tx_tsc > cur_tsc);
+    assert(abs_tx_tsc > _rdtsc);
 
     // - abs_tx_tsc was computed at compute_tsc.
     // - cur_tsc > compute_tsc holds because of RDTSC ordering
     //   - So we have: abs_tx_tsc > cur_tsc > compute_tsc
     // - By horizon definiton: abs_tx_tsc - compute_tsc <= horizon_tsc  So:
-    assert(abs_tx_tsc - cur_tsc < horizon_tsc);
+    assert(abs_tx_tsc - _rdtsc < horizon_tsc);
 
     // Advance the wheel to the current time
-    reap(cur_tsc);
-    assert(wheel[cur_wslot].tx_tsc > cur_tsc);
+    reap(_rdtsc);
+    assert(wheel[cur_wslot].tx_tsc > _rdtsc);
 
-    size_t wslot_delta = (abs_tx_tsc - cur_tsc) / wslot_width_tsc;
+    size_t wslot_delta = (abs_tx_tsc - _rdtsc) / wslot_width_tsc;
     assert(wslot_delta < num_wslots);
 
     size_t dst_wslot = (cur_wslot + wslot_delta);

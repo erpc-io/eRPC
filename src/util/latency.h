@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <cstdio>
 #include "common.h"
-#include "util/timer.h"
 
 namespace erpc {
 
@@ -172,46 +171,6 @@ class Latency {
   size_t bin4_[128];
   // [3968, inf) us
   size_t bin5_;
-};
-
-/// Average latency measurement class using TSC timestamps
-class TscLatency {
- public:
-  double freq_ghz = -1.0;  // Nominal TSC frequency
-  bool started = false;  // Debug-only. True iff the stopwatch has been started.
-  size_t stopwatch_start_cycles = 0;
-  size_t total_cycles = 0;
-  size_t num_samples = 0;
-
-  TscLatency(double freq_ghz) : freq_ghz(freq_ghz) {}
-  TscLatency() {}
-
-  void stopwatch_start() {
-    assert(!started);
-    started = true;
-    stopwatch_start_cycles = erpc::rdtsc();
-  }
-
-  void stopwatch_stop() {
-    assert(started);
-    started = false;
-    total_cycles += (erpc::rdtsc() - stopwatch_start_cycles);
-    num_samples++;
-  }
-
-  /// Reset the statistics, while keeping the current timing state
-  void reset() {
-    total_cycles = 0;
-    num_samples = 0;
-  }
-
-  double get_avg_us() {
-    if (unlikely(num_samples) == 0) return -0.0;
-    if (unlikely(freq_ghz == -1.0)) return -0.0;
-
-    size_t avg_cycles = total_cycles / num_samples;
-    return erpc::to_usec(avg_cycles, freq_ghz);
-  }
 };
 }
 
