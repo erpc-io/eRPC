@@ -131,15 +131,11 @@ class TimingWheel {
     }
   }
 
-  /// Add an entry for transmission at timestamp = abs_tx_tsc
+  /// Add an entry for transmission at timestamp = abs_tx_tsc. We never add
+  /// directly to the ready queue here because doing so can cause reordering.
   inline void insert(const wheel_ent_t &ent, size_t _rdtsc, size_t abs_tx_tsc) {
     assert(abs_tx_tsc >= _rdtsc);
-
-    // - abs_tx_tsc was computed at compute_tsc.
-    // - _rdtsc >= compute_tsc holds because of RDTSC ordering
-    //   - So we have: abs_tx_tsc > _rdtsc > compute_tsc
-    // - By horizon definiton: abs_tx_tsc - compute_tsc <= horizon_tsc  So:
-    assert(abs_tx_tsc - _rdtsc <= horizon_tsc);
+    assert(abs_tx_tsc - _rdtsc <= horizon_tsc);  // Horizon def + TSC ordering
 
     // Advance the wheel to the current time
     reap(_rdtsc);
