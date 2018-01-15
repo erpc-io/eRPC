@@ -118,7 +118,7 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
     if (kCC) {
       size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(0);
       size_t _rdtsc = dpath_rdtsc();
-      size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(pkt_size);
+      size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, pkt_size);
       wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(0)), _rdtsc,
                     abs_tx_tsc);
     } else {
@@ -137,7 +137,7 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
       if (kCC) {
         size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(ci.req_sent);
         size_t _rdtsc = dpath_rdtsc();
-        size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(psz);
+        size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, psz);
 
         LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, abs TX %.3f us.\n",
                rpc_id, sslot->cur_req_num, ci.req_sent,

@@ -72,13 +72,23 @@ class Session {
   inline bool is_server() const { return role == Role::kServer; }
   inline bool is_connected() const { return state == SessionState::kConnected; }
 
-  /// Get the absolute TX timestamp for transmission, and update abs_tx_tsc
-  inline size_t cc_getupdate_tx_tsc(size_t pkt_size) {
+  /**
+   * @brief Get the absolute TX timestamp for transmission, and update
+   * the session's abs_tx_tsc
+   *
+   * @param _rdtsc A recently-sampled RDTSC
+   * @param pkt_size The size of the packet to transmit
+   * @return The absolute TX timestamp
+   */
+  inline size_t cc_getupdate_tx_tsc(size_t _rdtsc, size_t pkt_size) {
     assert(is_client());
+    assert(_rdtsc > 1000000000 && pkt_size <= 8192);  // Args sanity check
+
     double ns_delta = 1000000000 * (pkt_size / client_info.cc.timely.rate);
-    size_t cycle_delta = ns_to_cycles(ns_delta, freq_ghz);
-    size_t abs_tx_tsc = client_info.cc.abs_tx_tsc + cycle_delta;
-    client_info.cc.abs_tx_tsc = abs_tx_tsc;
+
+    size_t &abs_tx_tsc = client_info.cc.abs_rx_tsc;
+    abs_tx_tsc += ns_to_cycles(ns_delta, freq_ghz);
+    abs_tx_tsc = std::max(_rdtsc, abs_tx_tsc);
     return abs_tx_tsc;
   }
 
