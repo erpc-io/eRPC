@@ -22,7 +22,7 @@ namespace erpc {
 #define LOG_LEVEL_TRACE 5  // Extremely frequent (e.g., all datapath packets)
 
 // Logging for congestion control/packet pacing datapath is enabled separately
-#define LOG_CC_ENABLE 1
+#define LOG_CC_ENABLE 0
 
 #define LOG_OUTPUT_STREAM stdout
 

@@ -133,21 +133,13 @@ class TimingWheel {
 
   /// Add an entry for transmission at timestamp = abs_tx_tsc
   inline void insert(const wheel_ent_t &ent, size_t _rdtsc, size_t abs_tx_tsc) {
-    if (abs_tx_tsc <= _rdtsc) {
-      // If abs_tx_tsc is in the past, add directly to ready queue
-      ready_queue.push(ent);
-
-      if (kWheelRecord) record_vec.emplace_back(abs_tx_tsc);
-      return;
-    }
-
-    assert(abs_tx_tsc > _rdtsc);
+    assert(abs_tx_tsc >= _rdtsc);
 
     // - abs_tx_tsc was computed at compute_tsc.
-    // - cur_tsc > compute_tsc holds because of RDTSC ordering
-    //   - So we have: abs_tx_tsc > cur_tsc > compute_tsc
+    // - _rdtsc >= compute_tsc holds because of RDTSC ordering
+    //   - So we have: abs_tx_tsc > _rdtsc > compute_tsc
     // - By horizon definiton: abs_tx_tsc - compute_tsc <= horizon_tsc  So:
-    assert(abs_tx_tsc - _rdtsc < horizon_tsc);
+    assert(abs_tx_tsc - _rdtsc <= horizon_tsc);
 
     // Advance the wheel to the current time
     reap(_rdtsc);
