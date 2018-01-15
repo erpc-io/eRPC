@@ -94,7 +94,7 @@ class TimingWheel {
         wslot_width_tsc(us_to_cycles(wslot_width, freq_ghz)),
         horizon(1000000 * (kSessionCredits * mtu) / kTimelyMinRate),
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
-        num_wslots(round_up(horizon / wslot_width)),
+        num_wslots(1 + round_up(horizon / wslot_width)),
         console_ref_tsc(rdtsc()),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
@@ -114,8 +114,6 @@ class TimingWheel {
       wheel[ws_i].tx_tsc = base_tsc + (ws_i + 1) * wslot_width_tsc;
       wheel[ws_i].last = &wheel[ws_i];
     }
-
-    cur_wslot = 0;
   }
 
   /// Move entries from all wheel slots older than reap_tsc to the ready queue.
@@ -141,11 +139,17 @@ class TimingWheel {
     reap(_rdtsc);
     assert(wheel[cur_wslot].tx_tsc > _rdtsc);
 
-    size_t wslot_delta = (abs_tx_tsc - _rdtsc) / wslot_width_tsc;
-    assert(wslot_delta < num_wslots);
+    size_t dst_wslot;
+    if (abs_tx_tsc <= wheel[cur_wslot].tx_tsc) {
+      dst_wslot = cur_wslot;
+    } else {
+      size_t wslot_delta =
+          1 + (abs_tx_tsc - wheel[cur_wslot].tx_tsc) / wslot_width_tsc;
+      assert(wslot_delta < num_wslots);
 
-    size_t dst_wslot = (cur_wslot + wslot_delta);
-    if (dst_wslot >= num_wslots) dst_wslot -= num_wslots;
+      dst_wslot = cur_wslot + wslot_delta;
+      if (dst_wslot >= num_wslots) dst_wslot -= num_wslots;
+    }
 
     if (kWheelRecord) {
       record_vec.emplace_back(abs_tx_tsc,
@@ -219,7 +223,7 @@ class TimingWheel {
   HugeAlloc *huge_alloc;
 
   wheel_bkt_t *wheel;
-  size_t cur_wslot;
+  size_t cur_wslot = 0;
   MemPool<wheel_bkt_t> bkt_pool;
 
  public:
