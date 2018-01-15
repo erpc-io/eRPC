@@ -226,8 +226,7 @@ void RawTransport::init_send_qp() {
 
   struct ibv_exp_qp_init_attr qp_init_attr;
   memset(&qp_init_attr, 0, sizeof(qp_init_attr));
-  qp_init_attr.comp_mask =
-      IBV_EXP_QP_INIT_ATTR_PD | IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS;
+  qp_init_attr.comp_mask = IBV_EXP_QP_INIT_ATTR_PD;
 
   qp_init_attr.pd = pd;
   qp_init_attr.send_cq = send_cq;
@@ -238,7 +237,6 @@ void RawTransport::init_send_qp() {
   qp_init_attr.cap.max_recv_sge = kDumb ? 0 : 1;
   qp_init_attr.cap.max_inline_data = kMaxInline;
   qp_init_attr.qp_type = IBV_QPT_RAW_PACKET;
-  qp_init_attr.exp_create_flags |= IBV_EXP_QP_CREATE_SCATTER_FCS;
 
   qp = ibv_exp_create_qp(resolve.ib_ctx, &qp_init_attr);
   rt_assert(qp != nullptr, "Failed to create QP");
