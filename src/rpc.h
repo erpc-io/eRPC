@@ -767,7 +767,7 @@ class Rpc {
   const sm_handler_t sm_handler;
   const uint8_t phy_port;  ///< Zero-based physical port specified by app
   const size_t numa_node;
-  const uint64_t creation_tsc;  ///< Timestamp of creation of this Rpc endpoint
+  const size_t creation_tsc;  ///< Timestamp of creation of this Rpc endpoint
 
   // Derived
   const bool multi_threaded;  ///< True iff there are background threads

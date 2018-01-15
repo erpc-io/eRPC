@@ -21,6 +21,9 @@ namespace erpc {
 #define LOG_LEVEL_DEBUG 4  // Too frequent to print (e.g., reordered packets)
 #define LOG_LEVEL_TRACE 5  // Extremely frequent (e.g., all datapath packets)
 
+// Logging for congestion control/packet pacing datapath is enabled separately
+#define LOG_CC_ENABLE 1
+
 #define LOG_OUTPUT_STREAM stdout
 
 // If LOG_LEVEL is not defined, default to LOG_LEVEL_INFO in debug mode, and
@@ -78,6 +81,14 @@ static void output_log_header(int level);
   fflush(stdout)
 #else
 #define LOG_TRACE(...) ((void)0)
+#endif
+
+#if LOG_CC_ENABLE == 1
+#define LOG_CC(...)                        \
+  fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
+  fflush(stdout)
+#else
+#define LOG_CC(...) ((void)0)
 #endif
 
 static std::string get_formatted_time() {

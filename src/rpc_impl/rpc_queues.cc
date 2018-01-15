@@ -23,13 +23,18 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
 
 template <class TTr>
 void Rpc<TTr>::process_wheel_st() {
-  assert(in_dispatch());
-  wheel->reap(dpath_rdtsc());
+  assert(in_dispatch() && kCC);
+  size_t cur_tsc = dpath_rdtsc();
+  wheel->reap(cur_tsc);
 
   size_t num_ready = wheel->ready_queue.size();
   for (size_t i = 0; i < num_ready; i++) {
     wheel_ent_t &ent = wheel->ready_queue.front();
     assert(!ent.is_rfr);  // For now
+
+    LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, actual TX %.3f us.\n",
+           rpc_id, ent.sslot->cur_req_num, ent.pkt_num,
+           to_usec(cur_tsc - creation_tsc, freq_ghz));
 
     enqueue_pkt_tx_burst_st(
         ent.sslot, ent.pkt_num,

@@ -3,7 +3,7 @@
 --resp_size 32
 --num_processes 2
 --num_threads 1
---concurrency 4
+--concurrency 1
 --drop_prob 0.0
 --profile incast
---session_gbps 8.0
+--session_gbps 4.0
