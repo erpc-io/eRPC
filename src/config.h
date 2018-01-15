@@ -13,7 +13,7 @@ namespace erpc {
 class IBTransport;
 class RawTransport;
 
-static constexpr bool kCC = true;  ///< Enable congestion control
+static constexpr bool kCC = true;  ///< Enable Timely and wheel-based pacing
 static constexpr bool kDisableTimely = true;  ///< Disable Timely rate update
 
 // static constexpr size_t kHeadroom = 0;
