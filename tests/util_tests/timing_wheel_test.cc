@@ -12,9 +12,9 @@
 using namespace erpc;
 
 static constexpr size_t kTestMTU = 1024;
-static constexpr size_t kTestPktSize = 88;
-static constexpr size_t kTestNumPkts = 100000;
-static constexpr double kTestWslotWidth = .1;  // us per wheel slot
+static constexpr size_t kTestPktSize = 1024;
+static constexpr size_t kTestNumPkts = 8000;
+static constexpr double kTestWslotWidth = .2;  // us per wheel slot
 
 // Dummy registration and deregistration functions
 Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
