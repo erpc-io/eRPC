@@ -166,8 +166,9 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_rx_bytes_tot += FLAGS_resp_size;
   c->rpc->release_response(resp_handle);
 
-  if (c->stat_rx_bytes_tot >= 50000000 || c->stat_tx_bytes_tot >= 50000000) {
-    double ns = erpc::ns_since(c->tput_t0);
+  // Print twice every second
+  double ns = erpc::ns_since(c->tput_t0);
+  if (ns >= 500000000) {
     double rx_gbps = c->stat_rx_bytes_tot * 8 / ns;
     double tx_gbps = c->stat_tx_bytes_tot * 8 / ns;
 
