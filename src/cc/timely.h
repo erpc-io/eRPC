@@ -18,7 +18,7 @@ static constexpr double kTimelyMinRTT = 2;
 static constexpr double kTimelyTLow = 50;
 static constexpr double kTimelyTHigh = 1000;
 
-static constexpr double kTimelyDecreaseFactor = 0.8;
+static constexpr double kTimelyBeta = 0.8;
 static constexpr size_t kTimelyHaiThresh = 5;
 
 /// Max = 5 GB/s (40 Gbps), min = 5 MB/s (arbitrary)
@@ -44,6 +44,13 @@ class Timely {
         min_rtt_tsc(kTimelyMinRTT * freq_ghz * 1000),
         freq_ghz(freq_ghz) {}
 
+  // The w(g) function from ECN vs Delay
+  static double w_func(double g) {
+    if (g <= -0.25) return 0;
+    if (g >= 0.25) return 1;
+    return (2 * g + 0.5);
+  }
+
   /**
    * @brief Perform a rate update
    *
@@ -66,8 +73,6 @@ class Timely {
     avg_rtt_diff =
         ((1 - kTimelyEwmaAlpha) * avg_rtt_diff) + (kTimelyEwmaAlpha * rtt_diff);
 
-    double normalized_gradient = avg_rtt_diff / kTimelyMinRTT;
-
     double delta_factor = (_rdtsc - last_update_tsc) / min_rtt_tsc;  // fdiv
     delta_factor = std::min(delta_factor, 1.0);
 
@@ -78,17 +83,18 @@ class Timely {
     } else {
       if (unlikely(sample_rtt > kTimelyTHigh)) {
         // Multiplicative decrease based on current RTT sample, not average
-        new_rate = rate * (1 - (delta_factor * kTimelyDecreaseFactor *
+        new_rate = rate * (1 - (delta_factor * kTimelyBeta *
                                 (1 - (kTimelyTHigh / sample_rtt))));
       } else {
-        if (normalized_gradient <= 0) {
+        double norm_grad = avg_rtt_diff / kTimelyMinRTT;  // Normalized gradient
+
+        if (norm_grad <= 0) {
           // Additive increase, possibly hyper-active
           size_t N = neg_gradient_count >= kTimelyHaiThresh ? 5 : 1;
           new_rate = rate + (N * kTimelyAddRate * delta_factor);
         } else {
           // Multiplicative decrease based on moving average gradient
-          new_rate = rate * (1.0 - (delta_factor * kTimelyDecreaseFactor *
-                                    normalized_gradient));
+          new_rate = rate * (1.0 - (delta_factor * kTimelyBeta * norm_grad));
         }
       }
     }
