@@ -15,11 +15,11 @@ namespace erpc {
 
 // Log levels: higher means more verbose
 #define LOG_LEVEL_OFF 0
-#define LOG_LEVEL_ERROR 1  // Only fatal conditions
-#define LOG_LEVEL_WARN 2   // Conditions from which it is possible to recover
-#define LOG_LEVEL_INFO 3   // Reasonable to print (e.g., management packets)
-#define LOG_LEVEL_DEBUG 4  // Too frequent to print (e.g., reordered packets)
-#define LOG_LEVEL_TRACE 5  // Extremely frequent (e.g., all datapath packets)
+#define LOG_LEVEL_ERROR 1    // Only fatal conditions
+#define LOG_LEVEL_WARN 2     // Conditions from which it is possible to recover
+#define LOG_LEVEL_INFO 3     // Reasonable to print (e.g., management packets)
+#define LOG_LEVEL_REORDER 4  // Too frequent to print (e.g., reordered packets)
+#define LOG_LEVEL_TRACE 5    // Extremely frequent (e.g., all datapath packets)
 
 // Logging for congestion control/packet pacing datapath is enabled separately
 #define LOG_CC_ENABLE 0
@@ -65,9 +65,9 @@ static void output_log_header(int level);
 #define LOG_INFO(...) ((void)0)
 #endif
 
-#if LOG_LEVEL >= LOG_LEVEL_DEBUG
+#if LOG_LEVEL >= LOG_LEVEL_REORDER
 #define LOG_REORDER(...)                   \
-  output_log_header(LOG_LEVEL_DEBUG);      \
+  output_log_header(LOG_LEVEL_REORDER);    \
   fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
   fflush(stdout)
 #else
@@ -123,8 +123,8 @@ static void output_log_header(int level) {
     case LOG_LEVEL_INFO:
       type = "INFO";
       break;
-    case LOG_LEVEL_DEBUG:
-      type = "DEBUG";
+    case LOG_LEVEL_REORDER:
+      type = "REORDER";
       break;
     case LOG_LEVEL_TRACE:
       type = "TRACE";
@@ -136,7 +136,7 @@ static void output_log_header(int level) {
   fprintf(LOG_OUTPUT_STREAM, "%s %s: ", formatted_time.c_str(), type);
 }
 
-/// Return true iff DEBUG and TRACE mode logging is disabled. These modes can
+/// Return true iff REORDER and TRACE mode logging is disabled. These modes can
 /// print an unreasonable number of log messages.
 static bool is_log_level_reasonable() { return LOG_LEVEL <= LOG_LEVEL_INFO; }
 
