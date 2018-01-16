@@ -228,9 +228,8 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.tmp_stat = new TmpStat("rx_gbps tx_gbps avg_us 99_us");
   c.thread_id = thread_id;
 
-  uint8_t phy_port;
-  if (FLAGS_numa_node == 0) phy_port = numa_0_ports[thread_id % 2];
-  if (FLAGS_numa_node == 1) phy_port = numa_1_ports[thread_id % 2];
+  uint8_t phy_port = (FLAGS_numa_node == 0) ? numa_0_ports[thread_id % 2]
+                                            : numa_1_ports[thread_id % 2];
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id), sm_handler,
                                   phy_port);
