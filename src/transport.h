@@ -124,11 +124,10 @@ class Transport {
   void tx_flush();
 
   /**
-   * @brief The generic packet reception function
+   * @brief The generic packet RX function
    *
-   * This function returns the number of new packets available in the RX ring.
-   *
-   * The Rpc layer controls posting of RECVs explicitly using post_recvs().
+   * @return the number of new packets available in the RX ring. The Rpc layer
+   * controls posting of RECVs explicitly using post_recvs().
    */
   size_t rx_burst();
 

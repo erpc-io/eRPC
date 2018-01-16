@@ -244,8 +244,7 @@ class RawTransport : public Transport {
 
   // Multi-packet RECV fields. Used only in dumbpipe mode.
   struct ibv_sge mp_recv_sge[kRQDepth];  ///< The multi-packet RECV SGEs
-  size_t mp_sge_idx = 0;    ///< Index of the multi-packet SGE to post
-  size_t recv_backlog = 0;  ///< Used to store RECVs and return <= kPostlist
+  size_t mp_sge_idx = 0;  ///< Index of the multi-packet SGE to post
 
   // Non-multi-packet RECV fields
   struct ibv_recv_wr recv_wr[kRQDepth];

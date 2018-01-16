@@ -100,11 +100,7 @@ size_t RawTransport::rx_burst() {
     const size_t delta = get_cqe_cycle_delta(prev_snapshot, cur_snapshot);
     if (delta == 0 || delta >= kNumRxRingEntries) return 0;
 
-    recv_backlog += delta;
-    size_t comps_clamped = recv_backlog < kPostlist ? recv_backlog : kPostlist;
-    recv_backlog -= comps_clamped;
-
-    for (size_t i = 0; i < comps_clamped; i++) {
+    for (size_t i = 0; i < delta; i++) {
       auto* pkthdr =
           reinterpret_cast<pkthdr_t*>(&ring_extent.buf[recv_head * kRecvSize]);
       __builtin_prefetch(pkthdr, 0, 3);
@@ -117,9 +113,10 @@ size_t RawTransport::rx_burst() {
       recv_head = (recv_head + 1) % kNumRxRingEntries;
     }
 
+    // We can move to next CQE only after the current is used (i.e., delta > 0)
     cqe_idx = (cqe_idx + 1) % kRecvCQDepth;
     prev_snapshot = cur_snapshot;
-    return comps_clamped;
+    return delta;
   } else {
     int ret = ibv_poll_cq(recv_cq, kPostlist, recv_wc);
     assert(ret >= 0);
