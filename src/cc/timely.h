@@ -19,6 +19,7 @@ static constexpr double kTimelyAddRate = 5.0 * 1000 * 1000;
 
 class Timely {
  private:
+  static constexpr bool kPatched = true;  // Pacth from ECN-vs-delay
   static constexpr double kEwmaAlpha = 0.02;
 
   static constexpr double kMinRTT = 2;
@@ -44,8 +45,9 @@ class Timely {
         min_rtt_tsc(kMinRTT * freq_ghz * 1000),
         freq_ghz(freq_ghz) {}
 
-  // The w(g) function from ECN vs Delay
+  // The w(g) function from ECN-vs-delay
   static double w_func(double g) {
+    assert(kPatched);
     if (g <= -0.25) return 0;
     if (g >= 0.25) return 1;
     return (2 * g + 0.5);
@@ -72,26 +74,32 @@ class Timely {
     neg_gradient_count = (rtt_diff < 0) ? neg_gradient_count + 1 : 0;
     avg_rtt_diff = ((1 - kEwmaAlpha) * avg_rtt_diff) + (kEwmaAlpha * rtt_diff);
 
-    double delta_factor = (_rdtsc - last_update_tsc) / min_rtt_tsc;  // fdiv
-    delta_factor = std::min(delta_factor, 1.0);
+    double _delta_factor = (_rdtsc - last_update_tsc) / min_rtt_tsc;  // fdiv
+    _delta_factor = std::min(_delta_factor, 1.0);
+
+    double ai_factor = kTimelyMaxRate * _delta_factor;
 
     double new_rate;
     if (sample_rtt < kTLow) {
       // Additive increase
-      new_rate = rate + (kTimelyAddRate * delta_factor);
+      new_rate = rate + ai_factor;
     } else {
-      double md_factor = delta_factor * kBeta;  // Scaled factor for decrease
+      double md_factor = _delta_factor * kBeta;   // Scaled factor for decrease
+      double norm_grad = avg_rtt_diff / kMinRTT;  // Normalized gradient
 
       if (likely(sample_rtt <= kTHigh)) {
-        double norm_grad = avg_rtt_diff / kMinRTT;  // Normalized gradient
-
-        if (norm_grad <= 0) {
-          // Additive increase, possibly hyper-active
-          size_t N = neg_gradient_count >= kHaiThresh ? 5 : 1;
-          new_rate = rate + (N * kTimelyAddRate * delta_factor);
+        if (kPatched) {
+          double wght = w_func(norm_grad);
+          double err = (sample_rtt - kMinRTT) / kMinRTT;
+          rate = rate * (1 - md_factor * wght * err) + ai_factor * (1 - wght);
         } else {
-          // Multiplicative decrease based on moving average gradient
-          new_rate = rate * (1.0 - md_factor * norm_grad);
+          // Original logic
+          if (norm_grad <= 0) {
+            size_t N = neg_gradient_count >= kHaiThresh ? 5 : 1;
+            new_rate = rate + N * ai_factor;
+          } else {
+            new_rate = rate * (1.0 - md_factor * norm_grad);
+          }
         }
       } else {
         // Multiplicative decrease based on current RTT sample, not average
