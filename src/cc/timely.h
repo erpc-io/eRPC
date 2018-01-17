@@ -91,7 +91,8 @@ class Timely {
         if (kPatched) {
           double wght = w_func(norm_grad);
           double err = (sample_rtt - kMinRTT) / kMinRTT;
-          rate = rate * (1 - md_factor * wght * err) + ai_factor * (1 - wght);
+          new_rate =
+              rate * (1 - md_factor * wght * err) + ai_factor * (1 - wght);
         } else {
           // Original logic
           if (norm_grad <= 0) {
@@ -107,12 +108,12 @@ class Timely {
       }
     }
 
-    prev_rtt = sample_rtt;
-    last_update_tsc = _rdtsc;
-
     rate = std::max(new_rate, rate * 0.5);
     rate = std::min(rate, kTimelyMaxRate);
     rate = std::max(rate, kTimelyMinRate);
+
+    prev_rtt = sample_rtt;
+    last_update_tsc = _rdtsc;
   }
 
   double get_avg_rtt_diff() const { return avg_rtt_diff; }

@@ -1,4 +1,4 @@
---test_ms 20000
+--test_ms 200000
 --req_size 65536
 --resp_size 32
 --num_processes 2
