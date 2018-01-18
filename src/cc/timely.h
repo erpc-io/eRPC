@@ -8,6 +8,7 @@
 #ifndef ERPC_TIMELY_H
 #define ERPC_TIMELY_H
 
+#include <iomanip>
 #include "common.h"
 #include "util/timer.h"
 
@@ -17,9 +18,26 @@ static constexpr double kTimelyMaxRate = 5.0 * 1000 * 1000 * 1000;
 static constexpr double kTimelyMinRate = 5.0 * 1000 * 1000;
 static constexpr double kTimelyAddRate = 5.0 * 1000 * 1000;
 
+struct timely_record_t {
+  double rtt;
+  double rate;
+
+  timely_record_t() : rtt(0.0), rate(0.0) {}
+  timely_record_t(double rtt, double rate) : rtt(rtt), rate(rate) {}
+
+  std::string to_string() {
+    std::ostringstream ret;
+    ret << "[RTT " << std::setprecision(5) << rtt << " us"
+        << ", rate " << std::setprecision(4)
+        << (rate / (1000 * 1000 * 1000)) * 8 << "]";
+    return ret.str();
+  }
+};
+
 class Timely {
  private:
-  static constexpr bool kPatched = true;  // Pacth from ECN-vs-delay
+  static constexpr bool kRecord = false;  // Record Timely steps
+  static constexpr bool kPatched = true;  // Patch from ECN-vs-delay
   static constexpr double kEwmaAlpha = 0.02;
 
   static constexpr double kMinRTT = 2;
@@ -36,6 +54,10 @@ class Timely {
   double min_rtt_tsc = 0.0;
   double freq_ghz = 0.0;
 
+  // For recording, used only with kRecord
+  size_t create_tsc;
+  std::vector<timely_record_t> record_vec;
+
  public:
   double rate = kTimelyMaxRate;
 
@@ -43,7 +65,10 @@ class Timely {
   Timely(double freq_ghz)
       : last_update_tsc(rdtsc()),
         min_rtt_tsc(kMinRTT * freq_ghz * 1000),
-        freq_ghz(freq_ghz) {}
+        freq_ghz(freq_ghz),
+        create_tsc(rdtsc()) {
+    if (kRecord) record_vec.reserve(1000000);
+  }
 
   // The w(g) function from ECN-vs-delay
   static double w_func(double g) {
@@ -111,6 +136,22 @@ class Timely {
     rate = std::max(new_rate, rate * 0.5);
     rate = std::min(rate, kTimelyMaxRate);
     rate = std::max(rate, kTimelyMinRate);
+
+    if (kRecord && rate != kTimelyMaxRate) {
+      record_vec.emplace_back(sample_rtt, rate);
+    }
+
+    if (kRecord && rate == kTimelyMinRate) {
+      // If we reach min rate after steady state, print a log and exit
+      double sec_since_creation = to_sec(rdtsc() - create_tsc, freq_ghz);
+      if (sec_since_creation >= 20.0) {
+        for (size_t i = 0; i < 100; i++) {
+          printf("%s\n", record_vec.back().to_string().c_str());
+          record_vec.pop_back();
+        }
+        exit(-1);
+      }
+    }
 
     prev_rtt = sample_rtt;
     last_update_tsc = _rdtsc;
