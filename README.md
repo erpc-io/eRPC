@@ -184,6 +184,4 @@
    reduce perf (`rt_assert` takes a string argument - does that cause overhead?)
  * Less frequent use of `rdtsc()`
  * Optimize `pkthdr_0` filling using preconstructed headers.
- * Are we losing some performance by using `size_t` instead of `uint32_t` in
-   in-memory structs like Buffer and MsgBuffer?
  * Need to have a test for session management request timeouts.
