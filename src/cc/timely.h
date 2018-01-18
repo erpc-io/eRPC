@@ -35,16 +35,16 @@ struct timely_record_t {
 };
 
 class Timely {
- private:
-  static constexpr bool kRecord = false;  // Record Timely steps
-  static constexpr bool kPatched = true;  // Patch from ECN-vs-delay
-  static constexpr double kEwmaAlpha = 0.02;
+ public:
+  static constexpr bool kRecord = false;      // Record Timely steps
+  static constexpr bool kPatched = true;      // Patch from ECN-vs-delay
+  static constexpr double kEwmaAlpha = .875;  // From ECN-vs-delay
 
   static constexpr double kMinRTT = 2;
   static constexpr double kTLow = 50;
   static constexpr double kTHigh = 1000;
 
-  static constexpr double kBeta = 0.8;
+  static constexpr double kBeta = kPatched ? .008 : .8;
   static constexpr size_t kHaiThresh = 5;
 
   size_t neg_gradient_count = 0;
@@ -58,7 +58,6 @@ class Timely {
   size_t create_tsc;
   std::vector<timely_record_t> record_vec;
 
- public:
   double rate = kTimelyMaxRate;
 
   Timely() {}
@@ -115,7 +114,7 @@ class Timely {
       if (likely(sample_rtt <= kTHigh)) {
         if (kPatched) {
           double wght = w_func(norm_grad);
-          double err = (sample_rtt - kMinRTT) / kMinRTT;
+          double err = (sample_rtt - kTLow) / kTLow;
           new_rate =
               rate * (1 - md_factor * wght * err) + ai_factor * (1 - wght);
         } else {
