@@ -8,6 +8,9 @@ void Rpc<TTr>::process_comps_st() {
   size_t num_pkts = transport->rx_burst();
   if (num_pkts == 0) return;
 
+  dpath_stat_inc(dpath_stats.rx_burst_calls, 1);
+  dpath_stat_inc(dpath_stats.pkts_rx, num_pkts);
+
   for (size_t i = 0; i < num_pkts; i++) {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     rx_ring_head = (rx_ring_head + 1) % Transport::kNumRxRingEntries;

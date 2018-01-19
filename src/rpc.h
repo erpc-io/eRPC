@@ -503,9 +503,8 @@ class Rpc {
   inline void do_tx_burst_st() {
     assert(in_dispatch());
     assert(tx_batch_i > 0);
-
-    dpath_stat_inc(dpath_stats.post_send_calls, 1);
-    dpath_stat_inc(dpath_stats.pkts_sent, tx_batch_i);
+    dpath_stat_inc(dpath_stats.tx_burst_calls, 1);
+    dpath_stat_inc(dpath_stats.pkts_tx, tx_batch_i);
 
     if (kCC) {
       size_t batch_tsc = dpath_rdtsc();  // Once per batch => low overhead
@@ -625,13 +624,6 @@ class Rpc {
   // Stats functions
   //
  public:
-  /// Return the average number of packets in a TX batch
-  double get_avg_tx_burst_size() const {
-    if (!kDatapathStats) return -1;
-    return static_cast<double>(dpath_stats.pkts_sent) /
-           dpath_stats.post_send_calls;
-  }
-
   /// Reset all datapath stats
   void reset_dpath_stats_st() {
     assert(in_dispatch());
@@ -758,6 +750,15 @@ class Rpc {
   /// happens when the server RPC thread has not started.
   bool retry_connect_on_invalid_rpc_id = false;
 
+  // Datapath stats
+  struct {
+    size_t ev_loop_calls = 0;
+    size_t pkts_tx = 0;
+    size_t tx_burst_calls = 0;
+    size_t pkts_rx = 0;
+    size_t rx_burst_calls = 0;
+  } dpath_stats;
+
  private:
   // Constructor args
   Nexus *nexus;
@@ -841,12 +842,6 @@ class Rpc {
     /// Derived: Drop packet iff urand[0, ..., one billion] is smaller than this
     uint32_t pkt_drop_thresh_billion = 0;
   } faults;
-
-  // Datapath stats
-  struct {
-    size_t pkts_sent = 0;
-    size_t post_send_calls = 0;
-  } dpath_stats;
 
   // Additional members for testing
 

@@ -236,12 +236,11 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
     size_t num_sessions = c->session_num_vec.size();
     printf(
-        "Process %zu, thread %zu: %.2f Mrps. Average TX batch = %.2f. "
+        "Process %zu, thread %zu: %.2f Mrps. "
         "Resps RX = %zu, requests RX = %zu. "
         "Resps/concurrent batch: min %zu, max %zu. "
         "Latency: {%.2f, %.2f} us, tput = {%.2f, %.2f, %.2f, %.2f} Gbps.\n",
-        FLAGS_process_id, c->thread_id, tput_mrps,
-        c->rpc->get_avg_tx_burst_size(), c->stat_resp_rx_tot,
+        FLAGS_process_id, c->thread_id, tput_mrps, c->stat_resp_rx_tot,
         c->stat_req_rx_tot, min_resps, max_resps,
         kAppMeasureLatency ? c->latency.perc(.50) / 10.0 : -1,
         kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1,

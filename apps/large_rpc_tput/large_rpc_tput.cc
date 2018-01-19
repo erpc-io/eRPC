@@ -131,6 +131,19 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->stat_tx_bytes_tot += FLAGS_resp_size;
 
   c->rpc->enqueue_response(req_handle);
+
+  // Print burstiness stats, twice per second
+  double ns = erpc::ns_since(c->tput_t0);
+  if (erpc::kDatapathStats && ns >= 500000000) {
+    auto &stats = c->rpc->dpath_stats;
+    printf(
+        "large_rpc_tput: Thread %zu: "
+        "Pkts/event loop call = {%.4f Tx, %.4f Rx}\n",
+        c->thread_id, stats.pkts_tx / (stats.tx_burst_calls + 0.1),
+        stats.pkts_rx / (stats.rx_burst_calls + 0.1));
+
+    clock_gettime(CLOCK_REALTIME, &c->tput_t0);
+  }
 }
 
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {

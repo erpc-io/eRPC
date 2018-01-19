@@ -5,6 +5,7 @@ namespace erpc {
 template <class TTr>
 void Rpc<TTr>::run_event_loop_do_one_st() {
   assert(in_dispatch());
+  dpath_stat_inc(dpath_stats.ev_loop_calls, 1);
 
   if (unlikely(multi_threaded)) {
     // Process the background queues
