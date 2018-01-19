@@ -6,8 +6,9 @@ int main() {
   Timely timely(freq_ghz);
 
   std::vector<double> sample_us;
-  for (size_t i = 0; i < 1000; i++) {
-    double rtt_sample = 500 + (rand() % 25);
+  for (size_t i = 0; i < 2000; i++) {
+    // double rtt_sample = 500 + (0.2 * i);
+    double rtt_sample = 500 + rand() % 1;
     sample_us.push_back(rtt_sample);
   }
 

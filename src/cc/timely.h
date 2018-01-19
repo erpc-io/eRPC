@@ -36,6 +36,7 @@ struct timely_record_t {
 
 class Timely {
  public:
+  static constexpr bool kVerbose = false;
   static constexpr bool kRecord = false;      // Record Timely steps
   static constexpr bool kPatched = true;      // Patch from ECN-vs-delay
   static constexpr double kEwmaAlpha = .875;  // From ECN-vs-delay
@@ -101,7 +102,7 @@ class Timely {
     double _delta_factor = (_rdtsc - last_update_tsc) / min_rtt_tsc;  // fdiv
     _delta_factor = std::min(_delta_factor, 1.0);
 
-    double ai_factor = kTimelyMaxRate * _delta_factor;
+    double ai_factor = kTimelyAddRate * _delta_factor;
 
     double new_rate;
     if (sample_rtt < kTLow) {
@@ -115,6 +116,12 @@ class Timely {
         if (kPatched) {
           double wght = w_func(norm_grad);
           double err = (sample_rtt - kTLow) / kTLow;
+          if (kVerbose) {
+            printf("wght = %.4f, err = %.4f, md = x%.3f, ai = %.3f Gbps\n",
+                   wght, err, (1 - md_factor * wght * err),
+                   rate_to_gbps(ai_factor * (1 - wght)));
+          }
+
           new_rate =
               rate * (1 - md_factor * wght * err) + ai_factor * (1 - wght);
         } else {
