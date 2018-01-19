@@ -5,7 +5,7 @@
 #include "rpc.h"
 #include "util/autorun_helpers.h"
 #include "util/latency.h"
-#include "util/misc.h"
+#include "util/numautils.h"
 
 static constexpr bool kAppVerbose = false;  // Print debug info on datapath
 static constexpr bool kAppMeasureLatency = false;

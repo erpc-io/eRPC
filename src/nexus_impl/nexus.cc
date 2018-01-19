@@ -4,7 +4,7 @@
 #include "rpc.h"
 #include "util/autorun_helpers.h"
 #include "util/barrier.h"
-#include "util/misc.h"
+#include "util/numautils.h"
 
 namespace erpc {
 

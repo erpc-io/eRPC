@@ -7,7 +7,7 @@
 #include "mt_index_api.h"
 #include "rpc.h"
 #include "util/latency.h"
-#include "util/misc.h"
+#include "util/numautils.h"
 
 static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppPointReqType = 1;

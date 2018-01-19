@@ -16,11 +16,11 @@ class RawTransport;
 static constexpr bool kCC = true;  ///< Enable Timely and wheel-based pacing
 static constexpr bool kDisableTimely = false;  ///< Disable Timely rate update
 
-// static constexpr size_t kHeadroom = 0;
-// typedef IBTransport CTransport;
+static constexpr size_t kHeadroom = 0;
+typedef IBTransport CTransport;
 
-static constexpr size_t kHeadroom = 40;
-typedef RawTransport CTransport;
+// static constexpr size_t kHeadroom = 40;
+// typedef RawTransport CTransport;
 
 #if defined(TESTING)
 static constexpr bool kTesting = true;

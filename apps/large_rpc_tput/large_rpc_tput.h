@@ -6,7 +6,7 @@
 #include "../apps_common.h"
 #include "rpc.h"
 #include "util/autorun_helpers.h"
-#include "util/misc.h"
+#include "util/numautils.h"
 
 static constexpr size_t kAppReqType = 1;
 static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
