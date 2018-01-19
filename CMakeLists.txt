@@ -191,7 +191,8 @@ set(UTIL_TESTS
   timing_wheel_test
   rand_test
   fixed_vector_test
-  timely_test)
+  timely_test
+  numautil_test)
 
 # Compile the tests
 if(COMPILE_ERPC_LIB)
