@@ -5,3 +5,5 @@
 --num_processes 8
 --num_threads 2
 --concurrency 8
+--numa_0_ports 0
+--numa_1_ports NA

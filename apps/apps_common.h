@@ -7,12 +7,10 @@
 
 #include <gflags/gflags.h>
 #include <papi.h>
+#include <boost/algorithm/string.hpp>
 #include <fstream>
 #include "rpc.h"
 #include "util/latency.h"
-
-static uint8_t numa_0_ports[2] = {0, 2};
-static uint8_t numa_1_ports[2] = {1, 3};
 
 //
 // Gflags
@@ -23,17 +21,32 @@ static uint8_t numa_1_ports[2] = {1, 3};
 DEFINE_uint64(test_ms, 0, "Test milliseconds");
 DEFINE_uint64(sm_verbose, 0, "Print session management debug info");
 DEFINE_uint64(num_processes, 0, "Number of eRPC processes in the cluster");
-DEFINE_uint64(process_id, std::numeric_limits<size_t>::max(),
-              "The global ID of this process");
+DEFINE_uint64(process_id, SIZE_MAX, "The global ID of this process");
 DEFINE_uint64(numa_node, 0, "NUMA node for this process");
+DEFINE_string(numa_0_ports, "", "Fabric ports on NUMA node 0, CSV, no spaces");
+DEFINE_string(numa_1_ports, "", "Fabric ports on NUMA node 1, CSV, no spaces");
 
-static bool validate_test_ms(const char *, uint64_t test_ms) {
-  return test_ms >= 1000;
+// Return the fabric ports for a NUMA node. The user must specify numa_0_ports
+// and numa_1_ports, but they may be empty.
+std::vector<size_t> flags_get_numa_ports(size_t numa_node) {
+  erpc::rt_assert(numa_node <= 1);  // Only NUMA 0 and 1 supported for now
+  std::vector<size_t> ret;
+
+  std::string port_str =
+      numa_node == 0 ? FLAGS_numa_0_ports : FLAGS_numa_1_ports;
+  if (port_str.size() == 0) return ret;
+
+  std::vector<std::string> split_vec;
+  boost::split(split_vec, port_str, boost::is_any_of(","));
+  erpc::rt_assert(split_vec.size() > 0);
+
+  for (auto &s : split_vec) {
+    boost::trim(s);
+    ret.push_back(std::stoull(s));
+  }
+
+  return ret;
 }
-DEFINE_validator(test_ms, &validate_test_ms);
-
-// Work around g++-5's unused variable warning for validators
-void avoid_gcc5_unused_warning() { _unused(test_ms_validator_registered); }
 
 //
 // PAPI
