@@ -45,6 +45,7 @@
 #include "mlx4.h"
 #include "doorbell.h"
 #include "wqe.h"
+#include "modded_drivers.h"
 
 #ifndef htobe64
 #include <endian.h>
@@ -341,29 +342,6 @@ static inline void set_local_inv_seg(struct mlx4_wqe_local_inval_seg *iseg,
 	iseg->reserved2    = 0;
 	iseg->reserved3[0] = 0;
 	iseg->reserved3[1] = 0;
-}
-
-static void set_bind_seg(struct mlx4_wqe_bind_seg *bseg, struct ibv_send_wr *wr)
-{
-	int acc = wr->bind_mw.bind_info.mw_access_flags;
-	bseg->flags1 = 0;
-	if (acc & IBV_ACCESS_REMOTE_ATOMIC)
-		bseg->flags1 |= htonl(MLX4_WQE_MW_ATOMIC);
-	if (acc & IBV_ACCESS_REMOTE_WRITE)
-		bseg->flags1 |= htonl(MLX4_WQE_MW_REMOTE_WRITE);
-	if (acc & IBV_ACCESS_REMOTE_READ)
-		bseg->flags1 |= htonl(MLX4_WQE_MW_REMOTE_READ);
-
-	bseg->flags2 = 0;
-	if (((struct ibv_mw *)(wr->bind_mw.mw))->type == IBV_MW_TYPE_2)
-		bseg->flags2 |= htonl(MLX4_WQE_BIND_TYPE_2);
-	if (acc & IBV_ACCESS_ZERO_BASED)
-		bseg->flags2 |= htonl(MLX4_WQE_BIND_ZERO_BASED);
-
-	bseg->new_rkey = htonl(wr->bind_mw.rkey);
-	bseg->lkey = htonl(wr->bind_mw.bind_info.mr->lkey);
-	bseg->addr = htobe64((uint64_t) wr->bind_mw.bind_info.addr);
-	bseg->length = htobe64(wr->bind_mw.bind_info.length);
 }
 
 static inline void set_raddr_seg(struct mlx4_wqe_raddr_seg *rseg,
