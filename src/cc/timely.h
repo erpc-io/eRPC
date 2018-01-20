@@ -10,11 +10,11 @@
 
 #include <iomanip>
 #include "common.h"
+#include "util/latency.h"
 #include "util/timer.h"
 
 namespace erpc {
-/// Max = 5 GB/s (40 Gbps), min = 5 MB/s (arbitrary)
-static constexpr double kTimelyMaxRate = 5.0 * 1000 * 1000 * 1000;
+static constexpr double kTimelyMaxRate = kBandwidth;
 static constexpr double kTimelyMinRate = 5.0 * 1000 * 1000;
 static constexpr double kTimelyAddRate = 5.0 * 1000 * 1000;
 
@@ -36,15 +36,17 @@ struct timely_record_t {
 
 class Timely {
  public:
+  // Debugging
   static constexpr bool kVerbose = false;
-  static constexpr bool kRecord = false;      // Record Timely steps
-  static constexpr bool kPatched = true;      // Patch from ECN-vs-delay
-  static constexpr double kEwmaAlpha = .875;  // From ECN-vs-delay
+  static constexpr bool kRecord = false;       // Record Timely steps
+  static constexpr bool kPatched = true;       // Patch from ECN-vs-delay
+  static constexpr bool kLatencyStats = true;  // Track average RTT
 
   static constexpr double kMinRTT = 2;
   static constexpr double kTLow = 50;
   static constexpr double kTHigh = 1000;
 
+  static constexpr double kEwmaAlpha = .875;  // From ECN-vs-delay
   static constexpr double kBeta = kPatched ? .008 : .8;
   static constexpr size_t kHaiThresh = 5;
 
@@ -54,6 +56,12 @@ class Timely {
   size_t last_update_tsc = 0;
   double min_rtt_tsc = 0.0;
   double freq_ghz = 0.0;
+
+  // For latency stats
+  struct {
+    size_t num_rate_updates = 0;
+    double rtt_sum = 0;
+  } stats;
 
   // For recording, used only with kRecord
   size_t create_tsc;
@@ -143,6 +151,14 @@ class Timely {
     rate = std::min(rate, kTimelyMaxRate);
     rate = std::max(rate, kTimelyMinRate);
 
+    prev_rtt = sample_rtt;
+    last_update_tsc = _rdtsc;
+
+    if (kLatencyStats) {
+      stats.rtt_sum += sample_rtt;
+      stats.num_rate_updates++;
+    }
+
     if (kRecord && rate != kTimelyMaxRate) {
       record_vec.emplace_back(sample_rtt, rate);
     }
@@ -150,17 +166,21 @@ class Timely {
     if (kRecord && rate == kTimelyMinRate) {
       // If we reach min rate after steady state, print a log and exit
       double sec_since_creation = to_sec(rdtsc() - create_tsc, freq_ghz);
-      if (sec_since_creation >= 20.0) {
-        for (size_t i = 0; i < 100; i++) {
-          printf("%s\n", record_vec.back().to_string().c_str());
-          record_vec.pop_back();
-        }
+      if (sec_since_creation >= 0.0) {
+        for (auto &r : record_vec) printf("%s\n", r.to_string().c_str());
         exit(-1);
       }
     }
+  }
 
-    prev_rtt = sample_rtt;
-    last_update_tsc = _rdtsc;
+  /// Get average RTT if it's enabled and reset it
+  double get_avg_rtt() {
+    if (!kLatencyStats || stats.num_rate_updates == 0) return -1.0;
+    double ret = stats.rtt_sum / stats.num_rate_updates;
+
+    stats.rtt_sum = 0.0;
+    stats.num_rate_updates = 0;
+    return ret;
   }
 
   double get_avg_rtt_diff() const { return avg_rtt_diff; }

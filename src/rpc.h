@@ -259,6 +259,13 @@ class Rpc {
     session->client_info.cc.timely.rate = Timely::gbps_to_rate(rate_gbps);
   }
 
+  /// Get the average RTT observed by Timely for this session. This resets
+  /// Timely's RTT measurement.
+  double get_session_timely_rtt(int session_num) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    return session->client_info.timely.get_avg_rtt();
+  }
+
  private:
   int create_session_st(std::string remote_uri, uint8_t rem_rpc_id);
   int destroy_session_st(int session_num);

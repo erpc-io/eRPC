@@ -13,13 +13,16 @@ namespace erpc {
 class IBTransport;
 class RawTransport;
 
-static constexpr bool kCC = true;  ///< Enable Timely and wheel-based pacing
+static constexpr bool kCC = false;  ///< Enable Timely and wheel-based pacing
 static constexpr bool kDisableTimely = false;  ///< Disable Timely rate update
 
+// InfiniBand
 static constexpr size_t kHeadroom = 0;
+static constexpr double kBandwidth = 7.0 * 1000 * 1000 * 1000;
 typedef IBTransport CTransport;
 
 // static constexpr size_t kHeadroom = 40;
+// static constexpr double kBandwidth = 5.0 * 1000 * 1000 * 1000;
 // typedef RawTransport CTransport;
 
 #if defined(TESTING)
