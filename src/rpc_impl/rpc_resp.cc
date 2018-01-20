@@ -106,8 +106,12 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   }
 
   if (kCC) {
-    size_t _rdtsc = dpath_rdtsc();  // Use for both rtt_tsc and update_rate()
-    size_t rtt_tsc = _rdtsc - sslot->client_info.tx_ts[0];
+    // The pkt_num of the packet that triggered this response
+    size_t trg_pkt_num = sslot->tx_msgbuf->num_pkts - 1;
+
+    size_t _rdtsc = dpath_rdtsc();  // Reuse below
+    size_t rtt_tsc =
+        _rdtsc - sslot->client_info.tx_ts[trg_pkt_num % kSessionCredits];
     sslot->session->client_info.cc.timely.update_rate(_rdtsc, rtt_tsc);
   }
 
@@ -181,9 +185,13 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
   bump_credits(sslot->session);
   if (kCC) {
-    size_t _rdtsc = dpath_rdtsc();  // Use for both rtt_tsc and update_rate()
+    // The pkt_num of the packet that triggered this response
+    size_t trg_pkt_num =
+        pkthdr->pkt_num == 0 ? sslot->tx_msgbuf->num_pkts - 1 : pkthdr->pkt_num;
+
+    size_t _rdtsc = dpath_rdtsc();  // Reuse below
     size_t rtt_tsc =
-        _rdtsc - sslot->client_info.tx_ts[pkthdr->pkt_num % kSessionCredits];
+        _rdtsc - sslot->client_info.tx_ts[trg_pkt_num % kSessionCredits];
     sslot->session->client_info.cc.timely.update_rate(_rdtsc, rtt_tsc);
   }
 
