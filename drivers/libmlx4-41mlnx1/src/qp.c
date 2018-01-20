@@ -408,11 +408,26 @@ static void set_masked_atomic_seg(struct mlx4_wqe_masked_atomic_seg *aseg,
 static void set_datagram_seg(struct mlx4_wqe_datagram_seg *dseg,
 			     struct ibv_send_wr *wr)
 {
-	memcpy(dseg->av, &to_mah(wr->wr.ud.ah)->av, sizeof (struct mlx4_av));
+  // Copy address vector
+  size_t *dst_av = (size_t *)dseg->av;
+  size_t *src_av = (size_t *)&to_mah(wr->wr.ud.ah)->av;
+  dst_av[0] = src_av[0];
+  dst_av[1] = src_av[1];
+  dst_av[2] = src_av[2];
+  dst_av[3] = src_av[3];
+
 	dseg->dqpn = htonl(wr->wr.ud.remote_qpn);
 	dseg->qkey = htonl(wr->wr.ud.remote_qkey);
 	dseg->vlan = htons(to_mah(wr->wr.ud.ah)->vlan);
-	memcpy(dseg->mac, to_mah(wr->wr.ud.ah)->mac, 6);
+
+  uint8_t *dst_mac = dseg->mac;
+  uint8_t *src_mac = to_mah(wr->wr.ud.ah)->mac;
+  dst_mac[0] = src_mac[0];
+  dst_mac[1] = src_mac[1];
+  dst_mac[2] = src_mac[2];
+  dst_mac[3] = src_mac[3];
+  dst_mac[4] = src_mac[4];
+  dst_mac[5] = src_mac[5];
 }
 
 static  inline void __set_data_seg(struct mlx4_wqe_data_seg *dseg, struct ibv_sge *sg) __attribute__((always_inline));
@@ -616,6 +631,12 @@ static void set_ctrl_seg(struct mlx4_wqe_ctrl_seg *ctrl, struct ibv_send_wr *wr,
 	ctrl->owner_opcode = htonl(wr_op) | owner_bit;
 }
 
+//
+// Modifications:
+// 1. Works only for num_sge = 1 (it cannot be 0!)
+// 2. The data in the SGE must fit in max_inline_data. No error is reported if
+//    this is violated.
+//
 static inline int set_data_inl_seg(struct mlx4_qp *qp, int num_sge, struct ibv_sge *sg_list,
 				   void *wqe, int *size, unsigned int owner_bit) __attribute__((always_inline));
 static inline int set_data_inl_seg(struct mlx4_qp *qp, int num_sge, struct ibv_sge *sg_list,
@@ -623,66 +644,34 @@ static inline int set_data_inl_seg(struct mlx4_qp *qp, int num_sge, struct ibv_s
 {
 	struct mlx4_wqe_inline_seg *seg;
 	void *addr;
-	int len, seg_len;
-	int num_seg;
-	int off, to_copy;
-	int i;
+	int len;
 	int inl = 0;
 
 	seg = wqe;
 	wqe += sizeof(*seg);
-	off = ((uintptr_t) wqe) & (MLX4_INLINE_ALIGN - 1);
-	num_seg = 0;
-	seg_len = 0;
 
-	for (i = 0; i < num_sge; ++i) {
-		addr = (void *) (uintptr_t) sg_list[i].addr;
-		len  = sg_list[i].length;
-		inl += len;
+  addr = (void *) (uintptr_t) sg_list[0].addr;
+  len  = sg_list[0].length;
+  inl += len;
 
-		if (unlikely(inl > qp->max_inline_data))
-			return ENOMEM;
+  memcpy(wqe, addr, len);
+  wqe += len;
 
-		while (len >= MLX4_INLINE_ALIGN - off) {
-			to_copy = MLX4_INLINE_ALIGN - off;
-			memcpy(wqe, addr, to_copy);
-			len -= to_copy;
-			wqe += to_copy;
-			addr += to_copy;
-			seg_len += to_copy;
-			wmb(); /* see comment below */
-			seg->byte_count = SET_BYTE_COUNT((MLX4_INLINE_SEG | seg_len));
-			seg_len = 0;
-			seg = wqe;
-			wqe += sizeof(*seg);
-			off = sizeof(*seg);
-			++num_seg;
-		}
+  /*
+   * Need a barrier here to make sure
+   * all the data is visible before the
+   * byte_count field is set.  Otherwise
+   * the HCA prefetcher could grab the
+   * 64-byte chunk with this inline
+   * segment and get a valid (!=
+   * 0xffffffff) byte count but stale
+   * data, and end up sending the wrong
+   * data.
+   */
+  wmb();
+  seg->byte_count = SET_BYTE_COUNT((MLX4_INLINE_SEG | len));
 
-		memcpy(wqe, addr, len);
-		wqe += len;
-		seg_len += len;
-		off += len;
-	}
-
-	if (likely(seg_len)) {
-		++num_seg;
-		/*
-		 * Need a barrier here to make sure
-		 * all the data is visible before the
-		 * byte_count field is set.  Otherwise
-		 * the HCA prefetcher could grab the
-		 * 64-byte chunk with this inline
-		 * segment and get a valid (!=
-		 * 0xffffffff) byte count but stale
-		 * data, and end up sending the wrong
-		 * data.
-		 */
-		wmb();
-		seg->byte_count = SET_BYTE_COUNT((MLX4_INLINE_SEG | seg_len));
-	}
-
-	*size += (inl + num_seg * sizeof(*seg) + 15) / 16;
+	*size += (inl + 1 * sizeof(*seg) + 15) / 16;
 
 	return 0;
 }
@@ -886,9 +875,7 @@ static int post_send_ud(struct ibv_send_wr *wr,
 	int idx = (wr->send_flags & IBV_SEND_SIGNALED)/IBV_SEND_SIGNALED |
 		  (wr->send_flags & IBV_SEND_SOLICITED)/(IBV_SEND_SOLICITED >> 1);
 	uint32_t srcrb_flags = htonl((uint32_t)qp->srcrb_flags_tbl[idx]);
-	uint32_t imm = (wr->opcode == IBV_WR_SEND_WITH_IMM ||
-			wr->opcode == IBV_WR_RDMA_WRITE_WITH_IMM)
-		       ? wr->imm_data : 0;
+	uint32_t imm = wr->imm_data;
 
 	set_datagram_seg(wqe, wr);
 	wqe  += sizeof(struct mlx4_wqe_datagram_seg);
@@ -959,30 +946,6 @@ static inline int post_send_connected(struct ibv_send_wr *wr,
 
 		break;
 
-	case IBV_WR_LOCAL_INV:
-		srcrb_flags |=
-			htonl(MLX4_WQE_CTRL_STRONG_ORDER);
-		set_local_inv_seg(wqe, wr->imm_data);
-		wqe  += sizeof
-			(struct mlx4_wqe_local_inval_seg);
-		size += sizeof
-			(struct mlx4_wqe_local_inval_seg) / 16;
-		break;
-
-	case IBV_WR_BIND_MW:
-		srcrb_flags |=
-			htonl(MLX4_WQE_CTRL_STRONG_ORDER);
-		set_bind_seg(wqe, wr);
-		wqe  += sizeof
-			(struct mlx4_wqe_bind_seg);
-		size += sizeof
-			(struct mlx4_wqe_bind_seg) / 16;
-		break;
-
-	case IBV_WR_SEND_WITH_INV:
-		imm = htonl(wr->imm_data);
-		break;
-
 	case IBV_WR_SEND:
 		break;
 
@@ -1035,6 +998,14 @@ void mlx4_update_post_send_one(struct mlx4_qp *qp)
 	}
 }
 
+//
+// Changes:
+// 1. Directly call post_send_ud() instead of using function pointer
+// 2. Ignore WQ overflow check
+// 3. Ignore num_sge > max_gs check
+// 4. Ignore invalid opcode check
+// 5. Don't grab QP lock (this lock is elided anyway with MLX4_SINGLE_THREADED)
+//
 int mlx4_post_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 		     struct ibv_send_wr **bad_wr)
 {
@@ -1046,40 +1017,13 @@ int mlx4_post_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 	int ret = 0;
 	int size = 0;
 
-	mlx4_lock(&qp->sq.lock);
-
-	/* XXX check that state is OK to post send */
-
 	ind = qp->sq.head;
 
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
-		/* to be considered whether can throw first check, create_qp_exp with post_send */
-		if (!(qp->create_flags & IBV_EXP_QP_CREATE_IGNORE_SQ_OVERFLOW))
-			if (unlikely(wq_overflow(&qp->sq, nreq, qp))) {
-				ret = ENOMEM;
-				errno = ret;
-				*bad_wr = wr;
-				goto out;
-			}
-
-		if (unlikely(wr->num_sge > qp->sq.max_gs)) {
-			ret = ENOMEM;
-			errno = ret;
-			*bad_wr = wr;
-			goto out;
-		}
-
-		if (unlikely(wr->opcode >= sizeof(mlx4_ib_opcode) / sizeof(mlx4_ib_opcode[0]))) {
-			ret = EINVAL;
-			errno = ret;
-			*bad_wr = wr;
-			goto out;
-		}
-
 		ctrl = get_send_wqe(qp, ind & (qp->sq.wqe_cnt - 1));
 		qp->sq.wrid[ind & (qp->sq.wqe_cnt - 1)] = wr->wr_id;
 
-		ret = qp->post_send_one(wr, qp, ctrl, &size, &inl, ind);
+		ret = post_send_ud(wr, qp, ctrl, &size, &inl, ind);
 		if (unlikely(ret)) {
 			inl = 0;
 			errno = ret;
@@ -1115,7 +1059,6 @@ out:
 		set_owner_wqe(qp, ind - 1, size,
 			      ((ind - 1) & qp->sq.wqe_cnt ? htonl(WQE_CTRL_OWN) : 0));
 #endif
-	mlx4_unlock(&qp->sq.lock);
 
 	return ret;
 }
@@ -1465,6 +1408,35 @@ out:
 int mlx4_post_recv(struct ibv_qp *ibqp, struct ibv_recv_wr *wr,
 		   struct ibv_recv_wr **bad_wr)
 {
+	if (likely(wr == NULL && (*bad_wr) != NULL &&
+		 (*bad_wr)->wr_id == ERPC_MAGIC_WRID_FOR_FAST_RECV)) {
+		/* Handle fast RECV */
+		struct mlx4_qp *qp = to_mqp(ibqp);
+
+		int nreq = (*bad_wr)->num_sge;
+		qp->rq.head += nreq;
+
+		wmb();
+		*qp->db = htonl(qp->rq.head & 0xffff);
+
+		return 0;
+	}
+
+	/*
+	 * Respond to a "Is driver modded?" probe. A probe is ibv_post_recv() with:
+	 * a. A valid queue pair
+	 * b. *wr = NULL
+	 * c. The @wr_id field of @bad_wr set to ERPC_MODDED_PROBE_WRID
+	 *
+	 * On a non-modded driver, this call is safe and returns 0. On a modded
+	 * driver, this call returns @ERPC_MODDED_PROBE_RET.
+	 */
+	if (unlikely(ibqp != NULL && wr == NULL && (*bad_wr) != NULL &&
+		(*bad_wr)->wr_id == ERPC_MODDED_PROBE_WRID)) {
+		/* Tell the caller that this is a modded driver */
+		return ERPC_MODDED_PROBE_RET;
+	}
+
 	struct mlx4_qp *qp = to_mqp(ibqp);
 	struct mlx4_wqe_data_seg *scat;
 	int ret = 0;
@@ -1730,7 +1702,6 @@ int mlx4_post_task(struct ibv_context *context,
 	int rc = 0;
 	struct ibv_exp_task *cur_task = NULL;
 	struct ibv_exp_send_wr  *bad_wr;
-	struct ibv_recv_wr	*bad_wr_r;
 	struct mlx4_context *mlx4_ctx = to_mctx(context);
 
 	if (!task_list)
@@ -1751,7 +1722,7 @@ int mlx4_post_task(struct ibv_context *context,
 		case IBV_EXP_TASK_RECV:
 			rc = ibv_post_recv(cur_task->item.qp,
 					cur_task->item.recv_wr,
-					&bad_wr_r);
+					NULL);
 			break;
 
 		default:
