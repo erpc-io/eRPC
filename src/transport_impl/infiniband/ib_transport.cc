@@ -278,7 +278,7 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
 
   // Initialize the memory region for RECVs
   size_t ring_extent_size = kNumRxRingEntries * kRecvSize;
-  ring_extent = huge_alloc->alloc(ring_extent_size);
+  ring_extent = huge_alloc->alloc_raw(ring_extent_size, DoRegister::kTrue);
   if (ring_extent.buf == nullptr) {
     xmsg << "eRPC IBTransport: Failed to allocate " << std::setprecision(2)
          << 1.0 * ring_extent_size / MB(1) << "MB for ring buffers.";
