@@ -722,6 +722,17 @@ class Rpc {
     if (unlikely(multi_threaded)) mutex->unlock();
   }
 
+  /// Perform a Timely rate update on receiving the explict CR or response
+  /// packet for this triggering packet number. For the zeroth response packet,
+  /// the triggering packet number may be different from the received packet's
+  /// number.
+  inline void update_timely_rate(SSlot *sslot, size_t trigger_pkt_num) {
+    size_t _rdtsc = dpath_rdtsc();  // Reuse below
+    size_t rtt_tsc =
+        _rdtsc - sslot->client_info.tx_ts[trigger_pkt_num % kSessionCredits];
+    sslot->session->client_info.cc.timely.update_rate(_rdtsc, rtt_tsc);
+  }
+
   // rpc_cr.cc
 
   /**
