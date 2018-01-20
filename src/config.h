@@ -13,7 +13,7 @@ namespace erpc {
 class IBTransport;
 class RawTransport;
 
-static constexpr bool kCC = false;  ///< Enable Timely and wheel-based pacing
+static constexpr bool kCC = true;  ///< Enable Timely and wheel-based pacing
 static constexpr bool kDisableTimely = false;  ///< Disable Timely rate update
 
 // InfiniBand

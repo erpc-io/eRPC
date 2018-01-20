@@ -263,7 +263,7 @@ class Rpc {
   /// Timely's RTT measurement.
   double get_session_timely_rtt(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.timely.get_avg_rtt();
+    return session->client_info.cc.timely.get_avg_rtt();
   }
 
  private:
