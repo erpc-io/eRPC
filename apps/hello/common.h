@@ -1,14 +1,11 @@
 #include <stdio.h>
 #include "rpc.h"
-using namespace erpc;
 
-#define UDP_PORT 31851
-#define REQ_TYPE 1
-#define SERVER_ID 2
-#define CLIENT_ID 3
+static const std::string kServerHostname =
+    "akaliaNode-1.RDMA.fawn.apt.emulab.net";
+static const std::string kClientHostname =
+    "akaliaNode-2.RDMA.fawn.apt.emulab.net";
 
+static constexpr uint16_t kUDPPort = 31850;
+static constexpr uint8_t kReqType = 2;
 static constexpr size_t kMsgSize = 16;
-
-#define HelloTransport RawTransport
-
-static constexpr ReqFuncType kForeground = ReqFuncType::kForeground;

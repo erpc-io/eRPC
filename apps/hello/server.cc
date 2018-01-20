@@ -1,5 +1,5 @@
 #include "common.h"
-Rpc<HelloTransport> *rpc;
+erpc::Rpc<erpc::CTransport> *rpc;
 
 void req_handler(erpc::ReqHandle *req_handle, void *) {
   auto &resp = req_handle->pre_resp_msgbuf;
@@ -11,9 +11,12 @@ void req_handler(erpc::ReqHandle *req_handle, void *) {
 }
 
 int main() {
-  Nexus nexus("10.100.3.13", UDP_PORT);
-  nexus.register_req_func(REQ_TYPE, ReqFunc(req_handler, kForeground));
+  std::string server_uri = kServerHostname + ":" + std::to_string(kUDPPort);
+  erpc::Nexus nexus(server_uri, 0, 0);
 
-  rpc = new Rpc<HelloTransport>(&nexus, nullptr, SERVER_ID, nullptr);
+  nexus.register_req_func(
+      kReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
+
+  rpc = new erpc::Rpc<erpc::CTransport>(&nexus, nullptr, 0, nullptr);
   rpc->run_event_loop(100000);
 }
