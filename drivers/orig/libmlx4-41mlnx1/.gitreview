@@ -1,0 +1,5 @@
+[gerrit]
+host=r-webdev02.lab.mtl.com
+port=29418
+project=mlnx_ofed_2_0/libmlx4.git
+defaultbranch=mlnx_ofed_2_1
