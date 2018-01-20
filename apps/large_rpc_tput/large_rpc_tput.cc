@@ -242,8 +242,10 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   c.tmp_stat = new TmpStat("rx_gbps tx_gbps avg_us 99_us");
   c.thread_id = thread_id;
 
-  uint8_t phy_port = (FLAGS_numa_node == 0) ? numa_0_ports[thread_id % 2]
-                                            : numa_1_ports[thread_id % 2];
+  std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
+  erpc::rt_assert(port_vec.size() > 0);
+  uint8_t phy_port = port_vec.at(thread_id % port_vec.size());
+
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id), sm_handler,
                                   phy_port);
