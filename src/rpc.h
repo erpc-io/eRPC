@@ -762,8 +762,7 @@ class Rpc {
  private:
   // Constructor args
   Nexus *nexus;
-  void *context;       ///< The application context
-  const uint8_t epid;  ///< The small eRPC local process ID of the parent Nexus
+  void *context;  ///< The application context
   const uint8_t rpc_id;
   const sm_handler_t sm_handler;
   const uint8_t phy_port;  ///< Zero-based physical port specified by app

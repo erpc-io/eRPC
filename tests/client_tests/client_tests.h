@@ -9,7 +9,6 @@
 
 using namespace erpc;
 
-static constexpr size_t kTestEPid = 0;
 static constexpr size_t kTestEventLoopMs = 200;
 static constexpr size_t kTestMaxEventLoopMs = 20000;  // 20 seconds
 static constexpr uint8_t kTestClientRpcId = 100;
@@ -220,7 +219,7 @@ void launch_server_client_threads(
     void (*client_thread_func)(Nexus *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers, double srv_pkt_drop_prob) {
-  Nexus nexus("localhost:31850", kTestEPid, kTestNumaNode, num_bg_threads);
+  Nexus nexus("localhost:31850", kTestNumaNode, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {

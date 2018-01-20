@@ -8,19 +8,16 @@
 
 namespace erpc {
 
-Nexus::Nexus(std::string local_uri, uint8_t epid, size_t numa_node,
-             size_t num_bg_threads)
+Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
     : freq_ghz(measure_rdtsc_freq()),
       hostname(extract_hostname_from_uri(local_uri)),
       sm_udp_port(std::stoi(extract_udp_port_from_uri(local_uri))),
-      epid(epid),
       numa_node(numa_node),
       num_bg_threads(num_bg_threads) {
   if (kTesting) {
     LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   }
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
-  rt_assert(epid <= kMaxEPid, "Invalid eRPC PID");
   rt_assert(numa_node < kInvalidNUMANode, "Invalid NUMA node");
 
   kill_switch = false;

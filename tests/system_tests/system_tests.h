@@ -6,7 +6,6 @@
 // These tests never run event loop, so SM pkts sent by Rpc have no consequence
 namespace erpc {
 
-static constexpr size_t kTestEPid = 0;
 static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
@@ -27,7 +26,7 @@ class RpcTest : public ::testing::Test {
       return;
     }
 
-    nexus = new Nexus("localhost:31850", kTestEPid, kTestNumaNode, 0);
+    nexus = new Nexus("localhost:31850", kTestNumaNode, 0);
     rt_assert(nexus != nullptr, "Failed to create nexus");
     nexus->register_req_func(kTestReqType,
                              ReqFunc(req_handler, ReqFuncType::kForeground));

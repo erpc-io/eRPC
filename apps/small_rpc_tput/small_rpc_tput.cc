@@ -345,7 +345,7 @@ int main(int argc, char **argv) {
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
-                    FLAGS_process_id, FLAGS_numa_node, 0);
+                    FLAGS_numa_node, 0);
   nexus.register_req_func(
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 

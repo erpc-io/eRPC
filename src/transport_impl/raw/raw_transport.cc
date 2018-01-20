@@ -11,10 +11,9 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
-RawTransport::RawTransport(uint8_t epid, uint8_t rpc_id, uint8_t phy_port,
-                           size_t numa_node)
-    : Transport(TransportType::kRaw, epid, rpc_id, phy_port, numa_node),
-      rx_flow_udp_port(kBaseRawUDPPort + (256u * epid) + rpc_id) {
+RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node)
+    : Transport(TransportType::kRaw, rpc_id, phy_port, numa_node),
+      rx_flow_udp_port(kBaseRawUDPPort + (256u * numa_node) + rpc_id) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 

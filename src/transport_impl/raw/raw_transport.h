@@ -19,7 +19,7 @@ class RawTransport : public Transport {
   /// Enable the dumbpipe optimizations (multi-packet RECVs, overrunning CQ)
   static constexpr bool kDumb = true;
 
-  /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and epid.
+  /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and numa node.
   static constexpr uint16_t kBaseRawUDPPort = 10000;
 
   // Transport-specific constants
@@ -117,8 +117,7 @@ class RawTransport : public Transport {
     return ((cur_idx + kCQESnapshotCycle) - prev_idx) % kCQESnapshotCycle;
   }
 
-  RawTransport(uint8_t epid, uint8_t rpc_id, uint8_t phy_port,
-               size_t numa_node);
+  RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
   ~RawTransport();

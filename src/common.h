@@ -38,7 +38,6 @@ static constexpr size_t kMaxRpcId = UINT8_MAX - 1;
 /// Array size to hold registered request handler functions
 static constexpr size_t kReqTypeArraySize = 1ull + UINT8_MAX;
 
-static constexpr size_t kMaxEPid = 8;       ///< Max eRPC processes on a machine
 static constexpr size_t kMaxPhyPorts = 16;  ///< Max fabric device ports
 static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
 static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
