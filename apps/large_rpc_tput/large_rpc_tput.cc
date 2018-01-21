@@ -202,11 +202,12 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     printf(
         "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps, "
         "latency {%.1f, %.1f}, transfer {RX %.1f, TX %.1f} MB, "
-        "Requests/session {%s}. Session 0 Timely RTT = %.2f us. "
+        "Requests/session {%s}. Session 0 Timely: {%.2f us, %.2f Gbps}. "
         "Credits %zu, best 32.\n",
         c->thread_id, rx_gbps, tx_gbps, avg_us, _99_us,
         c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
         session_req_count_str.c_str(), c->rpc->get_session_timely_rtt(0),
+        c->rpc->get_session_rate_gbps(0),
         erpc::kSessionCredits);
 
     // Stats: rx_gbps tx_gbps avg_us 99_us

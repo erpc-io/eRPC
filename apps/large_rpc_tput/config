@@ -2,7 +2,7 @@
 --req_size 65536
 --resp_size 32
 --num_processes 2
---num_threads 8
+--num_threads 4
 --concurrency 1
 --drop_prob 0.0
 --profile incast
