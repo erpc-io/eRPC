@@ -243,27 +243,10 @@ class Rpc {
     return session_vec[static_cast<size_t>(session_num)]->is_connected();
   }
 
-  /// Return session bandwidth computed by the congestion control. If congestion
-  /// control is disabled, this returns the max rate.
-  double get_session_rate_gbps(int session_num) const {
+  /// Return the Timely instance for a session. Expert use only.
+  Timely *get_timely(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.cc.timely.get_rate_gbps();
-  }
-
-  /// Set bandwidth for a session. This may get modified by Timely later.
-  void set_session_rate_gbps(int session_num, double rate_gbps) {
-    assert(rate_gbps >= Timely::rate_to_gbps(kTimelyMinRate) &&
-           rate_gbps <= Timely::rate_to_gbps(kTimelyMaxRate));
-
-    Session *session = session_vec[static_cast<size_t>(session_num)];
-    session->client_info.cc.timely.rate = Timely::gbps_to_rate(rate_gbps);
-  }
-
-  /// Get the average RTT observed by Timely for this session. This resets
-  /// Timely's RTT measurement.
-  double get_session_timely_rtt(int session_num) {
-    Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.cc.timely.get_avg_rtt();
+    return &session->client_info.cc.timely;
   }
 
  private:

@@ -199,16 +199,20 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       session_req_count_str += " ";
     }
 
+    erpc::Timely *timely_0 = c->rpc->get_timely(0);
+
     printf(
         "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps, "
         "latency {%.1f, %.1f}, transfer {RX %.1f, TX %.1f} MB, "
-        "Requests/session {%s}. Session 0 Timely: {%.2f us, %.2f Gbps}. "
+        "Requests/session {%s}. Session 0: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. "
         "Credits %zu, best 32.\n",
         c->thread_id, rx_gbps, tx_gbps, avg_us, _99_us,
         c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
-        session_req_count_str.c_str(), c->rpc->get_session_timely_rtt(0),
-        c->rpc->get_session_rate_gbps(0),
-        erpc::kSessionCredits);
+        session_req_count_str.c_str(), timely_0->get_rtt_perc(.5),
+        timely_0->get_rtt_perc(.9), timely_0->get_rtt_perc(.99),
+        timely_0->get_rate_gbps(), erpc::kSessionCredits);
+
+    timely_0->reset_rtt_stats();
 
     // Stats: rx_gbps tx_gbps avg_us 99_us
     c->tmp_stat->write(std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) +

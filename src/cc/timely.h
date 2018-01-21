@@ -58,10 +58,7 @@ class Timely {
   double freq_ghz = 0.0;
 
   // For latency stats
-  struct {
-    size_t num_rate_updates = 0;
-    double rtt_sum = 0;
-  } stats;
+  Latency latency;
 
   // For recording, used only with kRecord
   size_t create_tsc;
@@ -154,10 +151,7 @@ class Timely {
     prev_rtt = sample_rtt;
     last_update_tsc = _rdtsc;
 
-    if (kLatencyStats) {
-      stats.rtt_sum += sample_rtt;
-      stats.num_rate_updates++;
-    }
+    if (kLatencyStats) latency.update(static_cast<size_t>(sample_rtt));
 
     if (kRecord && rate != kTimelyMaxRate) {
       record_vec.emplace_back(sample_rtt, rate);
@@ -173,15 +167,14 @@ class Timely {
     }
   }
 
-  /// Get average RTT if it's enabled and reset it
-  double get_avg_rtt() {
-    if (!kLatencyStats || stats.num_rate_updates == 0) return -1.0;
-    double ret = stats.rtt_sum / stats.num_rate_updates;
-
-    stats.rtt_sum = 0.0;
-    stats.num_rate_updates = 0;
+  /// Get RTT percentile if latency stats are enabled, and reset latency stats
+  double get_rtt_perc(double perc) {
+    if (!kLatencyStats || latency.count() == 0) return -1.0;
+    double ret = latency.perc(perc);
     return ret;
   }
+
+  void reset_rtt_stats() { latency.reset(); }
 
   double get_avg_rtt_diff() const { return avg_rtt_diff; }
   double get_rate_gbps() const { return rate_to_gbps(rate); }

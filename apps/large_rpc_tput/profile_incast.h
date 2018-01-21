@@ -31,7 +31,8 @@ void connect_sessions_func_incast(AppContext *c) {
     if (ctrl_c_pressed == 1) return;
   }
 
-  c->rpc->set_session_rate_gbps(c->session_num_vec[0], FLAGS_session_gbps);
+  erpc::Timely *timely_0 = c->rpc->get_timely(c->session_num_vec[0]);
+  timely_0->rate = erpc::Timely::gbps_to_rate(FLAGS_session_gbps);
 }
 
 #endif
