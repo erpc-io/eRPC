@@ -12,8 +12,6 @@
  * The experiment configuration is controlled by the "profile" flag. The profile
  * setting can override other flags such as request and response size. The
  * available profiles are:
- *   o random: Each thread sends requests and responses to randomly chosen
- *     threads, excluding itself.
  *   o incast: Incast
  *   o victim: With N processes {0, ..., N - 1}, where N >= 3, processes 1
  *     through (N - 1) incast to process 0. In addition, processes (N - 2) and
@@ -24,7 +22,6 @@
 #include <signal.h>
 #include <cstring>
 #include "profile_incast.h"
-#include "profile_random.h"
 #include "profile_victim.h"
 #include "util/autorun_helpers.h"
 
@@ -313,12 +310,6 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
 // Use the supplied profile set up globals and possibly modify other flags
 void setup_profile() {
-  if (FLAGS_profile == "random") {
-    connect_sessions_func = connect_sessions_func_random;
-    get_session_idx_func = get_session_idx_func_random;
-    return;
-  }
-
   if (FLAGS_profile == "incast") {
     connect_sessions_func = connect_sessions_func_incast;
     get_session_idx_func = get_session_idx_func_incast;
@@ -340,8 +331,7 @@ int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid conc");
-  erpc::rt_assert(FLAGS_profile == "random" || FLAGS_profile == "incast" ||
-                      FLAGS_profile == "victim",
+  erpc::rt_assert(FLAGS_profile == "incast" || FLAGS_profile == "victim",
                   "Invalid profile");
   if (!erpc::kTesting) {
     erpc::rt_assert(FLAGS_drop_prob == 0.0, "Invalid drop prob");
