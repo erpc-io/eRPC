@@ -17,7 +17,7 @@ void connect_sessions_func_victim(AppContext *c) {
 
   c->session_num_vec.resize(1);
 
-  printf("large_rpc_tput: Thread %zu: Creating 1 session. Profile 'victim'.",
+  printf("large_rpc_tput: Thread %zu: Creating 1 session. Profile 'victim'.\n",
          c->thread_id);
 
   c->session_num_vec[0] =
