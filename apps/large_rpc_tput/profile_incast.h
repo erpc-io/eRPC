@@ -26,8 +26,13 @@ void connect_sessions_func_incast(AppContext *c) {
     if (ctrl_c_pressed == 1) return;
   }
 
-  erpc::Timely *timely_0 = c->rpc->get_timely(c->session_num_vec[0]);
-  timely_0->rate = erpc::Timely::gbps_to_rate(FLAGS_session_gbps);
+  if (FLAGS_throttle == 1) {
+    erpc::Timely *timely_0 = c->rpc->get_timely(c->session_num_vec[0]);
+    double num_flows = (FLAGS_num_processes - 1) * FLAGS_num_threads;
+    double fair_share = erpc::kBandwidth / num_flows;
+
+    timely_0->rate = fair_share * FLAGS_throttle_fraction;
+  }
 }
 
 #endif

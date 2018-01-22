@@ -23,7 +23,8 @@ DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
 DEFINE_double(drop_prob, 0, "Packet drop probability");
 DEFINE_string(profile, "", "Experiment profile to use");
-DEFINE_double(session_gbps, erpc::kTimelyMaxRate, "Non-CC session throughput");
+DEFINE_double(throttle, 0, "Throttle flows to incast receiver?");
+DEFINE_double(throttle_fraction, 1, "Fraction of fair share to throttle to.");
 
 // Per-thread app context
 class AppContext : public BasicAppContext {

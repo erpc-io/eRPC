@@ -274,6 +274,8 @@ int main(int argc, char **argv) {
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid conc");
   erpc::rt_assert(FLAGS_profile == "incast" || FLAGS_profile == "victim",
                   "Invalid profile");
+  erpc::rt_assert(FLAGS_process_id < FLAGS_num_processes, "Invalid process ID");
+
   if (!erpc::kTesting) {
     erpc::rt_assert(FLAGS_drop_prob == 0.0, "Invalid drop prob");
   } else {

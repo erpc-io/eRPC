@@ -6,6 +6,7 @@
 --concurrency 1
 --drop_prob 0.0
 --profile victim
---session_gbps 40
+--throttle 1
+--throttle_fraction 0.9
 --numa_0_ports 0
 --numa_1_ports NA
