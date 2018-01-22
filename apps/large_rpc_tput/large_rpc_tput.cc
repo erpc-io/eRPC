@@ -2,20 +2,15 @@
  * @file large_rpc_tput.cc
  *
  * @brief Benchmark to measure large RPC throughput. Each thread measures its
- * response RX and TX bandwidth. For this measurement to be useful, request
- * size should be small and response size large.
+ * RX and TX bandwidth.
  *
- * A request is described by its MsgBuffer index and session index, and is
- * queued into req_vec until it can be transmitted. Before queueing a request
- * descriptor, it's request MsgBuffer must be filled with request data.
- *
- * The experiment configuration is controlled by the "profile" flag. The profile
- * setting can override other flags such as request and response size. The
- * available profiles are:
+ * Each thread creates at most session. The session connectivity is controlled
+ * by the "profile" flag. The available profiles are:
  *   o incast: Incast
- *   o victim: With N processes {0, ..., N - 1}, where N >= 3, processes 1
- *     through (N - 1) incast to process 0. In addition, processes (N - 2) and
- *     (N - 1) send data to each other.
+ *   o victim: With N processes {0, ..., N - 1}, where N >= 3:
+ *     o Process 0 and process (N - 1) do not send requests
+ *     o All threads on processes 1 through (N - 2) incast to process 0
+ *     o Thread T - 1 on processes (N - 2) sends requests to process (N - 1)
  */
 
 #include "large_rpc_tput.h"
@@ -32,9 +27,6 @@ static constexpr bool kAppClientMemsetReq = false;   // Fill entire request
 static constexpr bool kAppServerMemsetResp = false;  // Fill entire response
 static constexpr bool kAppClientCheckResp = false;   // Check entire response
 
-// Profile controls
-std::function<size_t(AppContext *, size_t resp_session_idx)>
-    get_session_idx_func = nullptr;
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
 // A basic session management handler that expects successful responses
@@ -73,37 +65,24 @@ void sm_handler(int session_num, erpc::SmEventType sm_event_type,
 
 void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
-// Send requests (i.e., msgbuf indexes) queued in req_vec. Requests that cannot
-// be sent are req-queued into req_vec.
-void send_reqs(AppContext *c) {
-  size_t write_index = 0;  // XXX: This is unused
+// Send a request using this MsgBuffer
+void send_req(AppContext *c, size_t msgbuf_idx) {
+  erpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
+  assert(req_msgbuf.get_data_size() == FLAGS_req_size);
 
-  for (size_t i = 0; i < c->req_vec.size(); i++) {
-    size_t msgbuf_idx = c->req_vec[i].s.msgbuf_idx;
-    size_t session_idx = c->req_vec[i].s.session_idx;
-
-    erpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
-    assert(req_msgbuf.get_data_size() == FLAGS_req_size);
-
-    if (kAppVerbose) {
-      printf(
-          "large_rpc_tput: Trying to send request for session index %zu, "
-          "msgbuf_idx %zu.\n",
-          session_idx, msgbuf_idx);
-    }
-
-    // Timestamp before trying enqueue_request(). If enqueue_request() fails,
-    // we'll timestamp again on the next try.
-    c->req_ts[msgbuf_idx] = erpc::rdtsc();
-    c->rpc->enqueue_request(c->session_num_vec[session_idx], kAppReqType,
-                            &req_msgbuf, &c->resp_msgbuf[msgbuf_idx],
-                            app_cont_func, c->req_vec[i]._tag);
-
-    c->stat_req_vec[session_idx]++;
-    c->stat_tx_bytes_tot += FLAGS_req_size;
+  if (kAppVerbose) {
+    printf("large_rpc_tput: Thread %zu sending request using msgbuf_idx %zu.\n",
+           c->thread_id, msgbuf_idx);
   }
 
-  c->req_vec.resize(write_index);  // Pending requests = write_index
+  // Timestamp before trying enqueue_request(). If enqueue_request() fails,
+  // we'll timestamp again on the next try.
+  c->req_ts[msgbuf_idx] = erpc::rdtsc();
+  c->rpc->enqueue_request(c->session_num_vec[0], kAppReqType, &req_msgbuf,
+                          &c->resp_msgbuf[msgbuf_idx], app_cont_func,
+                          msgbuf_idx);
+
+  c->stat_tx_bytes_tot += FLAGS_req_size;
 }
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
@@ -145,11 +124,9 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  size_t msgbuf_idx = static_cast<tag_t>(_tag).s.msgbuf_idx;
-  size_t session_idx = static_cast<tag_t>(_tag).s.session_idx;
+  size_t msgbuf_idx = _tag;
   if (kAppVerbose) {
-    printf("large_rpc_tput: Received response for msgbuf %zu, session %zu.\n",
-           msgbuf_idx, session_idx);
+    printf("large_rpc_tput: Received response for msgbuf %zu.\n", msgbuf_idx);
   }
 
   // Measure latency. 1 us granularity is sufficient for large RPC latency.
@@ -190,24 +167,17 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     double avg_us = latency_sum / c->latency_vec.size();
     double _99_us = c->latency_vec.at(c->latency_vec.size() * 0.99);
 
-    std::string session_req_count_str;
-    for (size_t session_req_count : c->stat_req_vec) {
-      session_req_count_str += std::to_string(session_req_count);
-      session_req_count_str += " ";
-    }
-
     erpc::Timely *timely_0 = c->rpc->get_timely(0);
 
     printf(
         "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps, "
         "latency {%.1f, %.1f}, transfer {RX %.1f, TX %.1f} MB, "
-        "Requests/session {%s}. Session 0: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. "
-        "Credits %zu, best 32.\n",
+        "Session 0: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. Credits %zu/best 32.\n",
         c->thread_id, rx_gbps, tx_gbps, avg_us, _99_us,
         c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
-        session_req_count_str.c_str(), timely_0->get_rtt_perc(.5),
-        timely_0->get_rtt_perc(.9), timely_0->get_rtt_perc(.99),
-        timely_0->get_rate_gbps(), erpc::kSessionCredits);
+        timely_0->get_rtt_perc(.5), timely_0->get_rtt_perc(.9),
+        timely_0->get_rtt_perc(.99), timely_0->get_rate_gbps(),
+        erpc::kSessionCredits);
 
     timely_0->reset_rtt_stats();
 
@@ -220,7 +190,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->stat_rx_bytes_tot = 0;
     c->stat_tx_bytes_tot = 0;
     c->rpc->reset_dpath_stats_st();
-    std::fill(c->stat_req_vec.begin(), c->stat_req_vec.end(), 0);
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
@@ -232,12 +201,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->req_msgbuf[msgbuf_idx].buf[0] = kAppDataByte;
   }
 
-  // For some profiles, the session_idx argument will be ignored
-  c->req_vec.push_back(tag_t(get_session_idx_func(c, session_idx), msgbuf_idx));
-
-  // Try to send the queued requests. The request buffer for these requests is
-  // already filled.
-  send_reqs(c);
+  send_req(c, msgbuf_idx);
 }
 
 // The function executed by each thread in the cluster
@@ -258,19 +222,15 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 
   c.rpc = &rpc;
 
-  // Create sessions. Some threads may not create any sessions, and therefore
+  // Create the session. Some threads may not create any sessions, and therefore
   // not run the event loop required for other threads to connect them. This
   // is OK because all threads will run the event loop below.
   connect_sessions_func(&c);
 
   if (c.session_num_vec.size() > 0) {
-    fprintf(stderr, "large_rpc_tput: Thread %zu: All sessions connected.\n",
-            thread_id);
-    c.stat_req_vec.resize(c.session_num_vec.size());
-    std::fill(c.stat_req_vec.begin(), c.stat_req_vec.end(), 0);
+    printf("large_rpc_tput: Thread %zu: All sessions connected.\n", thread_id);
   } else {
-    fprintf(stderr, "large_rpc_tput: Thread %zu: No sessions created.\n",
-            thread_id);
+    printf("large_rpc_tput: Thread %zu: No sessions created.\n", thread_id);
   }
 
   // Regardless of the profile and thread role, all threads allocate request
@@ -294,10 +254,8 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
                     "Cannot send requests without sessions");
 
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
-      size_t session_idx = get_session_idx_func(&c, SIZE_MAX);
-      c.req_vec.push_back(tag_t(session_idx, msgbuf_idx));
+      send_req(&c, msgbuf_idx);
     }
-    send_reqs(&c);
   }
 
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
@@ -312,17 +270,13 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
 void setup_profile() {
   if (FLAGS_profile == "incast") {
     connect_sessions_func = connect_sessions_func_incast;
-    get_session_idx_func = get_session_idx_func_incast;
     return;
   }
 
   if (FLAGS_profile == "victim") {
-    erpc::rt_assert(FLAGS_num_processes >= 3,
-                    "victim profile needs 3 or more processes.");
-    erpc::rt_assert(FLAGS_concurrency >= 2,
-                    "victim profile needs concurrency >= 2.");
+    erpc::rt_assert(FLAGS_num_processes >= 3, "Too few processes");
+    erpc::rt_assert(FLAGS_num_threads >= 2, "Too few threads");
     connect_sessions_func = connect_sessions_func_victim;
-    get_session_idx_func = get_session_idx_func_victim;
     return;
   }
 }
@@ -340,7 +294,6 @@ int main(int argc, char **argv) {
   }
 
   setup_profile();
-  erpc::rt_assert(get_session_idx_func != nullptr, "No session index getter");
   erpc::rt_assert(connect_sessions_func != nullptr, "No connect_sessions_func");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),

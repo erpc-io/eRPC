@@ -25,48 +25,17 @@ DEFINE_double(drop_prob, 0, "Packet drop probability");
 DEFINE_string(profile, "", "Experiment profile to use");
 DEFINE_double(session_gbps, erpc::kTimelyMaxRate, "Non-CC session throughput");
 
-static bool validate_drop_prob(const char *, double p) {
-  if (!erpc::kTesting) return p == 0.0;
-  return p >= 0 && p < 1;
-}
-
-// Request tag, which doubles up as the request descriptor for the request queue
-union tag_t {
-  struct {
-    uint64_t session_idx : 32;  // Index into context's session_num array
-    uint64_t msgbuf_idx : 32;   // Index into context's req_msgbuf array
-  } s;
-
-  size_t _tag;
-
-  tag_t(uint64_t session_idx, uint64_t msgbuf_idx) {
-    s.session_idx = session_idx;
-    s.msgbuf_idx = msgbuf_idx;
-  }
-  tag_t(size_t _tag) : _tag(_tag) {}
-  tag_t() : _tag(0) {}
-};
-static_assert(sizeof(tag_t) == sizeof(size_t), "");
-
-// Per-thread application context
-// session_num_vec contains a hole at self_session_idx. We need for simplicity
-// in the "victim" profile.
+// Per-thread app context
 class AppContext : public BasicAppContext {
  public:
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
   // >10 ms for 8MB RPCs under congestion. So erpc::Latency doesn't work here.
   std::vector<double> latency_vec;
 
-  // Index in session_num_vec that represents a self connection, if it exists
-  size_t self_session_idx = SIZE_MAX;
-
   struct timespec tput_t0;  // Start time for throughput measurement
 
   size_t stat_rx_bytes_tot = 0;  // Total bytes received
   size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
-
-  std::vector<size_t> stat_req_vec;  // Number of requests sent on a session
-  std::vector<tag_t> req_vec;        // Request queue
 
   uint64_t req_ts[kAppMaxConcurrency];  // Per-request timestamps
   erpc::MsgBuffer req_msgbuf[kAppMaxConcurrency];
