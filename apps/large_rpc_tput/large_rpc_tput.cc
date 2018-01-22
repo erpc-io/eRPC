@@ -233,26 +233,13 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
     printf("large_rpc_tput: Thread %zu: No sessions created.\n", thread_id);
   }
 
-  // Regardless of the profile and thread role, all threads allocate request
-  // and response MsgBuffers. Some threads may not send requests.
+  // All threads allocate MsgBuffers, but they may not send requests
   alloc_req_resp_msg_buffers(&c);
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
-  // Send requests. For some profiles, process 0 does not send requests.
-  // In these cases, by not injecting any requests now, we ensure that process 0
-  // *never* sends requests.
-  bool _send_reqs = true;
-  if (FLAGS_process_id == 0) {
-    if (FLAGS_profile == "incast" || FLAGS_profile == "victim") {
-      _send_reqs = false;
-    }
-  }
-
-  if (_send_reqs) {
-    erpc::rt_assert(c.session_num_vec.size() > 0,
-                    "Cannot send requests without sessions");
-
+  // Any thread that creates a session sends requests
+  if (c.session_num_vec.size() > 0) {
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
       send_req(&c, msgbuf_idx);
     }
