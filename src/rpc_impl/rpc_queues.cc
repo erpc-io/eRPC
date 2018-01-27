@@ -23,7 +23,7 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
 
 template <class TTr>
 void Rpc<TTr>::process_wheel_st() {
-  assert(in_dispatch() && kCC);
+  assert(in_dispatch());
   size_t cur_tsc = dpath_rdtsc();
   wheel->reap(cur_tsc);
 

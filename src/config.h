@@ -13,8 +13,11 @@ namespace erpc {
 class IBTransport;
 class RawTransport;
 
-static constexpr bool kCC = true;  ///< Enable Timely and wheel-based pacing
-static constexpr bool kDisableTimely = true;  ///< Disable Timely rate update
+// Congestion control
+static constexpr bool kCcRTT = true;        ///< Measure per-packet RTT
+static constexpr bool kCcRateComp = false;  ///< Perform rate updates
+static constexpr bool kCcPacing = true;     ///< Do packet pacing
+static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
 // InfiniBand
 static constexpr size_t kHeadroom = 0;

@@ -222,11 +222,12 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->stat_resp_rx[i] = 0;
     }
 
-    // Session throughput percentiles, used if congestion control is enabled
+    // Session throughput percentiles, used if rate computation is enabled
     std::vector<double> session_tput;
-    if (erpc::kCC) {
+    if (erpc::kCcRateComp) {
       for (int session_num : c->session_num_vec) {
-        session_tput.push_back(c->rpc->get_session_rate_gbps(session_num));
+        erpc::Timely *timely = c->rpc->get_timely(session_num);
+        session_tput.push_back(timely->get_rate_gbps());
       }
       std::sort(session_tput.begin(), session_tput.end());
     }
@@ -244,10 +245,10 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         c->stat_req_rx_tot, min_resps, max_resps,
         kAppMeasureLatency ? c->latency.perc(.50) / 10.0 : -1,
         kAppMeasureLatency ? c->latency.perc(.99) / 10.0 : -1,
-        erpc::kCC ? session_tput.at(num_sessions * 0.00) : -1,
-        erpc::kCC ? session_tput.at(num_sessions * 0.05) : -1,
-        erpc::kCC ? session_tput.at(num_sessions * 0.50) : -1,
-        erpc::kCC ? session_tput.at(num_sessions * 0.95) : -1);
+        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.00) : -1,
+        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.05) : -1,
+        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.50) : -1,
+        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.95) : -1);
 
     // Thread 1 records stats: throughput
     if (thread_id == 0) {

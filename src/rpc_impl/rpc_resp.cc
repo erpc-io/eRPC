@@ -105,7 +105,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     return;
   }
 
-  if (kCC) {
+  if (kCcRateComp) {
     size_t trigger_pkt_num = sslot->tx_msgbuf->num_pkts - 1;
     update_timely_rate(sslot, trigger_pkt_num);
   }
@@ -179,7 +179,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   }
 
   bump_credits(sslot->session);
-  if (kCC) {
+  if (kCcRateComp) {
     size_t trigger_pkt_num =
         pkthdr->pkt_num == 0 ? sslot->tx_msgbuf->num_pkts - 1 : pkthdr->pkt_num;
     update_timely_rate(sslot, trigger_pkt_num);

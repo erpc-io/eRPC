@@ -42,7 +42,8 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
                              transport->reg_mr_func, transport->dereg_mr_func);
 
-  if (kCC) {
+  wheel = nullptr;
+  if (kCcPacing) {
     timing_wheel_args_t args;
     args.mtu = TTr::kMTU;
     args.freq_ghz = freq_ghz;
@@ -72,7 +73,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
            creator_etid);
 
   pkt_loss_epoch_tsc = rdtsc();  // Assign epoch timestamp as late as possible
-  if (kCC) wheel->catchup();     // Wheel could be lagging, so catch up
+  if (kCcPacing) wheel->catchup();  // Wheel could be lagging, so catch up
 }
 
 template <class TTr>

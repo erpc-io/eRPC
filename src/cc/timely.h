@@ -91,7 +91,7 @@ class Timely {
    * @param sample_rtt_tsc The RTT sample in RDTSC cycles
    */
   void update_rate(size_t _rdtsc, size_t sample_rtt_tsc) {
-    if (kDisableTimely) return;
+    if (!kCcRateComp) return;
     assert(_rdtsc >= 1000000000 && _rdtsc >= last_update_tsc);  // Sanity check
 
     // Sample RTT can be lower than min RTT during retransmissions

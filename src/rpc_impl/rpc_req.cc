@@ -115,7 +115,7 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
 
   if (likely(req_msgbuf->num_pkts == 1)) {
     // Small request
-    if (kCC) {
+    if (kCcPacing) {
       size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(0);
       size_t _rdtsc = dpath_rdtsc();
       size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, pkt_size);
@@ -134,7 +134,7 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
     assert(sending > 0);
 
     for (size_t _x = 0; _x < sending; _x++) {
-      if (kCC) {
+      if (kCcPacing) {
         size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(ci.req_sent);
         size_t _rdtsc = dpath_rdtsc();
         size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, psz);

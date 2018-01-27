@@ -49,7 +49,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     return;
   }
 
-  if (kCC) {
+  if (kCcRateComp) {
     size_t trigger_pkt_num = pkthdr->pkt_num;
     update_timely_rate(sslot, trigger_pkt_num);
   }

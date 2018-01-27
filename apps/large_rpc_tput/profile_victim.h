@@ -32,6 +32,7 @@ void connect_sessions_func_victim(AppContext *c) {
 
   // If throttling is enabled, flows to the incast victim are throttled
   if (server_process_id == 0 && FLAGS_throttle == 1) {
+    erpc::rt_assert(!erpc::kCcRateComp, "Flows cannot be statically throttled");
     erpc::Timely *timely_0 = c->rpc->get_timely(c->session_num_vec[0]);
     double num_incast_flows =
         ((FLAGS_num_processes - 2) * FLAGS_num_threads) - 1;

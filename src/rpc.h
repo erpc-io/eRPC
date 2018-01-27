@@ -450,7 +450,7 @@ class Rpc {
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
     item.pkt_index = pkt_index;
-    if (kCC) item.tx_ts = tx_ts;
+    if (kCcRTT) item.tx_ts = tx_ts;
 
     if (kTesting) {
       item.drop = roll_pkt_drop();
@@ -475,7 +475,7 @@ class Rpc {
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = ctrl_msgbuf;
     item.pkt_index = 0;
-    if (kCC) item.tx_ts = tx_ts;
+    if (kCcRTT) item.tx_ts = tx_ts;
 
     if (kTesting) {
       item.drop = roll_pkt_drop();
@@ -496,7 +496,7 @@ class Rpc {
     dpath_stat_inc(dpath_stats.tx_burst_calls, 1);
     dpath_stat_inc(dpath_stats.pkts_tx, tx_batch_i);
 
-    if (kCC) {
+    if (kCcRTT) {
       size_t batch_tsc = dpath_rdtsc();  // Once per batch => low overhead
       for (size_t i = 0; i < tx_batch_i; i++) {
         if (tx_burst_arr[i].tx_ts != nullptr) {
