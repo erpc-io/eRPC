@@ -50,7 +50,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     args.wslot_width = kWheelDefWslotWidth;
     args.huge_alloc = huge_alloc;
 
-    wheel = new TimingWheel(args);
+    wheel = new TimingWheel(args, creation_tsc);
   }
 
   // Complete transport initialization using the hugepage allocator

@@ -37,7 +37,7 @@ TEST(TimingWheelTest, Basic) {
   args.wslot_width = kTestWslotWidth;
   args.huge_alloc = &alloc;
 
-  TimingWheel wheel(args);
+  TimingWheel wheel(args, rdtsc());
   const auto dummy_ent = wheel_ent_t(nullptr, 1);
 
   // Empty wheel
@@ -74,7 +74,7 @@ TEST(TimingWheelTest, RateTest) {
     args.wslot_width = kTestWslotWidth;
     args.huge_alloc = &alloc;
 
-    TimingWheel wheel(args);
+    TimingWheel wheel(args, rdtsc());
     const auto dummy_ent = wheel_ent_t(nullptr, 1);
 
     // Update the wheel and start measurement

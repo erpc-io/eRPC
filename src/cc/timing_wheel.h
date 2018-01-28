@@ -22,29 +22,19 @@ static constexpr bool kWheelRecord = false;        /// Fast-record wheel actions
 static constexpr double kWheelDefWslotWidth = .2;  // 200 ns
 
 struct wheel_record_t {
-  bool direct_to_ready_queue;  ///< Did we place entry directly to ready queue?
   size_t abs_tx_tsc;           ///< User's requested TX timestamp
   size_t wslot_tx_tsc;         ///< TX timestamp of the alloted wheel slot
 
-  wheel_record_t(size_t abs_tx_tsc)
-      : direct_to_ready_queue(true), abs_tx_tsc(abs_tx_tsc){};
-
   wheel_record_t(size_t abs_tx_tsc, size_t wslot_tx_tsc)
-      : direct_to_ready_queue(false),
-        abs_tx_tsc(abs_tx_tsc),
+      : abs_tx_tsc(abs_tx_tsc),
         wslot_tx_tsc(wslot_tx_tsc){};
 
-  std::string to_string(size_t baseline_tsc, double freq_ghz) {
+  std::string to_string(size_t console_ref_tsc, double freq_ghz) {
     std::ostringstream ret;
-    if (direct_to_ready_queue) {
-      ret << "[Direct, abs " << std::setprecision(3)
-          << to_usec(abs_tx_tsc - baseline_tsc, freq_ghz) << " us]";
-    } else {
-      ret << "[Non-direct, abs " << std::setprecision(3)
-          << to_usec(abs_tx_tsc - baseline_tsc, freq_ghz) << " us, wslot "
+      ret << "[Abs " << std::setprecision(3)
+          << to_usec(abs_tx_tsc - console_ref_tsc, freq_ghz) << " us, wslot "
           << std::setprecision(3)
-          << to_usec(wslot_tx_tsc - baseline_tsc, freq_ghz) << " us]";
-    }
+          << to_usec(wslot_tx_tsc - console_ref_tsc, freq_ghz) << " us]";
 
     return ret.str();
   }
@@ -87,7 +77,7 @@ struct timing_wheel_args_t {
 
 class TimingWheel {
  public:
-  TimingWheel(timing_wheel_args_t args)
+  TimingWheel(timing_wheel_args_t args, size_t console_ref_tsc)
       : mtu(args.mtu),
         freq_ghz(args.freq_ghz),
         wslot_width(args.wslot_width),
@@ -95,7 +85,7 @@ class TimingWheel {
         horizon(1000000 * (kSessionCredits * mtu) / kTimelyMinRate),
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
         num_wslots(1 + round_up(horizon / wslot_width)),
-        console_ref_tsc(rdtsc()),
+        console_ref_tsc(console_ref_tsc),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
     rt_assert(wslot_width > .01 && wslot_width < 8.0, "Invalid wslot width");
