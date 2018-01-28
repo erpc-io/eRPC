@@ -20,13 +20,13 @@ static constexpr bool kCcPacing = true;     ///< Do packet pacing
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
 // InfiniBand
-static constexpr size_t kHeadroom = 0;
-static constexpr double kBandwidth = 7.0 * 1000 * 1000 * 1000;
-typedef IBTransport CTransport;
+// static constexpr size_t kHeadroom = 0;
+// static constexpr double kBandwidth = 7.0 * 1000 * 1000 * 1000;
+// typedef IBTransport CTransport;
 
-// static constexpr size_t kHeadroom = 40;
-// static constexpr double kBandwidth = 5.0 * 1000 * 1000 * 1000;
-// typedef RawTransport CTransport;
+static constexpr size_t kHeadroom = 40;
+static constexpr double kBandwidth = 5.0 * 1000 * 1000 * 1000;
+typedef RawTransport CTransport;
 
 #if defined(TESTING)
 static constexpr bool kTesting = true;
