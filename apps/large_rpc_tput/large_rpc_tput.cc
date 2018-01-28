@@ -262,7 +262,7 @@ void setup_profile() {
 
   if (FLAGS_profile == "victim") {
     erpc::rt_assert(FLAGS_num_processes >= 3, "Too few processes");
-    erpc::rt_assert(FLAGS_num_threads >= 2, "Too few threads");
+    erpc::rt_assert(FLAGS_num_proc_other_threads >= 2, "Too few threads");
     connect_sessions_func = connect_sessions_func_victim;
     return;
   }
@@ -290,8 +290,10 @@ int main(int argc, char **argv) {
   nexus.register_req_func(
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
 
-  std::vector<std::thread> threads(FLAGS_num_threads);
-  for (size_t i = 0; i < FLAGS_num_threads; i++) {
+  size_t num_threads = FLAGS_process_id == 0 ? FLAGS_num_proc_0_threads
+                                             : FLAGS_num_proc_other_threads;
+  std::vector<std::thread> threads(num_threads);
+  for (size_t i = 0; i < num_threads; i++) {
     threads[i] = std::thread(thread_func, i, &nexus);
     erpc::bind_to_core(threads[i], FLAGS_numa_node, i);
   }

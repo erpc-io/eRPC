@@ -9,16 +9,21 @@ size_t get_session_idx_func_incast(AppContext *) {
 }
 
 void connect_sessions_func_incast(AppContext *c) {
+  // All non-zero processes create one session to process #0
   if (FLAGS_process_id == 0) return;
 
-  // All non-zero processes create one session to process #0
-  c->session_num_vec.resize(1);
-  fprintf(stderr,
-          "large_rpc_tput: Thread %zu: Creating 1 session. Profile = incast.\n",
-          c->thread_id);
+  size_t global_thread_id =
+      FLAGS_process_id * FLAGS_num_proc_other_threads + c->thread_id;
+  size_t rem_tid = global_thread_id % FLAGS_num_proc_0_threads;
 
-  c->session_num_vec[0] = c->rpc->create_session(
-      erpc::get_uri_for_process(0), static_cast<uint8_t>(c->thread_id));
+  c->session_num_vec.resize(1);
+
+  printf(
+      "large_rpc_tput: Thread %zu: Creating 1 session to proc 0, thread %zu.\n",
+      c->thread_id, rem_tid);
+
+  c->session_num_vec[0] =
+      c->rpc->create_session(erpc::get_uri_for_process(0), rem_tid);
   erpc::rt_assert(c->session_num_vec[0] >= 0, "create_session() failed");
 
   while (c->num_sm_resps != 1) {
@@ -28,7 +33,7 @@ void connect_sessions_func_incast(AppContext *c) {
 
   if (FLAGS_throttle == 1) {
     erpc::Timely *timely_0 = c->rpc->get_timely(c->session_num_vec[0]);
-    double num_flows = (FLAGS_num_processes - 1) * FLAGS_num_threads;
+    double num_flows = (FLAGS_num_processes - 1) * FLAGS_num_proc_other_threads;
     double fair_share = erpc::kBandwidth / num_flows;
 
     timely_0->rate = fair_share * FLAGS_throttle_fraction;
