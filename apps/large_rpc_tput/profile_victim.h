@@ -16,11 +16,11 @@ void connect_sessions_func_victim(AppContext *c) {
     rem_tid = global_thread_id % FLAGS_num_proc_0_threads;
   } else {
     if (c->thread_id == FLAGS_num_proc_other_threads - 1) {
-      server_process_id = 0;
-      rem_tid = global_thread_id % FLAGS_num_proc_0_threads;
-    } else {
       server_process_id = FLAGS_num_processes - 1;
       rem_tid = 0;
+    } else {
+      server_process_id = 0;
+      rem_tid = global_thread_id % FLAGS_num_proc_0_threads;
     }
   }
 
