@@ -128,7 +128,7 @@ void RawTransport::resolve_phy_port() {
   int num_devices = 0;
   struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
   rt_assert(dev_list != nullptr,
-            "eRPC RawTransport: Failed to get InfiniBand device list");
+            "eRPC RawTransport: Failed to get device list");
 
   // Traverse the device list
   int ports_to_discover = phy_port;
@@ -141,7 +141,7 @@ void RawTransport::resolve_phy_port() {
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
     if (ibv_query_device(ib_ctx, &device_attr) != 0) {
-      xmsg << "eRPC RawTransport: Failed to query InfiniBand device "
+      xmsg << "eRPC RawTransport: Failed to query device "
            << std::to_string(dev_i);
       throw std::runtime_error(xmsg.str());
     }
@@ -193,7 +193,7 @@ void RawTransport::resolve_phy_port() {
 
     // Thank you Mario, but our port is in another device
     if (ibv_close_device(ib_ctx) != 0) {
-      xmsg << "eRPC RawTransport: Failed to close InfiniBand device "
+      xmsg << "eRPC RawTransport: Failed to close device "
            << ib_ctx->device->name;
       throw std::runtime_error(xmsg.str());
     }
@@ -201,7 +201,7 @@ void RawTransport::resolve_phy_port() {
 
   // If we are here, port resolution has failed
   assert(resolve.ib_ctx == nullptr);
-  xmsg << "eRPC RawTransport: Failed to resolve InfiniBand port index "
+  xmsg << "eRPC RawTransport: Failed to resolve RoCE port index "
        << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
