@@ -252,9 +252,21 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   }
 
   erpc::TimingWheel *wheel = rpc.get_wheel();
-  for (auto &rec : wheel->record_vec) {
-    printf("wheel: %s\n",
-           rec.to_string(console_ref_tsc, rpc.get_freq_ghz()).c_str());
+  if (wheel != nullptr && !wheel->record_vec.empty()) {
+    const size_t num_to_print = 200;
+    const size_t tot_entries = wheel->record_vec.size();
+    const size_t base_entry = tot_entries * .9;
+
+    printf("Printing up to 200 entries toward the end of wheel record\n");
+    size_t num_printed = 0;
+
+    for (size_t i = base_entry; i < tot_entries; i++) {
+      auto &rec = wheel->record_vec.at(i);
+      printf("wheel: %s\n",
+             rec.to_string(console_ref_tsc, rpc.get_freq_ghz()).c_str());
+
+      if (num_printed++ == num_to_print) break;
+    }
   }
 
   // We don't disconnect sessions
