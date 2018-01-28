@@ -103,7 +103,7 @@ class TimingWheel {
         console_ref_tsc(console_ref_tsc),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
-    rt_assert(wslot_width > .01 && wslot_width < 8.0, "Invalid wslot width");
+    rt_assert(wslot_width > .01 && wslot_width <= 8.0, "Invalid wslot width");
     rt_assert(num_wslots > 10, "Too few wheel slots");
     rt_assert(num_wslots < 10000000, "Too many wheel slots");
 
