@@ -17,24 +17,39 @@
 
 namespace erpc {
 
-static constexpr size_t kWheelBucketCap = 4;       /// Wheel entries per bucket
-static constexpr bool kWheelRecord = false;        /// Fast-record wheel actions
+static constexpr size_t kWheelBucketCap = 4;  ///< Wheel entries per bucket
+static constexpr bool kWheelRecord = false;   ///< Fast-record wheel actions
 static constexpr double kWheelDefWslotWidth = .2;  // 200 ns
 
 struct wheel_record_t {
-  size_t abs_tx_tsc;           ///< User's requested TX timestamp
-  size_t wslot_tx_tsc;         ///< TX timestamp of the alloted wheel slot
+  size_t record_tsc;  ///< Timestamp at which this record was created
+  bool insert;        ///< Is this a record for a wheel insertion?
+  size_t pkt_num;     ///< The packet number of the wheel entry
+  size_t abs_tx_tsc;  ///< For inserts, the requested TX timestamp
 
-  wheel_record_t(size_t abs_tx_tsc, size_t wslot_tx_tsc)
-      : abs_tx_tsc(abs_tx_tsc),
-        wslot_tx_tsc(wslot_tx_tsc){};
+  /// Record an insertion entry
+  wheel_record_t(size_t pkt_num, size_t abs_tx_tsc)
+      : record_tsc(rdtsc()),
+        insert(true),
+        pkt_num(pkt_num),
+        abs_tx_tsc(abs_tx_tsc) {}
+
+  /// Record a reap entry
+  wheel_record_t(size_t pkt_num)
+      : record_tsc(rdtsc()), insert(false), pkt_num(pkt_num) {}
 
   std::string to_string(size_t console_ref_tsc, double freq_ghz) {
     std::ostringstream ret;
-      ret << "[Abs " << std::setprecision(3)
-          << to_usec(abs_tx_tsc - console_ref_tsc, freq_ghz) << " us, wslot "
-          << std::setprecision(3)
-          << to_usec(wslot_tx_tsc - console_ref_tsc, freq_ghz) << " us]";
+    size_t record_us =
+        static_cast<size_t>(to_usec(record_tsc - console_ref_tsc, freq_ghz));
+    size_t abs_tx_us =
+        static_cast<size_t>(to_usec(abs_tx_tsc - console_ref_tsc, freq_ghz));
+    if (insert) {
+      ret << "[Insert pkt " << pkt_num << ", at " << record_us << " us, abs TX "
+          << abs_tx_us << " us]";
+    } else {
+      ret << "[Reap pkt " << pkt_num << ", at " << record_us << " us]";
+    }
 
     return ret.str();
   }
@@ -123,7 +138,7 @@ class TimingWheel {
   /// directly to the ready queue here because doing so can cause reordering.
   inline void insert(const wheel_ent_t &ent, size_t _rdtsc, size_t abs_tx_tsc) {
     assert(abs_tx_tsc >= _rdtsc);
-    assert(abs_tx_tsc - _rdtsc <= horizon_tsc);  // Horizon def + TSC ordering
+    assert(abs_tx_tsc - _rdtsc <= horizon_tsc);  // Horizon definition
 
     // Advance the wheel to the current time
     reap(_rdtsc);
@@ -141,11 +156,7 @@ class TimingWheel {
       if (dst_wslot >= num_wslots) dst_wslot -= num_wslots;
     }
 
-    if (kWheelRecord) {
-      record_vec.emplace_back(abs_tx_tsc,
-                              static_cast<size_t>(wheel[dst_wslot].tx_tsc));
-    }
-
+    if (kWheelRecord) record_vec.emplace_back(ent.pkt_num, abs_tx_tsc);
     insert_into_wslot(dst_wslot, ent);
   }
 
@@ -179,6 +190,7 @@ class TimingWheel {
     while (bkt != nullptr) {
       for (size_t i = 0; i < bkt->num_entries; i++) {
         ready_queue.push(bkt->entry[i]);
+        if (kWheelRecord) record_vec.emplace_back(bkt->entry[i].pkt_num);
       }
 
       wheel_bkt_t *_tmp_next = bkt->next;

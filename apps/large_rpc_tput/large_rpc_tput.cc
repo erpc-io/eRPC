@@ -236,6 +236,7 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   // All threads allocate MsgBuffers, but they may not send requests
   alloc_req_resp_msg_buffers(&c);
 
+  size_t console_ref_tsc = erpc::rdtsc();
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
   // Any thread that creates a session sends requests
@@ -248,6 +249,12 @@ void thread_func(size_t thread_id, erpc::Nexus *nexus) {
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(1000);  // 1 second
     if (ctrl_c_pressed == 1) break;
+  }
+
+  erpc::TimingWheel *wheel = rpc.get_wheel();
+  for (auto &rec : wheel->record_vec) {
+    printf("wheel: %s\n",
+           rec.to_string(console_ref_tsc, rpc.get_freq_ghz()).c_str());
   }
 
   // We don't disconnect sessions

@@ -249,6 +249,9 @@ class Rpc {
     return &session->client_info.cc.timely;
   }
 
+  /// Return the Timing Wheel for this Rpc. Expert use only.
+  TimingWheel *get_wheel() { return wheel; }
+
  private:
   int create_session_st(std::string remote_uri, uint8_t rem_rpc_id);
   int destroy_session_st(int session_num);
