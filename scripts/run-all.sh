@@ -23,7 +23,7 @@ app_config=$autorun_erpc_home/apps/$autorun_app/config
 assert_file_exists $app_config
 app_args=`cat $app_config | tr '\n' ' '`
 
-for i in `seq 1 $autorun_num_processes`; do
+for ((i = 0; i < $autorun_num_processes; i++)); do
   name=${autorun_name_list[$i]}
   # We don't need the UDP port - the C++ code figures it out
   numa_node=${autorun_numa_list[$i]}
@@ -51,7 +51,7 @@ sleep $sleep_sec
 
 # Print processes that are still running
 blue "run-all: Printing $autorun_app processes that are still running..."
-for i in `seq 1 $autorun_num_processes`; do
+for ((i = 0; i < $autorun_num_processes; i++)); do
   (
 	ret=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} \
     "pgrep -x $autorun_app"`
