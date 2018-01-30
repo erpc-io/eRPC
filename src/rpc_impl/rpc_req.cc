@@ -114,7 +114,7 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
   if (credits == 0) return false;
 
   if (likely(req_msgbuf->num_pkts == 1)) {
-    // Small request
+    // Small request. Bypass wheel if pacing is disabled or bypass is enabled.
     if (!kCcPacing ||
         (kCcOptWheelBypass &&
          session->client_info.cc.timely.rate == Timely::kMaxRate)) {
