@@ -14,10 +14,6 @@
 #include "util/timer.h"
 
 namespace erpc {
-static constexpr double kTimelyMaxRate = kBandwidth;
-static constexpr double kTimelyMinRate = 5.0 * 1000 * 1000;
-static constexpr double kTimelyAddRate = 5.0 * 1000 * 1000;
-
 struct timely_record_t {
   double rtt;
   double rate;
@@ -38,9 +34,14 @@ class Timely {
  public:
   // Debugging
   static constexpr bool kVerbose = false;
-  static constexpr bool kRecord = false;       // Record Timely steps
-  static constexpr bool kPatched = true;       // Patch from ECN-vs-delay
-  static constexpr bool kLatencyStats = true;  // Track average RTT
+  static constexpr bool kRecord = false;        ///< Fast-record Timely steps
+  static constexpr bool kLatencyStats = false;  ///< Track average RTT
+  static constexpr bool kPatched = true;        ///< Patch from ECN-vs-delay
+
+  // Config
+  static constexpr double kMaxRate = kBandwidth;
+  static constexpr double kMinRate = 5.0 * 1000 * 1000;
+  static constexpr double kAddRate = 5.0 * 1000 * 1000;
 
   static constexpr double kMinRTT = 2;
   static constexpr double kTLow = 50;
@@ -50,11 +51,15 @@ class Timely {
   static constexpr double kBeta = kPatched ? .008 : .8;
   static constexpr size_t kHaiThresh = 5;
 
+  double rate = kMaxRate;
   size_t neg_gradient_count = 0;
   double prev_rtt = kMinRTT;
   double avg_rtt_diff = 0.0;
   size_t last_update_tsc = 0;
+
+  // Const
   double min_rtt_tsc = 0.0;
+  double t_low_tsc = 0.0;
   double freq_ghz = 0.0;
 
   // For latency stats
@@ -64,12 +69,11 @@ class Timely {
   size_t create_tsc;
   std::vector<timely_record_t> record_vec;
 
-  double rate = kTimelyMaxRate;
-
   Timely() {}
   Timely(double freq_ghz)
       : last_update_tsc(rdtsc()),
         min_rtt_tsc(kMinRTT * freq_ghz * 1000),
+        t_low_tsc(kTLow * freq_ghz * 1000),
         freq_ghz(freq_ghz),
         create_tsc(rdtsc()) {
     if (kRecord) record_vec.reserve(1000000);
@@ -106,7 +110,7 @@ class Timely {
     double _delta_factor = (_rdtsc - last_update_tsc) / min_rtt_tsc;  // fdiv
     _delta_factor = std::min(_delta_factor, 1.0);
 
-    double ai_factor = kTimelyAddRate * _delta_factor;
+    double ai_factor = kAddRate * _delta_factor;
 
     double new_rate;
     if (sample_rtt < kTLow) {
@@ -144,19 +148,20 @@ class Timely {
     }
 
     rate = std::max(new_rate, rate * 0.5);
-    rate = std::min(rate, kTimelyMaxRate);
-    rate = std::max(rate, kTimelyMinRate);
+    rate = std::min(rate, kMaxRate);
+    rate = std::max(rate, kMinRate);
 
     prev_rtt = sample_rtt;
     last_update_tsc = _rdtsc;
 
+    // For debugging only
     if (kLatencyStats) latency.update(static_cast<size_t>(sample_rtt));
 
-    if (kRecord && rate != kTimelyMaxRate) {
+    if (kRecord && rate != kMaxRate) {
       record_vec.emplace_back(sample_rtt, rate);
     }
 
-    if (kRecord && rate == kTimelyMinRate) {
+    if (kRecord && rate == kMinRate) {
       // If we reach min rate after steady state, print a log and exit
       double sec_since_creation = to_sec(rdtsc() - create_tsc, freq_ghz);
       if (sec_since_creation >= 0.0) {

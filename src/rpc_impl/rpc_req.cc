@@ -115,14 +115,16 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
 
   if (likely(req_msgbuf->num_pkts == 1)) {
     // Small request
-    if (kCcPacing) {
+    if (!kCcPacing ||
+        (kCcOptWheelBypass &&
+         session->client_info.cc.timely.rate == Timely::kMaxRate)) {
+      enqueue_pkt_tx_burst_st(sslot, 0, &ci.tx_ts[0]);
+    } else {
       size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(0);
       size_t _rdtsc = dpath_rdtsc();
       size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, pkt_size);
       wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(0)), _rdtsc,
                     abs_tx_tsc);
-    } else {
-      enqueue_pkt_tx_burst_st(sslot, 0, &ci.tx_ts[0]);
     }
 
     credits--;

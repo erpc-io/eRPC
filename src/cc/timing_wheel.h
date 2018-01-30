@@ -97,7 +97,7 @@ class TimingWheel {
         freq_ghz(args.freq_ghz),
         wslot_width(args.wslot_width),
         wslot_width_tsc(us_to_cycles(wslot_width, freq_ghz)),
-        horizon(1000000 * (kSessionCredits * mtu) / kTimelyMinRate),
+        horizon(1000000 * (kSessionCredits * mtu) / Timely::kMinRate),
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
         num_wslots(1 + round_up(horizon / wslot_width)),
         console_ref_tsc(console_ref_tsc),
