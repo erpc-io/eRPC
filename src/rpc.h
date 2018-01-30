@@ -718,7 +718,14 @@ class Rpc {
     size_t _rdtsc = dpath_rdtsc();  // Reuse below
     size_t rtt_tsc =
         _rdtsc - sslot->client_info.tx_ts[trigger_pkt_num % kSessionCredits];
-    sslot->session->client_info.cc.timely.update_rate(_rdtsc, rtt_tsc);
+
+    Timely &timely = sslot->session->client_info.cc.timely;
+    if (kCcOptTimelyBypass &&
+        (timely.rate == Timely::kMaxRate && rtt_tsc <= timely.t_low_tsc)) {
+      return;
+    }
+
+    timely.update_rate(_rdtsc, rtt_tsc);
   }
 
   // rpc_cr.cc
