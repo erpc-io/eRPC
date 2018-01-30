@@ -713,7 +713,7 @@ class Rpc {
   /// the triggering packet number may be different from the received packet's
   /// number.
   inline void update_timely_rate(SSlot *sslot, size_t trigger_pkt_num) {
-    if (!kCcRateComp) return;
+    assert(kCcRateComp);
 
     size_t _rdtsc = dpath_rdtsc();  // Reuse below
     size_t rtt_tsc =
