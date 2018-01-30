@@ -11,6 +11,9 @@ void Rpc<TTr>::process_comps_st() {
   dpath_stat_inc(dpath_stats.rx_burst_calls, 1);
   dpath_stat_inc(dpath_stats.pkts_rx, num_pkts);
 
+  size_t batch_rx_tsc = 0;
+  if (kCcOptBatchTsc) batch_rx_tsc = dpath_rdtsc();
+
   for (size_t i = 0; i < num_pkts; i++) {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     rx_ring_head = (rx_ring_head + 1) % Transport::kNumRxRingEntries;
@@ -50,7 +53,7 @@ void Rpc<TTr>::process_comps_st() {
     // Process control packets, which are sent only for large RPCs
     if (pkthdr->msg_size == 0) {
       assert(pkthdr->is_expl_cr() || pkthdr->is_req_for_resp());
-      pkthdr->is_expl_cr() ? process_expl_cr_st(sslot, pkthdr)
+      pkthdr->is_expl_cr() ? process_expl_cr_st(sslot, pkthdr, batch_rx_tsc)
                            : process_req_for_resp_st(sslot, pkthdr);
       continue;
     }
@@ -61,10 +64,10 @@ void Rpc<TTr>::process_comps_st() {
     if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
       assert(pkthdr->pkt_num == 0);
       pkthdr->is_req() ? process_small_req_st(sslot, pkthdr)
-                       : process_small_resp_st(sslot, pkthdr);
+                       : process_small_resp_st(sslot, pkthdr, batch_rx_tsc);
     } else {
       pkthdr->is_req() ? process_large_req_one_st(sslot, pkthdr)
-                       : process_large_resp_one_st(sslot, pkthdr);
+                       : process_large_resp_one_st(sslot, pkthdr, batch_rx_tsc);
     }
   }
 

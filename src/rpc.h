@@ -407,10 +407,10 @@ class Rpc {
 
  private:
   /// Process a single-packet request message
-  void process_small_resp_st(SSlot *, const pkthdr_t *);
+  void process_small_resp_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
   /// Process a packet for a multi-packet response
-  void process_large_resp_one_st(SSlot *, const pkthdr_t *);
+  void process_large_resp_one_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
   //
   // Event loop
@@ -500,10 +500,12 @@ class Rpc {
     dpath_stat_inc(dpath_stats.pkts_tx, tx_batch_i);
 
     if (kCcRTT) {
-      size_t batch_tsc = dpath_rdtsc();  // Once per batch => low overhead
+      size_t batch_tsc = 0;
+      if (kCcOptBatchTsc) batch_tsc = dpath_rdtsc();
+
       for (size_t i = 0; i < tx_batch_i; i++) {
         if (tx_burst_arr[i].tx_ts != nullptr) {
-          *tx_burst_arr[i].tx_ts = batch_tsc;
+          *tx_burst_arr[i].tx_ts = kCcOptBatchTsc ? batch_tsc : dpath_rdtsc();
         }
       }
     }
@@ -708,16 +710,30 @@ class Rpc {
     if (unlikely(multi_threaded)) mutex->unlock();
   }
 
-  /// Perform a Timely rate update on receiving the explict CR or response
-  /// packet for this triggering packet number. For the zeroth response packet,
-  /// the triggering packet number may be different from the received packet's
-  /// number.
-  inline void update_timely_rate(SSlot *sslot, size_t trigger_pkt_num) {
+  /**
+   * @brief Perform a Timely rate update on receiving the explict CR or response
+   * packet for this triggering packet number
+   * 
+   * @param sslot The request sslot for which a packet is received
+   * 
+   * @param trigger_pkt_num The packet number of the request or RFR that
+   * triggered this explicit CR or response. This is needed because for the
+   * zeroth response packet, the triggering packet number may be different from
+   * the received packet's number.
+   * 
+   * @param Time at which the explicit CR or response packet was received
+   */
+  inline void update_timely_rate(SSlot *sslot, size_t trigger_pkt_num,
+                                 size_t rx_tsc) {
     assert(kCcRateComp);
 
-    size_t _rdtsc = dpath_rdtsc();  // Reuse below
+    if (!kCcOptBatchTsc) {
+      assert(rx_tsc == 0);  // Caller shouldn't have paid the overhead
+      rx_tsc = dpath_rdtsc();
+    }
+
     size_t rtt_tsc =
-        _rdtsc - sslot->client_info.tx_ts[trigger_pkt_num % kSessionCredits];
+        rx_tsc - sslot->client_info.tx_ts[trigger_pkt_num % kSessionCredits];
 
     Timely &timely = sslot->session->client_info.cc.timely;
     if (kCcOptTimelyBypass &&
@@ -725,7 +741,7 @@ class Rpc {
       return;
     }
 
-    timely.update_rate(_rdtsc, rtt_tsc);
+    timely.update_rate(rx_tsc, rtt_tsc);
   }
 
   // rpc_cr.cc
@@ -740,7 +756,7 @@ class Rpc {
   void enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
 
   /// Process a credit return
-  void process_expl_cr_st(SSlot *, const pkthdr_t *);
+  void process_expl_cr_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
   // rpc_rfr.cc
 

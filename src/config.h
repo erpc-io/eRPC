@@ -19,6 +19,7 @@ static constexpr bool kCcRateComp = true;   ///< Perform rate updates
 static constexpr bool kCcPacing = true;     ///< Do packet pacing
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
+static constexpr bool kCcOptBatchTsc = true;      ///< Use per-batch TSC
 static constexpr bool kCcOptWheelBypass = true;   ///< Bypass wheel if possible
 static constexpr bool kCcOptTimelyBypass = true;  ///< Bypass Timely if possible
 

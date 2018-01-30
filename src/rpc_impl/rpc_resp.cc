@@ -74,7 +74,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr,
+                                     size_t rx_tsc) {
   assert(in_dispatch());
   assert(sslot->is_client);
   assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
@@ -107,7 +108,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
   if (kCcRateComp) {
     size_t trigger_pkt_num = sslot->tx_msgbuf->num_pkts - 1;
-    update_timely_rate(sslot, trigger_pkt_num);
+    update_timely_rate(sslot, trigger_pkt_num, rx_tsc);
   }
 
   // If we're here, this is the first (and only) packet of the response
@@ -138,7 +139,8 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
+                                         size_t rx_tsc) {
   assert(in_dispatch());
   assert(sslot->is_client);
 
@@ -182,7 +184,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   if (kCcRateComp) {
     size_t trigger_pkt_num =
         pkthdr->pkt_num == 0 ? sslot->tx_msgbuf->num_pkts - 1 : pkthdr->pkt_num;
-    update_timely_rate(sslot, trigger_pkt_num);
+    update_timely_rate(sslot, trigger_pkt_num, rx_tsc);
   }
 
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;

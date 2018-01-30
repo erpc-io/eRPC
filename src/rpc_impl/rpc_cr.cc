@@ -26,7 +26,8 @@ void Rpc<TTr>::enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
+                                  size_t rx_tsc) {
   assert(in_dispatch());
   assert(sslot->is_client);
 
@@ -51,7 +52,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
   if (kCcRateComp) {
     size_t trigger_pkt_num = pkthdr->pkt_num;
-    update_timely_rate(sslot, trigger_pkt_num);
+    update_timely_rate(sslot, trigger_pkt_num, rx_tsc);
   }
 
   sslot->client_info.expl_cr_rcvd++;
