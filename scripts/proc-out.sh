@@ -68,7 +68,8 @@ for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
 
   file_avg_str=""  # Average of each column for this file
   for ((col_idx = 0; col_idx < $num_columns; col_idx++)); do
-    file_avg=`awk -v col=$col_idx '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
+    awk_col_idx=`expr $col_idx + 1` # 1-based
+    file_avg=`awk -v col=$awk_col_idx '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
     col_sum_of_avgs[$col_idx]=`echo "scale=3; ${col_sum_of_avgs[$col_idx]} + $file_avg" | bc -l`
     file_avg_str=`echo $file_avg_str ${col_name[$col_idx]}:$file_avg, `
   done
