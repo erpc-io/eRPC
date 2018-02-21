@@ -17,7 +17,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "config.h"
+#include "tweakme.h"
 
 namespace erpc {
 
@@ -58,7 +58,7 @@ static constexpr size_t kInvalidBgETid = kMaxBgThreads;
 
 // Simple methods
 
-/// Emulab hostnames are very long, so trim it to just the node name.
+/// Emulab hostnames are long, so trim it to just the node name.
 static std::string trim_hostname(std::string hostname) {
   if (hostname.find("emulab.net") != std::string::npos) {
     std::string trimmed_hostname = hostname.substr(0, hostname.find("."));
@@ -73,6 +73,12 @@ static inline void rt_assert(bool condition, std::string throw_str) {
   if (unlikely(!condition)) throw std::runtime_error(throw_str);
 }
 
+/// Check a condition at runtime. If the condition is false, throw exception.
+/// This is faster than rt_assert(cond, str) as it avoids string construction.
+static inline void rt_assert(bool condition) {
+  if (unlikely(!condition)) throw std::runtime_error("Error");
+}
+
 /// Check a condition at runtime. If the condition is false, print error message
 /// and exit.
 static inline void exit_assert(bool condition, std::string error_msg) {
@@ -83,9 +89,8 @@ static inline void exit_assert(bool condition, std::string error_msg) {
   }
 }
 
-/// Check a condition at runtime. If the condition is false, throw exception.
-static inline void rt_assert(bool condition) {
-  if (unlikely(!condition)) throw std::runtime_error("Error");
+static inline void dpath_stat_inc(size_t &stat, size_t val) {
+  if (kDatapathStats) stat += val;
 }
 
 }  // End erpc

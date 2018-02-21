@@ -496,6 +496,8 @@ class Rpc {
   inline void do_tx_burst_st() {
     assert(in_dispatch());
     assert(tx_batch_i > 0);
+
+    // Measure TX burst size
     dpath_stat_inc(dpath_stats.tx_burst_calls, 1);
     dpath_stat_inc(dpath_stats.pkts_tx, tx_batch_i);
 
@@ -713,14 +715,14 @@ class Rpc {
   /**
    * @brief Perform a Timely rate update on receiving the explict CR or response
    * packet for this triggering packet number
-   * 
+   *
    * @param sslot The request sslot for which a packet is received
-   * 
+   *
    * @param trigger_pkt_num The packet number of the request or RFR that
    * triggered this explicit CR or response. This is needed because for the
    * zeroth response packet, the triggering packet number may be different from
    * the received packet's number.
-   * 
+   *
    * @param Time at which the explicit CR or response packet was received
    */
   inline void update_timely_rate(SSlot *sslot, size_t trigger_pkt_num,

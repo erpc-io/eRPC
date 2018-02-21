@@ -8,6 +8,7 @@ void Rpc<TTr>::process_comps_st() {
   size_t num_pkts = transport->rx_burst();
   if (num_pkts == 0) return;
 
+  // Measure RX burst size
   dpath_stat_inc(dpath_stats.rx_burst_calls, 1);
   dpath_stat_inc(dpath_stats.pkts_rx, num_pkts);
 
@@ -46,11 +47,10 @@ void Rpc<TTr>::process_comps_st() {
     LOG_TRACE("eRPC Rpc %u: Received packet %s.\n", rpc_id,
               pkthdr->to_string().c_str());
 
-    // Locate the session slot
     size_t sslot_i = pkthdr->req_num % kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
-    // Process control packets, which are sent only for large RPCs
+    // Process control packets
     if (pkthdr->msg_size == 0) {
       assert(pkthdr->is_expl_cr() || pkthdr->is_req_for_resp());
       pkthdr->is_expl_cr() ? process_expl_cr_st(sslot, pkthdr, batch_rx_tsc)
