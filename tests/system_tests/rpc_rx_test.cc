@@ -66,37 +66,37 @@ TEST_F(RpcRxTest, process_small_req_st) {
   pkthdr_0->format(kTestReqType, kTestSmallMsgSize, server.session_num,
                    PktType::kPktTypeReq, 0 /* pkt_num */, kSessionReqWindow);
 
-  // Past: Receive an old request.
-  // It's dropped.
+  // Receive an old request (past)
+  // Expect: It's dropped
   sslot_0->cur_req_num += 2 * kSessionReqWindow;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->size(), 0);
   sslot_0->cur_req_num -= 2 * kSessionReqWindow;
 
-  // In-order: Receive an in-order small request.
-  // Response handler is called and response is sent.
+  // Receive an in-order small request (in-order)
+  // Expect: Response handler is called and response is sent
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   test_context.num_req_handler_calls = 0;
 
-  // Past: Receive the same request again.
-  // Request handler is not called. Response is re-sent, and TX queue flushed.
+  // Receive the same request again (past)
+  // Expect: Request handler is not called. Resp is re-sent & TX queue flushed.
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   ASSERT_EQ(pkthdr_tx_queue->pop().pkt_type, PktType::kPktTypeResp);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
-  // Past: Receive the same request again, but response is not ready.
-  // Request handler is not called and response is not re-sent.
+  // Receive the same request again, but response is not ready (past)
+  // Expect: Request handler is not called and response is not re-sent
   MsgBuffer *tx_msgbuf_save = sslot_0->tx_msgbuf;
   sslot_0->tx_msgbuf = nullptr;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 0);
   sslot_0->tx_msgbuf = tx_msgbuf_save;
 
-  // In-order: Receive the next in-order request.
-  // Response handler is called and response is sent.
+  // Receive the next in-order request (in-order)
+  // Expect: Response handler is called and response is sent
   pkthdr_0->req_num += kSessionReqWindow;
   rpc->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_req_handler_calls, 1);
