@@ -127,31 +127,31 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   pkthdr_0->format(kTestReqType, kTestSmallMsgSize, client.session_num,
                    PktType::kPktTypeResp, 0 /* pkt_num */, kSessionReqWindow);
 
-  // Past: Receive an old response.
-  // It's dropped.
+  // Receive an old response (past)
+  // Expect: It's dropped
   assert(sslot_0->cur_req_num == kSessionReqWindow);
   sslot_0->cur_req_num += kSessionReqWindow;
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
   sslot_0->cur_req_num -= kSessionReqWindow;
 
-  // Roll-back: Receive resp while request progress is rolled back.
-  // It's dropped.
+  // Receive resp while request progress is rolled back (roll-back)
+  // Expect: It's dropped.
   assert(sslot_0->client_info.req_sent == 1);
   sslot_0->client_info.req_sent = 0;
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
   sslot_0->client_info.req_sent = 1;
 
-  // In-order: Receive an in-order small response.
-  // Continuation is invoked.
+  // Receive an in-order small response (in-order)
+  // Expect: Continuation is invoked.
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
   ASSERT_EQ(sslot_0->tx_msgbuf, nullptr);  // Response received
   test_context.num_cont_func_calls = 0;
 
-  // Past: Receive the same response again.
-  // It's dropped.
+  // Receive the same response again (past)
+  // Expect: It's dropped
   rpc->process_small_resp_st(sslot_0, pkthdr_0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
 }
@@ -179,33 +179,33 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   expl_cr.format(kTestReqType, 0 /* msg_size */, client.session_num,
                  PktType::kPktTypeExplCR, 0 /* pkt_num */, kSessionReqWindow);
 
-  // Past: Receive credit return for an old request.
-  // It's dropped.
+  // Receive credit return for an old request (past)
+  // Expect: It's dropped
   sslot_0->cur_req_num += kSessionReqWindow;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 0);
   sslot_0->cur_req_num -= kSessionReqWindow;
 
-  // In-order: Receive an in-order explicit credit return.
-  // This bumps sslot's expl_cr_rcvd
+  // Receive an in-order explicit credit return (in-order)
+  // Expect: This bumps sslot's expl_cr_rcvd
   clt_session->client_info.credits = kSessionCredits - 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
-  // Past: Receive the same explicit credit return again.
-  // It's dropped.
+  // Receive the same explicit credit return again (past)
+  // Expect: It's dropped
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
-  // Sensitivity: Client should use only the expl_cr_rcvd counter for ordering.
-  // On resetting it, behavior should be exactly like an in-order explicit CR.
+  // Client should use only the expl_cr_rcvd counter for ordering (sensitivity)
+  // Expect: On resetting it, behavior should be like an in-order explicit CR
   sslot_0->client_info.expl_cr_rcvd = 0;
   clt_session->client_info.credits = kSessionCredits - 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
-  // Roll-back: Receive explicit credit return for a future pkt in this request.
-  // It's dropped.
+  // Receive explicit credit return for a future pkt in this request (roll-back)
+  // Expect: It's dropped
   expl_cr.pkt_num = 1;
   rpc->process_expl_cr_st(sslot_0, &expl_cr);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
