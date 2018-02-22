@@ -234,36 +234,36 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   rfr.format(kTestReqType, 0 /* msg_size */, server.session_num,
              PktType::kPktTypeReqForResp, 1 /* pkt_num */, kSessionReqWindow);
 
-  // Past: Receive RFR for an old request.
-  // It's dropped.
+  // Receive RFR for an old request (past)
+  // Expect: It's dropped
   sslot_0->cur_req_num += kSessionReqWindow;
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 0);
   ASSERT_TRUE(pkthdr_tx_queue->size() == 0);
   sslot_0->cur_req_num -= kSessionReqWindow;
 
-  // In-order: Receive an in-order RFR.
-  // Response packet #1 is sent.
+  // Receive an in-order RFR (in-order)
+  // Expect: Response packet #1 is sent
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
 
-  // Past: Receive the same RFR again.
-  // Response packet is re-sent and TX queue is flushed.
+  // Receive the same RFR again (past)
+  // Expect: Response packet is re-sent and TX queue is flushed
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
 
-  // Sensitivity: Server should use only the rfr_rcvd counter for ordering.
-  // On resetting it, behavior should be exactly like an in-order RFR.
+  // Server should use only the rfr_rcvd counter for ordering (sensitivity)
+  // Expect: On resetting it, behavior should be exactly like an in-order RFR
   sslot_0->server_info.rfr_rcvd = 0;
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 1));
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
 
-  // Future: Receive a future RFR packet for this request.
-  // It's dropped.
+  // Receive a future RFR packet for this request (future)
+  // Expect: It's dropped
   rfr.pkt_num += 2u;
   rpc->process_req_for_resp_st(sslot_0, &rfr);
   ASSERT_EQ(sslot_0->server_info.rfr_rcvd, 1);
@@ -289,8 +289,8 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   pkthdr_0->format(kTestReqType, kTestLargeMsgSize, server.session_num,
                    PktType::kPktTypeReq, 0 /* pkt_num */, kSessionReqWindow);
 
-  // Past: Receive a packet for a past request.
-  // It's dropped.
+  // Receive a packet for a past request (past)
+  // Expect: It's dropped
   assert(sslot_0->cur_req_num == 0);
   sslot_0->cur_req_num += 2 * kSessionReqWindow;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
@@ -298,36 +298,36 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 0);
   sslot_0->cur_req_num -= 2 * kSessionReqWindow;
 
-  // In-order: Receive the zeroth request packet.
-  // Credit return is sent.
+  // Receive the zeroth request packet (in-order)
+  // Expect: Credit return is sent
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeExplCR, 0));
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 1);
 
-  // In-order: Receive the next request packet.
-  // Credit return is sent.
+  // Receive the next request packet (in-order)
+  // Expect: Credit return is sent
   pkthdr_0->pkt_num++;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeExplCR, 1));
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 2);
 
-  // Past: Receive the same request packet again.
-  // Credit return is re-sent and transport is NOT flushed.
+  // Receive the same request packet again (past)
+  // Expect: Credit return is re-sent and transport is NOT flushed
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeExplCR, 1));
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 2);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 0);
 
-  // Future: Receive a future packet for this request.
-  // It's dropped.
+  // Receive a future packet for this request (future)
+  // Expect: It's dropped
   pkthdr_0->pkt_num += 2u;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_EQ(pkthdr_tx_queue->size(), 0);
   ASSERT_EQ(sslot_0->server_info.req_rcvd, 2);
   pkthdr_0->pkt_num -= 2u;
 
-  // In-order: Receive the last packet of this request.
-  // First response packet is sent, and request is buried.
+  // Receive the last packet of this request (in-order)
+  // Expect: First response packet is sent, and request is buried
   sslot_0->server_info.req_rcvd = num_pkts_in_req - 1;
   pkthdr_0->pkt_num = num_pkts_in_req - 1;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
@@ -335,16 +335,16 @@ TEST_F(RpcRxTest, process_large_req_one_st) {
   ASSERT_EQ(sslot_0->server_info.req_rcvd, num_pkts_in_req);
   ASSERT_TRUE(sslot_0->server_info.req_msgbuf.is_buried());
 
-  // Past: Receive the last request packet again.
-  // First response packet is sent and transport flushed.
+  // Receive the last request packet again (past)
+  // Expect: First response packet is sent and transport flushed
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeResp, 0));
   ASSERT_EQ(sslot_0->server_info.req_rcvd, num_pkts_in_req);
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 1);
   rpc->transport->testing.tx_flush_count = 0;
 
-  // Past: Receive any request packet except the last.
-  // Credit return is re-sent and transport is NOT flushed.
+  // Receive any request packet except the last (past)
+  // Expect: Credit return is re-sent and transport is NOT flushed
   pkthdr_0->pkt_num = 5;
   rpc->process_large_req_one_st(sslot_0, pkthdr_0);
   ASSERT_TRUE(pkthdr_tx_queue->pop().matches(PktType::kPktTypeExplCR, 5));
