@@ -406,10 +406,16 @@ class Rpc {
   }
 
  private:
-  /// Process a single-packet request message
+  /**
+   * @brief Process a single-packet response
+   * @param rx_tsc The timestamp at which this packet was received
+   */
   void process_small_resp_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
-  /// Process a packet for a multi-packet response
+  /**
+   * @brief Process a packet for a multi-packet response
+   * @param rx_tsc The timestamp at which this packet was received
+   */
   void process_large_resp_one_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
   //
@@ -757,7 +763,10 @@ class Rpc {
    */
   void enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
 
-  /// Process a credit return
+  /**
+   * @brief Process an explicit credit return packet
+   * @param rx_tsc Timestamp at which the packet was received
+   */
   void process_expl_cr_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
   // rpc_rfr.cc
