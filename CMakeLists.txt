@@ -50,18 +50,6 @@ else(PERF)
   SET(TESTING ON)
 endif(PERF)
 
-# Datapath transport
-if(TRANSPORT STREQUAL "infiniband")
-  MESSAGE(STATUS "Using InfiniBand transport")
-  add_definitions(-DINFINIBAND=1)
-elseif(TRANSPORT STREQUAL "roce")
-  MESSAGE(STATUS "Using RoCE transport")
-  add_definitions(-DROCE=1)
-elseif(TRANSPORT STREQUAL "raw")
-  MESSAGE(STATUS "Using raw Ethernet transport")
-  add_definitions(-DRAW_ETHERNET=1)
-endif()
-
 # Profile-guided optimization
 if(PGO STREQUAL "generate")
   MESSAGE(STATUS "Profile-guided optimization (generate mode) is enabled. Performance will be low.")
