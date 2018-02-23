@@ -52,8 +52,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       wr.num_sge = 2;
     }
 
-    // We can do an 8-byte aligned memcpy because the two UDP checksum bytes
-    // are already zero.
+    // We can do an 8-byte aligned memcpy as the 2-byte UDP csum is already 0
     static constexpr size_t hdr_copy_sz = kInetHdrsTotSize - 2;
     static_assert(hdr_copy_sz == 40, "");
     memcpy(&pkthdr->headroom[0], item.routing_info, hdr_copy_sz);
