@@ -101,7 +101,6 @@ void IBTransport::tx_flush() {
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
-
   assert(ret == 0);
   if (unlikely(ret != 0)) {
     fprintf(stderr, "eRPC Error. tx_flush post_send() failed. ret = %d\n", ret);

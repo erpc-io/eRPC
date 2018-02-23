@@ -1,4 +1,5 @@
 #include "raw_transport.h"
+#include "util/huge_alloc.h"
 
 namespace erpc {
 
@@ -94,6 +95,30 @@ void RawTransport::tx_flush() {
   assert(nb_tx > 0);
   poll_cq_one_helper(send_cq);  // Poll the one existing signaled WQE
 
+  size_t pkt_size = kInetHdrsTotSize + 8;
+  Buffer buffer = huge_alloc->alloc(pkt_size);  // Get a registered buffer
+  assert(buffer.buf != nullptr);
+
+  memset(buffer.buf, 0, pkt_size);
+  auto* pkthdr = reinterpret_cast<pkthdr_t*>(buffer.buf);
+
+  // Create a valid packet to self, but later we'll garble the destination IP
+  RoutingInfo self_ri;
+  fill_local_routing_info(&self_ri);
+  resolve_remote_routing_info(&self_ri);
+
+  memcpy(&pkthdr->headroom[0], &self_ri, sizeof(RoutingInfo));
+
+  auto* ipv4_hdr =
+      reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
+  assert(ipv4_hdr->check == 0);
+  ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
+  ipv4_hdr->dst_ip = 0;  // Dropped by switch, fast
+
+  auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
+  assert(udp_hdr->check == 0);
+  udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
+
   // Use send_wr[0] to post the second signaled flush WQE
   struct ibv_send_wr& wr = send_wr[0];
   struct ibv_sge* sgl = send_sgl[0];
@@ -102,26 +127,19 @@ void RawTransport::tx_flush() {
   assert(wr.opcode == IBV_WR_SEND);
   assert(wr.sg_list == send_sgl[0]);
 
-  // We could use a header-only SEND, but the optimized inline-copy function in
-  // the modded driver expects WQEs with exactly one SGE.
-  char flush_inline_buf[1];
-  sgl[0].addr = reinterpret_cast<uint64_t>(flush_inline_buf);
-  sgl[0].length = 1;
+  sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
+  sgl[0].length = pkt_size;
+  sgl[0].lkey = buffer.lkey;
 
   wr.next = nullptr;  // Break the chain
   wr.send_flags = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
   wr.num_sge = 1;
-  wr.wr.ud.remote_qpn = 0;  // Invalid QPN, which will cause the drop
-  wr.wr.ud.ah = self_ah;    // Send to self
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
-
   assert(ret == 0);
   if (unlikely(ret != 0)) {
-    fprintf(stderr,
-            "eRPC: Fatal error. ibv_post_send failed for flush WQE. ret = %d\n",
-            ret);
+    fprintf(stderr, "eRPC Error. tx_flush post_send() failed. ret = %d\n", ret);
     exit(-1);
   }
 
@@ -130,6 +148,7 @@ void RawTransport::tx_flush() {
   poll_cq_one_helper(send_cq);  // Poll the signaled WQE posted above
   nb_tx = 0;                    // Reset signaling logic
 
+  huge_alloc->free_buf(buffer);
   testing.tx_flush_count++;
 }
 
