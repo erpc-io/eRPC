@@ -26,9 +26,8 @@ namespace erpc {
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define KB(x) (static_cast<size_t>(x) << 10)
-#define KB_(x) (KB(x) - 1)
 #define MB(x) (static_cast<size_t>(x) << 20)
-#define MB_(x) (MB(x) - 1)
+#define GB(x) (static_cast<size_t>(x) << 30)
 
 // General constants
 

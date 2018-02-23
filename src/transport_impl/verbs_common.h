@@ -82,19 +82,17 @@ static void ibv_dereg_mr_wrapper(Transport::MemRegInfo mr) {
   LOG_INFO("eRPC Verbs: Deregistered %zu B, lkey = %u\n", size, lkey);
 }
 
-// This is a slower polling function than the one used in datapaths: it prints
-// a warning message when the number of polling attempts gets too high. This
-// overhead is fine because the send queue is flushed rarely.
-static void poll_send_cq_for_flush(struct ibv_cq *send_cq, bool first) {
+static inline void poll_cq_one_helper(struct ibv_cq *send_cq) {
   struct ibv_wc wc;
   size_t num_tries = 0;
   while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
-    num_tries++;
-    if (num_tries == 1000000000) {
-      fprintf(stderr,
-              "eRPC: Warning. tx_flush stuck polling for %s signaled wr.\n",
-              first ? "first" : "second");
-      num_tries = 0;
+    // Do nothing while we have no CQE or poll_cq error
+    if (LOG_LEVEL == LOG_LEVEL_INFO) {
+      num_tries++;
+      if (unlikely(num_tries == GB(1))) {
+        fprintf(stderr, "eRPC: Warning. Stuck in poll_cq()");
+        num_tries = 0;
+      }
     }
   }
 

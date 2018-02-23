@@ -154,19 +154,7 @@ class RawTransport : public Transport {
     int flag;
     if (nb_tx % kUnsigBatch == 0) {
       flag = IBV_SEND_SIGNALED;
-
-      if (likely(nb_tx != 0)) {
-        struct ibv_wc wc;
-        while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
-          // Do nothing while we have no CQE or poll_cq error
-        }
-
-        if (unlikely(wc.status != 0)) {
-          fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n",
-                  wc.status);
-          exit(-1);
-        }
-      }
+      if (likely(nb_tx != 0)) poll_cq_one_helper(send_cq);
     } else {
       flag = 0;
     }

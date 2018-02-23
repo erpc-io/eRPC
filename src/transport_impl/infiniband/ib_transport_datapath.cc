@@ -73,17 +73,10 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 }
 
 void IBTransport::tx_flush() {
-  testing.tx_flush_count++;
-
-  if (unlikely(nb_tx == 0)) {
-    fprintf(stderr,
-            "eRPC: Warning. tx_flush called, but no SEND request in queue.\n");
-    return;
-  }
-
-  // If we are here, we have posted a SEND work request. The selective signaling
-  // logic guarantees that there is *exactly one* *signaled* SEND work request.
-  poll_send_cq_for_flush(send_cq, true);  // Poll the one existing signaled WQE
+  // If we are here, we have sent a packet. The selective signaling logic
+  // guarantees that there is *exactly one* *signaled* SEND work request.
+  assert(nb_tx > 0);
+  poll_cq_one_helper(send_cq);  // Poll the one existing signaled WQE
 
   // Use send_wr[0] to post the second signaled flush WQE
   struct ibv_send_wr& wr = send_wr[0];
@@ -119,8 +112,10 @@ void IBTransport::tx_flush() {
 
   wr.next = &send_wr[1];  // Restore the chain
 
-  poll_send_cq_for_flush(send_cq, false);  // Poll the signaled WQE posted above
-  nb_tx = 0;                               // Reset signaling logic
+  poll_cq_one_helper(send_cq);  // Poll the signaled WQE posted above
+  nb_tx = 0;                    // Reset signaling logic
+
+  testing.tx_flush_count++;
 }
 
 size_t IBTransport::rx_burst() {
