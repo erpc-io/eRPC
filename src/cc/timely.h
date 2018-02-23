@@ -148,8 +148,8 @@ class Timely {
     }
 
     rate = std::max(new_rate, rate * 0.5);
-    rate = std::min(rate, kMaxRate);
-    rate = std::max(rate, kMinRate);
+    rate = std::min(rate, double(kMaxRate));
+    rate = std::max(rate, double(kMinRate));
 
     prev_rtt = sample_rtt;
     last_update_tsc = _rdtsc;

@@ -92,7 +92,7 @@ endif()
 if(DEBUG)
   MESSAGE(STATUS "Debugging is enabled. Perf will be low.")
   add_definitions(-g)
-  add_definitions(-O2)
+  add_definitions(-Og)
 else(DEBUG)
   MESSAGE(STATUS "Debugging is disabled.")
   add_definitions(-DNDEBUG)
@@ -184,7 +184,7 @@ set(UTIL_TESTS
 
 # Compile the tests
 if(COMPILE_ERPC_LIB)
-  MESSAGE(STATUS "Compiling ERPC as a library")
+  MESSAGE(STATUS "Compiling eRPC as a library")
   add_library(erpc ${SOURCES})
 
   foreach(test_name IN LISTS CLIENT_TESTS)
