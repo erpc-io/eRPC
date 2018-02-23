@@ -10,6 +10,7 @@ namespace erpc {
 
 static constexpr size_t kTestSmallMsgSize = 32;
 static constexpr size_t kTestLargeMsgSize = KB(64);
+static constexpr size_t kTestRxTsc = 1000000000;
 
 class TestContext {
  public:
@@ -131,7 +132,7 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   // Expect: It's dropped
   assert(sslot_0->cur_req_num == kSessionReqWindow);
   sslot_0->cur_req_num += kSessionReqWindow;
-  rpc->process_small_resp_st(sslot_0, pkthdr_0);
+  rpc->process_small_resp_st(sslot_0, pkthdr_0, kTestRxTsc);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
   sslot_0->cur_req_num -= kSessionReqWindow;
 
@@ -139,20 +140,20 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   // Expect: It's dropped.
   assert(sslot_0->client_info.req_sent == 1);
   sslot_0->client_info.req_sent = 0;
-  rpc->process_small_resp_st(sslot_0, pkthdr_0);
+  rpc->process_small_resp_st(sslot_0, pkthdr_0, kTestRxTsc);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
   sslot_0->client_info.req_sent = 1;
 
   // Receive an in-order small response (in-order)
   // Expect: Continuation is invoked.
-  rpc->process_small_resp_st(sslot_0, pkthdr_0);
+  rpc->process_small_resp_st(sslot_0, pkthdr_0, kTestRxTsc);
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
   ASSERT_EQ(sslot_0->tx_msgbuf, nullptr);  // Response received
   test_context.num_cont_func_calls = 0;
 
   // Receive the same response again (past)
   // Expect: It's dropped
-  rpc->process_small_resp_st(sslot_0, pkthdr_0);
+  rpc->process_small_resp_st(sslot_0, pkthdr_0, kTestRxTsc);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
 }
 
@@ -182,32 +183,32 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   // Receive credit return for an old request (past)
   // Expect: It's dropped
   sslot_0->cur_req_num += kSessionReqWindow;
-  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 0);
   sslot_0->cur_req_num -= kSessionReqWindow;
 
   // Receive an in-order explicit credit return (in-order)
   // Expect: This bumps sslot's expl_cr_rcvd
   clt_session->client_info.credits = kSessionCredits - 1;
-  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
   // Receive the same explicit credit return again (past)
   // Expect: It's dropped
-  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
   // Client should use only the expl_cr_rcvd counter for ordering (sensitivity)
   // Expect: On resetting it, behavior should be like an in-order explicit CR
   sslot_0->client_info.expl_cr_rcvd = 0;
   clt_session->client_info.credits = kSessionCredits - 1;
-  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
   // Receive explicit credit return for a future pkt in this request (roll-back)
   // Expect: It's dropped
   expl_cr.pkt_num = 1;
-  rpc->process_expl_cr_st(sslot_0, &expl_cr);
+  rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
   expl_cr.pkt_num = 0;
 }

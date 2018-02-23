@@ -56,9 +56,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     // are already zero.
     static constexpr size_t hdr_copy_sz = kInetHdrsTotSize - 2;
     static_assert(hdr_copy_sz == 40, "");
-
-    memcpy(&pkthdr->headroom[0], reinterpret_cast<uint8_t*>(item.routing_info),
-           hdr_copy_sz);
+    memcpy(&pkthdr->headroom[0], item.routing_info, hdr_copy_sz);
 
     auto* ipv4_hdr =
         reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
