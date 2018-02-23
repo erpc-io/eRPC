@@ -104,9 +104,7 @@ void IBTransport::tx_flush() {
 
   assert(ret == 0);
   if (unlikely(ret != 0)) {
-    fprintf(stderr,
-            "eRPC: Fatal error. ibv_post_send failed for flush WQE. ret = %d\n",
-            ret);
+    fprintf(stderr, "eRPC Error. tx_flush post_send() failed. ret = %d\n", ret);
     exit(-1);
   }
 
