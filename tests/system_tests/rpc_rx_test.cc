@@ -119,7 +119,7 @@ TEST_F(RpcRxTest, process_small_resp_st) {
 
   // Use enqueue_request() to do sslot formatting for the request. Small request
   // is sent right away, so it uses credits.
-  rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, 0);
+  rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == kSessionCredits - 1);
 
   // Construct the basic test response packet
@@ -166,14 +166,17 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   Session *clt_session = create_client_session_connected(client, server);
   SSlot *sslot_0 = &clt_session->sslot_arr[0];
 
+  // Ensure that we have enough packets to fill one credit window
+  static_assert(kTestLargeMsgSize / CTransport::kMTU > kSessionCredits, "");
+
   MsgBuffer req = rpc->alloc_msg_buffer(kTestLargeMsgSize);
   MsgBuffer resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);  // Unused
 
-  // Use enqueue_request() to do sslot formatting for the request. Large request
-  // is queued, so it doesn't use credits for now.
-  rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, 0);
-  assert(clt_session->client_info.credits == kSessionCredits);
-  sslot_0->client_info.req_sent = 1;
+  // Use enqueue_request() to do sslot formatting for the request. This should
+  // use all credits since the message is large.
+  rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
+  assert(sslot_0->client_info.req_sent == kSessionCredits);
+  assert(clt_session->client_info.credits == 0);
 
   // Construct the basic explicit credit return packet
   pkthdr_t expl_cr;
@@ -188,10 +191,10 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   sslot_0->cur_req_num -= kSessionReqWindow;
 
   // Receive an in-order explicit credit return (in-order)
-  // Expect: This bumps sslot's expl_cr_rcvd
-  clt_session->client_info.credits = kSessionCredits - 1;
+  // Expect: expl_cr_rcvd and credits are bumped
   rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
+  ASSERT_EQ(clt_session->client_info.credits, 1);
 
   // Receive the same explicit credit return again (past)
   // Expect: It's dropped
@@ -200,14 +203,15 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
 
   // Client should use only the expl_cr_rcvd counter for ordering (sensitivity)
   // Expect: On resetting it, behavior should be like an in-order explicit CR
-  sslot_0->client_info.expl_cr_rcvd = 0;
-  clt_session->client_info.credits = kSessionCredits - 1;
+  sslot_0->client_info.expl_cr_rcvd--;
+  clt_session->client_info.credits--;
   rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
 
   // Receive explicit credit return for a future pkt in this request (roll-back)
   // Expect: It's dropped
-  expl_cr.pkt_num = 1;
+  sslot_0->client_info.req_sent = 1;  // Roll-back
+  expl_cr.pkt_num = 2;                // Future
   rpc->process_expl_cr_st(sslot_0, &expl_cr, kTestRxTsc);
   ASSERT_EQ(sslot_0->client_info.expl_cr_rcvd, 1);
   expl_cr.pkt_num = 0;

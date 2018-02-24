@@ -11,6 +11,7 @@ static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
 static constexpr size_t kTestRpcId = 0;  // ID of the fixture's Rpc
 static constexpr size_t kTestReqType = 1;
+static constexpr size_t kTestTag = 0;
 
 extern void req_handler(ReqHandle *, void *);  // Defined in each test.cc
 
