@@ -645,7 +645,7 @@ static inline int set_data_seg(struct mlx5_qp *qp, void *seg, int *sz, int is_in
 		 int num_sge, struct ibv_sge *sg_list, int atom_arg,
 		 int idx, int offset, int is_tso)
 {
-	if (ENABLE_INLINING && is_inl)
+	if (ERPC_ENABLE_INLINING && is_inl)
 		return set_data_inl_seg(qp, num_sge, sg_list, seg, sz, idx,
 					offset);
 	return set_data_non_inl_seg(qp, num_sge, sg_list, seg, sz, idx, offset, is_tso);
@@ -1308,7 +1308,7 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	int err = 0;
 	int size = 0;
 	int num_sge = wr->num_sge;
-	int inl_hdr_size = ENABLE_INLINING ? MLX5_ETH_INLINE_HEADER_SIZE : 0;  // 18 B
+	int inl_hdr_size = ERPC_ENABLE_INLINING ? MLX5_ETH_INLINE_HEADER_SIZE : 0;  // 18 B
 	int inl_hdr_copy_size = 0;
 	int i = 0;
 	uint8_t fm_ce_se;
@@ -1328,7 +1328,7 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 		/* The first bytes of the headers should be copied to the
 		 * inline-headers of the ETH segment.
 		 */
-		if (ENABLE_INLINING) {
+		if (ERPC_ENABLE_INLINING) {
 			inl_hdr_copy_size = inl_hdr_size;
 			memcpy(eseg->inline_hdr_start,
 			       (void *)(uintptr_t)wr->sg_list[0].addr,
