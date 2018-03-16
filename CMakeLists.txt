@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(eRPC)
 
+#set(CMAKE_CXX_COMPILER clang++-6.0)
+#set(CMAKE_C_LINK_EXECUTABLE clang++-6.0)
 set(CMAKE_CXX_COMPILER g++-7)
 set(CMAKE_C_LINK_EXECUTABLE g++-7)
 
@@ -11,6 +13,7 @@ add_definitions(-Wsign-conversion)
 add_definitions(-Wold-style-cast)
 
 add_definitions(-Wno-unused-function)
+add_definitions(-Wno-nested-anon-types)
 add_definitions(-march=native)
 add_definitions(-g)
 

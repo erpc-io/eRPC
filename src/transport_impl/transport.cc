@@ -1,4 +1,5 @@
 #include "transport.h"
+#include "util/huge_alloc.h"
 
 namespace erpc {
 

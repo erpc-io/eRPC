@@ -17,7 +17,7 @@ namespace erpc {
 class RawTransport : public Transport {
  public:
   /// Enable the dumbpipe optimizations (multi-packet RECVs, overrunning CQ)
-  static constexpr bool kDumb = true;
+  static constexpr bool kDumb = false;
 
   /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and numa node.
   static constexpr uint16_t kBaseRawUDPPort = 10000;

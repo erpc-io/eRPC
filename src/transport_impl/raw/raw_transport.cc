@@ -22,7 +22,7 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node)
   init_mem_reg_funcs();
 
   LOG_WARN(
-      "eRPC RawTransport: Created for ID %u. Device (%s, %s). IPv4 %s, MAC %s. "
+      "Created for ID %u. Device (%s, %s). IPv4 %s, MAC %s. "
       "port %d.\n",
       rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
       ipv4_to_string(resolve.ipv4_addr).c_str(),
@@ -43,52 +43,43 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 //
 // We only need to clean up non-hugepage structures.
 RawTransport::~RawTransport() {
-  LOG_INFO("eRPC RawTransport: Destroying transport for ID %u\n", rpc_id);
+  LOG_INFO("Destroying transport for ID %u\n", rpc_id);
 
   if (kDumb) {
-    exit_assert(ibv_destroy_qp(qp) == 0,
-                "eRPC RawTransport: Failed to destroy QP.");
-
-    exit_assert(ibv_destroy_cq(send_cq) == 0,
-                "eRPC RawTransport: Failed to destroy send CQ.");
+    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP.");
+    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ.");
 
     struct ibv_exp_release_intf_params rel_intf_params;
     memset(&rel_intf_params, 0, sizeof(rel_intf_params));
     exit_assert(
         ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
-        "eRPC RawTransport: Failed to release interface.");
+        "Failed to release interface.");
 
     exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
-                "eRPC RawTransport: Failed to destroy RECV flow");
+                "Failed to destroy RECV flow");
 
     exit_assert(ibv_destroy_qp(mp_recv_qp) == 0,
-                "eRPC RawTransport: Failed to destroy RECV QP.");
+                "Failed to destroy MP RECV QP.");
 
     exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
-                "eRPC RawTransport: Failed to destroy indirection table.");
+                "Failed to destroy indirection table.");
 
-    exit_assert(ibv_exp_destroy_wq(wq) == 0,
-                "eRPC RawTransport: Failed to destroy WQ.");
+    exit_assert(ibv_exp_destroy_wq(wq) == 0, "Failed to destroy WQ.");
   } else {
     exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
-                "eRPC RawTransport: Failed to destroy RECV flow");
+                "Failed to destroy RECV flow");
 
-    exit_assert(ibv_destroy_qp(qp) == 0,
-                "eRPC RawTransport: Failed to destroy QP.");
+    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP.");
 
-    exit_assert(ibv_destroy_cq(send_cq) == 0,
-                "eRPC RawTransport: Failed to destroy send CQ.");
+    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ.");
   }
 
-  exit_assert(ibv_destroy_cq(recv_cq) == 0,
-              "eRPC RawTransport: Failed to destroy RECV CQ.");
+  exit_assert(ibv_destroy_cq(recv_cq) == 0, "Failed to destroy RECV CQ.");
 
   // Destroy protection domain and device context
-  exit_assert(ibv_dealloc_pd(pd) == 0,
-              "eRPC RawTransport: Failed to destroy protection domain.");
+  exit_assert(ibv_dealloc_pd(pd) == 0, "Failed to destroy protection domain.");
 
-  exit_assert(ibv_close_device(resolve.ib_ctx) == 0,
-              "eRPC RawTransport: Failed to close device.");
+  exit_assert(ibv_close_device(resolve.ib_ctx) == 0, "Failed to close device.");
 }
 
 void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
@@ -127,22 +118,19 @@ void RawTransport::resolve_phy_port() {
   // Get the device list
   int num_devices = 0;
   struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
-  rt_assert(dev_list != nullptr,
-            "eRPC RawTransport: Failed to get device list");
+  rt_assert(dev_list != nullptr, "Failed to get device list");
 
   // Traverse the device list
   int ports_to_discover = phy_port;
 
   for (int dev_i = 0; dev_i < num_devices; dev_i++) {
     struct ibv_context *ib_ctx = ibv_open_device(dev_list[dev_i]);
-    rt_assert(ib_ctx != nullptr,
-              "eRPC RawTransport: Failed to open dev " + std::to_string(dev_i));
+    rt_assert(ib_ctx != nullptr, "Failed to open dev " + std::to_string(dev_i));
 
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
     if (ibv_query_device(ib_ctx, &device_attr) != 0) {
-      xmsg << "eRPC RawTransport: Failed to query device "
-           << std::to_string(dev_i);
+      xmsg << "Failed to query device " << std::to_string(dev_i);
       throw std::runtime_error(xmsg.str());
     }
 
@@ -150,8 +138,8 @@ void RawTransport::resolve_phy_port() {
       // Count this port only if it is enabled
       struct ibv_port_attr port_attr;
       if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
-        xmsg << "eRPC RawTransport: Failed to query port "
-             << std::to_string(port_i) << " on device " << ib_ctx->device->name;
+        xmsg << "Failed to query port " << std::to_string(port_i)
+             << " on device " << ib_ctx->device->name;
         throw std::runtime_error(xmsg.str());
       }
 
@@ -176,6 +164,9 @@ void RawTransport::resolve_phy_port() {
                                    std::to_string(active_mtu));
         }
 
+        LOG_INFO("Port %u resolved to device %s, port %u\n", phy_port,
+                 ib_ctx->device->name, port_i);
+
         resolve.device_id = dev_i;
         resolve.ib_ctx = ib_ctx;
         resolve.dev_port_id = port_i;
@@ -193,16 +184,14 @@ void RawTransport::resolve_phy_port() {
 
     // Thank you Mario, but our port is in another device
     if (ibv_close_device(ib_ctx) != 0) {
-      xmsg << "eRPC RawTransport: Failed to close device "
-           << ib_ctx->device->name;
+      xmsg << "Failed to close device " << ib_ctx->device->name;
       throw std::runtime_error(xmsg.str());
     }
   }
 
   // If we are here, port resolution has failed
   assert(resolve.ib_ctx == nullptr);
-  xmsg << "eRPC RawTransport: Failed to resolve RoCE port index "
-       << std::to_string(phy_port);
+  xmsg << "Failed to resolve RoCE port index " << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
 
@@ -214,7 +203,7 @@ void RawTransport::init_send_qp() {
   memset(&cq_init_attr, 0, sizeof(cq_init_attr));
   send_cq = ibv_exp_create_cq(resolve.ib_ctx, kSQDepth, nullptr, nullptr, 0,
                               &cq_init_attr);
-  rt_assert(send_cq != nullptr, "Failed to create SEND CQ");
+  rt_assert(send_cq != nullptr, "Failed to create SEND CQ. Forgot hugepages?");
 
   // In dumbpipe mode, we don't need a RECV CQ for this QP
   if (!kDumb) {
@@ -354,7 +343,7 @@ void RawTransport::install_flow_rule() {
   assert(qp_for_flow != nullptr);
 
   LOG_WARN(
-      "eRPC RawTransport: Installing flow rule for Rpc %u. NUMA node = %zu. "
+      "Installing flow rule for Rpc %u. NUMA node = %zu. "
       "Flow RX UDP port = %u.\n",
       rpc_id, numa_node, rx_flow_udp_port);
 
@@ -405,7 +394,7 @@ void RawTransport::map_mlx5_overrunning_recv_cqes() {
   // This cast works for mlx5 where ibv_cq is the first member of mlx5_cq.
   auto *_mlx5_cq = reinterpret_cast<mlx5_cq *>(recv_cq);
   rt_assert(kRecvCQDepth == std::pow(2, _mlx5_cq->cq_log_size),
-            "eRPC RawTransport: mlx5 CQ depth does not match kRecvCQDepth");
+            "mlx5 CQ depth does not match kRecvCQDepth");
   rt_assert(_mlx5_cq->buf_a.buf != nullptr);
 
   recv_cqe_arr = reinterpret_cast<volatile mlx5_cqe64 *>(_mlx5_cq->buf_a.buf);
@@ -435,7 +424,7 @@ void RawTransport::init_verbs_structs() {
 
   // Create protection domain, send CQ, and recv CQ
   pd = ibv_alloc_pd(resolve.ib_ctx);
-  rt_assert(pd != nullptr, "eRPC RawTransport: Failed to allocate PD");
+  rt_assert(pd != nullptr, "Failed to allocate PD");
 
   init_send_qp();
   if (kDumb) init_mp_recv_qp();
@@ -460,7 +449,7 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
   // Initialize the memory region for RECVs
   ring_extent = huge_alloc->alloc_raw(kRingSize, DoRegister::kTrue);
   if (ring_extent.buf == nullptr) {
-    xmsg << "eRPC RawTransport: Failed to allocate " << std::setprecision(2)
+    xmsg << "Failed to allocate " << std::setprecision(2)
          << 1.0 * kRingSize / MB(1) << "MB for ring buffers.";
     throw std::runtime_error(xmsg.str());
   }
@@ -502,7 +491,7 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
     recv_wr[kRQDepth - 1].next = nullptr;  // Breaker of chains
 
     int ret = ibv_post_recv(qp, &recv_wr[0], &bad_wr);
-    rt_assert(ret == 0, "eRPC RawTransport: Failed to fill RECV queue.");
+    rt_assert(ret == 0, "Failed to fill RECV queue.");
 
     recv_wr[kRQDepth - 1].next = &recv_wr[0];  // Restore circularity
   }
