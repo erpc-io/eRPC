@@ -63,9 +63,9 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
-  assert(ret == 0);
   if (unlikely(ret != 0)) {
     fprintf(stderr, "eRPC: Fatal error. ibv_post_send failed. ret = %d\n", ret);
+    assert(ret == 0);
     exit(-1);
   }
 
