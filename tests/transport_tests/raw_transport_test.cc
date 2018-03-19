@@ -26,8 +26,8 @@ class RawTransportTest : public ::testing::Test {
   }
 
   ~RawTransportTest() {
-    delete transport;
     delete huge_alloc;
+    delete transport;
   }
 
   uint8_t *rx_ring[RawTransport::kNumRxRingEntries];

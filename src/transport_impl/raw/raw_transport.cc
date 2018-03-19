@@ -46,36 +46,36 @@ RawTransport::~RawTransport() {
   LOG_INFO("Destroying transport for ID %u\n", rpc_id);
 
   if (kDumb) {
-    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP.");
-    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ.");
+    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP");
+    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ");
 
     struct ibv_exp_release_intf_params rel_intf_params;
     memset(&rel_intf_params, 0, sizeof(rel_intf_params));
     exit_assert(
         ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
-        "Failed to release interface.");
+        "Failed to release interface");
 
     exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
                 "Failed to destroy RECV flow");
 
     exit_assert(ibv_destroy_qp(mp_recv_qp) == 0,
-                "Failed to destroy MP RECV QP.");
+                "Failed to destroy MP RECV QP");
 
     exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
-                "Failed to destroy indirection table.");
+                "Failed to destroy indirection table");
 
-    exit_assert(ibv_exp_destroy_wq(wq) == 0, "Failed to destroy WQ.");
+    exit_assert(ibv_exp_destroy_wq(wq) == 0, "Failed to destroy WQ");
   } else {
     exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
                 "Failed to destroy RECV flow");
 
-    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP.");
-    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ.");
+    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP");
+    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ");
   }
 
-  exit_assert(ibv_destroy_cq(recv_cq) == 0, "Failed to destroy RECV CQ.");
-  exit_assert(ibv_dealloc_pd(pd) == 0, "Failed to destroy protection domain.");
-  exit_assert(ibv_close_device(resolve.ib_ctx) == 0, "Failed to close device.");
+  exit_assert(ibv_destroy_cq(recv_cq) == 0, "Failed to destroy RECV CQ");
+  exit_assert(ibv_dealloc_pd(pd) == 0, "Failed to destroy PD. Leaked MRs?");
+  exit_assert(ibv_close_device(resolve.ib_ctx) == 0, "Failed to close device");
 }
 
 void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
