@@ -197,9 +197,8 @@ void RawTransport::post_recvs(size_t num_recvs) {
     recvs_to_post -= kStridesPerWQE;  // Reset slack counter
   } else {
     if (recvs_to_post < kRecvSlack) return;
-    bool use_fast_recv = true;
 
-    if (use_fast_recv) {
+    if (kFastRecv) {
       // Construct a special RECV wr that the modded driver understands. Encode
       // the number of required RECVs in its num_sge field.
       struct ibv_recv_wr special_wr;

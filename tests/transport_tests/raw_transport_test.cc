@@ -6,7 +6,7 @@
 
 namespace erpc {
 static constexpr size_t kTestPhyPort = 0;
-static constexpr size_t kTestRpcId = 0;
+static constexpr size_t kTestRpcId = 100;
 static constexpr size_t kTestNumaNode = 0;
 
 static constexpr size_t kTestSmallMsgSize = 32;   // Data in small messages
@@ -35,9 +35,7 @@ class RawTransportTest : public ::testing::Test {
 
     // Initialize TX msgbufs. All packets are sent to self.
     transport->fill_local_routing_info(&self_ri);
-    transport->resolve_remote_routing_info(&self_ri);
-    printf("Self routing info = %s\n",
-           RawTransport::routing_info_str(&self_ri).c_str());
+    transport->resolve_remote_routing_info(&self_ri);  // Treat self as remote
 
     for (size_t i = 0; i < RawTransport::kPostlist; i++) {
       Buffer buf = huge_alloc->alloc(RawTransport::kMTU);
@@ -81,12 +79,9 @@ class RawTransportTest : public ::testing::Test {
 
     auto* ipv4_hdr =
         reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
-    assert(ipv4_hdr->check == 0);
     ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
-    ipv4_hdr->dst_ip = 0;  // Dropped by switch, fast
 
     auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
-    assert(udp_hdr->check == 0);
     udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
 
     return buffer;
@@ -99,6 +94,9 @@ TEST_F(RawTransportTest, create) {
 
 TEST_F(RawTransportTest, one_small_tx) {
   Buffer buffer = create_packet(kTestSmallMsgSize);
+
+  printf("Sending packet. Frame header = %s.\n",
+         frame_header_to_string(&buffer.buf[0]).c_str());
 
   struct ibv_sge sge;
   sge.addr = reinterpret_cast<uint64_t>(buffer.buf);
