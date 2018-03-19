@@ -1,11 +1,9 @@
-#include "system_tests.h"
+#include "protocol_tests.h"
 
-// Note that only real packet orderings are tested. Buggy cases are ignored. For
+// Note that only real packet orderings are tested; invalid packet orderings are
+// are ignored, and it's OK for eRPC to crash in with such orderings. For
 // example, the server cannot receive a future request before it sends a
 // response to the current request.
-//
-// eRPC handles such buggy cases by dropping the packet or by crashing, but the
-// exact action is unspecified.
 namespace erpc {
 
 static constexpr size_t kTestSmallMsgSize = 32;

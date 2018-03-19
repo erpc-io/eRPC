@@ -171,7 +171,7 @@ set(CLIENT_TESTS
   req_in_req_func_test
   packet_loss_test)
 
-set(SYSTEM_TESTS
+set(PROTOCOL_TESTS
   rpc_sm_test
   rpc_rx_test)
 
@@ -195,8 +195,8 @@ if(COMPILE_ERPC_LIB)
     add_test(NAME ${test_name} COMMAND ${test_name})
   endforeach()
 
-  foreach(test_name IN LISTS SYSTEM_TESTS)
-    add_executable(${test_name} tests/system_tests/${test_name}.cc)
+  foreach(test_name IN LISTS PROTOCOL_TESTS)
+    add_executable(${test_name} tests/protocol_tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
   endforeach()

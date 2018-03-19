@@ -1,4 +1,4 @@
-#include "system_tests.h"
+#include "protocol_tests.h"
 
 namespace erpc {
 
