@@ -42,6 +42,9 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
                              transport->reg_mr_func, transport->dereg_mr_func);
 
+  // Complete transport initialization using the hugepage allocator
+  transport->init_hugepage_structures(huge_alloc, rx_ring);
+
   wheel = nullptr;
   if (kCcPacing) {
     timing_wheel_args_t args;
@@ -53,10 +56,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     wheel = new TimingWheel(args, creation_tsc);
   }
 
-  // Complete transport initialization using the hugepage allocator
-  transport->init_hugepage_structures(huge_alloc, rx_ring);
-
-  // Create msgbufs for control packets
+  // Create DMA-registered msgbufs for control packets
   for (MsgBuffer &ctrl_msgbuf : ctrl_msgbufs) {
     ctrl_msgbuf = alloc_msg_buffer(8);  // alloc_msg_buffer() requires size > 0
     if (ctrl_msgbuf.buf == nullptr) {

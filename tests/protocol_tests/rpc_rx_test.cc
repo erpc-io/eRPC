@@ -50,9 +50,6 @@ class RpcRxTest : public RpcTest {
   TestContext test_context;
 };
 
-//
-// process_small_req_st()
-//
 TEST_F(RpcRxTest, process_small_req_st) {
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
@@ -103,9 +100,6 @@ TEST_F(RpcRxTest, process_small_req_st) {
   test_context.num_req_handler_calls = 0;
 }
 
-//
-// process_small_resp_st()
-//
 TEST_F(RpcRxTest, process_small_resp_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
@@ -155,9 +149,6 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
 }
 
-//
-// process_expl_cr_st()
-//
 TEST_F(RpcRxTest, process_expl_cr_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
@@ -215,9 +206,6 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   expl_cr.pkt_num = 0;
 }
 
-//
-// process_req_for_resp_st()
-//
 TEST_F(RpcRxTest, process_req_for_resp_st) {
   const auto server = get_local_endpoint();
   const auto client = get_remote_endpoint();
@@ -274,9 +262,6 @@ TEST_F(RpcRxTest, process_req_for_resp_st) {
   rfr.pkt_num -= 2u;
 }
 
-//
-// process_large_req_one_st()
-//
 TEST_F(RpcRxTest, process_large_req_one_st) {
   const size_t num_pkts_in_req = rpc->data_size_to_num_pkts(kTestLargeMsgSize);
   ASSERT_GT(num_pkts_in_req, 10);

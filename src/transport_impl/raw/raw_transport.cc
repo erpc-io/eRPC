@@ -70,15 +70,11 @@ RawTransport::~RawTransport() {
                 "Failed to destroy RECV flow");
 
     exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP.");
-
     exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ.");
   }
 
   exit_assert(ibv_destroy_cq(recv_cq) == 0, "Failed to destroy RECV CQ.");
-
-  // Destroy protection domain and device context
   exit_assert(ibv_dealloc_pd(pd) == 0, "Failed to destroy protection domain.");
-
   exit_assert(ibv_close_device(resolve.ib_ctx) == 0, "Failed to close device.");
 }
 
