@@ -131,15 +131,15 @@ void RawTransport::tx_flush() {
   sgl[0].length = pkt_size;
   sgl[0].lkey = buffer.lkey;
 
-  wr.next = nullptr;  // Break the chain
-  wr.send_flags = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
+  wr.next = nullptr;                  // Break the chain
+  wr.send_flags = IBV_SEND_SIGNALED;  // Not inlined!
   wr.num_sge = 1;
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
-  assert(ret == 0);
   if (unlikely(ret != 0)) {
-    fprintf(stderr, "eRPC Error. tx_flush post_send() failed. ret = %d\n", ret);
+    fprintf(stderr, "tx_flush post_send() failed. ret = %d\n", ret);
+    assert(ret == 0);
     exit(-1);
   }
 
