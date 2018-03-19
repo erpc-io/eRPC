@@ -20,6 +20,11 @@ class RawTransportTest : public ::testing::Test {
       return;
     }
 
+    if (RawTransport::kDumb) {
+      fprintf(stderr, "Dumbpipe mode not tested yet.\n");
+      return;
+    }
+
     // Initalize the transport
     transport = new RawTransport(kTestRpcId, kTestPhyPort, kTestNumaNode);
 
@@ -31,6 +36,8 @@ class RawTransportTest : public ::testing::Test {
     // Initialize TX msgbufs. All packets are sent to self.
     transport->fill_local_routing_info(&self_ri);
     transport->resolve_remote_routing_info(&self_ri);
+    printf("Self routing info = %s\n",
+           RawTransport::routing_info_str(&self_ri).c_str());
 
     for (size_t i = 0; i < RawTransport::kPostlist; i++) {
       Buffer buf = huge_alloc->alloc(RawTransport::kMTU);
@@ -110,6 +117,8 @@ TEST_F(RawTransportTest, one_small_tx) {
   ASSERT_EQ(ret, 0);
 
   poll_cq_one_helper(transport->send_cq);
+  poll_cq_one_helper(transport->recv_cq);
+
   huge_alloc->free_buf(buffer);
 }
 
