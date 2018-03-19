@@ -175,6 +175,9 @@ set(PROTOCOL_TESTS
   rpc_sm_test
   rpc_rx_test)
 
+set(TRANSPORT_TESTS
+  raw_transport_test)
+
 # These are not run using ctest
 set(UTIL_TESTS
   huge_alloc_test
@@ -197,6 +200,12 @@ if(COMPILE_ERPC_LIB)
 
   foreach(test_name IN LISTS PROTOCOL_TESTS)
     add_executable(${test_name} tests/protocol_tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    add_test(NAME ${test_name} COMMAND ${test_name})
+  endforeach()
+
+  foreach(test_name IN LISTS TRANSPORT_TESTS)
+    add_executable(${test_name} tests/transport_tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
   endforeach()
