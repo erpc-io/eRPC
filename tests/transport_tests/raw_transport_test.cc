@@ -91,7 +91,9 @@ class RawTransportTest : public ::testing::Test {
     return buffer;
   }
 
-  void base_test(size_t data_size, size_t batch_size) {
+  // Client transmits a batch of same-length, all-signaled packets. Then check
+  // for all SEND completions at client, and RECV completions at server.
+  void simple_test(size_t data_size, size_t batch_size) {
     Buffer buffer = create_packet(data_size);
     rt_assert(batch_size <= RawTransport::kPostlist, "Batch size too large");
     struct ibv_sge sge[RawTransport::kPostlist];
@@ -121,16 +123,23 @@ class RawTransportTest : public ::testing::Test {
   }
 };
 
-TEST_F(RawTransportTest, create) {
-  // Test if we we can create and destroy a transport instance
-}
+// Test if we we can create and destroy a transport instance
+TEST_F(RawTransportTest, create) {}
 
 // One small packet
-TEST_F(RawTransportTest, one_small) { base_test(kTestSmallMsgSize, 1); }
+TEST_F(RawTransportTest, one_small) { simple_test(kTestSmallMsgSize, 1); }
 
 // A postlist of small packets
 TEST_F(RawTransportTest, one_postlist_small) {
-  base_test(kTestSmallMsgSize, RawTransport::kPostlist);
+  simple_test(kTestSmallMsgSize, RawTransport::kPostlist);
+}
+
+// One large packet
+TEST_F(RawTransportTest, one_large) { simple_test(kTestLargeMsgSize, 1); }
+
+// A postlist of large packets
+TEST_F(RawTransportTest, one_postlist_large) {
+  simple_test(kTestLargeMsgSize, RawTransport::kPostlist);
 }
 
 }  // End erpc
