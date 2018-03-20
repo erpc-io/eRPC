@@ -614,6 +614,10 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 			psge = sg_list + i;
 
 			set_data_ptr_seg(dpseg, psge, qp, offset);
+			if (0) {
+				mlx5_dbg(fp, MLX5_DBG_QP_SEND, "failed allocating memory for implicit lkey structure\n");
+				return ENOMEM;
+			}
 			++dpseg;
 			offset = 0;
 			*sz += sizeof(struct mlx5_wqe_data_seg) / 16;
@@ -1329,7 +1333,8 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	int err = 0;
 	int size = 0;
 	int num_sge = wr->num_sge;
-	int inl_hdr_size = ERPC_ENABLE_INLINING ? MLX5_ETH_INLINE_HEADER_SIZE : 0;  // 18 B
+	int inl_hdr_size =
+		ERPC_ENABLE_INLINING ? MLX5_ETH_INLINE_HEADER_SIZE : 0;  // 18 bytes
 	int inl_hdr_copy_size = 0;
 	int i = 0;
 	uint8_t fm_ce_se;
@@ -1353,17 +1358,45 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 		/* The first bytes of the headers should be copied to the
 		 * inline-headers of the ETH segment.
 		 */
+		// 1. If inlining is enabled, we copy to inlined header regardless of the
+		//    wr's inline flag.
+		// 2. We never have an sge with length < MLX5_ETH_INLINE_HEADER_SIZE.
 		if (ERPC_ENABLE_INLINING) {
 			inl_hdr_copy_size = inl_hdr_size;
 			memcpy(eseg->inline_hdr_start,
 			       (void *)(uintptr_t)wr->sg_list[0].addr,
 			       inl_hdr_copy_size);
+		} else if (0) {
+			for (i = 0; i < num_sge && inl_hdr_size > 0; ++i) {
+				inl_hdr_copy_size = min(wr->sg_list[i].length,
+							inl_hdr_size);
+				memcpy(eseg->inline_hdr_start +
+				       (MLX5_ETH_INLINE_HEADER_SIZE - inl_hdr_size),
+				       (void *)(uintptr_t)wr->sg_list[i].addr,
+				       inl_hdr_copy_size);
+				inl_hdr_size -= inl_hdr_copy_size;
+			}
+			--i;
+			if (unlikely(inl_hdr_size)) {
+				mlx5_dbg(fp, MLX5_DBG_QP_SEND, "Ethernet headers < %d bytes\n",
+					 MLX5_ETH_INLINE_HEADER_SIZE);
+				return EINVAL;
+			}
 		}
 
 		eseg->inline_hdr_sz = htons(inl_hdr_size);
 
 		seg += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr) + inl_hdr_size) & ~0xf;
 		size += (offsetof(struct mlx5_wqe_eth_seg, inline_hdr) + inl_hdr_size) >> 4;
+
+		/* If we copied all the sge into the inline-headers, then we need to
+		 * start copying from the next sge into the data-segment.
+		 */
+		// Each SGE has more data than inl_hdr_copy_size (18 bytes)
+		if (0) {
+			++i;
+			inl_hdr_copy_size = 0;
+		}
 
 		/* The copied headers should be excluded from the data segment */
 		err = set_data_seg(qp, seg, &size,
@@ -2349,7 +2382,8 @@ int mlx5_post_recv(struct ibv_qp *ibqp, struct ibv_recv_wr *wr,
 	FILE *fp = to_mctx(ibqp->context)->dbg_fp;
 #endif
 
-  if (wr == NULL && (*bad_wr) != NULL && (*bad_wr)->wr_id == ERPC_MAGIC_WRID_FOR_FAST_RECV) {
+  if (wr == NULL && (*bad_wr) != NULL &&
+			(*bad_wr)->wr_id == ERPC_MAGIC_WRID_FOR_FAST_RECV) {
     /* Handle fast RECV */
     struct mlx5_qp *qp = to_mqp(ibqp);
     int nreq = (*bad_wr)->num_sge;
