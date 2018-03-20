@@ -69,9 +69,9 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
 
     LOG_TRACE(
-        "eRPC RawTransport: Sending packet (drop = %u). SGE #1 = %u bytes, "
-        "SGE #2 = %u bytes. pkthdr = %s. Frame header = %s.\n",
-        item.drop, sgl[0].length, (wr.num_sge == 2 ? sgl[1].length : 0),
+        "eRPC RawTransport: Sending packet (idx = %zu, drop = %u). SGE #1 %uB, "
+        " SGE #2 = %uB. pkthdr = %s. Frame header = %s.\n",
+        i, item.drop, sgl[0].length, (wr.num_sge == 2 ? sgl[1].length : 0),
         pkthdr->to_string().c_str(),
         frame_header_to_string(&pkthdr->headroom[0]).c_str());
   }
@@ -131,15 +131,15 @@ void RawTransport::tx_flush() {
   sgl[0].length = pkt_size;
   sgl[0].lkey = buffer.lkey;
 
-  wr.next = nullptr;  // Break the chain
-  wr.send_flags = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
+  wr.next = nullptr;                  // Break the chain
+  wr.send_flags = IBV_SEND_SIGNALED;  // Not inlined!
   wr.num_sge = 1;
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
-  assert(ret == 0);
   if (unlikely(ret != 0)) {
-    fprintf(stderr, "eRPC Error. tx_flush post_send() failed. ret = %d\n", ret);
+    fprintf(stderr, "tx_flush post_send() failed. ret = %d\n", ret);
+    assert(ret == 0);
     exit(-1);
   }
 
@@ -197,9 +197,8 @@ void RawTransport::post_recvs(size_t num_recvs) {
     recvs_to_post -= kStridesPerWQE;  // Reset slack counter
   } else {
     if (recvs_to_post < kRecvSlack) return;
-    bool use_fast_recv = true;
 
-    if (use_fast_recv) {
+    if (kFastRecv) {
       // Construct a special RECV wr that the modded driver understands. Encode
       // the number of required RECVs in its num_sge field.
       struct ibv_recv_wr special_wr;
