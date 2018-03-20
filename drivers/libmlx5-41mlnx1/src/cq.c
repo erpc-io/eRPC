@@ -238,6 +238,51 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 		++wq->tail;
 	}
 
+#if 0 // Unneeded fields of wc
+	wc->byte_len = ntohl(cqe->byte_cnt);
+
+	switch (cqe->op_own >> 4) {
+	case MLX5_CQE_RESP_WR_IMM:
+		wc->opcode	= IBV_WC_RECV_RDMA_WITH_IMM;
+		wc->wc_flags	|= IBV_WC_WITH_IMM;
+		wc->imm_data = cqe->imm_inval_pkey;
+		break;
+	case MLX5_CQE_RESP_SEND:
+		wc->opcode   = IBV_WC_RECV;
+		break;
+	case MLX5_CQE_RESP_SEND_IMM:
+		wc->opcode	= IBV_WC_RECV;
+		wc->wc_flags	|= IBV_WC_WITH_IMM;
+		wc->imm_data = cqe->imm_inval_pkey;
+		break;
+	case MLX5_CQE_RESP_SEND_INV:
+		wc->opcode = IBV_WC_RECV;
+		wc->wc_flags	|= IBV_WC_WITH_INV;
+		wc->imm_data = ntohl(cqe->imm_inval_pkey);
+		break;
+	}
+	wc->slid	   = ntohs(cqe->slid);
+	wc->sl		   = (ntohl(cqe->flags_rqpn) >> 24) & 0xf;
+	if (srq && (type != MLX5_RSC_TYPE_DCT) &&
+	    ((type == MLX5_RSC_TYPE_INVAL) || (type == MLX5_RSC_TYPE_XSRQ) ||
+	     ((qp->verbs_qp.qp.qp_type == IBV_QPT_XRC_RECV) ||
+	      (qp->verbs_qp.qp.qp_type == IBV_QPT_XRC))))
+		wc->src_qp	   = srq->srqn;
+	else
+		wc->src_qp	   = ntohl(cqe->flags_rqpn) & 0xffffff;
+
+
+	wc->dlid_path_bits = cqe->ml_path & 0x7f;
+
+	if ((qp && qp->verbs_qp.qp.qp_type == IBV_QPT_UD) ||
+	    (type == MLX5_RSC_TYPE_DCT)) {
+		g = (ntohl(cqe->flags_rqpn) >> 28) & 3;
+		wc->wc_flags |= g ? IBV_WC_GRH : 0;
+	}
+
+	wc->pkey_index     = ntohl(cqe->imm_inval_pkey) & 0xffff;
+#endif
+
 	return IBV_WC_SUCCESS;
 }
 
@@ -878,6 +923,15 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	 * ownership bit.
 	 */
 	rmb();
+
+#ifdef MLX5_DEBUG
+	if (mlx5_debug_mask & MLX5_DBG_CQ_CQE) {
+		FILE *fp = mctx->dbg_fp;
+
+		mlx5_dbg(fp, MLX5_DBG_CQ_CQE, "dump cqe for cqn 0x%x:\n", cq->cqn);
+		dump_cqe(fp, cqe64);
+	}
+#endif
 
 	((struct ibv_wc *)wc)->wc_flags = 0;
 	opcode = cqe64->op_own >> 4;

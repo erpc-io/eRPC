@@ -167,7 +167,7 @@ static inline int __ring_db(struct mlx5_qp *qp, const int db_method, uint32_t cu
 		bf->offset ^= bf->buf_size;
 		break;
 
-#if 0
+#if 0 // Unused doorbell modes
 	case MLX5_DB_METHOD_DEDIC_BF:
 		/* The QP has dedicated blue-flame */
 
