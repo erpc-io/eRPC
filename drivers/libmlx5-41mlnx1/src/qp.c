@@ -513,6 +513,9 @@ static inline int set_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sg
 			    struct mlx5_qp *qp,
 			    int offset)
 {
+	if (0)
+		return set_odp_data_ptr_seg(dseg, sg, qp);
+
 	dseg->byte_count = htonl(sg->length - offset);
 	dseg->lkey       = htonl(sg->lkey);
 	dseg->addr       = htonll(sg->addr + offset);
@@ -587,6 +590,9 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 	struct mlx5_wqe_data_seg *dpseg = wqe;
 	struct ibv_sge *psge;
 	int i;
+#ifdef MLX5_DEBUG
+	FILE *fp = to_mctx(qp->verbs_qp.qp.context)->dbg_fp;
+#endif
 
 	for (i = idx; i < num_sge; ++i) {
 		if (unlikely(dpseg == qp->gen_data.sqend))
@@ -1323,7 +1329,11 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	*((uint64_t *)eseg) = 0;
 	eseg->rsvd2 = 0;
 
+	if (0)
+		eseg->cs_flags = MLX5_ETH_WQE_L3_CSUM | MLX5_ETH_WQE_L4_CSUM;
+
 	if (0) {
+		err = set_tso_eth_seg(&seg, wr, qp, &size);
 	} else {
 		/* The first bytes of the headers should be copied to the
 		 * inline-headers of the ETH segment.
@@ -2178,6 +2188,22 @@ int mlx5_exp_rollback_send(struct ibv_qp *ibqp,
 int mlx5_post_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 		   struct ibv_send_wr **bad_wr)
 {
+
+#ifdef MW_DEBUG
+	if (wr->opcode == IBV_WR_BIND_MW) {
+		if (wr->bind_mw.mw->type == IBV_MW_TYPE_1)
+			return EINVAL;
+
+		if (!wr->bind_mw.bind_info.mr ||
+		    !wr->bind_mw.bind_info.addr ||
+		    !wr->bind_mw.bind_info.length)
+			return EINVAL;
+
+		if (wr->bind_mw.bind_info.mr->pd != wr->bind_mw.mw->pd)
+			return EINVAL;
+	}
+#endif
+
 	return __mlx5_post_send(ibqp, (struct ibv_exp_send_wr *)wr,
 				(struct ibv_exp_send_wr **)bad_wr, 0);
 }
