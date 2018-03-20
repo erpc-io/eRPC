@@ -29,7 +29,8 @@ sudo apt-get update && \
   sudo apt-get install g++-7 -y
 
 # General packages not specific to eRPC
-sudo apt-get install -y htop memcached libmemcached-dev clang-format exuberant-ctags silversearcher-ag
+sudo apt-get install -y htop memcached libmemcached-dev clang-format \
+  exuberant-ctags silversearcher-ag sloccount calc
 
 # Fuzzy find configuration
 git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
