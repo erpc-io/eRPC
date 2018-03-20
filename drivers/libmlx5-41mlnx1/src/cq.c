@@ -982,7 +982,88 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	case MLX5_CQE_RESP_SEND:
     // post_recv() completion
 		handle_responder((struct ibv_wc *)wc, cqe64, mqp, NULL, type, &exp_wc_flags);
+
+#if 0  // Unsupported CQE types
+	case MLX5_CQE_RESP_SEND_IMM:
+	case MLX5_CQE_RESP_SEND_INV:
+		if (cqe64->app == MLX5_CQE_APP_TAG_MATCHING) {
+			if (!is_srq)
+				return CQ_POLL_ERR;
+
+			handle_tag_matching(wc, cqe64, *cur_srq, &exp_wc_flags);
+			break;
+		}
+
+		wc->status = handle_responder((struct ibv_wc *)wc, cqe64, mqp,
+					      is_srq ? *cur_srq : NULL, type,
+					      &exp_wc_flags);
+		if (mqp &&
+		    (mqp->gen_data.model_flags & MLX5_QP_MODEL_RX_CSUM_IP_OK_IP_NON_TCP_UDP)) {
+			l3_hdr = (cqe64->l4_hdr_type_etc) & MLX5_CQE_L3_HDR_TYPE_MASK;
+			exp_wc_flags |=
+				(!!(cqe64->hds_ip_ext & MLX5_CQE_L4_OK) *
+				 (uint64_t)IBV_EXP_WC_RX_TCP_UDP_CSUM_OK) |
+				(!!(cqe64->hds_ip_ext & MLX5_CQE_L3_OK) *
+				 (uint64_t)IBV_EXP_WC_RX_IP_CSUM_OK) |
+				((l3_hdr == MLX5_CQE_L3_HDR_TYPE_IPV4) *
+				 (uint64_t)IBV_EXP_WC_RX_IPV4_PACKET) |
+				((l3_hdr == MLX5_CQE_L3_HDR_TYPE_IPV6) *
+				 (uint64_t)IBV_EXP_WC_RX_IPV6_PACKET);
+		}
 		break;
+
+	case MLX5_CQE_NO_PACKET:
+		if (cqe64->app != MLX5_CQE_APP_TAG_MATCHING || !is_srq)
+			return CQ_POLL_ERR;
+		handle_tag_matching(wc, cqe64, *cur_srq, &exp_wc_flags);
+		break;
+
+	case MLX5_CQE_RESIZE_CQ:
+		break;
+	case MLX5_CQE_REQ_ERR:
+	case MLX5_CQE_RESP_ERR:
+		{
+		uint8_t is_umr = 0;
+		ecqe = (struct mlx5_err_cqe *)cqe64;
+		mlx5_handle_error_cqe(ecqe, wc);
+		mlx5_set_bad_wc_opcode(wc, ecqe, (opcode == MLX5_CQE_REQ_ERR), &is_umr);
+		if (unlikely(ecqe->syndrome != MLX5_CQE_SYNDROME_WR_FLUSH_ERR &&
+			     ecqe->syndrome != MLX5_CQE_SYNDROME_TRANSPORT_RETRY_EXC_ERR)) {
+			FILE *fp = mctx->dbg_fp;
+			fprintf(fp, PFX "%s: got completion with error:\n",
+				mctx->hostname);
+			dump_cqe(fp, ecqe);
+			if (mlx5_freeze_on_error_cqe) {
+				fprintf(fp, PFX "freezing at poll cq...");
+				while (1)
+					sleep(10);
+			}
+		}
+
+		if (opcode == MLX5_CQE_REQ_ERR) {
+			wq = &mqp->sq;
+			wqe_ctr = ntohs(cqe64->wqe_counter);
+			idx = wqe_ctr & (wq->wqe_cnt - 1);
+			wc->wr_id = wq->wrid[idx];
+			wq->tail = mqp->gen_data.wqe_head[idx] + 1;
+			if (is_umr)
+				wc->exp_opcode = wq->wr_data[idx];
+		} else {
+			if (*cur_srq) {
+				wqe_ctr = ntohs(cqe64->wqe_counter);
+				wc->wr_id = (*cur_srq)->wrid[wqe_ctr];
+				mlx5_free_srq_wqe(*cur_srq, wqe_ctr);
+			} else {
+				if (rwq)
+					wq = &rwq->rq;
+				else
+					wq = &mqp->rq;
+				wc->wr_id = wq->wrid[wq->tail & (wq->wqe_cnt - 1)];
+				++wq->tail;
+			}
+		}
+		break;
+#endif
   default:
     return CQ_POLL_ERR;
 
