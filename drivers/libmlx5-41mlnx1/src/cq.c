@@ -942,7 +942,7 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	 */
 	rmb();
 
-#ifdef MLX5_DEBUG
+#if 0
 	if (mlx5_debug_mask & MLX5_DBG_CQ_CQE) {
 		FILE *fp = mctx->dbg_fp;
 
