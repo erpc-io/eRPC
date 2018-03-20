@@ -1437,7 +1437,7 @@ static int mlx5_calc_send_wqe(struct mlx5_context *ctx,
 	if (tot_size > ctx->max_sq_desc_sz)
 		return -EINVAL;
 
-  printf("mlx5: mlx5_calc_send_wqe(): tot_size to be aligned to 64B= %d\n",
+  printf("mlx5: mlx5_calc_send_wqe(): tot_size to be aligned to 64B = %d.\n",
 			tot_size);
 	return align(tot_size, MLX5_SEND_WQE_BB);
 }
