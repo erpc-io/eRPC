@@ -90,36 +90,47 @@ class RawTransportTest : public ::testing::Test {
 
     return buffer;
   }
+
+  void base_test(size_t data_size, size_t batch_size) {
+    Buffer buffer = create_packet(data_size);
+    rt_assert(batch_size <= RawTransport::kPostlist, "Batch size too large");
+    struct ibv_sge sge[RawTransport::kPostlist];
+    struct ibv_send_wr send_wr[RawTransport::kPostlist + 1];
+
+    for (size_t i = 0; i < batch_size; i++) {
+      sge[i].addr = reinterpret_cast<uint64_t>(buffer.buf);
+      sge[i].length = kInetHdrsTotSize + kTestSmallMsgSize;
+      sge[i].lkey = buffer.lkey;
+
+      send_wr[i].next = &send_wr[i + 1];
+      send_wr[i].opcode = IBV_WR_SEND;
+      send_wr[i].sg_list = &sge[i];
+      send_wr[i].send_flags = IBV_SEND_SIGNALED;
+      send_wr[i].num_sge = 1;
+    }
+    send_wr[batch_size - 1].next = nullptr;
+
+    struct ibv_send_wr* bad_wr;
+    int ret = ibv_post_send(clt_ttr.transport->qp, &send_wr[0], &bad_wr);
+    ASSERT_EQ(ret, 0);
+
+    for (size_t i = 0; i < batch_size; i++) {
+      poll_cq_one_helper(clt_ttr.transport->send_cq);
+      poll_cq_one_helper(srv_ttr.transport->recv_cq);
+    }
+  }
 };
 
 TEST_F(RawTransportTest, create) {
   // Test if we we can create and destroy a transport instance
 }
 
-TEST_F(RawTransportTest, one_small_tx) {
-  Buffer buffer = create_packet(kTestSmallMsgSize);
+// One small packet
+TEST_F(RawTransportTest, one_small) { base_test(kTestSmallMsgSize, 1); }
 
-  printf("Sending packet. Frame header = %s.\n",
-         frame_header_to_string(&buffer.buf[0]).c_str());
-
-  struct ibv_sge sge;
-  sge.addr = reinterpret_cast<uint64_t>(buffer.buf);
-  sge.length = kInetHdrsTotSize + kTestSmallMsgSize;
-  sge.lkey = buffer.lkey;
-
-  struct ibv_send_wr send_wr;
-  send_wr.next = nullptr;
-  send_wr.opcode = IBV_WR_SEND;
-  send_wr.sg_list = &sge;
-  send_wr.send_flags = IBV_SEND_SIGNALED;
-  send_wr.num_sge = 1;
-
-  struct ibv_send_wr* bad_wr;
-  int ret = ibv_post_send(clt_ttr.transport->qp, &send_wr, &bad_wr);
-  ASSERT_EQ(ret, 0);
-
-  poll_cq_one_helper(clt_ttr.transport->send_cq);
-  poll_cq_one_helper(srv_ttr.transport->recv_cq);
+// A postlist of small packets
+TEST_F(RawTransportTest, one_postlist_small) {
+  base_test(kTestSmallMsgSize, RawTransport::kPostlist);
 }
 
 }  // End erpc
