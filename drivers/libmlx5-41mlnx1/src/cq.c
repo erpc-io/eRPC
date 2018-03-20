@@ -1040,6 +1040,17 @@ static inline int poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 	int err = CQ_OK;
 	void *twc;
 
+	if (0) {
+		if (cq->stall_adaptive_enable) {
+			if (cq->stall_last_count)
+				mlx5_stall_cycles_poll_cq(cq->stall_last_count + cq->stall_cycles);
+		} else if (cq->stall_next_poll) {
+			cq->stall_next_poll = 0;
+			mlx5_stall_poll_cq();
+		}
+	}
+
+
 	for (npolled = 0, twc = wc; npolled < ne; ++npolled, twc += wc_size) {
 		err = mlx5_poll_one(cq, &rsc, &srq, twc, wc_size, cqe_ver);
 		if (err != CQ_OK)
@@ -1047,6 +1058,28 @@ static inline int poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 	}
 
 	mlx5_update_cons_index(cq);
+
+
+	if (0) {
+		if (cq->stall_adaptive_enable) {
+			if (npolled == 0) {
+				cq->stall_cycles = max(cq->stall_cycles-mlx5_stall_cq_dec_step,
+						       mlx5_stall_cq_poll_min);
+				mlx5_get_cycles(&cq->stall_last_count);
+			} else if (npolled < ne) {
+				cq->stall_cycles = min(cq->stall_cycles+mlx5_stall_cq_inc_step,
+						       mlx5_stall_cq_poll_max);
+				mlx5_get_cycles(&cq->stall_last_count);
+			} else {
+				cq->stall_cycles = max(cq->stall_cycles-mlx5_stall_cq_dec_step,
+						       mlx5_stall_cq_poll_min);
+				cq->stall_last_count = 0;
+			}
+		} else if (err == CQ_EMPTY) {
+			cq->stall_next_poll = 1;
+		}
+	}
+
 	return err == CQ_POLL_ERR ? err : npolled;
 }
 
