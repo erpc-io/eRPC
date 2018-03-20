@@ -595,6 +595,18 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 #endif
 
 	for (i = idx; i < num_sge; ++i) {
+#if 0
+		if (unlikely(is_tso)) {
+			if (unlikely(max_tso < sg_list[i].length)) {
+				mlx5_dbg(fp, MLX5_DBG_QP_SEND,
+					 "max tso payload length is %d\n",
+					 ctx->max_tso);
+				return EINVAL;
+			}
+			max_tso -= sg_list[i].length;
+		}
+#endif
+
 		if (unlikely(dpseg == qp->gen_data.sqend))
 			dpseg = mlx5_get_send_wqe(qp, 0);
 
@@ -654,6 +666,9 @@ static inline int set_data_seg(struct mlx5_qp *qp, void *seg, int *sz, int is_in
 	if (ERPC_ENABLE_INLINING && is_inl)
 		return set_data_inl_seg(qp, num_sge, sg_list, seg, sz, idx,
 					offset);
+	if (0)
+		return set_data_atom_seg(qp, num_sge, sg_list, seg, sz, atom_arg);
+
 	return set_data_non_inl_seg(qp, num_sge, sg_list, seg, sz, idx, offset, is_tso);
 }
 
@@ -2083,12 +2098,34 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 	int size;
 	unsigned idx;
 	uint64_t exp_send_flags;
+#ifdef MLX5_DEBUG
+	FILE *fp = to_mctx(ibqp->context)->dbg_fp;
+#endif
 
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
 		idx = qp->gen_data.scur_post & (qp->sq.wqe_cnt - 1);
 		seg = mlx5_get_send_wqe(qp, idx);
 
 		exp_send_flags = ((struct ibv_send_wr *)wr)->send_flags;
+
+		if (0) {
+			mlx5_dbg(fp, MLX5_DBG_QP_SEND, "work queue overflow\n");
+			errno = ENOMEM;
+			err = errno;
+			*bad_wr = wr;
+			goto out;
+		}
+
+		if (0) {
+			mlx5_dbg(fp, MLX5_DBG_QP_SEND, "max gs exceeded %d (max = %d)\n",
+				 wr->num_sge, qp->sq.max_gs);
+			errno = ENOMEM;
+			err = errno;
+			*bad_wr = wr;
+			goto out;
+		}
+
+
 
 		err = __mlx5_post_send_one_raw_packet(wr, qp, exp_send_flags, seg, &size);
 		if (unlikely(err)) {
@@ -2097,18 +2134,37 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 			goto out;
 		}
 
+
+
 		qp->sq.wrid[idx] = wr->wr_id;
 		qp->gen_data.wqe_head[idx] = qp->sq.head + nreq;
 		qp->gen_data.scur_post += DIV_ROUND_UP(size * 16, MLX5_SEND_WQE_BB);
 
 		wqe2ring = seg;
+
+#ifdef MLX5_DEBUG
+		if (mlx5_debug_mask & MLX5_DBG_QP_SEND)
+			dump_wqe(to_mctx(ibqp->context)->dbg_fp, idx, size, qp);
+#endif
 	}
 
 out:
 	if (likely(nreq)) {
 		qp->sq.head += nreq;
+
+		if (0) {
+			/* Controlled or peer-direct qp */
+			wmb();
+			if (qp->peer_enabled)
+				qp->peer_ctrl_seg = wqe2ring;
+			goto post_send_no_db;
+		}
+
 		__ring_db(qp, qp->gen_data.bf->db_method, qp->gen_data.scur_post & 0xffff, wqe2ring, (size + 3) / 4);
 	}
+
+post_send_no_db:
+
 
 	return err;
 }
