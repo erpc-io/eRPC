@@ -228,15 +228,33 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
   //assert(srq == NULL);  Commented for perf, but true
 	uint16_t	wqe_ctr;
 	struct mlx5_wq *wq;
+	int err = 0;
 
 	wc->byte_len = ntohl(cqe->byte_cnt);
 	if (0) {
+		wqe_ctr = ntohs(cqe->wqe_counter);
+		wc->wr_id = srq->wrid[wqe_ctr];
+		mlx5_free_srq_wqe(srq, wqe_ctr);
+		if (0)
+			err = mlx5_copy_to_recv_srq(srq, wqe_ctr, cqe,
+						    wc->byte_len);
+		else if (0)
+			err = mlx5_copy_to_recv_srq(srq, wqe_ctr, cqe - 1,
+						    wc->byte_len);
 	} else {
 		wq	  = &qp->rq;
 		wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
     __builtin_prefetch((void *)(wq->wrid[wqe_ctr]), 0, 3);
 		++wq->tail;
+		if (0)
+			err = mlx5_copy_to_recv_wqe(qp, wqe_ctr, cqe,
+						    wc->byte_len);
+		else if (0)
+			err = mlx5_copy_to_recv_wqe(qp, wqe_ctr, cqe - 1,
+						    wc->byte_len);
 	}
+	if (err)
+		return err;
 
 #if 0 // Unneeded fields of wc
 	wc->byte_len = ntohl(cqe->byte_cnt);
@@ -1022,6 +1040,20 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		wq = &mqp->sq;
 		wqe_ctr = ntohs(cqe64->wqe_counter);
 		idx = wqe_ctr & (wq->wqe_cnt - 1);
+		//handle_good_req((struct ibv_wc *)wc, cqe64, wq, idx);
+#if 0
+		if (cqe_format == MLX5_INLINE_DATA32_SEG) {
+			cqe = cqe64;
+			err = mlx5_copy_to_send_wqe(mqp, wqe_ctr, cqe,
+						    wc->byte_len);
+		} else if (cqe_format == MLX5_INLINE_DATA64_SEG) {
+			cqe = cqe64 - 1;
+			err = mlx5_copy_to_send_wqe(mqp, wqe_ctr, cqe,
+						    wc->byte_len);
+		} else {
+			err = 0;
+		}
+#endif
 
 		wc->wr_id = wq->wrid[idx];
 		wq->tail = mqp->gen_data.wqe_head[idx] + 1;
@@ -1116,6 +1148,22 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
     return CQ_POLL_ERR;
 
 	}
+
+#if 0  // Unneeded WC flags
+	if (unlikely(timestamp_en)) {
+		wc->timestamp = ntohll(cqe64->timestamp);
+		exp_wc_flags |= IBV_EXP_WC_WITH_TIMESTAMP;
+	}
+
+	if (likely(offsetof(struct ibv_exp_wc, exp_wc_flags) < wc_size))
+		wc->exp_wc_flags = exp_wc_flags | (uint64_t)((struct ibv_wc *)wc)->wc_flags;
+
+	if (unlikely(cq->peer_enabled &&
+	    !(cq->peer_ctx->caps & IBV_EXP_PEER_OP_POLL_NOR_DWORD_CAP))) {
+		cqe64->op_own = MLX5_CQE_INVALID << 4;
+		wmb();
+	}
+#endif
 
 	return CQ_OK;
 }
