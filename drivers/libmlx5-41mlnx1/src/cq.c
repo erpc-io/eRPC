@@ -146,7 +146,27 @@ static inline struct mlx5_cqe64 *get_next_cqe(struct mlx5_cq *cq, const int cqe_
 {
 	unsigned idx = cq->cons_index & cq->ibv_cq.cqe;
 	void *cqe = cq->active_buf->buf + idx * 64;
-	struct mlx5_cqe64 *cqe64 = cqe;
+	struct mlx5_cqe64 *cqe64;
+
+	if (unlikely(0))
+		return &cq->next_decomp_cqe64;
+
+	if (unlikely(0)) {
+		struct mlx5_peek_entry *tmp;
+
+		while (cq->peer_peek_table[idx]) {
+			if (cq->peer_peek_table[idx]->busy) {
+				errno = EBUSY;
+				return NULL;
+			}
+			tmp = cq->peer_peek_table[idx];
+			cq->peer_peek_table[idx] = PEEK_ENTRY(cq, tmp->next);
+			tmp->next = PEEK_ENTRY_N(cq, cq->peer_peek_free);
+			cq->peer_peek_free = tmp;
+		}
+	}
+
+	cqe64 = cqe;
 
 	if (likely((cqe64->op_own) >> 4 != MLX5_CQE_INVALID) &&
 	    !((cqe64->op_own & MLX5_CQE_OWNER_MASK) ^ !!(cq->cons_index & (cq->ibv_cq.cqe + 1)))) {
