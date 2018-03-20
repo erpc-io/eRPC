@@ -974,11 +974,40 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 				wc->qp = &mqp->verbs_qp.qp;
 				exp_wc_flags |= IBV_EXP_WC_QP;
 			}
+			if (cqe_ver && responder && 0) {
+				*cur_srq = to_msrq(mqp->verbs_qp.qp.srq);
+			}
 			break;
+#if 0  // Unused types
+		case MLX5_RSC_TYPE_DCT:
+			mdct = (struct mlx5_dct *)*cur_rsc;
+			is_srq = 1;
+			if (likely(offsetof(struct ibv_exp_wc, dct) < wc_size)) {
+				wc->dct = &mdct->ibdct;
+				exp_wc_flags |= IBV_EXP_WC_DCT;
+			}
+
+			if (cqe_ver)
+				*cur_srq = to_msrq(mdct->ibdct.srq);
+			break;
+		case MLX5_RSC_TYPE_XSRQ:
+			*cur_srq = (struct mlx5_srq *)*cur_rsc;
+			is_srq = 1;
+			break;
+		case MLX5_RSC_TYPE_RWQ:
+		case MLX5_RSC_TYPE_MP_RWQ:
+			rwq = (struct mlx5_rwq *)*cur_rsc;
+			break;
+#endif
 		default:
 			return CQ_POLL_ERR;
 		}
 		type = (*cur_rsc)->type;
+	}
+
+	if (0 && likely(offsetof(struct ibv_exp_wc, srq) < wc_size)) {
+		wc->srq = &(*cur_srq)->vsrq.srq;
+		exp_wc_flags |= IBV_EXP_WC_SRQ;
 	}
 
 	wc->qp_num = rsn;
