@@ -1033,14 +1033,14 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	switch (opcode) {
 	case MLX5_CQE_REQ:
     // post_send() completion
-		if (unlikely(!mqp)) {
+		if (0) {
 			fprintf(stderr, "all requestors are kinds of QPs\n");
 			return CQ_POLL_ERR;
 		}
 		wq = &mqp->sq;
 		wqe_ctr = ntohs(cqe64->wqe_counter);
 		idx = wqe_ctr & (wq->wqe_cnt - 1);
-		//handle_good_req((struct ibv_wc *)wc, cqe64, wq, idx);
+		//handle_good_req((struct ibv_wc *)wc, cqe64, wq, idx); // Unused wc fields
 #if 0
 		if (cqe_format == MLX5_INLINE_DATA32_SEG) {
 			cqe = cqe64;
@@ -1062,6 +1062,7 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 	case MLX5_CQE_RESP_SEND:
     // post_recv() completion
 		handle_responder((struct ibv_wc *)wc, cqe64, mqp, NULL, type, &exp_wc_flags);
+		break;
 
 #if 0  // Unsupported CQE types
 	case MLX5_CQE_RESP_SEND_IMM:
