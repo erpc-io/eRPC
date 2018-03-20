@@ -941,11 +941,30 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 		return CQ_POLL_ERR;
 
 	rsn = ntohl(cqe64->sop_drop_qpn) & 0xffffff;
-  if (!*cur_rsc) {
-    *cur_rsc = mlx5_find_uidx(mctx, 0);
-  }
+	if (1) {
+		if (!*cur_rsc) {
+			*cur_rsc = mlx5_find_uidx(mctx, 0);
+			if (unlikely(!*cur_rsc))
+				return CQ_POLL_ERR;
+		}
+	} else {
+#if 0
+		if (responder && srqn_uidx) {
+			is_srq = 1;
+			if (!*cur_srq || (srqn_uidx != (*cur_srq)->srqn)) {
+				*cur_srq = mlx5_find_srq(mctx, srqn_uidx);
+				if (unlikely(!*cur_srq))
+					return CQ_POLL_ERR;
+			}
+		}
 
-  if (unlikely(!*cur_rsc)) return CQ_POLL_ERR;
+		if (!*cur_rsc || (rsn != (*cur_rsc)->rsn)) {
+			*cur_rsc = mlx5_find_rsc(mctx, rsn);
+			if (unlikely(!*cur_rsc && !srqn_uidx))
+				return CQ_POLL_ERR;
+		}
+#endif
+	}
 
 	if (*cur_rsc) {
 		switch ((*cur_rsc)->type) {
