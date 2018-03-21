@@ -1333,9 +1333,8 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	int err = 0;
 	int size = 0;
 	int num_sge = wr->num_sge;
-	int inl_hdr_size =
-		ERPC_ENABLE_INLINING ? MLX5_ETH_INLINE_HEADER_SIZE : 0;  // 18 bytes
-	int inl_hdr_copy_size = 0;
+	int inl_hdr_size = MLX5_ETH_INLINE_HEADER_SIZE;  // 18 bytes
+	int inl_hdr_copy_size = MLX5_ETH_INLINE_HEADER_SIZE;
 	int i = 0;
 	uint8_t fm_ce_se;
 #ifdef MLX5_DEBUG
@@ -1358,15 +1357,16 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 		/* The first bytes of the headers should be copied to the
 		 * inline-headers of the ETH segment.
 		 */
-		// 1. If inlining is enabled, we copy to inlined header regardless of the
-		//    wr's inline flag.
-		// 2. We never have an sge with length < MLX5_ETH_INLINE_HEADER_SIZE.
-		if (ERPC_ENABLE_INLINING) {
-			inl_hdr_copy_size = inl_hdr_size;
+
+		// 1. wqe_min_eth_inline is 0 and 18 for ConnectX-5 and ConnectX-4,
+		//    respectively, so we are safe by always copying. The memcpy below won't
+		//    call glibc's memcpy.
+		// 2. We never have an sge with length < MLX5_ETH_INLINE_HEADER_SIZE
+		if (1) {
 			memcpy(eseg->inline_hdr_start,
 			       (void *)(uintptr_t)wr->sg_list[0].addr,
 			       inl_hdr_copy_size);
-		} else if (0) {
+		} else {
 			for (i = 0; i < num_sge && inl_hdr_size > 0; ++i) {
 				inl_hdr_copy_size = min(wr->sg_list[i].length,
 							inl_hdr_size);
