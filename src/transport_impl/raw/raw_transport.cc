@@ -216,7 +216,7 @@ void RawTransport::init_send_qp() {
   qp_init_attr.send_cq = send_cq;
   qp_init_attr.recv_cq = kDumb ? send_cq : recv_cq;  // recv_cq comment above
   qp_init_attr.cap.max_send_wr = kSQDepth;
-  qp_init_attr.cap.max_send_sge = 0;  // This is better than 2!?
+  qp_init_attr.cap.max_send_sge = 2;
   qp_init_attr.cap.max_recv_wr = kDumb ? 0 : kRQDepth;
   qp_init_attr.cap.max_recv_sge = kDumb ? 0 : 1;
   qp_init_attr.cap.max_inline_data = kMaxInline;
