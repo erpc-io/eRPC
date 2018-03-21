@@ -13,8 +13,7 @@ static constexpr size_t kTestRpcIdClient = 100;
 static constexpr size_t kTestRpcIdServer = 200;
 static constexpr size_t kTestNumaNode = 0;
 
-static constexpr size_t kTestSmallMsgSize = 32;   // Data in small messages
-static constexpr size_t kTestLargeMsgSize = 900;  // Data in large messages
+static constexpr size_t kTestMsgSize = 500;   // Data in each message
 
 struct transport_info_t {
   HugeAlloc* huge_alloc;
@@ -70,7 +69,7 @@ class RawTransportTest : public ::testing::Test {
   Transport::RoutingInfo srv_ri;  // We only need the server's routing info
 
   // Create a ready-to-send packet from client to server, with space for
-  // \p data_size user data bytes
+  // \p data_size user data bytes. \p data_size can be zero.
   Buffer create_packet(size_t data_size) {
     size_t pkt_size = kInetHdrsTotSize + data_size;
     Buffer buffer = clt_ttr.huge_alloc->alloc(pkt_size);
@@ -91,17 +90,23 @@ class RawTransportTest : public ::testing::Test {
     return buffer;
   }
 
-  // Client transmits a batch of same-length, all-signaled packets. Then check
-  // for all SEND completions at client, and RECV completions at server.
-  void simple_test(size_t data_size, size_t batch_size) {
+  /**
+   * @brief Client transmits a batch of same-length packets, each in one SGE.
+   * Then client checks for all SEND completions, and server for all RECV
+   * completions.
+   */
+  void simple_test_one_sge(size_t data_size, size_t batch_size) {
+    rt_assert(kInetHdrsTotSize + data_size < RawTransport::kMTU);
+    rt_assert(batch_size <= RawTransport::kSQDepth, "Batch size too large");
+
     Buffer buffer = create_packet(data_size);
-    rt_assert(batch_size <= RawTransport::kPostlist, "Batch size too large");
-    struct ibv_sge sge[RawTransport::kPostlist];
-    struct ibv_send_wr send_wr[RawTransport::kPostlist + 1];
+
+    struct ibv_sge sge[RawTransport::kSQDepth];
+    struct ibv_send_wr send_wr[RawTransport::kSQDepth + 1];
 
     for (size_t i = 0; i < batch_size; i++) {
       sge[i].addr = reinterpret_cast<uint64_t>(buffer.buf);
-      sge[i].length = kInetHdrsTotSize + kTestSmallMsgSize;
+      sge[i].length = kInetHdrsTotSize + data_size;
       sge[i].lkey = buffer.lkey;
 
       send_wr[i].next = &send_wr[i + 1];
@@ -121,25 +126,73 @@ class RawTransportTest : public ::testing::Test {
       poll_cq_one_helper(srv_ttr.transport->recv_cq);
     }
   }
+
+  /**
+   * @brief Client transmits a batch of same-length packets, each in two SGEs.
+   * Then client checks for all SEND completions, and server for all RECV
+   * completions.
+   * 
+   * The first SGE contains only the Ethernet header, the second only the data.
+   */
+  void simple_test_two_sges(size_t data_size, size_t batch_size) {
+    rt_assert(kInetHdrsTotSize + data_size < RawTransport::kMTU);
+    rt_assert(batch_size <= RawTransport::kSQDepth, "Batch size too large");
+
+    Buffer hdr_buffer = create_packet(0);  // Allocates space for one header
+    Buffer data_buffer = clt_ttr.huge_alloc->alloc(data_size);
+
+    struct ibv_sge sge[RawTransport::kSQDepth][2];
+    struct ibv_send_wr send_wr[RawTransport::kSQDepth + 1];
+
+    for (size_t i = 0; i < batch_size; i++) {
+      sge[i][0].addr = reinterpret_cast<uint64_t>(hdr_buffer.buf);
+      sge[i][0].length = kInetHdrsTotSize;
+      sge[i][0].lkey = hdr_buffer.lkey;
+
+      sge[i][1].addr = reinterpret_cast<uint64_t>(data_buffer.buf);
+      sge[i][1].length = data_size;
+      sge[i][1].lkey = data_buffer.lkey;
+
+      send_wr[i].next = &send_wr[i + 1];
+      send_wr[i].opcode = IBV_WR_SEND;
+      send_wr[i].sg_list = &sge[i][0];
+      send_wr[i].send_flags = IBV_SEND_SIGNALED;
+      send_wr[i].num_sge = 2;
+    }
+    send_wr[batch_size - 1].next = nullptr;
+
+    struct ibv_send_wr* bad_wr;
+    int ret = ibv_post_send(clt_ttr.transport->qp, &send_wr[0], &bad_wr);
+    ASSERT_EQ(ret, 0);
+
+    for (size_t i = 0; i < batch_size; i++) {
+      poll_cq_one_helper(clt_ttr.transport->send_cq);
+      poll_cq_one_helper(srv_ttr.transport->recv_cq);
+    }
+  }
 };
 
 // Test if we we can create and destroy a transport instance
 TEST_F(RawTransportTest, create) {}
 
-// One small packet
-TEST_F(RawTransportTest, one_small) { simple_test(kTestSmallMsgSize, 1); }
-
-// A postlist of small packets
-TEST_F(RawTransportTest, one_postlist_small) {
-  simple_test(kTestSmallMsgSize, RawTransport::kPostlist);
+// One packet in one SGE
+TEST_F(RawTransportTest, one_packet_one_sge) {
+  simple_test_one_sge(kTestMsgSize, 1);
 }
 
-// One large packet
-TEST_F(RawTransportTest, one_large) { simple_test(kTestLargeMsgSize, 1); }
+// One packet in two SGEs
+TEST_F(RawTransportTest, one_packet_two_sges) {
+  simple_test_two_sges(kTestMsgSize, 1);
+}
 
-// A postlist of large packets
-TEST_F(RawTransportTest, one_postlist_large) {
-  simple_test(kTestLargeMsgSize, RawTransport::kPostlist);
+// A full queue of packets, each in one SGE
+TEST_F(RawTransportTest, full_queue_one_sge) {
+  simple_test_one_sge(kTestMsgSize, RawTransport::kSQDepth);
+}
+
+// A full queue of packets, each in two SGEs
+TEST_F(RawTransportTest, full_queue_two_sges) {
+  simple_test_two_sges(kTestMsgSize, RawTransport::kSQDepth);
 }
 
 }  // End erpc
