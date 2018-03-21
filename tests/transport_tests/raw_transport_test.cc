@@ -13,7 +13,7 @@ static constexpr size_t kTestRpcIdClient = 100;
 static constexpr size_t kTestRpcIdServer = 200;
 static constexpr size_t kTestNumaNode = 0;
 
-static constexpr size_t kTestMsgSize = 500;   // Data in each message
+static constexpr size_t kTestMsgSize = 500;  // Data in each message
 
 struct transport_info_t {
   HugeAlloc* huge_alloc;
@@ -131,7 +131,7 @@ class RawTransportTest : public ::testing::Test {
    * @brief Client transmits a batch of same-length packets, each in two SGEs.
    * Then client checks for all SEND completions, and server for all RECV
    * completions.
-   * 
+   *
    * The first SGE contains only the Ethernet header, the second only the data.
    */
   void simple_test_two_sges(size_t data_size, size_t batch_size) {
