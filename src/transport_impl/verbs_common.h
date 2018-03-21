@@ -100,6 +100,7 @@ static inline void poll_cq_one_helper(struct ibv_cq *cq) {
 
   if (unlikely(wc.status != 0)) {
     fprintf(stderr, "eRPC: Fatal error. Bad wc status %d.\n", wc.status);
+    assert(false);
     exit(-1);
   }
 }
