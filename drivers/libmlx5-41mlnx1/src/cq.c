@@ -996,7 +996,7 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 				*cur_srq = to_msrq(mqp->verbs_qp.qp.srq);
 			}
 			break;
-#if 0  // Unused types
+#if 0  // Unused queue types
 		case MLX5_RSC_TYPE_DCT:
 			mdct = (struct mlx5_dct *)*cur_rsc;
 			is_srq = 1;

@@ -3,3 +3,6 @@
 #define ERPC_MODDED_PROBE_RET 3187
 
 #define ERPC_ENABLE_INLINING 0
+
+#define MODDED_PRINTF(...) do { fprintf(stderr , __VA_ARGS__); } while(0)
+//#define DEBUG_PRINT(...) do{} while (0)
