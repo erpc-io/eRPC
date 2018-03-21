@@ -82,22 +82,24 @@ static void ibv_dereg_mr_wrapper(Transport::MemRegInfo mr) {
   LOG_INFO("eRPC Verbs: Deregistered %zu B, lkey = %u\n", size, lkey);
 }
 
-static inline void poll_cq_one_helper(struct ibv_cq *send_cq) {
+/// Polls a CQ for one completion. In verbose mode only, prints a warning
+/// message if polling gets stuck.
+static inline void poll_cq_one_helper(struct ibv_cq *cq) {
   struct ibv_wc wc;
   size_t num_tries = 0;
-  while (ibv_poll_cq(send_cq, 1, &wc) == 0) {
+  while (ibv_poll_cq(cq, 1, &wc) == 0) {
     // Do nothing while we have no CQE or poll_cq error
     if (LOG_LEVEL == LOG_LEVEL_INFO) {
       num_tries++;
       if (unlikely(num_tries == GB(1))) {
-        fprintf(stderr, "eRPC: Warning. Stuck in poll_cq()");
+        fprintf(stderr, "eRPC: Warning. Stuck in poll_cq().");
         num_tries = 0;
       }
     }
   }
 
   if (unlikely(wc.status != 0)) {
-    fprintf(stderr, "eRPC: Fatal error. Bad SEND wc status %d\n", wc.status);
+    fprintf(stderr, "eRPC: Fatal error. Bad wc status %d.\n", wc.status);
     exit(-1);
   }
 }
