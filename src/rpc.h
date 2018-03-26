@@ -66,6 +66,7 @@ class Rpc {
 
   /**
    * @brief Construct the Rpc object from a foreground thread
+   * @param phy_port Zero-based index among active fabric ports
    * @throw runtime_error if construction fails
    */
   Rpc(Nexus *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,

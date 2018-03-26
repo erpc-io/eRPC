@@ -9,8 +9,7 @@
 
 namespace erpc {
 
-// Return line with index \p n from \p filename. Throw exception if it doesn't
-// exist.
+// Return line with index \p from \p filename. Throw exception if no such line.
 static std::string get_line_n(std::string filename, size_t n) {
   std::ifstream in(filename.c_str());
 
@@ -28,25 +27,25 @@ static std::string get_line_n(std::string filename, size_t n) {
   return s;
 }
 
+static bool is_valid_uri(std::string uri) {
+  std::vector<std::string> split;
+  boost::split(split, uri, boost::is_any_of(":"));
+  return split.size() == 2 && split[0].length() > 0 && split[1].length() > 0;
+}
+
 /// Extract the hostname from a URI formatted as hostname:udp_port
 static std::string extract_hostname_from_uri(std::string uri) {
+  rt_assert(is_valid_uri(uri), "Invalid uri " + uri);
   std::vector<std::string> split_vec;
   boost::split(split_vec, uri, boost::is_any_of(":"));
-  erpc::rt_assert(split_vec.size() == 2 && split_vec[0].length() > 0 &&
-                      split_vec[1].length() > 0,
-                  "Invalid URI " + uri);
-
   return split_vec[0];
 }
 
 /// Extract the UDP port from a URI formatted as hostname:udp_port
 static std::string extract_udp_port_from_uri(std::string uri) {
+  rt_assert(is_valid_uri(uri), "Invalid uri " + uri);
   std::vector<std::string> split_vec;
   boost::split(split_vec, uri, boost::is_any_of(":"));
-  erpc::rt_assert(split_vec.size() == 2 && split_vec[0].length() > 0 &&
-                      split_vec[1].length() > 0,
-                  "Invalid URI " + uri);
-
   return split_vec[1];
 }
 
@@ -55,15 +54,8 @@ static std::string extract_udp_port_from_uri(std::string uri) {
 /// <DNS name> <UDP port> <NUMA>
 static std::string get_hostname_for_process(size_t process_i) {
   std::string process_file = "../eRPC/scripts/autorun_process_file";
-  std::string line = get_line_n(process_file, process_i);
-
-  std::vector<std::string> split_vec;
-  boost::split(split_vec, line, boost::is_any_of(" "));
-
-  erpc::rt_assert(split_vec.size() == 3 && split_vec[0].length() > 0 &&
-                      split_vec[1].length() > 0 && split_vec[2].length() > 0,
-                  "Invalid process file line: " + line);
-  return split_vec[0];
+  std::string uri = get_line_n(process_file, process_i);
+  return extract_hostname_from_uri(uri);
 }
 
 /// Return the SM UDP port of the process with index process_i, from the autorun
@@ -71,15 +63,8 @@ static std::string get_hostname_for_process(size_t process_i) {
 /// <DNS name> <UDP port> <NUMA>
 static std::string get_udp_port_for_process(size_t process_i) {
   std::string process_file = "../eRPC/scripts/autorun_process_file";
-  std::string line = get_line_n(process_file, process_i);
-
-  std::vector<std::string> split_vec;
-  boost::split(split_vec, line, boost::is_any_of(" "));
-
-  erpc::rt_assert(split_vec.size() == 3 && split_vec[0].length() > 0 &&
-                      split_vec[1].length() > 0 && split_vec[2].length() > 0,
-                  "Invalid process file line: " + line);
-  return split_vec[1];
+  std::string uri = get_line_n(process_file, process_i);
+  return extract_udp_port_from_uri(uri);
 }
 
 /// Return the URI of the process with index process_i

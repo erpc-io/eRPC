@@ -110,8 +110,6 @@ bool RawTransport::resolve_remote_routing_info(
 
 void RawTransport::resolve_phy_port() {
   std::ostringstream xmsg;  // The exception message
-
-  // Get the device list
   int num_devices = 0;
   struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
   rt_assert(dev_list != nullptr, "Failed to get device list");

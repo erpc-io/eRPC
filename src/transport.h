@@ -164,7 +164,7 @@ class Transport {
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type;
   const uint8_t rpc_id;    ///< The parent Rpc's ID
-  const uint8_t phy_port;  ///< 0-based physical port specified by application
+  const uint8_t phy_port;  ///< 0-based index among active fabric ports
   const size_t numa_node;  ///< Derived from \p huge_alloc
 
   // Other members
