@@ -55,7 +55,6 @@ CTestTestfile.cmake
 
 # Common temp files
 ibnet_out
-apps/consensus/ticket_orig.cc
-scripts/autorun_node_file
+scripts/autorun_process_file
 gdb_history
 *.swp
