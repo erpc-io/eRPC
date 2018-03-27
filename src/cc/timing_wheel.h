@@ -92,7 +92,7 @@ struct timing_wheel_args_t {
 
 class TimingWheel {
  public:
-  TimingWheel(timing_wheel_args_t args, size_t console_ref_tsc)
+  TimingWheel(timing_wheel_args_t args)
       : mtu(args.mtu),
         freq_ghz(args.freq_ghz),
         wslot_width(args.wslot_width),
@@ -100,7 +100,6 @@ class TimingWheel {
         horizon(1000000 * (kSessionCredits * mtu) / Timely::kMinRate),
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
         num_wslots(1 + round_up(horizon / wslot_width)),
-        console_ref_tsc(console_ref_tsc),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
     rt_assert(wslot_width > .01 && wslot_width <= 8.0, "Invalid wslot width");
@@ -221,7 +220,6 @@ class TimingWheel {
   const double horizon;          ///< Timespan of one wheel rotation
   const size_t horizon_tsc;      ///< Horizon in TSC units
   const size_t num_wslots;
-  const size_t console_ref_tsc;  ///< Reference TSC for console logging
   HugeAlloc *huge_alloc;
 
   wheel_bkt_t *wheel;

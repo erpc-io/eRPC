@@ -53,7 +53,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     args.wslot_width = kWheelDefWslotWidth;
     args.huge_alloc = huge_alloc;
 
-    wheel = new TimingWheel(args, creation_tsc);
+    wheel = new TimingWheel(args);
   }
 
   // Create DMA-registered msgbufs for control packets
