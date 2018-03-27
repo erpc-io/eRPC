@@ -12,7 +12,7 @@ fi
 function gen_apt() {
   process_ids=`seq 1 $1`
   for process_i in $process_ids; do
-    echo akalianode-$process_i.RDMA.fawn.apt.emulab.net:31850 >> autorun_process_file
+    echo akalianode-$process_i.RDMA.fawn.apt.emulab.net 31850 0 >> autorun_process_file
   done
 }
 
@@ -21,7 +21,7 @@ function gen_apt() {
 function gen_cloudlab() {
   process_ids=`seq 1 $1`
   for process_i in $process_ids; do
-    echo akalianode-$process_i.erpc.ron-PG0.utah.cloudlab.us:31850 >> autorun_process_file
+    echo akalianode-$process_i.erpc.ron-PG0.utah.cloudlab.us 31850 0 >> autorun_process_file
   done
 }
 

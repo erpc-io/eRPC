@@ -1,9 +1,9 @@
 --test_ms 10000
 --sm_verbose 0
---batch_size 3
---concurrency 21
+--batch_size 6
+--concurrency 10
 --msg_size 32
 --num_processes 2
 --num_threads 2
---numa_0_ports 0,2
+--numa_0_ports 0
 --numa_1_ports 1,3
