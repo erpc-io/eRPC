@@ -221,8 +221,7 @@ void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
 
   ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_buf)));
   if (ret != 0) {
-    fprintf(stderr, "HugeAlloc: Error freeing SHM buf %p. (SHM key = %d)\n",
-            shm_buf, shm_key);
+    fprintf(stderr, "HugeAlloc: Error freeing SHM buf for key %d.\n", shm_key);
     exit(-1);
   }
 }
