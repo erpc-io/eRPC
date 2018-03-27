@@ -80,4 +80,7 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   // Send the response packet with index = pkthdr->pktnum (same as above)
   enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num, nullptr);
 }
+
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

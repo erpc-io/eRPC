@@ -115,4 +115,6 @@ double Rpc<TTr>::usec_since_creation() {
   return to_usec(rdtsc() - creation_tsc, nexus->freq_ghz);
 }
 
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

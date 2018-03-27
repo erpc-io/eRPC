@@ -165,4 +165,6 @@ size_t Rpc<TTr>::num_active_sessions_st() {
   return ret;
 }
 
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

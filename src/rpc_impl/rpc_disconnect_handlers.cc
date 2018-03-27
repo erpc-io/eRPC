@@ -91,4 +91,6 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   bury_session_st(session);
 }
 
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

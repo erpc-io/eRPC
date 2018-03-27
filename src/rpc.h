@@ -892,9 +892,10 @@ class Rpc {
   } testing;
 };
 
-// Instantiate required Rpc classes so they get compiled for the linker
-template class Rpc<IBTransport>;
-template class Rpc<RawTransport>;
+// This goes at the end of every Rpc implementation file to force compilation.
+#define FORCE_COMPILE_TRANSPORTS   \
+  template class Rpc<IBTransport>; \
+  template class Rpc<RawTransport>;
 
 }  // End erpc
 

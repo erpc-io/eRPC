@@ -91,4 +91,7 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
   auto *req_queue = nexus_hook.bg_req_queue_arr[bg_etid];
   req_queue->unlocked_push(Nexus::BgWorkItem(wi_type, rpc_id, context, sslot));
 }
+
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

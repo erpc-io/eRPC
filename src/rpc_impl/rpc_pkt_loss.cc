@@ -123,4 +123,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     }
   }
 }
+
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

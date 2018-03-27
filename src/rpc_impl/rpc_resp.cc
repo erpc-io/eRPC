@@ -236,4 +236,7 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   }
   return;
 }
+
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

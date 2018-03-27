@@ -27,4 +27,6 @@ void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double p) {
   faults.pkt_drop_thresh_billion = p * 1000000000;
 }
 
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

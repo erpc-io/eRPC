@@ -59,4 +59,6 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
   bump_credits(sslot->session);
 }
 
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

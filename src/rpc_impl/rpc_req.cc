@@ -360,4 +360,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
   }
 }
+
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc

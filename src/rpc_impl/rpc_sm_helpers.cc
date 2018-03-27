@@ -82,4 +82,6 @@ void Rpc<TTr>::send_sm_req_st(Session *session) {
   sm_pkt_udp_tx_st(sm_pkt);
 }
 
+FORCE_COMPILE_TRANSPORTS
+
 }  // End erpc
