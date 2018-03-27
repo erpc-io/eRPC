@@ -12,6 +12,7 @@ add_definitions(-Wold-style-cast)
 
 add_definitions(-Wno-unused-function)
 add_definitions(-Wno-nested-anon-types)
+add_definitions(-Wno-keyword-macro)
 add_definitions(-march=native)
 add_definitions(-g)
 
