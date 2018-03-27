@@ -1,7 +1,6 @@
 ## Instructions
- * These are instructions to build and run eRPC on a machine with vanilla
-   Ubuntu 16.04
- * eRPC requires a machine with a C++17 compiler and RDMA support
+ * eRPC requires a machine with a C++11 compiler. clang and gcc have been
+   tested.
  * To install all required packages, run `./scripts/packages.sh`
  * Increase SHM limits and create at least 2048 hugepages on each NUMA node.
  * Installing RDMA drivers:
@@ -11,14 +10,14 @@
      kernel drivers. On Ubuntu, the incantation is:
       * `apt install libmlx4-dev libibverbs-dev`
       * `modprobe mlx4_ib ib_uverbs`
-   * For Connect-IB and newer NICs, replace `mlx4` by `mlx5`
+   * For Connect-IB and newer NICs, use `mlx4` by `mlx5`
  * To build the tests, use `cmake . -DPERF=OFF; make -j`. Use `sudo ctest` to
    run all tests.
  * To build an application, change the contents of `scripts/autorun_app_file`
    to one of the available applications (see CMakeLists.txt). Then generate a
    Makefile using `cmake . -DPERF=ON/OFF`
  * The IPs of cluster machines are specified in `scripts/autorun_node_file`
- * XXX: This does not account for NUMA nodes. To run an app, run `do.sh <i>` on
+ * XXX: To run an app, run `do.sh <i>` on
    as many machines as needed by the app, where `i` is the zero-based machine
    index. Alternatively, execute `run-all.sh` on machine 0.
 
