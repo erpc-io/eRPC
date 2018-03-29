@@ -154,7 +154,7 @@ class Timely {
     prev_rtt = sample_rtt;
     last_update_tsc = _rdtsc;
 
-    // For debugging only
+    // Debug/stats code goes here
     if (kLatencyStats) latency.update(static_cast<size_t>(sample_rtt));
 
     if (kRecord && rate != kMaxRate) {
