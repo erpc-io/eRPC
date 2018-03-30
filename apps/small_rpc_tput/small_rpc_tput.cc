@@ -64,7 +64,7 @@ static_assert(sizeof(app_stats_t) == 64, "");
 class AppContext : public BasicAppContext {
  public:
   struct timespec tput_t0;  // Start time for throughput measurement
-  app_stats_t *app_stats;
+  app_stats_t *app_stats;   // Common stats array for all threads
 
   size_t stat_resp_rx[kAppMaxConcurrency] = {0};  // Resps received for batch i
   size_t stat_resp_rx_tot = 0;  // Total responses received (all batches)
@@ -211,7 +211,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_resp_rx[tag.s.batch_i]++;
 
   if (unlikely(c->stat_resp_rx_tot == 1000000)) {
-    size_t thread_id = c->rpc->get_rpc_id();
     double seconds = erpc::sec_since(c->tput_t0);
 
     // Min/max responses for a concurrent batch, to check for stagnated batches
@@ -233,7 +232,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
 
     double tput_mrps = c->stat_resp_rx_tot / (seconds * 1000000);
-    c->app_stats[thread_id].tput_mrps = tput_mrps;
+    c->app_stats[c->thread_id].tput_mrps = tput_mrps;
 
     size_t num_sessions = c->session_num_vec.size();
     printf(
@@ -250,8 +249,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         erpc::kCcRateComp ? session_tput.at(num_sessions * 0.50) : -1,
         erpc::kCcRateComp ? session_tput.at(num_sessions * 0.95) : -1);
 
-    // Thread 1 records stats: throughput
-    if (thread_id == 0) {
+    if (c->thread_id == 0) {
       double tot_tput_mrps = 0;
       for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
         tot_tput_mrps += c->app_stats[t_i].tput_mrps;
@@ -273,7 +271,6 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
-
   if (thread_id == 0) c.tmp_stat = new TmpStat("Mrps");
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
