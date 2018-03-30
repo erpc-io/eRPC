@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Utilities for other scripts
 
-# Echo in blue color
+# Echo in blue color. Actually, is yellow.
 function blue() {
-	es=`tput setaf 4`
+	es=`tput setaf 3`
 	ee=`tput sgr0`
 	echo "${es}$1${ee}"
 }

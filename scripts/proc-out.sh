@@ -22,7 +22,8 @@ while [ $process_idx -lt $autorun_num_processes ]; do
   stat_file=${autorun_app}_stats_${process_idx}
 
 	echo "proc-out: Fetching /tmp/$stat_file from $name to $tmpdir/$stat_file"
-  scp $name:/tmp/$stat_file $tmpdir/$stat_file 1>/dev/null 2>/dev/null &
+  scp -oStrictHostKeyChecking=no \
+    $name:/tmp/$stat_file $tmpdir/$stat_file 1>/dev/null 2>/dev/null &
   ((process_idx+=1))
 done
 

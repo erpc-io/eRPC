@@ -31,7 +31,7 @@ assert_file_exists $autorun_erpc_home/build/$autorun_app
 
 # Variables exported by this script
 autorun_out_prefix="/tmp/${autorun_app}_out"
-autorun_err_prexif="/tmp/${autorun_app}_err"
+autorun_err_prefix="/tmp/${autorun_app}_err"
 
 autorun_test_ms=`get_from_config "test_ms"`
 autorun_num_processes=`get_from_config "num_processes"`

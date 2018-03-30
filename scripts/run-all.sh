@@ -28,6 +28,7 @@ for ((i = 0; i < $autorun_num_processes; i++)); do
 	ssh -oStrictHostKeyChecking=no $name "\
     cd $autorun_erpc_home; \
     source scripts/utils.sh; \
+    export autorun_app=$autorun_app; \
     drop_shm; \
     sudo nohup numactl --physcpubind $numa_node --membind $numa_node \
     ./build/$autorun_app $app_args --process_id $i --numa_node $numa_node \
