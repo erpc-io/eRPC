@@ -27,7 +27,33 @@ DEFINE_string(profile, "", "Experiment profile to use");
 DEFINE_double(throttle, 0, "Throttle flows to incast receiver?");
 DEFINE_double(throttle_fraction, 1, "Fraction of fair share to throttle to.");
 
-// Per-thread app context
+struct app_stats_t {
+  double rx_gbps;
+  double tx_gbps;
+  double avg_us;
+  double _99_us;
+  size_t pad[4];
+
+  app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
+
+  /// Return a space-separated string of all stats
+  std::string to_string() {
+    return std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) + " " +
+           std::to_string(avg_us) + " " + std::to_string(_99_us);
+  }
+
+  /// Accumulate stats
+  app_stats_t& operator+=(const app_stats_t& rhs) {
+    this->rx_gbps += rhs.rx_gbps;
+    this->tx_gbps += rhs.tx_gbps;
+    this->avg_us += rhs.avg_us;
+    this->_99_us += rhs._99_us;
+    return *this;
+  }
+};
+static_assert(sizeof(app_stats_t) == 64, "");
+
+// Per-thread application context
 class AppContext : public BasicAppContext {
  public:
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
@@ -35,6 +61,7 @@ class AppContext : public BasicAppContext {
   std::vector<double> latency_vec;
 
   struct timespec tput_t0;  // Start time for throughput measurement
+  app_stats_t* app_stats;   // Common stats array for all threads
 
   size_t stat_rx_bytes_tot = 0;  // Total bytes received
   size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
@@ -45,7 +72,7 @@ class AppContext : public BasicAppContext {
 };
 
 // Allocate request and response MsgBuffers
-void alloc_req_resp_msg_buffers(AppContext *c) {
+void alloc_req_resp_msg_buffers(AppContext* c) {
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
     c->resp_msgbuf[i] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
     erpc::rt_assert(c->resp_msgbuf[i].buf != nullptr, "Alloc failed");

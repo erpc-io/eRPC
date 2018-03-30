@@ -46,9 +46,7 @@ void sm_handler(int session_num, erpc::SmEventType sm_event_type,
   // The callback gives us the eRPC session number - get the index in vector
   size_t session_idx = c->session_num_vec.size();
   for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-    if (c->session_num_vec[i] == session_num) {
-      session_idx = i;
-    }
+    if (c->session_num_vec[i] == session_num) session_idx = i;
   }
 
   erpc::rt_assert(session_idx < c->session_num_vec.size(),
@@ -156,16 +154,17 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   // Print twice every second
   double ns = erpc::ns_since(c->tput_t0);
   if (ns >= 500000000) {
-    double rx_gbps = c->stat_rx_bytes_tot * 8 / ns;
-    double tx_gbps = c->stat_tx_bytes_tot * 8 / ns;
+    auto &stats = c->app_stats[c->thread_id];
+    stats.rx_gbps = c->stat_rx_bytes_tot * 8 / ns;
+    stats.tx_gbps = c->stat_tx_bytes_tot * 8 / ns;
 
     // Compute latency stats
     std::sort(c->latency_vec.begin(), c->latency_vec.end());
     double latency_sum = 0.0;
     for (double sample : c->latency_vec) latency_sum += sample;
 
-    double avg_us = latency_sum / c->latency_vec.size();
-    double _99_us = c->latency_vec.at(c->latency_vec.size() * 0.99);
+    stats.avg_us = latency_sum / c->latency_vec.size();
+    stats._99_us = c->latency_vec.at(c->latency_vec.size() * 0.99);
 
     erpc::Timely *timely_0 = c->rpc->get_timely(0);
 
@@ -173,7 +172,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
         "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps, "
         "latency {%.1f, %.1f}, transfer {RX %.1f, TX %.1f} MB, "
         "Session 0: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. Credits %zu/best 32.\n",
-        c->thread_id, rx_gbps, tx_gbps, avg_us, _99_us,
+        c->thread_id, stats.rx_gbps, stats.tx_gbps, stats.avg_us, stats._99_us,
         c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
         timely_0->get_rtt_perc(.5), timely_0->get_rtt_perc(.9),
         timely_0->get_rtt_perc(.99), timely_0->get_rate_gbps(),
@@ -182,9 +181,13 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     timely_0->reset_rtt_stats();
 
     // Stats: rx_gbps tx_gbps avg_us 99_us
-    c->tmp_stat->write(std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) +
-                       " " + std::to_string(avg_us) + " " +
-                       std::to_string(_99_us));
+    if (c->thread_id == 0) {
+      app_stats_t accum_stats;
+      for (size_t i = 0; i < FLAGS_num_proc_other_threads; i++) {
+        accum_stats += c->app_stats[i];
+      }
+      c->tmp_stat->write(accum_stats.to_string());
+    }
 
     c->latency_vec.clear();
     c->stat_rx_bytes_tot = 0;
@@ -205,10 +208,11 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 // The function executed by each thread in the cluster
-void thread_func(size_t thread_id, erpc::Nexus *nexus) {
+void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
-  c.tmp_stat = new TmpStat("rx_gbps tx_gbps avg_us 99_us");
   c.thread_id = thread_id;
+  c.app_stats = app_stats;
+  if (thread_id == 0) c.tmp_stat = new TmpStat("rx_gbps tx_gbps avg_us 99_us");
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
@@ -312,10 +316,13 @@ int main(int argc, char **argv) {
   size_t num_threads = FLAGS_process_id == 0 ? FLAGS_num_proc_0_threads
                                              : FLAGS_num_proc_other_threads;
   std::vector<std::thread> threads(num_threads);
+  auto *app_stats = new app_stats_t[num_threads];
+
   for (size_t i = 0; i < num_threads; i++) {
-    threads[i] = std::thread(thread_func, i, &nexus);
+    threads[i] = std::thread(thread_func, i, app_stats, &nexus);
     erpc::bind_to_core(threads[i], FLAGS_numa_node, i);
   }
 
   for (auto &thread : threads) thread.join();
+  delete[] app_stats;
 }
