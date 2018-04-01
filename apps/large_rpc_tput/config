@@ -1,7 +1,7 @@
---test_ms 200000
+--test_ms 10000
 --req_size 7900000
 --resp_size 32
---num_processes 2
+--num_processes 20
 --num_proc_0_threads 10
 --num_proc_other_threads 10
 --concurrency 1
