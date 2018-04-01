@@ -1,5 +1,5 @@
 #!/bin/bash
-# Print the error and output of each process
+# Fetch and print the error and output of each process
 
 source $(dirname $0)/utils.sh
 source $(dirname $0)/autorun_parse.sh
@@ -20,7 +20,7 @@ while [ $process_idx -lt $autorun_num_processes ]; do
     $name:$out_file $tmpdir/out-$process_idx 1>/dev/null 2>/dev/null &
 
   scp -oStrictHostKeyChecking=no \
-    $name:$out_file $tmpdir/err-$process_idx 1>/dev/null 2>/dev/null &
+    $name:$err_file $tmpdir/err-$process_idx 1>/dev/null 2>/dev/null &
   ((process_idx+=1))
 done
 
