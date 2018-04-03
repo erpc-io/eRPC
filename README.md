@@ -1,16 +1,19 @@
-## Instructions
- * eRPC requires a machine with a C++11 compiler. clang and gcc have been
-   tested.
- * To install all required packages, run `./scripts/packages.sh`
- * Increase SHM limits and create at least 2048 hugepages on each NUMA node.
- * Installing RDMA drivers:
-   * It's best to install drivers using the latest Mellanox OFED
+## Requirements
+ * A C++11 compiler. clang and gcc have been tested. See `scripts/packages.sh`
+   for a list of required software packages.
+ * A machine with InfiniBand or Mellanox Ethernet NICs. Ideally, any InfiniBand
+   NIC should work. Non-Mellanox Ethernet NICs are not currently supported.
+   * It's best to use NIC drivers from Mellanox OFED. Optimized drivers for eRPC
+     are available in the `drivers` directory.
    * Upstream drivers work as well. This requires installing the `ibverbs` and
      `mlx4` userspace packages, and enabling the `mlx4_ib` and `ib_uverbs`
      kernel drivers. On Ubuntu, the incantation is:
       * `apt install libmlx4-dev libibverbs-dev`
       * `modprobe mlx4_ib ib_uverbs`
    * For Connect-IB and newer NICs, use `mlx4` by `mlx5`
+ * Unlimited SHM limits, and at least 2048 huge pages on every NUMA node.
+
+## Instructions
  * To build the tests, use `cmake . -DPERF=OFF; make -j`. Use `sudo ctest` to
    run all tests.
  * To build an application, change the contents of `scripts/autorun_app_file`
@@ -22,11 +25,8 @@
    index. Alternatively, execute `run-all.sh` on machine 0.
 
 ## Code notes
- * Major types:
-   * Request type is 8-bit.
-   * Application thread IDs are 8-bit.
-   * Session numbers are 16-bit. We don't expect to support over 64K sessions
-     per thread. More sessions can be supported across multiple threads.
+ * The packet number carried in packet headers may not match the packet's index
+   in MsgBuffers.
  * If a function throws an exception, its documentation should say so.
  * The Rpc object cannot be destroyed by a background thread or while the
    foreground thread is in the event loop (i.e., by the request handler or
