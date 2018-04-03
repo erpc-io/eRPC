@@ -131,8 +131,7 @@ int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
 
   // Check if this request type is already registered
   if (req_func_arr[req_type].is_registered()) {
-    LOG_WARN("%s: A handler for this request type already exists.\n",
-             issue_msg);
+    LOG_WARN("%s: Handler for this request type already exists.\n", issue_msg);
     return -EEXIST;
   }
 

@@ -180,7 +180,6 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   sslot->server_info.num_rx = 1;
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
-  assert(req_func.is_registered());
 
   // Remember request metadata for enqueue_response(). req_type was invalidated
   // on previous enqueue_response(). Setting it implies that an enqueue_resp()
