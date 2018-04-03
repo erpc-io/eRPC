@@ -41,7 +41,9 @@ class Rpc {
       HugeAlloc::kMaxClassSize -
       ((HugeAlloc::kMaxClassSize / TTr::kMaxDataPerPkt) * sizeof(pkthdr_t));
   static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
-  static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt >= kMaxMsgSize, "");
+
+  static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt > 2 * kMaxMsgSize,
+                "");
 
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (8 * MB(1));
