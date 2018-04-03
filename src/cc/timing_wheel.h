@@ -17,10 +17,11 @@
 
 namespace erpc {
 
-static constexpr size_t kWheelBucketCap = 4;  ///< Wheel entries per bucket
-static constexpr bool kWheelRecord = false;   ///< Fast-record wheel actions
+static constexpr size_t kWheelBucketCap = 4;       ///< Wheel entries per bucket
 static constexpr double kWheelDefWslotWidth = .2;  // 200 ns
+static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
+/// Used for fast recording of wheel actions for debugging
 struct wheel_record_t {
   size_t record_tsc;  ///< Timestamp at which this record was created
   bool insert;        ///< Is this a record for a wheel insertion?
@@ -133,8 +134,17 @@ class TimingWheel {
     }
   }
 
-  /// Add an entry for transmission at timestamp = abs_tx_tsc. We never add
-  /// directly to the ready queue here because doing so can cause reordering.
+  /**
+   * @brief Add an entry for transmission at an absolute timestamp.
+   *
+   * Even if the entry falls in the "current" wheel slot, we must not place it
+   * entry directly in the ready queue. Doing so can reorder this entry before
+   * prior entries in the current wheel slot that have not been reaped.
+   *
+   * @param ent The wheel entry to add
+   * @param _rdtsc A timestamp taken in the recent past
+   * @param abs_tx_tsc The desired absolute timestamp for packet transmission
+   */
   inline void insert(const wheel_ent_t &ent, size_t _rdtsc, size_t abs_tx_tsc) {
     assert(abs_tx_tsc >= _rdtsc);
     assert(abs_tx_tsc - _rdtsc <= horizon_tsc);  // Horizon definition
@@ -183,7 +193,7 @@ class TimingWheel {
   }
 
   /// Transfer all entries from a wheel slot to the ready queue. The wheel slot
-  /// is reset and its chained buckets returned to the pool.
+  /// is reset and its chained buckets are returned to the pool.
   void reap_wslot(size_t ws_i) {
     wheel_bkt_t *bkt = &wheel[ws_i];
     while (bkt != nullptr) {
