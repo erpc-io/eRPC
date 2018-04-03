@@ -53,7 +53,7 @@ class Transport {
 
     /// The packet index in msg_buffer to transmit. For control packets, this
     /// (being zero) is different from packet's transport-level pkt_num.
-    size_t pkt_index;
+    size_t pkt_idx;
     size_t* tx_ts = nullptr;  ///< TX timestamp, only for congestion control
     bool drop;                ///< Drop this packet. Used only with kTesting.
   };

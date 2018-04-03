@@ -356,7 +356,7 @@ class Rpc {
 
  private:
   /**
-   * @brief Enqueue packets for a request sslot, while handling credits and
+   * @brief Enqueue request packets for a sslot, handling credits and
    * congestion control. Packets may be added to the timing wheel or the TX
    * burst; credits are used in both cases.
    *
@@ -449,8 +449,12 @@ class Rpc {
     return ((fast_rand.next_u32() % billion) < faults.pkt_drop_thresh_billion);
   }
 
-  /// Enqueue a data packet from sslot's tx_msgbuf for tx_burst
-  inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t pkt_index,
+  /**
+   * @brief Enqueue a data packet from sslot's tx_msgbuf for tx_burst
+   * @param pkt_idx The index of the packet in tx_msgbuf. The index may not
+   * match the packet number for response packets.
+   */
+  inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t pkt_idx,
                                       size_t *tx_ts) {
     assert(in_dispatch());
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
@@ -459,16 +463,16 @@ class Rpc {
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = const_cast<MsgBuffer *>(tx_msgbuf);
-    item.pkt_index = pkt_index;
+    item.pkt_idx = pkt_idx;
     if (kCcRTT) item.tx_ts = tx_ts;
 
     if (kTesting) {
       item.drop = roll_pkt_drop();
-      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_index));
+      testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_idx));
     }
 
-    LOG_TRACE("eRPC Rpc %u: Enqueing packet %s, drop = %u.\n", rpc_id,
-              tx_msgbuf->get_pkthdr_str(pkt_index).c_str(), item.drop);
+    LOG_TRACE("eRPC Rpc %u: Enqueuing packet %s, drop = %u.\n", rpc_id,
+              tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(), item.drop);
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -484,7 +488,7 @@ class Rpc {
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
     item.msg_buffer = ctrl_msgbuf;
-    item.pkt_index = 0;
+    item.pkt_idx = 0;
     if (kCcRTT) item.tx_ts = tx_ts;
 
     if (kTesting) {
@@ -492,8 +496,8 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
     }
 
-    LOG_TRACE("eRPC Rpc %u: Enqueueing packet %s, drop = %u.\n", rpc_id,
-              ctrl_msgbuf->get_pkthdr_str().c_str(), item.drop);
+    LOG_TRACE("eRPC Rpc %u: Enqueuing packet %s, drop = %u.\n", rpc_id,
+              ctrl_msgbuf->get_pkthdr_str(0).c_str(), item.drop);
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -542,11 +546,10 @@ class Rpc {
     session->client_info.credits++;
   }
 
-  /// Copy the data from \p pkt to \p msgbuf
-  inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, const pkthdr_t *pkthdr) {
-    assert(msgbuf->data_size == pkthdr->msg_size);
-
-    size_t offset = pkthdr->pkt_num * TTr::kMaxDataPerPkt;
+  /// Copy the data from \p pkt to \p msgbuf at a packet index
+  inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, size_t pkt_idx,
+                                  const pkthdr_t *pkthdr) {
+    size_t offset = pkt_idx * TTr::kMaxDataPerPkt;
     size_t to_copy = std::min(TTr::kMaxDataPerPkt, pkthdr->msg_size - offset);
     memcpy(&msgbuf->buf[offset], pkthdr + 1, to_copy);  // From end of pkthdr
   }
@@ -724,16 +727,10 @@ class Rpc {
    * packet for this triggering packet number
    *
    * @param sslot The request sslot for which a packet is received
-   *
-   * @param trigger_pkt_num The packet number of the request or RFR that
-   * triggered this explicit CR or response. This is needed because for the
-   * zeroth response packet, the triggering packet number may be different from
-   * the received packet's number.
-   *
+   * @param pkt_num The received packet's packet number
    * @param Time at which the explicit CR or response packet was received
    */
-  inline void update_timely_rate(SSlot *sslot, size_t trigger_pkt_num,
-                                 size_t rx_tsc) {
+  inline void update_timely_rate(SSlot *sslot, size_t pkt_num, size_t rx_tsc) {
     assert(kCcRateComp);
 
     if (!kCcOptBatchTsc) {
@@ -742,7 +739,7 @@ class Rpc {
     }
 
     size_t rtt_tsc =
-        rx_tsc - sslot->client_info.tx_ts[trigger_pkt_num % kSessionCredits];
+        rx_tsc - sslot->client_info.tx_ts[pkt_num % kSessionCredits];
 
     Timely &timely = sslot->session->client_info.cc.timely;
     if (kCcOptTimelyBypass &&
@@ -756,11 +753,11 @@ class Rpc {
   // rpc_cr.cc
 
   /**
-   * @brief Enqueue a credit return
+   * @brief Enqueue an explicit credit return
    *
-   * @param sslot The session slot to send the credit return for
+   * @param sslot The session slot to send the explicit CR for
    * @param req_pkthdr The packet header of the request packet that triggered
-   * this credit return
+   * this explicit CR. The packet number of req_pkthdr is copied to the CR.
    */
   void enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
 
@@ -775,9 +772,10 @@ class Rpc {
   /**
    * @brief Enqueue a request-for-response
    *
-   * @param sslot The session slot to send the request-for-response for
+   * @param sslot The session slot to send the RFR for
    * @param req_pkthdr The packet header of the response packet that triggered
-   * this request-for-response
+   * this RFR. Since one response packet can trigger multiple RFRs, the RFR's
+   * packet number should be computed from num_tx, not from resp_pkthdr.
    */
   void enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
 

@@ -33,8 +33,7 @@ class MsgBuffer {
     return reinterpret_cast<pkthdr_t *>(buf - sizeof(pkthdr_t));
   }
 
-  /// Return a pointer to the nth packet header of this MsgBuffer. This must use
-  /// \p max_data_size, not \p data_size.
+  /// Return a pointer to the nth packet header of this MsgBuffer.
   /// get_pkthdr_0() is more efficient for retrieving the zeroth header.
   inline pkthdr_t *get_pkthdr_n(size_t n) const {
     if (unlikely(n == 0)) return get_pkthdr_0();
@@ -53,13 +52,11 @@ class MsgBuffer {
   inline uint64_t get_req_num() const { return get_pkthdr_0()->req_num; }
   inline uint64_t get_pkt_type() const { return get_pkthdr_0()->pkt_type; }
   inline uint8_t get_req_type() const { return get_pkthdr_0()->req_type; }
-  inline std::string get_pkthdr_str() const {
-    return get_pkthdr_0()->to_string();
-  }
-  inline std::string get_pkthdr_str(size_t pkt_num) const {
-    return get_pkthdr_0()->to_string(pkt_num);
-  }
   ///@}
+
+  std::string get_pkthdr_str(size_t pkt_idx) const {
+    return get_pkthdr_n(pkt_idx)->to_string();
+  }
 
   /// Basic validity check that every MsgBuffer must satisfy
   inline bool is_valid() const {
@@ -104,8 +101,8 @@ class MsgBuffer {
 
   /// Get the packet size (i.e., including packet header) of a packet
   template <size_t kMaxDataPerPkt>
-  inline size_t get_pkt_size(size_t pkt_num) const {
-    size_t offset = pkt_num * kMaxDataPerPkt;
+  inline size_t get_pkt_size(size_t pkt_idx) const {
+    size_t offset = pkt_idx * kMaxDataPerPkt;
     return sizeof(pkthdr_t) + std::min(kMaxDataPerPkt, data_size - offset);
   }
 

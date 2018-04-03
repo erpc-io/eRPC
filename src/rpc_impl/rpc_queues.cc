@@ -37,7 +37,7 @@ void Rpc<TTr>::process_wheel_st() {
            to_usec(cur_tsc - creation_tsc, freq_ghz));
 
     enqueue_pkt_tx_burst_st(
-        ent.sslot, ent.pkt_num,
+        ent.sslot, ent.pkt_num, /* Packet index */
         &ent.sslot->client_info.tx_ts[ent.pkt_num % kSessionCredits]);
 
     wheel->ready_queue.pop();

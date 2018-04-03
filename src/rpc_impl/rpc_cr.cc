@@ -5,8 +5,6 @@ namespace erpc {
 template <class TTr>
 void Rpc<TTr>::enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr) {
   assert(in_dispatch());
-  assert(!sslot->is_client);
-  assert(req_pkthdr->is_req() && req_pkthdr->check_magic());
 
   MsgBuffer *ctrl_msgbuf = &ctrl_msgbufs[ctrl_msgbuf_head];
   ctrl_msgbuf_head++;
@@ -20,7 +18,7 @@ void Rpc<TTr>::enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr) {
   cr_pkthdr->pkt_type = kPktTypeExplCR;
   cr_pkthdr->pkt_num = req_pkthdr->pkt_num;
   cr_pkthdr->req_num = req_pkthdr->req_num;
-  cr_pkthdr->magic = req_pkthdr->magic;
+  cr_pkthdr->magic = kPktHdrMagic;
 
   enqueue_hdr_tx_burst_st(sslot, ctrl_msgbuf, nullptr);
 }
@@ -29,34 +27,25 @@ template <class TTr>
 void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                   size_t rx_tsc) {
   assert(in_dispatch());
-  assert(sslot->is_client);
 
-  // Handle reordering
+  // Handle reordering. If request numbers match, then we have not reset num_rx.
   assert(pkthdr->req_num <= sslot->cur_req_num);
   bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (pkthdr->pkt_num == sslot->client_info.expl_cr_rcvd);
-
-  // When we roll back req_sent during packet loss recovery, for instance from 8
-  // to 0, we can get credit returns for request packets 0--7 before the event
-  // loop re-sends the request packets. These received packets are out of order.
-  in_order &= (pkthdr->pkt_num < sslot->client_info.req_sent);
+                  (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
+                  (pkthdr->pkt_num == sslot->client_info.num_rx);
 
   if (unlikely(!in_order)) {
     LOG_REORDER(
         "eRPC Rpc %u: Received out-of-order explicit CR for session %u. "
-        "Pkt = %zu/%zu. cur_req_num = %zu, expl_cr_rcvd = %zu. Dropping.\n",
+        "Pkt = %zu/%zu. cur_req_num = %zu, num_rx = %zu. Dropping.\n",
         rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.expl_cr_rcvd);
+        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.num_rx);
     return;
   }
 
-  if (kCcRateComp) {
-    size_t trigger_pkt_num = pkthdr->pkt_num;
-    update_timely_rate(sslot, trigger_pkt_num, rx_tsc);
-  }
-
-  sslot->client_info.expl_cr_rcvd++;
+  if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
+  sslot->client_info.num_rx++;
 }
 
 FORCE_COMPILE_TRANSPORTS

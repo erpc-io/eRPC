@@ -76,7 +76,6 @@ static void output_log_header(int level);
 
 #if LOG_LEVEL >= LOG_LEVEL_TRACE
 #define LOG_TRACE(...)                     \
-  output_log_header(LOG_LEVEL_TRACE);      \
   fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
   fflush(stdout)
 #else

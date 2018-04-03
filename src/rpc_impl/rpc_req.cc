@@ -11,19 +11,6 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                                MsgBuffer *req_msgbuf, MsgBuffer *resp_msgbuf,
                                erpc_cont_func_t cont_func, size_t tag,
                                size_t cont_etid) {
-  // Since this can be called from a background thread, only do basic checks
-  // that don't require accessing the session.
-  assert(req_msgbuf->is_valid_dynamic());
-  assert(req_msgbuf->data_size > 0 && req_msgbuf->data_size <= kMaxMsgSize);
-  assert(req_msgbuf->num_pkts > 0);
-
-  assert(resp_msgbuf->is_valid_dynamic());
-
-  // The current size of resp_msgbuf can be 0
-  assert(resp_msgbuf->max_data_size > 0 &&
-         resp_msgbuf->max_data_size <= kMaxMsgSize);
-  assert(resp_msgbuf->max_num_pkts > 0);
-
   // When called from a background thread, enqueue to the foreground thread
   if (unlikely(!in_dispatch())) {
     assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
@@ -34,12 +21,8 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   }
 
   // If we're here, we're in the dispatch thread
-  assert(is_usr_session_num_in_range_st(session_num));
   Session *session = session_vec[static_cast<size_t>(session_num)];
-
-  // We never disconnect a session before notifying the eRPC user, so we don't
-  // need to catch this behavior
-  assert(session != nullptr && session->is_client() && session->is_connected());
+  assert(session->is_connected());  // User is notified before we disconnect
 
   // If a free sslot is unavailable, save to session backlog
   if (unlikely(session->client_info.sslot_free_vec.size() == 0)) {
@@ -49,32 +32,22 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     return;
   }
 
-  size_t sslot_i = session->client_info.sslot_free_vec.pop_back();
-  assert(sslot_i < kSessionReqWindow);
-
   // Fill in the sslot info
+  size_t sslot_i = session->client_info.sslot_free_vec.pop_back();
   SSlot &sslot = session->sslot_arr[sslot_i];
   assert(sslot.tx_msgbuf == nullptr);  // Previous response was received
   sslot.tx_msgbuf = req_msgbuf;        // Mark the request as active/incomplete
+  sslot.cur_req_num += kSessionReqWindow;  // Move to next request
 
-  sslot.client_info.resp_msgbuf = resp_msgbuf;
+  auto &ci = sslot.client_info;
+  ci.resp_msgbuf = resp_msgbuf;
+  ci.cont_func = cont_func;
+  ci.tag = tag;
+  ci.enqueue_req_tsc = pkt_loss_epoch_tsc;
 
-  // Fill in client-save info
-  sslot.client_info.cont_func = cont_func;
-  sslot.client_info.tag = tag;
-  sslot.client_info.req_sent = 0;  // Reset queueing progress
-  sslot.client_info.resp_rcvd = 0;
-  sslot.client_info.rfr_sent = 0;
-  sslot.client_info.expl_cr_rcvd = 0;
-
-  sslot.client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
-
-  if (unlikely(cont_etid != kInvalidBgETid)) {
-    // We need to run the continuation in a background thread
-    sslot.client_info.cont_etid = cont_etid;
-  }
-
-  sslot.cur_req_num += kSessionReqWindow;  // Generate req num
+  ci.num_rx = 0;
+  ci.num_tx = 0;
+  if (unlikely(cont_etid != kInvalidBgETid)) ci.cont_etid = cont_etid;
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();
@@ -102,19 +75,16 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 template <class TTr>
 bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
   MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
-  Session *session = sslot->session;
-  assert(session->is_client() && session->is_connected());
-  assert(req_msgbuf->is_valid_dynamic() && req_msgbuf->is_req());
-  assert(sslot->client_info.req_sent < req_msgbuf->num_pkts);
+  assert(sslot->client_info.num_tx < req_msgbuf->num_pkts);
 
+  Session *session = sslot->session;
   size_t &credits = session->client_info.credits;
   auto &ci = sslot->client_info;
-
-  // Proceed if we have at least one credit
   if (credits == 0) return false;
 
   if (likely(req_msgbuf->num_pkts == 1)) {
     // Small request. Bypass wheel if pacing is disabled or bypass is enabled.
+    // Here, packet index and packet number are both zero.
     if (!kCcPacing ||
         (kCcOptWheelBypass &&
          session->client_info.cc.timely.rate == Timely::kMaxRate)) {
@@ -128,33 +98,33 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
     }
 
     credits--;
-    ci.req_sent++;
+    ci.num_tx++;
     return true;
   } else {
     // Large request
-    size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.req_sent);
-    assert(sending > 0);
+    size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.num_tx);
 
     for (size_t _x = 0; _x < sending; _x++) {
+      // Here, packet index and packet number are both ci.num_tx
       if (kCcPacing) {
-        size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(ci.req_sent);
+        size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(ci.num_tx);
         size_t _rdtsc = dpath_rdtsc();
         size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, psz);
 
         LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, abs TX %.3f us.\n",
-               rpc_id, sslot->cur_req_num, ci.req_sent,
+               rpc_id, sslot->cur_req_num, pkt_num,
                to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
-        wheel->insert(wheel_ent_t(sslot, ci.req_sent), _rdtsc, abs_tx_tsc);
+        wheel->insert(wheel_ent_t(sslot, ci.num_tx), _rdtsc, abs_tx_tsc);
       } else {
-        enqueue_pkt_tx_burst_st(sslot, ci.req_sent,
-                                &ci.tx_ts[ci.req_sent % kSessionCredits]);
+        enqueue_pkt_tx_burst_st(sslot, ci.num_tx,
+                                &ci.tx_ts[ci.num_tx % kSessionCredits]);
       }
 
       credits--;
-      ci.req_sent++;
+      ci.num_tx++;
     }
 
-    if (ci.req_sent == req_msgbuf->num_pkts) return true;
+    if (ci.num_tx == req_msgbuf->num_pkts) return true;
   }
 
   return false;
@@ -163,7 +133,6 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
 template <class TTr>
 void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   assert(in_dispatch());
-  assert(!sslot->is_client);
 
   // Handle reordering
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
@@ -180,16 +149,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
       return;
     } else {
       // This is a retransmission for the currently active request
-      assert(sslot->server_info.req_rcvd == 1);
-
       if (sslot->tx_msgbuf != nullptr) {
         // The response is available, so resend it
-        assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
-        assert(sslot->tx_msgbuf->is_resp());
-        assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
-
         LOG_REORDER("%s: Re-sending response.\n", issue_msg);
-        enqueue_pkt_tx_burst_st(sslot, 0, nullptr);
+        enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Packet index = 0
 
         // Release all transport-owned buffers before re-entering event loop
         if (tx_batch_i > 0) do_tx_burst_st();
@@ -208,13 +171,13 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   auto &req_msgbuf = sslot->server_info.req_msgbuf;
   assert(req_msgbuf.is_buried());  // Buried on prev req's enqueue_response()
 
-  // Update sslot tracking
-  sslot->cur_req_num = pkthdr->req_num;
-  sslot->server_info.req_rcvd = 1;
-
   // Bury the previous, possibly dynamic response (sslot->tx_msgbuf). This marks
   // the response for cur_req_num as unavailable.
   bury_resp_msgbuf_server_st(sslot);
+
+  // Update sslot tracking
+  sslot->cur_req_num = pkthdr->req_num;
+  sslot->server_info.num_rx = 1;
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
   assert(req_func.is_registered());
@@ -247,13 +210,12 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
 template <class TTr>
 void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_dispatch());
-  assert(!sslot->is_client);
   MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
 
   // Handle reordering
   bool is_next_pkt_same_req =  // Is this the next packet in this request?
       (pkthdr->req_num == sslot->cur_req_num) &&
-      (pkthdr->pkt_num == sslot->server_info.req_rcvd);
+      (pkthdr->pkt_num == sslot->server_info.num_rx);
   bool is_first_pkt_next_req =  // Is this the first packet in the next request?
       (pkthdr->req_num == sslot->cur_req_num + kSessionReqWindow) &&
       (pkthdr->pkt_num == 0);
@@ -265,26 +227,21 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
             "eRPC Rpc %u: Received out-of-order request for session %u. "
             "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Action",
             rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-            pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.req_rcvd);
+            pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.num_rx);
 
     // Only past packets belonging to this request are not dropped
     if (pkthdr->req_num != sslot->cur_req_num ||
-        pkthdr->pkt_num > sslot->server_info.req_rcvd) {
+        pkthdr->pkt_num > sslot->server_info.num_rx) {
       LOG_REORDER("%s: Dropping.\n", issue_msg);
       return;
     }
 
+    // If this is not the last packet in the request, send a credit return.
+    //
     // req_msgbuf could be buried if we have received the entire request and
-    // queued the response, so directly compute the number of packets in request
-    size_t num_pkts_in_req = data_size_to_num_pkts(pkthdr->msg_size);
-    if (sslot->server_info.req_rcvd != num_pkts_in_req) {
-      assert(req_msgbuf.is_dynamic_and_matches(pkthdr));
-    }
-
-    if (pkthdr->pkt_num != num_pkts_in_req - 1) {
-      // This is not the last packet in the request => send a credit return
+    // queued the response, so directly compute number of packets in request.
+    if (pkthdr->pkt_num != data_size_to_num_pkts(pkthdr->msg_size) - 1) {
       LOG_REORDER("%s: Re-sending credit return.\n", issue_msg);
-
       enqueue_cr_st(sslot, pkthdr);  // tx_flush uneeded. XXX: why?
       return;
     }
@@ -292,14 +249,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // This is the last request packet, so re-send response if it's available
     if (sslot->tx_msgbuf != nullptr) {
       // The response is available, so resend it
-      assert(sslot->tx_msgbuf->get_req_num() == sslot->cur_req_num);
-      assert(sslot->tx_msgbuf->is_resp());
-      assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
-
       LOG_REORDER("%s: Re-sending response.\n", issue_msg);
-      enqueue_pkt_tx_burst_st(sslot, 0, nullptr);
-
-      // Release all transport-owned buffers before re-entering event loop
+      enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Packet index = 0
       if (tx_batch_i > 0) do_tx_burst_st();
       transport->tx_flush();
     } else {
@@ -315,36 +266,32 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // This is the first packet received for this request
     assert(req_msgbuf.is_buried());  // Buried on prev req's enqueue_response()
 
-    // Update sslot tracking
-    sslot->cur_req_num = pkthdr->req_num;
-    sslot->server_info.req_rcvd = 1;
-
     // Bury the previous, possibly dynamic response. This marks the response for
     // cur_req_num as unavailable.
     bury_resp_msgbuf_server_st(sslot);
 
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(req_msgbuf.buf != nullptr);
-    *(req_msgbuf.get_pkthdr_0()) = *pkthdr;  // Copy packet header
+    *(req_msgbuf.get_pkthdr_0()) = *pkthdr;
+
+    // Update sslot tracking
+    sslot->cur_req_num = pkthdr->req_num;
+    sslot->server_info.num_rx = 1;
   } else {
     // This is not the first packet for this request
-    assert(req_msgbuf.is_dynamic_and_matches(pkthdr));
-    assert(sslot->server_info.req_rcvd >= 1);
-    assert(sslot->cur_req_num == pkthdr->req_num);
-
-    sslot->server_info.req_rcvd++;
+    sslot->server_info.num_rx++;
   }
 
   // Send a credit return for every request packet except the last in sequence
   if (pkthdr->pkt_num != req_msgbuf.num_pkts - 1) enqueue_cr_st(sslot, pkthdr);
 
-  copy_data_to_msgbuf(&req_msgbuf, pkthdr);  // Header 0 was copied earlier
+  // Header 0 was copied earlier. Request packet's index = packet number.
+  copy_data_to_msgbuf(&req_msgbuf, pkthdr->pkt_num, pkthdr);
 
   // Invoke the request handler iff we have all the request packets
-  if (sslot->server_info.req_rcvd != req_msgbuf.num_pkts) return;
+  if (sslot->server_info.num_rx != req_msgbuf.num_pkts) return;
 
   const ReqFunc &req_func = req_func_arr[pkthdr->req_type];
-  assert(req_func.is_registered());
 
   // Remember request metadata for enqueue_response(). req_type was invalidated
   // on previous enqueue_response(). Setting it implies that an enqueue_resp()

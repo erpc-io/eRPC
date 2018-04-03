@@ -5,10 +5,6 @@ namespace erpc {
 template <class TTr>
 void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   assert(in_dispatch());
-  assert(sslot->is_client);
-  assert(sslot->client_info.resp_msgbuf->is_valid_dynamic() &&
-         sslot->client_info.resp_msgbuf->is_resp());
-  assert(resp_pkthdr->check_magic() && resp_pkthdr->is_resp());
 
   MsgBuffer *ctrl_msgbuf = &ctrl_msgbufs[ctrl_msgbuf_head];
   ctrl_msgbuf_head++;
@@ -20,9 +16,12 @@ void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   rfr_pkthdr->msg_size = 0;
   rfr_pkthdr->dest_session_num = sslot->session->remote_session_num;
   rfr_pkthdr->pkt_type = kPktTypeReqForResp;
-  rfr_pkthdr->pkt_num = sslot->client_info.rfr_sent + 1;
+  rfr_pkthdr->pkt_num = sslot->client_info.num_tx;
   rfr_pkthdr->req_num = resp_pkthdr->req_num;
-  rfr_pkthdr->magic = resp_pkthdr->magic;
+  rfr_pkthdr->magic = kPktHdrMagic;
+
+  sslot->client_info.num_tx++;
+  sslot->session->client_info.credits--;
 
   enqueue_hdr_tx_burst_st(
       sslot, ctrl_msgbuf,
@@ -33,40 +32,33 @@ template <class TTr>
 void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_dispatch());
   assert(!sslot->is_client);
+  auto &si = sslot->server_info;
 
-  // Handle reordering
+  // Handle reordering. If request numbers match, then we have not reset num_rx.
   assert(pkthdr->req_num <= sslot->cur_req_num);
-  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (pkthdr->pkt_num == sslot->server_info.rfr_rcvd + 1);
+  bool in_order =
+      (pkthdr->req_num == sslot->cur_req_num) && (pkthdr->pkt_num == si.num_rx);
   if (unlikely(!in_order)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
             "eRPC Rpc %u: Received out-of-order RFR for session %u. "
-            "Pkt = %zu/%zu. cur_req_num = %zu, rfr_rcvd = %zu. Action",
+            "Pkt = %zu/%zu. cur_req_num = %zu, num_rx = %zu. Action",
             rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-            pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.rfr_rcvd);
+            pkthdr->pkt_num, sslot->cur_req_num, si.num_rx);
 
-    if (pkthdr->req_num < sslot->cur_req_num) {
-      // Reject RFR for old requests
+    if (pkthdr->req_num < sslot->cur_req_num || pkthdr->pkt_num > si.num_rx) {
+      // Reject RFR for old requests or future packets in this request
       LOG_REORDER("%s: Dropping.\n", issue_msg);
       return;
     }
 
-    if (pkthdr->pkt_num > sslot->server_info.rfr_rcvd + 1) {
-      // Reject future packets
-      LOG_REORDER("%s: Dropping.\n", issue_msg);
-      return;
-    }
-
-    // If we're here, this is a past RFR packet for this request. Resend resp.
-    assert(pkthdr->req_num == sslot->cur_req_num &&
-           pkthdr->pkt_num < sslot->server_info.rfr_rcvd + 1);
+    // If we're here, this is a past RFR packet for this request. So, we still
+    // have the response, and we saved request packet count.
     assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
+    const size_t resp_pkt_idx = pkthdr->pkt_num - si.sav_num_req_pkts + 1;
 
     LOG_REORDER("%s: Re-sending response.\n", issue_msg);
-
-    // Re-send the response packet with index = pkthdr->pkt_num (same as below)
-    enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num, nullptr);
+    enqueue_pkt_tx_burst_st(sslot, resp_pkt_idx, nullptr);
 
     // Release all transport-owned buffers before re-entering event loop
     if (tx_batch_i > 0) do_tx_burst_st();
@@ -75,10 +67,10 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     return;
   }
 
-  sslot->server_info.rfr_rcvd++;
+  sslot->server_info.num_rx++;
 
-  // Send the response packet with index = pkthdr->pktnum (same as above)
-  enqueue_pkt_tx_burst_st(sslot, pkthdr->pkt_num, nullptr);
+  const size_t resp_pkt_idx = pkthdr->pkt_num - si.sav_num_req_pkts + 1;
+  enqueue_pkt_tx_burst_st(sslot, resp_pkt_idx, nullptr);
 }
 
 FORCE_COMPILE_TRANSPORTS

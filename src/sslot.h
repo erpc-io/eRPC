@@ -52,6 +52,7 @@ class SSlot {
   /// non-null value indicates that the request is active/incomplete.
   MsgBuffer *tx_msgbuf;
 
+  /// Info about the current request
   size_t cur_req_num;
 
   union {
@@ -60,10 +61,8 @@ class SSlot {
       erpc_cont_func_t cont_func;  ///< Continuation function for the request
       size_t tag;                  ///< Tag of the request
 
-      size_t req_sent;      ///< Number of request packets sent
-      size_t expl_cr_rcvd;  ///< Number of explicit credit returns received
-      size_t rfr_sent;      ///< Number of request-for-response packets sent
-      size_t resp_rcvd;     ///< Number of response packets received
+      size_t num_tx;  ///< Number of packets sent
+      size_t num_rx;  ///< Number of packets received
 
       size_t enqueue_req_tsc;  ///< Approx epoch-based TSC of enqueue_request()
       size_t cont_etid;        ///< eRPC thread ID to run the continuation on
@@ -76,11 +75,7 @@ class SSlot {
       std::string progress_str(size_t req_num) const {
         std::ostringstream ret;
         ret << "[req " << req_num << ",";
-        if (req_sent != 0) ret << "[req_sent " << req_sent;
-        if (expl_cr_rcvd != 0) ret << ", expl_cr_rcvd " << expl_cr_rcvd;
-        if (rfr_sent != 0) ret << ", rfr_sent " << rfr_sent;
-        if (resp_rcvd != 0) ret << ", resp_rcvd " << resp_rcvd;
-        ret << "]";
+        ret << "num_tx " << num_tx << ", num_rx " << num_rx << "]";
         return ret.str();
       }
     } client_info;
@@ -101,9 +96,12 @@ class SSlot {
       uint8_t req_type;
       ReqFuncType req_func_type;  ///< The req handler type (e.g., background)
 
-      // RX progress. Note that the server does not track any TX progress
-      size_t req_rcvd;  ///< Number of request packets received
-      size_t rfr_rcvd;  ///< Number of request-for-response packets received
+      /// RX progress. Note that the server does not track TX progress.
+      size_t num_rx;
+
+      /// The server remembers the number of packets in the request after
+      /// burying the request in enqueue_response().
+      size_t sav_num_req_pkts;
     } server_info;
   };
 };

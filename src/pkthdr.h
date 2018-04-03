@@ -55,13 +55,7 @@ struct pkthdr_t {
   uint64_t msg_size : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t dest_session_num : 16;    ///< Destination session number
   uint64_t pkt_type : 2;             ///< The packet type
-
-  /// Packet number
-  /// o For request or response data packets, it's the packet number in the
-  ///   data MsgBuffer.
-  /// o For explicit CRs and RFRs, it's the packet number of the corresponding
-  ///   request or response packet, respectively.
-  uint64_t pkt_num : kPktNumBits;
+  uint64_t pkt_num : kPktNumBits;    ///< Monotonically increasing packet number
 
   /// Request number, carried by all data and control packets for a request.
   uint64_t req_num : kReqNumBits;
@@ -88,23 +82,10 @@ struct pkthdr_t {
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[type " << pkt_type_str(pkt_type) << ", "
-        << "dest session " << std::to_string(dest_session_num) << ", "
-        << "req " << std::to_string(req_num) << ", "
-        << "pkt " << std::to_string(pkt_num) << ", "
-        << "msg size " << std::to_string(msg_size) << ", "
-        << "magic " << std::to_string(magic) << "]";
-
-    return ret.str();
-  }
-
-  /// Return a string representation of a packet header, with custom pkt_num.
-  std::string to_string(size_t _pkt_num) const {
-    std::ostringstream ret;
-    ret << "[type " << pkt_type_str(pkt_type) << ", "
-        << "dest session " << std::to_string(dest_session_num) << ", "
-        << "req " << std::to_string(req_num) << ", "
-        << "pkt " << std::to_string(_pkt_num) << ", "
-        << "msg size " << std::to_string(msg_size) << ", "
+        << "destssn " << std::to_string(dest_session_num) << ", "
+        << "reqn " << std::to_string(req_num) << ", "
+        << "pktn " << std::to_string(pkt_num) << ", "
+        << "msgsz " << std::to_string(msg_size) << ", "
         << "magic " << std::to_string(magic) << "]";
 
     return ret.str();

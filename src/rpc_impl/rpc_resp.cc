@@ -17,11 +17,10 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   // If we're here, we're in the dispatch thread
   SSlot *sslot = static_cast<SSlot *>(req_handle);
+  sslot->server_info.sav_num_req_pkts = sslot->server_info.req_msgbuf.num_pkts;
   bury_req_msgbuf_server_st(sslot);  // Bury the possibly-dynamic req MsgBuffer
 
   Session *session = sslot->session;
-  assert(session != nullptr && session->is_server());
-
   if (unlikely(!session->is_connected())) {
     // A session reset could be waiting for this enqueue_response()
     assert(session->state == SessionState::kResetInProgress);
@@ -39,7 +38,6 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
   MsgBuffer *resp_msgbuf =
       sslot->prealloc_used ? &sslot->pre_resp_msgbuf : &sslot->dyn_resp_msgbuf;
-  assert(resp_msgbuf->is_valid_dynamic() && resp_msgbuf->data_size > 0);
 
   // Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();
@@ -47,7 +45,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
   resp_pkthdr_0->msg_size = resp_msgbuf->data_size;
   resp_pkthdr_0->dest_session_num = session->remote_session_num;
   resp_pkthdr_0->pkt_type = kPktTypeResp;
-  resp_pkthdr_0->pkt_num = 0;
+  resp_pkthdr_0->pkt_num = sslot->server_info.sav_num_req_pkts - 1;
   resp_pkthdr_0->req_num = sslot->cur_req_num;
 
   // Fill in non-zeroth packet headers, if any
@@ -57,45 +55,31 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     for (size_t i = 1; i < resp_msgbuf->num_pkts; i++) {
       pkthdr_t *resp_pkthdr_i = resp_msgbuf->get_pkthdr_n(i);
       *resp_pkthdr_i = *resp_pkthdr_0;
-      resp_pkthdr_i->pkt_num = i;
+      resp_pkthdr_i->pkt_num = resp_pkthdr_0->pkt_num + i;
     }
   }
 
   // Fill in the slot and reset queueing progress
   assert(sslot->tx_msgbuf == nullptr);  // Buried before calling request handler
   sslot->tx_msgbuf = resp_msgbuf;       // Mark response as valid
-  sslot->server_info.rfr_rcvd = 0;
 
   // Mark enqueue_response() as completed
   assert(sslot->server_info.req_type != kInvalidReqType);
   sslot->server_info.req_type = kInvalidReqType;
 
-  enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Enqueue zeroth response packet
+  enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // 0 = packet index, not pkt_num
 }
 
 template <class TTr>
 void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                      size_t rx_tsc) {
   assert(in_dispatch());
-  assert(sslot->is_client);
   assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
 
-  // Handle reordering
+  // Handle reordering. If request numbers match, num_rx & num_tx are valid.
   bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (sslot->client_info.resp_rcvd == 0);
-
-  if (likely(in_order)) {
-    // resp_rcvd == 0 means that we haven't received the response before now,
-    // so the request MsgBuffer (tx_msgbuf) is valid.
-    assert(sslot->tx_msgbuf != nullptr &&
-           sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
-
-    // When we roll back req_sent during packet loss recovery, for instance
-    // from 8 to 7 for an 8-packet request, we can get response packet 0 before
-    // the event loop re-sends the 8th request packet. This received response
-    // packet is out-of-order.
-    in_order &= (sslot->client_info.req_sent == sslot->tx_msgbuf->num_pkts);
-  }
+                  (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
+                  (pkthdr->pkt_num == sslot->client_info.num_rx);
 
   if (unlikely(!in_order)) {
     LOG_REORDER(
@@ -106,21 +90,17 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr,
     return;
   }
 
-  if (kCcRateComp) {
-    size_t trigger_pkt_num = sslot->tx_msgbuf->num_pkts - 1;
-    update_timely_rate(sslot, trigger_pkt_num, rx_tsc);
-  }
-
-  // If we're here, this is the first (and only) packet of the response
+  // This is the entire, in-order response. So, we still have the request.
   assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
 
-  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-  assert(resp_msgbuf->max_data_size >= pkthdr->msg_size);
-  resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-
-  sslot->client_info.resp_rcvd = 1;
+  if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
+  sslot->client_info.num_rx++;
+
   sslot->tx_msgbuf = nullptr;  // Mark response as received
+
+  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
+  resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
 
   // Copy header and data, but not headroom
   memcpy(reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
@@ -142,89 +122,52 @@ template <class TTr>
 void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                          size_t rx_tsc) {
   assert(in_dispatch());
-  assert(sslot->is_client);
 
-  // Handle reordering
+  // Handle reordering. If request numbers match, then we have not reset num_rx.
   assert(pkthdr->req_num <= sslot->cur_req_num);
   bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (pkthdr->pkt_num == sslot->client_info.resp_rcvd);
-
-  if (likely(in_order)) {
-    // pkt_num == resp_rcvd means that we haven't received the full response
-    // before now, so the request MsgBuffer (tx_msgbuf) is valid.
-    assert(sslot->tx_msgbuf != nullptr &&
-           sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
-
-    // Check if the response has been reordered before a credit return.
-    in_order &=
-        (sslot->client_info.expl_cr_rcvd == sslot->tx_msgbuf->num_pkts - 1);
-
-    // When we roll back req_sent during packet loss recovery, for instance
-    // from 8 to 7 for an 8-packet request, we can get response packet 0 before
-    // the event loop re-sends the 8th request packet. This received response
-    // packet is out-of-order.
-    in_order &= (sslot->client_info.req_sent == sslot->tx_msgbuf->num_pkts);
-
-    // When we roll back rfr_sent during packet loss recovery, for instance from
-    // 8 to 0, we can get response packets 1--8 before the event loop re-sends
-    // the RFR packets. These received packets are out of order.
-    in_order &= (pkthdr->pkt_num <= sslot->client_info.rfr_sent);
-  }
+                  (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
+                  (pkthdr->pkt_num == sslot->client_info.num_rx);
 
   if (unlikely(!in_order)) {
     LOG_REORDER(
         "eRPC Rpc %u: Received out-of-order response for session %u. "
         "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
         rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.resp_rcvd);
+        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.num_rx);
     return;
   }
 
+  // This is an in-order response packet. So, we still have the request.
+  MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
+  assert(req_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
+
+  if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
-  if (kCcRateComp) {
-    size_t trigger_pkt_num =
-        pkthdr->pkt_num == 0 ? sslot->tx_msgbuf->num_pkts - 1 : pkthdr->pkt_num;
-    update_timely_rate(sslot, trigger_pkt_num, rx_tsc);
-  }
+  sslot->client_info.num_rx++;
 
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-  if (pkthdr->pkt_num == 0) {
-    // This is the first response packet, so resize the response MsgBuffer
-    assert(resp_msgbuf->max_data_size >= pkthdr->msg_size);
+  if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
+    // This is the first response packet
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-    *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;  // Copy packet header
-
-    sslot->client_info.resp_rcvd = 1;
-  } else {
-    // We've already resized resp msgbuf and copied pkthdr_0
-    assert(resp_msgbuf->is_dynamic_and_matches(pkthdr));
-    assert(sslot->client_info.resp_rcvd >= 1);
-
-    sslot->client_info.resp_rcvd++;
+    *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;
   }
 
-  size_t &rfr_sent = sslot->client_info.rfr_sent;
-
-  // Check if we need to send more request-for-response packets
+  // Send RFRs before doing the response memcpy
+  const auto rfr_sent = sslot->client_info.num_tx - req_msgbuf->num_pkts;
   size_t rfr_pending = ((resp_msgbuf->num_pkts - 1) - rfr_sent);
   if (rfr_pending > 0) {
-    size_t now_sending =
-        std::min(sslot->session->client_info.credits, rfr_pending);
-    assert(now_sending > 0);
-
-    for (size_t i = 0; i < now_sending; i++) {
-      enqueue_rfr_st(sslot, pkthdr);
-      rfr_sent++;
-      assert(rfr_sent <= resp_msgbuf->num_pkts - 1);
-    }
-
-    sslot->session->client_info.credits -= now_sending;
+    size_t sending = std::min(sslot->session->client_info.credits, rfr_pending);
+    for (size_t i = 0; i < sending; i++) enqueue_rfr_st(sslot, pkthdr);
   }
 
   // Header 0 was copied earlier, other headers are unneeded, so copy just data
-  copy_data_to_msgbuf(resp_msgbuf, pkthdr);
+  size_t resp_pkt_idx = pkthdr->pkt_num - req_msgbuf->num_pkts + 1;
+  copy_data_to_msgbuf(resp_msgbuf, resp_pkt_idx, pkthdr);
 
-  if (sslot->client_info.resp_rcvd != resp_msgbuf->num_pkts) return;
+  if (sslot->client_info.num_rx !=
+      req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1)
+    return;
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
   if (sslot->client_info.cont_etid == kInvalidBgETid) {

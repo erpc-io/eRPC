@@ -23,7 +23,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
     size_t pkt_size;
     pkthdr_t* pkthdr;
-    if (item.pkt_index == 0) {
+    if (item.pkt_idx == 0) {
       // This is the first packet, so we need only 1 SGE. This can be CR/RFR.
       pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
@@ -39,12 +39,12 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
       wr.num_sge = 1;
     } else {
       // This is not the first packet, so we need 2 SGEs
-      pkthdr = msg_buffer->get_pkthdr_n(item.pkt_index);
+      pkthdr = msg_buffer->get_pkthdr_n(item.pkt_idx);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
       sgl[0].lkey = msg_buffer->buffer.lkey;
 
-      size_t offset = item.pkt_index * kMaxDataPerPkt;
+      size_t offset = item.pkt_idx * kMaxDataPerPkt;
       sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[offset]);
       sgl[1].length = std::min(kMaxDataPerPkt, msg_buffer->data_size - offset);
       sgl[1].lkey = msg_buffer->buffer.lkey;
@@ -68,12 +68,14 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(udp_hdr->check == 0);
     udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
 
+    /*
     LOG_TRACE(
         "eRPC RawTransport: Sending packet (idx = %zu, drop = %u). SGE #1 %uB, "
         " SGE #2 = %uB. pkthdr = %s. Frame header = %s.\n",
         i, item.drop, sgl[0].length, (wr.num_sge == 2 ? sgl[1].length : 0),
         pkthdr->to_string().c_str(),
         frame_header_to_string(&pkthdr->headroom[0]).c_str());
+    */
   }
 
   send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains
@@ -164,10 +166,12 @@ size_t RawTransport::rx_burst() {
           reinterpret_cast<pkthdr_t*>(&ring_extent.buf[recv_head * kRecvSize]);
       __builtin_prefetch(pkthdr, 0, 3);
 
+      /*
       LOG_TRACE(
           "eRPC RawTransport: Received pkt. pkthdr = %s. Frame header = %s.\n",
           pkthdr->to_string().c_str(),
           frame_header_to_string(&pkthdr->headroom[0]).c_str());
+      */
 
       recv_head = (recv_head + 1) % kNumRxRingEntries;
     }
