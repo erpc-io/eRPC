@@ -451,8 +451,7 @@ class Rpc {
 
   /**
    * @brief Enqueue a data packet from sslot's tx_msgbuf for tx_burst
-   * @param pkt_idx The index of the packet in tx_msgbuf. The index may not
-   * match the packet number for response packets.
+   * @param pkt_idx The index of the packet in tx_msgbuf, not packet number
    */
   inline void enqueue_pkt_tx_burst_st(SSlot *sslot, size_t pkt_idx,
                                       size_t *tx_ts) {
@@ -546,7 +545,7 @@ class Rpc {
     session->client_info.credits++;
   }
 
-  /// Copy the data from \p pkt to \p msgbuf at a packet index
+  /// Copy the data from a packet to a MsgBuffer at a packet index
   inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, size_t pkt_idx,
                                   const pkthdr_t *pkthdr) {
     size_t offset = pkt_idx * TTr::kMaxDataPerPkt;

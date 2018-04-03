@@ -55,10 +55,10 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // If we're here, this is a past RFR packet for this request. So, we still
     // have the response, and we saved request packet count.
     assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
-    const size_t resp_pkt_idx = pkthdr->pkt_num - si.sav_num_req_pkts + 1;
 
     LOG_REORDER("%s: Re-sending response.\n", issue_msg);
-    enqueue_pkt_tx_burst_st(sslot, resp_pkt_idx, nullptr);
+    enqueue_pkt_tx_burst_st(
+        sslot, resp_ntoi(pkthdr->pkt_num, si.sav_num_req_pkts), nullptr);
 
     // Release all transport-owned buffers before re-entering event loop
     if (tx_batch_i > 0) do_tx_burst_st();
@@ -68,9 +68,8 @@ void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   }
 
   sslot->server_info.num_rx++;
-
-  const size_t resp_pkt_idx = pkthdr->pkt_num - si.sav_num_req_pkts + 1;
-  enqueue_pkt_tx_burst_st(sslot, resp_pkt_idx, nullptr);
+  enqueue_pkt_tx_burst_st(
+      sslot, resp_ntoi(pkthdr->pkt_num, si.sav_num_req_pkts), nullptr);
 }
 
 FORCE_COMPILE_TRANSPORTS

@@ -25,8 +25,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     wr.send_flags = get_signaled_flag();
 
     if (item.pkt_idx == 0) {
-      // This is the first packet, so we need only 1 SGE. This can be a credit
-      // return packet or an RFR.
+      // This is the first packet, so we need only 1 SGE. This can be CR/RFR.
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = msg_buffer->get_pkt_size<kMaxDataPerPkt>(0);
@@ -53,7 +52,6 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
     const auto* ib_rinfo =
         reinterpret_cast<ib_routing_info_t*>(item.routing_info);
-
     wr.wr.ud.ah = ib_rinfo->ah;
     wr.wr.ud.remote_qpn = ib_rinfo->qpn;
     if (kTesting && item.drop) wr.wr.ud.remote_qpn = 0;

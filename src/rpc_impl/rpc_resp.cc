@@ -162,8 +162,8 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   }
 
   // Header 0 was copied earlier, other headers are unneeded, so copy just data
-  size_t resp_pkt_idx = pkthdr->pkt_num - req_msgbuf->num_pkts + 1;
-  copy_data_to_msgbuf(resp_msgbuf, resp_pkt_idx, pkthdr);
+  copy_data_to_msgbuf(resp_msgbuf,
+                      resp_ntoi(pkthdr->pkt_num, req_msgbuf->num_pkts), pkthdr);
 
   if (sslot->client_info.num_rx !=
       req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1)

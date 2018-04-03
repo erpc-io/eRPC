@@ -48,6 +48,11 @@ static std::string pkt_type_str(uint64_t pkt_type) {
   throw std::runtime_error("Invalid packet type.");
 }
 
+/// Convert a response packet number to the MsgBuffer packet index
+static inline size_t resp_ntoi(size_t pkt_num, size_t num_req_pkts) {
+  return pkt_num - (num_req_pkts - 1);
+}
+
 struct pkthdr_t {
   static_assert(kHeadroom == 0 || kHeadroom == 40, "");
   uint8_t headroom[kHeadroom + 2];   ///< Ethernet L2/L3/L3 headers
