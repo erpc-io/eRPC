@@ -84,16 +84,16 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
 
   if (likely(req_msgbuf->num_pkts == 1)) {
     // Small request. Bypass wheel if pacing is disabled or bypass is enabled.
-    // Here, packet index and packet number are both zero.
+    const size_t pkt_idx = 0, pkt_num = 0;
     if (!kCcPacing ||
         (kCcOptWheelBypass &&
          session->client_info.cc.timely.rate == Timely::kMaxRate)) {
-      enqueue_pkt_tx_burst_st(sslot, 0, &ci.tx_ts[0]);
+      enqueue_pkt_tx_burst_st(sslot, pkt_idx, &ci.tx_ts[pkt_num]);
     } else {
-      size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(0);
+      size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
       size_t _rdtsc = dpath_rdtsc();
       size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, pkt_size);
-      wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(0)), _rdtsc,
+      wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(pkt_num)), _rdtsc,
                     abs_tx_tsc);
     }
 
@@ -105,19 +105,19 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
     size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.num_tx);
 
     for (size_t _x = 0; _x < sending; _x++) {
-      // Here, packet index and packet number are both ci.num_tx
+      const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
       if (kCcPacing) {
-        size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(ci.num_tx);
+        size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
         size_t _rdtsc = dpath_rdtsc();
         size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(_rdtsc, psz);
 
         LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, abs TX %.3f us.\n",
                rpc_id, sslot->cur_req_num, pkt_num,
                to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
-        wheel->insert(wheel_ent_t(sslot, ci.num_tx), _rdtsc, abs_tx_tsc);
+        wheel->insert(wheel_ent_t(sslot, pkt_num), _rdtsc, abs_tx_tsc);
       } else {
-        enqueue_pkt_tx_burst_st(sslot, ci.num_tx,
-                                &ci.tx_ts[ci.num_tx % kSessionCredits]);
+        enqueue_pkt_tx_burst_st(sslot, pkt_idx,
+                                &ci.tx_ts[pkt_num % kSessionCredits]);
       }
 
       credits--;
