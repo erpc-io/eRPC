@@ -7,7 +7,7 @@
 namespace erpc {
 
 static constexpr size_t kTestSmallMsgSize = 32;
-static constexpr size_t kTestLargeMsgSize = KB(64);
+static constexpr size_t kTestLargeMsgSize = KB(128);
 static constexpr size_t kTestRxTsc = 1000000000;
 
 class TestContext {
