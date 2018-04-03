@@ -28,13 +28,9 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                   size_t rx_tsc) {
   assert(in_dispatch());
 
-  // Handle reordering. If request numbers match, then we have not reset num_rx.
+  // Handle reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
-  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
-                  (pkthdr->pkt_num == sslot->client_info.num_rx);
-
-  if (unlikely(!in_order)) {
+  if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
         "eRPC Rpc %u: Received out-of-order explicit CR for session %u. "
         "Pkt = %zu/%zu. cur_req_num = %zu, num_rx = %zu. Dropping.\n",

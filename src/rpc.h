@@ -329,6 +329,24 @@ class Rpc {
     assert(ring_entries_available <= Transport::kNumRxRingEntries);
   }
 
+  //
+  // Datapath helpers
+  //
+
+  /// Convert a response packet number to the MsgBuffer packet index
+  static inline size_t resp_ntoi(size_t pkt_num, size_t num_req_pkts) {
+    return pkt_num - (num_req_pkts - 1);
+  }
+
+  /// Return true iff a packet received by a client is in order
+  static inline size_t in_order_client(const SSlot *sslot,
+                                       const pkthdr_t *pkthdr) {
+    // If request numbers match, num_rx & num_tx are valid for the request
+    return (pkthdr->req_num == sslot->cur_req_num) &&
+           (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
+           (pkthdr->pkt_num == sslot->client_info.num_rx);
+  }
+
   // rpc_req.cc
  public:
   /**

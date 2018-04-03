@@ -76,12 +76,8 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr,
   assert(in_dispatch());
   assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
 
-  // Handle reordering. If request numbers match, num_rx & num_tx are valid.
-  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
-                  (pkthdr->pkt_num == sslot->client_info.num_rx);
-
-  if (unlikely(!in_order)) {
+  // Handle reordering
+  if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
         "eRPC Rpc %u: Received out-of-order response for session %u. "
         "Request num: %zu (pkt), %zu (sslot). Dropping.\n",
@@ -123,13 +119,9 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                          size_t rx_tsc) {
   assert(in_dispatch());
 
-  // Handle reordering. If request numbers match, then we have not reset num_rx.
+  // Handler reordering
   assert(pkthdr->req_num <= sslot->cur_req_num);
-  bool in_order = (pkthdr->req_num == sslot->cur_req_num) &&
-                  (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
-                  (pkthdr->pkt_num == sslot->client_info.num_rx);
-
-  if (unlikely(!in_order)) {
+  if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
         "eRPC Rpc %u: Received out-of-order response for session %u. "
         "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
