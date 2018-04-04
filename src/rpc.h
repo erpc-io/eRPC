@@ -48,11 +48,9 @@ class Rpc {
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (8 * MB(1));
 
-  /// Duration of an RPC packet loss detection epoch in milliseconds
-  static constexpr size_t kRpcPktLossEpochMs = kTesting ? 1 : 10;
-
-  /// Packet loss timeout for an RPC request in milliseconds
-  static constexpr size_t kRpcPktLossTimeoutMs = kTesting ? 5 : 500;
+  /// Packet loss timeout for an RPC request in microseconds. The list of
+  /// requests is scanned at every "epoch", which is fraction of the RTO.
+  static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 500000;
 
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 10 : 100;
@@ -246,10 +244,22 @@ class Rpc {
     return session_vec[static_cast<size_t>(session_num)]->is_connected();
   }
 
-  /// Return the Timely instance for a session. Expert use only.
+  /// Return the Timely instance for a connected session. Expert use only.
   Timely *get_timely(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
     return &session->client_info.cc.timely;
+  }
+
+  /// Return the number of retransmissions for a connected session
+  size_t get_num_retransmissions(int session_num) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    return session->client_info.cc.num_retransmissions;
+  }
+
+  /// Reset the number of retransmissions for a connected session
+  void reset_num_retransmissions(int session_num) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    session->client_info.cc.num_retransmissions = 0;
   }
 
   /// Return the Timing Wheel for this Rpc. Expert use only.
@@ -807,11 +817,6 @@ class Rpc {
     size_t rx_burst_calls = 0;
   } dpath_stats;
 
-  /// Less frequent stats that are always enabled
-  struct {
-    size_t retransmissions = 0;
-  } slow_stats;
-
  private:
   // Constructor args
   Nexus *nexus;
@@ -825,7 +830,9 @@ class Rpc {
   // Derived
   const bool multi_threaded;  ///< True iff there are background threads
   const double freq_ghz;      ///< RDTSC frequency, derived from Nexus
-  const size_t rpc_pkt_loss_epoch_cycles;  ///< RPC packet loss epoch in cycles
+
+  ///< RPC packet loss epoch in cycles. It's some fraction of RTO (e.g., 1/10).
+  const size_t rpc_pkt_loss_epoch_cycles;
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.

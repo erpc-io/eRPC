@@ -25,10 +25,8 @@ void Rpc<TTr>::pkt_loss_scan_st() {
           assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
 
           size_t cycles_elapsed = rdtsc() - sslot.client_info.enqueue_req_tsc;
-          size_t ms_elapsed = to_msec(cycles_elapsed, nexus->freq_ghz);
-          if (ms_elapsed >= kRpcPktLossTimeoutMs) {
-            pkt_loss_retransmit_st(&sslot);
-          }
+          size_t us_elapsed = to_usec(cycles_elapsed, nexus->freq_ghz);
+          if (us_elapsed >= kRpcRTOUs) pkt_loss_retransmit_st(&sslot);
         }
 
         break;
@@ -72,6 +70,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
   }
 
+  // If we're here, we will roll back and retransmit
+  sslot->session->client_info.cc.num_retransmissions++;
   credits += delta;
   ci.num_tx = ci.num_rx;
 

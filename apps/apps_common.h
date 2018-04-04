@@ -83,14 +83,6 @@ class TmpStat {
  public:
   TmpStat() {}
 
-  bool contains_newline(std::string line) {
-    for (size_t i = 0; i < line.length(); i++) {
-      if (line[i] == '\n') return true;
-    }
-
-    return false;
-  }
-
   TmpStat(std::string header) {
     erpc::rt_assert(!contains_newline(header), "Invalid stat file header");
     char *autorun_app = std::getenv("autorun_app");
@@ -112,6 +104,13 @@ class TmpStat {
   void write(std::string stat) { stat_file << stat << std::endl; }
 
  private:
+  bool contains_newline(std::string line) {
+    for (size_t i = 0; i < line.length(); i++) {
+      if (line[i] == '\n') return true;
+    }
+    return false;
+  }
+
   std::ofstream stat_file;
 };
 

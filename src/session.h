@@ -120,7 +120,8 @@ class Session {
     // Congestion control
     struct {
       Timely timely;
-      size_t abs_tx_tsc;  ///< Last absolute TX timestamp
+      size_t abs_tx_tsc;               ///< Last absolute TX timestamp
+      size_t num_retransmissions = 0;  ///< Number of retransmissions
     } cc;
 
     size_t sm_req_ts;  ///< Timestamp of the last session management request

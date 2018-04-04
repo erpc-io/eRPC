@@ -30,22 +30,25 @@ DEFINE_double(throttle_fraction, 1, "Fraction of fair share to throttle to.");
 struct app_stats_t {
   double rx_gbps;
   double tx_gbps;
+  size_t retransmissions;
   double avg_us;
   double _99_us;
-  size_t pad[4];
+  size_t pad[3];
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
   /// Return a space-separated string of all stats
   std::string to_string() {
     return std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) + " " +
-           std::to_string(avg_us) + " " + std::to_string(_99_us);
+           std::to_string(retransmissions) + " " + std::to_string(avg_us) +
+           " " + std::to_string(_99_us);
   }
 
   /// Accumulate stats
   app_stats_t& operator+=(const app_stats_t& rhs) {
     this->rx_gbps += rhs.rx_gbps;
     this->tx_gbps += rhs.tx_gbps;
+    this->retransmissions += rhs.retransmissions;
     this->avg_us += rhs.avg_us;
     this->_99_us += rhs._99_us;
     return *this;

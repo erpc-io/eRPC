@@ -4,7 +4,7 @@
  * @brief Benchmark to measure large RPC throughput. Each thread measures its
  * RX and TX bandwidth.
  *
- * Each thread creates at most session. The session connectivity is controlled
+ * Each thread creates at most one session. Session connectivity is controlled
  * by the "profile" flag. The available profiles are:
  *   o incast: Incast
  *   o victim: With N processes {0, ..., N - 1}, where N >= 3:
@@ -27,6 +27,7 @@ static constexpr bool kAppClientMemsetReq = false;   // Fill entire request
 static constexpr bool kAppServerMemsetResp = false;  // Fill entire response
 static constexpr bool kAppClientCheckResp = false;   // Check entire response
 
+// Profile-specifc session connection function
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
 // A basic session management handler that expects successful responses
@@ -154,17 +155,23 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   // Print twice every second
   double ns = erpc::ns_since(c->tput_t0);
   if (ns >= 500000000) {
-    auto &stats = c->app_stats[c->thread_id];
-    stats.rx_gbps = c->stat_rx_bytes_tot * 8 / ns;
-    stats.tx_gbps = c->stat_tx_bytes_tot * 8 / ns;
-
-    // Compute latency stats
     std::sort(c->latency_vec.begin(), c->latency_vec.end());
     double latency_sum = 0.0;
     for (double sample : c->latency_vec) latency_sum += sample;
 
+    auto &stats = c->app_stats[c->thread_id];
+    stats.rx_gbps = c->stat_rx_bytes_tot * 8 / ns;
+    stats.tx_gbps = c->stat_tx_bytes_tot * 8 / ns;
+    stats.retransmissions =
+        c->rpc->get_num_retransmissions(c->session_num_vec[0]);
     stats.avg_us = latency_sum / c->latency_vec.size();
     stats._99_us = c->latency_vec.at(c->latency_vec.size() * 0.99);
+
+    // Reset stats for next iteration
+    c->stat_rx_bytes_tot = 0;
+    c->stat_tx_bytes_tot = 0;
+    c->rpc->reset_num_retransmissions(c->session_num_vec[0]);
+    c->latency_vec.clear();
 
     erpc::Timely *timely_0 = c->rpc->get_timely(0);
 
@@ -189,10 +196,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->tmp_stat->write(accum_stats.to_string());
     }
 
-    c->latency_vec.clear();
-    c->stat_rx_bytes_tot = 0;
-    c->stat_tx_bytes_tot = 0;
-
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
 
@@ -211,7 +214,9 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
-  if (thread_id == 0) c.tmp_stat = new TmpStat("rx_gbps tx_gbps avg_us 99_us");
+  if (thread_id == 0) {
+    c.tmp_stat = new TmpStat("rx_gbps tx_gbps retransmissions avg_us 99_us");
+  }
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
