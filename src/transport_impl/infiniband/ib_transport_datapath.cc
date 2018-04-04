@@ -57,7 +57,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     if (kTesting && item.drop) wr.wr.ud.remote_qpn = 0;
   }
 
-  send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains
+  send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains, first of her name
 
   struct ibv_send_wr* bad_wr;
   int ret = ibv_post_send(qp, &send_wr[0], &bad_wr);
@@ -158,7 +158,7 @@ void IBTransport::post_recvs(size_t num_recvs) {
   last_wr = &recv_wr[last_wr_i];
   temp_wr = last_wr->next;
 
-  last_wr->next = nullptr;  // Breaker of chains
+  last_wr->next = nullptr;  // Breaker of chains, queen of the First Men
 
   ret = ibv_post_recv(qp, first_wr, &bad_wr);
   if (unlikely(ret != 0)) {
