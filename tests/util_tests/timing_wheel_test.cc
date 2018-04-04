@@ -45,7 +45,9 @@ TEST(TimingWheelTest, Basic) {
   ASSERT_EQ(wheel.ready_queue.size(), 0);
 
   // One entry. Check that it's eventually sent.
-  wheel.insert(dummy_ent, rdtsc(), rdtsc() + wheel.wslot_width_tsc);
+  size_t ref_tsc = rdtsc();
+  size_t abs_tx_tsc = ref_tsc + wheel.wslot_width_tsc;
+  wheel.insert(dummy_ent, ref_tsc, abs_tx_tsc);
 
   while (true) {
     wheel.reap(rdtsc());
@@ -79,14 +81,15 @@ TEST(TimingWheelTest, RateTest) {
 
     // Update the wheel and start measurement
     wheel.catchup();
-
     rate_timer.start();
 
-    // Send one window
     size_t abs_tx_tsc = rdtsc();  // TX tsc for this session
+
+    // Send one window
+    size_t ref_tsc = rdtsc();
     for (size_t i = 0; i < kSessionCredits; i++) {
-      wheel.insert(dummy_ent, rdtsc(), abs_tx_tsc);
-      abs_tx_tsc += cycles_per_pkt;
+      abs_tx_tsc = std::max(ref_tsc, abs_tx_tsc + cycles_per_pkt);
+      wheel.insert(dummy_ent, ref_tsc, abs_tx_tsc);
     }
 
     size_t num_pkts_sent = 0;
@@ -100,11 +103,13 @@ TEST(TimingWheelTest, RateTest) {
       if (num_ready > 0) {
         num_pkts_sent += num_ready;
 
+        for (size_t i = 0; i < num_ready; i++) wheel.ready_queue.pop();
+
         // Send more packets
+        ref_tsc = rdtsc();
         for (size_t i = 0; i < num_ready; i++) {
-          wheel.insert(dummy_ent, rdtsc(), abs_tx_tsc);
-          abs_tx_tsc += cycles_per_pkt;
-          wheel.ready_queue.pop();
+          abs_tx_tsc = std::max(ref_tsc, abs_tx_tsc + cycles_per_pkt);
+          wheel.insert(dummy_ent, ref_tsc, abs_tx_tsc);
         }
       }
     }

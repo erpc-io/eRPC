@@ -142,16 +142,17 @@ class TimingWheel {
    * prior entries in the current wheel slot that have not been reaped.
    *
    * @param ent The wheel entry to add
-   * @param _rdtsc A timestamp taken in the recent past
+   * @param ref_tsc A recent timestamp that was used to compute \p abs_tx_tsc
+   * using the sending rate.
    * @param abs_tx_tsc The desired absolute timestamp for packet transmission
    */
-  inline void insert(const wheel_ent_t &ent, size_t _rdtsc, size_t abs_tx_tsc) {
-    assert(abs_tx_tsc >= _rdtsc);
-    assert(abs_tx_tsc - _rdtsc <= horizon_tsc);  // Horizon definition
+  inline void insert(const wheel_ent_t &ent, size_t ref_tsc,
+                     size_t abs_tx_tsc) {
+    assert(abs_tx_tsc >= ref_tsc);
+    assert(abs_tx_tsc - ref_tsc <= horizon_tsc);  // Horizon definition
 
-    // Advance the wheel to the current time
-    reap(_rdtsc);
-    assert(wheel[cur_wslot].tx_tsc > _rdtsc);
+    reap(ref_tsc);  // Advance the wheel to a recent time
+    assert(wheel[cur_wslot].tx_tsc > ref_tsc);
 
     size_t dst_wslot;
     if (abs_tx_tsc <= wheel[cur_wslot].tx_tsc) {
