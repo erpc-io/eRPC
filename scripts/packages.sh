@@ -10,7 +10,7 @@
 ###
 
 sudo apt-get update
-sudo apt-get -y install cmake libnuma-dev libpapi-dev numactl bc \
+sudo apt-get -y install cmake libnuma-dev numactl bc \
   libgflags-dev libboost-date-time-dev
 
 # GTest is special for some reason

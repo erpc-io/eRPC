@@ -6,7 +6,6 @@
 #define APPS_COMMON_H
 
 #include <gflags/gflags.h>
-#include <papi.h>
 #include <boost/algorithm/string.hpp>
 #include <fstream>
 #include "rpc.h"
@@ -46,26 +45,6 @@ std::vector<size_t> flags_get_numa_ports(size_t numa_node) {
   }
 
   return ret;
-}
-
-//
-// PAPI
-//
-
-// This returns an int instead of throwing an error becuase I can't get PAPI to
-// work on Ubuntu 17.04
-int papi_init() {
-  float real_time, proc_time, ipc;
-  long long ins;
-  return PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-}
-
-float papi_get_ipc() {
-  float real_time, proc_time, ipc;
-  long long ins;
-  int ret = PAPI_ipc(&real_time, &proc_time, &ins, &ipc);
-  if (ret < PAPI_OK) throw std::runtime_error("PAPI measurement failed.");
-  return ipc;
 }
 
 // A basic mempool for preallocated objects of type T. eRPC has a faster,
