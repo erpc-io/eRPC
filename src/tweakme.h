@@ -14,9 +14,10 @@ class IBTransport;
 class RawTransport;
 
 // Congestion control
-#define ENABLE_CC false
+#define ENABLE_CC true
 
 #if ENABLE_CC
+// Congestion control without optimizations
 static constexpr bool kCcRTT = true;       ///< Measure per-packet RTT
 static constexpr bool kCcRateComp = true;  ///< Perform rate updates
 static constexpr bool kCcPacing = true;    ///< Do packet pacing
