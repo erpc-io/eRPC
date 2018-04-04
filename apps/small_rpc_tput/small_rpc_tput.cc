@@ -317,7 +317,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
 
   while (c.num_sm_resps != c.session_num_vec.size()) {
     rpc.run_event_loop(200);  // 200 milliseconds
-    if (ctrl_c_pressed == 1) return;
+    if (unlikely(ctrl_c_pressed == 1)) return;
   }
 
   fprintf(stderr,

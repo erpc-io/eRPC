@@ -107,53 +107,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_rx_bytes_tot += FLAGS_resp_size;
   c->rpc->release_response(resp_handle);
 
-  // Print twice every second
-  double ns = erpc::ns_since(c->tput_t0);
-  if (ns >= 500000000) {
-    std::sort(c->latency_vec.begin(), c->latency_vec.end());
-    double latency_sum = 0.0;
-    for (double sample : c->latency_vec) latency_sum += sample;
-
-    auto &stats = c->app_stats[c->thread_id];
-    stats.rx_gbps = c->stat_rx_bytes_tot * 8 / ns;
-    stats.tx_gbps = c->stat_tx_bytes_tot * 8 / ns;
-    stats.retransmissions =
-        c->rpc->get_num_retransmissions(c->session_num_vec[0]);
-    stats.avg_us = latency_sum / c->latency_vec.size();
-    stats._99_us = c->latency_vec.at(c->latency_vec.size() * 0.99);
-
-    // Reset stats for next iteration
-    c->stat_rx_bytes_tot = 0;
-    c->stat_tx_bytes_tot = 0;
-    c->rpc->reset_num_retransmissions(c->session_num_vec[0]);
-    c->latency_vec.clear();
-
-    erpc::Timely *timely_0 = c->rpc->get_timely(0);
-
-    printf(
-        "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps, "
-        "latency {%.1f, %.1f}, transfer {RX %.1f, TX %.1f} MB, "
-        "Session 0: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. Credits %zu/best 32.\n",
-        c->thread_id, stats.rx_gbps, stats.tx_gbps, stats.avg_us, stats._99_us,
-        c->stat_rx_bytes_tot / 1000000.0, c->stat_tx_bytes_tot / 1000000.0,
-        timely_0->get_rtt_perc(.5), timely_0->get_rtt_perc(.9),
-        timely_0->get_rtt_perc(.99), timely_0->get_rate_gbps(),
-        erpc::kSessionCredits);
-
-    timely_0->reset_rtt_stats();
-
-    // Stats: rx_gbps tx_gbps avg_us 99_us
-    if (c->thread_id == 0) {
-      app_stats_t accum_stats;
-      for (size_t i = 0; i < FLAGS_num_proc_other_threads; i++) {
-        accum_stats += c->app_stats[i];
-      }
-      c->tmp_stat->write(accum_stats.to_string());
-    }
-
-    clock_gettime(CLOCK_REALTIME, &c->tput_t0);
-  }
-
   // Create a new request clocking this response, and put in request queue
   if (kAppClientMemsetReq) {
     memset(c->req_msgbuf[msgbuf_idx].buf, kAppDataByte, FLAGS_req_size);
@@ -170,7 +123,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   c.thread_id = thread_id;
   c.app_stats = app_stats;
   if (thread_id == 0) {
-    c.tmp_stat = new TmpStat("rx_gbps tx_gbps retransmissions avg_us 99_us");
+    c.tmp_stat = new TmpStat("rx_gbps tx_gbps re_tx avg_us 99_us");
   }
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
@@ -209,9 +162,55 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     }
   }
 
+  clock_gettime(CLOCK_REALTIME, &c.tput_t0);
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(1000);  // 1 second
-    if (ctrl_c_pressed == 1) break;
+    if (unlikely(ctrl_c_pressed == 1)) break;
+    if (c.session_num_vec.size() == 0) continue;  // No stats to print
+
+    double ns = erpc::ns_since(c.tput_t0);  // Don't rely on event loop's 1 sec
+
+    std::sort(c.latency_vec.begin(), c.latency_vec.end());
+    double latency_sum = 0.0;
+    for (double sample : c.latency_vec) latency_sum += sample;
+
+    // Publish stats
+    auto &stats = c.app_stats[c.thread_id];
+    stats.rx_gbps = c.stat_rx_bytes_tot * 8 / ns;
+    stats.tx_gbps = c.stat_tx_bytes_tot * 8 / ns;
+    stats.re_tx = c.rpc->get_num_retransmissions(c.session_num_vec[0]);
+    stats.avg_us = latency_sum / c.latency_vec.size();
+    stats._99_us = c.latency_vec.at(c.latency_vec.size() * 0.99);
+
+    // Reset stats for next iteration
+    c.stat_rx_bytes_tot = 0;
+    c.stat_tx_bytes_tot = 0;
+    c.rpc->reset_num_retransmissions(c.session_num_vec[0]);
+    c.latency_vec.clear();
+
+    erpc::Timely *timely_0 = c.rpc->get_timely(0);
+
+    printf(
+        "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps. "
+        "Retransmissions %zu. Latency {%.1f, %.1f}. "
+        "Session 0 Timely: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. "
+        "Credits %zu (best = 32).\n",
+        c.thread_id, stats.rx_gbps, stats.tx_gbps, stats.re_tx, stats.avg_us,
+        stats._99_us, timely_0->get_rtt_perc(.5), timely_0->get_rtt_perc(.9),
+        timely_0->get_rtt_perc(.99), timely_0->get_rate_gbps(),
+        erpc::kSessionCredits);
+
+    timely_0->reset_rtt_stats();
+
+    if (c.thread_id == 0) {
+      app_stats_t accum_stats;
+      for (size_t i = 0; i < FLAGS_num_proc_other_threads; i++) {
+        accum_stats += c.app_stats[i];
+      }
+      c.tmp_stat->write(accum_stats.to_string());
+    }
+
+    clock_gettime(CLOCK_REALTIME, &c.tput_t0);
   }
 
   erpc::TimingWheel *wheel = rpc.get_wheel();
