@@ -58,7 +58,7 @@ for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
   # Ignore files with less than 8 lines. This takes care of empty files.
   lines_in_file=`cat $filename | wc -l`
   if [ $lines_in_file -le 8 ]; then
-    blue "proc-out: Ignoring $filename. Too short ($lines_in_file lines), 12 required."
+    blue "proc-out: Ignoring $filename. $lines_in_file lines), 8 required."
     ((ignored_files+=1))
     continue;
   fi

@@ -25,14 +25,4 @@ while [ $process_idx -lt $autorun_num_processes ]; do
 done
 
 wait
-echo "proc-err: Finished fetching files."
-
-for ((process_idx = 0; process_idx < $autorun_num_processes; process_idx++)); do
-  echo ""
-  echo "======================================================================="
-  echo "Process $process_idx out:"
-  cat $tmpdir/out-$process_idx
-
-  echo "Process $process_idx err:"
-  cat $tmpdir/err-$process_idx
-done
+echo "proc-err: Finished fetching files to $tmpdir/out-X and $tmpdir/err-X"

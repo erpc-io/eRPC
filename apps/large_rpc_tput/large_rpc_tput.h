@@ -61,7 +61,7 @@ class AppContext : public BasicAppContext {
  public:
   // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
   // >10 ms for 8MB RPCs under congestion. So erpc::Latency doesn't work here.
-  std::vector<double> latency_vec;
+  std::vector<double> lat_vec;
 
   struct timespec tput_t0;  // Start time for throughput measurement
   app_stats_t* app_stats;   // Common stats array for all threads

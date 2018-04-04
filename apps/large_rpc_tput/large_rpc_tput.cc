@@ -20,6 +20,7 @@
 #include "profile_victim.h"
 #include "util/autorun_helpers.h"
 
+static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;
 
 // Experiment control flags
@@ -87,7 +88,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   auto *c = static_cast<AppContext *>(_context);
   double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
-  c->latency_vec.push_back(usec);
+  c->lat_vec.push_back(usec);
 
   // Check the response
   erpc::rt_assert(resp_msgbuf->get_data_size() == FLAGS_resp_size,
@@ -163,30 +164,34 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   }
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
-  for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
-    rpc.run_event_loop(1000);  // 1 second
+  for (size_t i = 0; i < FLAGS_test_ms; i += kAppEvLoopMs) {
+    rpc.run_event_loop(kAppEvLoopMs);
     if (unlikely(ctrl_c_pressed == 1)) break;
     if (c.session_num_vec.size() == 0) continue;  // No stats to print
 
-    double ns = erpc::ns_since(c.tput_t0);  // Don't rely on event loop's 1 sec
-
-    std::sort(c.latency_vec.begin(), c.latency_vec.end());
-    double latency_sum = 0.0;
-    for (double sample : c.latency_vec) latency_sum += sample;
+    double ns = erpc::ns_since(c.tput_t0);  // Don't rely on kAppEvLoopMs
 
     // Publish stats
     auto &stats = c.app_stats[c.thread_id];
     stats.rx_gbps = c.stat_rx_bytes_tot * 8 / ns;
     stats.tx_gbps = c.stat_tx_bytes_tot * 8 / ns;
     stats.re_tx = c.rpc->get_num_retransmissions(c.session_num_vec[0]);
-    stats.avg_us = latency_sum / c.latency_vec.size();
-    stats._99_us = c.latency_vec.at(c.latency_vec.size() * 0.99);
+    if (c.lat_vec.size() > 0) {
+      std::sort(c.lat_vec.begin(), c.lat_vec.end());
+      double lat_sum = std::accumulate(c.lat_vec.begin(), c.lat_vec.end(), 0.0);
+      stats.avg_us = lat_sum / c.lat_vec.size();
+      stats._99_us = c.lat_vec[c.lat_vec.size() * 0.99];
+    } else {
+      // Even if no RPCs completed, we need retransmission counter
+      stats.avg_us = kAppEvLoopMs * 1000;
+      stats._99_us = kAppEvLoopMs * 1000;
+    }
 
     // Reset stats for next iteration
     c.stat_rx_bytes_tot = 0;
     c.stat_tx_bytes_tot = 0;
     c.rpc->reset_num_retransmissions(c.session_num_vec[0]);
-    c.latency_vec.clear();
+    c.lat_vec.clear();
 
     erpc::Timely *timely_0 = c.rpc->get_timely(0);
 
