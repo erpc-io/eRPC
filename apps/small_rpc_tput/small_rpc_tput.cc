@@ -257,7 +257,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
       c->tmp_stat->write(std::to_string(tot_tput_mrps));
     }
 
-    c->rpc->reset_dpath_stats_st();
     c->stat_resp_rx_tot = 0;
     c->stat_req_rx_tot = 0;
     c->latency.reset();

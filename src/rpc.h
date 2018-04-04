@@ -647,16 +647,6 @@ class Rpc {
   void pkt_loss_retransmit_st(SSlot *sslot);
 
   //
-  // Stats functions
-  //
- public:
-  /// Reset all datapath stats
-  void reset_dpath_stats_st() {
-    assert(in_dispatch());
-    memset(&dpath_stats, 0, sizeof(dpath_stats));
-  }
-
-  //
   // Misc public functions
   //
 
@@ -808,7 +798,7 @@ class Rpc {
   /// happens when the server RPC thread has not started.
   bool retry_connect_on_invalid_rpc_id = false;
 
-  // Datapath stats
+  /// Datapath stats that can be disabled
   struct {
     size_t ev_loop_calls = 0;
     size_t pkts_tx = 0;
@@ -816,6 +806,11 @@ class Rpc {
     size_t pkts_rx = 0;
     size_t rx_burst_calls = 0;
   } dpath_stats;
+
+  /// Less frequent stats that are always enabled
+  struct {
+    size_t retransmissions = 0;
+  } slow_stats;
 
  private:
   // Constructor args

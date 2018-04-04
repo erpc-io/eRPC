@@ -192,7 +192,6 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     c->latency_vec.clear();
     c->stat_rx_bytes_tot = 0;
     c->stat_tx_bytes_tot = 0;
-    c->rpc->reset_dpath_stats_st();
 
     clock_gettime(CLOCK_REALTIME, &c->tput_t0);
   }
