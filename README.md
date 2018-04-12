@@ -1,12 +1,12 @@
 eRPC is a fast and general-purpose RPC library for kernel-bypass fabrics.
 Some highlights:
+ * Multiple supported fabrics: UDP (PFC is recommended), InfiniBand, and RoCE
  * Small RPC rate: 10 million RPCs/second per CPU core
  * Low latency: 2.5 microseconds round-trip RPC latency
  * Large RPC bandwidth: 40 Gbps transfer per CPU core
  * Scalability: 12000 or more RPC sessions per server
  * End-to-end congestion control
  * Nested RPCs, and long-running background RPCs
- * Support for UDP (PFC is recommended), InfiniBand, and RoCE
  * A port of [Raft](https://github.com/willemt/raft) as an example, with
    5.3 microseconds of client-measured latency
 
