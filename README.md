@@ -2,7 +2,8 @@ eRPC is a fast and general-purpose RPC library for lossless, kernel-bypass
 fabrics.
 
 ## Requirements
- * A C++11 compiler. clang and gcc have been tested.
+ * A C++11 compiler, specified in `CMakeLists.txt`. clang and gcc have been
+   tested.
  * See `scripts/packages.sh` for a list of required software packages.
  * A machine with any InfiniBand NIC, or Mellanox Ethernet NICs (ConnectX-4 or
    newer). Non-Mellanox Ethernet NICs, and Mellanox NICs older than ConnectX-4
@@ -38,6 +39,7 @@ fabrics.
 
 ## eRPC quickstart
  * Build and run the test suite: `cmake . -DPERF=OFF; make -j; sudo ctest`.
+ * Generate the documentation: `doxygen`
  * Running the hello world application in `apps/hello`:
    * Compile the eRPC library using CMake.
    * This application requires two machines. Set `kServerHostname` and
