@@ -14,20 +14,23 @@ Some highlights:
  * A C++11 compiler, specified in `CMakeLists.txt`. clang and gcc have been
    tested.
  * See `scripts/packages.sh` for a list of required software packages.
+ * Unlimited SHM limits, and at least 2048 huge pages on every NUMA node.
  * Supported NICs:
    * UDP over Ethernet mode: ConnectX-4 or newer Mellanox Ethernet NICs.
      Non-Mellanox NICs are not supported. ConnectX-3 and older Mellanox NICs are
      supported in eRPC's RoCE mode. PRs for unsupported NICs are welcome.
-   * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
-     optimized for eRPC are available in the `drivers` directory, but they are
-     primarily for expert use.
-   * Upstream drivers work as well. This requires installing the `ibverbs` and
-     `mlx4` userspace packages, and enabling the `mlx4_ib` and `ib_uverbs`
-     kernel drivers. On Ubuntu, the incantation is:
-      * `apt install libmlx4-dev libibverbs-dev`
-      * `modprobe mlx4_ib ib_uverbs`
-   * For Connect-IB and newer NICs, use `mlx4` by `mlx5`.
- * Unlimited SHM limits, and at least 2048 huge pages on every NUMA node.
+   * InfiniBand mode: Any InfiniBand-compliant NICs
+   * RoCE mode: Any RoCE-compilant NICs
+   * Mellanox NIC drivers:
+     * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
+       optimized for eRPC are available in the `drivers` directory, but they are
+       primarily for expert use.
+     * Upstream drivers work as well. This requires installing the `ibverbs` and
+       `mlx4` userspace packages, and enabling the `mlx4_ib` and `ib_uverbs`
+       kernel drivers. On Ubuntu, the incantation is:
+        * `apt install libmlx4-dev libibverbs-dev`
+        * `modprobe mlx4_ib ib_uverbs`
+     * For Connect-IB and newer NICs, use `mlx4` by `mlx5`.
 
 ## eRPC configuration
  * `src/tweakme.h` defines parameters that govern eRPC's behavior.
