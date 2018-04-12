@@ -1,11 +1,15 @@
+eRPC is a fast and general-purpose RPC library for lossless, kernel-bypass
+fabrics.
+
 ## Requirements
  * A C++11 compiler. clang and gcc have been tested.
  * See `scripts/packages.sh` for a list of required software packages.
  * A machine with any InfiniBand NIC, or Mellanox Ethernet NICs (ConnectX-4 or
    newer). Non-Mellanox Ethernet NICs, and Mellanox NICs older than ConnectX-4
-   are not supported currently. PRs for these NICs are welcome.
-   * It's best to use drivers from Mellanox OFED. Optimized Mellanox drivers for
-     eRPC are available in the `drivers` directory, but they are for expert use.
+   are not supported currently - PRs for these NICs are welcome.
+   * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
+     optimized for eRPC are available in the `drivers` directory, but they are
+     primarily for expert use.
    * Upstream drivers work as well. This requires installing the `ibverbs` and
      `mlx4` userspace packages, and enabling the `mlx4_ib` and `ib_uverbs`
      kernel drivers. On Ubuntu, the incantation is:
@@ -18,7 +22,7 @@
  * `src/tweakme.h` defines parameters that govern eRPC's behavior.
    * `CTransport` defines which fabric transport eRPC is compiled for. It can
       be set to `IBTransport` for InfiniBand, or `RawTransport` for Mellanox's
-      "Raw" Ethernet transport. `kHeadroom` must be set correspondingly.
+      "Raw" Ethernet transport. `kHeadroom` must be set accordingly.
    * Parameters with the `kCc` prefix govern eRPC's congestion control behavior.
  * Since compilation is slow, the CMake build compiles only one application,
    defined by the contents of `scripts/autorun_app_file`. This file should
@@ -35,7 +39,7 @@
 ## eRPC quickstart
  * Build and run the test suite: `cmake . -DPERF=OFF; make -j; sudo ctest`.
  * Running the hello world application in `apps/hello`:
-   * First compile the eRPC library using CMake.
+   * Compile the eRPC library using CMake.
    * This application requires two machines. Set `kServerHostname` and
      `kClientHostname` to the IP addresses of your machines.
    * Build the application using `make`.
@@ -163,7 +167,6 @@ Anuj Kalia (akalia@cs.cmu.edu)
  * Optimizations for `small_rpc_tput`:
    * Each of these optimizations can help a fair bit (5-10%) individually, but
      the benefits do not stack.
-   * Set optlevel to extreme.
    * Disable datapath checks and datapath stats.
    * Use O2 intead of O3. Try profile-guided optimization.
    * Use power-of-two number of sessions and avoid Lemire's trick in app.
@@ -174,6 +177,9 @@ Anuj Kalia (akalia@cs.cmu.edu)
 
 ## Short-term TODOs
  * Use TX flush on client-side retransmission
+ * For RawTransport:
+   * Test `kDumb` with default OFED driver.
+   * Don't hardcode `kFastRecv`. Use `use_fast_recv` similar to IBTransport.
  * Destroy session test fails with `kSessionCredits = 1`, `kSessionReqWindow = 1`
  * in `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
  * Make a list of functions allowed in request and continuation handler. For
