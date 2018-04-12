@@ -12,6 +12,8 @@
 
 namespace erpc {
 
+/// A per-process object that manages the background threads, the session
+/// management thread, and request handler registration.
 class Nexus {
  public:
   static constexpr size_t kNexusSmThreadCore = 15;  /// CPU core for SM thread
