@@ -1,6 +1,5 @@
 eRPC is a fast and general-purpose RPC library for kernel-bypass fabrics.
-
-eRPC provides both high performance and general-purpose features:
+Some highlights:
  * Small RPC rate: 10 million RPCs/second per CPU core
  * Low latency: 2.5 microseconds round-trip RPC latency
  * Large RPC bandwidth: 40 Gbps transfer per CPU core
