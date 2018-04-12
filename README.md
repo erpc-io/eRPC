@@ -45,9 +45,9 @@ Some highlights:
    contain the name of a directory in `apps` (e.g., `small_rpc_tput`).
  * The URIs of eRPC processes in the cluster are specified in
    `scripts/autorun_process_file`. Each line in this file must be
-   `<hostname> <management udp port> <numa_node>`. We allow running one eRPC
-   process per NUMA node. See `scripts/gen_autorun_process_file.sh` for how
-   to generate this file.
+   `<hostname> <management udp port> <numa_node>`. One eRPC process is allowed
+   per NUMA node. See `scripts/gen_autorun_process_file.sh` for how to generate
+   this file.
  * Each application directory in `apps` (except `hello`) contains a config file
    that must contain the flags defined in `apps/apps_common.h`. In addition, it
    may contain any application-specific flags.
@@ -63,7 +63,7 @@ Some highlights:
    * Run `./server` at the server, and `./client` at the client.
 
 ## Running the applications
- * We provide a suite of benchmarks in the `apps` directory.
+ * The `apps` directory contains a suite of benchmarks and examples.
  * To build an application, change the contents of `scripts/autorun_app_file`
    to one of the available applications. Then generate a Makefile using
    `cmake . -DPERF=ON/OFF`
