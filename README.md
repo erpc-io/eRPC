@@ -5,7 +5,7 @@ fabrics.
  * A C++11 compiler, specified in `CMakeLists.txt`. clang and gcc have been
    tested.
  * See `scripts/packages.sh` for a list of required software packages.
- * A machine with any InfiniBand NIC, or Mellanox Ethernet NICs (ConnectX-4 or
+ * Machines with any InfiniBand NIC, or Mellanox Ethernet NICs (ConnectX-4 or
    newer). Non-Mellanox Ethernet NICs, and Mellanox NICs older than ConnectX-4
    are not supported currently - PRs for these NICs are welcome.
    * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
@@ -16,7 +16,7 @@ fabrics.
      kernel drivers. On Ubuntu, the incantation is:
       * `apt install libmlx4-dev libibverbs-dev`
       * `modprobe mlx4_ib ib_uverbs`
-   * For Connect-IB and newer NICs, use `mlx4` by `mlx5`
+   * For Connect-IB and newer NICs, use `mlx4` by `mlx5`.
  * Unlimited SHM limits, and at least 2048 huge pages on every NUMA node.
 
 ## eRPC configuration
