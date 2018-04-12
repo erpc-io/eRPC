@@ -28,12 +28,21 @@
    `<hostname> <management udp port> <numa_node>`. We allow running one eRPC
    process per NUMA node. See `scripts/gen_autorun_process_file.sh` for how
    to generate this file.
- * Each application directory in `apps` contains a config file that must contain
-   the flags defined in `apps/apps_common.h`. In addition, it may contain any
-   application-specific flags.
+ * Each application directory in `apps` (except `hello`) contains a config file
+   that must contain the flags defined in `apps/apps_common.h`. In addition, it
+   may contain any application-specific flags.
 
 ## eRPC quickstart
  * Build and run the test suite: `cmake . -DPERF=OFF; make -j; sudo ctest`.
+ * Running the hello world application in `apps/hello`:
+   * First compile the eRPC library using CMake.
+   * This application requires two machines. Set `kServerHostname` and
+     `kClientHostname` to the IP addresses of your machines.
+   * Build the application using `make`.
+   * Run `./server` at the server, and `./client` at the client.
+
+## Running the applications
+ * We provide a suite of benchmarks in the `apps` directory.
  * To build an application, change the contents of `scripts/autorun_app_file`
    to one of the available applications. Then generate a Makefile using
    `cmake . -DPERF=ON/OFF`
@@ -44,9 +53,31 @@
      Run `scripts/do.sh <i> 0` on machine `i` in `{0, ..., num_processes - 1}`.
    * With dual-CPU machines: `num_machines = ceil(num_processes / 2)` machines
      are needed. Run `scripts/do.sh <i> <i % 2>` on machine i in
-     `{0, ..., num_machines}`.
+     `{0, ..., num_machines - 1}`.
  * To automatically run an app, use `scripts/run-all.sh`. Application
    statistics generated in a run can be analysed using `scripts/proc-out.sh`.
+
+## Getting help
+ * GitHub issues are preferred over email.
+
+## Contact
+Anuj Kalia (akalia@cs.cmu.edu)
+
+## License
+		Copyright 2018, Carnegie Mellon University
+
+        Licensed under the Apache License, Version 2.0 (the "License");
+        you may not use this file except in compliance with the License.
+        You may obtain a copy of the License at
+
+            http://www.apache.org/licenses/LICENSE-2.0
+
+        Unless required by applicable law or agreed to in writing, software
+        distributed under the License is distributed on an "AS IS" BASIS,
+        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+        See the License for the specific language governing permissions and
+        limitations under the License.
+
 
 ## Code notes
  * The packet number carried in packet headers may not match the packet's index
