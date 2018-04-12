@@ -14,9 +14,10 @@ Some highlights:
  * A C++11 compiler, specified in `CMakeLists.txt`. clang and gcc have been
    tested.
  * See `scripts/packages.sh` for a list of required software packages.
- * Machines with any InfiniBand NIC, or Mellanox Ethernet NICs (ConnectX-4 or
-   newer). Non-Mellanox Ethernet NICs, and Mellanox NICs older than ConnectX-4
-   are not supported currently - PRs for these NICs are welcome.
+ * Supported NICs:
+   * UDP over Ethernet mode: ConnectX-4 or newer Mellanox Ethernet NICs.
+     Non-Mellanox NICs are not supported. ConnectX-3 and older Mellanox NICs are
+     supported in eRPC's RoCE mode. PRs for unsupported NICs are welcome.
    * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
      optimized for eRPC are available in the `drivers` directory, but they are
      primarily for expert use.
