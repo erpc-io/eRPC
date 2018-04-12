@@ -16,9 +16,11 @@ Some highlights:
  * See `scripts/packages.sh` for a list of required software packages.
  * Unlimited SHM limits, and at least 2048 huge pages on every NUMA node.
  * Supported NICs:
-   * UDP over Ethernet mode: ConnectX-4 or newer Mellanox Ethernet NICs.
-     Non-Mellanox NICs are not supported. ConnectX-3 and older Mellanox NICs are
-     supported in eRPC's RoCE mode. PRs for unsupported NICs are welcome.
+   * UDP over Ethernet mode:
+     * ConnectX-4 or newer Mellanox Ethernet NICs. Non-Mellanox Ethernet NICs
+       are not supported.
+     * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode.
+     * PRs for unsupported NICs (e.g., via DPDK) are welcome.
    * InfiniBand mode: Any InfiniBand-compliant NICs
    * RoCE mode: Any RoCE-compilant NICs
    * Mellanox NIC drivers:
