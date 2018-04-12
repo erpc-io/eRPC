@@ -30,6 +30,7 @@ struct timely_record_t {
   }
 };
 
+/// Implementation of the Timely congestion control protocol from SIGCOMM 15
 class Timely {
  public:
   // Debugging
@@ -79,7 +80,7 @@ class Timely {
     if (kRecord) record_vec.reserve(1000000);
   }
 
-  // The w(g) function from ECN-vs-delay
+  /// The w() function from the ECN-vs-delay paper by Zhu et al. (CoNEXT 16)
   static double w_func(double g) {
     assert(kPatched);
     if (g <= -0.25) return 0;

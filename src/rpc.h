@@ -145,6 +145,7 @@ class Rpc {
     return ret;
   }
 
+ private:
   // Methods to bury server-side request and response MsgBuffers. Client-side
   // request and response MsgBuffers are owned by user apps, so eRPC doesn't
   // free their backing memory.
@@ -559,13 +560,6 @@ class Rpc {
   //
   // rpc_rx.cc
   //
-
- public:
-  /// Check an RX MsgBuffer submitted to a background thread. It should be
-  /// valid, dynamic, and the \p is_req field should match. This holds for
-  /// both background request handlers and continuations.
-  static void debug_check_bg_rx_msgbuf(SSlot *sslot,
-                                       Nexus::BgWorkItemType wi_type);
 
  private:
   /// Return a credit to this session
