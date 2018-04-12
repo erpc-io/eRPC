@@ -183,12 +183,14 @@ Anuj Kalia (akalia@cs.cmu.edu)
    * Test `kDumb` with default OFED driver.
    * Don't hardcode `kFastRecv`. Use `use_fast_recv` similar to IBTransport.
  * Destroy session test fails with `kSessionCredits = 1`, `kSessionReqWindow = 1`
- * in `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
+ * Session reset and machine failure detection broke when I changed session
+   management to use UDP instead of ENet.
+ * In `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
  * Make a list of functions allowed in request and continuation handler. For
    example, `run_ev_loop()` and `delete rpc` are not allowed, and eRPC does not
    guard against these errors.
  * Make apps use BasicAppContext and `basic_sm_handler`.
- * Use `rt_assert` in src and apps
+ * Use `rt_assert` in src and apps.
  * In IBTransport, check if MLX environment vars are set. Do it in constructor.
  * RFR sending needs to be paced, so we cannot use `send_rfr_now`.
  * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
