@@ -22,7 +22,10 @@ typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
                                  size_t tag);
 
 /// The request handler types
-enum class ReqFuncType : uint8_t { kForeground, kBackground };
+enum class ReqFuncType : uint8_t {
+  kForeground,  ///< Request handler runs in foreground (network I/O) thread
+  kBackground   ///< Request handler runs in a background thread
+};
 
 /// The application-specified eRPC request handler
 class ReqFunc {

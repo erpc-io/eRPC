@@ -30,8 +30,8 @@ static constexpr uint16_t kInvalidSessionNum = UINT16_MAX;
 typedef size_t conn_req_uniq_token_t;
 
 enum class SessionState {
-  kConnectInProgress,  ///< Client-only state, connect request is in flight
-  kConnected,
+  kConnectInProgress,     ///< Client-only state, connect request is in flight
+  kConnected,             ///< Session is successfully connected
   kDisconnectInProgress,  ///< Client-only state, disconnect req is in flight
   kResetInProgress,       ///< A session reset is in progress
 };
@@ -52,8 +52,8 @@ enum class SmErrType : int {
   kRingExhausted,    ///< Connect req failed because server is out of ring bufs
   kOutOfMemory,      ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
-  kInvalidRemoteRpcId,
-  kInvalidTransport
+  kInvalidRemoteRpcId,  ///< Connect req failed because remote RPC ID was wrong
+  kInvalidTransport     ///< Connect req failed because of transport mismatch
 };
 
 /// Events generated for application-level session management handler

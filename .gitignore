@@ -53,6 +53,10 @@ CTestTestfile.cmake
 # Mac
 .DS_Store
 
+# Doxygen
+html
+latex
+
 # Common temp files
 ibnet_out
 scripts/autorun_process_file
