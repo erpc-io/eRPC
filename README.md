@@ -1,5 +1,15 @@
-eRPC is a fast and general-purpose RPC library for lossless, kernel-bypass
-fabrics.
+eRPC is a fast and general-purpose RPC library for kernel-bypass fabrics.
+
+eRPC provides both high performance and general-purpose features:
+ * Small RPC rate: 10 million RPCs/second per CPU core
+ * Low latency: 2.5 microseconds round-trip RPC latency
+ * Large RPC bandwidth: 40 Gbps transfer per CPU core
+ * Scalability: 12000 or more RPC sessions per server
+ * End-to-end congestion control
+ * Nested RPCs, and long-running background RPCs
+ * Support for UDP (PFC is recommended), InfiniBand, or RoCE
+ * A port of [Raft](https://github.com/willemt/raft) as an example, with
+   5.3 microseconds of client-measured latency.
 
 ## Requirements
  * A C++11 compiler, specified in `CMakeLists.txt`. clang and gcc have been
