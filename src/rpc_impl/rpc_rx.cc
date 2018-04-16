@@ -23,8 +23,6 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
     uint16_t session_num = pkthdr->dest_session_num;  // The local session
-    assert(session_num < session_vec.size());
-
     Session *session = session_vec[session_num];
     if (unlikely(session == nullptr)) {
       LOG_WARN(
@@ -50,30 +48,27 @@ void Rpc<TTr>::process_comps_st() {
     size_t sslot_i = pkthdr->req_num % kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
-    // Process control packets
-    if (pkthdr->msg_size == 0) {
-      assert(pkthdr->is_req_for_resp() || pkthdr->is_expl_cr());
-      pkthdr->is_req_for_resp()
-          ? process_req_for_resp_st(sslot, pkthdr)
-          : process_expl_cr_st(sslot, pkthdr,
-                               kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc());
-      continue;
-    }
-
-    // If we're here, this is a data packet
-    assert(pkthdr->is_req() || pkthdr->is_resp());
-
-    if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
-      assert(pkthdr->pkt_num == 0);
-      pkthdr->is_req()
-          ? process_small_req_st(sslot, pkthdr)
-          : process_small_resp_st(
-                sslot, pkthdr, kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc());
-    } else {
-      pkthdr->is_req()
-          ? process_large_req_one_st(sslot, pkthdr)
-          : process_large_resp_one_st(
-                sslot, pkthdr, kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc());
+    switch (pkthdr->pkt_type) {
+      case PktType::kPktTypeReq:
+        pkthdr->msg_size <= TTr::kMaxDataPerPkt
+            ? process_small_req_st(sslot, pkthdr)
+            : process_large_req_one_st(sslot, pkthdr);
+        break;
+      case PktType::kPktTypeResp: {
+        size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
+        pkthdr->msg_size <= TTr::kMaxDataPerPkt
+            ? process_small_resp_st(sslot, pkthdr, rx_tsc)
+            : process_large_resp_one_st(sslot, pkthdr, rx_tsc);
+        break;
+      }
+      case PktType::kPktTypeReqForResp:
+        process_req_for_resp_st(sslot, pkthdr);
+        break;
+      case PktType::kPktTypeExplCR: {
+        size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
+        process_expl_cr_st(sslot, pkthdr, rx_tsc);
+        break;
+      }
     }
   }
 
