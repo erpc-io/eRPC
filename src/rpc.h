@@ -689,6 +689,11 @@ class Rpc {
     return TTr::kNumRxRingEntries;
   }
 
+  /// Return the maximum number of sessions supported
+  static inline constexpr size_t get_max_num_sessions() {
+    return Transport::kNumRxRingEntries / kSessionCredits;
+  }
+
   /// Return the maximum message *data* size that can be sent
   static inline size_t get_max_msg_size() { return kMaxMsgSize; }
 

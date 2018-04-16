@@ -39,7 +39,7 @@ set(COMPILE_ERPC_LIB ON)
 option(PERF "Compile for performance" OFF)
 set(TRANSPORT "infiniband" CACHE STRING "Datapath transport (infiniband/roce/raw)")
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
-set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/debug/trace)") 
+set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace)") 
 
 # Parse the user-exposed options
 if(PERF)

@@ -39,13 +39,6 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
     return -EINVAL;
   }
 
-  // Ensure bounded session_vec size
-  if (session_vec.size() >= kMaxSessionsPerThread) {
-    LOG_WARN("%s: Session limit (%zu) reached.\n", issue_msg,
-             kMaxSessionsPerThread);
-    return -ENOMEM;
-  }
-
   // Ensure that we have ring buffers for this session
   if (!have_ring_entries()) {
     LOG_WARN("%s: Ring buffers exhausted.\n", issue_msg);

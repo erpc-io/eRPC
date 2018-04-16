@@ -92,7 +92,6 @@
 
 ## Short-term TODOs
  * Use TX flush on client-side retransmission
- * Destroy session test fails with `kSessionCredits = 1`, `kSessionReqWindow = 1`
  * Session reset and machine failure detection broke when I changed session
    management to use UDP instead of ENet.
  * In `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
