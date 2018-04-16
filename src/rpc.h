@@ -744,13 +744,6 @@ class Rpc {
    * @param Time at which the explicit CR or response packet was received
    */
   inline void update_timely_rate(SSlot *sslot, size_t pkt_num, size_t rx_tsc) {
-    assert(kCcRateComp);
-
-    if (!kCcOptBatchTsc) {
-      assert(rx_tsc == 0);  // Caller shouldn't have paid the overhead
-      rx_tsc = dpath_rdtsc();
-    }
-
     size_t rtt_tsc =
         rx_tsc - sslot->client_info.tx_ts[pkt_num % kSessionCredits];
 

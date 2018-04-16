@@ -1,5 +1,11 @@
-// Ideally these tests would use a loopback, but loopback doesn't work for some
-// reason.
+/**
+ * @file raw_transport_test.cc
+ * @brief Tests for Mellanox Raw transport implementation
+ *
+ * Ideally these tests would use only one RawTransport instance and loopback,
+ * but I couldn't get loopback to work. Two RawTransport instances are used as
+ * a workaround.
+ */
 
 #include <gtest/gtest.h>
 
@@ -22,15 +28,13 @@ struct transport_info_t {
 };
 
 class RawTransportTest : public ::testing::Test {
+  transport_info_t srv_ttr, clt_ttr;
+  Transport::RoutingInfo srv_ri;  // We only need the server's routing info
+
  public:
   RawTransportTest() {
     if (!kTesting) {
       fprintf(stderr, "Cannot run tests - kTesting is disabled.\n");
-      return;
-    }
-
-    if (RawTransport::kDumb) {
-      fprintf(stderr, "Dumbpipe mode not tested yet.\n");
       return;
     }
 
@@ -52,9 +56,9 @@ class RawTransportTest : public ::testing::Test {
     srv_ttr.transport->init_hugepage_structures(srv_ttr.huge_alloc,
                                                 srv_ttr.rx_ring);
 
-    // Precompute the UDP header for the server
+    // Precompute the packet header, pretending that srv_ttr is the remote.
     srv_ttr.transport->fill_local_routing_info(&srv_ri);
-    clt_ttr.transport->resolve_remote_routing_info(&srv_ri);
+    clt_ttr.transport->resolve_remote_routing_info(&srv_ri);  // srv_ri ~ header
   }
 
   ~RawTransportTest() {
@@ -64,9 +68,6 @@ class RawTransportTest : public ::testing::Test {
     delete srv_ttr.huge_alloc;
     delete srv_ttr.transport;
   }
-
-  transport_info_t srv_ttr, clt_ttr;
-  Transport::RoutingInfo srv_ri;  // We only need the server's routing info
 
   // Create a ready-to-send packet from client to server, with space for
   // \p data_size user data bytes. \p data_size can be zero.

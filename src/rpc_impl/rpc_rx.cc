@@ -52,9 +52,11 @@ void Rpc<TTr>::process_comps_st() {
 
     // Process control packets
     if (pkthdr->msg_size == 0) {
-      assert(pkthdr->is_expl_cr() || pkthdr->is_req_for_resp());
-      pkthdr->is_expl_cr() ? process_expl_cr_st(sslot, pkthdr, batch_rx_tsc)
-                           : process_req_for_resp_st(sslot, pkthdr);
+      assert(pkthdr->is_req_for_resp() || pkthdr->is_expl_cr());
+      pkthdr->is_req_for_resp()
+          ? process_req_for_resp_st(sslot, pkthdr)
+          : process_expl_cr_st(sslot, pkthdr,
+                               kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc());
       continue;
     }
 
@@ -63,11 +65,15 @@ void Rpc<TTr>::process_comps_st() {
 
     if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
       assert(pkthdr->pkt_num == 0);
-      pkthdr->is_req() ? process_small_req_st(sslot, pkthdr)
-                       : process_small_resp_st(sslot, pkthdr, batch_rx_tsc);
+      pkthdr->is_req()
+          ? process_small_req_st(sslot, pkthdr)
+          : process_small_resp_st(
+                sslot, pkthdr, kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc());
     } else {
-      pkthdr->is_req() ? process_large_req_one_st(sslot, pkthdr)
-                       : process_large_resp_one_st(sslot, pkthdr, batch_rx_tsc);
+      pkthdr->is_req()
+          ? process_large_req_one_st(sslot, pkthdr)
+          : process_large_resp_one_st(
+                sslot, pkthdr, kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc());
     }
   }
 

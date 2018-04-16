@@ -68,6 +68,7 @@ class SSlot {
       size_t cont_etid;        ///< eRPC thread ID to run the continuation on
 
       /// Transmission timestamps for request and RFRs. Cold if CC is disabled.
+      /// This is indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;
 
       /// Return a string representation of the progress made by this sslot.
