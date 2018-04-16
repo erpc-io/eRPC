@@ -124,8 +124,10 @@ class RawTransportTest : public ::testing::Test {
 
     for (size_t i = 0; i < batch_size; i++) {
       poll_cq_one_helper(clt_ttr.transport->send_cq);
-      poll_cq_one_helper(srv_ttr.transport->recv_cq);
     }
+
+    size_t num_rx = 0;
+    while (num_rx != batch_size) num_rx += srv_ttr.transport->rx_burst();
   }
 
   /**
@@ -168,8 +170,10 @@ class RawTransportTest : public ::testing::Test {
 
     for (size_t i = 0; i < batch_size; i++) {
       poll_cq_one_helper(clt_ttr.transport->send_cq);
-      poll_cq_one_helper(srv_ttr.transport->recv_cq);
     }
+
+    size_t num_rx = 0;
+    while (num_rx != batch_size) num_rx += srv_ttr.transport->rx_burst();
   }
 };
 
