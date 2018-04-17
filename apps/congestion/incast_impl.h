@@ -78,7 +78,7 @@ void cont_incast(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 
   auto *c = static_cast<AppContext *>(_context);
-  assert(resp_msgbuf->get_data_size() == FLAGS_regular_resp_size);
+  assert(resp_msgbuf->get_data_size() == FLAGS_incast_resp_size);
   erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte);  // Touch
 
   c->rpc->release_response(resp_handle);

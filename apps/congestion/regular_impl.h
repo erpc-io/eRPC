@@ -19,6 +19,8 @@ void connect_sessions_func_regular(AppContext *c) {
     for (size_t t_i = FLAGS_incast_threads_other;
          t_i < FLAGS_incast_threads_other + FLAGS_regular_threads_other;
          t_i++) {
+      if (p_i == FLAGS_process_id && t_i == c->thread_id) continue;
+
       c->session_num_vec.at(session_idx) =
           c->rpc->create_session(erpc::get_uri_for_process(p_i), t_i);
       erpc::rt_assert(c->session_num_vec[session_idx] >= 0);
