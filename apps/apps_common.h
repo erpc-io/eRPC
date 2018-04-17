@@ -131,26 +131,28 @@ class BasicAppContext {
   }
 };
 
-// A reasonable SM handler
+// A basic session management handler that expects successful responses
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
                       erpc::SmErrType sm_err_type, void *_context) {
-  assert(_context != nullptr);
-
   auto *c = static_cast<BasicAppContext *>(_context);
   c->num_sm_resps++;
+
+  erpc::rt_assert(sm_err_type == erpc::SmErrType::kNoError,
+                  "SM response with error");
 
   if (!(sm_event_type == erpc::SmEventType::kConnected ||
         sm_event_type == erpc::SmEventType::kDisconnected)) {
     throw std::runtime_error("Received unexpected SM event.");
   }
 
-  // The callback gives us the eRPC session number - get the index
+  // The callback gives us the eRPC session number - get the index in vector
   size_t session_idx = c->session_num_vec.size();
   for (size_t i = 0; i < c->session_num_vec.size(); i++) {
     if (c->session_num_vec[i] == session_num) session_idx = i;
   }
+
   erpc::rt_assert(session_idx < c->session_num_vec.size(),
-                  "Invalid session number");
+                  "SM callback for invalid session number.");
 
   if (FLAGS_sm_verbose == 1) {
     fprintf(stderr,
