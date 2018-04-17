@@ -99,9 +99,7 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
-  if (thread_id == 0) {
-    c.tmp_stat = new TmpStat("rx_gbps tx_gbps re_tx avg_us 99_us");
-  }
+  if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);

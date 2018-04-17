@@ -41,20 +41,18 @@ struct app_stats_t {
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
+  static std::string get_template_str() {
+    return "incast_gbps re_tx regular_50_us regular_99_us";
+  }
+
   /// Return a space-separated string of all stats
   std::string to_string() {
     return std::to_string(incast_gbps) + " " + std::to_string(re_tx) + " " +
            std::to_string(regular_50_us) + " " + std::to_string(regular_99_us);
   }
 
-  /// Accumulate stats
-  app_stats_t& operator+=(const app_stats_t& rhs) {
-    this->incast_gbps += rhs.incast_gbps;
-    this->re_tx += rhs.re_tx;
-    this->regular_50_us += rhs.regular_50_us;
-    this->regular_99_us += rhs.regular_99_us;
-    return *this;
-  }
+  /// Threads publish stats selectively, so must accumulate manually
+  app_stats_t& operator+=(const app_stats_t& rhs) = delete;
 };
 static_assert(sizeof(app_stats_t) == 64, "");
 

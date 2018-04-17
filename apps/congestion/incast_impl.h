@@ -91,9 +91,7 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
-  if (thread_id == 0) {
-    c.tmp_stat = new TmpStat("rx_gbps tx_gbps re_tx avg_us 99_us");
-  }
+  if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
@@ -152,8 +150,20 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
       app_stats_t accum_stats;
       for (size_t i = 0;
            i < FLAGS_incast_threads_other + FLAGS_regular_threads_other; i++) {
-        accum_stats += c.app_stats[i];
+        // Stats published by all threads
+        accum_stats.incast_gbps += c.app_stats[i].incast_gbps;
+        accum_stats.re_tx += c.app_stats[i].re_tx;
+
+        if (i >= FLAGS_incast_threads_other) {
+          // Stats published by only regular threads
+          accum_stats.regular_50_us += c.app_stats[i].regular_50_us;
+          accum_stats.regular_99_us += c.app_stats[i].regular_99_us;
+        }
       }
+
+      accum_stats.regular_50_us /= FLAGS_regular_threads_other;
+      accum_stats.regular_99_us /= FLAGS_regular_threads_other;
+
       c.tmp_stat->write(accum_stats.to_string());
     }
 
