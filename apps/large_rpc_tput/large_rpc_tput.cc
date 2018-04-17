@@ -132,8 +132,8 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   uint8_t phy_port = port_vec.at(thread_id % port_vec.size());
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
-                                  static_cast<uint8_t>(thread_id), sm_handler,
-                                  phy_port);
+                                  static_cast<uint8_t>(thread_id),
+                                  basic_sm_handler, phy_port);
   rpc.retry_connect_on_invalid_rpc_id = true;
   if (erpc::kTesting) rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
 
