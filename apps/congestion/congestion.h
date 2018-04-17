@@ -16,15 +16,16 @@ static constexpr size_t kAppMaxConcurrency = 32;  // Outstanding reqs per thread
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
-// Flags
-DEFINE_uint64(num_proc_0_threads, 0, "Threads in process 0");
-DEFINE_uint64(num_proc_other_threads, 0, "Threads in process with ID != 0");
-DEFINE_uint64(req_size, 0, "Request data size");
-DEFINE_uint64(resp_size, 0, "Response data size");
-DEFINE_uint64(concurrency, 0, "Concurrent batches per thread");
-DEFINE_string(profile, "", "Experiment profile to use");
-DEFINE_double(throttle, 0, "Throttle flows to incast receiver?");
-DEFINE_double(throttle_fraction, 1, "Fraction of fair share to throttle to.");
+// Incast flags
+DEFINE_uint64(incast_threads_zero, 0, "Threads receiving incast at process 0");
+DEFINE_uint64(incast_threads_other, 0, "Threads sending incast traffic");
+DEFINE_uint64(incast_req_size, 0, "Incast request data size");
+DEFINE_uint64(incast_resp_size, 0, "Incast response data size");
+DEFINE_double(incast_throttle, 0, "If != 0, fair share fraction for incasts");
+
+// Non-incast traffic flags
+DEFINE_uint64(alltoall_threads_other, 0, "Threads sending all-to-all traffic");
+DEFINE_uint64(alltoall_concurrency, 0, "Concurrent batches per thread");
 
 struct app_stats_t {
   double rx_gbps;
