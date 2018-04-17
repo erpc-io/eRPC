@@ -85,9 +85,9 @@ void cont_incast(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   send_req_incast(c, msgbuf_idx);
 }
 
-// The function executed by each incast thread in the cluster
-void thread_func_incast(size_t thread_id, app_stats_t *app_stats,
-                        erpc::Nexus *nexus) {
+// The function executed by each incast thread at non-zero processes
+void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
+                              erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
@@ -160,25 +160,28 @@ void thread_func_incast(size_t thread_id, app_stats_t *app_stats,
     clock_gettime(CLOCK_REALTIME, &c.tput_t0);
   }
 
-  erpc::TimingWheel *wheel = rpc.get_wheel();
-  if (wheel != nullptr && !wheel->record_vec.empty()) {
-    const size_t num_to_print = 200;
-    const size_t tot_entries = wheel->record_vec.size();
-    const size_t base_entry = tot_entries * .9;
-
-    printf("Printing up to 200 entries toward the end of wheel record\n");
-    size_t num_printed = 0;
-
-    for (size_t i = base_entry; i < tot_entries; i++) {
-      auto &rec = wheel->record_vec.at(i);
-      printf("wheel: %s\n",
-             rec.to_string(console_ref_tsc, rpc.get_freq_ghz()).c_str());
-
-      if (num_printed++ == num_to_print) break;
-    }
-  }
-
   // We don't disconnect sessions
+}
+
+// The function executed by each incast thread at process zero
+void thread_func_incast_zero(size_t thread_id, erpc::Nexus *nexus) {
+  AppContext c;
+  c.thread_id = thread_id;
+
+  std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
+  erpc::rt_assert(port_vec.size() > 0);
+  uint8_t phy_port = port_vec.at(thread_id % port_vec.size());
+
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
+                                  static_cast<uint8_t>(thread_id),
+                                  basic_sm_handler, phy_port);
+  rpc.retry_connect_on_invalid_rpc_id = true;
+  c.rpc = &rpc;
+
+  for (size_t i = 0; i < FLAGS_test_ms; i += kAppEvLoopMs) {
+    rpc.run_event_loop(kAppEvLoopMs);
+    if (unlikely(ctrl_c_pressed == 1)) break;
+  }
 }
 
 #endif

@@ -26,8 +26,9 @@
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  erpc::rt_assert(FLAGS_regular_concurrency <= kAppMaxConcurrency);
+  erpc::rt_assert(FLAGS_num_processes >= 3);
   erpc::rt_assert(FLAGS_process_id < FLAGS_num_processes, "Invalid process ID");
+  erpc::rt_assert(FLAGS_regular_concurrency <= kAppMaxConcurrency);
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
@@ -45,10 +46,18 @@ int main(int argc, char **argv) {
   auto *app_stats = new app_stats_t[num_threads];
 
   for (size_t i = 0; i < num_threads; i++) {
-    if (FLAGS_process_id == 0 || i < FLAGS_incast_threads_other) {
-      threads[i] = std::thread(thread_func_incast, i, app_stats, &nexus);
+    if (FLAGS_process_id == 0) {
+      // Incast receiver
+      threads[i] = std::thread(thread_func_incast_zero, i, &nexus);
     } else {
-      threads[i] = std::thread(thread_func_regular, i, app_stats, &nexus);
+      if (i < FLAGS_incast_threads_other) {
+        // Incast sender
+        threads[i] =
+            std::thread(thread_func_incast_other, i, app_stats, &nexus);
+      } else {
+        // Non-incast, "regular" threads
+        threads[i] = std::thread(thread_func_regular, i, app_stats, &nexus);
+      }
     }
     erpc::bind_to_core(threads[i], FLAGS_numa_node, i);
   }
