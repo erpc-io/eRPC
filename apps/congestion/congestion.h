@@ -8,9 +8,12 @@
 #include "util/autorun_helpers.h"
 #include "util/numautils.h"
 
-static constexpr size_t kAppReqType = 1;
+static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
+static constexpr bool kAppVerbose = false;
+static constexpr size_t kAppReqTypeIncast = 1;
+static constexpr size_t kAppReqTypeRegular = 2;
 static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
-static constexpr size_t kAppMaxConcurrency = 32;  // Outstanding reqs per thread
+static constexpr size_t kAppMaxConcurrency = 32;  // Max outstanding reqs/thread
 
 // Globals
 volatile sig_atomic_t ctrl_c_pressed = 0;
@@ -21,36 +24,35 @@ DEFINE_uint64(incast_threads_zero, 0, "Threads receiving incast at process 0");
 DEFINE_uint64(incast_threads_other, 0, "Threads sending incast traffic");
 DEFINE_uint64(incast_req_size, 0, "Incast request data size");
 DEFINE_uint64(incast_resp_size, 0, "Incast response data size");
-DEFINE_double(incast_throttle, 0, "If != 0, fair share fraction for incasts");
+DEFINE_double(incast_throttle, 0, "If not 0, fair share fraction for incasts");
 
 // Non-incast traffic flags
-DEFINE_uint64(alltoall_threads_other, 0, "Threads sending all-to-all traffic");
-DEFINE_uint64(alltoall_concurrency, 0, "Concurrent batches per thread");
+DEFINE_uint64(regular_threads_other, 0, "Threads sending regular traffic");
+DEFINE_uint64(regular_concurrency, 0, "Concurrent batches per thread");
+DEFINE_uint64(regular_req_size, 0, "Reqular request data size");
+DEFINE_uint64(regular_resp_size, 0, "Regular response data size");
 
 struct app_stats_t {
-  double rx_gbps;
-  double tx_gbps;
+  double incast_gbps;
   size_t re_tx;
-  double avg_us;
-  double _99_us;
-  size_t pad[3];
+  double regular_50_us;
+  double regular_99_us;
+  size_t pad[4];
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
   /// Return a space-separated string of all stats
   std::string to_string() {
-    return std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) + " " +
-           std::to_string(re_tx) + " " + std::to_string(avg_us) + " " +
-           std::to_string(_99_us);
+    return std::to_string(incast_gbps) + " " + std::to_string(re_tx) + " " +
+           std::to_string(regular_50_us) + " " + std::to_string(regular_99_us);
   }
 
   /// Accumulate stats
   app_stats_t& operator+=(const app_stats_t& rhs) {
-    this->rx_gbps += rhs.rx_gbps;
-    this->tx_gbps += rhs.tx_gbps;
+    this->incast_gbps += rhs.incast_gbps;
     this->re_tx += rhs.re_tx;
-    this->avg_us += rhs.avg_us;
-    this->_99_us += rhs._99_us;
+    this->regular_50_us += rhs.regular_50_us;
+    this->regular_99_us += rhs.regular_99_us;
     return *this;
   }
 };
@@ -59,33 +61,15 @@ static_assert(sizeof(app_stats_t) == 64, "");
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
-  // We need a wide range of latency measurements: ~4 us for 4KB RPCs, to
-  // >10 ms for 8MB RPCs under congestion. So erpc::Latency doesn't work here.
-  std::vector<double> lat_vec;
-
-  struct timespec tput_t0;  // Start time for throughput measurement
+  struct timespec tput_t0;  // Start time for measurement
   app_stats_t* app_stats;   // Common stats array for all threads
 
-  size_t stat_rx_bytes_tot = 0;  // Total bytes received
-  size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
+  size_t incast_tx_bytes = 0;     // Total incast bytes sent
+  erpc::Latency regular_latency;  // Latency percentiles for regular traffic
 
   uint64_t req_ts[kAppMaxConcurrency];  // Per-request timestamps
   erpc::MsgBuffer req_msgbuf[kAppMaxConcurrency];
   erpc::MsgBuffer resp_msgbuf[kAppMaxConcurrency];
 };
-
-// Allocate request and response MsgBuffers
-void alloc_req_resp_msg_buffers(AppContext* c) {
-  for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    c->resp_msgbuf[i] = c->rpc->alloc_msg_buffer(FLAGS_resp_size);
-    erpc::rt_assert(c->resp_msgbuf[i].buf != nullptr, "Alloc failed");
-
-    c->req_msgbuf[i] = c->rpc->alloc_msg_buffer(FLAGS_req_size);
-    erpc::rt_assert(c->req_msgbuf[i].buf != nullptr, "Alloc failed");
-
-    // Fill the request regardless of kAppMemset. This is a one-time thing.
-    memset(c->req_msgbuf[i].buf, kAppDataByte, FLAGS_req_size);
-  }
-}
 
 #endif
