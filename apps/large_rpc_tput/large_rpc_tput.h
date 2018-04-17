@@ -37,6 +37,10 @@ struct app_stats_t {
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
+  static std::string get_template_str() {
+    return "rx_gbps tx_gbps re_tx avg_us _99_us";
+  }
+
   /// Return a space-separated string of all stats
   std::string to_string() {
     return std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) + " " +

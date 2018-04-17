@@ -43,8 +43,6 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
            c->thread_id, msgbuf_idx);
   }
 
-  // Timestamp before trying enqueue_request(). If enqueue_request() fails,
-  // we'll timestamp again on the next try.
   c->req_ts[msgbuf_idx] = erpc::rdtsc();
   c->rpc->enqueue_request(c->session_num_vec[0], kAppReqType, &req_msgbuf,
                           &c->resp_msgbuf[msgbuf_idx], app_cont_func,
@@ -123,9 +121,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
-  if (thread_id == 0) {
-    c.tmp_stat = new TmpStat("rx_gbps tx_gbps re_tx avg_us 99_us");
-  }
+  if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
