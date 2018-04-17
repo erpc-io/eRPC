@@ -15,13 +15,13 @@ export MLX_QP_ALLOC_TYPE="HUGE"
 export MLX_CQ_ALLOC_TYPE="HUGE"
 
 # Install modded driver - this is not a requirement
-if [ "$autorun_app" != "consensus" ]; then
+if [ "$autorun_app" != "smr" ]; then
   blue "Installing modded driver"
   ./drivers/libmlx5-41mlnx1/update-driver.sh
 else
-  # The consensus app latency improves with inline size = 120 bytes. However,
-  # the modded driver only supports inline size = 60 bytes.
-  blue "Installing original driver for consensus app"
+  # The SMR app latency improves with inline size = 120 bytes. However, the
+  # modded driver only supports inline size = 60 bytes.
+  blue "Installing original driver for smr app"
   ~/install-original-driver.sh
 fi
 

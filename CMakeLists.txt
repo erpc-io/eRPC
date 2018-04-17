@@ -222,7 +222,7 @@ file(STRINGS "scripts/autorun_app_file" APP)
 message(STATUS "Compiling app = " ${APP})
 
 # Add app-specific defines now, isolating them from the tests
-if(APP STREQUAL "consensus")
+if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
   set(LIBRARIES ${LIBRARIES} craft)
   set(APP_ADDITIONAL_SOURCES third_party/cityhash/city_mod.cc)

@@ -3,7 +3,7 @@
  * @brief Handlers for requestvote RPC
  */
 
-#include "consensus.h"
+#include "smr.h"
 
 #ifndef REQUESTVOTE_H
 #define REQUESTVOTE_H
@@ -27,7 +27,7 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
       reinterpret_cast<requestvote_req_t *>(req_msgbuf->buf);
   assert(node_id_to_name_map.count(requestvote_req->node_id) != 0);
 
-  printf("consensus: Received requestvote request from %s [%s].\n",
+  printf("smr: Received requestvote request from %s [%s].\n",
          node_id_to_name_map[requestvote_req->node_id].c_str(),
          erpc::get_formatted_time().c_str());
 
@@ -66,11 +66,11 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   assert(c->check_magic());
 
   if (!c->rpc->is_connected(conn->session_num)) {
-    printf("consensus: Cannot send requestvote request (disconnected).\n");
+    printf("smr: Cannot send requestvote request (disconnected).\n");
     return 0;
   }
 
-  printf("consensus: Sending requestvote request to node %s [%s].\n",
+  printf("smr: Sending requestvote request to node %s [%s].\n",
          node_id_to_name_map[raft_node_get_id(node)].c_str(),
          erpc::get_formatted_time().c_str());
 
@@ -112,7 +112,7 @@ void requestvote_cont(erpc::RespHandle *resp_handle, void *_context,
     assert(rrt->resp_msgbuf.get_data_size() ==
            sizeof(msg_requestvote_response_t));
 
-    printf("consensus: Received requestvote response from node %s [%s].\n",
+    printf("smr: Received requestvote response from node %s [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            erpc::get_formatted_time().c_str());
 
@@ -125,7 +125,7 @@ void requestvote_cont(erpc::RespHandle *resp_handle, void *_context,
     _unused(e);
   } else {
     // This is a continuation-with-failure
-    printf("consensus: Requestvote RPC to node %s failed to complete [%s].\n",
+    printf("smr: Requestvote RPC to node %s failed to complete [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            erpc::get_formatted_time().c_str());
   }

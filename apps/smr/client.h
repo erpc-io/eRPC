@@ -3,7 +3,7 @@
  * @brief The client for the replicated service
  */
 
-#include "consensus.h"
+#include "smr.h"
 
 #ifndef CLIENT_H
 #define CLIENT_H
@@ -13,7 +13,7 @@ void client_cont(erpc::RespHandle *, void *, size_t);  // Forward declaration
 // Change the leader to a different Raft server that we are connected to
 void change_leader_to_any(AppContext *c) {
   size_t cur_leader_idx = c->client.leader_idx;
-  printf("consensus: Client change_leader_to_any() from current leader %zu.\n",
+  printf("smr: Client change_leader_to_any() from current leader %zu.\n",
          c->client.leader_idx);
 
   // Pick the next session to a Raft server that is not disconnected
@@ -22,14 +22,13 @@ void change_leader_to_any(AppContext *c) {
     if (!c->conn_vec[next_leader_idx].disconnected) {
       c->client.leader_idx = next_leader_idx;
 
-      printf("consensus: Client changed leader view to %zu.\n",
-             c->client.leader_idx);
+      printf("smr: Client changed leader view to %zu.\n", c->client.leader_idx);
       return;
     }
   }
 
   printf(
-      "consensus: Client failed to change leader to any Raft server. "
+      "smr: Client failed to change leader to any Raft server. "
       "Exiting.\n");
   exit(0);
 }
@@ -52,7 +51,7 @@ bool change_leader_to_node(AppContext *c, int node_id) {
     }
   }
 
-  printf("consensus: Client could not find node %d. Exiting.\n", node_id);
+  printf("smr: Client could not find node %d. Exiting.\n", node_id);
   exit(0);
 }
 
@@ -67,7 +66,7 @@ void send_req_one(AppContext *c) {
   req->value[0] = rand_key;
 
   if (kAppVerbose) {
-    printf("consensus: Client sending request %s to leader index %zu [%s].\n",
+    printf("smr: Client sending request %s to leader index %zu [%s].\n",
            req->to_string().c_str(), c->client.leader_idx,
            erpc::get_formatted_time().c_str());
   }
@@ -100,7 +99,7 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
     double us_max = lat_vec.at(lat_vec.size() - 1);
 
     printf(
-        "consensus: Latency us = "
+        "smr: Latency us = "
         "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f max}. "
         "Request window = %zu (best 1). Inline size = %zu (best 120).\n",
         us_min, us_median, us_99, us_999, us_max, erpc::kSessionReqWindow,
@@ -115,7 +114,7 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
         reinterpret_cast<client_resp_t *>(c->client.resp_msgbuf.buf);
 
     if (kAppVerbose) {
-      printf("consensus: Client received resp %s [%s].\n",
+      printf("smr: Client received resp %s [%s].\n",
              client_resp->to_string().c_str(),
              erpc::get_formatted_time().c_str());
     }
@@ -127,7 +126,7 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
 
       case ClientRespType::kFailRedirect: {
         printf(
-            "consensus: Client request to server %zu failed with code = "
+            "smr: Client request to server %zu failed with code = "
             "redirect. Trying to change leader to %s.\n",
             c->client.leader_idx,
             node_id_to_name_map.at(client_resp->leader_node_id).c_str());
@@ -135,7 +134,7 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
         bool success = change_leader_to_node(c, client_resp->leader_node_id);
         if (!success) {
           printf(
-              "consensus: Client failed to change leader to %s. "
+              "smr: Client failed to change leader to %s. "
               "Retrying to current leader %zu after 200 ms.\n",
               node_id_to_name_map.at(client_resp->leader_node_id).c_str(),
               c->client.leader_idx);
@@ -147,7 +146,7 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
 
       case ClientRespType::kFailTryAgain: {
         printf(
-            "consensus: Client request to server %zu failed with code = "
+            "smr: Client request to server %zu failed with code = "
             "try again. Trying again after 200 ms.\n",
             c->client.leader_idx);
         usleep(200000);
@@ -156,7 +155,7 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
     }
   } else {
     // This is a continuation-with-failure
-    printf("consensus: Client RPC to server %zu failed to complete [%s].\n",
+    printf("smr: Client RPC to server %zu failed to complete [%s].\n",
            c->client.leader_idx, erpc::get_formatted_time().c_str());
     change_leader_to_any(c);
   }
@@ -188,8 +187,8 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
   // Raft client: Create session to each Raft server
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     std::string hostname = erpc::get_hostname_for_process(i);
-    printf("consensus: Client %zu creating session to %s, index = %zu.\n",
-           thread_id, hostname.c_str(), i);
+    printf("smr: Client %zu creating session to %s, index = %zu.\n", thread_id,
+           hostname.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
     c->conn_vec[i].session_num = c->rpc->create_session(hostname, 0);
@@ -204,7 +203,7 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
     }
   }
 
-  printf("consensus: Client %zu connected to all servers. Sending requests.\n",
+  printf("smr: Client %zu connected to all servers. Sending requests.\n",
          thread_id);
 
   send_req_one(c);
