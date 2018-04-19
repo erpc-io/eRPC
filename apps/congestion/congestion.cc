@@ -30,6 +30,11 @@ int main(int argc, char **argv) {
   erpc::rt_assert(FLAGS_process_id < FLAGS_num_processes, "Invalid process ID");
   erpc::rt_assert(FLAGS_regular_concurrency <= kAppMaxConcurrency);
 
+  // Supporting zero threads is troublesome (e.g., who prints the stats?)
+  erpc::rt_assert(FLAGS_incast_threads_zero >= 1, "Need > 0 incast threads");
+  erpc::rt_assert(FLAGS_incast_threads_other >= 1, "Need > 0 incast threads");
+  erpc::rt_assert(FLAGS_regular_threads_other >= 1, "Need > 0 regular threads");
+
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
   nexus.register_req_func(

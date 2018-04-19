@@ -8,6 +8,6 @@
 --regular_concurrency 1
 --regular_req_size 100
 --regular_resp_size 100
---num_processes 3
+--num_processes 4
 --numa_0_ports 0
 --numa_1_ports 1

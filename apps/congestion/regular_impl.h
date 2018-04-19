@@ -12,7 +12,7 @@ void connect_sessions_func_regular(AppContext *c) {
   erpc::rt_assert(c->thread_id >= FLAGS_incast_threads_other);
 
   c->session_num_vec.resize(
-      (FLAGS_incast_threads_other * (FLAGS_num_processes - 1)) - 1);
+      (FLAGS_regular_threads_other * (FLAGS_num_processes - 1)) - 1);
 
   size_t session_idx = 0;
   for (size_t p_i = 1; p_i < FLAGS_num_processes; p_i++) {
@@ -122,7 +122,6 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
     memset(c.req_msgbuf[i].buf, kAppDataByte, FLAGS_regular_req_size);
   }
 
-  size_t console_ref_tsc = erpc::rdtsc();
   for (size_t msgbuf_i = 0; msgbuf_i < FLAGS_regular_concurrency; msgbuf_i++) {
     send_req_regular(&c, msgbuf_i);
   }
@@ -149,25 +148,6 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
         c.thread_id, stats.re_tx, stats.regular_50_us, stats.regular_99_us);
     // An incast thread will write to tmp_stat
   }
-
-  erpc::TimingWheel *wheel = rpc.get_wheel();
-  if (wheel != nullptr && !wheel->record_vec.empty()) {
-    const size_t num_to_print = 200;
-    const size_t tot_entries = wheel->record_vec.size();
-    const size_t base_entry = tot_entries * .9;
-
-    printf("Printing up to 200 entries toward the end of wheel record\n");
-    size_t num_printed = 0;
-
-    for (size_t i = base_entry; i < tot_entries; i++) {
-      auto &rec = wheel->record_vec.at(i);
-      printf("wheel: %s\n",
-             rec.to_string(console_ref_tsc, rpc.get_freq_ghz()).c_str());
-
-      if (num_printed++ == num_to_print) break;
-    }
-  }
-
   // We don't disconnect sessions
 }
 
