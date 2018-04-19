@@ -167,7 +167,7 @@ class Rpc {
     assert(!sslot->is_client);
 
     // Free the response MsgBuffer iff it is not preallocated
-    if (!sslot->prealloc_used) {
+    if (unlikely(!sslot->prealloc_used)) {
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
       assert(tx_msgbuf->is_valid_dynamic());
       free_msg_buffer(*tx_msgbuf);
@@ -188,7 +188,7 @@ class Rpc {
     assert(!sslot->is_client);
 
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
-    if (req_msgbuf.is_dynamic()) {
+    if (unlikely(req_msgbuf.is_dynamic())) {
       // This check is OK, as dynamic MsgBuffers must be initialized
       assert(req_msgbuf.is_valid_dynamic());
       free_msg_buffer(req_msgbuf);
