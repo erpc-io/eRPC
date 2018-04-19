@@ -89,6 +89,7 @@ void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // This is the entire, in-order response. So, we still have the request.
   assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
 
+  // Update client tracking metdata. No need to update progress_tsc.
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   sslot->client_info.num_rx++;
@@ -134,9 +135,11 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
   assert(req_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
 
+  // Update client tracking metadata.
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   sslot->client_info.num_rx++;
+  sslot->client_info.progress_tsc = ev_loop_tsc;
 
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
   if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {

@@ -39,9 +39,11 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
     return;
   }
 
+  // Update client tracking metadata.
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   sslot->client_info.num_rx++;
+  sslot->client_info.progress_tsc = ev_loop_tsc;
 }
 
 FORCE_COMPILE_TRANSPORTS
