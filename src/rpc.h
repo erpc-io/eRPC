@@ -811,9 +811,7 @@ class Rpc {
   const bool multi_threaded;    ///< True iff there are background threads
   const double freq_ghz;        ///< RDTSC frequency, derived from Nexus
   const size_t rpc_rto_cycles;  ///< RPC RTO in cycles
-
-  ///< RPC packet loss epoch in cycles. It's some fraction of RTO (e.g., 1/10).
-  const size_t rpc_pkt_loss_epoch_cycles;
+  const size_t rpc_pkt_loss_scan_cycles;  ///< Packet loss scan frequency
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.
@@ -844,8 +842,8 @@ class Rpc {
 
   std::vector<SSlot *> credit_stall_txq;  ///< Req sslots stalled for credits
 
-  size_t ev_loop_tsc;         ///< TSC taken at each iteration of the ev loop
-  size_t pkt_loss_epoch_tsc;  ///< Timestamp of the packet loss epoch
+  size_t ev_loop_tsc;        ///< TSC taken at each iteration of the ev loop
+  size_t pkt_loss_scan_tsc;  ///< Timestamp of the previous scan for lost pkts
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator

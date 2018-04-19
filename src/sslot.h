@@ -64,8 +64,8 @@ class SSlot {
       size_t num_tx;  ///< Number of packets sent
       size_t num_rx;  ///< Number of packets received
 
-      size_t enqueue_req_tsc;  ///< Approx epoch-based TSC of enqueue_request()
-      size_t cont_etid;        ///< eRPC thread ID to run the continuation on
+      size_t progress_tsc;  ///< Last TSC at which this request made progress
+      size_t cont_etid;     ///< eRPC thread ID to run the continuation on
 
       /// Transmission timestamps for request and RFRs. Cold if CC is disabled.
       /// This is indexed by pkt_num % kSessionCredits.

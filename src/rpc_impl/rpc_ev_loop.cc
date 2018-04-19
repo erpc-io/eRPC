@@ -28,10 +28,10 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
   // Handle any new session management packets
   if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_rx_st();
 
-  // Check for packet loss if we're in a new epoch. We use a recent value of
-  // TSC that is stale by at most one event loop iteration.
-  if (unlikely(ev_loop_tsc - pkt_loss_epoch_tsc > rpc_pkt_loss_epoch_cycles)) {
-    pkt_loss_epoch_tsc = ev_loop_tsc;
+  // Check for packet loss if we're in a new epoch. ev_loop_tsc is stale by
+  // less than one event loop iteration, which is negligible compared to epoch.
+  if (unlikely(ev_loop_tsc - pkt_loss_scan_tsc > rpc_pkt_loss_scan_cycles)) {
+    pkt_loss_scan_tsc = ev_loop_tsc;
     pkt_loss_scan_st();
   }
 }

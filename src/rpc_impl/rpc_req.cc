@@ -43,7 +43,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   ci.resp_msgbuf = resp_msgbuf;
   ci.cont_func = cont_func;
   ci.tag = tag;
-  ci.enqueue_req_tsc = pkt_loss_epoch_tsc;
+  ci.progress_tsc = ev_loop_tsc;
 
   ci.num_rx = 0;
   ci.num_tx = 0;

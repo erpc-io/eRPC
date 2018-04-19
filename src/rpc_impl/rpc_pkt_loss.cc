@@ -24,9 +24,8 @@ void Rpc<TTr>::pkt_loss_scan_st() {
 
           assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
 
-          size_t cycles_elapsed = rdtsc() - sslot.client_info.enqueue_req_tsc;
-          size_t us_elapsed = to_usec(cycles_elapsed, nexus->freq_ghz);
-          if (us_elapsed >= kRpcRTOUs) pkt_loss_retransmit_st(&sslot);
+          size_t cycles_elapsed = ev_loop_tsc - sslot.client_info.progress_tsc;
+          if (cycles_elapsed > rpc_rto_cycles) pkt_loss_retransmit_st(&sslot);
         }
 
         break;
@@ -85,7 +84,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
         std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), sslot),
         credit_stall_txq.end());
 
-    sslot->client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
+    sslot->client_info.progress_tsc = ev_loop_tsc;
     bool all_pkts_tx = req_sslot_tx_credits_cc_st(sslot);
     if (!all_pkts_tx) credit_stall_txq.push_back(sslot);
   } else {
@@ -96,7 +95,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     assert(resp_msgbuf->is_dynamic_and_matches(sslot->tx_msgbuf));
 
     LOG_REORDER("%s: Retransmitting RFR.\n", issue_msg);
-    sslot->client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
+    sslot->client_info.progress_tsc = ev_loop_tsc;
     enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
   }
 }
