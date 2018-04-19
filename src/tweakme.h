@@ -18,7 +18,7 @@ static constexpr bool kTesting = false;
 
 /// Packet loss timeout for an RPC request in microseconds. The list of
 /// requests is scanned at every "epoch", which is fraction of the RTO.
-static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 500000;
+static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 5000;
 
 // Congestion control
 #define ENABLE_CC true
