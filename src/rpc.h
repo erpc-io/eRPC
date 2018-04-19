@@ -816,8 +816,9 @@ class Rpc {
   const size_t creation_tsc;  ///< Timestamp of creation of this Rpc endpoint
 
   // Derived
-  const bool multi_threaded;  ///< True iff there are background threads
-  const double freq_ghz;      ///< RDTSC frequency, derived from Nexus
+  const bool multi_threaded;    ///< True iff there are background threads
+  const double freq_ghz;        ///< RDTSC frequency, derived from Nexus
+  const size_t rpc_rto_cycles;  ///< RPC RTO in cycles
 
   ///< RPC packet loss epoch in cycles. It's some fraction of RTO (e.g., 1/10).
   const size_t rpc_pkt_loss_epoch_cycles;
