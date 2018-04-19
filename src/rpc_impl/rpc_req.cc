@@ -93,8 +93,7 @@ bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
       size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
       size_t ref_tsc = dpath_rdtsc();
       size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(ref_tsc, pkt_size);
-      wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(pkt_num)), ref_tsc,
-                    abs_tx_tsc);
+      wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
     }
 
     credits--;
