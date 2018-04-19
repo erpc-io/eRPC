@@ -10,12 +10,18 @@
 
 namespace erpc {
 
-class IBTransport;
-class RawTransport;
+#if defined(TESTING)
+static constexpr bool kTesting = true;
+#else
+static constexpr bool kTesting = false;
+#endif
+
+/// Packet loss timeout for an RPC request in microseconds. The list of
+/// requests is scanned at every "epoch", which is fraction of the RTO.
+static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 500000;
 
 // Congestion control
 #define ENABLE_CC true
-
 #if ENABLE_CC
 // Congestion control without optimizations
 static constexpr bool kCcRTT = true;       ///< Measure per-packet RTT
@@ -38,6 +44,8 @@ static constexpr bool kCcOptTimelyBypass = true;  ///< Bypass Timely if possible
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
 // Pick a transport. This is hard to control from CMake.
+class IBTransport;
+class RawTransport;
 
 // 56 Gbps InfiniBand
 // typedef IBTransport CTransport;
@@ -49,12 +57,6 @@ typedef RawTransport CTransport;
 static constexpr size_t kHeadroom = 40;
 // static constexpr double kBandwidth = 5.0 * 1000 * 1000 * 1000;  // 40 Gbps
 static constexpr double kBandwidth = 3.125 * 1000 * 1000 * 1000;  // 25 Gbps
-
-#if defined(TESTING)
-static constexpr bool kTesting = true;
-#else
-static constexpr bool kTesting = false;
-#endif
 
 static constexpr bool kDatapathStats = false;
 }

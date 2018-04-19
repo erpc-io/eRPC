@@ -48,10 +48,6 @@ class Rpc {
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (8 * MB(1));
 
-  /// Packet loss timeout for an RPC request in microseconds. The list of
-  /// requests is scanned at every "epoch", which is fraction of the RTO.
-  static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 500000;
-
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 10 : 100;
 
