@@ -8,8 +8,8 @@
 #include "congestion.h"
 
 void connect_sessions_func_incast(AppContext *c) {
-  erpc::rt_assert(FLAGS_process_id != 0);
-  erpc::rt_assert(c->thread_id < FLAGS_incast_threads_other);
+  assert(FLAGS_process_id != 0);
+  assert(c->thread_id < FLAGS_incast_threads_other);
 
   size_t rem_tid =
       (FLAGS_process_id * FLAGS_incast_threads_other + c->thread_id) %
@@ -61,7 +61,7 @@ void req_handler_incast(erpc::ReqHandle *req_handle, void *_context) {
 
   req_handle->prealloc_used = false;
   erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
-  resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_incast_resp_size);
+  resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_incast_resp_size);  // eRPC frees
   assert(resp_msgbuf.buf != nullptr);
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();

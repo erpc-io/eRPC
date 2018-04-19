@@ -8,8 +8,8 @@
 #include "congestion.h"
 
 void connect_sessions_func_regular(AppContext *c) {
-  erpc::rt_assert(FLAGS_process_id != 0);
-  erpc::rt_assert(c->thread_id >= FLAGS_incast_threads_other);
+  assert(FLAGS_process_id != 0);
+  assert(c->thread_id >= FLAGS_incast_threads_other);
 
   c->session_num_vec.resize(
       (FLAGS_regular_threads_other * (FLAGS_num_processes - 1)) - 1);
@@ -33,6 +33,7 @@ void connect_sessions_func_regular(AppContext *c) {
       session_idx++;
     }
   }
+  assert(session_idx == c->session_num_vec.size());
 
   while (c->num_sm_resps != c->session_num_vec.size()) {
     c->rpc->run_event_loop(200);  // 200 milliseconds
