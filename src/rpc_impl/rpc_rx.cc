@@ -12,8 +12,8 @@ void Rpc<TTr>::process_comps_st() {
   dpath_stat_inc(dpath_stats.rx_burst_calls, 1);
   dpath_stat_inc(dpath_stats.pkts_rx, num_pkts);
 
-  size_t batch_rx_tsc = 0;
-  if (kCcOptBatchTsc) batch_rx_tsc = dpath_rdtsc();
+  // ev_loop_tsc was taken just before calling the packet RX code
+  const size_t &batch_rx_tsc = ev_loop_tsc;
 
   for (size_t i = 0; i < num_pkts; i++) {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);

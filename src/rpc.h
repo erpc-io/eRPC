@@ -51,11 +51,6 @@ class Rpc {
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 10 : 100;
 
-  /// Reset threshold of the event loop ticker. Assuming each iteration of the
-  /// event loop lasts 10 microseconds (it is much smaller in reality), the
-  /// time until reset is 10 ms.
-  static constexpr size_t kEvLoopTickerReset = 1000;
-
   //
   // Constructor/destructor (rpc.cc)
   //
@@ -457,14 +452,11 @@ class Rpc {
   }
 
   /// Run the event loop once
-  inline void run_event_loop_once() { run_event_loop_once_st(); }
+  inline void run_event_loop_once() { run_event_loop_do_one_st(); }
 
  private:
   /// Implementation of the run_event_loop(timeout) API function
   void run_event_loop_timeout_st(size_t timeout_ms);
-
-  /// Implementation of run_event_loop() API function
-  void run_event_loop_once_st();
 
   /// Actually run one iteration of the event loop
   void run_event_loop_do_one_st();
@@ -852,7 +844,7 @@ class Rpc {
 
   std::vector<SSlot *> credit_stall_txq;  ///< Req sslots stalled for credits
 
-  size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
+  size_t ev_loop_tsc;         ///< TSC taken at each iteration of the ev loop
   size_t pkt_loss_epoch_tsc;  ///< Timestamp of the packet loss epoch
 
   // Allocator
