@@ -41,7 +41,7 @@ class Timely {
 
   // Config
   static constexpr double kMaxRate = kBandwidth;
-  static constexpr double kMinRate = 5.0 * 1000 * 1000;
+  static constexpr double kMinRate = 15.0 * 1000 * 1000;
   static constexpr double kAddRate = 5.0 * 1000 * 1000;
 
   static constexpr double kMinRTT = 2;

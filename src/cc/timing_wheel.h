@@ -62,9 +62,9 @@ class TimingWheel {
       : mtu(args.mtu),
         freq_ghz(args.freq_ghz),
         wslot_width_tsc(us_to_cycles(kWheelSlotWidthUs, freq_ghz)),
-        horizon(1000000 * (kSessionCredits * mtu) / Timely::kMinRate),
-        horizon_tsc(us_to_cycles(horizon, freq_ghz)),
-        num_wslots(1 + round_up(horizon / kWheelSlotWidthUs)),
+        horizon_us(1000000 * (kSessionCredits * mtu) / Timely::kMinRate),
+        horizon_tsc(us_to_cycles(horizon_us, freq_ghz)),
+        num_wslots(1 + round_up(horizon_us / kWheelSlotWidthUs)),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
     rt_assert(num_wslots > 10, "Too few wheel slots");
@@ -190,7 +190,7 @@ class TimingWheel {
   const size_t mtu;
   const double freq_ghz;         ///< TSC freq, used only for us/tsc conversion
   const size_t wslot_width_tsc;  ///< Time-granularity in TSC units
-  const double horizon;          ///< Timespan of one wheel rotation
+  const double horizon_us;       ///< Timespan of one wheel rotation
   const size_t horizon_tsc;      ///< Horizon in TSC units
   const size_t num_wslots;
   HugeAlloc *huge_alloc;
