@@ -14,7 +14,6 @@ using namespace erpc;
 static constexpr size_t kTestMTU = 1024;
 static constexpr size_t kTestPktSize = 1024;
 static constexpr size_t kTestNumPkts = 8000;
-static constexpr double kTestWslotWidth = .2;  // us per wheel slot
 
 // Dummy registration and deregistration functions
 Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
@@ -34,7 +33,6 @@ TEST(TimingWheelTest, Basic) {
   timing_wheel_args_t args;
   args.mtu = kTestMTU;
   args.freq_ghz = measure_rdtsc_freq();
-  args.wslot_width = kTestWslotWidth;
   args.huge_alloc = &alloc;
 
   TimingWheel wheel(args);

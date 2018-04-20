@@ -18,9 +18,9 @@
 
 namespace erpc {
 
-static constexpr size_t kWheelBucketCap = 4;       ///< Wheel entries per bucket
-static constexpr double kWheelDefWslotWidth = .2;  // 200 ns
-static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
+static constexpr size_t kWheelBucketCap = 4;     ///< Wheel entries per bucket
+static constexpr double kWheelSlotWidthUs = .2;  ///< Duration per wheel slot
+static constexpr bool kWheelRecord = false;      ///< Fast-record wheel actions
 
 /// One entry in a timing wheel bucket
 struct wheel_ent_t {
@@ -53,7 +53,6 @@ static_assert(sizeof(wheel_bkt_t) == 120, "");
 struct timing_wheel_args_t {
   size_t mtu;
   double freq_ghz;
-  double wslot_width;
   HugeAlloc *huge_alloc;
 };
 
@@ -62,14 +61,12 @@ class TimingWheel {
   TimingWheel(timing_wheel_args_t args)
       : mtu(args.mtu),
         freq_ghz(args.freq_ghz),
-        wslot_width(args.wslot_width),
-        wslot_width_tsc(us_to_cycles(wslot_width, freq_ghz)),
+        wslot_width_tsc(us_to_cycles(kWheelSlotWidthUs, freq_ghz)),
         horizon(1000000 * (kSessionCredits * mtu) / Timely::kMinRate),
         horizon_tsc(us_to_cycles(horizon, freq_ghz)),
-        num_wslots(1 + round_up(horizon / wslot_width)),
+        num_wslots(1 + round_up(horizon / kWheelSlotWidthUs)),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
-    rt_assert(wslot_width > .01 && wslot_width <= 8.0, "Invalid wslot width");
     rt_assert(num_wslots > 10, "Too few wheel slots");
     rt_assert(num_wslots < 10000000, "Too many wheel slots");
 
@@ -192,7 +189,6 @@ class TimingWheel {
 
   const size_t mtu;
   const double freq_ghz;         ///< TSC freq, used only for us/tsc conversion
-  const double wslot_width;      ///< Time-granularity of a slot
   const size_t wslot_width_tsc;  ///< Time-granularity in TSC units
   const double horizon;          ///< Timespan of one wheel rotation
   const size_t horizon_tsc;      ///< Horizon in TSC units
