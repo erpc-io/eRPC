@@ -37,7 +37,12 @@ static inline size_t msb_index(int x) {
   return static_cast<size_t>(index);
 }
 
-static inline size_t round_up(double x) { return std::round(.5 + x); }
+/// C++11 constexpr ceil
+static constexpr size_t ceil(double num) {
+  return (static_cast<double>(static_cast<size_t>(num)) == num)
+             ? static_cast<size_t>(num)
+             : static_cast<size_t>(num) + ((num > 0) ? 1 : 0);
+}
 
 }  /// End erpc
 

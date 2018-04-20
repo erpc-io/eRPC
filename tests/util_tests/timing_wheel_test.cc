@@ -61,7 +61,7 @@ TEST(TimingWheelTest, RateTest) {
     const double target_rate = Timely::gbps_to_rate(target_gbps[iters]);
     test_printf("Target rate = %.2f Gbps\n", target_gbps[iters]);
     const double ns_per_pkt = 1000000000 * (kTestPktSize / target_rate);
-    const size_t cycles_per_pkt = round_up(freq_ghz * ns_per_pkt);
+    const size_t cycles_per_pkt = erpc::ceil(freq_ghz * ns_per_pkt);
 
     TscTimer rate_timer;
 
@@ -71,7 +71,6 @@ TEST(TimingWheelTest, RateTest) {
     timing_wheel_args_t args;
     args.mtu = kTestMTU;
     args.freq_ghz = freq_ghz;
-    args.wslot_width = kTestWslotWidth;
     args.huge_alloc = &alloc;
 
     TimingWheel wheel(args);

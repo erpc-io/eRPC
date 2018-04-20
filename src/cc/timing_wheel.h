@@ -13,14 +13,23 @@
 #include "common.h"
 #include "sm_types.h"
 #include "sslot.h"
+#include "transport_impl/infiniband/ib_transport.h"
+#include "transport_impl/raw/raw_transport.h"
 #include "util/mempool.h"
 #include "wheel_record.h"
 
 namespace erpc {
 
 static constexpr size_t kWheelBucketCap = 4;     ///< Wheel entries per bucket
-static constexpr double kWheelSlotWidthUs = .2;  ///< Duration per wheel slot
-static constexpr bool kWheelRecord = false;      ///< Fast-record wheel actions
+static constexpr double kWheelSlotWidthUs = .5;  ///< Duration per wheel slot
+static constexpr double kWheelHorizonUs =
+    1000000 * (kSessionCredits * CTransport::kMTU) / Timely::kMinRate;
+
+static constexpr size_t kWheelNumWslots =
+    1 + erpc::ceil(kWheelHorizonUs / kWheelSlotWidthUs);
+static_assert(kWheelNumWslots < UINT16_MAX, "");  ///< sslots track wslots
+
+static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
 /// One entry in a timing wheel bucket
 struct wheel_ent_t {
@@ -62,22 +71,17 @@ class TimingWheel {
       : mtu(args.mtu),
         freq_ghz(args.freq_ghz),
         wslot_width_tsc(us_to_cycles(kWheelSlotWidthUs, freq_ghz)),
-        horizon_us(1000000 * (kSessionCredits * mtu) / Timely::kMinRate),
-        horizon_tsc(us_to_cycles(horizon_us, freq_ghz)),
-        num_wslots(1 + round_up(horizon_us / kWheelSlotWidthUs)),
+        horizon_tsc(us_to_cycles(kWheelHorizonUs, freq_ghz)),
         huge_alloc(args.huge_alloc),
         bkt_pool(huge_alloc) {
-    rt_assert(num_wslots > 10, "Too few wheel slots");
-    rt_assert(num_wslots < 10000000, "Too many wheel slots");
-
-    // wheel_buffer is leaked, and deleted later with the allocator
+    // wheel_buffer is leaked by the wheel, and deleted later with the allocator
     Buffer wheel_buffer = huge_alloc->alloc_raw(
-        num_wslots * sizeof(wheel_bkt_t), DoRegister::kFalse);
+        kWheelNumWslots * sizeof(wheel_bkt_t), DoRegister::kFalse);
     rt_assert(wheel_buffer.buf != nullptr, "Failed to allocate wheel");
 
     size_t base_tsc = rdtsc();
     wheel = reinterpret_cast<wheel_bkt_t *>(wheel_buffer.buf);
-    for (size_t ws_i = 0; ws_i < num_wslots; ws_i++) {
+    for (size_t ws_i = 0; ws_i < kWheelNumWslots; ws_i++) {
       reset_bkt(&wheel[ws_i]);
       wheel[ws_i].tx_tsc = base_tsc + (ws_i + 1) * wslot_width_tsc;
       wheel[ws_i].last = &wheel[ws_i];
@@ -90,10 +94,10 @@ class TimingWheel {
   void reap(size_t reap_tsc) {
     while (wheel[cur_wslot].tx_tsc <= reap_tsc) {
       reap_wslot(cur_wslot);
-      wheel[cur_wslot].tx_tsc += (wslot_width_tsc * num_wslots);
+      wheel[cur_wslot].tx_tsc += (wslot_width_tsc * kWheelNumWslots);
 
       cur_wslot++;
-      if (cur_wslot == num_wslots) cur_wslot = 0;
+      if (cur_wslot == kWheelNumWslots) cur_wslot = 0;
     }
   }
 
@@ -123,10 +127,10 @@ class TimingWheel {
     } else {
       size_t wslot_delta =
           1 + (abs_tx_tsc - wheel[cur_wslot].tx_tsc) / wslot_width_tsc;
-      assert(wslot_delta < num_wslots);
+      assert(wslot_delta < kWheelNumWslots);
 
       dst_wslot = cur_wslot + wslot_delta;
-      if (dst_wslot >= num_wslots) dst_wslot -= num_wslots;
+      if (dst_wslot >= kWheelNumWslots) dst_wslot -= kWheelNumWslots;
     }
 
     if (kWheelRecord) record_vec.emplace_back(ent.pkt_num, abs_tx_tsc);
@@ -190,9 +194,7 @@ class TimingWheel {
   const size_t mtu;
   const double freq_ghz;         ///< TSC freq, used only for us/tsc conversion
   const size_t wslot_width_tsc;  ///< Time-granularity in TSC units
-  const double horizon_us;       ///< Timespan of one wheel rotation
   const size_t horizon_tsc;      ///< Horizon in TSC units
-  const size_t num_wslots;
   HugeAlloc *huge_alloc;
 
   wheel_bkt_t *wheel;
