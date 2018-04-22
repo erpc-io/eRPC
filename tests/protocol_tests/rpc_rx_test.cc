@@ -99,7 +99,7 @@ TEST_F(RpcRxTest, process_small_req_st) {
   test_context.num_req_handler_calls = 0;
 }
 
-TEST_F(RpcRxTest, process_small_resp_st) {
+TEST_F(RpcRxTest, process_resp_one_SMALL_st) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
   Session *clt_session = create_client_session_connected(client, server);
@@ -126,7 +126,7 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   // Expect: It's dropped
   assert(sslot_0->cur_req_num == kSessionReqWindow);
   sslot_0->cur_req_num += kSessionReqWindow;
-  rpc->process_small_resp_st(sslot_0, pkthdr_0, batch_rx_tsc);
+  rpc->process_resp_one_st(sslot_0, pkthdr_0, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info.num_rx, 0);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
   sslot_0->cur_req_num -= kSessionReqWindow;
@@ -135,21 +135,25 @@ TEST_F(RpcRxTest, process_small_resp_st) {
   // Expect: It's dropped.
   assert(sslot_0->client_info.num_tx == 1);
   sslot_0->client_info.num_tx = 0;
-  rpc->process_small_resp_st(sslot_0, pkthdr_0, batch_rx_tsc);
+  rpc->process_resp_one_st(sslot_0, pkthdr_0, batch_rx_tsc);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
   sslot_0->client_info.num_tx = 1;
 
   // Receive an in-order small response (in-order)
   // Expect: Continuation is invoked.
-  rpc->process_small_resp_st(sslot_0, pkthdr_0, batch_rx_tsc);
+  rpc->process_resp_one_st(sslot_0, pkthdr_0, batch_rx_tsc);
   ASSERT_EQ(test_context.num_cont_func_calls, 1);
   ASSERT_EQ(sslot_0->tx_msgbuf, nullptr);  // Response received
   test_context.num_cont_func_calls = 0;
 
   // Receive the same response again (past)
   // Expect: It's dropped
-  rpc->process_small_resp_st(sslot_0, pkthdr_0, batch_rx_tsc);
+  rpc->process_resp_one_st(sslot_0, pkthdr_0, batch_rx_tsc);
   ASSERT_EQ(test_context.num_cont_func_calls, 0);
+}
+
+TEST_F(RpcRxTest, process_resp_one_LARGE_st) {
+  // TODO
 }
 
 TEST_F(RpcRxTest, process_expl_cr_st) {

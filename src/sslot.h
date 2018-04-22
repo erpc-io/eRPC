@@ -67,9 +67,13 @@ class SSlot {
       size_t progress_tsc;  ///< Last TSC at which this request made progress
       size_t cont_etid;     ///< eRPC thread ID to run the continuation on
 
-      /// Transmission timestamps for request and RFRs. Cold if CC is disabled.
-      /// This is indexed by pkt_num % kSessionCredits.
+      // Fields for congestion control, cold if CC is disabled.
+
+      /// Per-packet TX timestamp. Indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;
+
+      /// Per-packet wheel slot index. Indexed by pkt_num % kSessionCredits.
+      std::array<uint16_t, kSessionCredits> wslot_idx;
 
       /// Return a string representation of the progress made by this sslot.
       /// Progress fields that are zero are not included in the string.

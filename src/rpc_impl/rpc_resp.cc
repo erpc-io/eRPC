@@ -71,57 +71,12 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr,
-                                     size_t rx_tsc) {
+void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
+                                   size_t rx_tsc) {
   assert(in_dispatch());
   assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
 
   // Handle reordering
-  if (unlikely(!in_order_client(sslot, pkthdr))) {
-    LOG_REORDER(
-        "eRPC Rpc %u: Received out-of-order response for session %u. "
-        "Request num: %zu (pkt), %zu (sslot). Dropping.\n",
-        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        sslot->cur_req_num);
-    return;
-  }
-
-  // This is the entire, in-order response. So, we still have the request.
-  assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
-
-  // Update client tracking metdata. No need to update progress_tsc.
-  if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
-  bump_credits(sslot->session);
-  sslot->client_info.num_rx++;
-
-  sslot->tx_msgbuf = nullptr;  // Mark response as received
-
-  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-  resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-
-  // Copy header and data, but not headroom
-  memcpy(reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
-         reinterpret_cast<const uint8_t *>(pkthdr) + kHeadroom,
-         pkthdr->msg_size + sizeof(pkthdr_t) - kHeadroom);
-
-  if (likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
-    sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
-                                 sslot->client_info.tag);
-  } else {
-    // Background thread will run continuation
-    submit_background_st(sslot, Nexus::BgWorkItemType::kResp,
-                         sslot->client_info.cont_etid);
-    return;
-  }
-}
-
-template <class TTr>
-void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
-                                         size_t rx_tsc) {
-  assert(in_dispatch());
-
-  // Handler reordering
-  assert(pkthdr->req_num <= sslot->cur_req_num);
   if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
         "eRPC Rpc %u: Received out-of-order response for session %u. "
@@ -135,35 +90,58 @@ void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
   assert(req_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
 
-  // Update client tracking metadata.
+  // Update client tracking metadata
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   sslot->client_info.num_rx++;
-  sslot->client_info.progress_tsc = ev_loop_tsc;
 
   MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-  if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
-    // This is the first response packet
+
+  // Special handling for single-packet respones
+  if (likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-    *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;
+
+    // Copy eRPC header and data, but not Transport headroom
+    memcpy(reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
+           reinterpret_cast<const uint8_t *>(pkthdr) + kHeadroom,
+           pkthdr->msg_size + sizeof(pkthdr_t) - kHeadroom);
+
+    // Fall through
+  } else {
+    sslot->client_info.progress_tsc = ev_loop_tsc;
+
+    if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
+      // This is the first response packet
+      resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
+
+      // Copy only eRPC header - data is copied later
+      memcpy(
+          reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
+          reinterpret_cast<const uint8_t *>(pkthdr) + kHeadroom,
+          sizeof(pkthdr_t) - kHeadroom);
+    }
+
+    // Send RFRs before doing the response memcpy
+    const auto rfr_sent = sslot->client_info.num_tx - req_msgbuf->num_pkts;
+    size_t rfr_pending = ((resp_msgbuf->num_pkts - 1) - rfr_sent);
+    if (rfr_pending > 0) {
+      size_t sending =
+          std::min(sslot->session->client_info.credits, rfr_pending);
+      for (size_t i = 0; i < sending; i++) enqueue_rfr_st(sslot, pkthdr);
+    }
+
+    // Hdr 0 was copied earlier, other headers are unneeded, so copy just data
+    copy_data_to_msgbuf(
+        resp_msgbuf, resp_ntoi(pkthdr->pkt_num, req_msgbuf->num_pkts), pkthdr);
+
+    if (sslot->client_info.num_rx !=
+        req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1)
+      return;
+
+    // Else fall through
   }
 
-  // Send RFRs before doing the response memcpy
-  const auto rfr_sent = sslot->client_info.num_tx - req_msgbuf->num_pkts;
-  size_t rfr_pending = ((resp_msgbuf->num_pkts - 1) - rfr_sent);
-  if (rfr_pending > 0) {
-    size_t sending = std::min(sslot->session->client_info.credits, rfr_pending);
-    for (size_t i = 0; i < sending; i++) enqueue_rfr_st(sslot, pkthdr);
-  }
-
-  // Header 0 was copied earlier, other headers are unneeded, so copy just data
-  copy_data_to_msgbuf(resp_msgbuf,
-                      resp_ntoi(pkthdr->pkt_num, req_msgbuf->num_pkts), pkthdr);
-
-  if (sslot->client_info.num_rx !=
-      req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1)
-    return;
-
+  // If we are here, the complete response has been received
   sslot->tx_msgbuf = nullptr;  // Mark response as received
   if (sslot->client_info.cont_etid == kInvalidBgETid) {
     sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,

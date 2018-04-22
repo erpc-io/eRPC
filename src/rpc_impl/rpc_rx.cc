@@ -56,9 +56,7 @@ void Rpc<TTr>::process_comps_st() {
         break;
       case PktType::kPktTypeResp: {
         size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
-        pkthdr->msg_size <= TTr::kMaxDataPerPkt
-            ? process_small_resp_st(sslot, pkthdr, rx_tsc)
-            : process_large_resp_one_st(sslot, pkthdr, rx_tsc);
+        process_resp_one_st(sslot, pkthdr, rx_tsc);
         break;
       }
       case PktType::kPktTypeReqForResp:

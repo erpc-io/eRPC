@@ -3,7 +3,7 @@
 --batch_size 6
 --concurrency 10
 --msg_size 32
---num_processes 20
---num_threads 1
+--num_processes 10
+--num_threads 2
 --numa_0_ports 0
 --numa_1_ports 1,3

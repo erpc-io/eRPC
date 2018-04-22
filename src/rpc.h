@@ -433,13 +433,7 @@ class Rpc {
    * @brief Process a single-packet response
    * @param rx_tsc The timestamp at which this packet was received
    */
-  void process_small_resp_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
-
-  /**
-   * @brief Process a packet for a multi-packet response
-   * @param rx_tsc The timestamp at which this packet was received
-   */
-  void process_large_resp_one_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
+  void process_resp_one_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
   //
   // Event loop

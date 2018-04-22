@@ -27,7 +27,9 @@ static constexpr double kWheelHorizonUs =
 
 static constexpr size_t kWheelNumWslots =
     1 + erpc::ceil(kWheelHorizonUs / kWheelSlotWidthUs);
-static_assert(kWheelNumWslots < UINT16_MAX, "");  ///< sslots track wslots
+
+/// Session slots track wheel slots. UINT16_MAX is an invalid wheel index.
+static_assert(kWheelNumWslots < UINT16_MAX, "");
 
 static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
