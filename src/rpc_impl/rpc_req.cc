@@ -67,66 +67,11 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  bool all_pkts_tx = req_sslot_tx_credits_cc_st(&sslot);
-  if (!all_pkts_tx) credit_stall_txq.push_back(&sslot);
-  return;
-}
-
-template <class TTr>
-bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
-  MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
-  assert(sslot->client_info.num_tx < req_msgbuf->num_pkts);
-
-  Session *session = sslot->session;
-  size_t &credits = session->client_info.credits;
-  auto &ci = sslot->client_info;
-  if (credits == 0) return false;
-
-  if (likely(req_msgbuf->num_pkts == 1)) {
-    // Small request. Bypass wheel if pacing is disabled or bypass is possible.
-    const size_t pkt_idx = 0, pkt_num = 0;
-    if (!kCcPacing ||
-        (kCcOptWheelBypass &&
-         session->client_info.cc.timely.rate == Timely::kMaxRate)) {
-      enqueue_pkt_tx_burst_st(sslot, pkt_idx, &ci.tx_ts[pkt_num]);
-    } else {
-      size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
-      size_t ref_tsc = dpath_rdtsc();
-      size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(ref_tsc, pkt_size);
-      wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
-    }
-
-    credits--;
-    ci.num_tx++;
-    return true;
+  if (likely(session->client_info.credits > 0)) {
+    client_kick_st(&sslot);
   } else {
-    // Large request
-    size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.num_tx);
-
-    for (size_t _x = 0; _x < sending; _x++) {
-      const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
-      if (kCcPacing) {
-        size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
-        size_t ref_tsc = dpath_rdtsc();
-        size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(ref_tsc, psz);
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
-
-        LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, abs TX %.3f us.\n",
-               rpc_id, sslot->cur_req_num, pkt_num,
-               to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
-      } else {
-        enqueue_pkt_tx_burst_st(sslot, pkt_idx,
-                                &ci.tx_ts[pkt_num % kSessionCredits]);
-      }
-
-      credits--;
-      ci.num_tx++;
-    }
-
-    if (ci.num_tx == req_msgbuf->num_pkts) return true;
+    credit_stall_txq.push_back(&sslot);
   }
-
-  return false;
 }
 
 template <class TTr>

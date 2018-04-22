@@ -8,14 +8,11 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
   size_t write_index = 0;  // Re-add incomplete sslots at this index
 
   for (SSlot *sslot : credit_stall_txq) {
-    // Try early exit
-    if (sslot->session->client_info.credits == 0) {
+    if (sslot->session->client_info.credits > 0) {
+      client_kick_st(sslot);
+    } else {
       credit_stall_txq[write_index++] = sslot;
-      continue;
     }
-
-    bool all_pkts_tx = req_sslot_tx_credits_cc_st(sslot);
-    if (!all_pkts_tx) credit_stall_txq[write_index++] = sslot;
   }
 
   credit_stall_txq.resize(write_index);  // Number of sslots left = write_index

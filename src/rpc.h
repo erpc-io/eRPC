@@ -349,6 +349,15 @@ class Rpc {
            (pkthdr->pkt_num == sslot->client_info.num_rx);
   }
 
+  // rpc_client_kick.cc
+
+  /**
+   * @brief Enqueue client packets for a sslot that has at least one credit.
+   * Packets may be added to the timing wheel or the TX burst; credits are used
+   * in both cases.
+   */
+  void client_kick_st(SSlot *);
+
   // rpc_req.cc
  public:
   /**
@@ -377,17 +386,6 @@ class Rpc {
                        size_t tag, size_t cont_etid = kInvalidBgETid);
 
  private:
-  /**
-   * @brief Enqueue request packets for a sslot, handling credits and
-   * congestion control. Packets may be added to the timing wheel or the TX
-   * burst; credits are used in both cases.
-   *
-   * @return True if there were sufficient credits to send all request packets
-   * in the sslot. Otherwise false is returned, and the caller should add the
-   * sslot to the credit stalled queue.
-   */
-  bool req_sslot_tx_credits_cc_st(SSlot *);
-
   /// Process a single-packet request message. Using (const pkthdr_t *) instead
   /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
   void process_small_req_st(SSlot *, pkthdr_t *);

@@ -129,6 +129,7 @@ set(SOURCES
   src/rpc_impl/rpc_queues.cc
   src/rpc_impl/rpc_rfr.cc
   src/rpc_impl/rpc_cr.cc
+  src/rpc_impl/rpc_client_kick.cc
   src/rpc_impl/rpc_req.cc
   src/rpc_impl/rpc_resp.cc
   src/rpc_impl/rpc_ev_loop.cc

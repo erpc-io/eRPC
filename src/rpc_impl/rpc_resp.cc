@@ -86,69 +86,52 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     return;
   }
 
+  auto &ci = sslot->client_info;
+  MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
+
   // This is an in-order response packet. So, we still have the request.
   MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
   assert(req_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
 
-  // Update client tracking metadata
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
-  sslot->client_info.num_rx++;
-
-  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
+  ci.num_rx++;
 
   // Special handling for single-packet respones
   if (likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
 
     // Copy eRPC header and data, but not Transport headroom
-    memcpy(reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
-           reinterpret_cast<const uint8_t *>(pkthdr) + kHeadroom,
+    memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
            pkthdr->msg_size + sizeof(pkthdr_t) - kHeadroom);
 
-    // Fall through
+    // Fall through to invoke continuation
   } else {
-    sslot->client_info.progress_tsc = ev_loop_tsc;
+    ci.progress_tsc = ev_loop_tsc;
 
     if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
-      // This is the first response packet
+      // This is the first response packet. Resize and copy eRPC header.
       resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-
-      // Copy only eRPC header - data is copied later
-      memcpy(
-          reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
-          reinterpret_cast<const uint8_t *>(pkthdr) + kHeadroom,
-          sizeof(pkthdr_t) - kHeadroom);
+      memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
+             sizeof(pkthdr_t) - kHeadroom);
     }
 
-    // Send RFRs before doing the response memcpy
-    const auto rfr_sent = sslot->client_info.num_tx - req_msgbuf->num_pkts;
-    size_t rfr_pending = ((resp_msgbuf->num_pkts - 1) - rfr_sent);
-    if (rfr_pending > 0) {
-      size_t sending =
-          std::min(sslot->session->client_info.credits, rfr_pending);
-      for (size_t i = 0; i < sending; i++) enqueue_rfr_st(sslot, pkthdr);
-    }
+    client_kick_st(sslot);  // Send RFRs before doing the response memcpy
 
-    // Hdr 0 was copied earlier, other headers are unneeded, so copy just data
-    copy_data_to_msgbuf(
-        resp_msgbuf, resp_ntoi(pkthdr->pkt_num, req_msgbuf->num_pkts), pkthdr);
+    // Hdr 0 was copied earlier, other headers are unneeded, so copy just data.
+    const size_t pkt_idx = resp_ntoi(pkthdr->pkt_num, resp_msgbuf->num_pkts);
+    copy_data_to_msgbuf(resp_msgbuf, pkt_idx, pkthdr);
 
-    if (sslot->client_info.num_rx !=
-        req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1)
-      return;
-
-    // Else fall through
+    if (ci.num_rx != req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1) return;
+    // Fall through to invoke continuation
   }
 
   // If we are here, the complete response has been received
   sslot->tx_msgbuf = nullptr;  // Mark response as received
-  if (sslot->client_info.cont_etid == kInvalidBgETid) {
-    sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
-                                 sslot->client_info.tag);
+  if (ci.cont_etid == kInvalidBgETid) {
+    ci.cont_func(static_cast<RespHandle *>(sslot), context, ci.tag);
   } else {
-    submit_background_st(sslot, Nexus::BgWorkItemType::kResp,
-                         sslot->client_info.cont_etid);
+    submit_background_st(sslot, Nexus::BgWorkItemType::kResp, ci.cont_etid);
   }
   return;
 }

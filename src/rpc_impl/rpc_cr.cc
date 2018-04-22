@@ -44,6 +44,8 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
   bump_credits(sslot->session);
   sslot->client_info.num_rx++;
   sslot->client_info.progress_tsc = ev_loop_tsc;
+
+  client_kick_st(sslot);  // We have credits
 }
 
 FORCE_COMPILE_TRANSPORTS

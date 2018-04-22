@@ -91,6 +91,16 @@ struct pkthdr_t {
     return ret.str();
   }
 
+  /// Return a pointer to the eRPC header in this packet header
+  inline uint8_t *ehdrptr() {
+    return reinterpret_cast<uint8_t *>(this) + kHeadroom;
+  }
+
+  /// Return a const pointer to the eRPC header in this const packet header
+  inline const uint8_t *ehdrptr() const {
+    return reinterpret_cast<const uint8_t *>(this) + kHeadroom;
+  }
+
   inline bool check_magic() const { return magic == kPktHdrMagic; }
 
   inline bool is_req() const { return pkt_type == kPktTypeReq; }
