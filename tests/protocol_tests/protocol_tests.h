@@ -135,7 +135,7 @@ class RpcTest : public ::testing::Test {
   }
 
   Rpc<CTransport> *rpc = nullptr;
-  FixedQueue<pkthdr_t, Rpc<CTransport>::kTestingPkthdrQueueSz> *pkthdr_tx_queue;
+  FixedQueue<pkthdr_t, kSessionCredits> *pkthdr_tx_queue;
 
  private:
   Nexus *nexus = nullptr;

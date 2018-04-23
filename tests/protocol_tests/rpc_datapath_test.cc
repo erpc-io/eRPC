@@ -173,6 +173,8 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(sslot_0->client_info.num_tx == kSessionCredits);
   assert(clt_session->client_info.credits == 0);
+  assert(pkthdr_tx_queue->size() == kSessionCredits);
+  pkthdr_tx_queue->clear();
 
   // Construct the basic explicit credit return packet
   pkthdr_t expl_cr;
@@ -188,31 +190,35 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
   ASSERT_EQ(sslot_0->client_info.num_rx, 0);
   sslot_0->cur_req_num -= kSessionReqWindow;
 
-  // Receive an in-order explicit credit return (in-order)
-  // Expect: num_rx and credits are bumped
+  // Receive the first in-order explicit credit return (in-order)
+  // Expect: num_rx is bumped; another request packet is sent that uses a credit
   rpc->process_expl_cr_st(sslot_0, &expl_cr, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info.num_rx, 1);
-  ASSERT_EQ(clt_session->client_info.credits, 1);
+  ASSERT_EQ(clt_session->client_info.credits, 0);
+  ASSERT_TRUE(
+      pkthdr_tx_queue->pop().matches(PktType::kPktTypeReq, kSessionCredits));
 
   // Receive the same explicit credit return again (past)
   // Expect: It's dropped
   rpc->process_expl_cr_st(sslot_0, &expl_cr, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info.num_rx, 1);
 
-  // Client should use only the num_rx counter for ordering (sensitivity)
+  // Client should use only num_rx & num_tx for ordering (sensitivity)
   // Expect: On resetting it, behavior should be like an in-order explicit CR
   sslot_0->client_info.num_rx--;
-  clt_session->client_info.credits--;
+  sslot_0->client_info.num_tx--;
   rpc->process_expl_cr_st(sslot_0, &expl_cr, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info.num_rx, 1);
-  ASSERT_EQ(clt_session->client_info.credits, 1);
+  ASSERT_EQ(clt_session->client_info.credits, 0);
+  ASSERT_TRUE(
+      pkthdr_tx_queue->pop().matches(PktType::kPktTypeReq, kSessionCredits));
 
   // Receive explicit credit return for a future pkt in this request (roll-back)
   // Expect: It's dropped
-  sslot_0->client_info.num_rx = 1;  // Roll-back
   expl_cr.pkt_num = 2;              // Future
   rpc->process_expl_cr_st(sslot_0, &expl_cr, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info.num_rx, 1);
+  ASSERT_EQ(pkthdr_tx_queue->size(), 0);
   expl_cr.pkt_num = 0;
 }
 

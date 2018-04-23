@@ -32,6 +32,12 @@ class FixedQueue {
     return ret;
   }
 
+  /// Clear the queue
+  inline void clear() {
+    std::queue<T> empty;
+    std::swap(queue, empty);
+  }
+
   /// Return the number of elements currently in the queue
   inline size_t size() { return queue.size(); }
 

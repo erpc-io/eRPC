@@ -874,11 +874,8 @@ class Rpc {
   } faults;
 
   // Additional members for testing
-
-  /// Number of packet headers recorded
-  static constexpr size_t kTestingPkthdrQueueSz = 16;
   struct {
-    FixedQueue<pkthdr_t, kTestingPkthdrQueueSz> pkthdr_tx_queue;
+    FixedQueue<pkthdr_t, kSessionCredits> pkthdr_tx_queue;
   } testing;
 };
 
