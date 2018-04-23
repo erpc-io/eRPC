@@ -215,7 +215,7 @@ TEST_F(RpcRxTest, process_expl_cr_st) {
 
   // Receive explicit credit return for a future pkt in this request (roll-back)
   // Expect: It's dropped
-  expl_cr.pkt_num = 2;              // Future
+  expl_cr.pkt_num = 2;  // Future
   rpc->process_expl_cr_st(sslot_0, &expl_cr, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info.num_rx, 1);
   ASSERT_EQ(pkthdr_tx_queue->size(), 0);
