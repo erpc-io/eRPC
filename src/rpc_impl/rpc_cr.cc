@@ -45,7 +45,10 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
   sslot->client_info.num_rx++;
   sslot->client_info.progress_tsc = ev_loop_tsc;
 
-  client_kick_st(sslot);  // We have credits
+  // If we've transmitted all request pkts, there's nothing more to TX yet
+  if (sslot->client_info.num_tx < sslot->tx_msgbuf->num_pkts) {
+    client_kick_st(sslot);  // We have at least one credit
+  }
 }
 
 FORCE_COMPILE_TRANSPORTS

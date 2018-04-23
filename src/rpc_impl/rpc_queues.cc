@@ -9,7 +9,7 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
 
   for (SSlot *sslot : credit_stall_txq) {
     if (sslot->session->client_info.credits > 0) {
-      client_kick_st(sslot);
+      client_kick_st(sslot);  // sslots in stall queue have packets to send
     } else {
       credit_stall_txq[write_index++] = sslot;
     }

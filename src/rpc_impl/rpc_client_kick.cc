@@ -40,21 +40,22 @@ void Rpc<TTr>::client_kick_st(SSlot *sslot) {
       ci.num_tx++;
     }
   } else {
-    // We've sent all request packets. Send RFRs if we've received 1st response.
-    if (ci.num_rx >= req_msgbuf->num_pkts) {
-      // We don't have the full response. So, a continuation in the background
-      // thread can't invalidate resp_msgbuf.
-      MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
-      assert(resp_msgbuf->is_dynamic_and_matches(sslot->tx_msgbuf));
-      assert(ci.num_rx < req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1);
+    // We've sent all request packets and now we must send more. This means that
+    // we have recieved the first response packet, but not the entire response.
+    //
+    // The latter means that a background contn. cannot invalidate resp_msgbuf.
+    assert(ci.num_rx >= req_msgbuf->num_pkts);
+    MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
+    assert(resp_msgbuf->is_dynamic_and_matches(sslot->tx_msgbuf));
+    assert(ci.num_rx < req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1);
 
-      // TODO: Pace RFRs
-      auto rfr_sent = ci.num_tx - req_msgbuf->num_pkts;
-      size_t rfr_pending = ((resp_msgbuf->num_pkts - 1) - rfr_sent);
-      size_t sending = std::min(credits, rfr_pending);
-      for (size_t i = 0; i < sending; i++) {
-        enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
-      }
+    // TODO: Pace RFRs
+    size_t rfr_pending =
+        (resp_msgbuf->num_pkts + req_msgbuf->num_pkts - 1) - ci.num_tx;
+    size_t sending = std::min(credits, rfr_pending);
+    assert(sending > 0);
+    for (size_t i = 0; i < sending; i++) {
+      enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
     }
   }
 

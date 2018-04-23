@@ -352,7 +352,9 @@ class Rpc {
   // rpc_client_kick.cc
 
   /**
-   * @brief Enqueue client packets for a sslot that has at least one credit.
+   * @brief Enqueue client packets for a sslot that has at least one credit and
+   * packets to send.
+   *
    * Packets may be added to the timing wheel or the TX burst; credits are used
    * in both cases.
    */

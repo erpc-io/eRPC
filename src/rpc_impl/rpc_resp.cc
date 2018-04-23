@@ -116,7 +116,10 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
              sizeof(pkthdr_t) - kHeadroom);
     }
 
-    client_kick_st(sslot);  // Send RFRs before doing the response memcpy
+    if (ci.num_tx != req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1) {
+      // Transmit remaining RFRs before response memcpy. We have credits.
+      client_kick_st(sslot);
+    }
 
     // Hdr 0 was copied earlier, other headers are unneeded, so copy just data.
     const size_t pkt_idx = resp_ntoi(pkthdr->pkt_num, resp_msgbuf->num_pkts);
