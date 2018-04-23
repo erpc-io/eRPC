@@ -349,6 +349,13 @@ class Rpc {
            (pkthdr->pkt_num == sslot->client_info.num_rx);
   }
 
+  /// Return the total number of packets sent on the wire by one RPC endpoint.
+  /// The client must have received the first response packet to call this.
+  static inline size_t wire_pkts(MsgBuffer *req_msgbuf,
+                                 MsgBuffer *resp_msgbuf) {
+    return req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1;
+  }
+
   // rpc_client_kick.cc
 
   /**

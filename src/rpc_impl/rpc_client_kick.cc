@@ -42,16 +42,14 @@ void Rpc<TTr>::client_kick_st(SSlot *sslot) {
   } else {
     // We've sent all request packets and now we must send more. This means that
     // we have recieved the first response packet, but not the entire response.
-    //
     // The latter means that a background contn. cannot invalidate resp_msgbuf.
     assert(ci.num_rx >= req_msgbuf->num_pkts);
     MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
     assert(resp_msgbuf->is_dynamic_and_matches(sslot->tx_msgbuf));
-    assert(ci.num_rx < req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1);
+    assert(ci.num_rx < wire_pkts(req_msgbuf, resp_msgbuf));
 
     // TODO: Pace RFRs
-    size_t rfr_pending =
-        (resp_msgbuf->num_pkts + req_msgbuf->num_pkts - 1) - ci.num_tx;
+    size_t rfr_pending = wire_pkts(req_msgbuf, resp_msgbuf) - ci.num_tx;
     size_t sending = std::min(credits, rfr_pending);
     assert(sending > 0);
     for (size_t i = 0; i < sending; i++) {
