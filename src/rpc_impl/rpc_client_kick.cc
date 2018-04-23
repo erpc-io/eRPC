@@ -9,8 +9,8 @@ void Rpc<TTr>::client_kick_st(SSlot *sslot) {
   auto &credits = session->client_info.credits;
   assert(credits > 0);  // Precondition
 
-  bool _uncongested = (session->client_info.cc.timely.rate == Timely::kMaxRate);
-  const bool bypass_wheel = !kCcPacing || (kCcOptWheelBypass && _uncongested);
+  const bool bypass_wheel =
+      !kCcPacing || (kCcOptWheelBypass && session->is_uncongested());
 
   MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
   auto &ci = sslot->client_info;

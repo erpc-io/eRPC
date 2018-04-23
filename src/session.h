@@ -92,6 +92,11 @@ class Session {
     return abs_tx_tsc;
   }
 
+  /// Return true iff this session is uncongested
+  inline bool is_uncongested() const {
+    return client_info.cc.timely.rate == Timely::kMaxRate;
+  }
+
   const Role role;  ///< The role (server/client) of this session endpoint
   const conn_req_uniq_token_t uniq_token;  ///< A cluster-wide unique token
   const double freq_ghz;                   ///< TSC frequency
