@@ -2,8 +2,6 @@
 
 namespace erpc {
 
-void req_handler(ReqHandle *, void *) {}  // Required by RpcTest
-
 class RpcSmTest : public RpcTest {
  public:
   RpcSmTest() {
