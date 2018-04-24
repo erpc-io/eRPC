@@ -176,7 +176,11 @@ set(CLIENT_TESTS
 
 set(PROTOCOL_TESTS
   rpc_sm_test
-  rpc_datapath_test)
+  rpc_req_test
+  rpc_resp_test
+  rpc_cr_test
+  rpc_rfr_test
+  rpc_client_kick_test)
 
 set(TRANSPORT_TESTS
   raw_transport_test)
