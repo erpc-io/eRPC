@@ -1,3 +1,13 @@
+/**
+ * @file protocol_tests.h
+ * @brief Tests for the eRPC wire protocol implementation
+ *
+ * Only real packet orderings are tested. Impossible/buggy packet orderings are
+ * ignored: it's OK for eRPC to crash or misbehave with such orderings. For
+ * example, the server cannot receive a future request before it sends a
+ * response to the current request.
+ */
+
 #include <gtest/gtest.h>
 
 #define private public
@@ -12,6 +22,8 @@ static constexpr size_t kTestUniqToken = 42;
 static constexpr size_t kTestRpcId = 0;  // ID of the fixture's Rpc
 static constexpr size_t kTestReqType = 1;
 static constexpr size_t kTestTag = 0;
+static constexpr size_t kTestSmallMsgSize = 32;
+static constexpr size_t kTestLargeMsgSize = KB(128);
 
 static void req_handler(ReqHandle *, void *);  // Defined in each test.cc
 
