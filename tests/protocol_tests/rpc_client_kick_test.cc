@@ -26,7 +26,6 @@ class RpcClientKickTest : public RpcTest {
 
 /// Kicking a sslot without credits is disallowed
 TEST_F(RpcClientKickTest, client_kick_st_no_credits) {
-  // Use enqueue_request() to do sslot formatting. This uses all credits.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
   ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
@@ -35,7 +34,6 @@ TEST_F(RpcClientKickTest, client_kick_st_no_credits) {
 /// Kicking a sslot that has transmitted all request packets but received no
 /// response packet is disallowed
 TEST_F(RpcClientKickTest, client_kick_st_all_request_no_response) {
-  // Use enqueue_request() to do sslot formatting. This uses all credits.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
   sslot_0->client_info.num_tx = rpc->data_size_to_num_pkts(req.data_size);
@@ -45,7 +43,6 @@ TEST_F(RpcClientKickTest, client_kick_st_all_request_no_response) {
 
 /// Kicking a sslot that has received the full response is disallowed
 TEST_F(RpcClientKickTest, client_kick_st_full_response) {
-  // Use enqueue_request() to do sslot formatting. This uses all credits.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
 
@@ -56,6 +53,24 @@ TEST_F(RpcClientKickTest, client_kick_st_full_response) {
   clt_session->client_info.credits = kSessionCredits;
   sslot_0->client_info.resp_msgbuf = &resp;
 
+  ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
+}
+
+/// Kick a sslot that hasn't transmitted all request packets
+TEST_F(RpcClientKickTest, client_kick_st_req_pkts) {
+  rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
+  assert(clt_session->client_info.credits == 0);
+  pkthdr_tx_queue->clear();
+
+  // Pretend that an RFR has been received
+  clt_session->client_info.credits = 1;
+  sslot_0->client_info.num_rx = 1;
+  rpc->client_kick_st(sslot_0);
+  ASSERT_EQ(pkthdr_tx_queue->size(), 1);
+  ASSERT_TRUE(
+      pkthdr_tx_queue->pop().matches(PktType::kPktTypeReq, kSessionCredits));
+
+  // Kicking twice in a row without any RX in between is disallowed
   ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
 }
 
