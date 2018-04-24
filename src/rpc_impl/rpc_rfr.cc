@@ -15,7 +15,7 @@ void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   rfr_pkthdr->req_type = resp_pkthdr->req_type;
   rfr_pkthdr->msg_size = 0;
   rfr_pkthdr->dest_session_num = sslot->session->remote_session_num;
-  rfr_pkthdr->pkt_type = kPktTypeReqForResp;
+  rfr_pkthdr->pkt_type = kPktTypeRFR;
   rfr_pkthdr->pkt_num = sslot->client_info.num_tx;
   rfr_pkthdr->req_num = resp_pkthdr->req_num;
   rfr_pkthdr->magic = kPktHdrMagic;
@@ -29,7 +29,7 @@ void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_req_for_resp_st(SSlot *sslot, const pkthdr_t *pkthdr) {
+void Rpc<TTr>::process_rfr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_dispatch());
   assert(!sslot->is_client);
   auto &si = sslot->server_info;

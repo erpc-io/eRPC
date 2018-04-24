@@ -502,7 +502,7 @@ class Rpc {
   inline void enqueue_hdr_tx_burst_st(SSlot *sslot, MsgBuffer *ctrl_msgbuf,
                                       size_t *tx_ts) {
     assert(in_dispatch());
-    assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_req_for_resp());
+    assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_rfr());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
@@ -780,7 +780,7 @@ class Rpc {
   void enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
 
   /// Process a request-for-response
-  void process_req_for_resp_st(SSlot *, const pkthdr_t *);
+  void process_rfr_st(SSlot *, const pkthdr_t *);
 
  public:
   // Hooks for apps to modify eRPC behavior

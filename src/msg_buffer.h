@@ -46,9 +46,7 @@ class MsgBuffer {
   inline bool is_req() const { return get_pkthdr_0()->is_req(); }
   inline bool is_resp() const { return get_pkthdr_0()->is_resp(); }
   inline bool is_expl_cr() const { return get_pkthdr_0()->is_expl_cr(); }
-  inline bool is_req_for_resp() const {
-    return get_pkthdr_0()->is_req_for_resp();
-  }
+  inline bool is_rfr() const { return get_pkthdr_0()->is_rfr(); }
   inline uint64_t get_req_num() const { return get_pkthdr_0()->req_num; }
   inline uint64_t get_pkt_type() const { return get_pkthdr_0()->pkt_type; }
   inline uint8_t get_req_type() const { return get_pkthdr_0()->req_type; }
