@@ -50,14 +50,11 @@ void Rpc<TTr>::client_kick_st(SSlot *sslot) {
 
     // TODO: Pace RFRs
     size_t rfr_pending = wire_pkts(req_msgbuf, resp_msgbuf) - ci.num_tx;
-    size_t sending = std::min(credits, rfr_pending);
-    assert(sending > 0);
+    size_t sending = std::min(credits, rfr_pending);  // > 0
     for (size_t i = 0; i < sending; i++) {
       enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
     }
   }
-
-  assert(ci.num_tx > ci.num_rx);  // Ensure that we can detect lost packets
 }
 
 FORCE_COMPILE_TRANSPORTS

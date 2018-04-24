@@ -14,8 +14,7 @@ TEST_F(RpcTest, process_expl_cr_st) {
   MsgBuffer req = rpc->alloc_msg_buffer(kTestLargeMsgSize);
   MsgBuffer resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);  // Unused
 
-  // Use enqueue_request() to do sslot formatting for the request. This should
-  // use all credits since the message is large.
+  // Use enqueue_request() to do sslot formatting. This uses all credits.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(sslot_0->client_info.num_tx == kSessionCredits);
   assert(clt_session->client_info.credits == 0);

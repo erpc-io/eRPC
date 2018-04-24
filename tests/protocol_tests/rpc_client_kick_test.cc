@@ -20,17 +20,45 @@ class RpcClientKickTest : public RpcTest {
     sslot_0 = &clt_session->sslot_arr[0];
 
     req = rpc->alloc_msg_buffer(kTestLargeMsgSize);
-    resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);  // Unused
+    resp = rpc->alloc_msg_buffer(kTestLargeMsgSize);
   }
 };
 
+/// Kicking a sslot without credits is disallowed
 TEST_F(RpcClientKickTest, client_kick_st_no_credits) {
   // Use enqueue_request() to do sslot formatting. This uses all credits.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
+  ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
+}
+
+/// Kicking a sslot that has transmitted all request packets but received no
+/// response packet is disallowed
+TEST_F(RpcClientKickTest, client_kick_st_all_request_no_response) {
+  // Use enqueue_request() to do sslot formatting. This uses all credits.
+  rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
+  assert(clt_session->client_info.credits == 0);
+  sslot_0->client_info.num_tx = rpc->data_size_to_num_pkts(req.data_size);
+  sslot_0->client_info.num_rx = sslot_0->client_info.num_tx - kSessionCredits;
+  ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
+}
+
+/// Kicking a sslot that has received the full response is disallowed
+TEST_F(RpcClientKickTest, client_kick_st_full_response) {
+  // Use enqueue_request() to do sslot formatting. This uses all credits.
+  rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
+  assert(clt_session->client_info.credits == 0);
+
+  *resp.get_pkthdr_0() = *req.get_pkthdr_0();  // Match request's formatted hdr
+
+  sslot_0->client_info.num_tx = rpc->wire_pkts(&req, &resp);
+  sslot_0->client_info.num_rx = rpc->wire_pkts(&req, &resp);
+  clt_session->client_info.credits = kSessionCredits;
+  sslot_0->client_info.resp_msgbuf = &resp;
 
   ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
 }
+
 }  // End erpc
 
 int main(int argc, char **argv) {
