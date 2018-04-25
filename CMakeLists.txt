@@ -128,7 +128,7 @@ set(SOURCES
   src/rpc_impl/rpc_queues.cc
   src/rpc_impl/rpc_rfr.cc
   src/rpc_impl/rpc_cr.cc
-  src/rpc_impl/rpc_client_kick.cc
+  src/rpc_impl/rpc_kick.cc
   src/rpc_impl/rpc_req.cc
   src/rpc_impl/rpc_resp.cc
   src/rpc_impl/rpc_ev_loop.cc
@@ -179,7 +179,7 @@ set(PROTOCOL_TESTS
   rpc_resp_test
   rpc_cr_test
   rpc_rfr_test
-  rpc_client_kick_test)
+  rpc_kick_test)
 
 set(TRANSPORT_TESTS
   raw_transport_test)

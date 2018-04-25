@@ -68,7 +68,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   }
 
   if (likely(session->client_info.credits > 0)) {
-    client_kick_st(&sslot);
+    kick_req_st(&sslot);
   } else {
     credit_stall_txq.push_back(&sslot);
   }

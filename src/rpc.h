@@ -348,16 +348,30 @@ class Rpc {
     return req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1;
   }
 
-  // rpc_client_kick.cc
+  /// Return true iff this sslot needs to send more request packets
+  static inline bool req_pkts_pending(SSlot *sslot) {
+    return sslot->client_info.num_tx < sslot->tx_msgbuf->num_pkts;
+  }
 
-  /**
-   * @brief Enqueue client packets for a sslot that has at least one credit and
-   * packets to send.
-   *
-   * Packets may be added to the timing wheel or the TX burst; credits are used
-   * in both cases.
-   */
-  void client_kick_st(SSlot *);
+  /// Return true iff it's currently OK to bypass the wheel for this session
+  inline bool can_bypass_wheel(Session *session) const {
+    if (!kCcPacing) return true;
+    if (kTesting) return faults.hard_wheel_bypass;
+    if (kCcOptTimelyBypass) return session->is_uncongested();
+    return false;
+  }
+
+  // rpc_kick.cc
+
+  /// Enqueue client packets for a sslot that has at least one credit and
+  /// request packets to send. Packets may be added to the timing wheel or the
+  /// TX burst; credits are used in both cases.
+  void kick_req_st(SSlot *);
+
+  /// Enqueue client packets for a sslot that has at least one credit and
+  /// RFR packets to send. Packets may be added to the timing wheel or the
+  /// TX burst; credits are used in both cases.
+  void kick_rfr_st(SSlot *);
 
   // rpc_req.cc
  public:
@@ -512,6 +526,33 @@ class Rpc {
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
+  }
+
+  /**
+   * @brief Enqueue a request packet to the timing wheel
+   *
+   * @param sslot The sslot containing the request
+   * @param pkt_num The request packet number. This doesn't go into the wheel.
+   */
+  inline void enqueue_req_wheel_st(SSlot *sslot, size_t pkt_num) {
+    // pkt_num = pkt_idx
+    size_t pkt_size =
+        sslot->tx_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_num);
+    size_t ref_tsc = dpath_rdtsc();
+    size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pkt_size);
+
+    LOG_CC("eRPC Rpc %u: Req/pkt %zu/%zu, desired abs TX %.3f us.\n", rpc_id,
+           sslot->cur_req_num, pkt_num,
+           to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
+
+    wheel->insert(wheel_ent_t(sslot), ref_tsc, abs_tx_tsc);
+  }
+
+  /// Enqueue an RFR packet to the timing wheel
+  /// XXX: TODO
+  inline void enqueue_rfr_wheel_st(SSlot *sslot, size_t pkt_idx) {
+    _unused(sslot);
+    _unused(pkt_idx);
   }
 
   /// Transmit packets in the TX batch

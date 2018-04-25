@@ -25,24 +25,24 @@ class RpcClientKickTest : public RpcTest {
 };
 
 /// Kicking a sslot without credits is disallowed
-TEST_F(RpcClientKickTest, client_kick_st_no_credits) {
+TEST_F(RpcClientKickTest, kick_st_no_credits) {
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
-  ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
+  ASSERT_DEATH(rpc->kick_req_st(sslot_0), ".*");
 }
 
 /// Kicking a sslot that has transmitted all request packets but received no
 /// response packet is disallowed
-TEST_F(RpcClientKickTest, client_kick_st_all_request_no_response) {
+TEST_F(RpcClientKickTest, kick_st_all_request_no_response) {
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
   sslot_0->client_info.num_tx = rpc->data_size_to_num_pkts(req.data_size);
   sslot_0->client_info.num_rx = sslot_0->client_info.num_tx - kSessionCredits;
-  ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
+  ASSERT_DEATH(rpc->kick_req_st(sslot_0), ".*");
 }
 
 /// Kicking a sslot that has received the full response is disallowed
-TEST_F(RpcClientKickTest, client_kick_st_full_response) {
+TEST_F(RpcClientKickTest, kick_st_full_response) {
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
 
@@ -53,14 +53,14 @@ TEST_F(RpcClientKickTest, client_kick_st_full_response) {
   sslot_0->client_info.num_rx = rpc->wire_pkts(&req, &resp);
   clt_session->client_info.credits = kSessionCredits;
 
-  ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
+  ASSERT_DEATH(rpc->kick_rfr_st(sslot_0), ".*");
 }
 
 /// Kick a sslot that hasn't transmitted all request packets
-TEST_F(RpcClientKickTest, client_kick_st_req_pkts) {
+TEST_F(RpcClientKickTest, kick_st_req_pkts) {
   assert(rpc->faults.hard_wheel_bypass == false);  // Wheel won't be bypassed
 
-  // enqueue_request() calls client_kick_st()
+  // enqueue_request() calls kick_st()
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   ASSERT_EQ(clt_session->client_info.credits, 0);
   ASSERT_EQ(sslot_0->client_info.num_tx, 0);  // All packets are in wheel
@@ -72,7 +72,7 @@ TEST_F(RpcClientKickTest, client_kick_st_req_pkts) {
   // Pretend that a CR has been received
   clt_session->client_info.credits = 1;
   sslot_0->client_info.num_rx = 1;
-  rpc->client_kick_st(sslot_0);
+  rpc->kick_req_st(sslot_0);
   ASSERT_EQ(clt_session->client_info.credits, 0);
   ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits);
 
@@ -84,11 +84,11 @@ TEST_F(RpcClientKickTest, client_kick_st_req_pkts) {
       pkthdr_tx_queue->pop().matches(PktType::kPktTypeReq, kSessionCredits));
 
   // Kicking twice in a row without any RX in between is disallowed
-  ASSERT_DEATH(rpc->client_kick_st(sslot_0), ".*");
+  ASSERT_DEATH(rpc->kick_req_st(sslot_0), ".*");
 }
 
 /// Kick a sslot that has received the first response packet
-TEST_F(RpcClientKickTest, client_kick_st_rfr_pkts) {
+TEST_F(RpcClientKickTest, kick_st_rfr_pkts) {
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == 0);
   pkthdr_tx_queue->clear();
@@ -102,7 +102,7 @@ TEST_F(RpcClientKickTest, client_kick_st_rfr_pkts) {
   sslot_0->client_info.num_rx = req_npkts;
   clt_session->client_info.credits = kSessionCredits;
 
-  rpc->client_kick_st(sslot_0);
+  rpc->kick_rfr_st(sslot_0);
   ASSERT_EQ(pkthdr_tx_queue->size(), kSessionCredits);
 
   for (size_t i = 0; i < kSessionCredits; i++) {

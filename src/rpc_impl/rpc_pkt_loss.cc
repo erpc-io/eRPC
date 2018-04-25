@@ -88,7 +88,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
               ci.num_rx < req_msgbuf->num_pkts ? "request" : "rfr");
-  client_kick_st(sslot);  // We have credits and packets to transmit
+  req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
 }
 
 FORCE_COMPILE_TRANSPORTS

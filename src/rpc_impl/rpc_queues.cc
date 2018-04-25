@@ -9,7 +9,8 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
 
   for (SSlot *sslot : credit_stall_txq) {
     if (sslot->session->client_info.credits > 0) {
-      client_kick_st(sslot);  // sslots in stall queue have packets to send
+      // sslots in stall queue have packets to send
+      req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
     } else {
       credit_stall_txq[write_index++] = sslot;
     }
@@ -26,8 +27,8 @@ void Rpc<TTr>::process_wheel_st() {
 
   size_t num_ready = wheel->ready_queue.size();
   for (size_t i = 0; i < num_ready; i++) {
-    // client_kick() cannot be used here. This packet has already used a credit
-    // and gone through the wheel; client_kick() might repeat these.
+    // kick_req/rfr() cannot be used here. This packet has already used a credit
+    // and gone through the wheel; the kick logic might repeat these.
     SSlot *sslot = wheel->ready_queue.front().sslot;
     auto &ci = sslot->client_info;
 
