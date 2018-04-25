@@ -65,29 +65,6 @@ class MsgBuffer {
   /// This function does not sanity-check other fields.
   inline bool is_dynamic() const { return buffer.buf != nullptr; }
 
-  /// Check if this MsgBuffer is a valid dynamic MsgBuffer
-  inline bool is_valid_dynamic() const { return is_valid() && is_dynamic(); }
-
-  /// Check if the \p req_type and \req num fields of this MsgBuffer match
-  /// \p pkthdr
-  bool matches(const pkthdr_t *pkthdr) const {
-    return (get_req_type() == pkthdr->req_type &&
-            get_req_num() == pkthdr->req_num);
-  }
-
-  /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
-  /// fields match those in \p pkthdr
-  bool is_dynamic_and_matches(const pkthdr_t *pkthdr) const {
-    return is_valid_dynamic() && matches(pkthdr);
-  }
-
-  /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
-  /// fields match those in \p other
-  bool is_dynamic_and_matches(const MsgBuffer *other) const {
-    return is_valid_dynamic() && (get_req_type() == other->get_req_type()) &&
-           (get_req_num() == other->get_req_num());
-  }
-
   /// Check if this MsgBuffer is buried
   inline bool is_buried() const {
     return (buf == nullptr && buffer.buf == nullptr);
