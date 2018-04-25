@@ -13,6 +13,7 @@ TEST_F(RpcTest, process_expl_cr_st) {
 
   MsgBuffer req = rpc->alloc_msg_buffer(kTestLargeMsgSize);
   MsgBuffer resp = rpc->alloc_msg_buffer(kTestSmallMsgSize);  // Unused
+  rpc->faults.hard_wheel_bypass = true;  // Don't place request pkts in wheel
 
   // Use enqueue_request() to do sslot formatting. This uses all credits.
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
