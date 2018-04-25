@@ -58,15 +58,28 @@ TEST_F(RpcClientKickTest, client_kick_st_full_response) {
 
 /// Kick a sslot that hasn't transmitted all request packets
 TEST_F(RpcClientKickTest, client_kick_st_req_pkts) {
+  assert(rpc->faults.hard_wheel_bypass == false);  // Wheel won't be bypassed
+
+  // enqueue_request() calls client_kick_st()
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
-  assert(clt_session->client_info.credits == 0);
-  pkthdr_tx_queue->clear();
+  ASSERT_EQ(clt_session->client_info.credits, 0);
+  ASSERT_EQ(sslot_0->client_info.num_tx, 0);  // All packets are in wheel
+
+  // Transmit the kSessionCredits request packets in the wheel
+  ASSERT_EQ(wheel_tx_all(), kSessionCredits);
+  ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits);
 
   // Pretend that a CR has been received
   clt_session->client_info.credits = 1;
   sslot_0->client_info.num_rx = 1;
   rpc->client_kick_st(sslot_0);
-  ASSERT_EQ(pkthdr_tx_queue->size(), 1);
+  ASSERT_EQ(clt_session->client_info.credits, 0);
+  ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits);
+
+  // Transmit the one request packet in the wheel
+  pkthdr_tx_queue->clear();
+  ASSERT_EQ(wheel_tx_all(), 1);
+  ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits + 1);
   ASSERT_TRUE(
       pkthdr_tx_queue->pop().matches(PktType::kPktTypeReq, kSessionCredits));
 
