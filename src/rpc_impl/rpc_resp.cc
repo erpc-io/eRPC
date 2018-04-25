@@ -89,10 +89,6 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   auto &ci = sslot->client_info;
   MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
 
-  // This is an in-order response packet. So, we still have the request.
-  MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
-  assert(req_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
-
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   ci.num_rx++;
@@ -108,6 +104,9 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     // Fall through to invoke continuation
   } else {
     ci.progress_tsc = ev_loop_tsc;
+
+    // This is an in-order response packet. So, we still have the request.
+    MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
 
     if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
       // This is the first response packet. Resize and copy eRPC header.
