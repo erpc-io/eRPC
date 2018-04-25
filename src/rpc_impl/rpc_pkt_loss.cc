@@ -80,8 +80,6 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   // sslot may be in dispatch queues, but not in background queues since we
   // don't have the full response.
-  //
-  // TODO: Remove sslot from timing wheel
   credit_stall_txq.erase(
       std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), sslot),
       credit_stall_txq.end());
