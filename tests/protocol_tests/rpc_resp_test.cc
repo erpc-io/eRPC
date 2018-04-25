@@ -13,6 +13,7 @@ TEST_F(RpcTest, process_resp_one_SMALL_st) {
 
   // Use enqueue_request() to do sslot formatting for the request. Small request
   // is sent right away, so it uses credits.
+  rpc->faults.hard_wheel_bypass = true;  // Don't place request pkt in wheel
   rpc->enqueue_request(0, kTestReqType, &req, &local_resp, cont_func, kTestTag);
   assert(clt_session->client_info.credits == kSessionCredits - 1);
   assert(sslot_0->client_info.num_tx == 1);
