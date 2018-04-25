@@ -94,7 +94,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
     } else {
       // This is a retransmission for the currently active request
       if (sslot->tx_msgbuf != nullptr) {
-        // The response is available, so resend it
+        // The response is available, so resend this req's corresponding packet
         LOG_REORDER("%s: Re-sending response.\n", issue_msg);
         enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Packet index = 0
 

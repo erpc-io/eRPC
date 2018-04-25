@@ -58,7 +58,6 @@ void Rpc<TTr>::process_rfr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // Release all transport-owned buffers before re-entering event loop
     if (tx_batch_i > 0) do_tx_burst_st();
     transport->tx_flush();
-
     return;
   }
 
