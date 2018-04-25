@@ -26,17 +26,25 @@ void Rpc<TTr>::process_wheel_st() {
 
   size_t num_ready = wheel->ready_queue.size();
   for (size_t i = 0; i < num_ready; i++) {
-    wheel_ent_t &ent = wheel->ready_queue.front();
-    assert(!ent.is_rfr);  // For now
+    // client_kick() cannot be used here. This packet has already used a credit
+    // and gone through the wheel; client_kick() might repeat these.
+    SSlot *sslot = wheel->ready_queue.front().sslot;
+    auto &ci = sslot->client_info;
 
-    LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, actual TX %.3f us.\n",
-           rpc_id, ent.sslot->cur_req_num, ent.pkt_num,
+    if (ci.num_tx < sslot->tx_msgbuf->num_pkts) {
+      const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
+      enqueue_pkt_tx_burst_st(sslot, pkt_idx,
+                              &ci.tx_ts[pkt_num % kSessionCredits]);
+    } else {
+      MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
+      enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
+    }
+
+    LOG_CC("eRPC Rpc %u: Req/pkt %zu/%zu, TX at %.3f us.\n", rpc_id,
+           sslot->cur_req_num, ci.num_tx,
            to_usec(cur_tsc - creation_tsc, freq_ghz));
 
-    enqueue_pkt_tx_burst_st(
-        ent.sslot, ent.pkt_num, /* Packet index */
-        &ent.sslot->client_info.tx_ts[ent.pkt_num % kSessionCredits]);
-
+    ci.num_tx++;
     wheel->ready_queue.pop();
   }
 }

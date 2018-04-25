@@ -20,9 +20,6 @@ void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   rfr_pkthdr->req_num = resp_pkthdr->req_num;
   rfr_pkthdr->magic = kPktHdrMagic;
 
-  sslot->client_info.num_tx++;
-  sslot->session->client_info.credits--;
-
   enqueue_hdr_tx_burst_st(
       sslot, ctrl_msgbuf,
       &sslot->client_info.tx_ts[rfr_pkthdr->pkt_num % kSessionCredits]);
@@ -54,8 +51,6 @@ void Rpc<TTr>::process_rfr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     // If we're here, this is a past RFR packet for this request. So, we still
     // have the response, and we saved request packet count.
-    assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));
-
     LOG_REORDER("%s: Re-sending response.\n", issue_msg);
     enqueue_pkt_tx_burst_st(
         sslot, resp_ntoi(pkthdr->pkt_num, si.sav_num_req_pkts), nullptr);

@@ -21,7 +21,7 @@ static constexpr bool kTesting = false;
 static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 5000;
 
 // Congestion control
-#define ENABLE_CC false
+#define ENABLE_CC true
 #if ENABLE_CC
 // Congestion control without optimizations
 static constexpr bool kCcRTT = true;       ///< Measure per-packet RTT

@@ -121,8 +121,6 @@ class Rpc {
 
   /// Free a MsgBuffer created by \p alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
-    assert(msg_buffer.is_valid_dynamic());
-
     lock_cond(&huge_alloc_lock);
     huge_alloc->free_buf(msg_buffer.buffer);
     unlock_cond(&huge_alloc_lock);
@@ -155,12 +153,10 @@ class Rpc {
    */
   inline void bury_resp_msgbuf_server_st(SSlot *sslot) {
     assert(in_dispatch());
-    assert(!sslot->is_client);
 
     // Free the response MsgBuffer iff it is not preallocated
     if (unlikely(!sslot->prealloc_used)) {
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
-      assert(tx_msgbuf->is_valid_dynamic());
       free_msg_buffer(*tx_msgbuf);
       // Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf
     }
@@ -176,12 +172,8 @@ class Rpc {
    * conditinally bury only initialized MsgBuffers.
    */
   inline void bury_req_msgbuf_server_st(SSlot *sslot) {
-    assert(!sslot->is_client);
-
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
     if (unlikely(req_msgbuf.is_dynamic())) {
-      // This check is OK, as dynamic MsgBuffers must be initialized
-      assert(req_msgbuf.is_valid_dynamic());
       free_msg_buffer(req_msgbuf);
       req_msgbuf.buffer.buf = nullptr;  // Mark invalid for future
     }
@@ -770,7 +762,8 @@ class Rpc {
   // rpc_rfr.cc
 
   /**
-   * @brief Enqueue a request-for-response
+   * @brief Enqueue a request-for-response. This doesn't modify credits or
+   * sslot's num_tx.
    *
    * @param sslot The session slot to send the RFR for
    * @param req_pkthdr The packet header of the response packet that triggered
@@ -876,6 +869,7 @@ class Rpc {
   /// All the faults that can be injected into eRPC for testing
   struct {
     bool fail_resolve_rinfo = false;  ///< Fail routing info resolution
+    bool hard_wheel_bypass = false;   ///< Wheel bypass regardless of congestion
     double pkt_drop_prob = 0.0;       ///< Probability of dropping an RPC packet
 
     /// Derived: Drop packet iff urand[0, ..., one billion] is smaller than this

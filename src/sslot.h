@@ -16,11 +16,7 @@ class Nexus;
 template <typename T>
 class Rpc;
 
-/**
- * @brief Session slot metadata maintained about an RPC
- *
- * This slot structure is used by both server and client sessions.
- */
+ /// Session slot metadata maintained for an RPC by both client and server
 class SSlot {
   friend class Session;
   friend class Nexus;
@@ -109,6 +105,9 @@ class SSlot {
       size_t sav_num_req_pkts;
     } server_info;
   };
+
+public:
+  size_t get_cur_req_num() const { return cur_req_num; }
 };
 
 class ReqHandle : public SSlot {

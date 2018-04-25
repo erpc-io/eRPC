@@ -33,16 +33,10 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
           wi.rpc_id, s->cur_req_num);
 
       if (wi.is_req()) {
-        assert(!s->is_client && s->server_info.req_msgbuf.is_valid_dynamic());
-
         uint8_t req_type = s->server_info.req_msgbuf.get_req_type();
         const ReqFunc &req_func = ctx.req_func_arr->at(req_type);
-        assert(req_func.is_registered());  // Checked during submit_bg
-
         req_func.req_func(static_cast<ReqHandle *>(s), wi.context);
       } else {
-        assert(s->is_client && s->client_info.resp_msgbuf->is_valid_dynamic());
-
         wi.sslot->client_info.cont_func(static_cast<RespHandle *>(s),
                                         wi.context, s->client_info.tag);
       }

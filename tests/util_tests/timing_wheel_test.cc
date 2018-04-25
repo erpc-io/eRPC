@@ -36,7 +36,7 @@ TEST(TimingWheelTest, Basic) {
   args.huge_alloc = &alloc;
 
   TimingWheel wheel(args);
-  const auto dummy_ent = wheel_ent_t(nullptr, 1);
+  const auto dummy_ent = wheel_ent_t(nullptr);
 
   // Empty wheel
   wheel.reap(rdtsc());
@@ -74,7 +74,7 @@ TEST(TimingWheelTest, RateTest) {
     args.huge_alloc = &alloc;
 
     TimingWheel wheel(args);
-    const auto dummy_ent = wheel_ent_t(nullptr, 1);
+    const auto dummy_ent = wheel_ent_t(nullptr);
 
     // Update the wheel and start measurement
     wheel.catchup();
