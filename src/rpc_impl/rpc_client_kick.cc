@@ -37,6 +37,7 @@ void Rpc<TTr>::client_kick_st(SSlot *sslot) {
                to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
 
         wheel->insert(wheel_ent_t(sslot), ref_tsc, abs_tx_tsc);
+        // ci.num_tx will be bumped when we reap this sslot from the wheel
       }
 
       credits--;
