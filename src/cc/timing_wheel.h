@@ -20,7 +20,6 @@
 
 namespace erpc {
 
-static constexpr size_t kWheelBucketCap = 4;     ///< Wheel entries per bucket
 static constexpr double kWheelSlotWidthUs = .5;  ///< Duration per wheel slot
 static constexpr double kWheelHorizonUs =
     1000000 * (kSessionCredits * CTransport::kMTU) / Timely::kMinRate;
@@ -35,31 +34,20 @@ static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
 /// One entry in a timing wheel bucket
 struct wheel_ent_t {
-  bool is_rfr;  ///< True iff this entry is an RFR
   SSlot *sslot;
-  union {
-    size_t pkt_num;
-    pkthdr_t *pkthdr;
-  };
-
-  wheel_ent_t() : sslot(nullptr), pkthdr(nullptr) {}
-
-  wheel_ent_t(SSlot *sslot, size_t pkt_num)
-      : is_rfr(false), sslot(sslot), pkt_num(pkt_num) {}
-
-  wheel_ent_t(SSlot *sslot, pkthdr_t *pkthdr)
-      : is_rfr(false), sslot(sslot), pkthdr(pkthdr) {}
+  wheel_ent_t(SSlot *sslot) : sslot(sslot) {}
 };
-static_assert(sizeof(wheel_ent_t) == 24, "");
+static_assert(sizeof(wheel_ent_t) == 8, "");
 
+static constexpr size_t kWheelBucketCap = 5;  ///< Wheel entries per bucket
 struct wheel_bkt_t {
-  size_t num_entries : 8;
-  size_t tx_tsc : 56;  // Timestamp at which it is safe to transmit
-  wheel_bkt_t *last;
-  wheel_bkt_t *next;
-  wheel_ent_t entry[kWheelBucketCap];
+  size_t num_entries : 8;  ///< Number of valid entries in this bucket
+  size_t tx_tsc : 56;      ///< Timestamp at which it is safe to transmit
+  wheel_bkt_t *last;  ///< Last bucket in chain. Used only at the first bucket.
+  wheel_bkt_t *next;  ///< Next bucket in chain
+  wheel_ent_t entry[kWheelBucketCap];  ///< Space for wheel entries
 };
-static_assert(sizeof(wheel_bkt_t) == 120, "");
+static_assert(sizeof(wheel_bkt_t) == 64, "");
 
 struct timing_wheel_args_t {
   size_t mtu;
@@ -135,7 +123,10 @@ class TimingWheel {
       if (dst_wslot >= kWheelNumWslots) dst_wslot -= kWheelNumWslots;
     }
 
-    if (kWheelRecord) record_vec.emplace_back(ent.pkt_num, abs_tx_tsc);
+    if (kWheelRecord) {
+      record_vec.emplace_back(ent.sslot->get_cur_req_num(), abs_tx_tsc);
+    }
+
     insert_into_wslot(dst_wslot, ent);
   }
 
@@ -169,7 +160,9 @@ class TimingWheel {
     while (bkt != nullptr) {
       for (size_t i = 0; i < bkt->num_entries; i++) {
         ready_queue.push(bkt->entry[i]);
-        if (kWheelRecord) record_vec.emplace_back(bkt->entry[i].pkt_num);
+        if (kWheelRecord) {
+          record_vec.emplace_back(bkt->entry[i].sslot->get_cur_req_num());
+        }
       }
 
       wheel_bkt_t *_tmp_next = bkt->next;
