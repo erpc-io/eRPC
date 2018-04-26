@@ -92,9 +92,9 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   if (kCcPacing || (kTesting && !faults.hard_wheel_bypass)) {
     // Enqueue the rolled-back packets into the wheel. The wheel might already
-    // contain some packets for this sslot, which is OK since those packets
-    // have consumed credits, not bumped num_tx.
-    // 
+    // contain some packets for this sslot. This is OK because those packets
+    // have consumed credits and not bumped num_tx.
+    //
     // Ignore the run-time wheel bypass optimization and packet size.
     for (size_t _x = 0; _x < delta; _x++) {
       enqueue_wheel_st(sslot, TTr::kMTU);
