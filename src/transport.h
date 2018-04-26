@@ -115,13 +115,7 @@ class Transport {
    */
   void tx_burst(const tx_burst_item_t* tx_burst_arr, size_t num_pkts);
 
-  /**
-   * @brief Flush the transmit queue, returning ownership of all SEND WQE
-   * buffers back to eRPC.
-   *
-   * Before tx_flush() is called, there must be a signaled SEND in the SEND
-   * queue. This is OK because we flush only after sending a packet.
-   */
+  /// Flush the TX queue, returning ownership of all TX DMA buffers to eRPC
   void tx_flush();
 
   /**

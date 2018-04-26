@@ -185,7 +185,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // queued the response, so directly compute number of packets in request.
     if (pkthdr->pkt_num != data_size_to_num_pkts(pkthdr->msg_size) - 1) {
       LOG_REORDER("%s: Re-sending credit return.\n", issue_msg);
-      enqueue_cr_st(sslot, pkthdr);  // tx_flush uneeded. XXX: why?
+      enqueue_cr_st(sslot, pkthdr);  // Header only, so tx_flush uneeded
       return;
     }
 

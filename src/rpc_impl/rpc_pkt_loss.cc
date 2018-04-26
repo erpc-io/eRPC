@@ -75,9 +75,11 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   // Here we have num_tx > num_rx, so stallq cannot contain sslot
   assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
-  assert(sslot->client_info.wheel_count <= delta);
+  assert(ci.wheel_count <= delta);
 
   // If we're here, we will roll back and retransmit
+  LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
+              ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
   sslot->session->client_info.cc.num_retransmissions++;
   credits += delta;
   ci.num_tx = ci.num_rx;
@@ -89,9 +91,16 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // if (tx_batch_i > 0) do_tx_burst_st();
   // transport->tx_flush();
 
-  LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
-              ci.num_rx < req_msgbuf->num_pkts ? "request" : "rfr");
-  req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
+  if (kCcPacing || (kTesting && faults.hard_wheel_bypass)) {
+    // The wheel already contains ci.wheel_count packets. Enqueue the remaining.
+    // Ignore the run-time wheel bypass optimization and packet size.
+    for (size_t _x = 0; _x < delta - ci.wheel_count; _x++) {
+      enqueue_wheel_st(sslot, TTr::kMTU);
+    }
+  } else {
+    // If we are here, pacing is disabled, so kicking won't insert into wheel
+    req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
+  }
 }
 
 FORCE_COMPILE_TRANSPORTS
