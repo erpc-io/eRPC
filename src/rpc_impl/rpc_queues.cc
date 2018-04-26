@@ -33,7 +33,7 @@ void Rpc<TTr>::process_wheel_st() {
     sslot->client_info.wheel_count--;
 
     auto &ci = sslot->client_info;
-    if (ci.num_tx < sslot->tx_msgbuf->num_pkts) {
+    if (req_pkts_pending(sslot)) {
       const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
       enqueue_pkt_tx_burst_st(sslot, pkt_idx,
                               &ci.tx_ts[pkt_num % kSessionCredits]);
