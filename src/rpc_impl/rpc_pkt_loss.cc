@@ -73,8 +73,6 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     return;
   }
 
-  // Here we have num_tx > num_rx, so stallq cannot contain sslot
-  assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
   assert(ci.wheel_count <= delta);
 
   // If we're here, we will roll back and retransmit
@@ -88,8 +86,11 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // Drain all sources of packet queueing. sslot may be in dispatch queues, but
   // not in background queues since we don't have the full response.
 
-  // if (tx_batch_i > 0) do_tx_burst_st();
-  // transport->tx_flush();
+  // We have num_tx > num_rx, so stallq cannot contain sslot
+  assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
+
+  if (tx_batch_i > 0) do_tx_burst_st();
+  transport->tx_flush();
 
   if (kCcPacing || (kTesting && faults.hard_wheel_bypass)) {
     // The wheel already contains ci.wheel_count packets. Enqueue the remaining.

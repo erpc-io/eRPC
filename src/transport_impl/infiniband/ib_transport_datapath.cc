@@ -71,9 +71,10 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 }
 
 void IBTransport::tx_flush() {
+  if (unlikely(nb_tx == 0)) return;
+
   // If we are here, we have sent a packet. The selective signaling logic
   // guarantees that there is *exactly one* *signaled* SEND work request.
-  assert(nb_tx > 0);
   poll_cq_one_helper(send_cq);  // Poll the one existing signaled WQE
 
   // Use send_wr[0] to post the second signaled flush WQE
