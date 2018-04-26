@@ -2,6 +2,10 @@
  * @file timing_wheel.h
  * @brief Timing wheel implementation from Carousel [SIGCOMM 17]
  * Units: Microseconds or TSC for time, bytes/sec for throughput
+ *
+ * SSlots scheduled for transmission in a wheel slot are stored in a chain
+ * of associative buckets. Deletes do not compact the chain, so some buckets in
+ * a chain may be empty or partially full.
  */
 
 #ifndef ERPC_TIMING_WHEEL_H
@@ -34,8 +38,10 @@ static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
 /// One entry in a timing wheel bucket
 struct wheel_ent_t {
-  SSlot *sslot;
-  wheel_ent_t(SSlot *sslot) : sslot(sslot) {}
+  uint64_t sslot : 48;
+  uint64_t pkt_num : 16;
+  wheel_ent_t(SSlot *sslot, size_t pkt_num)
+      : sslot(reinterpret_cast<uint64_t>(sslot)), pkt_num(pkt_num) {}
 };
 static_assert(sizeof(wheel_ent_t) == 8, "");
 
@@ -78,6 +84,12 @@ class TimingWheel {
     }
   }
 
+  /// Roll the wheel forward until it catches up with current time. Hopefully
+  /// this is needed only during initialization.
+  void catchup() {
+    while (wheel[cur_wslot].tx_tsc < rdtsc()) reap(rdtsc());
+  }
+
   /// Move entries from all wheel slots older than reap_tsc to the ready queue.
   /// The max_tsc of all these wheel slots is advanced.
   /// This function must be called with non-decreasing values of reap_tsc
@@ -103,8 +115,8 @@ class TimingWheel {
    * using the sending rate.
    * @param abs_tx_tsc The desired absolute timestamp for packet transmission
    */
-  inline void insert(const wheel_ent_t &ent, size_t ref_tsc,
-                     size_t abs_tx_tsc) {
+  inline size_t insert(const wheel_ent_t &ent, size_t ref_tsc,
+                       size_t abs_tx_tsc) {
     assert(abs_tx_tsc >= ref_tsc);
     assert(abs_tx_tsc - ref_tsc <= horizon_tsc);  // Horizon definition
 
@@ -123,17 +135,24 @@ class TimingWheel {
       if (dst_wslot >= kWheelNumWslots) dst_wslot -= kWheelNumWslots;
     }
 
-    if (kWheelRecord) {
-      record_vec.emplace_back(ent.sslot->get_cur_req_num(), abs_tx_tsc);
-    }
+    if (kWheelRecord) record_vec.emplace_back(ent.pkt_num, abs_tx_tsc);
 
     insert_into_wslot(dst_wslot, ent);
+    return dst_wslot;
   }
 
-  /// Roll the wheel forward until it catches up with current time. Hopefully
-  /// this is needed only during initialization.
-  void catchup() {
-    while (wheel[cur_wslot].tx_tsc < rdtsc()) reap(rdtsc());
+  void delete_from_wslot(size_t ws_i, const SSlot *sslot) {
+    wheel_bkt_t *bkt = &wheel[ws_i];
+    while (bkt != nullptr) {
+      size_t write_i = 0;
+      for (size_t i = 0; i < bkt->num_entries; i++) {
+        if (bkt->entry[i].sslot == reinterpret_cast<size_t>(sslot)) continue;
+        bkt->entry[write_i++] = bkt->entry[i];
+      }
+
+      bkt->num_entries = write_i;
+      bkt = bkt->next;
+    }
   }
 
  private:
@@ -161,7 +180,7 @@ class TimingWheel {
       for (size_t i = 0; i < bkt->num_entries; i++) {
         ready_queue.push(bkt->entry[i]);
         if (kWheelRecord) {
-          record_vec.emplace_back(bkt->entry[i].sslot->get_cur_req_num());
+          record_vec.push_back(wheel_record_t(bkt->entry[i].pkt_num));
         }
       }
 
