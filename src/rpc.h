@@ -877,6 +877,9 @@ class Rpc {
   FastRand fast_rand;  ///< A fast random generator
 
   // Cold members live below, in order of coolness
+
+  /// The timing-wheel rate limiter. Packets in the wheel have consumed credits,
+  /// but not bumped the num_tx counter.
   TimingWheel *wheel;
 
   /// Queues for datapath API requests from background threads
