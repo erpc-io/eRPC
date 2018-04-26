@@ -16,7 +16,7 @@ class Nexus;
 template <typename T>
 class Rpc;
 
- /// Session slot metadata maintained for an RPC by both client and server
+/// Session slot metadata maintained for an RPC by both client and server
 class SSlot {
   friend class Session;
   friend class Nexus;
@@ -64,12 +64,10 @@ class SSlot {
       size_t cont_etid;     ///< eRPC thread ID to run the continuation on
 
       // Fields for congestion control, cold if CC is disabled.
+      size_t wheel_count;  ///< Number of packets in the wheel
 
       /// Per-packet TX timestamp. Indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;
-
-      /// Per-packet wheel slot index. Indexed by pkt_num % kSessionCredits.
-      std::array<uint16_t, kSessionCredits> wslot_idx;
 
       /// Return a string representation of the progress made by this sslot.
       /// Progress fields that are zero are not included in the string.
@@ -106,7 +104,7 @@ class SSlot {
     } server_info;
   };
 
-public:
+ public:
   size_t get_cur_req_num() const { return cur_req_num; }
 };
 

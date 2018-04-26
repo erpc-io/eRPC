@@ -30,8 +30,9 @@ void Rpc<TTr>::process_wheel_st() {
     // kick_req/rfr() cannot be used here. This packet has already used a credit
     // and gone through the wheel; the kick logic might repeat these.
     SSlot *sslot = wheel->ready_queue.front().sslot;
-    auto &ci = sslot->client_info;
+    sslot->client_info.wheel_count--;
 
+    auto &ci = sslot->client_info;
     if (ci.num_tx < sslot->tx_msgbuf->num_pkts) {
       const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
       enqueue_pkt_tx_burst_st(sslot, pkt_idx,

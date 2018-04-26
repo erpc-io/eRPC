@@ -20,7 +20,8 @@ void Rpc<TTr>::kick_req_st(SSlot *sslot) {
                               &ci.tx_ts[pkt_num % kSessionCredits]);
       ci.num_tx++;
     } else {
-      enqueue_req_wheel_st(sslot, pkt_idx);
+      enqueue_wheel_st(
+          sslot, sslot->tx_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx));
       // ci.num_tx will be bumped when we reap this sslot from the wheel
     }
 

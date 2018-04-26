@@ -66,11 +66,14 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   if (unlikely(delta == 0)) {
     // This can happen if:
     // (a) We're stalled on credits: credit stall queue will make progress.
-    // (b) We have received the full response and a background thread currently
+    // (b) Some packets are queued in the wheel: the wheel will make progress.
+    // (c) We have received the full response and a background thread currently
     // owns sslot. In this case, the bg thread cannot modify num_rx or num_tx.
     LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
     return;
   }
+
+  assert(sslot->client_info.wheel_count <= delta);
 
   // If we're here, we will roll back and retransmit
   sslot->session->client_info.cc.num_retransmissions++;
