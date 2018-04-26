@@ -10,7 +10,7 @@ void Rpc<TTr>::kick_req_st(SSlot *sslot) {
 
   auto &ci = sslot->client_info;
   size_t sending = std::min(credits, sslot->tx_msgbuf->num_pkts - ci.num_tx);
-  bool bypass = can_bypass_wheel(sslot->session);
+  bool bypass = can_bypass_wheel(sslot);
 
   for (size_t _x = 0; _x < sending; _x++) {
     const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;

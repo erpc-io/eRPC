@@ -354,10 +354,13 @@ class Rpc {
   }
 
   /// Return true iff it's currently OK to bypass the wheel for this session
-  inline bool can_bypass_wheel(Session *session) const {
+  inline bool can_bypass_wheel(SSlot *sslot) const {
     if (!kCcPacing) return true;
     if (kTesting) return faults.hard_wheel_bypass;
-    if (kCcOptTimelyBypass) return session->is_uncongested();
+    if (kCcOptTimelyBypass) {
+      return sslot->client_info.wheel_count == 0 &&
+             sslot->session->is_uncongested();
+    }
     return false;
   }
 
