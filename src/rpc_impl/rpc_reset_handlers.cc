@@ -53,11 +53,10 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   // The session can be in any state (except the temporary disconnected state).
   // In the connected state, the session may have outstanding requests.
   if (session->is_connected()) {
-    // Erase session slots from credit stall TX queue
+    // Erase session slots from credit stall queue
     for (const SSlot &sslot : session->sslot_arr) {
-      credit_stall_txq.erase(
-          std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), &sslot),
-          credit_stall_txq.end());
+      stallq.erase(std::remove(stallq.begin(), stallq.end(), &sslot),
+                   stallq.end());
     }
 
     // Invoke continuation-with-failure for sslots without complete response

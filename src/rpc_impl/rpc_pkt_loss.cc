@@ -73,6 +73,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     return;
   }
 
+  // Here we have num_tx > num_rx, so stallq cannot contain sslot
+  assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
   assert(sslot->client_info.wheel_count <= delta);
 
   // If we're here, we will roll back and retransmit
@@ -81,11 +83,11 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   ci.num_tx = ci.num_rx;
   ci.progress_tsc = ev_loop_tsc;
 
-  // sslot may be in dispatch queues, but not in background queues since we
-  // don't have the full response.
-  credit_stall_txq.erase(
-      std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), sslot),
-      credit_stall_txq.end());
+  // Drain all sources of packet queueing. sslot may be in dispatch queues, but
+  // not in background queues since we don't have the full response.
+
+  // if (tx_batch_i > 0) do_tx_burst_st();
+  // transport->tx_flush();
 
   LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
               ci.num_rx < req_msgbuf->num_pkts ? "request" : "rfr");

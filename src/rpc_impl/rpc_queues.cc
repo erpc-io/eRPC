@@ -7,16 +7,16 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
   assert(in_dispatch());
   size_t write_index = 0;  // Re-add incomplete sslots at this index
 
-  for (SSlot *sslot : credit_stall_txq) {
+  for (SSlot *sslot : stallq) {
     if (sslot->session->client_info.credits > 0) {
       // sslots in stall queue have packets to send
       req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
     } else {
-      credit_stall_txq[write_index++] = sslot;
+      stallq[write_index++] = sslot;
     }
   }
 
-  credit_stall_txq.resize(write_index);  // Number of sslots left = write_index
+  stallq.resize(write_index);  // Number of sslots left = write_index
 }
 
 template <class TTr>

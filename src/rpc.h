@@ -863,7 +863,7 @@ class Rpc {
   uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
 
-  std::vector<SSlot *> credit_stall_txq;  ///< Req sslots stalled for credits
+  std::vector<SSlot *> stallq;  ///< Req sslots stalled for credits
 
   size_t ev_loop_tsc;        ///< TSC taken at each iteration of the ev loop
   size_t pkt_loss_scan_tsc;  ///< Timestamp of the previous scan for lost pkts
