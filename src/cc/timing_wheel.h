@@ -39,7 +39,7 @@ static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
 /// One entry in a timing wheel bucket
 struct wheel_ent_t {
-  uint64_t sslot : 48;
+  uint64_t sslot : 48;  ///< The things I do for perf
   uint64_t pkt_num : 16;
   wheel_ent_t(SSlot *sslot, size_t pkt_num)
       : sslot(reinterpret_cast<uint64_t>(sslot)), pkt_num(pkt_num) {}
