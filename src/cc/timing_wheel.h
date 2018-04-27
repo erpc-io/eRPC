@@ -85,6 +85,11 @@ class TimingWheel {
     }
   }
 
+  /// Return a dummy wheel entry
+  static wheel_ent_t get_dummy_ent() {
+    return wheel_ent_t(reinterpret_cast<SSlot *>(0xdeadbeef), 3185);
+  }
+
   /// Roll the wheel forward until it catches up with current time. Hopefully
   /// this is needed only during initialization.
   void catchup() {

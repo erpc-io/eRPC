@@ -28,32 +28,58 @@ typename Transport::reg_mr_func_t reg_mr_func =
 typename Transport::dereg_mr_func_t dereg_mr_func =
     std::bind(dereg_mr_wrapper, _1);
 
-TEST(TimingWheelTest, Basic) {
-  HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
-  timing_wheel_args_t args;
-  args.mtu = kTestMTU;
-  args.freq_ghz = measure_rdtsc_freq();
-  args.huge_alloc = &alloc;
+class TimingWheelTest : public ::testing::Test {
+ public:
+  TimingWheelTest() {
+    alloc = new HugeAlloc(MB(2), 0, reg_mr_func, dereg_mr_func);
 
-  TimingWheel wheel(args);
-  const auto dummy_ent = wheel_ent_t(nullptr, 0);
+    timing_wheel_args_t args;
+    args.mtu = kTestMTU;
+    args.freq_ghz = measure_rdtsc_freq();
+    args.huge_alloc = alloc;
+    wheel = new TimingWheel(args);
+  }
 
+  ~TimingWheelTest() { delete alloc; }
+
+  HugeAlloc *alloc;
+  TimingWheel *wheel;
+};
+
+TEST_F(TimingWheelTest, Basic) {
   // Empty wheel
-  wheel.reap(rdtsc());
-  ASSERT_EQ(wheel.ready_queue.size(), 0);
+  wheel->reap(rdtsc());
+  ASSERT_EQ(wheel->ready_queue.size(), 0);
 
   // One entry. Check that it's eventually sent.
   size_t ref_tsc = rdtsc();
-  size_t abs_tx_tsc = ref_tsc + wheel.wslot_width_tsc;
-  wheel.insert(dummy_ent, ref_tsc, abs_tx_tsc);
+  size_t abs_tx_tsc = ref_tsc + wheel->wslot_width_tsc;
+  wheel->insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
 
   while (true) {
-    wheel.reap(rdtsc());
-    if (wheel.ready_queue.size() > 0) break;
+    wheel->reap(rdtsc());
+    if (wheel->ready_queue.size() > 0) break;
   }
 }
 
-TEST(TimingWheelTest, RateTest) {
+TEST_F(TimingWheelTest, Delete) {
+  // Empty wheel
+  wheel->reap(rdtsc());
+  ASSERT_EQ(wheel->ready_queue.size(), 0);
+
+  // One entry. Check that it's eventually sent.
+  size_t ref_tsc = rdtsc();
+  size_t abs_tx_tsc = ref_tsc + wheel->wslot_width_tsc;
+  wheel->insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
+
+  while (true) {
+    wheel->reap(rdtsc());
+    if (wheel->ready_queue.size() > 0) break;
+  }
+}
+
+// This is not a fixture test because we use a different wheel for each rate
+TEST(TimingWheelRateTest, Basic) {
   const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0, 80.0};
   const double freq_ghz = measure_rdtsc_freq();
 
@@ -74,7 +100,6 @@ TEST(TimingWheelTest, RateTest) {
     args.huge_alloc = &alloc;
 
     TimingWheel wheel(args);
-    const auto dummy_ent = wheel_ent_t(nullptr, 0);
 
     // Update the wheel and start measurement
     wheel.catchup();
@@ -86,7 +111,7 @@ TEST(TimingWheelTest, RateTest) {
     size_t ref_tsc = rdtsc();
     for (size_t i = 0; i < kSessionCredits; i++) {
       abs_tx_tsc = std::max(ref_tsc, abs_tx_tsc + cycles_per_pkt);
-      wheel.insert(dummy_ent, ref_tsc, abs_tx_tsc);
+      wheel.insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
     }
 
     size_t num_pkts_sent = 0;
@@ -106,7 +131,7 @@ TEST(TimingWheelTest, RateTest) {
         ref_tsc = rdtsc();
         for (size_t i = 0; i < num_ready; i++) {
           abs_tx_tsc = std::max(ref_tsc, abs_tx_tsc + cycles_per_pkt);
-          wheel.insert(dummy_ent, ref_tsc, abs_tx_tsc);
+          wheel.insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
         }
       }
     }
