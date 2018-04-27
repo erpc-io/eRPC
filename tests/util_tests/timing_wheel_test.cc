@@ -38,12 +38,15 @@ class TimingWheelTest : public ::testing::Test {
     args.freq_ghz = measure_rdtsc_freq();
     args.huge_alloc = alloc;
     wheel = new TimingWheel(args);
+
+    freq_ghz = measure_rdtsc_freq();
   }
 
   ~TimingWheelTest() { delete alloc; }
 
   HugeAlloc *alloc;
   TimingWheel *wheel;
+  double freq_ghz;
 };
 
 TEST_F(TimingWheelTest, Basic) {
@@ -60,11 +63,7 @@ TEST_F(TimingWheelTest, Basic) {
   ASSERT_EQ(wheel->ready_queue.size(), 1);
 }
 
-TEST_F(TimingWheelTest, Delete) {
-  // Empty wheel
-  wheel->reap(rdtsc());
-  ASSERT_EQ(wheel->ready_queue.size(), 0);
-
+TEST_F(TimingWheelTest, DeleteOne) {
   // Insert one entry and delete it
   wheel_ent_t ent = TimingWheel::get_dummy_ent();
   size_t ref_tsc = rdtsc();
@@ -73,6 +72,33 @@ TEST_F(TimingWheelTest, Delete) {
   wheel->delete_from_wslot(wslot_idx, reinterpret_cast<SSlot *>(ent.sslot));
 
   wheel->reap(abs_tx_tsc + wheel->wslot_width_tsc);
+  ASSERT_EQ(wheel->ready_queue.size(), 0);
+}
+
+TEST_F(TimingWheelTest, DeleteMany) {
+  // We'll insert around kNumEntriesPerWslot entries per wheel slot used
+  static constexpr size_t kNumEntries = 1000;
+  static constexpr size_t kNumEntriesPerWslot = kWheelBucketCap * 5;
+  static_assert(kNumEntries < kWheelNumWslots, "");
+
+  wheel_ent_t ent = TimingWheel::get_dummy_ent();
+  std::array<uint16_t, kNumEntries> wslot_idx_arr;
+
+  size_t ref_tsc = rdtsc();
+  size_t delta = 0;
+  for (size_t i = 0; i < kNumEntries; i++) {
+    delta += (wheel->wslot_width_tsc / kNumEntriesPerWslot);
+    wslot_idx_arr[i] = wheel->insert(ent, ref_tsc, ref_tsc + delta);
+  }
+
+  std::random_shuffle(wslot_idx_arr.begin(), wslot_idx_arr.end());
+  for (size_t i = 0; i < kNumEntries; i++) {
+    wheel->delete_from_wslot(wslot_idx_arr[i],
+                             reinterpret_cast<SSlot *>(ent.sslot));
+  }
+
+  // (ref_tsc + delta) is the maximum requested absolute TX TSC
+  wheel->reap((ref_tsc + delta) + wheel->wslot_width_tsc);
   ASSERT_EQ(wheel->ready_queue.size(), 0);
 }
 
