@@ -21,8 +21,6 @@ class AppContext : public BasicAppContext {
   FastRand fastrand;  ///< Used for picking large message sizes
 };
 
-/// Don't use very large messages, which can cause the test to time out
-static constexpr size_t kMaxPacketsInMsg = 20;
 static constexpr double kPktDropProb = 0.5;
 
 /// Configuration for controlling the test
@@ -35,11 +33,7 @@ size_t config_num_bg_threads;    ///< Number of background threads
 /// the response.
 void req_handler(ReqHandle *req_handle, void *_context) {
   auto *context = static_cast<AppContext *>(_context);
-  assert(!context->is_client);
-
-  if (config_num_bg_threads > 0) {
-    assert(context->rpc->in_background());
-  }
+  if (config_num_bg_threads > 0) assert(context->rpc->in_background());
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
@@ -120,14 +114,13 @@ void generic_test_func(Nexus *nexus, size_t) {
         assert(iter_req_i < tot_reqs_per_iter);
         MsgBuffer &cur_req_msgbuf = req_msgbufs[iter_req_i];
 
-        size_t req_size =
-            get_rand_msg_size(&context.fastrand, rpc->get_max_data_per_pkt(),
-                              rpc->get_max_data_per_pkt() * kMaxPacketsInMsg);
+        // Don't use very large requests because we drop a lot of packets
+        size_t req_pkts = (kSessionCredits * 2) +
+                          (context.fastrand.next_u32() % kSessionCredits);
+        size_t req_size = req_pkts * rpc->get_max_data_per_pkt();
 
         rpc->resize_msg_buffer(&cur_req_msgbuf, req_size);
-        for (size_t i = 0; i < req_size; i++) {
-          cur_req_msgbuf.buf[i] = static_cast<uint8_t>(iter_req_i);
-        }
+        memset(cur_req_msgbuf.buf, iter_req_i, req_size);
 
         rpc->enqueue_request(session_num_arr[sess_i], kTestReqType,
                              &cur_req_msgbuf, &resp_msgbufs[iter_req_i],
