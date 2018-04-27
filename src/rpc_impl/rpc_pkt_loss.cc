@@ -87,6 +87,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // We have num_tx > num_rx, so stallq cannot contain sslot
   assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
 
+  process_wheel_st();  // Drain packets from wheel's ready queue
+
   // Drain TX burst and DMA queue
   if (tx_batch_i > 0) do_tx_burst_st();
   transport->tx_flush();

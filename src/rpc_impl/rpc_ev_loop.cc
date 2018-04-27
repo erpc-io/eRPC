@@ -7,6 +7,9 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
   assert(in_dispatch());
   dpath_stat_inc(dpath_stats.ev_loop_calls, 1);
 
+  // Handle any new session management packets
+  if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_rx_st();
+
   // The packet RX code uses ev_loop_tsc as the RX timestamp, so it must be
   // next to ev_loop_tsc stamping.
   ev_loop_tsc = dpath_rdtsc();
@@ -24,9 +27,6 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
     process_bg_queues_enqueue_response_st();
     process_bg_queues_release_response_st();
   }
-
-  // Handle any new session management packets
-  if (unlikely(nexus_hook.sm_rx_queue.size > 0)) handle_sm_rx_st();
 
   // Check for packet loss if we're in a new epoch. ev_loop_tsc is stale by
   // less than one event loop iteration, which is negligible compared to epoch.
