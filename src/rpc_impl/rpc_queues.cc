@@ -29,24 +29,26 @@ void Rpc<TTr>::process_wheel_st() {
   for (size_t i = 0; i < num_ready; i++) {
     // kick_req/rfr() cannot be used here. This packet has already used a credit
     // and gone through the wheel; the kick logic might repeat these.
-    SSlot *sslot = wheel->ready_queue.front().sslot;
+    wheel_ent_t &ent = wheel->ready_queue.front();
+    auto *sslot = reinterpret_cast<SSlot *>(ent.sslot);
+    size_t pkt_num = ent.pkt_num;
+    size_t crd_i = pkt_num % kSessionCredits;
+
     sslot->client_info.wheel_count--;
+    sslot->client_info.wslot_idx[crd_i] = kWheelInvalidWslot;
 
     auto &ci = sslot->client_info;
-    if (req_pkts_pending(sslot)) {
-      const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
-      enqueue_pkt_tx_burst_st(sslot, pkt_idx,
-                              &ci.tx_ts[pkt_num % kSessionCredits]);
+    if (pkt_num < sslot->tx_msgbuf->num_pkts) {
+      enqueue_pkt_tx_burst_st(sslot, pkt_num /* pkt_idx */, &ci.tx_ts[crd_i]);
     } else {
       MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
       enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
     }
 
     LOG_CC("eRPC Rpc %u: Req/pkt %zu/%zu, TX at %.3f us.\n", rpc_id,
-           sslot->cur_req_num, ci.num_tx,
+           sslot->cur_req_num, pkt_num,
            to_usec(cur_tsc - creation_tsc, freq_ghz));
 
-    ci.num_tx++;
     wheel->ready_queue.pop();
   }
 }

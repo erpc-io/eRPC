@@ -531,16 +531,39 @@ class Rpc {
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
   }
 
-  /// Enqueue a packet to the timing wheel
-  inline void enqueue_wheel_st(SSlot *sslot, size_t pkt_size) {
+  /// Enqueue a request packet to the timing wheel
+  inline void enqueue_wheel_req_st(SSlot *sslot, size_t pkt_num) {
+    const size_t pkt_idx = pkt_num;
+    size_t pktsz = sslot->tx_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
     size_t ref_tsc = dpath_rdtsc();
-    size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pkt_size);
+    size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
-    LOG_CC("eRPC Rpc %u: Request, desired abs TX %.3f us.\n", rpc_id,
-           sslot->cur_req_num, to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
+    LOG_CC("eRPC Rpc %u: Req pkt %zu/%zu, desired abs TX %.3f us.\n", rpc_id,
+           sslot->cur_req_num, pkt_num,
+           to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
 
+    size_t wslot_idx =
+        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
+    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
     sslot->client_info.wheel_count++;
-    wheel->insert(wheel_ent_t(sslot), ref_tsc, abs_tx_tsc);
+  }
+
+  /// Enqueue an RFR packet to the timing wheel
+  inline void enqueue_wheel_rfr_st(SSlot *sslot, size_t pkt_num) {
+    const size_t pkt_idx = resp_ntoi(pkt_num, sslot->tx_msgbuf->num_pkts);
+    const MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
+    size_t pktsz = resp_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
+    size_t ref_tsc = dpath_rdtsc();
+    size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
+
+    LOG_CC("eRPC Rpc %u: RFR pkt %zu/%zu, desired abs TX %.3f us.\n", rpc_id,
+           sslot->cur_req_num, pkt_num,
+           to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
+
+    size_t wslot_idx =
+        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
+    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
+    sslot->client_info.wheel_count++;
   }
 
   /// Transmit packets in the TX batch

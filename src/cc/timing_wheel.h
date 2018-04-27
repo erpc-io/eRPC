@@ -33,6 +33,7 @@ static constexpr size_t kWheelNumWslots =
 
 /// Session slots track wheel slots. UINT16_MAX is an invalid wheel index.
 static_assert(kWheelNumWslots < UINT16_MAX, "");
+static constexpr uint16_t kWheelInvalidWslot = UINT16_MAX;
 
 static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
@@ -146,8 +147,9 @@ class TimingWheel {
     while (bkt != nullptr) {
       size_t write_i = 0;
       for (size_t i = 0; i < bkt->num_entries; i++) {
-        if (bkt->entry[i].sslot == reinterpret_cast<size_t>(sslot)) continue;
-        bkt->entry[write_i++] = bkt->entry[i];
+        if (bkt->entry[i].sslot != reinterpret_cast<size_t>(sslot)) {
+          bkt->entry[write_i++] = bkt->entry[i];
+        }
       }
 
       bkt->num_entries = write_i;

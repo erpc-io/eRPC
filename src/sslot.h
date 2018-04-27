@@ -64,7 +64,10 @@ class SSlot {
       size_t cont_etid;     ///< eRPC thread ID to run the continuation on
 
       // Fields for congestion control, cold if CC is disabled.
-      size_t wheel_count;  ///< Number of packets in the wheel
+
+      /// Per-packet wheel index
+      std::array<uint16_t, kSessionCredits> wslot_idx;
+      size_t wheel_count;  ///< Number of packets in wheel
 
       /// Per-packet TX timestamp. Indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;

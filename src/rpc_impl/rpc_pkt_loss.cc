@@ -87,23 +87,20 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // We have num_tx > num_rx, so stallq cannot contain sslot
   assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
 
+  // Drain TX burst and DMA queue
   if (tx_batch_i > 0) do_tx_burst_st();
   transport->tx_flush();
 
-  if (kCcPacing || (kTesting && !faults.hard_wheel_bypass)) {
-    // Enqueue the rolled-back packets into the wheel. The wheel might already
-    // contain some packets for this sslot. This is OK because those packets
-    // have consumed credits and not bumped num_tx.
-    //
-    // Ignore the run-time wheel bypass optimization and packet size.
-    for (size_t _x = 0; _x < delta; _x++) {
-      enqueue_wheel_st(sslot, TTr::kMTU);
+  // Delete packets from the wheel. This works even if pacing is disabled.
+  for (size_t i = 0; i < kSessionCredits; i++) {
+    if (ci.wslot_idx[i] != kWheelInvalidWslot) {
+      wheel->delete_from_wslot(ci.wslot_idx[i], sslot);
+      ci.wslot_idx[i] = kWheelInvalidWslot;
     }
-    credits -= delta;
-  } else {
-    // If we are here, pacing is disabled, so kicking won't insert into wheel
-    req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
   }
+  ci.wheel_count = 0;
+
+  req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
 }
 
 FORCE_COMPILE_TRANSPORTS

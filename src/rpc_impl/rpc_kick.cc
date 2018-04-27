@@ -13,18 +13,14 @@ void Rpc<TTr>::kick_req_st(SSlot *sslot) {
   bool bypass = can_bypass_wheel(sslot);
 
   for (size_t _x = 0; _x < sending; _x++) {
-    const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
-
     if (bypass) {
-      enqueue_pkt_tx_burst_st(sslot, pkt_idx,
-                              &ci.tx_ts[pkt_num % kSessionCredits]);
-      ci.num_tx++;
+      enqueue_pkt_tx_burst_st(sslot, ci.num_tx /* pkt_idx */,
+                              &ci.tx_ts[ci.num_tx % kSessionCredits]);
     } else {
-      enqueue_wheel_st(
-          sslot, sslot->tx_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx));
-      // ci.num_tx will be bumped when we reap this sslot from the wheel
+      enqueue_wheel_req_st(sslot, ci.num_tx);
     }
 
+    ci.num_tx++;
     credits--;
   }
 }

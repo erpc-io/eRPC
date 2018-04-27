@@ -6,6 +6,7 @@
 #include <queue>
 
 #include "cc/timely.h"
+#include "cc/timing_wheel.h"
 #include "common.h"
 #include "msg_buffer.h"
 #include "ops.h"
@@ -56,6 +57,7 @@ class Session {
       sslot.cur_req_num = sslot_i;  // 1st req num = (+kSessionReqWindow)
 
       if (is_client()) {
+        for (auto &x : sslot.client_info.wslot_idx) x = kWheelInvalidWslot;
         sslot.client_info.cont_etid = kInvalidBgETid;  // Continuations in fg
       } else {
         sslot.server_info.req_type = kInvalidReqType;
