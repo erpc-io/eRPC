@@ -36,13 +36,13 @@ enum PktType : uint64_t {
 static std::string pkt_type_str(uint64_t pkt_type) {
   switch (pkt_type) {
     case kPktTypeReq:
-      return "request";
+      return "REQ";
     case kPktTypeRFR:
-      return "request for response";
+      return "RFR";
     case kPktTypeExplCR:
-      return "explicit credit return";
+      return "CR";
     case kPktTypeResp:
-      return "response";
+      return "RESP";
   }
 
   throw std::runtime_error("Invalid packet type.");
@@ -82,11 +82,10 @@ struct pkthdr_t {
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[type " << pkt_type_str(pkt_type) << ", "
-        << "destssn " << std::to_string(dest_session_num) << ", "
+        << "dsn " << std::to_string(dest_session_num) << ", "
         << "reqn " << std::to_string(req_num) << ", "
         << "pktn " << std::to_string(pkt_num) << ", "
-        << "msgsz " << std::to_string(msg_size) << ", "
-        << "magic " << std::to_string(magic) << "]";
+        << "msz " << std::to_string(msg_size) << "]";
 
     return ret.str();
   }

@@ -71,15 +71,6 @@ class SSlot {
 
       /// Per-packet TX timestamp. Indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;
-
-      /// Return a string representation of the progress made by this sslot.
-      /// Progress fields that are zero are not included in the string.
-      std::string progress_str(size_t req_num) const {
-        std::ostringstream ret;
-        ret << "[req " << req_num << ",";
-        ret << "num_tx " << num_tx << ", num_rx " << num_rx << "]";
-        return ret.str();
-      }
     } client_info;
 
     struct {
@@ -106,6 +97,19 @@ class SSlot {
       size_t sav_num_req_pkts;
     } server_info;
   };
+
+  /// Return a string representation of the progress made by this sslot.
+  /// Progress fields that are zero are not included in the string.
+  std::string progress_str() const {
+    std::ostringstream ret;
+    if (is_client) {
+      ret << "[num_tx " << client_info.num_tx << ", num_rx "
+          << client_info.num_rx << "]";
+    } else {
+      ret << "[num_rx " << client_info.num_rx << "] ";
+    }
+    return ret.str();
+  }
 
  public:
   size_t get_cur_req_num() const { return cur_req_num; }
