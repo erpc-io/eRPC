@@ -56,10 +56,8 @@ TEST_F(TimingWheelTest, Basic) {
   size_t abs_tx_tsc = ref_tsc + wheel->wslot_width_tsc;
   wheel->insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
 
-  while (true) {
-    wheel->reap(rdtsc());
-    if (wheel->ready_queue.size() > 0) break;
-  }
+  wheel->reap(abs_tx_tsc + wheel->wslot_width_tsc);
+  ASSERT_EQ(wheel->ready_queue.size(), 1);
 }
 
 TEST_F(TimingWheelTest, Delete) {
@@ -67,19 +65,19 @@ TEST_F(TimingWheelTest, Delete) {
   wheel->reap(rdtsc());
   ASSERT_EQ(wheel->ready_queue.size(), 0);
 
-  // One entry. Check that it's eventually sent.
+  // Insert one entry and delete it
+  wheel_ent_t ent = TimingWheel::get_dummy_ent();
   size_t ref_tsc = rdtsc();
   size_t abs_tx_tsc = ref_tsc + wheel->wslot_width_tsc;
-  wheel->insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
+  size_t wslot_idx = wheel->insert(ent, ref_tsc, abs_tx_tsc);
+  wheel->delete_from_wslot(wslot_idx, reinterpret_cast<SSlot *>(ent.sslot));
 
-  while (true) {
-    wheel->reap(rdtsc());
-    if (wheel->ready_queue.size() > 0) break;
-  }
+  wheel->reap(abs_tx_tsc + wheel->wslot_width_tsc);
+  ASSERT_EQ(wheel->ready_queue.size(), 0);
 }
 
 // This is not a fixture test because we use a different wheel for each rate
-TEST(TimingWheelRateTest, Basic) {
+TEST(TimingWheelRateTest, RateTest) {
   const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0, 80.0};
   const double freq_ghz = measure_rdtsc_freq();
 
