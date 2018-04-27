@@ -24,6 +24,14 @@ class RpcClientKickTest : public RpcTest {
   }
 };
 
+/// Transmit all sslots in a wheel. Return number of packets transmitted.
+size_t wheel_tx_all(Rpc<CTransport> *rpc) {
+  for (size_t i = 0; i < kWheelNumWslots; i++) rpc->wheel->reap_wslot(i);
+  size_t ret = rpc->wheel->ready_queue.size();
+  rpc->process_wheel_st();
+  return ret;
+}
+
 /// Kicking a sslot without credits is disallowed
 TEST_F(RpcClientKickTest, kick_st_no_credits) {
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
@@ -63,10 +71,10 @@ TEST_F(RpcClientKickTest, kick_st_req_pkts) {
   // enqueue_request() calls kick_st()
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
   ASSERT_EQ(clt_session->client_info.credits, 0);
-  ASSERT_EQ(sslot_0->client_info.num_tx, 0);  // All packets are in wheel
+  ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits);
 
   // Transmit the kSessionCredits request packets in the wheel
-  ASSERT_EQ(wheel_tx_all(), kSessionCredits);
+  ASSERT_EQ(wheel_tx_all(rpc), kSessionCredits);
   ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits);
 
   // Pretend that a CR has been received
@@ -74,11 +82,11 @@ TEST_F(RpcClientKickTest, kick_st_req_pkts) {
   sslot_0->client_info.num_rx = 1;
   rpc->kick_req_st(sslot_0);
   ASSERT_EQ(clt_session->client_info.credits, 0);
-  ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits);
+  ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits + 1);
 
   // Transmit the one request packet in the wheel
   pkthdr_tx_queue->clear();
-  ASSERT_EQ(wheel_tx_all(), 1);
+  ASSERT_EQ(wheel_tx_all(rpc), 1);
   ASSERT_EQ(sslot_0->client_info.num_tx, kSessionCredits + 1);
   ASSERT_TRUE(
       pkthdr_tx_queue->pop().matches(PktType::kPktTypeReq, kSessionCredits));

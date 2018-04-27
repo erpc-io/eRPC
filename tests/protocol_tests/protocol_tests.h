@@ -148,15 +148,6 @@ class RpcTest : public ::testing::Test {
     return se;
   }
 
-  /// Transmit all sslots in the timing wheel. Return number of packets
-  /// transmitted.
-  size_t wheel_tx_all() {
-    for (size_t i = 0; i < kWheelNumWslots; i++) rpc->wheel->reap_wslot(i);
-    size_t ret = rpc->wheel->ready_queue.size();
-    rpc->process_wheel_st();
-    return ret;
-  }
-
   Rpc<CTransport> *rpc = nullptr;
   FixedQueue<pkthdr_t, kSessionCredits> *pkthdr_tx_queue;
 

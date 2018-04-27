@@ -542,7 +542,7 @@ class Rpc {
            sslot->cur_req_num, pkt_num,
            to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
 
-    size_t wslot_idx =
+    uint16_t wslot_idx =
         wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
     sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
     sslot->client_info.wheel_count++;
@@ -560,7 +560,7 @@ class Rpc {
            sslot->cur_req_num, pkt_num,
            to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
 
-    size_t wslot_idx =
+    uint16_t wslot_idx =
         wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
     sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
     sslot->client_info.wheel_count++;

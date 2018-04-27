@@ -121,8 +121,8 @@ class TimingWheel {
    * using the sending rate.
    * @param abs_tx_tsc The desired absolute timestamp for packet transmission
    */
-  inline size_t insert(const wheel_ent_t &ent, size_t ref_tsc,
-                       size_t abs_tx_tsc) {
+  inline uint16_t insert(const wheel_ent_t &ent, size_t ref_tsc,
+                         size_t abs_tx_tsc) {
     assert(abs_tx_tsc >= ref_tsc);
     assert(abs_tx_tsc - ref_tsc <= horizon_tsc);  // Horizon definition
 
