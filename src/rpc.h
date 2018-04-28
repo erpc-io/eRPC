@@ -543,8 +543,8 @@ class Rpc {
     size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
     LOG_CC(trace_file,
-           "eRPC Rpc %u: Req pkt %zu/%zu, desired abs TX %.3f us.\n", rpc_id,
-           sslot->cur_req_num, pkt_num,
+           "Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n", rpc_id,
+           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
 
     uint16_t wslot_idx =
@@ -562,8 +562,8 @@ class Rpc {
     size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
     LOG_CC(trace_file,
-           "eRPC Rpc %u: RFR pkt %zu/%zu, desired abs TX %.3f us.\n", rpc_id,
-           sslot->cur_req_num, pkt_num,
+           "Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n", rpc_id,
+           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
 
     uint16_t wslot_idx =
