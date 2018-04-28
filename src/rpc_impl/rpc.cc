@@ -69,9 +69,19 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   nexus_hook.rpc_id = rpc_id;
   nexus->register_hook(&nexus_hook);
 
+  if (LOG_LEVEL >= LOG_LEVEL_REORDER) {
+    std::string trace_filename = "/tmp/erpc_trace_" + std::to_string(rpc_id);
+    trace_file = fopen(trace_filename.c_str(), "w");
+    if (trace_file == nullptr) {
+      delete huge_alloc;
+      throw std::runtime_error("Failed to open trace file");
+    }
+  }
+
   LOG_INFO("eRPC Rpc: Created with ID = %u, eRPC TID = %zu.\n", rpc_id,
            creator_etid);
 
+  // Steps that must be done as late as possible
   pkt_loss_scan_tsc = rdtsc();  // Assign epoch timestamp as late as possible
   if (kCcPacing) wheel->catchup();  // Wheel could be lagging, so catch up
 }
@@ -103,6 +113,8 @@ Rpc<TTr>::~Rpc() {
   delete transport;
 
   nexus->unregister_hook(&nexus_hook);
+
+  if (LOG_LEVEL >= LOG_LEVEL_REORDER) fclose(trace_file);
 }
 
 template <class TTr>

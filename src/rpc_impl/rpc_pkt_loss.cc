@@ -69,12 +69,12 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     // (b) Some packets are queued in the wheel: the wheel will make progress.
     // (c) We have received the full response and a background thread currently
     // owns sslot. In this case, the bg thread cannot modify num_rx or num_tx.
-    LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
+    LOG_REORDER(trace_file, "%s: False positive. Ignoring.\n", issue_msg);
     return;
   }
 
   // If we're here, we will roll back and retransmit
-  LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
+  LOG_REORDER(trace_file, "%s: Retransmitting %s.\n", issue_msg,
               ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
   sslot->session->client_info.cc.num_retransmissions++;
   credits += delta;

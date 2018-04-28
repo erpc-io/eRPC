@@ -45,13 +45,13 @@ void Rpc<TTr>::process_rfr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     if (pkthdr->req_num < sslot->cur_req_num || pkthdr->pkt_num > si.num_rx) {
       // Reject RFR for old requests or future packets in this request
-      LOG_REORDER("%s: Dropping.\n", issue_msg);
+      LOG_REORDER(trace_file, "%s: Dropping.\n", issue_msg);
       return;
     }
 
     // If we're here, this is a past RFR packet for this request. So, we still
     // have the response, and we saved request packet count.
-    LOG_REORDER("%s: Re-sending response.\n", issue_msg);
+    LOG_REORDER(trace_file, "%s: Re-sending response.\n", issue_msg);
     enqueue_pkt_tx_burst_st(
         sslot, resp_ntoi(pkthdr->pkt_num, si.sav_num_req_pkts), nullptr);
 

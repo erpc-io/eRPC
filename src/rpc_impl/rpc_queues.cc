@@ -45,7 +45,7 @@ void Rpc<TTr>::process_wheel_st() {
       enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
     }
 
-    LOG_CC("eRPC Rpc %u: Req/pkt %zu/%zu, TX at %.3f us.\n", rpc_id,
+    LOG_CC(trace_file, "eRPC Rpc %u: Req/pkt %zu/%zu, TX at %.3f us.\n", rpc_id,
            sslot->cur_req_num, pkt_num,
            to_usec(cur_tsc - creation_tsc, freq_ghz));
 

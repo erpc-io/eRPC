@@ -31,11 +31,9 @@ namespace erpc {
 #define LOG_LEVEL_INFO 3     // Reasonable to print (e.g., management packets)
 #define LOG_LEVEL_REORDER 4  // Too frequent to print (e.g., reordered packets)
 #define LOG_LEVEL_TRACE 5    // Extremely frequent (e.g., all datapath packets)
+#define LOG_LEVEL_CC 6       // Even congestion control decisions!
 
-// Logging for congestion control/packet pacing datapath is enabled separately
-#define LOG_CC_ENABLE 0
-
-#define LOG_OUTPUT_STREAM stdout
+#define LOG_DEFAULT_STREAM stdout
 
 // If LOG_LEVEL is not defined, default to LOG_LEVEL_INFO in debug mode, and
 // LOG_LEVEL_WARN in non-debug mode.
@@ -50,53 +48,55 @@ namespace erpc {
 static void output_log_header(int level);
 
 #if LOG_LEVEL >= LOG_LEVEL_ERROR
-#define LOG_ERROR(...)                     \
-  output_log_header(LOG_LEVEL_ERROR);      \
-  fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
-  fflush(stdout)
+#define LOG_ERROR(...)                                    \
+  output_log_header(LOG_DEFAULT_STREAM, LOG_LEVEL_ERROR); \
+  fprintf(LOG_DEFAULT_STREAM, __VA_ARGS__);               \
+  fflush(LOG_DEFAULT_STREAM)
 #else
 #define LOG_ERROR(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_WARN
-#define LOG_WARN(...)                      \
-  output_log_header(LOG_LEVEL_WARN);       \
-  fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
-  fflush(stdout)
+#define LOG_WARN(...)                                    \
+  output_log_header(LOG_DEFAULT_STREAM, LOG_LEVEL_WARN); \
+  fprintf(LOG_DEFAULT_STREAM, __VA_ARGS__);              \
+  fflush(LOG_DEFAULT_STREAM)
 #else
 #define LOG_WARN(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_INFO
-#define LOG_INFO(...)                      \
-  output_log_header(LOG_LEVEL_INFO);       \
-  fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
-  fflush(stdout)
+#define LOG_INFO(...)                                    \
+  output_log_header(LOG_DEFAULT_STREAM, LOG_LEVEL_INFO); \
+  fprintf(LOG_DEFAULT_STREAM, __VA_ARGS__);              \
+  fflush(LOG_DEFAULT_STREAM)
 #else
 #define LOG_INFO(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_REORDER
-#define LOG_REORDER(...)                   \
-  output_log_header(LOG_LEVEL_REORDER);    \
-  fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
-  fflush(stdout)
+#define LOG_REORDER(fd, ...)                \
+  output_log_header(fd, LOG_LEVEL_REORDER); \
+  fprintf(fd, __VA_ARGS__);                 \
+  fflush(fd)
 #else
 #define LOG_REORDER(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_TRACE
-#define LOG_TRACE(...)                     \
-  fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
-  fflush(stdout)
+#define LOG_TRACE(fd, ...)                \
+  output_log_header(fd, LOG_LEVEL_TRACE); \
+  fprintf(fd, __VA_ARGS__);               \
+  fflush(fd)
 #else
 #define LOG_TRACE(...) ((void)0)
 #endif
 
-#if LOG_CC_ENABLE == 1
-#define LOG_CC(...)                        \
-  fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__); \
-  fflush(stdout)
+#if LOG_LEVEL >= LOG_LEVEL_CC
+#define LOG_CC(fd, ...)                \
+  output_log_header(fd, LOG_LEVEL_CC); \
+  fprintf(fd, __VA_ARGS__);            \
+  fflush(fd)
 #else
 #define LOG_CC(...) ((void)0)
 #endif
@@ -119,7 +119,7 @@ static std::string get_formatted_time() {
 }
 
 // Output log message header
-static void output_log_header(int level) {
+static void output_log_header(FILE *stream, int level) {
   std::string formatted_time = get_formatted_time();
 
   const char *type;
@@ -139,14 +139,17 @@ static void output_log_header(int level) {
     case LOG_LEVEL_TRACE:
       type = "TRACE";
       break;
+    case LOG_LEVEL_CC:
+      type = "CC";
+      break;
     default:
       type = "UNKWN";
   }
 
-  fprintf(LOG_OUTPUT_STREAM, "%s %s: ", formatted_time.c_str(), type);
+  fprintf(stream, "%s %s: ", formatted_time.c_str(), type);
 }
 
-/// Return true iff REORDER and TRACE mode logging is disabled. These modes can
+/// Return true iff REORDER/TRACE/CC mode logging is disabled. These modes can
 /// print an unreasonable number of log messages.
 static bool is_log_level_reasonable() { return LOG_LEVEL <= LOG_LEVEL_INFO; }
 

@@ -78,11 +78,11 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
 
   // Handle reordering
   if (unlikely(!in_order_client(sslot, pkthdr))) {
-    LOG_REORDER(
-        "eRPC Rpc %u: Received out-of-order response for session %u. "
-        "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
-        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.num_rx);
+    LOG_REORDER(trace_file,
+                "eRPC Rpc %u: Received out-of-order response for session %u. "
+                "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
+                rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+                pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.num_rx);
     return;
   }
 
