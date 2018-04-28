@@ -1,5 +1,5 @@
-#include "common.h"
 #include "nexus.h"
+#include "common.h"
 #include "ops.h"
 #include "session.h"
 #include "util/mt_queue.h"
@@ -25,12 +25,6 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
     while (ctx.bg_req_queue->size > 0) {
       BgWorkItem wi = ctx.bg_req_queue->unlocked_pop();
       SSlot *s = wi.sslot;
-
-      LOG_TRACE(
-          "eRPC Background: Background thread %zu running %s for Rpc %u."
-          "Request number = %zu.\n",
-          ctx.bg_thread_index, wi.is_req() ? "request handler" : "continuation",
-          wi.rpc_id, s->cur_req_num);
 
       if (wi.is_req()) {
         uint8_t req_type = s->server_info.req_msgbuf.get_req_type();
