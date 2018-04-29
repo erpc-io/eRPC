@@ -56,20 +56,26 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
           "eRPC Rpc %u: Packet loss suspected for session %u, req %zu. "
-          "num_tx %zu, num_rx %zu. Action",
+          "Status %s. Action",
           rpc_id, sslot->session->local_session_num, req_msgbuf->get_req_num(),
-          ci.num_tx, ci.num_rx);
+          sslot->progress_str().c_str());
 
   const size_t delta = ci.num_tx - ci.num_rx;
   assert(credits + delta <= kSessionCredits);
 
+  // This can happen if:
+  // (a) We're stalled on credits: credit stall queue will make progress.
+  // (c) We have received the full response and a background thread currently
+  // owns sslot. In this case, the bg thread cannot modify num_rx or num_tx.
   if (unlikely(delta == 0)) {
-    // This can happen if:
-    // (a) We're stalled on credits: credit stall queue will make progress.
-    // (b) Some packets are queued in the wheel: the wheel will make progress.
-    // (c) We have received the full response and a background thread currently
-    // owns sslot. In this case, the bg thread cannot modify num_rx or num_tx.
     LOG_REORDER(trace_file, "%s: False positive. Ignoring.\n", issue_msg);
+    return;
+  }
+
+  // Deleting from the rate limiter is too complex, see notes for details
+  if (unlikely(sslot->client_info.wheel_count > 0)) {
+    LOG_REORDER(trace_file, "%s: Packets still in wheel. Ignoring.\n",
+                issue_msg);
     return;
   }
 
@@ -87,20 +93,9 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // We have num_tx > num_rx, so stallq cannot contain sslot
   assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
 
-  process_wheel_st();  // Drain packets from wheel's ready queue
-
   // Drain TX burst and DMA queue
   if (tx_batch_i > 0) do_tx_burst_st();
   transport->tx_flush();
-
-  // Delete packets from the wheel. This works even if pacing is disabled.
-  for (size_t i = 0; i < kSessionCredits; i++) {
-    if (ci.wslot_idx[i] != kWheelInvalidWslot) {
-      wheel->delete_from_wslot(ci.wslot_idx[i], sslot);
-      ci.wslot_idx[i] = kWheelInvalidWslot;
-    }
-  }
-  ci.wheel_count = 0;
 
   req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
 }

@@ -34,9 +34,6 @@ void Rpc<TTr>::process_wheel_st() {
     size_t pkt_num = ent.pkt_num;
     size_t crd_i = pkt_num % kSessionCredits;
 
-    sslot->client_info.wheel_count--;
-    sslot->client_info.wslot_idx[crd_i] = kWheelInvalidWslot;
-
     auto &ci = sslot->client_info;
     if (pkt_num < sslot->tx_msgbuf->num_pkts) {
       enqueue_pkt_tx_burst_st(sslot, pkt_num /* pkt_idx */, &ci.tx_ts[crd_i]);
@@ -49,6 +46,8 @@ void Rpc<TTr>::process_wheel_st() {
            rpc_id, sslot->session->local_session_num, sslot->cur_req_num,
            pkt_num, to_usec(cur_tsc - creation_tsc, freq_ghz));
 
+    sslot->client_info.wheel_count--;
+    sslot->client_info.wslot_idx[crd_i] = kWheelInvalidWslot;
     wheel->ready_queue.pop();
   }
 }
