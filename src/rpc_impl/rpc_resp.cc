@@ -137,6 +137,9 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
       }
     }
     ci.wheel_count = 0;
+
+    LOG_CC("Rpc %u: lsn/req %u/%zu deleted from wheel.\n", rpc_id,
+           sslot->session->local_session_num, sslot->cur_req_num);
   }
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
