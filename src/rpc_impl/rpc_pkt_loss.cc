@@ -68,19 +68,18 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // (c) We have received the full response and a background thread currently
   // owns sslot. In this case, the bg thread cannot modify num_rx or num_tx.
   if (unlikely(delta == 0)) {
-    LOG_REORDER(trace_file, "%s: False positive. Ignoring.\n", issue_msg);
+    LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
     return;
   }
 
   // Deleting from the rate limiter is too complex, see notes for details
   if (unlikely(sslot->client_info.wheel_count > 0)) {
-    LOG_REORDER(trace_file, "%s: Packets still in wheel. Ignoring.\n",
-                issue_msg);
+    LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
     return;
   }
 
   // If we're here, we will roll back and retransmit
-  LOG_REORDER(trace_file, "%s: Retransmitting %s.\n", issue_msg,
+  LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
               ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
   sslot->session->client_info.cc.num_retransmissions++;
   credits += delta;

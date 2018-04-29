@@ -499,8 +499,8 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_idx));
     }
 
-    LOG_TRACE(trace_file, "eRPC Rpc %u: lsn %u, TX %s, %s, status drop %u.\n",
-              rpc_id, sslot->session->local_session_num,
+    LOG_TRACE("eRPC Rpc %u: lsn %u, TX %s, %s, status drop %u.\n", rpc_id,
+              sslot->session->local_session_num,
               tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(),
               sslot->progress_str().c_str(), item.drop);
 
@@ -526,8 +526,8 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
     }
 
-    LOG_TRACE(trace_file, "eRPC Rpc %u: lsn %u, TX %s, status %s, drop %u.\n",
-              rpc_id, sslot->session->local_session_num,
+    LOG_TRACE("eRPC Rpc %u: lsn %u, TX %s, status %s, drop %u.\n", rpc_id,
+              sslot->session->local_session_num,
               ctrl_msgbuf->get_pkthdr_str(0).c_str(),
               sslot->progress_str().c_str(), item.drop);
 
@@ -542,8 +542,7 @@ class Rpc {
     size_t ref_tsc = dpath_rdtsc();
     size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
-    LOG_CC(trace_file,
-           "Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n", rpc_id,
+    LOG_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n", rpc_id,
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
@@ -561,8 +560,7 @@ class Rpc {
     size_t ref_tsc = dpath_rdtsc();
     size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
-    LOG_CC(trace_file,
-           "Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n", rpc_id,
+    LOG_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n", rpc_id,
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
@@ -942,7 +940,9 @@ class Rpc {
     FixedQueue<pkthdr_t, kSessionCredits> pkthdr_tx_queue;
   } testing;
 
-  FILE *trace_file;  ///< File for dispatch thread trace output with LOG_TRACE
+  /// File for dispatch thread trace output. This is used indirectly by
+  /// LOG_TRACE and other macros.
+  FILE *trace_file;
 };
 
 // This goes at the end of every Rpc implementation file to force compilation.

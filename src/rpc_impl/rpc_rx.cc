@@ -42,7 +42,7 @@ void Rpc<TTr>::process_comps_st() {
     }
 
     // If we are here, we have a valid packet for a connected session
-    LOG_TRACE(trace_file, "eRPC Rpc %u: Received packet %s.\n", rpc_id,
+    LOG_TRACE("eRPC Rpc %u: Received packet %s.\n", rpc_id,
               pkthdr->to_string().c_str());
 
     size_t sslot_i = pkthdr->req_num % kSessionReqWindow;  // Bit shift

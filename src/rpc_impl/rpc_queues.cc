@@ -42,9 +42,9 @@ void Rpc<TTr>::process_wheel_st() {
       enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
     }
 
-    LOG_CC(trace_file, "Rpc %u: lsn/req/pkt %u,%zu/%zu, reaped at %.3f us.\n",
-           rpc_id, sslot->session->local_session_num, sslot->cur_req_num,
-           pkt_num, to_usec(cur_tsc - creation_tsc, freq_ghz));
+    LOG_CC("Rpc %u: lsn/req/pkt %u,%zu/%zu, reaped at %.3f us.\n", rpc_id,
+           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
+           to_usec(cur_tsc - creation_tsc, freq_ghz));
 
     sslot->client_info.wheel_count--;
     sslot->client_info.wslot_idx[crd_i] = kWheelInvalidWslot;

@@ -75,28 +75,28 @@ static void output_log_header(int level);
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_REORDER
-#define LOG_REORDER(fd, ...)                \
-  output_log_header(fd, LOG_LEVEL_REORDER); \
-  fprintf(fd, __VA_ARGS__);                 \
-  fflush(fd)
+#define LOG_REORDER(...)                            \
+  output_log_header(trace_file, LOG_LEVEL_REORDER); \
+  fprintf(trace_file, __VA_ARGS__);                 \
+  fflush(trace_file)
 #else
 #define LOG_REORDER(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_TRACE
-#define LOG_TRACE(fd, ...)                \
-  output_log_header(fd, LOG_LEVEL_TRACE); \
-  fprintf(fd, __VA_ARGS__);               \
-  fflush(fd)
+#define LOG_TRACE(...)                            \
+  output_log_header(trace_file, LOG_LEVEL_TRACE); \
+  fprintf(trace_file, __VA_ARGS__);               \
+  fflush(trace_file)
 #else
 #define LOG_TRACE(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_CC
-#define LOG_CC(fd, ...)                \
-  output_log_header(fd, LOG_LEVEL_CC); \
-  fprintf(fd, __VA_ARGS__);            \
-  fflush(fd)
+#define LOG_CC(...)                            \
+  output_log_header(trace_file, LOG_LEVEL_CC); \
+  fprintf(trace_file, __VA_ARGS__);            \
+  fflush(trace_file)
 #else
 #define LOG_CC(...) ((void)0)
 #endif
