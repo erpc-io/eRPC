@@ -123,10 +123,22 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     copy_data_to_msgbuf(resp_msgbuf, pkt_idx, pkthdr);
 
     if (ci.num_rx != wire_pkts(req_msgbuf, resp_msgbuf)) return;
-    // Fall through to invoke continuation
+    // Else fall through to invoke continuation
   }
 
-  // If we are here, the complete response has been received
+  // Here, the complete response has been received. All references to sslot must
+  // be removed before invalidating it. The TX batch or DMA queue cannot contain
+  // a reference because we drain it after retransmission.
+  if (kCcPacing && unlikely(sslot->client_info.wheel_count > 0)) {
+    for (size_t i = 0; i < kSessionCredits; i++) {
+      if (ci.wslot_idx[i] != kWheelInvalidWslot) {
+        wheel->delete_from_wslot(ci.wslot_idx[i], sslot);
+        ci.wslot_idx[i] = kWheelInvalidWslot;
+      }
+    }
+    ci.wheel_count = 0;
+  }
+
   sslot->tx_msgbuf = nullptr;  // Mark response as received
   if (ci.cont_etid == kInvalidBgETid) {
     ci.cont_func(static_cast<RespHandle *>(sslot), context, ci.tag);
