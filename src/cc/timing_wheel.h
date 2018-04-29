@@ -110,7 +110,8 @@ class TimingWheel {
   }
 
   /**
-   * @brief Add an entry for transmission at an absolute timestamp.
+   * @brief Add an entry to the wheel. This may move existing entries to the
+   * wheel's ready queue.
    *
    * Even if the entry falls in the "current" wheel slot, we must not place it
    * entry directly in the ready queue. Doing so can reorder this entry before
@@ -146,6 +147,8 @@ class TimingWheel {
     return dst_wslot;
   }
 
+  /// Delete all (zero or more) occurences of an sslot from a wheel slot. This
+  /// might leave some buckets in the wheel slot chain empty.
   void delete_from_wslot(size_t ws_i, const SSlot *sslot) {
     wheel_bkt_t *bkt = &wheel[ws_i];
     while (bkt != nullptr) {
@@ -158,6 +161,19 @@ class TimingWheel {
 
       bkt->num_entries = write_i;
       bkt = bkt->next;
+    }
+  }
+
+  /// Delete all (zero or more) occurences of an sslot from a wheel's ready
+  /// queue.
+  void delete_from_ready_queue(const SSlot *sslot) {
+    const size_t size = ready_queue.size();
+    for (size_t i = 0; i < size; i++) {
+      wheel_ent_t ent = ready_queue.front();
+      ready_queue.pop();
+      if (reinterpret_cast<SSlot *>(ent.sslot) != sslot) {
+        ready_queue.push(ent);
+      }
     }
   }
 

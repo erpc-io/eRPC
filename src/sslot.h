@@ -67,7 +67,7 @@ class SSlot {
 
       /// Per-packet wheel index
       std::array<uint16_t, kSessionCredits> wslot_idx;
-      size_t wheel_count;  ///< Number of packets in wheel
+      size_t wheel_count;  ///< Number of packets in wheel slots or ready queue
 
       /// Per-packet TX timestamp. Indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;

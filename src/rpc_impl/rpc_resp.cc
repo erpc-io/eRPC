@@ -130,6 +130,8 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // be removed before invalidating it. The TX batch or DMA queue cannot contain
   // a reference because we drain it after retransmission.
   if (kCcPacing && unlikely(sslot->client_info.wheel_count > 0)) {
+    wheel->delete_from_ready_queue(sslot);
+
     for (size_t i = 0; i < kSessionCredits; i++) {
       if (ci.wslot_idx[i] != kWheelInvalidWslot) {
         wheel->delete_from_wslot(ci.wslot_idx[i], sslot);
