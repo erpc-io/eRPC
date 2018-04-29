@@ -540,15 +540,15 @@ class Rpc {
     const size_t pkt_idx = pkt_num;
     size_t pktsz = sslot->tx_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
     size_t ref_tsc = dpath_rdtsc();
-    size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
+    size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
     LOG_CC(trace_file,
            "Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n", rpc_id,
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
-           to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
+           to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
     uint16_t wslot_idx =
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
+        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
     sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
     sslot->client_info.wheel_count++;
   }
@@ -559,15 +559,15 @@ class Rpc {
     const MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
     size_t pktsz = resp_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
     size_t ref_tsc = dpath_rdtsc();
-    size_t abs_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
+    size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
     LOG_CC(trace_file,
            "Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n", rpc_id,
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
-           to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
+           to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
     uint16_t wslot_idx =
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
+        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
     sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
     sslot->client_info.wheel_count++;
   }

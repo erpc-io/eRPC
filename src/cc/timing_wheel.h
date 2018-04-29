@@ -117,31 +117,30 @@ class TimingWheel {
    * prior entries in the current wheel slot that have not been reaped.
    *
    * @param ent The wheel entry to add
-   * @param ref_tsc A recent timestamp that was used to compute \p abs_tx_tsc
-   * using the sending rate.
-   * @param abs_tx_tsc The desired absolute timestamp for packet transmission
+   * @param ref_tsc A recent timestamp
+   * @param desired_tx_tsc The desired time for packet transmission
    */
   inline uint16_t insert(const wheel_ent_t &ent, size_t ref_tsc,
-                         size_t abs_tx_tsc) {
-    assert(abs_tx_tsc >= ref_tsc);
-    assert(abs_tx_tsc - ref_tsc <= horizon_tsc);  // Horizon definition
+                         size_t desired_tx_tsc) {
+    assert(desired_tx_tsc >= ref_tsc);
+    assert(desired_tx_tsc - ref_tsc <= horizon_tsc);  // Horizon definition
 
     reap(ref_tsc);  // Advance the wheel to a recent time
     assert(wheel[cur_wslot].tx_tsc > ref_tsc);
 
     size_t dst_wslot;
-    if (abs_tx_tsc <= wheel[cur_wslot].tx_tsc) {
+    if (desired_tx_tsc <= wheel[cur_wslot].tx_tsc) {
       dst_wslot = cur_wslot;
     } else {
       size_t wslot_delta =
-          1 + (abs_tx_tsc - wheel[cur_wslot].tx_tsc) / wslot_width_tsc;
+          1 + (desired_tx_tsc - wheel[cur_wslot].tx_tsc) / wslot_width_tsc;
       assert(wslot_delta < kWheelNumWslots);
 
       dst_wslot = cur_wslot + wslot_delta;
       if (dst_wslot >= kWheelNumWslots) dst_wslot -= kWheelNumWslots;
     }
 
-    if (kWheelRecord) record_vec.emplace_back(ent.pkt_num, abs_tx_tsc);
+    if (kWheelRecord) record_vec.emplace_back(ent.pkt_num, desired_tx_tsc);
 
     insert_into_wslot(dst_wslot, ent);
     return dst_wslot;

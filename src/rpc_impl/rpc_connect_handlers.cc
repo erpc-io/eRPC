@@ -209,7 +209,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   session->remote_session_num = session->server.session_num;
   session->state = SessionState::kConnected;
 
-  session->client_info.cc.abs_tx_tsc = rdtsc();
+  session->client_info.cc.prev_desired_tx_tsc = rdtsc();
 
   LOG_INFO("%s: None. Session connected.\n", issue_msg);
   sm_handler(session->local_session_num, SmEventType::kConnected,
