@@ -364,6 +364,13 @@ class Rpc {
     return false;
   }
 
+  /// Complete transmission for all packets in the Rpc's TX batch and the
+  /// transport's DMA queue
+  void drain_tx_batch_and_dma_queue() {
+    if (tx_batch_i > 0) do_tx_burst_st();
+    transport->tx_flush();
+  }
+
   // rpc_kick.cc
 
   /// Enqueue client packets for a sslot that has at least one credit and

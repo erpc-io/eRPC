@@ -97,10 +97,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
         // The response is available, so resend this req's corresponding packet
         LOG_REORDER("%s: Re-sending response.\n", issue_msg);
         enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Packet index = 0
-
-        // Release all transport-owned buffers before re-entering event loop
-        if (tx_batch_i > 0) do_tx_burst_st();
-        transport->tx_flush();
+        drain_tx_batch_and_dma_queue();
         return;
       } else {
         LOG_REORDER("%s: Response not available yet. Dropping.\n", issue_msg);
@@ -194,8 +191,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
       // The response is available, so resend it
       LOG_REORDER("%s: Re-sending response.\n", issue_msg);
       enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Packet index = 0
-      if (tx_batch_i > 0) do_tx_burst_st();
-      transport->tx_flush();
+      drain_tx_batch_and_dma_queue();
     } else {
       // The response is not available yet, client will have to timeout again
       LOG_REORDER("%s: Dropping because response not available yet.\n",

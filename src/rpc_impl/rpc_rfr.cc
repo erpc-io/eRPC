@@ -54,10 +54,7 @@ void Rpc<TTr>::process_rfr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     LOG_REORDER("%s: Re-sending response.\n", issue_msg);
     enqueue_pkt_tx_burst_st(
         sslot, resp_ntoi(pkthdr->pkt_num, si.sav_num_req_pkts), nullptr);
-
-    // Release all transport-owned buffers before re-entering event loop
-    if (tx_batch_i > 0) do_tx_burst_st();
-    transport->tx_flush();
+    drain_tx_batch_and_dma_queue();
     return;
   }
 

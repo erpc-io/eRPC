@@ -78,6 +78,9 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     return;
   }
 
+  // We have num_tx > num_rx, so stallq cannot contain sslot
+  assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
+
   // If we're here, we will roll back and retransmit
   LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
               ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
@@ -86,17 +89,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   ci.num_tx = ci.num_rx;
   ci.progress_tsc = ev_loop_tsc;
 
-  // Drain all sources of packet queueing. sslot may be in dispatch queues, but
-  // not in background queues since we don't have the full response.
-
-  // We have num_tx > num_rx, so stallq cannot contain sslot
-  assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
-
-  // Drain TX burst and DMA queue
-  if (tx_batch_i > 0) do_tx_burst_st();
-  transport->tx_flush();
-
   req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
+  drain_tx_batch_and_dma_queue();
 }
 
 FORCE_COMPILE_TRANSPORTS

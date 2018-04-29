@@ -12,9 +12,7 @@ bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
   LOG_INFO("eRPC Rpc %u: Handling reset event for remote hostname = %s.\n",
            rpc_id, reset_rem_hostname.c_str());
 
-  // Drain the TX batch and flush the transport
-  if (tx_batch_i > 0) do_tx_burst_st();
-  transport->tx_flush();
+  drain_tx_batch_and_dma_queue();
 
   bool success_all = true;
 
