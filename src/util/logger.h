@@ -18,7 +18,6 @@
 #ifndef ERPC_LOGGER_H
 #define ERPC_LOGGER_H
 
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <ctime>
 #include <string>
 
@@ -101,20 +100,15 @@ static void output_log_header(int level);
 #define LOG_CC(...) ((void)0)
 #endif
 
+/// Return decent-precision time formatted as seconds:microseconds
 static std::string get_formatted_time() {
-  const boost::posix_time::ptime now =
-      boost::posix_time::microsec_clock::local_time();
-  const boost::posix_time::time_duration td = now.time_of_day();
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME, &t);
+  char buf[20];
+  uint32_t seconds = t.tv_sec % 100;  // Rollover every 100 seconds
+  uint32_t usec = t.tv_nsec / 1000;
 
-  const long minutes = td.minutes();
-  const long seconds = td.seconds();
-  const long milliseconds =
-      td.total_milliseconds() -
-      ((td.hours() * 3600 + minutes * 60 + seconds) * 1000);
-
-  char buf[100];
-  sprintf(buf, "%02ld:%02ld.%03ld", minutes, seconds, milliseconds);
-
+  sprintf(buf, "%u:%06u", seconds, usec);
   return std::string(buf);
 }
 
