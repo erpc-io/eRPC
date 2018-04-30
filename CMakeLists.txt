@@ -169,7 +169,6 @@ set(MICA_SOURCES
 set(CLIENT_TESTS
   create_session_test
   destroy_session_test
-  api_restrictions_test
   small_msg_test
   large_msg_test
   req_in_cont_func_test
