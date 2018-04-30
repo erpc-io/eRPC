@@ -57,8 +57,11 @@ class SSlot {
       erpc_cont_func_t cont_func;  ///< Continuation function for the request
       size_t tag;                  ///< Tag of the request
 
-      size_t num_tx;  ///< Number of packets sent
-      size_t num_rx;  ///< Number of packets received
+      /// Number of packets sent. Packets up to (num_tx - 1) have been sent.
+      size_t num_tx;
+
+      /// Number of pkts received. Pkts up to (num_tx - 1) have been received.
+      size_t num_rx;
 
       size_t progress_tsc;  ///< Last TSC at which this request made progress
       size_t cont_etid;     ///< eRPC thread ID to run the continuation on
@@ -89,7 +92,7 @@ class SSlot {
       uint8_t req_type;
       ReqFuncType req_func_type;  ///< The req handler type (e.g., background)
 
-      /// RX progress. Note that the server does not track TX progress.
+      /// Number of pkts received. Pkts up to (num_tx - 1) have been received.
       size_t num_rx;
 
       /// The server remembers the number of packets in the request after
