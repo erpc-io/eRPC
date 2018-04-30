@@ -79,10 +79,10 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // Handle reordering
   if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
-        "eRPC Rpc %u: Received out-of-order response for session %u. "
-        "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
+        "Rpc %u: Received out-of-order response for session %u. "
+        "Packet %zu/%zu, sslot %zu/%s. Dropping.\n",
         rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.num_rx);
+        pkthdr->pkt_num, sslot->cur_req_num, sslot->progress_str().c_str());
     return;
   }
 
@@ -127,22 +127,13 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   }
 
   // Here, the complete response has been received. All references to sslot must
-  // be removed before invalidating it. The TX batch or DMA queue cannot contain
-  // a reference because we drain it after retransmission.
-  if (kCcPacing && unlikely(sslot->client_info.wheel_count > 0)) {
-    wheel->delete_from_ready_queue(sslot);
-
-    for (size_t i = 0; i < kSessionCredits; i++) {
-      if (ci.wslot_idx[i] != kWheelInvalidWslot) {
-        wheel->delete_from_wslot(ci.wslot_idx[i], sslot);
-        ci.wslot_idx[i] = kWheelInvalidWslot;
-      }
-    }
-    ci.wheel_count = 0;
-
-    LOG_CC("Rpc %u: lsn/req %u/%zu deleted from wheel.\n", rpc_id,
-           sslot->session->local_session_num, sslot->cur_req_num);
-  }
+  // be removed before invalidating it.
+  // 1. The TX batch or DMA queue cannot contain a reference because we drain
+  //    it after retransmission.
+  // 2. The wheel cannot contain a reference because we (a) wait for sslot to
+  //    drain from the wheel before retransmitting, and (b) discard spurious
+  //    corresponding packets received for packets in the wheel.
+  assert(sslot->client_info.wheel_count == 0);
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
   if (ci.cont_etid == kInvalidBgETid) {

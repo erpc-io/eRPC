@@ -332,13 +332,28 @@ class Rpc {
     return pkt_num - (num_req_pkts - 1);
   }
 
-  /// Return true iff a packet received by a client is in order
+  /// Return true iff a packet received by a client is in order. This must be
+  /// only a few instructions.
   static inline size_t in_order_client(const SSlot *sslot,
                                        const pkthdr_t *pkthdr) {
-    // If request numbers match, num_rx & num_tx are valid for the request
-    return (pkthdr->req_num == sslot->cur_req_num) &&
-           (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
-           (pkthdr->pkt_num == sslot->client_info.num_rx);
+    // Check if request numbers match. If so, counters are valid for the req.
+    if (unlikely(pkthdr->req_num != sslot->cur_req_num)) return false;
+
+    const auto &ci = sslot->client_info;
+    if (unlikely(pkthdr->pkt_num != ci.num_rx)) return false;
+
+    // Ignore spurious packets received after roll-back.
+    // 1. We've only sent pkts up to (ci.num_tx - 1). Ignore later packets.
+    // 2. Ignore if the corresponding client packet for pkthdr is still in the
+    //    wheel. In this case, the client packet has bumped num_tx, but has not
+    //    actually been transmitted.
+    if (unlikely(pkthdr->pkt_num >= ci.num_tx)) return false;
+
+    const bool _in_wheel =
+        ci.wslot_idx[pkthdr->pkt_num % kSessionCredits] != kWheelInvalidWslot;
+    if (kCcPacing && unlikely(_in_wheel)) return false;
+
+    return true;
   }
 
   /// Return the total number of packets sent on the wire by one RPC endpoint.

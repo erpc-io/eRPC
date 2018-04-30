@@ -72,7 +72,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
     return;
   }
 
-  // Deleting from the rate limiter is too complex, see notes for details
+  // Deleting from the rate limiter is too complex
   if (unlikely(sslot->client_info.wheel_count > 0)) {
     LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
     return;
