@@ -17,8 +17,7 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
 
   while (*ctx.kill_switch == false) {
     if (ctx.bg_req_queue->size == 0) {
-      // Try again later
-      usleep(1);
+      // TODO: Put bg thread to sleep if it's idle for a long time
       continue;
     }
 
