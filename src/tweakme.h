@@ -10,36 +10,25 @@
 
 namespace erpc {
 
-#if defined(TESTING)
-static constexpr bool kTesting = true;
-#else
-static constexpr bool kTesting = false;
-#endif
-
-/// Packet loss timeout for an RPC request in microseconds. The list of
-/// requests is scanned at every "epoch", which is fraction of the RTO.
-static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 5000;
+/// Packet loss timeout for an RPC request in microseconds
+static constexpr size_t kRpcRTOUs = 5000;
 
 // Congestion control
 #define ENABLE_CC true
-#if ENABLE_CC
-// Congestion control without optimizations
-static constexpr bool kCcRTT = true;       ///< Measure per-packet RTT
-static constexpr bool kCcRateComp = true;  ///< Perform rate updates
-static constexpr bool kCcPacing = true;    ///< Do packet pacing
+#define ENABLE_CC_OPTS false
 
-static constexpr bool kCcOptBatchTsc = false;      ///< Use per-batch TSC
-static constexpr bool kCcOptWheelBypass = false;   ///< Bypass wheel if safe
-static constexpr bool kCcOptTimelyBypass = false;  ///< Bypass Timely if safe
-#else
-static constexpr bool kCcRTT = false;       ///< Measure per-packet RTT
-static constexpr bool kCcRateComp = false;  ///< Perform rate updates
-static constexpr bool kCcPacing = false;    ///< Do packet pacing
+static constexpr bool kCcRTT = ENABLE_CC;       ///< Measure per-packet RTT
+static constexpr bool kCcRateComp = ENABLE_CC;  ///< Perform rate computation
+static constexpr bool kCcPacing = ENABLE_CC;    ///< Use rate limiter for pacing
 
-static constexpr bool kCcOptBatchTsc = true;      ///< Use per-batch TSC
-static constexpr bool kCcOptWheelBypass = true;   ///< Bypass wheel if possible
-static constexpr bool kCcOptTimelyBypass = true;  ///< Bypass Timely if possible
-#endif
+/// Sample RDTSC once per RX/TX batch for RTT measurements
+static constexpr bool kCcOptBatchTsc = ENABLE_CC_OPTS;
+
+/// Bypass timing wheel if a session is uncongested
+static constexpr bool kCcOptWheelBypass = ENABLE_CC_OPTS;
+
+/// Bypass Timely rate update if session is uncongested and RTT is below T_low
+static constexpr bool kCcOptTimelyBypass = ENABLE_CC_OPTS;
 
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 

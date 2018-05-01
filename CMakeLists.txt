@@ -108,9 +108,10 @@ endif(DEBUG)
 # Testing for packet loss, machine failure, etc
 if(TESTING)
   MESSAGE(STATUS "Testing is enabled. Performance will be low.")
-  add_definitions(-DTESTING)
+  add_definitions(-DTESTING=true)
 else(TESTING)
   MESSAGE(STATUS "Testing is disabled, so tests may fail.")
+  add_definitions(-DTESTING=false)
 endif(TESTING)
 
 # LTO

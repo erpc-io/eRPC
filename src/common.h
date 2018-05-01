@@ -1,6 +1,6 @@
 /**
  * @file common.h
- * @brief Header file with conveinence defines that is included everywhere
+ * @brief Common header file with convenience definitions
  */
 #ifndef ERPC_COMMON_H
 #define ERPC_COMMON_H
@@ -28,6 +28,12 @@ namespace erpc {
 #define KB(x) (static_cast<size_t>(x) << 10)
 #define MB(x) (static_cast<size_t>(x) << 20)
 #define GB(x) (static_cast<size_t>(x) << 30)
+
+#ifndef TESTING
+static constexpr bool kTesting = false;
+#else
+static constexpr bool kTesting = TESTING;
+#endif
 
 // General constants
 
