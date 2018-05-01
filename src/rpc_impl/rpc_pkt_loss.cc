@@ -19,8 +19,14 @@ void Rpc<TTr>::pkt_loss_scan_st() {
       case SessionState::kConnected: {
         // Datapath packet loss detection
         for (SSlot &sslot : session->sslot_arr) {
-          if (sslot.tx_msgbuf == nullptr) continue;     // Response received
-          if (sslot.client_info.num_tx == 0) continue;  // No packet sent
+          if (sslot.tx_msgbuf == nullptr) continue;  // Response received
+
+          // This can happen if:
+          // (a) We're stalled on credits: stall queue will make progress.
+          // (c) We have received the full response and a background thread
+          //     currently owns sslot. In this case, the bg thread cannot modify
+          //     num_rx or num_tx.
+          if (sslot.client_info.num_tx == sslot.client_info.num_rx) continue;
 
           assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
 
@@ -63,17 +69,15 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   const size_t delta = ci.num_tx - ci.num_rx;
   assert(credits + delta <= kSessionCredits);
 
-  // This can happen if:
-  // (a) We're stalled on credits: credit stall queue will make progress.
-  // (c) We have received the full response and a background thread currently
-  // owns sslot. In this case, the bg thread cannot modify num_rx or num_tx.
   if (unlikely(delta == 0)) {
+    pkt_loss_stat_inc(pkt_loss_stats.false_positives, 1);
     LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
     return;
   }
 
   // Deleting from the rate limiter is too complex
   if (unlikely(sslot->client_info.wheel_count > 0)) {
+    pkt_loss_stat_inc(pkt_loss_stats.still_in_wheel, 1);
     LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
     return;
   }

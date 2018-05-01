@@ -334,24 +334,28 @@ class Rpc {
 
   /// Return true iff a packet received by a client is in order. This must be
   /// only a few instructions.
-  static inline size_t in_order_client(const SSlot *sslot,
-                                       const pkthdr_t *pkthdr) {
-    // Check if request numbers match. If so, counters are valid for the req.
+  inline size_t in_order_client(const SSlot *sslot, const pkthdr_t *pkthdr) {
+    // Counters for pkthdr's request number are valid only if req numbers match
     if (unlikely(pkthdr->req_num != sslot->cur_req_num)) return false;
 
     const auto &ci = sslot->client_info;
     if (unlikely(pkthdr->pkt_num != ci.num_rx)) return false;
 
-    // Ignore spurious packets received after roll-back.
+    // Ignore spurious packets received as a consequence of rollback:
     // 1. We've only sent pkts up to (ci.num_tx - 1). Ignore later packets.
-    // 2. Ignore if the corresponding client packet for pkthdr is still in the
-    //    wheel. In this case, the client packet has bumped num_tx, but has not
-    //    actually been transmitted.
-    if (unlikely(pkthdr->pkt_num >= ci.num_tx)) return false;
+    // 2. Ignore if the corresponding client pkt for pkthdr is still in wheel.
+    if (unlikely(pkthdr->pkt_num >= ci.num_tx)) {
+      pkt_loss_stat_inc(pkt_loss_stats.false_positives, 1);
+      return false;
+    }
 
     const bool _in_wheel =
         ci.wslot_idx[pkthdr->pkt_num % kSessionCredits] != kWheelInvalidWslot;
-    if (kCcPacing && unlikely(_in_wheel)) return false;
+    if (kCcPacing && unlikely(_in_wheel)) {
+      pkt_loss_stat_inc(pkt_loss_stats.false_positives, 1);
+      pkt_loss_stat_inc(pkt_loss_stats.still_in_wheel, 1);
+      return false;
+    }
 
     return true;
   }
@@ -861,7 +865,9 @@ class Rpc {
   bool retry_connect_on_invalid_rpc_id = false;
 
   struct {
-  } stats;
+    size_t still_in_wheel = 0;
+    size_t false_positives = 0;
+  } pkt_loss_stats;
 
   /// Datapath stats that can be disabled
   struct {
