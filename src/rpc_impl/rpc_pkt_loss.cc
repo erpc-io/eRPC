@@ -84,7 +84,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // If we're here, we will roll back and retransmit
   LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
               ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
-  sslot->session->client_info.cc.num_retransmissions++;
+  sslot->session->client_info.num_retransmissions++;
   credits += delta;
   ci.num_tx = ci.num_rx;
   ci.progress_tsc = ev_loop_tsc;

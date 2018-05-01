@@ -237,13 +237,13 @@ class Rpc {
   /// Return the number of retransmissions for a connected session
   size_t get_num_retransmissions(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.cc.num_retransmissions;
+    return session->client_info.num_retransmissions;
   }
 
   /// Reset the number of retransmissions for a connected session
   void reset_num_retransmissions(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    session->client_info.cc.num_retransmissions = 0;
+    session->client_info.num_retransmissions = 0;
   }
 
   /// Return the Timing Wheel for this Rpc. Expert use only.
@@ -859,6 +859,9 @@ class Rpc {
   /// Retry session connection if the remote RPC ID was invalid. This usually
   /// happens when the server RPC thread has not started.
   bool retry_connect_on_invalid_rpc_id = false;
+
+  struct {
+  } stats;
 
   /// Datapath stats that can be disabled
   struct {

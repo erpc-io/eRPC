@@ -120,12 +120,12 @@ class Session {
     /// Requests that spill over kSessionReqWindow are queued here
     std::queue<enq_req_args_t> enq_req_backlog;
 
+    size_t num_retransmissions = 0;  ///< Number of retransmissions
+
     // Congestion control
     struct {
       Timely timely;
-
       size_t prev_desired_tx_tsc;  ///< Desired TX timestamp of the last packet
-      size_t num_retransmissions = 0;  ///< Number of retransmissions
     } cc;
 
     size_t sm_req_ts;  ///< Timestamp of the last session management request
