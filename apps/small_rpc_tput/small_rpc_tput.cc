@@ -341,6 +341,10 @@ int main(int argc, char **argv) {
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid concur.");
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
 
+  const size_t num_sessions = 2 * FLAGS_num_processes * FLAGS_num_threads;
+  erpc::rt_assert(num_sessions * erpc::kSessionCredits <=
+                  erpc::Transport::kNumRxRingEntries, "Too few ring buffers");
+
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
   nexus.register_req_func(
