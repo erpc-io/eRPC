@@ -18,12 +18,12 @@ mkdir $tmpdir
 
 process_idx=0
 while [ $process_idx -lt $autorun_num_processes ]; do
-  name=${autorun_name_list[$process_idx]}
+  node_name=${autorun_name_list[$process_idx]}
   stat_file=${autorun_app}_stats_${process_idx}
 
-	echo "proc-out: Fetching /tmp/$stat_file from $name to $tmpdir/$stat_file"
+	echo "proc-out: Fetching $stat_file from $node_name"
   scp -oStrictHostKeyChecking=no \
-    $name:/tmp/$stat_file $tmpdir/$stat_file 1>/dev/null 2>/dev/null &
+    $node_name:/tmp/$stat_file $tmpdir/$stat_file 1>/dev/null 2>/dev/null &
   ((process_idx+=1))
 done
 
@@ -53,12 +53,13 @@ done
 processed_files="0"
 ignored_files="0"
 for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
-  echo "proc-out: Processing file $filename."
+  filename_short=`echo $filename | rev | cut -d'/' -f 1 | rev`
+  echo "proc-out: Processing file $filename_short"
 
   # Ignore files with less than 8 lines. This takes care of empty files.
   lines_in_file=`cat $filename | wc -l`
   if [ $lines_in_file -le 8 ]; then
-    blue "proc-out: Ignoring $filename. $lines_in_file lines), 8 required."
+    blue "proc-out: Ignoring $filename_short. $lines_in_file lines, 8 needed."
     ((ignored_files+=1))
     continue;
   fi
@@ -75,7 +76,7 @@ for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
     file_avg_str=`echo $file_avg_str ${col_name[$col_idx]}:$file_avg, `
   done
 
-  echo "proc-out: Column averages for $filename = $file_avg_str"
+  echo "proc-out: Column averages for $filename_short = $file_avg_str"
   ((processed_files+=1))
 done
 
