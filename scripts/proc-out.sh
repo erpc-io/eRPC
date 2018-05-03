@@ -53,10 +53,10 @@ done
 processed_files="0"
 ignored_files="0"
 for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
-  filename_short=`echo $filename | rev | cut -d'/' -f 1 | rev`
+  filename_short=`echo $filename | rev | cut -d'/' -f 1 | rev`  # foo/bar/xxx
   echo "proc-out: Processing file $filename_short"
 
-  # Ignore files with less than 8 lines. This takes care of empty files.
+  # Ignore files <= 8 lines. This takes care of empty files.
   lines_in_file=`cat $filename | wc -l`
   if [ $lines_in_file -le 8 ]; then
     blue "proc-out: Ignoring $filename_short. $lines_in_file lines, 8 needed."
