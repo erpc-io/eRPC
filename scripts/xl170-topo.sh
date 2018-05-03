@@ -1,36 +1,43 @@
 #!/usr/bin/env bash
-source $(dirname $0)/autorun_parse.sh
+source $(dirname $0)/utils.sh
+if [ "$#" -ne 1 ]; then
+  echo "Illegal number of parameters"
+	echo "Usage: ./xl170-topo.sh <number of nodes to look up>"
+	exit
+fi
 
-switch_map[0]=""  # switch_map[i] will contain the list of nodes under switch i
+bad_nodes="hp186 hp187"
 
-tmpfile="xl170topo.txt"
-rm -rf $tmpfile
-touch $tmpfile
-
-# Fetch xxx from hpxxx for each node in parallel
-for ((i = 0; i < $autorun_num_processes; i++)); do
+# Create a map from node hostnames to switch IDs
+for ((i = 1; i <= $1; i++)); do
   (
-	hpnode=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} \
-    "hostname -A | cut -d '.' -f 1 | sed 's/hp//g'"`
-  echo "$(( $i + 1 )) $hpnode" >> $tmpfile
+  hostname="akalianode-$i.RDMA.ron-PG0.utah.cloudlab.us"
+
+  # Get the HP node ID (example hp012)
+	hpnode_id=`ssh -oStrictHostKeyChecking=no $hostname \
+    "hostname -A | cut -d '.' -f 1"`
+
+  # Ignore if node is bad
+  if [[ $bad_nodes == *"$hpnode_id"*  ]]; then
+    blue "Ignoring bad node $hpnode_id ($hostname)"
+  else
+    hpnode_id=`echo $hpnode_id | sed 's/hp0*//g'` # Trim leading hp and zeros
+    switch_id=$(( ($hpnode_id - 1) / 40 ))
+
+    echo "$hostname $switch_id" >> temp
+  fi
+
   ) &
 done
 wait
 
-while read line
-do
-  akalianode_id=`echo $line | cut -d' ' -f 1`
-  hpnode_id=`echo $line | cut -d' ' -f 2 | sed 's/^0*//'`  # Trim leading zeros
-  switch_id=$(( ($hpnode_id - 1) / 40 ))
-	switch_map[$switch_id]=$akalianode_id" "${switch_map[$switch_id]}
-
-  echo "Node $akalianode_id under switch $switch_id"
-done < $tmpfile
-
-
+# Here, temp contains:
+# <hostname> <switch_id>
+echo ""
 for ((switch_i = 0; switch_i < 5; switch_i++)); do
-	sorted_nodes=`echo ${switch_map[$switch_i]} | xargs -n 1 | sort -g | tr '\n' ' '`
-	echo Switch $switch_i: $sorted_nodes
+  count=`cat temp | grep " $switch_i" | wc -l`
+  blue "Under switch $switch_i ($count nodes):"
+  cat temp | grep " $switch_i" | cut -d' ' -f 1
 done
 
-rm $tmpfile
+rm temp
