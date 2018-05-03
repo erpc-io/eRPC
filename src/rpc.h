@@ -754,6 +754,10 @@ class Rpc {
     return TTr::kNumRxRingEntries;
   }
 
+  std::string get_server_hostname(int session_num) {
+    return session_vec[static_cast<size_t>(session_num)]->server.hostname;
+  }
+
   /// Return the maximum number of sessions supported
   static inline constexpr size_t get_max_num_sessions() {
     return Transport::kNumRxRingEntries / kSessionCredits;
@@ -775,10 +779,9 @@ class Rpc {
   inline double get_freq_ghz() const { return freq_ghz; }
 
   /// Return the number of seconds elapsed since this Rpc was created
-  double sec_since_creation();
-
-  /// Return the number of microseconds elapsed since this Rpc was created
-  double usec_since_creation();
+  double sec_since_creation() {
+    return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
+  }
 
   //
   // Misc private functions
@@ -963,11 +966,6 @@ class Rpc {
   /// LOG_TRACE and other macros.
   FILE *trace_file;
 
-  struct {
-    size_t num_re_tx = 0;
-    size_t still_in_wheel = 0;
-  } pkt_loss_stats;
-
   /// Datapath stats that can be disabled
   struct {
     size_t ev_loop_calls = 0;
@@ -976,6 +974,12 @@ class Rpc {
     size_t pkts_rx = 0;
     size_t rx_burst_calls = 0;
   } dpath_stats;
+
+ public:
+  struct {
+    size_t num_re_tx = 0;
+    size_t still_in_wheel = 0;
+  } pkt_loss_stats;
 };
 
 // This goes at the end of every Rpc implementation file to force compilation.

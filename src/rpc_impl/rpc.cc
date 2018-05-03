@@ -117,16 +117,6 @@ Rpc<TTr>::~Rpc() {
   if (LOG_LEVEL >= LOG_LEVEL_REORDER) fclose(trace_file);
 }
 
-template <class TTr>
-double Rpc<TTr>::sec_since_creation() {
-  return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
-}
-
-template <class TTr>
-double Rpc<TTr>::usec_since_creation() {
-  return to_usec(rdtsc() - creation_tsc, nexus->freq_ghz);
-}
-
 FORCE_COMPILE_TRANSPORTS
 
 }  // End erpc
