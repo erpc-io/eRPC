@@ -290,12 +290,13 @@ void print_stats(AppContext &c) {
           erpc::kCcRateComp ? session_tput.at(num_sessions * 0.95) : -1);
 
   printf(
-      "Process %zu, thread %zu: %.2f Mrps, re_tx = %zu. "
-      "RX: %zu resps, %zu reqs. Resps/batch: min %zu, max %zu. "
+      "Process %zu, thread %zu: %.2f Mrps, re_tx = %zu, still_in_wheel = %zu. "
+      "RX: %zuK resps, %zuK reqs. Resps/batch: min %zuK, max %zuK. "
       "Latency: %s. Rate = %s.\n",
       FLAGS_process_id, c.thread_id, tput_mrps,
-      c.app_stats[c.thread_id].num_re_tx, c.stat_resp_rx_tot, c.stat_req_rx_tot,
-      min_resps, max_resps, kAppMeasureLatency ? lat_stat : "N/A",
+      c.app_stats[c.thread_id].num_re_tx, c.rpc->pkt_loss_stats.still_in_wheel,
+      c.stat_resp_rx_tot / 1000, c.stat_req_rx_tot / 1000, min_resps / 1000,
+      max_resps / 1000, kAppMeasureLatency ? lat_stat : "N/A",
       erpc::kCcRateComp ? rate_stat : "N/A");
 
   if (c.thread_id == 0) {
@@ -343,7 +344,9 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   }
 
   connect_sessions(c);
-  printf("Process %zu, thread %zu: All sessions connected. Staring work.\n",
+  ping_all_blocking(c);
+
+  printf("Process %zu, thread %zu: All sessions connected. Starting work.\n",
          FLAGS_process_id, thread_id);
 
   // Start work
@@ -362,7 +365,7 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   erpc::rt_assert(FLAGS_batch_size <= kAppMaxBatchSize, "Invalid batch size");
-  erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid concur.");
+  erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid cncrrncy.");
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
 
   const size_t num_sessions = 2 * FLAGS_num_processes * FLAGS_num_threads;
@@ -374,6 +377,9 @@ int main(int argc, char **argv) {
                     FLAGS_numa_node, 0);
   nexus.register_req_func(
       kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
+  nexus.register_req_func(
+      kPingReqHandlerType,
+      erpc::ReqFunc(ping_req_handler, erpc::ReqFuncType::kForeground));
 
   std::vector<std::thread> threads(FLAGS_num_threads);
   auto *app_stats = new app_stats_t[FLAGS_num_threads];
