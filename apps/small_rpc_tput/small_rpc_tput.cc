@@ -56,8 +56,21 @@ class BatchContext {
 };
 
 struct app_stats_t {
-  double tput_mrps;
-  size_t pad[7];
+  double mrps;
+  size_t num_re_tx;
+  size_t pad[6];
+
+  static std::string get_template_str() { return "mrps num_re_tx"; }
+  std::string to_string() {
+    return std::to_string(mrps) + " " + std::to_string(num_re_tx);
+  }
+
+  /// Accumulate stats
+  app_stats_t &operator+=(const app_stats_t &rhs) {
+    this->mrps += rhs.mrps;
+    this->num_re_tx += rhs.num_re_tx;
+    return *this;
+  }
 };
 static_assert(sizeof(app_stats_t) == 64, "");
 
@@ -210,8 +223,32 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 
   c->stat_resp_rx_tot++;
   c->stat_resp_rx[tag.s.batch_i]++;
+}
 
-  if (unlikely(c->stat_resp_rx_tot == 1000000)) {
+void connect_sessions(AppContext *c) {
+  // Create a session to each thread in the cluster except self
+  for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
+    std::string remote_uri = erpc::get_uri_for_process(p_i);
+
+    if (FLAGS_sm_verbose == 1) {
+      printf("Process %zu, thread %zu: Creating sessions to %s.\n",
+             FLAGS_process_id, c->thread_id, remote_uri.c_str());
+    }
+
+    for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
+      if (FLAGS_process_id == p_i && c->thread_id == t_i) continue;
+      int session_num = c->rpc->create_session(remote_uri, t_i);
+      assert(session_num >= 0);
+      c->session_num_vec.push_back(session_num);
+    }
+  }
+
+  erpc::rt_assert(c->session_num_vec.size() ==
+                  FLAGS_num_processes * FLAGS_num_threads - 1);
+
+  while (c->num_sm_resps != c->session_num_vec.size()) {
+    c->rpc->run_event_loop(kAppEvLoopMs);
+    if (unlikely(ctrl_c_pressed == 1)) return;
   }
 }
 
@@ -220,7 +257,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
-  if (thread_id == 0) c.tmp_stat = new TmpStat("Mrps");
+  if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
@@ -245,32 +282,8 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     }
   }
 
-  // Create a session to each thread in the cluster except self
-  for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
-    std::string remote_uri = erpc::get_uri_for_process(p_i);
-
-    for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      if (FLAGS_process_id == p_i && thread_id == t_i) continue;
-      if (FLAGS_sm_verbose == 1) {
-        printf("Process %zu, thread %zu: Creating session to %s.\n",
-               FLAGS_process_id, thread_id, remote_uri.c_str());
-      }
-
-      int session_num = rpc.create_session(remote_uri, t_i);
-      assert(session_num >= 0);
-      c.session_num_vec.push_back(session_num);
-    }
-  }
-
-  erpc::rt_assert(c.session_num_vec.size() ==
-                  FLAGS_num_processes * FLAGS_num_threads - 1);
-
-  while (c.num_sm_resps != c.session_num_vec.size()) {
-    rpc.run_event_loop(kAppEvLoopMs);
-    if (unlikely(ctrl_c_pressed == 1)) return;
-  }
-
-  printf("Process %zu, thread %zu: All sessions connected. Running ev loop.\n",
+  connect_sessions(&c);
+  printf("Process %zu, thread %zu: All sessions connected. Staring work.\n",
          FLAGS_process_id, thread_id);
 
   // Start work
@@ -303,7 +316,8 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     }
 
     double tput_mrps = c.stat_resp_rx_tot / (seconds * 1000000);
-    c.app_stats[c.thread_id].tput_mrps = tput_mrps;
+    c.app_stats[c.thread_id].mrps = tput_mrps;
+    c.app_stats[c.thread_id].num_re_tx = c.rpc->get_num_re_tx_cumulative();
 
     size_t num_sessions = c.session_num_vec.size();
     printf(
@@ -321,11 +335,11 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
         erpc::kCcRateComp ? session_tput.at(num_sessions * 0.95) : -1);
 
     if (c.thread_id == 0) {
-      double tot_tput_mrps = 0;
-      for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-        tot_tput_mrps += c.app_stats[t_i].tput_mrps;
+      app_stats_t accum_stats;
+      for (size_t i = 0; i < FLAGS_num_threads; i++) {
+        accum_stats += c.app_stats[i];
       }
-      c.tmp_stat->write(std::to_string(tot_tput_mrps));
+      c.tmp_stat->write(accum_stats.to_string());
     }
 
     c.stat_resp_rx_tot = 0;

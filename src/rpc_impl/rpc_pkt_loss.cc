@@ -70,25 +70,26 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   assert(credits + delta <= kSessionCredits);
 
   if (unlikely(delta == 0)) {
-    pkt_loss_stat_inc(pkt_loss_stats.false_positives, 1);
     LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
-    return;
-  }
-
-  // Deleting from the rate limiter is too complex
-  if (unlikely(sslot->client_info.wheel_count > 0)) {
-    pkt_loss_stat_inc(pkt_loss_stats.still_in_wheel, 1);
-    LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
     return;
   }
 
   // We have num_tx > num_rx, so stallq cannot contain sslot
   assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
 
+  // Deleting from the rate limiter is too complex
+  if (unlikely(sslot->client_info.wheel_count > 0)) {
+    pkt_loss_stats.still_in_wheel++;
+    LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
+    return;
+  }
+
   // If we're here, we will roll back and retransmit
+  pkt_loss_stats.num_re_tx++;
+  sslot->session->client_info.num_re_tx++;
+
   LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
               ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
-  sslot->session->client_info.num_retransmissions++;
   credits += delta;
   ci.num_tx = ci.num_rx;
   ci.progress_tsc = ev_loop_tsc;

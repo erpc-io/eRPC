@@ -120,7 +120,7 @@ class Session {
     /// Requests that spill over kSessionReqWindow are queued here
     std::queue<enq_req_args_t> enq_req_backlog;
 
-    size_t num_retransmissions = 0;  ///< Number of retransmissions
+    size_t num_re_tx = 0;  ///< Number of retransmissions for this session
 
     // Congestion control
     struct {

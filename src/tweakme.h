@@ -48,7 +48,6 @@ static constexpr size_t kHeadroom = 40;
 static constexpr double kBandwidth = 3.125 * 1000 * 1000 * 1000;  // 25 Gbps
 
 static constexpr bool kDatapathStats = false;
-static constexpr bool kPktLossStats = true;
 }
 
 #endif  // ERPC_CONFIG_H

@@ -171,7 +171,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     auto &stats = c.app_stats[c.thread_id];
     stats.rx_gbps = c.stat_rx_bytes_tot * 8 / ns;
     stats.tx_gbps = c.stat_tx_bytes_tot * 8 / ns;
-    stats.re_tx = c.rpc->get_num_retransmissions(c.session_num_vec[0]);
+    stats.re_tx = c.rpc->get_num_re_tx(c.session_num_vec[0]);
     if (c.lat_vec.size() > 0) {
       std::sort(c.lat_vec.begin(), c.lat_vec.end());
       double lat_sum = std::accumulate(c.lat_vec.begin(), c.lat_vec.end(), 0.0);
@@ -186,7 +186,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     // Reset stats for next iteration
     c.stat_rx_bytes_tot = 0;
     c.stat_tx_bytes_tot = 0;
-    c.rpc->reset_num_retransmissions(c.session_num_vec[0]);
+    c.rpc->reset_num_re_tx(c.session_num_vec[0]);
     c.lat_vec.clear();
 
     erpc::Timely *timely_0 = c.rpc->get_timely(0);

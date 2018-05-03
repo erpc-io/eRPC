@@ -97,11 +97,6 @@ static inline void exit_assert(bool condition, std::string error_msg) {
 static inline void dpath_stat_inc(size_t &stat, size_t val) {
   if (kDatapathStats) stat += val;
 }
-
-static inline void pkt_loss_stat_inc(size_t &stat, size_t val) {
-  if (kPktLossStats) stat += val;
-}
-
 }  // End erpc
 
 #endif

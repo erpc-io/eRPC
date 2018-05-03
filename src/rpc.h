@@ -234,16 +234,22 @@ class Rpc {
     return &session->client_info.cc.timely;
   }
 
+  /// Return the cumulative retransmission counter
+  size_t get_num_re_tx_cumulative() { return pkt_loss_stats.num_re_tx; }
+
+  /// Reset the cumulative retransmission counter
+  void reset_num_re_tx_cumulative() { pkt_loss_stats.num_re_tx = 0; }
+
   /// Return the number of retransmissions for a connected session
-  size_t get_num_retransmissions(int session_num) {
+  size_t get_num_re_tx(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.num_retransmissions;
+    return session->client_info.num_re_tx;
   }
 
   /// Reset the number of retransmissions for a connected session
-  void reset_num_retransmissions(int session_num) {
+  void reset_num_re_tx(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    session->client_info.num_retransmissions = 0;
+    session->client_info.num_re_tx = 0;
   }
 
   /// Return the Timing Wheel for this Rpc. Expert use only.
@@ -344,16 +350,12 @@ class Rpc {
     // Ignore spurious packets received as a consequence of rollback:
     // 1. We've only sent pkts up to (ci.num_tx - 1). Ignore later packets.
     // 2. Ignore if the corresponding client pkt for pkthdr is still in wheel.
-    if (unlikely(pkthdr->pkt_num >= ci.num_tx)) {
-      pkt_loss_stat_inc(pkt_loss_stats.false_positives, 1);
-      return false;
-    }
+    if (unlikely(pkthdr->pkt_num >= ci.num_tx)) return false;
 
     const bool _in_wheel =
         ci.wslot_idx[pkthdr->pkt_num % kSessionCredits] != kWheelInvalidWslot;
     if (kCcPacing && unlikely(_in_wheel)) {
-      pkt_loss_stat_inc(pkt_loss_stats.false_positives, 1);
-      pkt_loss_stat_inc(pkt_loss_stats.still_in_wheel, 1);
+      pkt_loss_stats.still_in_wheel++;
       return false;
     }
 
@@ -864,20 +866,6 @@ class Rpc {
   /// happens when the server RPC thread has not started.
   bool retry_connect_on_invalid_rpc_id = false;
 
-  struct {
-    size_t still_in_wheel = 0;
-    size_t false_positives = 0;
-  } pkt_loss_stats;
-
-  /// Datapath stats that can be disabled
-  struct {
-    size_t ev_loop_calls = 0;
-    size_t pkts_tx = 0;
-    size_t tx_burst_calls = 0;
-    size_t pkts_rx = 0;
-    size_t rx_burst_calls = 0;
-  } dpath_stats;
-
  private:
   // Constructor args
   Nexus *nexus;
@@ -974,6 +962,20 @@ class Rpc {
   /// File for dispatch thread trace output. This is used indirectly by
   /// LOG_TRACE and other macros.
   FILE *trace_file;
+
+  struct {
+    size_t num_re_tx = 0;
+    size_t still_in_wheel = 0;
+  } pkt_loss_stats;
+
+  /// Datapath stats that can be disabled
+  struct {
+    size_t ev_loop_calls = 0;
+    size_t pkts_tx = 0;
+    size_t tx_burst_calls = 0;
+    size_t pkts_rx = 0;
+    size_t rx_burst_calls = 0;
+  } dpath_stats;
 };
 
 // This goes at the end of every Rpc implementation file to force compilation.
