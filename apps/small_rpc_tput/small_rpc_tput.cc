@@ -190,8 +190,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     for (size_t i = 0; i < FLAGS_msg_size; i++) {
       const uint8_t *buf = resp_msgbuf->buf;
       if (unlikely(buf[i] != static_cast<uint8_t>(buf[0] + i))) {
-        fprintf(stderr, "Invalid response byte at index %zu (%u, %u)\n", i,
-                buf[0], buf[i]);
+        fprintf(stderr, "Invalid resp at %zu (%u, %u)\n", i, buf[0], buf[i]);
         exit(-1);
       }
     }
@@ -225,31 +224,92 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   c->stat_resp_rx[tag.s.batch_i]++;
 }
 
-void connect_sessions(AppContext *c) {
+void connect_sessions(AppContext &c) {
   // Create a session to each thread in the cluster except self
   for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
     std::string remote_uri = erpc::get_uri_for_process(p_i);
 
     if (FLAGS_sm_verbose == 1) {
       printf("Process %zu, thread %zu: Creating sessions to %s.\n",
-             FLAGS_process_id, c->thread_id, remote_uri.c_str());
+             FLAGS_process_id, c.thread_id, remote_uri.c_str());
     }
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      if (FLAGS_process_id == p_i && c->thread_id == t_i) continue;
-      int session_num = c->rpc->create_session(remote_uri, t_i);
+      if (FLAGS_process_id == p_i && c.thread_id == t_i) continue;
+      int session_num = c.rpc->create_session(remote_uri, t_i);
       assert(session_num >= 0);
-      c->session_num_vec.push_back(session_num);
+      c.session_num_vec.push_back(session_num);
     }
   }
 
-  erpc::rt_assert(c->session_num_vec.size() ==
+  erpc::rt_assert(c.session_num_vec.size() ==
                   FLAGS_num_processes * FLAGS_num_threads - 1);
 
-  while (c->num_sm_resps != c->session_num_vec.size()) {
-    c->rpc->run_event_loop(kAppEvLoopMs);
+  while (c.num_sm_resps != c.session_num_vec.size()) {
+    c.rpc->run_event_loop(kAppEvLoopMs);
     if (unlikely(ctrl_c_pressed == 1)) return;
   }
+}
+
+void print_stats(AppContext &c) {
+  double seconds = erpc::sec_since(c.tput_t0);
+
+  // Min/max responses for a concurrent batch, to check for stagnated batches
+  size_t max_resps = 0, min_resps = SIZE_MAX;
+  for (size_t i = 0; i < FLAGS_concurrency; i++) {
+    min_resps = std::min(min_resps, c.stat_resp_rx[i]);
+    max_resps = std::max(max_resps, c.stat_resp_rx[i]);
+    c.stat_resp_rx[i] = 0;
+  }
+
+  // Session throughput percentiles, used if rate computation is enabled
+  std::vector<double> session_tput;
+  if (erpc::kCcRateComp) {
+    for (int session_num : c.session_num_vec) {
+      erpc::Timely *timely = c.rpc->get_timely(session_num);
+      session_tput.push_back(timely->get_rate_gbps());
+    }
+    std::sort(session_tput.begin(), session_tput.end());
+  }
+
+  double tput_mrps = c.stat_resp_rx_tot / (seconds * 1000000);
+  c.app_stats[c.thread_id].mrps = tput_mrps;
+  c.app_stats[c.thread_id].num_re_tx = c.rpc->get_num_re_tx_cumulative();
+
+  size_t num_sessions = c.session_num_vec.size();
+
+  // Optional stats
+  char lat_stat[100];
+  sprintf(lat_stat, "[%.2f, %.2f us]", c.latency.perc(.50) / 10.0,
+          c.latency.perc(.99) / 10.0);
+  char rate_stat[100];
+  sprintf(rate_stat, "[%.2f, %.2f, %.2f, %.2f Gbps]",
+          erpc::kCcRateComp ? session_tput.at(num_sessions * 0.00) : -1,
+          erpc::kCcRateComp ? session_tput.at(num_sessions * 0.05) : -1,
+          erpc::kCcRateComp ? session_tput.at(num_sessions * 0.50) : -1,
+          erpc::kCcRateComp ? session_tput.at(num_sessions * 0.95) : -1);
+
+  printf(
+      "Process %zu, thread %zu: %.2f Mrps, re_tx = %zu. "
+      "RX: %zu resps, %zu reqs. Resps/batch: min %zu, max %zu. "
+      "Latency: %s. Rate = %s.\n",
+      FLAGS_process_id, c.thread_id, tput_mrps,
+      c.app_stats[c.thread_id].num_re_tx, c.stat_resp_rx_tot, c.stat_req_rx_tot,
+      min_resps, max_resps, kAppMeasureLatency ? lat_stat : "N/A",
+      erpc::kCcRateComp ? rate_stat : "N/A");
+
+  if (c.thread_id == 0) {
+    app_stats_t accum;
+    for (size_t i = 0; i < FLAGS_num_threads; i++) accum += c.app_stats[i];
+    c.tmp_stat->write(accum.to_string());
+  }
+
+  c.stat_resp_rx_tot = 0;
+  c.stat_req_rx_tot = 0;
+  c.rpc->reset_num_re_tx_cumulative();
+  c.latency.reset();
+
+  clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 }
 
 // The function executed by each thread in the cluster
@@ -282,7 +342,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     }
   }
 
-  connect_sessions(&c);
+  connect_sessions(c);
   printf("Process %zu, thread %zu: All sessions connected. Staring work.\n",
          FLAGS_process_id, thread_id);
 
@@ -293,60 +353,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(kAppEvLoopMs);  // 1 second
     if (ctrl_c_pressed == 1) break;
-
-    // Print stats
-    double seconds = erpc::sec_since(c.tput_t0);
-
-    // Min/max responses for a concurrent batch, to check for stagnated batches
-    size_t max_resps = 0, min_resps = SIZE_MAX;
-    for (size_t i = 0; i < FLAGS_concurrency; i++) {
-      min_resps = std::min(min_resps, c.stat_resp_rx[i]);
-      max_resps = std::max(max_resps, c.stat_resp_rx[i]);
-      c.stat_resp_rx[i] = 0;
-    }
-
-    // Session throughput percentiles, used if rate computation is enabled
-    std::vector<double> session_tput;
-    if (erpc::kCcRateComp) {
-      for (int session_num : c.session_num_vec) {
-        erpc::Timely *timely = c.rpc->get_timely(session_num);
-        session_tput.push_back(timely->get_rate_gbps());
-      }
-      std::sort(session_tput.begin(), session_tput.end());
-    }
-
-    double tput_mrps = c.stat_resp_rx_tot / (seconds * 1000000);
-    c.app_stats[c.thread_id].mrps = tput_mrps;
-    c.app_stats[c.thread_id].num_re_tx = c.rpc->get_num_re_tx_cumulative();
-
-    size_t num_sessions = c.session_num_vec.size();
-    printf(
-        "Process %zu, thread %zu: %.2f Mrps. "
-        "Resps RX = %zu, requests RX = %zu. "
-        "Resps/concurrent batch: min %zu, max %zu. "
-        "Latency: {%.2f, %.2f} us, tput = {%.2f, %.2f, %.2f, %.2f} Gbps.\n",
-        FLAGS_process_id, c.thread_id, tput_mrps, c.stat_resp_rx_tot,
-        c.stat_req_rx_tot, min_resps, max_resps,
-        kAppMeasureLatency ? c.latency.perc(.50) / 10.0 : -1,
-        kAppMeasureLatency ? c.latency.perc(.99) / 10.0 : -1,
-        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.00) : -1,
-        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.05) : -1,
-        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.50) : -1,
-        erpc::kCcRateComp ? session_tput.at(num_sessions * 0.95) : -1);
-
-    if (c.thread_id == 0) {
-      app_stats_t accum_stats;
-      for (size_t i = 0; i < FLAGS_num_threads; i++) {
-        accum_stats += c.app_stats[i];
-      }
-      c.tmp_stat->write(accum_stats.to_string());
-    }
-
-    c.stat_resp_rx_tot = 0;
-    c.stat_req_rx_tot = 0;
-    c.latency.reset();
-
-    clock_gettime(CLOCK_REALTIME, &c.tput_t0);
+    print_stats(c);
   }
 }
 
