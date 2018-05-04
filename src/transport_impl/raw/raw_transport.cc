@@ -360,7 +360,7 @@ void RawTransport::install_flow_rule() {
   flow_attr->reserved = 0;
   buf += sizeof(struct ibv_exp_flow_attr);
 
-  // Ethernet - all wildcard
+  // Ethernet - filter auto-learning broadcast packets sent by switches
   auto *eth_spec = reinterpret_cast<struct ibv_exp_flow_spec_eth *>(buf);
   eth_spec->type = IBV_EXP_FLOW_SPEC_ETH;
   eth_spec->size = sizeof(struct ibv_exp_flow_spec_eth);
@@ -374,7 +374,7 @@ void RawTransport::install_flow_rule() {
   spec_ipv4->size = sizeof(struct ibv_exp_flow_spec_ipv4_ext);
   buf += sizeof(struct ibv_exp_flow_spec_ipv4_ext);
 
-  // UDP - match dst port
+  // UDP - steer packets for this Rpc
   auto *udp_spec = reinterpret_cast<struct ibv_exp_flow_spec_tcp_udp *>(buf);
   udp_spec->type = IBV_EXP_FLOW_SPEC_UDP;
   udp_spec->size = sizeof(struct ibv_exp_flow_spec_tcp_udp);

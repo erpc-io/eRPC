@@ -229,7 +229,7 @@ TEST_F(RawTransportTest, mac_filter_test) {
   while (num_rx != 1) num_rx += srv_ttr.transport->rx_burst();
 
   // Send a packet with a garbled destination MAC address and check it isn't
-  // received for a long time.
+  // received for 200 milliseconds
   num_rx = 0;
   auto* eth = reinterpret_cast<eth_hdr_t*>(buffer.buf);
   eth->dst_mac[0]++;
