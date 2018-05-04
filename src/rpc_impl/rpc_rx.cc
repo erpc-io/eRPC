@@ -22,27 +22,24 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
-    uint16_t session_num = pkthdr->dest_session_num;  // The local session
-    Session *session = session_vec[session_num];
+    uint16_t lsn = pkthdr->dest_session_num;  // The local session
+    Session *session = session_vec[lsn];
     if (unlikely(session == nullptr)) {
-      LOG_WARN(
-          "eRPC Rpc %u: Warning: Received packet %s for buried session. "
-          "Dropping packet.\n",
-          rpc_id, pkthdr->to_string().c_str());
+      LOG_WARN("Rpc %u: Received %s for buried session. Dropping.\n", rpc_id,
+               pkthdr->to_string().c_str());
       continue;
     }
 
     if (unlikely(!session->is_connected())) {
       LOG_WARN(
-          "eRPC Rpc %u: Warning: Received packet %s for unconnected "
-          "session (state is %s). Dropping packet.\n",
+          "Rpc %u: Received %s for unconnected session (state %s). Dropping.\n",
           rpc_id, pkthdr->to_string().c_str(),
           session_state_str(session->state).c_str());
       continue;
     }
 
     // If we are here, we have a valid packet for a connected session
-    LOG_TRACE("eRPC Rpc %u: Received packet %s.\n", rpc_id,
+    LOG_TRACE("Rpc %u, lsn %u: Received packet %s.\n", rpc_id, lsn,
               pkthdr->to_string().c_str());
 
     size_t sslot_i = pkthdr->req_num % kSessionReqWindow;  // Bit shift

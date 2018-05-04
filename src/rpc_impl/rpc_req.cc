@@ -82,7 +82,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "eRPC Rpc %u: Received out-of-order request for session %u. "
+            "Rpc %u, lsn %u: Received out-of-order request for session. "
             "Req num: %zu (pkt), %zu (sslot). Action",
             rpc_id, sslot->session->local_session_num, pkthdr->req_num,
             sslot->cur_req_num);
@@ -164,7 +164,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   if (unlikely(!in_order)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "eRPC Rpc %u: Received out-of-order request for session %u. "
+            "Rpc %u, lsn %u: Received out-of-order request. "
             "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Action",
             rpc_id, sslot->session->local_session_num, pkthdr->req_num,
             pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.num_rx);

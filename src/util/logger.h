@@ -122,19 +122,19 @@ static void output_log_header(FILE *stream, int level) {
       type = "ERROR";
       break;
     case LOG_LEVEL_WARN:
-      type = "WARN";
+      type = "WARNG";
       break;
     case LOG_LEVEL_INFO:
-      type = "INFO";
+      type = "INFOR";
       break;
     case LOG_LEVEL_REORDER:
-      type = "REORDER";
+      type = "REORD";
       break;
     case LOG_LEVEL_TRACE:
       type = "TRACE";
       break;
     case LOG_LEVEL_CC:
-      type = "CC";
+      type = "CONGC";
       break;
     default:
       type = "UNKWN";

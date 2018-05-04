@@ -527,10 +527,10 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_idx));
     }
 
-    LOG_TRACE("eRPC Rpc %u: lsn %u, TX %s, %s, status drop %u.\n", rpc_id,
+    LOG_TRACE("Rpc %u, lsn %u: TX %s. Slot %s.%s\n", rpc_id,
               sslot->session->local_session_num,
               tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(),
-              sslot->progress_str().c_str(), item.drop);
+              sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -554,10 +554,10 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
     }
 
-    LOG_TRACE("eRPC Rpc %u: lsn %u, TX %s, status %s, drop %u.\n", rpc_id,
+    LOG_TRACE("Rpc %u, lsn %u: TX %s. Slot %s.%s.\n", rpc_id,
               sslot->session->local_session_num,
               ctrl_msgbuf->get_pkthdr_str(0).c_str(),
-              sslot->progress_str().c_str(), item.drop);
+              sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();

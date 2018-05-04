@@ -9,8 +9,8 @@ namespace erpc {
 template <class TTr>
 bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
   assert(in_dispatch());
-  LOG_INFO("eRPC Rpc %u: Handling reset event for remote hostname = %s.\n",
-           rpc_id, reset_rem_hostname.c_str());
+  LOG_INFO("Rpc %u: Handling reset event for remote hostname = %s.\n", rpc_id,
+           reset_rem_hostname.c_str());
 
   drain_tx_batch_and_dma_queue();
 
@@ -44,7 +44,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: Trying to reset client session %u, state = %s. Issue",
+          "Rpc %u, lsn %u: Trying to reset client session. State = %s. Issue",
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
@@ -93,7 +93,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
     return true;
   } else {
     LOG_WARN(
-        "eRPC Rpc %u: Cannot reset session %u. %zu continuations pending.\n",
+        "Rpc %u, lsn %u: Cannot reset client session. %zu conts pending.\n",
         rpc_id, session->local_session_num, pending_conts);
     return false;
   }
@@ -107,7 +107,7 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: Trying to reset server session %u, state = %s. Issue",
+          "Rpc %u, lsn %u: Trying to reset server session. State = %s. Issue",
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
@@ -124,7 +124,8 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
     return true;
   } else {
     LOG_WARN(
-        "eRPC Rpc %u: Cannot reset session %u. %zu enqueue_response pending.\n",
+        "Rpc %u, lsn %u: Cannot reset server session. "
+        "%zu enqueue_response pending.\n",
         rpc_id, session->local_session_num, pending_enqueue_resps);
 
     return false;

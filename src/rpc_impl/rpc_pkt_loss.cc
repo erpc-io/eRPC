@@ -61,8 +61,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
-          "eRPC Rpc %u: Packet loss suspected for session %u, req %zu. "
-          "Status %s. Action",
+          "Rpc %u, lsn %u: Pkt loss suspected for req %zu. Status %s. Action",
           rpc_id, sslot->session->local_session_num, req_msgbuf->get_req_num(),
           sslot->progress_str().c_str());
 

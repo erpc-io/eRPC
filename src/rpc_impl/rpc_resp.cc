@@ -25,9 +25,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     // A session reset could be waiting for this enqueue_response()
     assert(session->state == SessionState::kResetInProgress);
 
-    LOG_WARN(
-        "eRPC Rpc %u: enqueue_response() for reset-in-progress session %u.\n",
-        rpc_id, session->local_session_num);
+    LOG_WARN("Rpc %u, lsn %u: enqueue_response() while reset in progress.\n",
+             rpc_id, session->local_session_num);
 
     // Mark enqueue_response() as completed
     assert(sslot->server_info.req_type != kInvalidReqType);
