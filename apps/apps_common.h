@@ -8,6 +8,7 @@
 #include <gflags/gflags.h>
 #include <boost/algorithm/string.hpp>
 #include <fstream>
+#include <set>
 #include "rpc.h"
 #include "util/latency.h"
 
@@ -184,23 +185,6 @@ void ping_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void ping_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
-
-// Send a ping using the context's Rpc on this session
-void ping_enqueue(BasicAppContext &c, int session_num) {
-  assert(!c.ping_pending);
-  c.ping_pending = true;
-
-  // We leak 2 * kPingMsgSize bytes for each ping
-  auto ping_req = c.rpc->alloc_msg_buffer(kPingMsgSize);
-  assert(ping_req.buf != nullptr);
-  auto ping_resp = c.rpc->alloc_msg_buffer(kPingMsgSize);
-  assert(ping_resp.buf != nullptr);
-
-  c.rpc->enqueue_request(session_num, kPingReqHandlerType, &ping_req,
-                         &ping_resp, ping_cont_func, 0);
-}
-
 void ping_cont_func(erpc::RespHandle *, void *_context, size_t) {
   auto *c = static_cast<BasicAppContext *>(_context);
   c->ping_pending = false;  // Mark ping as completed
@@ -208,12 +192,26 @@ void ping_cont_func(erpc::RespHandle *, void *_context, size_t) {
 
 // Ping all sessions after connecting them
 void ping_all_blocking(BasicAppContext &c) {
+  std::set<std::string> hostname_set;
+  erpc::MsgBuffer ping_req, ping_resp;
+
+  ping_req = c.rpc->alloc_msg_buffer(kPingMsgSize);
+  assert(ping_req.buf != nullptr);
+  ping_resp = c.rpc->alloc_msg_buffer(kPingMsgSize);
+  assert(ping_resp.buf != nullptr);
+
   for (int &session_num : c.session_num_vec) {
     auto srv_hostname = c.rpc->get_server_hostname(session_num);
-    printf("Process %zu, thread %zu: Checking fabric to server %s.\n",
-           FLAGS_process_id, c.thread_id, srv_hostname.c_str());
+    if (hostname_set.count(srv_hostname) > 0) continue;
+    hostname_set.insert(srv_hostname);
 
-    ping_enqueue(c, session_num);
+    printf("Process %zu, thread %zu: Pinging server %s.\n", FLAGS_process_id,
+           c.thread_id, srv_hostname.c_str());
+
+    c.ping_pending = true;
+    c.rpc->enqueue_request(session_num, kPingReqHandlerType, &ping_req,
+                           &ping_resp, ping_cont_func, 0);
+
     size_t ms_elapsed = 0;
     while (c.ping_pending) {
       c.rpc->run_event_loop(kPingEvLoopMs);

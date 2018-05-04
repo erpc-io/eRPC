@@ -60,6 +60,8 @@ struct app_stats_t {
   size_t num_re_tx;
   size_t pad[6];
 
+  app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
+
   static std::string get_template_str() { return "mrps num_re_tx"; }
   std::string to_string() {
     return std::to_string(mrps) + " " + std::to_string(num_re_tx);
