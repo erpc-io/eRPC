@@ -124,7 +124,8 @@ class RawTransport : public Transport {
     return ((cur_idx + kCQESnapshotCycle) - prev_idx) % kCQESnapshotCycle;
   }
 
-  RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node);
+  RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
+               FILE *trace_file);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
   ~RawTransport();

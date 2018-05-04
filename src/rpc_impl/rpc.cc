@@ -35,10 +35,19 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   tls_registry->init();  // Initialize thread-local variables for this thread
   creator_etid = get_etid();
 
+  if (LOG_LEVEL >= LOG_LEVEL_REORDER) {
+    std::string trace_filename = "/tmp/erpc_trace_" + std::to_string(rpc_id);
+    trace_file = fopen(trace_filename.c_str(), "w");
+    if (trace_file == nullptr) {
+      delete huge_alloc;
+      throw std::runtime_error("Failed to open trace file");
+    }
+  }
+
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for
   // the hugepage allocator.
-  transport = new TTr(rpc_id, phy_port, numa_node);
+  transport = new TTr(rpc_id, phy_port, numa_node, trace_file);
 
   huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
                              transport->reg_mr_func, transport->dereg_mr_func);
@@ -68,15 +77,6 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   // Register the hook with the Nexus. This installs SM and bg command queues.
   nexus_hook.rpc_id = rpc_id;
   nexus->register_hook(&nexus_hook);
-
-  if (LOG_LEVEL >= LOG_LEVEL_REORDER) {
-    std::string trace_filename = "/tmp/erpc_trace_" + std::to_string(rpc_id);
-    trace_file = fopen(trace_filename.c_str(), "w");
-    if (trace_file == nullptr) {
-      delete huge_alloc;
-      throw std::runtime_error("Failed to open trace file");
-    }
-  }
 
   LOG_INFO("Rpc %u created. eRPC TID = %zu.\n", rpc_id, creator_etid);
 

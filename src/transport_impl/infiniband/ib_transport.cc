@@ -11,8 +11,10 @@ constexpr size_t IBTransport::kMaxDataPerPkt;
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
-IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node)
-    : Transport(TransportType::kInfiniBand, rpc_id, phy_port, numa_node) {
+IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
+                         FILE *trace_file)
+    : Transport(TransportType::kInfiniBand, rpc_id, phy_port, numa_node,
+                trace_file) {
   rt_assert(kHeadroom == 0, "Invalid packet header headroom for InfiniBand");
   resolve_phy_port();
   init_verbs_structs();

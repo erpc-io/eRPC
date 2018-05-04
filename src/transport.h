@@ -88,7 +88,8 @@ class Transport {
    *
    * @throw runtime_error if creation fails
    */
-  Transport(TransportType, uint8_t rpc_id, uint8_t phy_port, size_t numa_node);
+  Transport(TransportType, uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
+            FILE* trace_file);
 
   /**
    * @brief Initialize transport structures that require hugepages, and fill
@@ -165,6 +166,7 @@ class Transport {
 
   // Members initialized after the hugepage allocator is provided
   HugeAlloc* huge_alloc;  ///< The parent Rpc's hugepage allocator
+  FILE* trace_file;       ///< The parent Rpc's high-verbosity log file
 
   struct {
     size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called

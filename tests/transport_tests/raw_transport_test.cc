@@ -30,6 +30,7 @@ struct transport_info_t {
 class RawTransportTest : public ::testing::Test {
   transport_info_t srv_ttr, clt_ttr;
   Transport::RoutingInfo srv_ri;  // We only need the server's routing info
+  FILE* trace_file;
 
  public:
   RawTransportTest() {
@@ -38,9 +39,13 @@ class RawTransportTest : public ::testing::Test {
       return;
     }
 
+    std::string trace_filename = "/tmp/test_trace";
+    trace_file = fopen(trace_filename.c_str(), "w");
+    assert(trace_file != nullptr);
+
     // Initalize client transport
-    clt_ttr.transport =
-        new RawTransport(kTestRpcIdClient, kTestPhyPort, kTestNumaNode);
+    clt_ttr.transport = new RawTransport(kTestRpcIdClient, kTestPhyPort,
+                                         kTestNumaNode, trace_file);
     clt_ttr.huge_alloc =
         new HugeAlloc(MB(32), kTestNumaNode, clt_ttr.transport->reg_mr_func,
                       clt_ttr.transport->dereg_mr_func);
@@ -48,8 +53,8 @@ class RawTransportTest : public ::testing::Test {
                                                 clt_ttr.rx_ring);
 
     // Initialize server transport
-    srv_ttr.transport =
-        new RawTransport(kTestRpcIdServer, kTestPhyPort, kTestNumaNode);
+    srv_ttr.transport = new RawTransport(kTestRpcIdServer, kTestPhyPort,
+                                         kTestNumaNode, trace_file);
     srv_ttr.huge_alloc =
         new HugeAlloc(MB(32), kTestNumaNode, srv_ttr.transport->reg_mr_func,
                       srv_ttr.transport->dereg_mr_func);
