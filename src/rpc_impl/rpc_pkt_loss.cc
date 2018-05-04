@@ -61,9 +61,10 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
-          "Rpc %u, lsn %u: Pkt loss suspected for req %zu. Status %s. Action",
-          rpc_id, sslot->session->local_session_num, req_msgbuf->get_req_num(),
-          sslot->progress_str().c_str());
+          "Rpc %u, lsn %u (%s): Pkt loss suspected for req %zu (%s). Action",
+          rpc_id, sslot->session->local_session_num,
+          sslot->session->get_remote_hostname().c_str(),
+          req_msgbuf->get_req_num(), sslot->progress_str().c_str());
 
   const size_t delta = ci.num_tx - ci.num_rx;
   assert(credits + delta <= kSessionCredits);

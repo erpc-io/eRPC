@@ -32,9 +32,10 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
   assert(pkthdr->req_num <= sslot->cur_req_num);
   if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
-        "Rpc %u: Received out-of-order CR for session %u. "
+        "Rpc %u, lsn %u (%s): Received out-of-order CR. "
         "Packet %zu/%zu, sslot: %zu/%s. Dropping.\n",
-        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+        rpc_id, sslot->session->local_session_num,
+        sslot->session->get_remote_hostname().c_str(), pkthdr->req_num,
         pkthdr->pkt_num, sslot->cur_req_num, sslot->progress_str().c_str());
     return;
   }

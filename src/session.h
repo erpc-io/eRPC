@@ -95,6 +95,12 @@ class Session {
     return client_info.cc.timely.rate == Timely::kMaxRate;
   }
 
+  /// Return the hostname of the remote endpoint for a connected session
+  std::string get_remote_hostname() const {
+    if (is_client()) return trim_hostname(server.hostname);
+    return trim_hostname(client.hostname);
+  }
+
   const Role role;  ///< The role (server/client) of this session endpoint
   const conn_req_uniq_token_t uniq_token;  ///< A cluster-wide unique token
   const double freq_ghz;                   ///< TSC frequency

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <boost/algorithm/string.hpp>
 #include <cerrno>
 #include <limits>
 #include <mutex>
@@ -63,14 +64,11 @@ static constexpr size_t kInvalidBgETid = kMaxBgThreads;
 
 // Simple methods
 
-/// Emulab hostnames are long, so trim it to just the node name.
+/// Trim a hostname to the part before the first dot
 static std::string trim_hostname(std::string hostname) {
-  if (hostname.find("emulab.net") != std::string::npos) {
-    std::string trimmed_hostname = hostname.substr(0, hostname.find("."));
-    return trimmed_hostname;
-  } else {
-    return hostname;
-  }
+  std::vector<std::string> split;
+  boost::split(split, hostname, boost::is_any_of("."));
+  return split.at(0);
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.

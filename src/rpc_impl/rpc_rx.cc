@@ -22,8 +22,7 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
-    uint16_t lsn = pkthdr->dest_session_num;  // The local session
-    Session *session = session_vec[lsn];
+    Session *session = session_vec[pkthdr->dest_session_num];
     if (unlikely(session == nullptr)) {
       LOG_WARN("Rpc %u: Received %s for buried session. Dropping.\n", rpc_id,
                pkthdr->to_string().c_str());
@@ -39,8 +38,9 @@ void Rpc<TTr>::process_comps_st() {
     }
 
     // If we are here, we have a valid packet for a connected session
-    LOG_TRACE("Rpc %u, lsn %u: Received packet %s.\n", rpc_id, lsn,
-              pkthdr->to_string().c_str());
+    LOG_TRACE(
+        "Rpc %u, lsn %u (%s): RX %s.\n", rpc_id, session->local_session_num,
+        session->get_remote_hostname().c_str(), pkthdr->to_string().c_str());
 
     size_t sslot_i = pkthdr->req_num % kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];

@@ -82,9 +82,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "Rpc %u, lsn %u: Received out-of-order request for session. "
+            "Rpc %u, lsn %u (%s): Received out-of-order request for session. "
             "Req num: %zu (pkt), %zu (sslot). Action",
-            rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+            rpc_id, sslot->session->local_session_num,
+            sslot->session->get_remote_hostname().c_str(), pkthdr->req_num,
             sslot->cur_req_num);
 
     if (pkthdr->req_num < sslot->cur_req_num) {

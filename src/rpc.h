@@ -527,8 +527,9 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_idx));
     }
 
-    LOG_TRACE("Rpc %u, lsn %u: TX %s. Slot %s.%s\n", rpc_id,
+    LOG_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s\n", rpc_id,
               sslot->session->local_session_num,
+              sslot->session->get_remote_hostname().c_str(),
               tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(),
               sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
@@ -554,8 +555,9 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
     }
 
-    LOG_TRACE("Rpc %u, lsn %u: TX %s. Slot %s.%s.\n", rpc_id,
+    LOG_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s.\n", rpc_id,
               sslot->session->local_session_num,
+              sslot->session->get_remote_hostname().c_str(),
               ctrl_msgbuf->get_pkthdr_str(0).c_str(),
               sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
@@ -754,8 +756,9 @@ class Rpc {
     return TTr::kNumRxRingEntries;
   }
 
-  std::string get_server_hostname(int session_num) {
-    return session_vec[static_cast<size_t>(session_num)]->server.hostname;
+  /// Return the hostname of the remote endpoint for a connected session
+  std::string get_remote_hostname(int session_num) const {
+    return session_vec[static_cast<size_t>(session_num)]->get_remote_hostname();
   }
 
   /// Return the maximum number of sessions supported

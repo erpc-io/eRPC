@@ -73,14 +73,24 @@ template <class TTr>
 void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                    size_t rx_tsc) {
   assert(in_dispatch());
-  assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
+  if (unlikely(pkthdr->req_num > sslot->cur_req_num)) {
+    LOG_ERROR(
+        "Rpc %u, lsn %u (%s): Received wrong order response %s."
+        "sslot %zu/%s. Exiting.\n",
+        rpc_id, sslot->session->local_session_num,
+        sslot->session->get_remote_hostname().c_str(),
+        pkthdr->to_string().c_str(), sslot->cur_req_num,
+        sslot->progress_str().c_str());
+    exit(-1);
+  }
 
   // Handle reordering
   if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
-        "Rpc %u: Received out-of-order response for session %u. "
+        "Rpc %u, lsn %u (%s): Received out-of-order response. "
         "Packet %zu/%zu, sslot %zu/%s. Dropping.\n",
-        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+        rpc_id, sslot->session->local_session_num,
+        sslot->session->get_remote_hostname().c_str(), pkthdr->req_num,
         pkthdr->pkt_num, sslot->cur_req_num, sslot->progress_str().c_str());
     return;
   }

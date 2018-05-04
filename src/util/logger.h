@@ -34,14 +34,9 @@ namespace erpc {
 
 #define LOG_DEFAULT_STREAM stdout
 
-// If LOG_LEVEL is not defined, default to LOG_LEVEL_INFO in debug mode, and
-// LOG_LEVEL_WARN in non-debug mode.
+// If LOG_LEVEL is not defined, default to the highest level for YouCompleteMe
 #ifndef LOG_LEVEL
-#ifndef NDEBUG
-#define LOG_LEVEL LOG_LEVEL_INFO
-#else
-#define LOG_LEVEL LOG_LEVEL_WARN
-#endif
+#define LOG_LEVEL LOG_LEVEL_CC
 #endif
 
 static void output_log_header(int level);
