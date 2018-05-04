@@ -364,6 +364,8 @@ void RawTransport::install_flow_rule() {
   auto *eth_spec = reinterpret_cast<struct ibv_exp_flow_spec_eth *>(buf);
   eth_spec->type = IBV_EXP_FLOW_SPEC_ETH;
   eth_spec->size = sizeof(struct ibv_exp_flow_spec_eth);
+  memcpy(&eth_spec->val.dst_mac, resolve.mac_addr, sizeof(resolve.mac_addr));
+  memset(&eth_spec->mask.dst_mac, 0xff, sizeof(resolve.mac_addr));
   buf += sizeof(struct ibv_exp_flow_spec_eth);
 
   // IPv4 - all wildcard

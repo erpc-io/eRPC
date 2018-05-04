@@ -9,9 +9,10 @@
 
 #include <gtest/gtest.h>
 
-#define private public  // XXX: Do we need this
+#define private public
 #include "transport_impl/raw/raw_transport.h"
 #include "util/huge_alloc.h"
+#include "util/timer.h"
 
 namespace erpc {
 static constexpr size_t kTestPhyPort = 0;
@@ -28,10 +29,6 @@ struct transport_info_t {
 };
 
 class RawTransportTest : public ::testing::Test {
-  transport_info_t srv_ttr, clt_ttr;
-  Transport::RoutingInfo srv_ri;  // We only need the server's routing info
-  FILE* trace_file;
-
  public:
   RawTransportTest() {
     if (!kTesting) {
@@ -180,6 +177,10 @@ class RawTransportTest : public ::testing::Test {
     size_t num_rx = 0;
     while (num_rx != batch_size) num_rx += srv_ttr.transport->rx_burst();
   }
+
+  transport_info_t srv_ttr, clt_ttr;
+  Transport::RoutingInfo srv_ri;  // We only need the server's routing info
+  FILE* trace_file;
 };
 
 // Test if we we can create and destroy a transport instance
@@ -205,6 +206,43 @@ TEST_F(RawTransportTest, full_queue_two_sges) {
   simple_test_two_sges(kTestMsgSize, RawTransport::kSQDepth);
 }
 
+// Test MAC filtering
+TEST_F(RawTransportTest, mac_filter_test) {
+  Buffer buffer = create_packet(kTestMsgSize);
+  struct ibv_sge sge;
+  struct ibv_send_wr send_wr, *bad_wr;
+  size_t num_rx = 0;
+
+  sge.addr = reinterpret_cast<uint64_t>(buffer.buf);
+  sge.length = kInetHdrsTotSize + kTestMsgSize;
+  sge.lkey = buffer.lkey;
+
+  send_wr.next = nullptr;
+  send_wr.opcode = IBV_WR_SEND;
+  send_wr.sg_list = &sge;
+  send_wr.send_flags = IBV_SEND_SIGNALED;
+  send_wr.num_sge = 1;
+
+  // Send a packet with a matching MAC address
+  int ret = ibv_post_send(clt_ttr.transport->qp, &send_wr, &bad_wr);
+  assert(ret == 0);
+  while (num_rx != 1) num_rx += srv_ttr.transport->rx_burst();
+
+  // Send a packet with a garbled destination MAC address and check it isn't
+  // received for a long time.
+  num_rx = 0;
+  auto* eth = reinterpret_cast<eth_hdr_t*>(buffer.buf);
+  eth->dst_mac[0]++;
+
+  ret = ibv_post_send(clt_ttr.transport->qp, &send_wr, &bad_wr);
+  assert(ret == 0);
+  struct timespec start;
+  clock_gettime(CLOCK_REALTIME, &start);
+  while (sec_since(start) <= .2) {
+    num_rx += srv_ttr.transport->rx_burst();
+  }
+  ASSERT_EQ(num_rx, 0);
+}
 }  // End erpc
 
 int main(int argc, char** argv) {
