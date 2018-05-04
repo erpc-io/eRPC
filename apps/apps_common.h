@@ -201,7 +201,7 @@ void ping_all_blocking(BasicAppContext &c) {
   assert(ping_resp.buf != nullptr);
 
   for (int &session_num : c.session_num_vec) {
-    auto srv_hostname = c.rpc->get_server_hostname(session_num);
+    auto srv_hostname = c.rpc->get_remote_hostname(session_num);
     if (hostname_set.count(srv_hostname) > 0) continue;
     hostname_set.insert(srv_hostname);
 

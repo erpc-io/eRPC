@@ -448,6 +448,7 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
          << 1.0 * kRingSize / MB(1) << "MB for ring buffers.";
     throw std::runtime_error(xmsg.str());
   }
+  memset(ring_extent.buf, 0, kRingSize);
 
   // Fill in the Rpc's RX ring
   for (size_t i = 0; i < kNumRxRingEntries; i++) {

@@ -346,7 +346,6 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   }
 
   connect_sessions(c);
-  ping_all_blocking(c);
 
   printf("Process %zu, thread %zu: All sessions connected. Starting work.\n",
          FLAGS_process_id, thread_id);
