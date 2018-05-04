@@ -109,7 +109,7 @@ class SSlot {
       ret << "[num_tx " << client_info.num_tx << ", num_rx "
           << client_info.num_rx << "]";
     } else {
-      ret << "[num_rx " << client_info.num_rx << "] ";
+      ret << "[num_rx " << client_info.num_rx << "]";
     }
     return ret.str();
   }
