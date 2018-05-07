@@ -148,10 +148,14 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
 
     if (c.thread_id == 0) {
       app_stats_t accum_stats;
+      std::vector<double> incast_gbps_vec;  // For stddev computation
+
       for (size_t i = 0;
            i < FLAGS_incast_threads_other + FLAGS_regular_threads_other; i++) {
         // Stats published by all threads
         accum_stats.incast_gbps += c.app_stats[i].incast_gbps;
+        incast_gbps_vec.push_back(c.app_stats[i].incast_gbps);
+
         accum_stats.re_tx += c.app_stats[i].re_tx;
 
         if (i >= FLAGS_incast_threads_other) {
@@ -161,6 +165,7 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
         }
       }
 
+      accum_stats.incast_gbps_stddev = erpc::stddev(incast_gbps_vec);
       accum_stats.regular_50_us /= FLAGS_regular_threads_other;
       accum_stats.regular_99_us /= FLAGS_regular_threads_other;
 

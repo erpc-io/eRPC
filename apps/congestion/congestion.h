@@ -33,22 +33,25 @@ DEFINE_uint64(regular_req_size, 0, "Reqular request data size");
 DEFINE_uint64(regular_resp_size, 0, "Regular response data size");
 
 struct app_stats_t {
-  double incast_gbps;
-  size_t re_tx;
-  double regular_50_us;
-  double regular_99_us;
-  size_t pad[4];
+  double incast_gbps;         // All incast threads
+  double incast_gbps_stddev;  // Only thread 0
+  size_t re_tx;               // All incast and regular threads
+  double regular_50_us;       // All regular threads
+  double regular_99_us;       // All regular threads
+  size_t pad[3];
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
   static std::string get_template_str() {
-    return "incast_gbps re_tx regular_50_us regular_99_us";
+    return "incast_gbps incast_gbps_stddev re_tx regular_50_us regular_99_us";
   }
 
   /// Return a space-separated string of all stats
   std::string to_string() {
-    return std::to_string(incast_gbps) + " " + std::to_string(re_tx) + " " +
-           std::to_string(regular_50_us) + " " + std::to_string(regular_99_us);
+    return std::to_string(incast_gbps) + " " +
+           std::to_string(incast_gbps_stddev) + " " + std::to_string(re_tx) +
+           " " + std::to_string(regular_50_us) + " " +
+           std::to_string(regular_99_us);
   }
 
   /// Threads publish stats selectively, so must accumulate manually
