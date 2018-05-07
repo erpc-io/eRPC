@@ -25,9 +25,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
     // A session reset could be waiting for this enqueue_response()
     assert(session->state == SessionState::kResetInProgress);
 
-    LOG_WARN(
-        "eRPC Rpc %u: enqueue_response() for reset-in-progress session %u.\n",
-        rpc_id, session->local_session_num);
+    LOG_WARN("Rpc %u, lsn %u: enqueue_response() while reset in progress.\n",
+             rpc_id, session->local_session_num);
 
     // Mark enqueue_response() as completed
     assert(sslot->server_info.req_type != kInvalidReqType);
@@ -71,103 +70,85 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 }
 
 template <class TTr>
-void Rpc<TTr>::process_small_resp_st(SSlot *sslot, const pkthdr_t *pkthdr,
-                                     size_t rx_tsc) {
+void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
+                                   size_t rx_tsc) {
   assert(in_dispatch());
-  assert(pkthdr->req_num <= sslot->cur_req_num);  // Response from the future?
+  if (unlikely(pkthdr->req_num > sslot->cur_req_num)) {
+    LOG_ERROR(
+        "Rpc %u, lsn %u (%s): Received wrong order response %s."
+        "sslot %zu/%s. Exiting.\n",
+        rpc_id, sslot->session->local_session_num,
+        sslot->session->get_remote_hostname().c_str(),
+        pkthdr->to_string().c_str(), sslot->cur_req_num,
+        sslot->progress_str().c_str());
+    exit(-1);
+  }
 
   // Handle reordering
   if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
-        "eRPC Rpc %u: Received out-of-order response for session %u. "
-        "Request num: %zu (pkt), %zu (sslot). Dropping.\n",
-        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        sslot->cur_req_num);
+        "Rpc %u, lsn %u (%s): Received out-of-order response. "
+        "Packet %zu/%zu, sslot %zu/%s. Dropping.\n",
+        rpc_id, sslot->session->local_session_num,
+        sslot->session->get_remote_hostname().c_str(), pkthdr->req_num,
+        pkthdr->pkt_num, sslot->cur_req_num, sslot->progress_str().c_str());
     return;
   }
 
-  // This is the entire, in-order response. So, we still have the request.
-  assert(sslot->tx_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
+  auto &ci = sslot->client_info;
+  MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
 
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
-  sslot->client_info.num_rx++;
+  ci.num_rx++;
 
-  sslot->tx_msgbuf = nullptr;  // Mark response as received
-
-  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-  resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-
-  // Copy header and data, but not headroom
-  memcpy(reinterpret_cast<uint8_t *>(resp_msgbuf->get_pkthdr_0()) + kHeadroom,
-         reinterpret_cast<const uint8_t *>(pkthdr) + kHeadroom,
-         pkthdr->msg_size + sizeof(pkthdr_t) - kHeadroom);
-
-  if (likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
-    sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
-                                 sslot->client_info.tag);
-  } else {
-    // Background thread will run continuation
-    submit_background_st(sslot, Nexus::BgWorkItemType::kResp,
-                         sslot->client_info.cont_etid);
-    return;
-  }
-}
-
-template <class TTr>
-void Rpc<TTr>::process_large_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
-                                         size_t rx_tsc) {
-  assert(in_dispatch());
-
-  // Handler reordering
-  assert(pkthdr->req_num <= sslot->cur_req_num);
-  if (unlikely(!in_order_client(sslot, pkthdr))) {
-    LOG_REORDER(
-        "eRPC Rpc %u: Received out-of-order response for session %u. "
-        "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Dropping.\n",
-        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.num_rx);
-    return;
-  }
-
-  // This is an in-order response packet. So, we still have the request.
-  MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
-  assert(req_msgbuf->is_dynamic_and_matches(pkthdr));  // Check request
-
-  if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
-  bump_credits(sslot->session);
-  sslot->client_info.num_rx++;
-
-  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-  if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
-    // This is the first response packet
+  // Special handling for single-packet respones
+  if (likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
-    *(resp_msgbuf->get_pkthdr_0()) = *pkthdr;
+
+    // Copy eRPC header and data, but not Transport headroom
+    memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
+           pkthdr->msg_size + sizeof(pkthdr_t) - kHeadroom);
+
+    // Fall through to invoke continuation
+  } else {
+    ci.progress_tsc = ev_loop_tsc;
+
+    // This is an in-order response packet. So, we still have the request.
+    MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
+
+    if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
+      // This is the first response packet. Resize and copy eRPC header.
+      resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
+      memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
+             sizeof(pkthdr_t) - kHeadroom);
+    }
+
+    // Transmit remaining RFRs before response memcpy. We have credits.
+    if (ci.num_tx != wire_pkts(req_msgbuf, resp_msgbuf)) kick_rfr_st(sslot);
+
+    // Hdr 0 was copied earlier, other headers are unneeded, so copy just data.
+    const size_t pkt_idx = resp_ntoi(pkthdr->pkt_num, resp_msgbuf->num_pkts);
+    copy_data_to_msgbuf(resp_msgbuf, pkt_idx, pkthdr);
+
+    if (ci.num_rx != wire_pkts(req_msgbuf, resp_msgbuf)) return;
+    // Else fall through to invoke continuation
   }
 
-  // Send RFRs before doing the response memcpy
-  const auto rfr_sent = sslot->client_info.num_tx - req_msgbuf->num_pkts;
-  size_t rfr_pending = ((resp_msgbuf->num_pkts - 1) - rfr_sent);
-  if (rfr_pending > 0) {
-    size_t sending = std::min(sslot->session->client_info.credits, rfr_pending);
-    for (size_t i = 0; i < sending; i++) enqueue_rfr_st(sslot, pkthdr);
-  }
-
-  // Header 0 was copied earlier, other headers are unneeded, so copy just data
-  copy_data_to_msgbuf(resp_msgbuf,
-                      resp_ntoi(pkthdr->pkt_num, req_msgbuf->num_pkts), pkthdr);
-
-  if (sslot->client_info.num_rx !=
-      req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1)
-    return;
+  // Here, the complete response has been received. All references to sslot must
+  // be removed before invalidating it.
+  // 1. The TX batch or DMA queue cannot contain a reference because we drain
+  //    it after retransmission.
+  // 2. The wheel cannot contain a reference because we (a) wait for sslot to
+  //    drain from the wheel before retransmitting, and (b) discard spurious
+  //    corresponding packets received for packets in the wheel.
+  assert(sslot->client_info.wheel_count == 0);
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
-  if (sslot->client_info.cont_etid == kInvalidBgETid) {
-    sslot->client_info.cont_func(static_cast<RespHandle *>(sslot), context,
-                                 sslot->client_info.tag);
+  if (ci.cont_etid == kInvalidBgETid) {
+    ci.cont_func(static_cast<RespHandle *>(sslot), context, ci.tag);
   } else {
-    submit_background_st(sslot, Nexus::BgWorkItemType::kResp,
-                         sslot->client_info.cont_etid);
+    submit_background_st(sslot, Nexus::BgWorkItemType::kResp, ci.cont_etid);
   }
   return;
 }

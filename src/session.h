@@ -6,6 +6,7 @@
 #include <queue>
 
 #include "cc/timely.h"
+#include "cc/timing_wheel.h"
 #include "common.h"
 #include "msg_buffer.h"
 #include "ops.h"
@@ -56,6 +57,7 @@ class Session {
       sslot.cur_req_num = sslot_i;  // 1st req num = (+kSessionReqWindow)
 
       if (is_client()) {
+        for (auto &x : sslot.client_info.wslot_idx) x = kWheelInvalidWslot;
         sslot.client_info.cont_etid = kInvalidBgETid;  // Continuations in fg
       } else {
         sslot.server_info.req_type = kInvalidReqType;
@@ -73,23 +75,30 @@ class Session {
   inline bool is_connected() const { return state == SessionState::kConnected; }
 
   /**
-   * @brief Get the absolute timestamp for transmission, and update abs_tx_tsc
+   * @brief Get the desired TX timestamp, and update TX timestamp tracking
    *
-   * @param ref_tsc A recently-sampled timestamp that acts as the base for the
-   * absolute TX timestamp
+   * @param ref_tsc A recent TSC that to detect if we are lagging
    * @param pkt_size The size of the packet to transmit
-   * @return The absolute TX timestamp
+   * @return The desired TX timestamp for this packet
    */
   inline size_t cc_getupdate_tx_tsc(size_t ref_tsc, size_t pkt_size) {
-    assert(is_client());
-    assert(ref_tsc > 1000000000 && pkt_size <= 8192);  // Args sanity check
-
     double ns_delta = 1000000000 * (pkt_size / client_info.cc.timely.rate);
 
-    size_t &abs_tx_tsc = client_info.cc.abs_tx_tsc;
-    abs_tx_tsc += ns_to_cycles(ns_delta, freq_ghz);
-    abs_tx_tsc = std::max(ref_tsc, abs_tx_tsc);  // Jump ahead if we're lagging
-    return abs_tx_tsc;
+    size_t &prev_desired_tx_tsc = client_info.cc.prev_desired_tx_tsc;
+    prev_desired_tx_tsc += ns_to_cycles(ns_delta, freq_ghz);
+    prev_desired_tx_tsc = std::max(ref_tsc, prev_desired_tx_tsc);
+    return prev_desired_tx_tsc;
+  }
+
+  /// Return true iff this session is uncongested
+  inline bool is_uncongested() const {
+    return client_info.cc.timely.rate == Timely::kMaxRate;
+  }
+
+  /// Return the hostname of the remote endpoint for a connected session
+  std::string get_remote_hostname() const {
+    if (is_client()) return trim_hostname(server.hostname);
+    return trim_hostname(client.hostname);
   }
 
   const Role role;  ///< The role (server/client) of this session endpoint
@@ -117,11 +126,12 @@ class Session {
     /// Requests that spill over kSessionReqWindow are queued here
     std::queue<enq_req_args_t> enq_req_backlog;
 
+    size_t num_re_tx = 0;  ///< Number of retransmissions for this session
+
     // Congestion control
     struct {
       Timely timely;
-      size_t abs_tx_tsc;               ///< Last absolute TX timestamp
-      size_t num_retransmissions = 0;  ///< Number of retransmissions
+      size_t prev_desired_tx_tsc;  ///< Desired TX timestamp of the last packet
     } cc;
 
     size_t sm_req_ts;  ///< Timestamp of the last session management request

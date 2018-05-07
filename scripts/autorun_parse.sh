@@ -53,6 +53,12 @@ fi
 # names in autorun_process_file.
 process_idx="0"
 while read dns_name udp_port numa; do
+  if [[ -z $dns_name || -z $udp_port || -z $numa ]]; then
+    blue "Invalid autorun file. name = $dns_name, udp = $udp_port, numa = $numa"
+    blue "Exiting"
+    exit
+  fi
+
   autorun_name_list[$process_idx]=$dns_name
   autorun_udp_port_list[$process_idx]=$udp_port
   autorun_numa_list[$process_idx]=$numa

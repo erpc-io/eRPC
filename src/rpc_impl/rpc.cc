@@ -22,7 +22,8 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
       creation_tsc(rdtsc()),
       multi_threaded(nexus->num_bg_threads > 0),
       freq_ghz(nexus->freq_ghz),
-      rpc_pkt_loss_epoch_cycles(us_to_cycles(kRpcRTOUs / 10, nexus->freq_ghz)),
+      rpc_rto_cycles(us_to_cycles(kRpcRTOUs, nexus->freq_ghz)),
+      rpc_pkt_loss_scan_cycles(rpc_rto_cycles / 10),
       req_func_arr(nexus->req_func_arr) {
   rt_assert(!getuid(), "You need to be root to use eRPC");
   rt_assert(rpc_id != kInvalidRpcId, "Invalid Rpc ID");
@@ -34,10 +35,19 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   tls_registry->init();  // Initialize thread-local variables for this thread
   creator_etid = get_etid();
 
+  if (LOG_LEVEL >= LOG_LEVEL_REORDER) {
+    std::string trace_filename = "/tmp/erpc_trace_" + std::to_string(rpc_id);
+    trace_file = fopen(trace_filename.c_str(), "w");
+    if (trace_file == nullptr) {
+      delete huge_alloc;
+      throw std::runtime_error("Failed to open trace file");
+    }
+  }
+
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for
   // the hugepage allocator.
-  transport = new TTr(rpc_id, phy_port, numa_node);
+  transport = new TTr(rpc_id, phy_port, numa_node, trace_file);
 
   huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
                              transport->reg_mr_func, transport->dereg_mr_func);
@@ -50,7 +60,6 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     timing_wheel_args_t args;
     args.mtu = TTr::kMTU;
     args.freq_ghz = freq_ghz;
-    args.wslot_width = kWheelDefWslotWidth;
     args.huge_alloc = huge_alloc;
 
     wheel = new TimingWheel(args);
@@ -69,21 +78,16 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   nexus_hook.rpc_id = rpc_id;
   nexus->register_hook(&nexus_hook);
 
-  LOG_INFO("eRPC Rpc: Created with ID = %u, eRPC TID = %zu.\n", rpc_id,
-           creator_etid);
+  LOG_INFO("Rpc %u created. eRPC TID = %zu.\n", rpc_id, creator_etid);
 
-  pkt_loss_epoch_tsc = rdtsc();  // Assign epoch timestamp as late as possible
+  // Steps that must be done as late as possible
+  pkt_loss_scan_tsc = rdtsc();  // Assign epoch timestamp as late as possible
   if (kCcPacing) wheel->catchup();  // Wheel could be lagging, so catch up
 }
 
 template <class TTr>
 Rpc<TTr>::~Rpc() {
-  // Rpc can only be destroyed from the creator thread
-  if (unlikely(!in_dispatch())) {
-    LOG_ERROR("eRPC Rpc %u: Error. Cannot destroy from background thread.\n",
-              rpc_id);
-    exit(-1);
-  }
+  assert(in_dispatch());
 
   // XXX: Check if all sessions are disconnected
   for (Session *session : session_vec) {
@@ -92,7 +96,7 @@ Rpc<TTr>::~Rpc() {
     }
   }
 
-  LOG_INFO("eRPC Rpc: Destroying Rpc ID %u.\n", rpc_id);
+  LOG_INFO("Destroying Rpc %u.\n", rpc_id);
 
   // First delete the hugepage allocator. This deregisters and deletes the
   // SHM regions. Deregistration is done using \p transport's deregistration
@@ -103,16 +107,8 @@ Rpc<TTr>::~Rpc() {
   delete transport;
 
   nexus->unregister_hook(&nexus_hook);
-}
 
-template <class TTr>
-double Rpc<TTr>::sec_since_creation() {
-  return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
-}
-
-template <class TTr>
-double Rpc<TTr>::usec_since_creation() {
-  return to_usec(rdtsc() - creation_tsc, nexus->freq_ghz);
+  if (LOG_LEVEL >= LOG_LEVEL_REORDER) fclose(trace_file);
 }
 
 FORCE_COMPILE_TRANSPORTS

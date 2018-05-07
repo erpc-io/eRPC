@@ -15,8 +15,8 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
          sm_pkt.server.rpc_id == rpc_id);
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
-  sprintf(issue_msg, "eRPC Rpc %u: Received connect request from %s. Issue",
-          rpc_id, sm_pkt.client.name().c_str());
+  sprintf(issue_msg, "Rpc %u: Received connect request from %s. Issue", rpc_id,
+          sm_pkt.client.name().c_str());
 
   // Handle reordering
   if (conn_req_token_map.count(sm_pkt.uniq_token) > 0) {
@@ -52,13 +52,6 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   if (!have_ring_entries()) {
     LOG_WARN("%s: Ring buffers exhausted. Sending response.\n", issue_msg);
     sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kRingExhausted));
-    return;
-  }
-
-  if (session_vec.size() == kMaxSessionsPerThread) {
-    LOG_WARN("%s: Reached session limit %zu. Sending response.\n", issue_msg,
-             kMaxSessionsPerThread);
-    sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kTooManySessions));
     return;
   }
 
@@ -140,8 +133,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   // Create the basic issue message using only the packet
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: Received connect response from %s for session %u. "
-          "Issue",
+          "Rpc %u: Received connect response from %s for session %u. Issue",
           rpc_id, sm_pkt.server.name().c_str(), sm_pkt.client.session_num);
 
   uint16_t session_num = sm_pkt.client.session_num;
@@ -216,7 +208,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   session->remote_session_num = session->server.session_num;
   session->state = SessionState::kConnected;
 
-  session->client_info.cc.abs_tx_tsc = rdtsc();
+  session->client_info.cc.prev_desired_tx_tsc = rdtsc();
 
   LOG_INFO("%s: None. Session connected.\n", issue_msg);
   sm_handler(session->local_session_num, SmEventType::kConnected,

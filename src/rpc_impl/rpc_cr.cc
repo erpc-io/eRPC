@@ -32,16 +32,22 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
   assert(pkthdr->req_num <= sslot->cur_req_num);
   if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
-        "eRPC Rpc %u: Received out-of-order explicit CR for session %u. "
-        "Pkt = %zu/%zu. cur_req_num = %zu, num_rx = %zu. Dropping.\n",
-        rpc_id, sslot->session->local_session_num, pkthdr->req_num,
-        pkthdr->pkt_num, sslot->cur_req_num, sslot->client_info.num_rx);
+        "Rpc %u, lsn %u (%s): Received out-of-order CR. "
+        "Packet %zu/%zu, sslot: %zu/%s. Dropping.\n",
+        rpc_id, sslot->session->local_session_num,
+        sslot->session->get_remote_hostname().c_str(), pkthdr->req_num,
+        pkthdr->pkt_num, sslot->cur_req_num, sslot->progress_str().c_str());
     return;
   }
 
+  // Update client tracking metadata.
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   sslot->client_info.num_rx++;
+  sslot->client_info.progress_tsc = ev_loop_tsc;
+
+  // If we've transmitted all request pkts, there's nothing more to TX yet
+  if (req_pkts_pending(sslot)) kick_req_st(sslot);  // credits >= 1
 }
 
 FORCE_COMPILE_TRANSPORTS

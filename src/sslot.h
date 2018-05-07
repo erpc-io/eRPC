@@ -16,11 +16,7 @@ class Nexus;
 template <typename T>
 class Rpc;
 
-/**
- * @brief Session slot metadata maintained about an RPC
- *
- * This slot structure is used by both server and client sessions.
- */
+/// Session slot metadata maintained for an RPC by both client and server
 class SSlot {
   friend class Session;
   friend class Nexus;
@@ -61,23 +57,23 @@ class SSlot {
       erpc_cont_func_t cont_func;  ///< Continuation function for the request
       size_t tag;                  ///< Tag of the request
 
-      size_t num_tx;  ///< Number of packets sent
-      size_t num_rx;  ///< Number of packets received
+      /// Number of packets sent. Packets up to (num_tx - 1) have been sent.
+      size_t num_tx;
 
-      size_t enqueue_req_tsc;  ///< Approx epoch-based TSC of enqueue_request()
-      size_t cont_etid;        ///< eRPC thread ID to run the continuation on
+      /// Number of pkts received. Pkts up to (num_tx - 1) have been received.
+      size_t num_rx;
 
-      /// Transmission timestamps for request and RFRs. Cold if CC is disabled.
+      size_t progress_tsc;  ///< Last TSC at which this request made progress
+      size_t cont_etid;     ///< eRPC thread ID to run the continuation on
+
+      // Fields for congestion control, cold if CC is disabled.
+
+      /// Per-packet wheel index
+      std::array<uint16_t, kSessionCredits> wslot_idx;
+      size_t wheel_count;  ///< Number of packets in wheel slots or ready queue
+
+      /// Per-packet TX timestamp. Indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;
-
-      /// Return a string representation of the progress made by this sslot.
-      /// Progress fields that are zero are not included in the string.
-      std::string progress_str(size_t req_num) const {
-        std::ostringstream ret;
-        ret << "[req " << req_num << ",";
-        ret << "num_tx " << num_tx << ", num_rx " << num_rx << "]";
-        return ret.str();
-      }
     } client_info;
 
     struct {
@@ -96,7 +92,7 @@ class SSlot {
       uint8_t req_type;
       ReqFuncType req_func_type;  ///< The req handler type (e.g., background)
 
-      /// RX progress. Note that the server does not track TX progress.
+      /// Number of pkts received. Pkts up to (num_tx - 1) have been received.
       size_t num_rx;
 
       /// The server remembers the number of packets in the request after
@@ -104,6 +100,22 @@ class SSlot {
       size_t sav_num_req_pkts;
     } server_info;
   };
+
+  /// Return a string representation of the progress made by this sslot.
+  /// Progress fields that are zero are not included in the string.
+  std::string progress_str() const {
+    std::ostringstream ret;
+    if (is_client) {
+      ret << "[num_tx " << client_info.num_tx << ", num_rx "
+          << client_info.num_rx << "]";
+    } else {
+      ret << "[num_rx " << client_info.num_rx << "]";
+    }
+    return ret.str();
+  }
+
+ public:
+  size_t get_cur_req_num() const { return cur_req_num; }
 };
 
 class ReqHandle : public SSlot {

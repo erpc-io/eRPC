@@ -88,7 +88,8 @@ class Transport {
    *
    * @throw runtime_error if creation fails
    */
-  Transport(TransportType, uint8_t rpc_id, uint8_t phy_port, size_t numa_node);
+  Transport(TransportType, uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
+            FILE* trace_file);
 
   /**
    * @brief Initialize transport structures that require hugepages, and fill
@@ -115,13 +116,7 @@ class Transport {
    */
   void tx_burst(const tx_burst_item_t* tx_burst_arr, size_t num_pkts);
 
-  /**
-   * @brief Flush the transmit queue, returning ownership of all SEND WQE
-   * buffers back to eRPC.
-   *
-   * Before tx_flush() is called, there must be a signaled SEND in the SEND
-   * queue. This is OK because we flush only after sending a packet.
-   */
+  /// Complete pending TX DMAs, returning ownership of all TX buffers to eRPC
   void tx_flush();
 
   /**
@@ -171,6 +166,7 @@ class Transport {
 
   // Members initialized after the hugepage allocator is provided
   HugeAlloc* huge_alloc;  ///< The parent Rpc's hugepage allocator
+  FILE* trace_file;       ///< The parent Rpc's high-verbosity log file
 
   struct {
     size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called

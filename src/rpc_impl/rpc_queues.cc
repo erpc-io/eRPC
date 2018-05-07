@@ -7,18 +7,16 @@ void Rpc<TTr>::process_credit_stall_queue_st() {
   assert(in_dispatch());
   size_t write_index = 0;  // Re-add incomplete sslots at this index
 
-  for (SSlot *sslot : credit_stall_txq) {
-    // Try early exit
-    if (sslot->session->client_info.credits == 0) {
-      credit_stall_txq[write_index++] = sslot;
-      continue;
+  for (SSlot *sslot : stallq) {
+    if (sslot->session->client_info.credits > 0) {
+      // sslots in stall queue have packets to send
+      req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
+    } else {
+      stallq[write_index++] = sslot;
     }
-
-    bool all_pkts_tx = req_sslot_tx_credits_cc_st(sslot);
-    if (!all_pkts_tx) credit_stall_txq[write_index++] = sslot;
   }
 
-  credit_stall_txq.resize(write_index);  // Number of sslots left = write_index
+  stallq.resize(write_index);  // Number of sslots left = write_index
 }
 
 template <class TTr>
@@ -29,17 +27,27 @@ void Rpc<TTr>::process_wheel_st() {
 
   size_t num_ready = wheel->ready_queue.size();
   for (size_t i = 0; i < num_ready; i++) {
+    // kick_req/rfr() cannot be used here. This packet has already used a credit
+    // and gone through the wheel; the kick logic might repeat these.
     wheel_ent_t &ent = wheel->ready_queue.front();
-    assert(!ent.is_rfr);  // For now
+    auto *sslot = reinterpret_cast<SSlot *>(ent.sslot);
+    size_t pkt_num = ent.pkt_num;
+    size_t crd_i = pkt_num % kSessionCredits;
 
-    LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, actual TX %.3f us.\n",
-           rpc_id, ent.sslot->cur_req_num, ent.pkt_num,
+    LOG_CC("Rpc %u: lsn/req/pkt %u,%zu/%zu, reaped at %.3f us.\n", rpc_id,
+           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(cur_tsc - creation_tsc, freq_ghz));
 
-    enqueue_pkt_tx_burst_st(
-        ent.sslot, ent.pkt_num, /* Packet index */
-        &ent.sslot->client_info.tx_ts[ent.pkt_num % kSessionCredits]);
+    auto &ci = sslot->client_info;
+    if (pkt_num < sslot->tx_msgbuf->num_pkts) {
+      enqueue_pkt_tx_burst_st(sslot, pkt_num /* pkt_idx */, &ci.tx_ts[crd_i]);
+    } else {
+      MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
+      enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
+    }
 
+    sslot->client_info.wheel_count--;
+    sslot->client_info.wslot_idx[crd_i] = kWheelInvalidWslot;
     wheel->ready_queue.pop();
   }
 }

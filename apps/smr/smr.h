@@ -1,5 +1,5 @@
-#ifndef CONSENSUS_H
-#define CONSENSUS_H
+#ifndef SMR_H
+#define SMR_H
 
 extern "C" {
 #include <raft/raft.h>
@@ -150,7 +150,7 @@ class AppContext {
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;
 
-  // Consensus client members
+  // SMR client members
   struct {
     size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
@@ -206,7 +206,7 @@ void sm_handler(int session_num, erpc::SmEventType sm_event_type,
   }
 
   fprintf(stderr,
-          "consensus: Rpc %u: Session number %d (index %zu) %s. Error = %s. "
+          "smr: Rpc %u: Session number %d (index %zu) %s. Error = %s. "
           "Time elapsed = %.3f s.\n",
           c->rpc->get_rpc_id(), session_num, session_idx,
           erpc::sm_event_type_str(sm_event_type).c_str(),

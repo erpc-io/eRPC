@@ -48,17 +48,8 @@ class Rpc {
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (8 * MB(1));
 
-  /// Packet loss timeout for an RPC request in microseconds. The list of
-  /// requests is scanned at every "epoch", which is fraction of the RTO.
-  static constexpr size_t kRpcRTOUs = kTesting ? 5000 : 500000;
-
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 10 : 100;
-
-  /// Reset threshold of the event loop ticker. Assuming each iteration of the
-  /// event loop lasts 10 microseconds (it is much smaller in reality), the
-  /// time until reset is 10 ms.
-  static constexpr size_t kEvLoopTickerReset = 1000;
 
   //
   // Constructor/destructor (rpc.cc)
@@ -130,8 +121,6 @@ class Rpc {
 
   /// Free a MsgBuffer created by \p alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
-    assert(msg_buffer.is_valid_dynamic());
-
     lock_cond(&huge_alloc_lock);
     huge_alloc->free_buf(msg_buffer.buffer);
     unlock_cond(&huge_alloc_lock);
@@ -164,12 +153,10 @@ class Rpc {
    */
   inline void bury_resp_msgbuf_server_st(SSlot *sslot) {
     assert(in_dispatch());
-    assert(!sslot->is_client);
 
     // Free the response MsgBuffer iff it is not preallocated
-    if (!sslot->prealloc_used) {
+    if (unlikely(!sslot->prealloc_used)) {
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
-      assert(tx_msgbuf->is_valid_dynamic());
       free_msg_buffer(*tx_msgbuf);
       // Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf
     }
@@ -185,12 +172,8 @@ class Rpc {
    * conditinally bury only initialized MsgBuffers.
    */
   inline void bury_req_msgbuf_server_st(SSlot *sslot) {
-    assert(!sslot->is_client);
-
     MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
-    if (req_msgbuf.is_dynamic()) {
-      // This check is OK, as dynamic MsgBuffers must be initialized
-      assert(req_msgbuf.is_valid_dynamic());
+    if (unlikely(req_msgbuf.is_dynamic())) {
       free_msg_buffer(req_msgbuf);
       req_msgbuf.buffer.buf = nullptr;  // Mark invalid for future
     }
@@ -251,16 +234,22 @@ class Rpc {
     return &session->client_info.cc.timely;
   }
 
+  /// Return the cumulative retransmission counter
+  size_t get_num_re_tx_cumulative() { return pkt_loss_stats.num_re_tx; }
+
+  /// Reset the cumulative retransmission counter
+  void reset_num_re_tx_cumulative() { pkt_loss_stats.num_re_tx = 0; }
+
   /// Return the number of retransmissions for a connected session
-  size_t get_num_retransmissions(int session_num) {
+  size_t get_num_re_tx(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.cc.num_retransmissions;
+    return session->client_info.num_re_tx;
   }
 
   /// Reset the number of retransmissions for a connected session
-  void reset_num_retransmissions(int session_num) {
+  void reset_num_re_tx(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
-    session->client_info.cc.num_retransmissions = 0;
+    session->client_info.num_re_tx = 0;
   }
 
   /// Return the Timing Wheel for this Rpc. Expert use only.
@@ -344,19 +333,76 @@ class Rpc {
   // Datapath helpers
   //
 
-  /// Convert a response packet number to the MsgBuffer packet index
+  /// Convert a response packet number to its index in the response MsgBuffer
   static inline size_t resp_ntoi(size_t pkt_num, size_t num_req_pkts) {
     return pkt_num - (num_req_pkts - 1);
   }
 
-  /// Return true iff a packet received by a client is in order
-  static inline size_t in_order_client(const SSlot *sslot,
-                                       const pkthdr_t *pkthdr) {
-    // If request numbers match, num_rx & num_tx are valid for the request
-    return (pkthdr->req_num == sslot->cur_req_num) &&
-           (sslot->client_info.num_tx > sslot->client_info.num_rx) &&
-           (pkthdr->pkt_num == sslot->client_info.num_rx);
+  /// Return true iff a packet received by a client is in order. This must be
+  /// only a few instructions.
+  inline size_t in_order_client(const SSlot *sslot, const pkthdr_t *pkthdr) {
+    // Counters for pkthdr's request number are valid only if req numbers match
+    if (unlikely(pkthdr->req_num != sslot->cur_req_num)) return false;
+
+    const auto &ci = sslot->client_info;
+    if (unlikely(pkthdr->pkt_num != ci.num_rx)) return false;
+
+    // Ignore spurious packets received as a consequence of rollback:
+    // 1. We've only sent pkts up to (ci.num_tx - 1). Ignore later packets.
+    // 2. Ignore if the corresponding client pkt for pkthdr is still in wheel.
+    if (unlikely(pkthdr->pkt_num >= ci.num_tx)) return false;
+
+    const bool _in_wheel =
+        ci.wslot_idx[pkthdr->pkt_num % kSessionCredits] != kWheelInvalidWslot;
+    if (kCcPacing && unlikely(_in_wheel)) {
+      pkt_loss_stats.still_in_wheel++;
+      return false;
+    }
+
+    return true;
   }
+
+  /// Return the total number of packets sent on the wire by one RPC endpoint.
+  /// The client must have received the first response packet to call this.
+  static inline size_t wire_pkts(MsgBuffer *req_msgbuf,
+                                 MsgBuffer *resp_msgbuf) {
+    return req_msgbuf->num_pkts + resp_msgbuf->num_pkts - 1;
+  }
+
+  /// Return true iff this sslot needs to send more request packets
+  static inline bool req_pkts_pending(SSlot *sslot) {
+    return sslot->client_info.num_tx < sslot->tx_msgbuf->num_pkts;
+  }
+
+  /// Return true iff it's currently OK to bypass the wheel for this session
+  inline bool can_bypass_wheel(SSlot *sslot) const {
+    if (!kCcPacing) return true;
+    if (kTesting) return faults.hard_wheel_bypass;
+    if (kCcOptTimelyBypass) {
+      return sslot->client_info.wheel_count == 0 &&
+             sslot->session->is_uncongested();
+    }
+    return false;
+  }
+
+  /// Complete transmission for all packets in the Rpc's TX batch and the
+  /// transport's DMA queue
+  void drain_tx_batch_and_dma_queue() {
+    if (tx_batch_i > 0) do_tx_burst_st();
+    transport->tx_flush();
+  }
+
+  // rpc_kick.cc
+
+  /// Enqueue client packets for a sslot that has at least one credit and
+  /// request packets to send. Packets may be added to the timing wheel or the
+  /// TX burst; credits are used in both cases.
+  void kick_req_st(SSlot *);
+
+  /// Enqueue client packets for a sslot that has at least one credit and
+  /// RFR packets to send. Packets may be added to the timing wheel or the
+  /// TX burst; credits are used in both cases.
+  void kick_rfr_st(SSlot *);
 
   // rpc_req.cc
  public:
@@ -386,17 +432,6 @@ class Rpc {
                        size_t tag, size_t cont_etid = kInvalidBgETid);
 
  private:
-  /**
-   * @brief Enqueue request packets for a sslot, handling credits and
-   * congestion control. Packets may be added to the timing wheel or the TX
-   * burst; credits are used in both cases.
-   *
-   * @return True if there were sufficient credits to send all request packets
-   * in the sslot. Otherwise false is returned, and the caller should add the
-   * sslot to the credit stalled queue.
-   */
-  bool req_sslot_tx_credits_cc_st(SSlot *);
-
   /// Process a single-packet request message. Using (const pkthdr_t *) instead
   /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
   void process_small_req_st(SSlot *, pkthdr_t *);
@@ -442,13 +477,7 @@ class Rpc {
    * @brief Process a single-packet response
    * @param rx_tsc The timestamp at which this packet was received
    */
-  void process_small_resp_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
-
-  /**
-   * @brief Process a packet for a multi-packet response
-   * @param rx_tsc The timestamp at which this packet was received
-   */
-  void process_large_resp_one_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
+  void process_resp_one_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
   //
   // Event loop
@@ -461,14 +490,11 @@ class Rpc {
   }
 
   /// Run the event loop once
-  inline void run_event_loop_once() { run_event_loop_once_st(); }
+  inline void run_event_loop_once() { run_event_loop_do_one_st(); }
 
  private:
   /// Implementation of the run_event_loop(timeout) API function
   void run_event_loop_timeout_st(size_t timeout_ms);
-
-  /// Implementation of run_event_loop() API function
-  void run_event_loop_once_st();
 
   /// Actually run one iteration of the event loop
   void run_event_loop_do_one_st();
@@ -501,8 +527,11 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_idx));
     }
 
-    LOG_TRACE("eRPC Rpc %u: Enqueuing packet %s, drop = %u.\n", rpc_id,
-              tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(), item.drop);
+    LOG_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s\n", rpc_id,
+              sslot->session->local_session_num,
+              sslot->session->get_remote_hostname().c_str(),
+              tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(),
+              sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -513,7 +542,7 @@ class Rpc {
   inline void enqueue_hdr_tx_burst_st(SSlot *sslot, MsgBuffer *ctrl_msgbuf,
                                       size_t *tx_ts) {
     assert(in_dispatch());
-    assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_req_for_resp());
+    assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_rfr());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
@@ -526,11 +555,49 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
     }
 
-    LOG_TRACE("eRPC Rpc %u: Enqueuing packet %s, drop = %u.\n", rpc_id,
-              ctrl_msgbuf->get_pkthdr_str(0).c_str(), item.drop);
+    LOG_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s.\n", rpc_id,
+              sslot->session->local_session_num,
+              sslot->session->get_remote_hostname().c_str(),
+              ctrl_msgbuf->get_pkthdr_str(0).c_str(),
+              sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
+  }
+
+  /// Enqueue a request packet to the timing wheel
+  inline void enqueue_wheel_req_st(SSlot *sslot, size_t pkt_num) {
+    const size_t pkt_idx = pkt_num;
+    size_t pktsz = sslot->tx_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
+    size_t ref_tsc = dpath_rdtsc();
+    size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
+
+    LOG_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n", rpc_id,
+           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
+           to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
+
+    uint16_t wslot_idx =
+        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
+    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
+    sslot->client_info.wheel_count++;
+  }
+
+  /// Enqueue an RFR packet to the timing wheel
+  inline void enqueue_wheel_rfr_st(SSlot *sslot, size_t pkt_num) {
+    const size_t pkt_idx = resp_ntoi(pkt_num, sslot->tx_msgbuf->num_pkts);
+    const MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
+    size_t pktsz = resp_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
+    size_t ref_tsc = dpath_rdtsc();
+    size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
+
+    LOG_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n", rpc_id,
+           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
+           to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
+
+    uint16_t wslot_idx =
+        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
+    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
+    sslot->client_info.wheel_count++;
   }
 
   /// Transmit packets in the TX batch
@@ -689,6 +756,16 @@ class Rpc {
     return TTr::kNumRxRingEntries;
   }
 
+  /// Return the hostname of the remote endpoint for a connected session
+  std::string get_remote_hostname(int session_num) const {
+    return session_vec[static_cast<size_t>(session_num)]->get_remote_hostname();
+  }
+
+  /// Return the maximum number of sessions supported
+  static inline constexpr size_t get_max_num_sessions() {
+    return Transport::kNumRxRingEntries / kSessionCredits;
+  }
+
   /// Return the maximum message *data* size that can be sent
   static inline size_t get_max_msg_size() { return kMaxMsgSize; }
 
@@ -705,10 +782,9 @@ class Rpc {
   inline double get_freq_ghz() const { return freq_ghz; }
 
   /// Return the number of seconds elapsed since this Rpc was created
-  double sec_since_creation();
-
-  /// Return the number of microseconds elapsed since this Rpc was created
-  double usec_since_creation();
+  double sec_since_creation() {
+    return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
+  }
 
   //
   // Misc private functions
@@ -744,13 +820,6 @@ class Rpc {
    * @param Time at which the explicit CR or response packet was received
    */
   inline void update_timely_rate(SSlot *sslot, size_t pkt_num, size_t rx_tsc) {
-    assert(kCcRateComp);
-
-    if (!kCcOptBatchTsc) {
-      assert(rx_tsc == 0);  // Caller shouldn't have paid the overhead
-      rx_tsc = dpath_rdtsc();
-    }
-
     size_t rtt_tsc =
         rx_tsc - sslot->client_info.tx_ts[pkt_num % kSessionCredits];
 
@@ -783,7 +852,8 @@ class Rpc {
   // rpc_rfr.cc
 
   /**
-   * @brief Enqueue a request-for-response
+   * @brief Enqueue a request-for-response. This doesn't modify credits or
+   * sslot's num_tx.
    *
    * @param sslot The session slot to send the RFR for
    * @param req_pkthdr The packet header of the response packet that triggered
@@ -793,7 +863,7 @@ class Rpc {
   void enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
 
   /// Process a request-for-response
-  void process_req_for_resp_st(SSlot *, const pkthdr_t *);
+  void process_rfr_st(SSlot *, const pkthdr_t *);
 
  public:
   // Hooks for apps to modify eRPC behavior
@@ -801,15 +871,6 @@ class Rpc {
   /// Retry session connection if the remote RPC ID was invalid. This usually
   /// happens when the server RPC thread has not started.
   bool retry_connect_on_invalid_rpc_id = false;
-
-  /// Datapath stats that can be disabled
-  struct {
-    size_t ev_loop_calls = 0;
-    size_t pkts_tx = 0;
-    size_t tx_burst_calls = 0;
-    size_t pkts_rx = 0;
-    size_t rx_burst_calls = 0;
-  } dpath_stats;
 
  private:
   // Constructor args
@@ -822,11 +883,10 @@ class Rpc {
   const size_t creation_tsc;  ///< Timestamp of creation of this Rpc endpoint
 
   // Derived
-  const bool multi_threaded;  ///< True iff there are background threads
-  const double freq_ghz;      ///< RDTSC frequency, derived from Nexus
-
-  ///< RPC packet loss epoch in cycles. It's some fraction of RTO (e.g., 1/10).
-  const size_t rpc_pkt_loss_epoch_cycles;
+  const bool multi_threaded;    ///< True iff there are background threads
+  const double freq_ghz;        ///< RDTSC frequency, derived from Nexus
+  const size_t rpc_rto_cycles;  ///< RPC RTO in cycles
+  const size_t rpc_pkt_loss_scan_cycles;  ///< Packet loss scan frequency
 
   /// A copy of the request/response handlers from the Nexus. We could use
   /// a pointer instead, but an array is faster.
@@ -855,10 +915,10 @@ class Rpc {
   uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
   size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
 
-  std::vector<SSlot *> credit_stall_txq;  ///< Req sslots stalled for credits
+  std::vector<SSlot *> stallq;  ///< Req sslots stalled for credits
 
-  size_t ev_loop_ticker = 0;  ///< Counts event loop iterations until reset
-  size_t pkt_loss_epoch_tsc;  ///< Timestamp of the packet loss epoch
+  size_t ev_loop_tsc;        ///< TSC taken at each iteration of the ev loop
+  size_t pkt_loss_scan_tsc;  ///< Timestamp of the previous scan for lost pkts
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
@@ -869,6 +929,9 @@ class Rpc {
   FastRand fast_rand;  ///< A fast random generator
 
   // Cold members live below, in order of coolness
+
+  /// The timing-wheel rate limiter. Packets in the wheel have consumed credits,
+  /// but not bumped the num_tx counter.
   TimingWheel *wheel;
 
   /// Queues for datapath API requests from background threads
@@ -890,6 +953,7 @@ class Rpc {
   /// All the faults that can be injected into eRPC for testing
   struct {
     bool fail_resolve_rinfo = false;  ///< Fail routing info resolution
+    bool hard_wheel_bypass = false;   ///< Wheel bypass regardless of congestion
     double pkt_drop_prob = 0.0;       ///< Probability of dropping an RPC packet
 
     /// Derived: Drop packet iff urand[0, ..., one billion] is smaller than this
@@ -897,12 +961,28 @@ class Rpc {
   } faults;
 
   // Additional members for testing
-
-  /// Number of packet headers recorded
-  static constexpr size_t kTestingPkthdrQueueSz = 16;
   struct {
-    FixedQueue<pkthdr_t, kTestingPkthdrQueueSz> pkthdr_tx_queue;
+    FixedQueue<pkthdr_t, kSessionCredits> pkthdr_tx_queue;
   } testing;
+
+  /// File for dispatch thread trace output. This is used indirectly by
+  /// LOG_TRACE and other macros.
+  FILE *trace_file;
+
+  /// Datapath stats that can be disabled
+  struct {
+    size_t ev_loop_calls = 0;
+    size_t pkts_tx = 0;
+    size_t tx_burst_calls = 0;
+    size_t pkts_rx = 0;
+    size_t rx_burst_calls = 0;
+  } dpath_stats;
+
+ public:
+  struct {
+    size_t num_re_tx = 0;
+    size_t still_in_wheel = 0;
+  } pkt_loss_stats;
 };
 
 // This goes at the end of every Rpc implementation file to force compilation.

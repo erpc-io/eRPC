@@ -18,11 +18,6 @@ static_assert(is_power_of_two(kSessionCredits), "");
 static constexpr size_t kSessionReqWindow = 8;
 static_assert(is_power_of_two(kSessionReqWindow), "");
 
-/// Maximum number of sessions (both as client and server) that can be created
-/// by an Rpc through its lifetime. Increase this for more sessions.
-static constexpr size_t kMaxSessionsPerThread = 4096;
-static_assert(kMaxSessionsPerThread < UINT16_MAX, "");
-
 // Invalid metadata values for session endpoint initialization
 static constexpr uint16_t kInvalidSessionNum = UINT16_MAX;
 
@@ -48,7 +43,6 @@ enum class SmPktType : int {
 enum class SmErrType : int {
   kNoError,          ///< The only non-error error type
   kSrvDisconnected,  ///< The control-path connection to the server failed
-  kTooManySessions,  ///< Connect req failed because server is out of sessions
   kRingExhausted,    ///< Connect req failed because server is out of ring bufs
   kOutOfMemory,      ///< Connect req failed because server is out of memory
   kRoutingResolutionFailure,  ///< Server failed to resolve client routing info
@@ -143,7 +137,6 @@ static bool sm_err_type_is_valid(SmErrType err_type) {
   switch (err_type) {
     case SmErrType::kNoError:
     case SmErrType::kSrvDisconnected:
-    case SmErrType::kTooManySessions:
     case SmErrType::kRingExhausted:
     case SmErrType::kOutOfMemory:
     case SmErrType::kRoutingResolutionFailure:
@@ -162,8 +155,6 @@ static std::string sm_err_type_str(SmErrType err_type) {
       return "[No error]";
     case SmErrType::kSrvDisconnected:
       return "[Server disconnected]";
-    case SmErrType::kTooManySessions:
-      return "[Too many sessions]";
     case SmErrType::kRingExhausted:
       return "[Ring buffers exhausted]";
     case SmErrType::kOutOfMemory:

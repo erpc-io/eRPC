@@ -1,4 +1,4 @@
-#include "consensus.h"
+#include "smr.h"
 #include <util/autorun_helpers.h>
 #include "appendentries.h"
 #include "callbacks.h"
@@ -9,7 +9,7 @@
 void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
                           client_resp_t *client_resp) {
   if (kAppVerbose) {
-    printf("consensus: Sending reply to client: %s [%s].\n",
+    printf("smr: Sending reply to client: %s [%s].\n",
            client_resp->to_string().c_str(),
            erpc::get_formatted_time().c_str());
   }
@@ -47,7 +47,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
   if (unlikely(leader == nullptr)) {
     printf(
-        "consensus: Received request %s from client, but leader is unknown. "
+        "smr: Received request %s from client, but leader is unknown. "
         "Asking client to retry later.\n",
         client_req->to_string().c_str());
 
@@ -60,7 +60,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   int leader_node_id = raft_node_get_id(leader);
   if (unlikely(leader_node_id != c->server.node_id)) {
     printf(
-        "consensus: Received request %s from client, "
+        "smr: Received request %s from client, "
         "but leader is %s (not me). Redirecting client.\n",
         client_req->to_string().c_str(),
         node_id_to_name_map.at(leader_node_id).c_str());
@@ -74,7 +74,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   // We're the leader
   if (kAppVerbose) {
-    printf("consensus: Received request %s from client [%s].\n",
+    printf("smr: Received request %s from client [%s].\n",
            client_req->to_string().c_str(), erpc::get_formatted_time().c_str());
   }
 
@@ -116,7 +116,7 @@ void init_raft(AppContext *c) {
 
   std::string machine_name = get_hostname_for_machine(FLAGS_process_id);
   c->server.node_id = get_raft_node_id_from_hostname(machine_name);
-  printf("consensus: Created Raft node with ID = %d.\n", c->server.node_id);
+  printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     std::string node_i_hostname = get_hostname_for_machine(i);
@@ -156,8 +156,7 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     if (i == FLAGS_process_id) continue;
     std::string hostname = erpc::get_hostname_for_process(i);
-    printf("consensus: Creating session to %s, index = %zu.\n",
-           hostname.c_str(), i);
+    printf("smr: Creating session to %s, index = %zu.\n", hostname.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
     c->conn_vec[i].session_num = c->rpc->create_session(hostname, 0);
@@ -177,7 +176,7 @@ void init_mica(AppContext *c) {
   assert(c->server.raft != nullptr);  // Only called at servers
   assert(c->rpc != nullptr);          // We need the Rpc's allocator
 
-  auto config = mica::util::Config::load_file("apps/consensus/kv_store.json");
+  auto config = mica::util::Config::load_file("apps/smr/kv_store.json");
   c->server.table = new FixedTable(config.get("table"), kAppValueSize,
                                    c->rpc->get_huge_alloc());
 }
@@ -221,7 +220,7 @@ int main(int argc, char **argv) {
     if (erpc::rdtsc() - loop_tsc > 3000000000ull) {
       erpc::Latency &commit_latency = c.server.commit_latency;
       printf(
-          "consensus: Leader commit latency (us) = "
+          "smr: Leader commit latency (us) = "
           "{%.2f median, %.2f 99%%}. Log size = %zu.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
@@ -269,7 +268,7 @@ int main(int argc, char **argv) {
   }
 
   // This is OK even when kAppCollectTimeEntries = false
-  printf("consensus: Printing first 1000 of %zu time entries.\n",
+  printf("smr: Printing first 1000 of %zu time entries.\n",
          c.server.time_entry_vec.size());
   size_t num_print = std::min(c.server.time_entry_vec.size(), 1000ul);
 
@@ -282,7 +281,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  printf("consensus: Final log size (including uncommitted entries) = %zu.\n",
+  printf("smr: Final log size (including uncommitted entries) = %zu.\n",
          c.server.raft_log.size());
   delete c.rpc;
 }

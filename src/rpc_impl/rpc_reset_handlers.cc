@@ -9,12 +9,10 @@ namespace erpc {
 template <class TTr>
 bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
   assert(in_dispatch());
-  LOG_INFO("eRPC Rpc %u: Handling reset event for remote hostname = %s.\n",
-           rpc_id, reset_rem_hostname.c_str());
+  LOG_INFO("Rpc %u: Handling reset event for remote hostname = %s.\n", rpc_id,
+           reset_rem_hostname.c_str());
 
-  // Drain the TX batch and flush the transport
-  if (tx_batch_i > 0) do_tx_burst_st();
-  transport->tx_flush();
+  drain_tx_batch_and_dma_queue();
 
   bool success_all = true;
 
@@ -46,18 +44,17 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: Trying to reset client session %u, state = %s. Issue",
+          "Rpc %u, lsn %u: Trying to reset client session. State = %s. Issue",
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
   // The session can be in any state (except the temporary disconnected state).
   // In the connected state, the session may have outstanding requests.
   if (session->is_connected()) {
-    // Erase session slots from credit stall TX queue
+    // Erase session slots from credit stall queue
     for (const SSlot &sslot : session->sslot_arr) {
-      credit_stall_txq.erase(
-          std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), &sslot),
-          credit_stall_txq.end());
+      stallq.erase(std::remove(stallq.begin(), stallq.end(), &sslot),
+                   stallq.end());
     }
 
     // Invoke continuation-with-failure for sslots without complete response
@@ -67,9 +64,6 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
 
         // sslot contains a valid request
         MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
-        assert(resp_msgbuf->is_valid_dynamic());
-        assert(sslot.client_info.cont_func != nullptr);
-
         resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
         sslot.client_info.cont_func(static_cast<RespHandle *>(&sslot), context,
                                     sslot.client_info.tag);
@@ -99,7 +93,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
     return true;
   } else {
     LOG_WARN(
-        "eRPC Rpc %u: Cannot reset session %u. %zu continuations pending.\n",
+        "Rpc %u, lsn %u: Cannot reset client session. %zu conts pending.\n",
         rpc_id, session->local_session_num, pending_conts);
     return false;
   }
@@ -113,7 +107,7 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
-          "eRPC Rpc %u: Trying to reset server session %u, state = %s. Issue",
+          "Rpc %u, lsn %u: Trying to reset server session. State = %s. Issue",
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
@@ -130,7 +124,8 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
     return true;
   } else {
     LOG_WARN(
-        "eRPC Rpc %u: Cannot reset session %u. %zu enqueue_response pending.\n",
+        "Rpc %u, lsn %u: Cannot reset server session. "
+        "%zu enqueue_response pending.\n",
         rpc_id, session->local_session_num, pending_enqueue_resps);
 
     return false;

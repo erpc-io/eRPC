@@ -19,14 +19,19 @@ void Rpc<TTr>::pkt_loss_scan_st() {
       case SessionState::kConnected: {
         // Datapath packet loss detection
         for (SSlot &sslot : session->sslot_arr) {
-          if (sslot.tx_msgbuf == nullptr) continue;     // Response received
-          if (sslot.client_info.num_tx == 0) continue;  // No packet sent
+          if (sslot.tx_msgbuf == nullptr) continue;  // Response received
+
+          // This can happen if:
+          // (a) We're stalled on credits: stall queue will make progress.
+          // (c) We have received the full response and a background thread
+          //     currently owns sslot. In this case, the bg thread cannot modify
+          //     num_rx or num_tx.
+          if (sslot.client_info.num_tx == sslot.client_info.num_rx) continue;
 
           assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
 
-          size_t cycles_elapsed = rdtsc() - sslot.client_info.enqueue_req_tsc;
-          size_t us_elapsed = to_usec(cycles_elapsed, nexus->freq_ghz);
-          if (us_elapsed >= kRpcRTOUs) pkt_loss_retransmit_st(&sslot);
+          size_t cycles_elapsed = ev_loop_tsc - sslot.client_info.progress_tsc;
+          if (cycles_elapsed > rpc_rto_cycles) pkt_loss_retransmit_st(&sslot);
         }
 
         break;
@@ -52,53 +57,45 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
 
   auto &ci = sslot->client_info;
   auto &credits = sslot->session->client_info.credits;
+  MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
 
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
-          "eRPC Rpc %u: Packet loss suspected for session %u, req %zu. "
-          "num_tx %zu, num_rx %zu. Action",
+          "Rpc %u, lsn %u (%s): Pkt loss suspected for req %zu (%s). Action",
           rpc_id, sslot->session->local_session_num,
-          sslot->tx_msgbuf->get_req_num(), ci.num_tx, ci.num_rx);
+          sslot->session->get_remote_hostname().c_str(),
+          req_msgbuf->get_req_num(), sslot->progress_str().c_str());
 
   const size_t delta = ci.num_tx - ci.num_rx;
   assert(credits + delta <= kSessionCredits);
 
-  if (delta == 0) {
-    // This can happen if we're stalled on credits. Or, we have received the
-    // full response and a background thread currently owns sslot. In the latter
-    // case, the background thread cannot modify num_rx or num_tx.
+  if (unlikely(delta == 0)) {
     LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
+    return;
+  }
+
+  // We have num_tx > num_rx, so stallq cannot contain sslot
+  assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
+
+  // Deleting from the rate limiter is too complex
+  if (unlikely(sslot->client_info.wheel_count > 0)) {
+    pkt_loss_stats.still_in_wheel++;
+    LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
+    return;
   }
 
   // If we're here, we will roll back and retransmit
-  sslot->session->client_info.cc.num_retransmissions++;
+  pkt_loss_stats.num_re_tx++;
+  sslot->session->client_info.num_re_tx++;
+
+  LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
+              ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
   credits += delta;
   ci.num_tx = ci.num_rx;
+  ci.progress_tsc = ev_loop_tsc;
 
-  if (ci.num_rx < sslot->tx_msgbuf->num_pkts) {
-    // We haven't received the first response packet
-    LOG_REORDER("%s: Retransmitting request.\n", issue_msg);
-
-    // sslot may be in dispatch queues, but not in background queues since
-    // we don't have the full response.
-    credit_stall_txq.erase(
-        std::remove(credit_stall_txq.begin(), credit_stall_txq.end(), sslot),
-        credit_stall_txq.end());
-
-    sslot->client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
-    bool all_pkts_tx = req_sslot_tx_credits_cc_st(sslot);
-    if (!all_pkts_tx) credit_stall_txq.push_back(sslot);
-  } else {
-    // We have received the first response packet, but we don't have the full
-    // response (which must be multi-packet => dynamic). So, a continuation in
-    // the background thread can't invalidate resp_msgbuf.
-    MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
-    assert(resp_msgbuf->is_dynamic_and_matches(sslot->tx_msgbuf));
-
-    LOG_REORDER("%s: Retransmitting RFR.\n", issue_msg);
-    sslot->client_info.enqueue_req_tsc = pkt_loss_epoch_tsc;
-    enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
-  }
+  req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
+  drain_tx_batch_and_dma_queue();
 }
 
 FORCE_COMPILE_TRANSPORTS

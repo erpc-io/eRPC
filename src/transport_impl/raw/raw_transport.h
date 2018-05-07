@@ -18,9 +18,13 @@ class RawTransport : public Transport {
  public:
   // Tweakme
 
-  /// Enable the dumbpipe optimizations (multi-packet RECVs, overrunning CQ)
-  static constexpr bool kDumb = false;
-  static constexpr bool kFastRecv = false;  ///< Enable fast RECV posting
+  /// Enable the dumbpipe optimizations (multi-packet RECVs, overrunning CQ).
+  /// This must work with the original unmodded drivers.
+  static constexpr bool kDumb = true;
+
+  /// Enable fast RECV posting (FaSST, OSDI 16). This requires the modded
+  /// driver. This is irrelevant if dumbpipe optimizations are enabled.
+  static constexpr bool kFastRecv = false;
 
   /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and numa node.
   static constexpr uint16_t kBaseRawUDPPort = 10000;
@@ -120,7 +124,8 @@ class RawTransport : public Transport {
     return ((cur_idx + kCQESnapshotCycle) - prev_idx) % kCQESnapshotCycle;
   }
 
-  RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node);
+  RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
+               FILE *trace_file);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
   ~RawTransport();
@@ -139,7 +144,7 @@ class RawTransport : public Transport {
     return std::string(ret.str());
   }
 
-  // ib_transport_datapath.cc
+  // raw_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
   void tx_flush();
   size_t rx_burst();

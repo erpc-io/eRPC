@@ -2,8 +2,6 @@
 
 namespace erpc {
 
-void req_handler(ReqHandle *, void *) {}  // Required by RpcTest
-
 class RpcSmTest : public RpcTest {
  public:
   RpcSmTest() {
@@ -80,12 +78,11 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
   common_check(0, SmPktType::kConnectResp, SmErrType::kRingExhausted);
   rpc->ring_entries_available = initial_ring_entries_available;  // Restore
 
-  // Too many sessions
-  rpc->session_vec.resize(kMaxSessionsPerThread, nullptr);
+  // Ring entries exhausted
+  rpc->ring_entries_available = 0;
   rpc->handle_connect_req_st(conn_req);
-  common_check(kMaxSessionsPerThread, SmPktType::kConnectResp,
-               SmErrType::kTooManySessions);
-  rpc->session_vec.clear();  // Restore
+  common_check(0, SmPktType::kConnectResp, SmErrType::kRingExhausted);
+  rpc->ring_entries_available = initial_ring_entries_available;
 
   // Client routing info resolution fails
   rpc->fault_inject_fail_resolve_rinfo_st();
@@ -170,7 +167,7 @@ TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
 TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
   const auto client = get_local_endpoint();
   const auto server = get_remote_endpoint();
-  const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kTooManySessions,
+  const SmPkt conn_resp(SmPktType::kConnectResp, SmErrType::kRingExhausted,
                         kTestUniqToken, client, server);
 
   // Make session 0 a client session in kConnectInProgress

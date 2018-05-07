@@ -92,9 +92,10 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 }
 
 void RawTransport::tx_flush() {
+  if (unlikely(nb_tx == 0)) return;  // There's nothing in the DMA queue
+
   // If we are here, we have sent a packet. The selective signaling logic
   // guarantees that there is *exactly one* *signaled* SEND work request.
-  assert(nb_tx > 0);
   poll_cq_one_helper(send_cq);  // Poll the one existing signaled WQE
 
   size_t pkt_size = kInetHdrsTotSize + 8;

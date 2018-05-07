@@ -43,7 +43,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   ci.resp_msgbuf = resp_msgbuf;
   ci.cont_func = cont_func;
   ci.tag = tag;
-  ci.enqueue_req_tsc = pkt_loss_epoch_tsc;
+  ci.progress_tsc = ev_loop_tsc;
 
   ci.num_rx = 0;
   ci.num_tx = 0;
@@ -67,67 +67,11 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     }
   }
 
-  bool all_pkts_tx = req_sslot_tx_credits_cc_st(&sslot);
-  if (!all_pkts_tx) credit_stall_txq.push_back(&sslot);
-  return;
-}
-
-template <class TTr>
-bool Rpc<TTr>::req_sslot_tx_credits_cc_st(SSlot *sslot) {
-  MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
-  assert(sslot->client_info.num_tx < req_msgbuf->num_pkts);
-
-  Session *session = sslot->session;
-  size_t &credits = session->client_info.credits;
-  auto &ci = sslot->client_info;
-  if (credits == 0) return false;
-
-  if (likely(req_msgbuf->num_pkts == 1)) {
-    // Small request. Bypass wheel if pacing is disabled or bypass is possible.
-    const size_t pkt_idx = 0, pkt_num = 0;
-    if (!kCcPacing ||
-        (kCcOptWheelBypass &&
-         session->client_info.cc.timely.rate == Timely::kMaxRate)) {
-      enqueue_pkt_tx_burst_st(sslot, pkt_idx, &ci.tx_ts[pkt_num]);
-    } else {
-      size_t pkt_size = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
-      size_t ref_tsc = dpath_rdtsc();
-      size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(ref_tsc, pkt_size);
-      wheel->insert(wheel_ent_t(sslot, static_cast<size_t>(pkt_num)), ref_tsc,
-                    abs_tx_tsc);
-    }
-
-    credits--;
-    ci.num_tx++;
-    return true;
+  if (likely(session->client_info.credits > 0)) {
+    kick_req_st(&sslot);
   } else {
-    // Large request
-    size_t sending = std::min(credits, req_msgbuf->num_pkts - ci.num_tx);
-
-    for (size_t _x = 0; _x < sending; _x++) {
-      const size_t pkt_idx = ci.num_tx, pkt_num = ci.num_tx;
-      if (kCcPacing) {
-        size_t psz = req_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
-        size_t ref_tsc = dpath_rdtsc();
-        size_t abs_tx_tsc = session->cc_getupdate_tx_tsc(ref_tsc, psz);
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, abs_tx_tsc);
-
-        LOG_CC("eRPC Rpc %u: Req num %zu, pkt num %zu, abs TX %.3f us.\n",
-               rpc_id, sslot->cur_req_num, pkt_num,
-               to_usec(abs_tx_tsc - creation_tsc, freq_ghz));
-      } else {
-        enqueue_pkt_tx_burst_st(sslot, pkt_idx,
-                                &ci.tx_ts[pkt_num % kSessionCredits]);
-      }
-
-      credits--;
-      ci.num_tx++;
-    }
-
-    if (ci.num_tx == req_msgbuf->num_pkts) return true;
+    stallq.push_back(&sslot);
   }
-
-  return false;
 }
 
 template <class TTr>
@@ -138,9 +82,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   if (unlikely(pkthdr->req_num <= sslot->cur_req_num)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "eRPC Rpc %u: Received out-of-order request for session %u. "
+            "Rpc %u, lsn %u (%s): Received out-of-order request for session. "
             "Req num: %zu (pkt), %zu (sslot). Action",
-            rpc_id, sslot->session->local_session_num, pkthdr->req_num,
+            rpc_id, sslot->session->local_session_num,
+            sslot->session->get_remote_hostname().c_str(), pkthdr->req_num,
             sslot->cur_req_num);
 
     if (pkthdr->req_num < sslot->cur_req_num) {
@@ -150,13 +95,10 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
     } else {
       // This is a retransmission for the currently active request
       if (sslot->tx_msgbuf != nullptr) {
-        // The response is available, so resend it
+        // The response is available, so resend this req's corresponding packet
         LOG_REORDER("%s: Re-sending response.\n", issue_msg);
         enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Packet index = 0
-
-        // Release all transport-owned buffers before re-entering event loop
-        if (tx_batch_i > 0) do_tx_burst_st();
-        transport->tx_flush();
+        drain_tx_batch_and_dma_queue();
         return;
       } else {
         LOG_REORDER("%s: Response not available yet. Dropping.\n", issue_msg);
@@ -223,7 +165,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   if (unlikely(!in_order)) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
-            "eRPC Rpc %u: Received out-of-order request for session %u. "
+            "Rpc %u, lsn %u: Received out-of-order request. "
             "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Action",
             rpc_id, sslot->session->local_session_num, pkthdr->req_num,
             pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.num_rx);
@@ -241,7 +183,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     // queued the response, so directly compute number of packets in request.
     if (pkthdr->pkt_num != data_size_to_num_pkts(pkthdr->msg_size) - 1) {
       LOG_REORDER("%s: Re-sending credit return.\n", issue_msg);
-      enqueue_cr_st(sslot, pkthdr);  // tx_flush uneeded. XXX: why?
+      enqueue_cr_st(sslot, pkthdr);  // Header only, so tx_flush uneeded
       return;
     }
 
@@ -250,8 +192,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
       // The response is available, so resend it
       LOG_REORDER("%s: Re-sending response.\n", issue_msg);
       enqueue_pkt_tx_burst_st(sslot, 0, nullptr);  // Packet index = 0
-      if (tx_batch_i > 0) do_tx_burst_st();
-      transport->tx_flush();
+      drain_tx_batch_and_dma_queue();
     } else {
       // The response is not available yet, client will have to timeout again
       LOG_REORDER("%s: Dropping because response not available yet.\n",

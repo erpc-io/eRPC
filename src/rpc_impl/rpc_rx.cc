@@ -12,8 +12,8 @@ void Rpc<TTr>::process_comps_st() {
   dpath_stat_inc(dpath_stats.rx_burst_calls, 1);
   dpath_stat_inc(dpath_stats.pkts_rx, num_pkts);
 
-  size_t batch_rx_tsc = 0;
-  if (kCcOptBatchTsc) batch_rx_tsc = dpath_rdtsc();
+  // ev_loop_tsc was taken just before calling the packet RX code
+  const size_t &batch_rx_tsc = ev_loop_tsc;
 
   for (size_t i = 0; i < num_pkts; i++) {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
@@ -22,52 +22,48 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
-    uint16_t session_num = pkthdr->dest_session_num;  // The local session
-    assert(session_num < session_vec.size());
-
-    Session *session = session_vec[session_num];
+    Session *session = session_vec[pkthdr->dest_session_num];
     if (unlikely(session == nullptr)) {
-      LOG_WARN(
-          "eRPC Rpc %u: Warning: Received packet %s for buried session. "
-          "Dropping packet.\n",
-          rpc_id, pkthdr->to_string().c_str());
+      LOG_WARN("Rpc %u: Received %s for buried session. Dropping.\n", rpc_id,
+               pkthdr->to_string().c_str());
       continue;
     }
 
     if (unlikely(!session->is_connected())) {
       LOG_WARN(
-          "eRPC Rpc %u: Warning: Received packet %s for unconnected "
-          "session (state is %s). Dropping packet.\n",
+          "Rpc %u: Received %s for unconnected session (state %s). Dropping.\n",
           rpc_id, pkthdr->to_string().c_str(),
           session_state_str(session->state).c_str());
       continue;
     }
 
     // If we are here, we have a valid packet for a connected session
-    LOG_TRACE("eRPC Rpc %u: Received packet %s.\n", rpc_id,
-              pkthdr->to_string().c_str());
+    LOG_TRACE(
+        "Rpc %u, lsn %u (%s): RX %s.\n", rpc_id, session->local_session_num,
+        session->get_remote_hostname().c_str(), pkthdr->to_string().c_str());
 
     size_t sslot_i = pkthdr->req_num % kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr[sslot_i];
 
-    // Process control packets
-    if (pkthdr->msg_size == 0) {
-      assert(pkthdr->is_expl_cr() || pkthdr->is_req_for_resp());
-      pkthdr->is_expl_cr() ? process_expl_cr_st(sslot, pkthdr, batch_rx_tsc)
-                           : process_req_for_resp_st(sslot, pkthdr);
-      continue;
-    }
-
-    // If we're here, this is a data packet
-    assert(pkthdr->is_req() || pkthdr->is_resp());
-
-    if (pkthdr->msg_size <= TTr::kMaxDataPerPkt) {
-      assert(pkthdr->pkt_num == 0);
-      pkthdr->is_req() ? process_small_req_st(sslot, pkthdr)
-                       : process_small_resp_st(sslot, pkthdr, batch_rx_tsc);
-    } else {
-      pkthdr->is_req() ? process_large_req_one_st(sslot, pkthdr)
-                       : process_large_resp_one_st(sslot, pkthdr, batch_rx_tsc);
+    switch (pkthdr->pkt_type) {
+      case PktType::kPktTypeReq:
+        pkthdr->msg_size <= TTr::kMaxDataPerPkt
+            ? process_small_req_st(sslot, pkthdr)
+            : process_large_req_one_st(sslot, pkthdr);
+        break;
+      case PktType::kPktTypeResp: {
+        size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
+        process_resp_one_st(sslot, pkthdr, rx_tsc);
+        break;
+      }
+      case PktType::kPktTypeRFR:
+        process_rfr_st(sslot, pkthdr);
+        break;
+      case PktType::kPktTypeExplCR: {
+        size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
+        process_expl_cr_st(sslot, pkthdr, rx_tsc);
+        break;
+      }
     }
   }
 

@@ -50,6 +50,8 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 /// request buffer is identical to the response buffer, and increments the
 /// number of responses in the context.
 void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
+  _unused(tag);
+
   const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   test_printf("Client: Received response of length %zu.\n",
               resp_msgbuf->get_data_size());

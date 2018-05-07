@@ -1,6 +1,6 @@
 /**
  * @file common.h
- * @brief Header file with conveinence defines that is included everywhere
+ * @brief Common header file with convenience definitions
  */
 #ifndef ERPC_COMMON_H
 #define ERPC_COMMON_H
@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <boost/algorithm/string.hpp>
 #include <cerrno>
 #include <limits>
 #include <mutex>
@@ -28,6 +29,12 @@ namespace erpc {
 #define KB(x) (static_cast<size_t>(x) << 10)
 #define MB(x) (static_cast<size_t>(x) << 20)
 #define GB(x) (static_cast<size_t>(x) << 30)
+
+#ifndef TESTING
+static constexpr bool kTesting = false;
+#else
+static constexpr bool kTesting = TESTING;
+#endif
 
 // General constants
 
@@ -57,14 +64,11 @@ static constexpr size_t kInvalidBgETid = kMaxBgThreads;
 
 // Simple methods
 
-/// Emulab hostnames are long, so trim it to just the node name.
+/// Trim a hostname to the part before the first dot
 static std::string trim_hostname(std::string hostname) {
-  if (hostname.find("emulab.net") != std::string::npos) {
-    std::string trimmed_hostname = hostname.substr(0, hostname.find("."));
-    return trimmed_hostname;
-  } else {
-    return hostname;
-  }
+  std::vector<std::string> split;
+  boost::split(split, hostname, boost::is_any_of("."));
+  return split.at(0);
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
@@ -91,7 +95,6 @@ static inline void exit_assert(bool condition, std::string error_msg) {
 static inline void dpath_stat_inc(size_t &stat, size_t val) {
   if (kDatapathStats) stat += val;
 }
-
 }  // End erpc
 
 #endif

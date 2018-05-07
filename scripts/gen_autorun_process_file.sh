@@ -3,7 +3,7 @@
 
 if [ "$#" -ne 1 ]; then
   echo "Illegal number of parameters"
-	echo "Usage: ./gen_autorun_process_file.sh.sh <number of processes to generate>"
+	echo "Usage: ./gen_autorun_process_file.sh <number of processes to generate>"
 	exit
 fi
 

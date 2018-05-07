@@ -8,6 +8,7 @@
 #include <gflags/gflags.h>
 #include <boost/algorithm/string.hpp>
 #include <fstream>
+#include <set>
 #include "rpc.h"
 #include "util/latency.h"
 
@@ -123,34 +124,37 @@ class BasicAppContext {
 
   std::vector<int> session_num_vec;
 
-  size_t thread_id;         // The ID of the thread that owns this context
-  size_t num_sm_resps = 0;  // Number of SM responses
+  size_t thread_id;           // The ID of the thread that owns this context
+  size_t num_sm_resps = 0;    // Number of SM responses
+  bool ping_pending = false;  // Only one ping is allowed at a time
 
   ~BasicAppContext() {
     if (tmp_stat != nullptr) delete tmp_stat;
   }
 };
 
-// A reasonable SM handler
+// A basic session management handler that expects successful responses
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
                       erpc::SmErrType sm_err_type, void *_context) {
-  assert(_context != nullptr);
-
   auto *c = static_cast<BasicAppContext *>(_context);
   c->num_sm_resps++;
+
+  erpc::rt_assert(sm_err_type == erpc::SmErrType::kNoError,
+                  "SM response with error");
 
   if (!(sm_event_type == erpc::SmEventType::kConnected ||
         sm_event_type == erpc::SmEventType::kDisconnected)) {
     throw std::runtime_error("Received unexpected SM event.");
   }
 
-  // The callback gives us the eRPC session number - get the index
+  // The callback gives us the eRPC session number - get the index in vector
   size_t session_idx = c->session_num_vec.size();
   for (size_t i = 0; i < c->session_num_vec.size(); i++) {
     if (c->session_num_vec[i] == session_num) session_idx = i;
   }
+
   erpc::rt_assert(session_idx < c->session_num_vec.size(),
-                  "Invalid session number");
+                  "SM callback for invalid session number.");
 
   if (FLAGS_sm_verbose == 1) {
     fprintf(stderr,
@@ -160,6 +164,64 @@ void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
             erpc::sm_event_type_str(sm_event_type).c_str(),
             erpc::sm_err_type_str(sm_err_type).c_str(),
             c->rpc->sec_since_creation());
+  }
+}
+
+// Utility pings
+static constexpr size_t kPingMsgSize = 32;
+static constexpr uint8_t kPingReqHandlerType = 201;
+static constexpr uint8_t kPingEvLoopMs = 1;
+static constexpr uint8_t kPingTimeoutMs = 50;
+
+// Apps must register this request handler with type = kPingReqHandlerType to
+// support pings
+void ping_req_handler(erpc::ReqHandle *req_handle, void *_context) {
+  auto *c = static_cast<BasicAppContext *>(_context);
+
+  req_handle->prealloc_used = true;
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+  c->rpc->resize_msg_buffer(&resp_msgbuf, kPingMsgSize);
+
+  c->rpc->enqueue_response(req_handle);
+}
+
+void ping_cont_func(erpc::RespHandle *, void *_context, size_t) {
+  auto *c = static_cast<BasicAppContext *>(_context);
+  c->ping_pending = false;  // Mark ping as completed
+}
+
+// Ping all sessions after connecting them
+void ping_all_blocking(BasicAppContext &c) {
+  std::set<std::string> hostname_set;
+  erpc::MsgBuffer ping_req, ping_resp;
+
+  ping_req = c.rpc->alloc_msg_buffer(kPingMsgSize);
+  assert(ping_req.buf != nullptr);
+  ping_resp = c.rpc->alloc_msg_buffer(kPingMsgSize);
+  assert(ping_resp.buf != nullptr);
+
+  for (int &session_num : c.session_num_vec) {
+    auto srv_hostname = c.rpc->get_remote_hostname(session_num);
+    if (hostname_set.count(srv_hostname) > 0) continue;
+    hostname_set.insert(srv_hostname);
+
+    printf("Process %zu, thread %zu: Pinging server %s.\n", FLAGS_process_id,
+           c.thread_id, srv_hostname.c_str());
+
+    c.ping_pending = true;
+    c.rpc->enqueue_request(session_num, kPingReqHandlerType, &ping_req,
+                           &ping_resp, ping_cont_func, 0);
+
+    size_t ms_elapsed = 0;
+    while (c.ping_pending) {
+      c.rpc->run_event_loop(kPingEvLoopMs);
+      ms_elapsed += kPingEvLoopMs;
+      if (ms_elapsed > kPingTimeoutMs) {
+        printf("Process %zu, thread %zu: Fabric to server broken %s.\n",
+               FLAGS_process_id, c.thread_id, srv_hostname.c_str());
+        break;
+      }
+    }
   }
 }
 

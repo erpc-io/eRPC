@@ -9,8 +9,8 @@
 #define CALLBACKS_H
 
 #include "appendentries.h"
-#include "consensus.h"
 #include "requestvote.h"
+#include "smr.h"
 
 // Raft callback for applying an entry to the FSM
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
@@ -29,10 +29,9 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
   assert(c->check_magic());
 
   if (kAppVerbose) {
-    printf(
-        "consensus: Applying log entry %s received at Raft server %u [%s].\n",
-        client_req->to_string().c_str(), ety->id,
-        erpc::get_formatted_time().c_str());
+    printf("smr: Applying log entry %s received at Raft server %u [%s].\n",
+           client_req->to_string().c_str(), ety->id,
+           erpc::get_formatted_time().c_str());
   }
 
   size_t key_hash = mica::util::hash(&client_req->key, kAppKeySize);
@@ -95,7 +94,7 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
 // Raft callback for removing the first entry from the log. This is provided to
 // support log compaction in the future.
 static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *, int) {
-  printf("consensus: Ignoring __raft_logentry_poll callback.\n");
+  printf("smr: Ignoring __raft_logentry_poll callback.\n");
   return 0;
 }
 
@@ -103,7 +102,7 @@ static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *, int) {
 // cfg log entry.
 static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
                                            raft_node_t *) {
-  printf("consensus: Ignoring __raft_node_has_sufficient_logs callback.\n");
+  printf("smr: Ignoring __raft_node_has_sufficient_logs callback.\n");
   return 0;
 }
 

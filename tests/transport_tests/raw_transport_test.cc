@@ -1,11 +1,18 @@
-// Ideally these tests would use a loopback, but loopback doesn't work for some
-// reason.
+/**
+ * @file raw_transport_test.cc
+ * @brief Tests for Mellanox Raw transport implementation
+ *
+ * Ideally these tests would use only one RawTransport instance and loopback,
+ * but I couldn't get loopback to work. Two RawTransport instances are used as
+ * a workaround.
+ */
 
 #include <gtest/gtest.h>
 
-#define private public  // XXX: Do we need this
+#define private public
 #include "transport_impl/raw/raw_transport.h"
 #include "util/huge_alloc.h"
+#include "util/timer.h"
 
 namespace erpc {
 static constexpr size_t kTestPhyPort = 0;
@@ -29,14 +36,13 @@ class RawTransportTest : public ::testing::Test {
       return;
     }
 
-    if (RawTransport::kDumb) {
-      fprintf(stderr, "Dumbpipe mode not tested yet.\n");
-      return;
-    }
+    std::string trace_filename = "/tmp/test_trace";
+    trace_file = fopen(trace_filename.c_str(), "w");
+    assert(trace_file != nullptr);
 
     // Initalize client transport
-    clt_ttr.transport =
-        new RawTransport(kTestRpcIdClient, kTestPhyPort, kTestNumaNode);
+    clt_ttr.transport = new RawTransport(kTestRpcIdClient, kTestPhyPort,
+                                         kTestNumaNode, trace_file);
     clt_ttr.huge_alloc =
         new HugeAlloc(MB(32), kTestNumaNode, clt_ttr.transport->reg_mr_func,
                       clt_ttr.transport->dereg_mr_func);
@@ -44,17 +50,17 @@ class RawTransportTest : public ::testing::Test {
                                                 clt_ttr.rx_ring);
 
     // Initialize server transport
-    srv_ttr.transport =
-        new RawTransport(kTestRpcIdServer, kTestPhyPort, kTestNumaNode);
+    srv_ttr.transport = new RawTransport(kTestRpcIdServer, kTestPhyPort,
+                                         kTestNumaNode, trace_file);
     srv_ttr.huge_alloc =
         new HugeAlloc(MB(32), kTestNumaNode, srv_ttr.transport->reg_mr_func,
                       srv_ttr.transport->dereg_mr_func);
     srv_ttr.transport->init_hugepage_structures(srv_ttr.huge_alloc,
                                                 srv_ttr.rx_ring);
 
-    // Precompute the UDP header for the server
+    // Precompute the packet header, pretending that srv_ttr is the remote.
     srv_ttr.transport->fill_local_routing_info(&srv_ri);
-    clt_ttr.transport->resolve_remote_routing_info(&srv_ri);
+    clt_ttr.transport->resolve_remote_routing_info(&srv_ri);  // srv_ri ~ header
   }
 
   ~RawTransportTest() {
@@ -64,9 +70,6 @@ class RawTransportTest : public ::testing::Test {
     delete srv_ttr.huge_alloc;
     delete srv_ttr.transport;
   }
-
-  transport_info_t srv_ttr, clt_ttr;
-  Transport::RoutingInfo srv_ri;  // We only need the server's routing info
 
   // Create a ready-to-send packet from client to server, with space for
   // \p data_size user data bytes. \p data_size can be zero.
@@ -123,8 +126,10 @@ class RawTransportTest : public ::testing::Test {
 
     for (size_t i = 0; i < batch_size; i++) {
       poll_cq_one_helper(clt_ttr.transport->send_cq);
-      poll_cq_one_helper(srv_ttr.transport->recv_cq);
     }
+
+    size_t num_rx = 0;
+    while (num_rx != batch_size) num_rx += srv_ttr.transport->rx_burst();
   }
 
   /**
@@ -167,9 +172,15 @@ class RawTransportTest : public ::testing::Test {
 
     for (size_t i = 0; i < batch_size; i++) {
       poll_cq_one_helper(clt_ttr.transport->send_cq);
-      poll_cq_one_helper(srv_ttr.transport->recv_cq);
     }
+
+    size_t num_rx = 0;
+    while (num_rx != batch_size) num_rx += srv_ttr.transport->rx_burst();
   }
+
+  transport_info_t srv_ttr, clt_ttr;
+  Transport::RoutingInfo srv_ri;  // We only need the server's routing info
+  FILE* trace_file;
 };
 
 // Test if we we can create and destroy a transport instance
@@ -195,6 +206,43 @@ TEST_F(RawTransportTest, full_queue_two_sges) {
   simple_test_two_sges(kTestMsgSize, RawTransport::kSQDepth);
 }
 
+// Test MAC filtering
+TEST_F(RawTransportTest, mac_filter_test) {
+  Buffer buffer = create_packet(kTestMsgSize);
+  struct ibv_sge sge;
+  struct ibv_send_wr send_wr, *bad_wr;
+  size_t num_rx = 0;
+
+  sge.addr = reinterpret_cast<uint64_t>(buffer.buf);
+  sge.length = kInetHdrsTotSize + kTestMsgSize;
+  sge.lkey = buffer.lkey;
+
+  send_wr.next = nullptr;
+  send_wr.opcode = IBV_WR_SEND;
+  send_wr.sg_list = &sge;
+  send_wr.send_flags = IBV_SEND_SIGNALED;
+  send_wr.num_sge = 1;
+
+  // Send a packet with a matching MAC address
+  int ret = ibv_post_send(clt_ttr.transport->qp, &send_wr, &bad_wr);
+  assert(ret == 0);
+  while (num_rx != 1) num_rx += srv_ttr.transport->rx_burst();
+
+  // Send a packet with a garbled destination MAC address and check it isn't
+  // received for 200 milliseconds
+  num_rx = 0;
+  auto* eth = reinterpret_cast<eth_hdr_t*>(buffer.buf);
+  eth->dst_mac[0]++;
+
+  ret = ibv_post_send(clt_ttr.transport->qp, &send_wr, &bad_wr);
+  assert(ret == 0);
+  struct timespec start;
+  clock_gettime(CLOCK_REALTIME, &start);
+  while (sec_since(start) <= .2) {
+    num_rx += srv_ttr.transport->rx_burst();
+  }
+  ASSERT_EQ(num_rx, 0);
+}
 }  // End erpc
 
 int main(int argc, char** argv) {

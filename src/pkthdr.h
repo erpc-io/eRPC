@@ -27,22 +27,22 @@ static_assert(kPktHdrMagic < (1ull << kPktHdrMagicBits), "");
 /// These packet types are stored as bitfields in the packet header, so don't
 /// use an enum class here to avoid casting all over the place.
 enum PktType : uint64_t {
-  kPktTypeReq,         ///< Request data
-  kPktTypeReqForResp,  ///< Request for response
-  kPktTypeExplCR,      ///< Explicit credit return
-  kPktTypeResp,        ///< Response data
+  kPktTypeReq,     ///< Request data
+  kPktTypeRFR,     ///< Request for response
+  kPktTypeExplCR,  ///< Explicit credit return
+  kPktTypeResp,    ///< Response data
 };
 
 static std::string pkt_type_str(uint64_t pkt_type) {
   switch (pkt_type) {
     case kPktTypeReq:
-      return "request";
-    case kPktTypeReqForResp:
-      return "request for response";
+      return "REQ";
+    case kPktTypeRFR:
+      return "RFR";
     case kPktTypeExplCR:
-      return "explicit credit return";
+      return "CR";
     case kPktTypeResp:
-      return "response";
+      return "RESP";
   }
 
   throw std::runtime_error("Invalid packet type.");
@@ -82,19 +82,28 @@ struct pkthdr_t {
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[type " << pkt_type_str(pkt_type) << ", "
-        << "destssn " << std::to_string(dest_session_num) << ", "
+        << "dsn " << std::to_string(dest_session_num) << ", "
         << "reqn " << std::to_string(req_num) << ", "
         << "pktn " << std::to_string(pkt_num) << ", "
-        << "msgsz " << std::to_string(msg_size) << ", "
-        << "magic " << std::to_string(magic) << "]";
+        << "msz " << std::to_string(msg_size) << "]";
 
     return ret.str();
+  }
+
+  /// Return a pointer to the eRPC header in this packet header
+  inline uint8_t *ehdrptr() {
+    return reinterpret_cast<uint8_t *>(this) + kHeadroom;
+  }
+
+  /// Return a const pointer to the eRPC header in this const packet header
+  inline const uint8_t *ehdrptr() const {
+    return reinterpret_cast<const uint8_t *>(this) + kHeadroom;
   }
 
   inline bool check_magic() const { return magic == kPktHdrMagic; }
 
   inline bool is_req() const { return pkt_type == kPktTypeReq; }
-  inline bool is_req_for_resp() const { return pkt_type == kPktTypeReqForResp; }
+  inline bool is_rfr() const { return pkt_type == kPktTypeRFR; }
   inline bool is_resp() const { return pkt_type == kPktTypeResp; }
   inline bool is_expl_cr() const { return pkt_type == kPktTypeExplCR; }
 

@@ -46,9 +46,7 @@ class MsgBuffer {
   inline bool is_req() const { return get_pkthdr_0()->is_req(); }
   inline bool is_resp() const { return get_pkthdr_0()->is_resp(); }
   inline bool is_expl_cr() const { return get_pkthdr_0()->is_expl_cr(); }
-  inline bool is_req_for_resp() const {
-    return get_pkthdr_0()->is_req_for_resp();
-  }
+  inline bool is_rfr() const { return get_pkthdr_0()->is_rfr(); }
   inline uint64_t get_req_num() const { return get_pkthdr_0()->req_num; }
   inline uint64_t get_pkt_type() const { return get_pkthdr_0()->pkt_type; }
   inline uint8_t get_req_type() const { return get_pkthdr_0()->req_type; }
@@ -66,29 +64,6 @@ class MsgBuffer {
   /// Return true iff this MsgBuffer uses a dynamically-allocated MsgBuffer.
   /// This function does not sanity-check other fields.
   inline bool is_dynamic() const { return buffer.buf != nullptr; }
-
-  /// Check if this MsgBuffer is a valid dynamic MsgBuffer
-  inline bool is_valid_dynamic() const { return is_valid() && is_dynamic(); }
-
-  /// Check if the \p req_type and \req num fields of this MsgBuffer match
-  /// \p pkthdr
-  bool matches(const pkthdr_t *pkthdr) const {
-    return (get_req_type() == pkthdr->req_type &&
-            get_req_num() == pkthdr->req_num);
-  }
-
-  /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
-  /// fields match those in \p pkthdr
-  bool is_dynamic_and_matches(const pkthdr_t *pkthdr) const {
-    return is_valid_dynamic() && matches(pkthdr);
-  }
-
-  /// Check if this MsgBuffer is dynamic and the \p req_type and \p req_num
-  /// fields match those in \p other
-  bool is_dynamic_and_matches(const MsgBuffer *other) const {
-    return is_valid_dynamic() && (get_req_type() == other->get_req_type()) &&
-           (get_req_num() == other->get_req_num());
-  }
 
   /// Check if this MsgBuffer is buried
   inline bool is_buried() const {

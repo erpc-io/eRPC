@@ -14,7 +14,7 @@ namespace erpc {
 template <class TTr>
 int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
-  sprintf(issue_msg, "eRPC Rpc %u: create_session() failed. Issue", rpc_id);
+  sprintf(issue_msg, "Rpc %u: create_session() failed. Issue", rpc_id);
 
   // Check that the caller is the creator thread
   if (!in_dispatch()) {
@@ -37,13 +37,6 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
       rem_sm_udp_port == nexus->sm_udp_port) {
     LOG_WARN("%s: Remote Rpc is same as local.\n", issue_msg);
     return -EINVAL;
-  }
-
-  // Ensure bounded session_vec size
-  if (session_vec.size() >= kMaxSessionsPerThread) {
-    LOG_WARN("%s: Session limit (%zu) reached.\n", issue_msg,
-             kMaxSessionsPerThread);
-    return -ENOMEM;
   }
 
   // Ensure that we have ring buffers for this session
@@ -85,8 +78,7 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
 template <class TTr>
 int Rpc<TTr>::destroy_session_st(int session_num) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
-  sprintf(issue_msg,
-          "eRPC Rpc %u: destroy_session() failed for session %d. Issue", rpc_id,
+  sprintf(issue_msg, "Rpc %u, lsn %u: destroy_session() failed. Issue", rpc_id,
           session_num);
 
   if (!in_dispatch()) {
@@ -129,11 +121,9 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       return -EPERM;
 
     case SessionState::kConnected:
-      LOG_INFO(
-          "eRPC Rpc %u: Sending disconnect request for session %u "
-          "to [%s, %u].\n",
-          rpc_id, session->local_session_num, session->server.hostname,
-          session->server.rpc_id);
+      LOG_INFO("Rpc %u, lsn %u: Sending disconnect request to [%s, %u].\n",
+               rpc_id, session->local_session_num, session->server.hostname,
+               session->server.rpc_id);
 
       session->state = SessionState::kDisconnectInProgress;
       send_sm_req_st(session);

@@ -43,8 +43,6 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
            c->thread_id, msgbuf_idx);
   }
 
-  // Timestamp before trying enqueue_request(). If enqueue_request() fails,
-  // we'll timestamp again on the next try.
   c->req_ts[msgbuf_idx] = erpc::rdtsc();
   c->rpc->enqueue_request(c->session_num_vec[0], kAppReqType, &req_msgbuf,
                           &c->resp_msgbuf[msgbuf_idx], app_cont_func,
@@ -123,17 +121,15 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
-  if (thread_id == 0) {
-    c.tmp_stat = new TmpStat("rx_gbps tx_gbps re_tx avg_us 99_us");
-  }
+  if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
   uint8_t phy_port = port_vec.at(thread_id % port_vec.size());
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
-                                  static_cast<uint8_t>(thread_id), sm_handler,
-                                  phy_port);
+                                  static_cast<uint8_t>(thread_id),
+                                  basic_sm_handler, phy_port);
   rpc.retry_connect_on_invalid_rpc_id = true;
   if (erpc::kTesting) rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
 
@@ -175,7 +171,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     auto &stats = c.app_stats[c.thread_id];
     stats.rx_gbps = c.stat_rx_bytes_tot * 8 / ns;
     stats.tx_gbps = c.stat_tx_bytes_tot * 8 / ns;
-    stats.re_tx = c.rpc->get_num_retransmissions(c.session_num_vec[0]);
+    stats.re_tx = c.rpc->get_num_re_tx(c.session_num_vec[0]);
     if (c.lat_vec.size() > 0) {
       std::sort(c.lat_vec.begin(), c.lat_vec.end());
       double lat_sum = std::accumulate(c.lat_vec.begin(), c.lat_vec.end(), 0.0);
@@ -190,7 +186,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     // Reset stats for next iteration
     c.stat_rx_bytes_tot = 0;
     c.stat_tx_bytes_tot = 0;
-    c.rpc->reset_num_retransmissions(c.session_num_vec[0]);
+    c.rpc->reset_num_re_tx(c.session_num_vec[0]);
     c.lat_vec.clear();
 
     erpc::Timely *timely_0 = c.rpc->get_timely(0);

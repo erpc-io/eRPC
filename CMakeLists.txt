@@ -39,7 +39,7 @@ set(COMPILE_ERPC_LIB ON)
 option(PERF "Compile for performance" OFF)
 set(TRANSPORT "infiniband" CACHE STRING "Datapath transport (infiniband/roce/raw)")
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
-set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/debug/trace)") 
+set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
 
 # Parse the user-exposed options
 if(PERF)
@@ -87,6 +87,9 @@ elseif(LOG_LEVEL STREQUAL "reorder")
 elseif(LOG_LEVEL STREQUAL "trace")
   MESSAGE(STATUS "Logging level = trace. Warning: Performance will be low.")
   add_definitions(-DLOG_LEVEL=5)
+elseif(LOG_LEVEL STREQUAL "cc")
+  MESSAGE(STATUS "Logging level = cc. Warning: Performance will be low.")
+  add_definitions(-DLOG_LEVEL=6)
 else()
   MESSAGE(STATUS "No logging level specified. Using warning level.")
   add_definitions(-DLOG_LEVEL=2)
@@ -105,9 +108,10 @@ endif(DEBUG)
 # Testing for packet loss, machine failure, etc
 if(TESTING)
   MESSAGE(STATUS "Testing is enabled. Performance will be low.")
-  add_definitions(-DTESTING)
+  add_definitions(-DTESTING=true)
 else(TESTING)
   MESSAGE(STATUS "Testing is disabled, so tests may fail.")
+  add_definitions(-DTESTING=false)
 endif(TESTING)
 
 # LTO
@@ -128,6 +132,7 @@ set(SOURCES
   src/rpc_impl/rpc_queues.cc
   src/rpc_impl/rpc_rfr.cc
   src/rpc_impl/rpc_cr.cc
+  src/rpc_impl/rpc_kick.cc
   src/rpc_impl/rpc_req.cc
   src/rpc_impl/rpc_resp.cc
   src/rpc_impl/rpc_ev_loop.cc
@@ -165,7 +170,6 @@ set(MICA_SOURCES
 set(CLIENT_TESTS
   create_session_test
   destroy_session_test
-  api_restrictions_test
   small_msg_test
   large_msg_test
   req_in_cont_func_test
@@ -174,7 +178,11 @@ set(CLIENT_TESTS
 
 set(PROTOCOL_TESTS
   rpc_sm_test
-  rpc_rx_test)
+  rpc_req_test
+  rpc_resp_test
+  rpc_cr_test
+  rpc_rfr_test
+  rpc_kick_test)
 
 set(TRANSPORT_TESTS
   raw_transport_test)
@@ -222,7 +230,7 @@ file(STRINGS "scripts/autorun_app_file" APP)
 message(STATUS "Compiling app = " ${APP})
 
 # Add app-specific defines now, isolating them from the tests
-if(APP STREQUAL "consensus")
+if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
   set(LIBRARIES ${LIBRARIES} craft)
   set(APP_ADDITIONAL_SOURCES third_party/cityhash/city_mod.cc)

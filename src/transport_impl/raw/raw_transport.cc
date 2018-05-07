@@ -11,8 +11,9 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
-RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node)
-    : Transport(TransportType::kRaw, rpc_id, phy_port, numa_node),
+RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
+                           FILE *trace_file)
+    : Transport(TransportType::kRaw, rpc_id, phy_port, numa_node, trace_file),
       rx_flow_udp_port(kBaseRawUDPPort + (256u * numa_node) + rpc_id) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
@@ -359,10 +360,12 @@ void RawTransport::install_flow_rule() {
   flow_attr->reserved = 0;
   buf += sizeof(struct ibv_exp_flow_attr);
 
-  // Ethernet - all wildcard
+  // Ethernet - filter auto-learning broadcast packets sent by switches
   auto *eth_spec = reinterpret_cast<struct ibv_exp_flow_spec_eth *>(buf);
   eth_spec->type = IBV_EXP_FLOW_SPEC_ETH;
   eth_spec->size = sizeof(struct ibv_exp_flow_spec_eth);
+  memcpy(&eth_spec->val.dst_mac, resolve.mac_addr, sizeof(resolve.mac_addr));
+  memset(&eth_spec->mask.dst_mac, 0xff, sizeof(resolve.mac_addr));
   buf += sizeof(struct ibv_exp_flow_spec_eth);
 
   // IPv4 - all wildcard
@@ -371,7 +374,7 @@ void RawTransport::install_flow_rule() {
   spec_ipv4->size = sizeof(struct ibv_exp_flow_spec_ipv4_ext);
   buf += sizeof(struct ibv_exp_flow_spec_ipv4_ext);
 
-  // UDP - match dst port
+  // UDP - steer packets for this Rpc
   auto *udp_spec = reinterpret_cast<struct ibv_exp_flow_spec_tcp_udp *>(buf);
   udp_spec->type = IBV_EXP_FLOW_SPEC_UDP;
   udp_spec->size = sizeof(struct ibv_exp_flow_spec_tcp_udp);
@@ -447,6 +450,7 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
          << 1.0 * kRingSize / MB(1) << "MB for ring buffers.";
     throw std::runtime_error(xmsg.str());
   }
+  memset(ring_extent.buf, 0, kRingSize);
 
   // Fill in the Rpc's RX ring
   for (size_t i = 0; i < kNumRxRingEntries; i++) {

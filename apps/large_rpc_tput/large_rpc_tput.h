@@ -37,6 +37,10 @@ struct app_stats_t {
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
+  static std::string get_template_str() {
+    return "rx_gbps tx_gbps re_tx avg_us _99_us";
+  }
+
   /// Return a space-separated string of all stats
   std::string to_string() {
     return std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) + " " +
@@ -86,38 +90,6 @@ void alloc_req_resp_msg_buffers(AppContext* c) {
     // Fill the request regardless of kAppMemset. This is a one-time thing.
     memset(c->req_msgbuf[i].buf, kAppDataByte, FLAGS_req_size);
   }
-}
-
-// A basic session management handler that expects successful responses
-void sm_handler(int session_num, erpc::SmEventType sm_event_type,
-                erpc::SmErrType sm_err_type, void* _context) {
-  auto* c = static_cast<AppContext*>(_context);
-  c->num_sm_resps++;
-
-  erpc::rt_assert(sm_err_type == erpc::SmErrType::kNoError,
-                  "SM response with error");
-
-  if (!(sm_event_type == erpc::SmEventType::kConnected ||
-        sm_event_type == erpc::SmEventType::kDisconnected)) {
-    throw std::runtime_error("Received unexpected SM event.");
-  }
-
-  // The callback gives us the eRPC session number - get the index in vector
-  size_t session_idx = c->session_num_vec.size();
-  for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-    if (c->session_num_vec[i] == session_num) session_idx = i;
-  }
-
-  erpc::rt_assert(session_idx < c->session_num_vec.size(),
-                  "SM callback for invalid session number.");
-
-  fprintf(stderr,
-          "large_rpc_tput: Rpc %u: Session number %d (index %zu) %s. "
-          "Time elapsed = %.3f s.\n",
-          c->rpc->get_rpc_id(), session_num, session_idx,
-          sm_event_type == erpc::SmEventType::kConnected ? "connected"
-                                                         : "disconncted",
-          c->rpc->sec_since_creation());
 }
 
 #endif

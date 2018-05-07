@@ -3,7 +3,7 @@
  * @brief Handlers for appendentries RPC
  */
 
-#include "consensus.h"
+#include "smr.h"
 
 #ifndef APPENDENTRIES_H
 #define APPENDENTRIES_H
@@ -40,7 +40,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   size_t n_entries = static_cast<size_t>(ae.n_entries);
   bool is_keepalive = (n_entries == 0);
   if (kAppVerbose) {
-    printf("consensus: Received appendentries (%s) req from node %s [%s].\n",
+    printf("smr: Received appendentries (%s) req from node %s [%s].\n",
            is_keepalive ? "keepalive" : "non-keepalive",
            node_id_to_name_map[appendentries_req->node_id].c_str(),
            erpc::get_formatted_time().c_str());
@@ -124,7 +124,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
   bool is_keepalive = m->n_entries == 0;
   if (kAppVerbose) {
-    printf("consensus: Sending appendentries (%s) to node %s [%s].\n",
+    printf("smr: Sending appendentries (%s) to node %s [%s].\n",
            is_keepalive ? "keepalive" : "non-keepalive",
            node_id_to_name_map[raft_node_get_id(node)].c_str(),
            erpc::get_formatted_time().c_str());
@@ -132,7 +132,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
   if (!c->rpc->is_connected(conn->session_num)) {
     if (kAppVerbose) {
-      printf("consensus: Cannot send appendentries on session %d.\n",
+      printf("smr: Cannot send appendentries on session %d.\n",
              conn->session_num);
     }
     return 0;
@@ -215,7 +215,7 @@ void appendentries_cont(erpc::RespHandle *resp_handle, void *_context,
            sizeof(msg_appendentries_response_t));
 
     if (kAppVerbose) {
-      printf("consensus: Received appendentries response from node %s [%s].\n",
+      printf("smr: Received appendentries response from node %s [%s].\n",
              node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
              erpc::get_formatted_time().c_str());
     }
@@ -230,7 +230,7 @@ void appendentries_cont(erpc::RespHandle *resp_handle, void *_context,
   } else {
     // This is a continuation-with-failure. Fall through and call
     // raft_periodic() again.
-    printf("consensus: Appendentries RPC to node %s failed to complete [%s].\n",
+    printf("smr: Appendentries RPC to node %s failed to complete [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            erpc::get_formatted_time().c_str());
   }
