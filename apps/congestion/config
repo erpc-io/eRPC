@@ -1,5 +1,5 @@
 --test_ms 20000
---num_processes 60
+--num_processes 5
 --incast_threads_zero 10
 --incast_threads_other 1
 --incast_req_size 7900000
