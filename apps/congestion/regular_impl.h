@@ -1,12 +1,14 @@
 /**
  * @file regular_impl.h
- * @brief The regular traffic component
+ * @brief The regular traffic component. Each regular thread keeps
+ * FLAGS_regular_concurrency requests outstanding.
  */
 #ifndef REGULAR_IMPL_H
 #define REGULAR_IMPL_H
 
 #include "congestion.h"
 
+// Create a session to each regular thread in the cluster
 void connect_sessions_func_regular(AppContext *c) {
   assert(FLAGS_process_id != 0);
   assert(c->thread_id >= FLAGS_incast_threads_other);
@@ -85,7 +87,7 @@ void cont_regular(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   auto *c = static_cast<AppContext *>(_context);
   double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
-  c->regular_latency.update(usec);
+  c->regular_latency.update(usec * 10);
 
   assert(resp_msgbuf->get_data_size() == FLAGS_regular_resp_size);
   erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte);  // Touch
@@ -136,8 +138,8 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
     auto &stats = c.app_stats[c.thread_id];
     assert(stats.incast_gbps == 0);
     stats.re_tx = c.rpc->get_num_re_tx(c.session_num_vec[0]);
-    stats.regular_50_us = c.regular_latency.perc(0.50);
-    stats.regular_99_us = c.regular_latency.perc(0.99);
+    stats.regular_50_us = c.regular_latency.perc(0.50) / 10;
+    stats.regular_99_us = c.regular_latency.perc(0.99) / 10;
 
     // Reset stats for next iteration
     c.rpc->reset_num_re_tx(c.session_num_vec[0]);

@@ -45,7 +45,7 @@ fi
 # Check if the process file has sufficient processs
 autorun_process_file_num_processes=`cat $autorun_process_file | wc -l`
 if [ "$autorun_process_file_num_processes" -lt  "$autorun_num_processes" ]; then
-  blue "auorun: Too few processs in process file. Exiting."
+  blue "autorun: Too few processs in process file. Exiting."
   exit
 fi
 
