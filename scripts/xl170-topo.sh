@@ -6,14 +6,14 @@ if [ "$#" -ne 1 ]; then
 	exit
 fi
 
-bad_nodes="hp186 hp187"
+bad_nodes=""
 
 # Create a map from node hostnames to switch IDs
 for ((i = 1; i <= $1; i++)); do
   (
   hostname="akalianode-$i.RDMA.ron-PG0.utah.cloudlab.us"
 
-  # Get the HP node ID (example hp012)
+  # Get the HP node ID (e.g., hp012 from hp012.utah.cloudlab.us)
 	hpnode_id=`ssh -oStrictHostKeyChecking=no $hostname \
     "hostname -A | cut -d '.' -f 1"`
 
@@ -37,7 +37,7 @@ echo ""
 for ((switch_i = 0; switch_i < 5; switch_i++)); do
   count=`cat temp | grep " $switch_i" | wc -l`
   blue "Under switch $switch_i ($count nodes):"
-  cat temp | grep " $switch_i" | cut -d' ' -f 1
+  cat temp | grep " $switch_i" | cut -d' ' -f 1 | sort -n
 done
 
 rm temp
