@@ -192,6 +192,7 @@ set(UTIL_TESTS
   huge_alloc_test
   timing_wheel_test
   rand_test
+  misc_test
   fixed_vector_test
   timely_test
   numautil_test)
