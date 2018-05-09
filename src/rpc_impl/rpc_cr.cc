@@ -27,9 +27,9 @@ template <class TTr>
 void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                   size_t rx_tsc) {
   assert(in_dispatch());
+  assert(pkthdr->req_num <= sslot->cur_req_num);
 
   // Handle reordering
-  assert(pkthdr->req_num <= sslot->cur_req_num);
   if (unlikely(!in_order_client(sslot, pkthdr))) {
     LOG_REORDER(
         "Rpc %u, lsn %u (%s): Received out-of-order CR. "
@@ -40,7 +40,7 @@ void Rpc<TTr>::process_expl_cr_st(SSlot *sslot, const pkthdr_t *pkthdr,
     return;
   }
 
-  // Update client tracking metadata.
+  // Update client tracking metadata
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   sslot->client_info.num_rx++;
