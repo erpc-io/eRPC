@@ -8,6 +8,7 @@
 #include <limits>
 #include <numeric>
 #include <vector>
+#include "common.h"
 
 namespace erpc {
 
@@ -48,10 +49,14 @@ static constexpr size_t ceil(double num) {
 
 /// Compute the standard deviation of a vector
 static double stddev(std::vector<double> v) {
+  if (unlikely(v.empty())) return 0;
   double sum = std::accumulate(v.begin(), v.end(), 0.0);
   double mean = sum / v.size();
   double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
-  return std::sqrt(sq_sum / v.size() - mean * mean);
+  double var = sq_sum / v.size() - (mean * mean);
+  if (unlikely(var < 0)) return 0.0;  // This can happen when var ~ 0
+
+  return std::sqrt(var);
 }
 
 }  /// End erpc
