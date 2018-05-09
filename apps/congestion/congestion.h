@@ -32,6 +32,10 @@ DEFINE_uint64(regular_concurrency, 0, "Concurrent requests per regular thread");
 DEFINE_uint64(regular_req_size, 0, "Reqular request data size");
 DEFINE_uint64(regular_resp_size, 0, "Regular response data size");
 
+size_t tot_threads_other() {
+  return FLAGS_incast_threads_other + FLAGS_regular_threads_other;
+}
+
 struct app_stats_t {
   double incast_gbps;         // All incast threads
   double incast_gbps_stddev;  // Only thread 0

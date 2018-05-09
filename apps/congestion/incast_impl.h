@@ -7,6 +7,7 @@
 
 #include "congestion.h"
 
+// Each incast thread creates one session to machine 0
 void connect_sessions_func_incast(AppContext *c) {
   assert(FLAGS_process_id != 0);
   assert(c->thread_id < FLAGS_incast_threads_other);
@@ -150,15 +151,15 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
       app_stats_t accum_stats;
       std::vector<double> incast_gbps_vec;  // For stddev computation
 
-      for (size_t i = 0;
-           i < FLAGS_incast_threads_other + FLAGS_regular_threads_other; i++) {
+      for (size_t i = 0; i < tot_threads_other(); i++) {
         // Stats published by all threads
-        accum_stats.incast_gbps += c.app_stats[i].incast_gbps;
-        incast_gbps_vec.push_back(c.app_stats[i].incast_gbps);
-
         accum_stats.re_tx += c.app_stats[i].re_tx;
 
-        if (i >= FLAGS_incast_threads_other) {
+        if (i < FLAGS_incast_threads_other) {
+          // Stats published by only incast threads
+          accum_stats.incast_gbps += c.app_stats[i].incast_gbps;
+          incast_gbps_vec.push_back(c.app_stats[i].incast_gbps);
+        } else {
           // Stats published by only regular threads
           accum_stats.regular_50_us += c.app_stats[i].regular_50_us;
           accum_stats.regular_99_us += c.app_stats[i].regular_99_us;

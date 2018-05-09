@@ -18,18 +18,16 @@ void connect_sessions_func_regular(AppContext *c) {
 
   size_t session_idx = 0;
   for (size_t p_i = 1; p_i < FLAGS_num_processes; p_i++) {
-    for (size_t t_i = FLAGS_incast_threads_other;
-         t_i < FLAGS_incast_threads_other + FLAGS_regular_threads_other;
-         t_i++) {
-      if (p_i == FLAGS_process_id && t_i == c->thread_id) continue;
+    for (size_t t = FLAGS_incast_threads_other; t < tot_threads_other(); t++) {
+      if (p_i == FLAGS_process_id && t == c->thread_id) continue;
 
       c->session_num_vec.at(session_idx) =
-          c->rpc->create_session(erpc::get_uri_for_process(p_i), t_i);
+          c->rpc->create_session(erpc::get_uri_for_process(p_i), t);
       erpc::rt_assert(c->session_num_vec[session_idx] >= 0);
 
       if (kAppVerbose) {
         printf("congestion: Regular thread %zu: Creating session to %zu/%zu.\n",
-               c->thread_id, p_i, t_i);
+               c->thread_id, p_i, t);
       }
 
       session_idx++;
