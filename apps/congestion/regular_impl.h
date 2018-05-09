@@ -8,30 +8,27 @@
 
 #include "congestion.h"
 
-// Create a session to each regular thread in the cluster
+// Create a session to each *peer* regular thread in the cluster
 void connect_sessions_func_regular(AppContext *c) {
   assert(FLAGS_process_id != 0);
   assert(c->thread_id >= FLAGS_incast_threads_other);
 
-  c->session_num_vec.resize(
-      (FLAGS_regular_threads_other * (FLAGS_num_processes - 1)) - 1);
+  c->session_num_vec.resize(FLAGS_num_processes - 2);
 
   size_t session_idx = 0;
   for (size_t p_i = 1; p_i < FLAGS_num_processes; p_i++) {
-    for (size_t t = FLAGS_incast_threads_other; t < tot_threads_other(); t++) {
-      if (p_i == FLAGS_process_id && t == c->thread_id) continue;
+    if (p_i == FLAGS_process_id) continue;
 
-      c->session_num_vec.at(session_idx) =
-          c->rpc->create_session(erpc::get_uri_for_process(p_i), t);
-      erpc::rt_assert(c->session_num_vec[session_idx] >= 0);
+    c->session_num_vec[session_idx] =
+        c->rpc->create_session(erpc::get_uri_for_process(p_i), c->thread_id);
+    erpc::rt_assert(c->session_num_vec[session_idx] >= 0);
 
-      if (kAppVerbose) {
-        printf("congestion: Regular thread %zu: Creating session to %zu/%zu.\n",
-               c->thread_id, p_i, t);
-      }
-
-      session_idx++;
+    if (kAppVerbose) {
+      printf("congestion: Regular thread %zu: Creating session to %zu.\n",
+             c->thread_id, p_i);
     }
+
+    session_idx++;
   }
   assert(session_idx == c->session_num_vec.size());
 
@@ -138,6 +135,7 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
     stats.re_tx = c.rpc->get_num_re_tx_cumulative();
     stats.regular_50_us = c.regular_latency.perc(0.50) / 10.0;
     stats.regular_99_us = c.regular_latency.perc(0.99) / 10.0;
+    stats.regular_999_us = c.regular_latency.perc(0.999) / 10.0;
 
     // Reset stats for next iteration
     c.rpc->reset_num_re_tx_cumulative();
@@ -145,8 +143,9 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
 
     printf(
         "congestion: Regular thread %zu: Retransmissions %zu. "
-        "Latency {%.3f us, %.3f us}.\n",
-        c.thread_id, stats.re_tx, stats.regular_50_us, stats.regular_99_us);
+        "Latency {%.1f, %.1f, %.1f us}.\n",
+        c.thread_id, stats.re_tx, stats.regular_50_us, stats.regular_99_us,
+        stats.regular_999_us);
     // An incast thread will write to tmp_stat
   }
   // We don't disconnect sessions

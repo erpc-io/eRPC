@@ -127,8 +127,8 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
     auto &stats = c.app_stats[c.thread_id];
     stats.incast_gbps = c.incast_tx_bytes * 8 / ns;
     stats.re_tx = c.rpc->get_num_re_tx_cumulative();
-    assert(stats.regular_50_us == 0);
-    assert(stats.regular_99_us == 0);
+    assert(stats.regular_50_us == 0 && stats.regular_99_us == 0 &&
+           stats.regular_999_us == 0);
 
     // Reset stats for next iteration
     c.incast_tx_bytes = 0;
@@ -163,12 +163,14 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
           // Stats published by only regular threads
           accum_stats.regular_50_us += c.app_stats[i].regular_50_us;
           accum_stats.regular_99_us += c.app_stats[i].regular_99_us;
+          accum_stats.regular_999_us += c.app_stats[i].regular_999_us;
         }
       }
 
       accum_stats.incast_gbps_stddev = erpc::stddev(incast_gbps_vec);
       accum_stats.regular_50_us /= FLAGS_regular_threads_other;
       accum_stats.regular_99_us /= FLAGS_regular_threads_other;
+      accum_stats.regular_999_us /= FLAGS_regular_threads_other;
 
       c.tmp_stat->write(accum_stats.to_string());
     }

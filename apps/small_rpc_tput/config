@@ -1,4 +1,4 @@
---test_ms 50000
+--test_ms 20000
 --sm_verbose 0
 --batch_size 6
 --concurrency 10
