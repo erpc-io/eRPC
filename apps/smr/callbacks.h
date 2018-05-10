@@ -40,8 +40,7 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 
   auto result = table->set(key_hash, *ft_key,
                            reinterpret_cast<char *>(&client_req->value));
-  erpc::rt_assert(result == mica::table::Result::kSuccess,
-                  "MICA insert failed");
+  erpc::rt_assert(result == mica::table::Result::kSuccess, "KV insert failed");
   return 0;
 }
 
@@ -51,7 +50,7 @@ static int __raft_persist_vote(raft_server_t *, void *, const int) {
 }
 
 // Raft callback for saving term field to persistent storage
-static int __raft_persist_term(raft_server_t *, void *, const int) {
+static int __raft_persist_term(raft_server_t *, void *, const int, const int) {
   return 0;  // Ignored
 }
 
@@ -129,11 +128,7 @@ void set_raft_callbacks(AppContext *c) {
 
   // Providing a non-null console log callback is expensive, even if we do
   // nothing in the callback.
-  if (kAppEnableRaftConsoleLog) {
-    raft_funcs.log = __raft_log;
-  } else {
-    raft_funcs.log = nullptr;
-  }
+  raft_funcs.log = kAppEnableRaftConsoleLog ? __raft_log : nullptr;
 
   // Callback udata = context
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));

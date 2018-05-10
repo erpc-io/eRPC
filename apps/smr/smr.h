@@ -43,15 +43,14 @@ static constexpr size_t kAppNumaNode = 0;
 
 // We run FLAGS_num_processes processes in the cluster, of which the first
 // FLAGS_num_raft_servers are Raft servers, and the remaining are Raft clients.
-DEFINE_uint64(num_raft_servers, 0,
-              "Number of Raft servers (i.e., non-client machines)");
+DEFINE_uint64(num_raft_servers, 0, "Number of Raft servers");
 static bool validate_num_raft_servers(const char *, uint64_t num_raft_servers) {
   return num_raft_servers > 0 && num_raft_servers % 2 == 1;
 }
 DEFINE_validator(num_raft_servers, &validate_num_raft_servers);
 
 // Return true iff this machine is a Raft server (leader or follower)
-bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
+bool is_raft_server() { return FLAGS_process_id < FLAGS_num_raft_servers; }
 
 /// The eRPC request types
 enum class ReqType : uint8_t {
@@ -175,9 +174,9 @@ class AppContext {
   bool check_magic() const { return magic == kAppContextMagic; }
 };
 
-// Generate a deterministic, random-ish node ID from a machine's hostname
-int get_raft_node_id_from_hostname(std::string hostname) {
-  uint32_t hash = CityHash32(hostname.c_str(), hostname.length());
+// Generate a deterministic, random-ish node ID from a process's URI
+int get_raft_node_id_from_uri(std::string uri) {
+  uint32_t hash = CityHash32(uri.c_str(), uri.length());
   return static_cast<int>(hash);
 }
 

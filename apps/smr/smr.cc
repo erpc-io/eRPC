@@ -97,11 +97,11 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   erpc::rt_assert(e == 0, "raft_recv_entry() failed");
 }
 
-void init_node_id_to_name_map() {
+void init_raft_node_id_to_name_map() {
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string node_i_hostname = get_hostname_for_machine(i);
-    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
-    node_id_to_name_map[node_i_id] = erpc::trim_hostname(node_i_hostname);
+    std::string uri = erpc::get_uri_for_process(i);
+    int raft_node_id = get_raft_node_id_from_uri(uri);
+    node_id_to_name_map[raft_node_id] = erpc::trim_hostname(uri);
   }
 }
 
@@ -114,13 +114,13 @@ void init_raft(AppContext *c) {
 
   set_raft_callbacks(c);
 
-  std::string machine_name = get_hostname_for_machine(FLAGS_process_id);
-  c->server.node_id = get_raft_node_id_from_hostname(machine_name);
+  std::string my_uri = erpc::get_uri_for_process(FLAGS_process_id);
+  c->server.node_id = get_raft_node_id_from_uri(my_uri);
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string node_i_hostname = get_hostname_for_machine(i);
-    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
+    std::string uri = erpc::get_uri_for_process(i);
+    int raft_node_id = get_raft_node_id_from_uri(uri);
 
     if (i == FLAGS_process_id) {
       // Add self. user_data = nullptr, peer_is_self = 1
@@ -128,7 +128,7 @@ void init_raft(AppContext *c) {
     } else {
       // Add a non-self node. peer_is_self = 0
       raft_add_node(c->server.raft, static_cast<void *>(&c->conn_vec[i]),
-                    node_i_id, 0);
+                    raft_node_id, 0);
     }
   }
 }
@@ -155,11 +155,11 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   // Create a session to each Raft server, excluding self
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     if (i == FLAGS_process_id) continue;
-    std::string hostname = erpc::get_hostname_for_process(i);
-    printf("smr: Creating session to %s, index = %zu.\n", hostname.c_str(), i);
+    std::string uri = erpc::get_uri_for_process(i);
+    printf("smr: Creating session to %s, index = %zu.\n", uri.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num = c->rpc->create_session(hostname, 0);
+    c->conn_vec[i].session_num = c->rpc->create_session(uri, 0);
     assert(c->conn_vec[i].session_num >= 0);
   }
 
@@ -192,12 +192,11 @@ int main(int argc, char **argv) {
   c.conn_vec.resize(FLAGS_num_raft_servers);  // Both clients and servers
   for (auto &peer_conn : c.conn_vec) peer_conn.c = &c;
 
-  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
-  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
-  erpc::Nexus nexus(hostname, std::stoi(udp_port_str));
+  erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
+                    FLAGS_numa_node, 0);
 
   // Both server and client need this map, so init it before launching client
-  init_node_id_to_name_map();
+  init_raft_node_id_to_name_map();
 
   if (!is_raft_server()) {
     // Run client
