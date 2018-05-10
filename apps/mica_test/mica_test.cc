@@ -49,12 +49,15 @@ int main() {
   auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
   FixedTable table(config.get("table"), kValSize, alloc);
 
-  auto *key_arr = reinterpret_cast<test_key_t *>(alloc->alloc_raw(
-      num_keys * sizeof(test_key_t), erpc::DoRegister::kFalse));
-  erpc::rt_assert(key_arr != nullptr, "");
+  erpc::Buffer key_buf =
+      alloc->alloc_raw(num_keys * sizeof(test_key_t), erpc::DoRegister::kFalse);
+  erpc::rt_assert(key_buf.buf != nullptr, "");
+  auto *key_arr = reinterpret_cast<test_key_t *>(key_buf.buf);
 
-  auto *val_arr = reinterpret_cast<test_val_t *>(alloc->alloc_raw(
-      num_keys * sizeof(test_val_t), erpc::DoRegister::kFalse));
+  erpc::Buffer val_buf =
+      alloc->alloc_raw(num_keys * sizeof(test_val_t), erpc::DoRegister::kFalse);
+  erpc::rt_assert(val_buf.buf != nullptr, "");
+  auto *val_arr = reinterpret_cast<test_val_t *>(val_buf.buf);
 
   uint64_t *key_hash_arr = new uint64_t[batch_size];
   MicaResult out_result;
