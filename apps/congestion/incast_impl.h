@@ -137,7 +137,7 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
     erpc::Timely *timely_0 = c.rpc->get_timely(0);
 
     printf(
-        "congestion: Inacst thread %zu: Tput %.2f Gbps. "
+        "congestion: Incast thread %zu: Tput %.2f Gbps. "
         "Retransmissions %zu. "
         "Session 0 Timely: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. "
         "Credits %zu (best = 32).\n",
