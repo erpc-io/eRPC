@@ -667,7 +667,7 @@ static inline int set_data_seg(struct mlx5_qp *qp, void *seg, int *sz, int is_in
 		 int num_sge, struct ibv_sge *sg_list, int atom_arg,
 		 int idx, int offset, int is_tso)
 {
-	if (ERPC_ENABLE_INLINING && is_inl)
+	if (is_inl)
 		return set_data_inl_seg(qp, num_sge, sg_list, seg, sz, idx,
 					offset);
 	if (0)
