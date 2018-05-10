@@ -44,10 +44,6 @@ static constexpr size_t kAppNumaNode = 0;
 // We run FLAGS_num_processes processes in the cluster, of which the first
 // FLAGS_num_raft_servers are Raft servers, and the remaining are Raft clients.
 DEFINE_uint64(num_raft_servers, 0, "Number of Raft servers");
-static bool validate_num_raft_servers(const char *, uint64_t num_raft_servers) {
-  return num_raft_servers > 0 && num_raft_servers % 2 == 1;
-}
-DEFINE_validator(num_raft_servers, &validate_num_raft_servers);
 
 // Return true iff this machine is a Raft server (leader or follower)
 bool is_raft_server() { return FLAGS_process_id < FLAGS_num_raft_servers; }

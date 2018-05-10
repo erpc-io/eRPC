@@ -182,11 +182,10 @@ void init_mica(AppContext *c) {
 }
 
 int main(int argc, char **argv) {
-  signal(SIGINT, ctrl_c_handler);
-
-  // Work around g++-5's unused variable warning for validators
-  _unused(num_raft_servers_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  signal(SIGINT, ctrl_c_handler);
+  erpc::rt_assert(FLAGS_num_raft_servers > 0 &&
+                  FLAGS_num_raft_servers % 2 == 1);
 
   AppContext c;
   c.conn_vec.resize(FLAGS_num_raft_servers);  // Both clients and servers
