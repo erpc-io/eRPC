@@ -21,7 +21,6 @@ struct app_rv_resp_t {
 
 void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
-
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(app_rv_req_t));
 

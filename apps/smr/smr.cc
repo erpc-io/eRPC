@@ -14,12 +14,11 @@ void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
            erpc::get_formatted_time().c_str());
   }
 
-  auto *_client_resp =
-      reinterpret_cast<client_resp_t *>(req_handle->pre_resp_msgbuf.buf);
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+  auto *_client_resp = reinterpret_cast<client_resp_t *>(resp_msgbuf.buf);
   *_client_resp = *client_resp;
 
-  c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                            sizeof(client_resp_t));
+  c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(client_resp_t));
   req_handle->prealloc_used = true;
   c->rpc->enqueue_response(req_handle);
 }
@@ -81,15 +80,14 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   *rsm_cmd_buf = *client_req;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
-  msg_entry_t entry;
-  entry.type = RAFT_LOGTYPE_NORMAL;
-  entry.id = FLAGS_process_id;
-  entry.data.buf = static_cast<void *>(rsm_cmd_buf);
-  entry.data.len = sizeof(client_req_t);
+  msg_entry_t ent;
+  ent.type = RAFT_LOGTYPE_NORMAL;
+  ent.id = FLAGS_process_id;
+  ent.data.buf = static_cast<void *>(rsm_cmd_buf);
+  ent.data.len = sizeof(client_req_t);
 
-  int e =
-      raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
-  erpc::rt_assert(e == 0, "raft_recv_entry() failed");
+  int e = raft_recv_entry(c->server.raft, &ent, &leader_sav.msg_entry_response);
+  erpc::rt_assert(e == 0);
 }
 
 void init_raft_node_id_to_name_map() {
@@ -102,7 +100,7 @@ void init_raft_node_id_to_name_map() {
 
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
-  assert(c->server.raft != nullptr);
+  erpc::rt_assert(c->server.raft != nullptr);
 
   if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
   c->server.raft_periodic_tsc = erpc::rdtsc();
