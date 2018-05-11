@@ -33,7 +33,7 @@ static_assert(sizeof(FixedTable::ft_key_t) == kAppKeySize, "");
 
 // Debug/measurement
 static constexpr bool kAppCollectTimeEntries = false;
-static constexpr bool kAppMeasureCommitLatency = false;  // Leader latency
+static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
 
@@ -163,11 +163,6 @@ class AppContext {
   erpc::Rpc<erpc::CTransport> *rpc = nullptr;
   erpc::FastRand fast_rand;
   size_t num_sm_resps = 0;
-
-  // Magic
-  static constexpr size_t kAppContextMagic = 0x3185;
-  volatile size_t magic = kAppContextMagic;  // Avoid optimizing check_magic()
-  bool check_magic() const { return magic == kAppContextMagic; }
 };
 
 // Generate a deterministic, random-ish node ID from a process's URI
@@ -179,8 +174,6 @@ int get_raft_node_id_from_uri(std::string uri) {
 // eRPC session management handler
 void sm_handler(int session_num, erpc::SmEventType sm_event_type,
                 erpc::SmErrType sm_err_type, void *_context) {
-  assert(_context != nullptr);
-
   auto *c = static_cast<AppContext *>(_context);
   c->num_sm_resps++;
 

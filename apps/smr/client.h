@@ -41,10 +41,8 @@ bool change_leader_to_node(AppContext *c, int raft_node_id) {
     int _raft_node_id = get_raft_node_id_from_uri(uri);
 
     if (_raft_node_id == raft_node_id) {
-      if (c->conn_vec[i].disconnected) {
-        // We're being redirected to a failed Raft server
-        return false;
-      }
+      // Ignore if we're being redirected to a failed Raft server
+      if (c->conn_vec[i].disconnected) return false;
 
       c->client.leader_idx = i;
       return true;
@@ -56,7 +54,6 @@ bool change_leader_to_node(AppContext *c, int raft_node_id) {
 }
 
 void send_req_one(AppContext *c) {
-  assert(c != nullptr && c->check_magic());
   c->client.req_start_tsc = erpc::rdtsc();
 
   // Format the client's PUT request. Key and value are identical.
@@ -78,10 +75,7 @@ void send_req_one(AppContext *c) {
 }
 
 void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
-  assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
-  assert(c->check_magic());
-
   double latency_us = erpc::to_usec(erpc::rdtsc() - c->client.req_start_tsc,
                                     c->rpc->get_freq_ghz());
   c->client.req_us_vec.push_back(latency_us);
@@ -165,10 +159,6 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
 }
 
 void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
-  assert(nexus != nullptr && c != nullptr);
-  assert(c->conn_vec.size() == FLAGS_num_raft_servers);
-  assert(thread_id <= erpc::kMaxRpcId);
-
   c->client.thread_id = thread_id;
   c->client.leader_idx = 0;  // Start with leader = 0
 
@@ -178,10 +168,10 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
 
   // Pre-allocate MsgBuffers
   c->client.req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(client_req_t));
-  assert(c->client.req_msgbuf.buf != nullptr);
+  erpc::rt_assert(c->client.req_msgbuf.buf != nullptr);
 
   c->client.resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(client_resp_t));
-  assert(c->client.resp_msgbuf.buf != nullptr);
+  erpc::rt_assert(c->client.resp_msgbuf.buf != nullptr);
 
   // Raft client: Create session to each Raft server
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
@@ -202,8 +192,7 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
     }
   }
 
-  printf("smr: Client %zu connected to all servers. Sending requests.\n",
-         thread_id);
+  printf("smr: Client %zu connected to all. Sending reqs.\n", thread_id);
 
   send_req_one(c);
   while (ctrl_c_pressed == 0) {

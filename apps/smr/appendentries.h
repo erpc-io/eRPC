@@ -19,9 +19,7 @@ struct appendentries_req_t {
 
 // appendentries request: node ID, msg_appendentries_t, [{size, buf}]
 void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
-  assert(c->check_magic());
 
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
@@ -86,7 +84,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   // This does a linear search, which is OK for a small number of Raft servers
   raft_node_t *requester_node =
       raft_get_node(c->server.raft, appendentries_req->node_id);
-  assert(requester_node != nullptr);
+  erpc::rt_assert(requester_node != nullptr);
 
   // The appendentries request and response structs need to valid only for
   // raft_recv_appendentries. The actual bufs in the appendentries request
@@ -94,8 +92,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *mar = reinterpret_cast<msg_appendentries_response_t *>(
       req_handle->pre_resp_msgbuf.buf);
   int e = raft_recv_appendentries(c->server.raft, requester_node, &ae, mar);
-  _unused(e);
-  assert(e == 0);
+  erpc::rt_assert(e == 0);
 
   if (n_entries > static_msg_entry_arr_size) {
     assert(ae.entries != nullptr && ae.entries != static_msg_entry_arr);
@@ -114,15 +111,10 @@ void appendentries_cont(erpc::RespHandle *, void *, size_t);  // Fwd decl
 // Raft callback for sending appendentries message
 static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
                                      msg_appendentries_t *m) {
-  assert(node != nullptr && m != nullptr);
-
   auto *conn = static_cast<connection_t *>(raft_node_get_udata(node));
-  assert(conn != nullptr && conn->session_num >= 0 && conn->c != nullptr);
-
   AppContext *c = conn->c;
-  assert(c->check_magic());
 
-  bool is_keepalive = m->n_entries == 0;
+  bool is_keepalive = (m->n_entries == 0);
   if (kAppVerbose) {
     printf("smr: Sending appendentries (%s) to node %s [%s].\n",
            is_keepalive ? "keepalive" : "non-keepalive",
@@ -146,18 +138,15 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
     req_size += sizeof(msg_entry_t) + sizeof(client_req_t);
   }
 
-  erpc::rt_assert(req_size <= c->rpc->get_max_msg_size(),
-                  "appendentries request too large for eRPC");
+  erpc::rt_assert(req_size <= c->rpc->get_max_msg_size());
 
   raft_req_tag_t *rrt = c->server.raft_req_tag_pool.alloc();
   rrt->req_msgbuf = c->rpc->alloc_msg_buffer(req_size);
-  erpc::rt_assert(rrt->req_msgbuf.buf != nullptr,
-                  "Failed to allocate request MsgBuffer");
+  erpc::rt_assert(rrt->req_msgbuf.buf != nullptr);
 
   rrt->resp_msgbuf =
       c->rpc->alloc_msg_buffer(sizeof(msg_appendentries_response_t));
-  erpc::rt_assert(rrt->resp_msgbuf.buf != nullptr,
-                  "Failed to allocate response MsgBuffer");
+  erpc::rt_assert(rrt->resp_msgbuf.buf != nullptr);
 
   rrt->node = node;
 
@@ -198,9 +187,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
 
 void appendentries_cont(erpc::RespHandle *resp_handle, void *_context,
                         size_t tag) {
-  assert(resp_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
-  assert(c->check_magic());
 
   if (kAppCollectTimeEntries) {
     c->server.time_entry_vec.push_back(
@@ -225,8 +212,7 @@ void appendentries_cont(erpc::RespHandle *resp_handle, void *_context,
 
     int e = raft_recv_appendentries_response(c->server.raft, rrt->node,
                                              msg_appendentries_response);
-    _unused(e);
-    assert(e == 0);
+    erpc::rt_assert(e == 0);
   } else {
     // This is a continuation-with-failure. Fall through and call
     // raft_periodic() again.

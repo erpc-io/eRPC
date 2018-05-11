@@ -15,7 +15,6 @@
 // Raft callback for applying an entry to the FSM
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            int) {
-  assert(udata != nullptr && ety != nullptr);
   assert(!raft_entry_is_cfg_change(ety));
 
   // We're applying an entry to the application's state machine, so we're sure
@@ -26,7 +25,6 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
   assert(client_req->key[0] == client_req->value[0]);
 
   auto *c = static_cast<AppContext *>(udata);
-  assert(c->check_magic());
 
   if (kAppVerbose) {
     printf("smr: Applying log entry %s received at Raft server %u [%s].\n",
@@ -57,12 +55,9 @@ static int __raft_persist_term(raft_server_t *, void *, const int, const int) {
 // Raft callback for appending an item to the log
 static int __raft_logentry_offer(raft_server_t *, void *udata,
                                  raft_entry_t *ety, int) {
-  assert(udata != nullptr && ety != nullptr);
   assert(!raft_entry_is_cfg_change(ety));
 
   auto *c = static_cast<AppContext *>(udata);
-  assert(c->check_magic());
-
   c->server.raft_log.push_back(*ety);
   return 0;  // Ignored
 }
@@ -72,9 +67,7 @@ static int __raft_logentry_offer(raft_server_t *, void *udata,
 // log entries.
 static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
                                int) {
-  assert(udata != nullptr);
   auto *c = static_cast<AppContext *>(udata);
-  assert(c->check_magic());
 
   raft_entry_t &entry = c->server.raft_log.back();
   if (likely(entry.data.len == sizeof(client_req_t))) {

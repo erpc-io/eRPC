@@ -25,9 +25,7 @@ void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
 }
 
 void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
-  assert(c->check_magic());
 
   // We need leader_sav to start commit latency measurement, but we won't mark
   // it in_use until checking that this node is the leader
@@ -173,9 +171,6 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
 }
 
 void init_mica(AppContext *c) {
-  assert(c->server.raft != nullptr);  // Only called at servers
-  assert(c->rpc != nullptr);          // We need the Rpc's allocator
-
   auto config = mica::util::Config::load_file("apps/smr/kv_store.json");
   c->server.table = new FixedTable(config.get("table"), kAppValueSize,
                                    c->rpc->get_huge_alloc());
