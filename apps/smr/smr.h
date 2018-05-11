@@ -32,7 +32,7 @@ typedef mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
 static_assert(sizeof(FixedTable::ft_key_t) == kAppKeySize, "");
 
 // Debug/measurement
-static constexpr bool kAppCollectTimeEntries = false;
+static constexpr bool kAppTimeEnt = false;
 static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
@@ -130,7 +130,7 @@ class AppContext {
     std::vector<raft_entry_t> raft_log;  // The Raft log, vector is OK
     size_t raft_periodic_tsc;            // rdtsc timestamp
     leader_saveinfo_t leader_saveinfo;   // Info for the ongoing commit request
-    std::vector<TimeEnt> time_ent_vec;
+    std::vector<TimeEnt> time_ents;
 
     // Pools
     AppMemPool<client_req_t> rsm_cmd_buf_pool;  // Pool for SMR commands

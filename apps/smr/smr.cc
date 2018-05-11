@@ -32,9 +32,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
 
   if (kAppMeasureCommitLatency) leader_sav.start_tsc = erpc::rdtsc();
-  if (kAppCollectTimeEntries) {
-    c->server.time_ent_vec.emplace_back(TimeEntType::kClientReq);
-  }
+  if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kClientReq);
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
@@ -106,7 +104,7 @@ void init_raft(AppContext *c) {
   c->server.raft = raft_new();
   assert(c->server.raft != nullptr);
 
-  if (kAppCollectTimeEntries) c->server.time_ent_vec.reserve(1000000);
+  if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
   c->server.raft_periodic_tsc = erpc::rdtsc();
 
   set_raft_callbacks(c);
@@ -244,9 +242,7 @@ int main(int argc, char **argv) {
         c.server.commit_latency.update(commit_usec * 10);
       }
 
-      if (kAppCollectTimeEntries) {
-        c.server.time_ent_vec.emplace_back(TimeEntType::kCommitted);
-      }
+      if (kAppTimeEnt) c.server.time_ents.emplace_back(TimeEntType::kCommitted);
 
       // XXX: Is this correct, or should we send response in _apply_log()
       // callback? This doesn't adversely affect failure-free performance.
@@ -258,17 +254,17 @@ int main(int argc, char **argv) {
     }
   }
 
-  // This is OK even when kAppCollectTimeEntries = false
+  // This is OK even when kAppTimeEnt = false
   printf("smr: Printing first 1000 of %zu time entries.\n",
-         c.server.time_ent_vec.size());
-  size_t num_print = std::min(c.server.time_ent_vec.size(), 1000ul);
+         c.server.time_ents.size());
+  size_t num_print = std::min(c.server.time_ents.size(), 1000ul);
 
   if (num_print > 0) {
-    size_t base_tsc = c.server.time_ent_vec[0].tsc;
+    size_t base_tsc = c.server.time_ents[0].tsc;
     double freq_ghz = c.rpc->get_freq_ghz();
     for (size_t i = 0; i < num_print; i++) {
       printf("%s\n",
-             c.server.time_ent_vec[i].to_string(base_tsc, freq_ghz).c_str());
+             c.server.time_ents[i].to_string(base_tsc, freq_ghz).c_str());
     }
   }
 
