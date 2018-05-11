@@ -27,9 +27,7 @@ void change_leader_to_any(AppContext *c) {
     }
   }
 
-  printf(
-      "smr: Client failed to change leader to any Raft server. "
-      "Exiting.\n");
+  printf("smr: Client failed to change leader to any Raft server. Exiting.\n");
   exit(0);
 }
 
@@ -195,9 +193,7 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
   printf("smr: Client %zu connected to all. Sending reqs.\n", thread_id);
 
   send_req_one(c);
-  while (ctrl_c_pressed == 0) {
-    c->rpc->run_event_loop(200);  // 200 milliseconds
-  }
+  while (ctrl_c_pressed == 0) c->rpc->run_event_loop(200);
 
   delete c->rpc;
 }
