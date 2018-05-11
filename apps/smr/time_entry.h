@@ -10,7 +10,7 @@
 #include "rpc.h"
 
 // Comments describe the common-case usage
-enum class TimeEntryType {
+enum class TimeEntType {
   kClientReq,   // Client request received by leader
   kSendAeReq,   // Leader sends appendentry request
   kRecvAeReq,   // Follower receives appendentry request
@@ -19,34 +19,32 @@ enum class TimeEntryType {
   kCommitted    // Entry committed at leader
 };
 
-class TimeEntry {
+class TimeEnt {
  public:
-  TimeEntryType time_entry_type;
+  TimeEntType type;
   size_t tsc;
-
-  TimeEntry() {}
-  TimeEntry(TimeEntryType t, size_t tsc) : time_entry_type(t), tsc(tsc) {}
+  TimeEnt(TimeEntType t) : type(t), tsc(erpc::rdtsc()) {}
 
   std::string to_string(size_t base_tsc, double freq_ghz) const {
     std::string ret;
 
-    switch (time_entry_type) {
-      case TimeEntryType::kClientReq:
+    switch (type) {
+      case TimeEntType::kClientReq:
         ret = "client_req";
         break;
-      case TimeEntryType::kSendAeReq:
+      case TimeEntType::kSendAeReq:
         ret = "send_appendentries_req";
         break;
-      case TimeEntryType::kRecvAeReq:
+      case TimeEntType::kRecvAeReq:
         ret = "recv_appendentries_req";
         break;
-      case TimeEntryType::kSendAeResp:
+      case TimeEntType::kSendAeResp:
         ret = "send_appendentries_resp";
         break;
-      case TimeEntryType::kRecvAeResp:
+      case TimeEntType::kRecvAeResp:
         ret = "recv_appendentries_resp";
         break;
-      case TimeEntryType::kCommitted:
+      case TimeEntType::kCommitted:
         ret = "committed";
         break;
     }

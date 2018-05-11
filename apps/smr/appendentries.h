@@ -22,8 +22,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
 
   if (kAppCollectTimeEntries) {
-    c->server.time_entry_vec.push_back(
-        TimeEntry(TimeEntryType::kRecvAeReq, erpc::rdtsc()));
+    c->server.time_ent_vec.emplace_back(TimeEntType::kRecvAeReq);
   }
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
@@ -100,8 +99,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   }
 
   if (kAppCollectTimeEntries) {
-    c->server.time_entry_vec.push_back(
-        TimeEntry(TimeEntryType::kSendAeResp, erpc::rdtsc()));
+    c->server.time_ent_vec.emplace_back(TimeEntType::kSendAeResp);
   }
   c->rpc->enqueue_response(req_handle);
 }
@@ -174,8 +172,7 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   assert(buf == rrt->req_msgbuf.buf + rrt->req_msgbuf.get_data_size());
 
   if (kAppCollectTimeEntries) {
-    c->server.time_entry_vec.push_back(
-        TimeEntry(TimeEntryType::kSendAeReq, erpc::rdtsc()));
+    c->server.time_ent_vec.emplace_back(TimeEntType::kSendAeReq);
   }
 
   c->rpc->enqueue_request(conn->session_num,
@@ -190,8 +187,7 @@ void appendentries_cont(erpc::RespHandle *resp_handle, void *_context,
   auto *c = static_cast<AppContext *>(_context);
 
   if (kAppCollectTimeEntries) {
-    c->server.time_entry_vec.push_back(
-        TimeEntry(TimeEntryType::kRecvAeResp, erpc::rdtsc()));
+    c->server.time_ent_vec.emplace_back(TimeEntType::kRecvAeResp);
   }
 
   auto *rrt = reinterpret_cast<raft_req_tag_t *>(tag);

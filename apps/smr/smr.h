@@ -130,7 +130,7 @@ class AppContext {
     std::vector<raft_entry_t> raft_log;  // The Raft log, vector is OK
     size_t raft_periodic_tsc;            // rdtsc timestamp
     leader_saveinfo_t leader_saveinfo;   // Info for the ongoing commit request
-    std::vector<TimeEntry> time_entry_vec;
+    std::vector<TimeEnt> time_ent_vec;
 
     // Pools
     AppMemPool<client_req_t> rsm_cmd_buf_pool;  // Pool for SMR commands
