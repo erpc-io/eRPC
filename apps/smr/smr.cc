@@ -14,30 +14,24 @@ void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
            erpc::get_formatted_time().c_str());
   }
 
-  auto *_client_resp =
-      reinterpret_cast<client_resp_t *>(req_handle->pre_resp_msgbuf.buf);
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+  auto *_client_resp = reinterpret_cast<client_resp_t *>(resp_msgbuf.buf);
   *_client_resp = *client_resp;
 
-  c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                            sizeof(client_resp_t));
+  c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(client_resp_t));
   req_handle->prealloc_used = true;
   c->rpc->enqueue_response(req_handle);
 }
 
 void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
-  assert(req_handle != nullptr && _context != nullptr);
   auto *c = static_cast<AppContext *>(_context);
-  assert(c->check_magic());
 
   // We need leader_sav to start commit latency measurement, but we won't mark
   // it in_use until checking that this node is the leader
   leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
 
   if (kAppMeasureCommitLatency) leader_sav.start_tsc = erpc::rdtsc();
-  if (kAppCollectTimeEntries) {
-    c->server.time_entry_vec.push_back(
-        TimeEntry(TimeEntryType::kClientReq, erpc::rdtsc()));
-  }
+  if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kClientReq);
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
@@ -86,41 +80,40 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   *rsm_cmd_buf = *client_req;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
-  msg_entry_t entry;
-  entry.type = RAFT_LOGTYPE_NORMAL;
-  entry.id = FLAGS_process_id;
-  entry.data.buf = static_cast<void *>(rsm_cmd_buf);
-  entry.data.len = sizeof(client_req_t);
+  msg_entry_t ent;
+  ent.type = RAFT_LOGTYPE_NORMAL;
+  ent.id = FLAGS_process_id;
+  ent.data.buf = static_cast<void *>(rsm_cmd_buf);
+  ent.data.len = sizeof(client_req_t);
 
-  int e =
-      raft_recv_entry(c->server.raft, &entry, &leader_sav.msg_entry_response);
-  erpc::rt_assert(e == 0, "raft_recv_entry() failed");
+  int e = raft_recv_entry(c->server.raft, &ent, &leader_sav.msg_entry_response);
+  erpc::rt_assert(e == 0);
 }
 
-void init_node_id_to_name_map() {
+void init_raft_node_id_to_name_map() {
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string node_i_hostname = get_hostname_for_machine(i);
-    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
-    node_id_to_name_map[node_i_id] = erpc::trim_hostname(node_i_hostname);
+    std::string uri = erpc::get_uri_for_process(i);
+    int raft_node_id = get_raft_node_id_from_uri(uri);
+    node_id_to_name_map[raft_node_id] = erpc::trim_hostname(uri);
   }
 }
 
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
-  assert(c->server.raft != nullptr);
+  erpc::rt_assert(c->server.raft != nullptr);
 
-  if (kAppCollectTimeEntries) c->server.time_entry_vec.reserve(1000000);
+  if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
   c->server.raft_periodic_tsc = erpc::rdtsc();
 
   set_raft_callbacks(c);
 
-  std::string machine_name = get_hostname_for_machine(FLAGS_process_id);
-  c->server.node_id = get_raft_node_id_from_hostname(machine_name);
+  std::string my_uri = erpc::get_uri_for_process(FLAGS_process_id);
+  c->server.node_id = get_raft_node_id_from_uri(my_uri);
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string node_i_hostname = get_hostname_for_machine(i);
-    int node_i_id = get_raft_node_id_from_hostname(node_i_hostname);
+    std::string uri = erpc::get_uri_for_process(i);
+    int raft_node_id = get_raft_node_id_from_uri(uri);
 
     if (i == FLAGS_process_id) {
       // Add self. user_data = nullptr, peer_is_self = 1
@@ -128,7 +121,7 @@ void init_raft(AppContext *c) {
     } else {
       // Add a non-self node. peer_is_self = 0
       raft_add_node(c->server.raft, static_cast<void *>(&c->conn_vec[i]),
-                    node_i_id, 0);
+                    raft_node_id, 0);
     }
   }
 }
@@ -155,11 +148,11 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   // Create a session to each Raft server, excluding self
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     if (i == FLAGS_process_id) continue;
-    std::string hostname = erpc::get_hostname_for_process(i);
-    printf("smr: Creating session to %s, index = %zu.\n", hostname.c_str(), i);
+    std::string uri = erpc::get_uri_for_process(i);
+    printf("smr: Creating session to %s, index = %zu.\n", uri.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num = c->rpc->create_session(hostname, 0);
+    c->conn_vec[i].session_num = c->rpc->create_session(uri, 0);
     assert(c->conn_vec[i].session_num >= 0);
   }
 
@@ -173,31 +166,26 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
 }
 
 void init_mica(AppContext *c) {
-  assert(c->server.raft != nullptr);  // Only called at servers
-  assert(c->rpc != nullptr);          // We need the Rpc's allocator
-
   auto config = mica::util::Config::load_file("apps/smr/kv_store.json");
   c->server.table = new FixedTable(config.get("table"), kAppValueSize,
                                    c->rpc->get_huge_alloc());
 }
 
 int main(int argc, char **argv) {
-  signal(SIGINT, ctrl_c_handler);
-
-  // Work around g++-5's unused variable warning for validators
-  _unused(num_raft_servers_validator_registered);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  signal(SIGINT, ctrl_c_handler);
+  erpc::rt_assert(FLAGS_num_raft_servers > 0 &&
+                  FLAGS_num_raft_servers % 2 == 1);
 
   AppContext c;
   c.conn_vec.resize(FLAGS_num_raft_servers);  // Both clients and servers
   for (auto &peer_conn : c.conn_vec) peer_conn.c = &c;
 
-  std::string hostname = erpc::get_hostname_for_process(FLAGS_process_id);
-  std::string udp_port_str = erpc::get_udp_port_for_process(FLAGS_process_id);
-  erpc::Nexus nexus(hostname, std::stoi(udp_port_str));
+  erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
+                    FLAGS_numa_node, 0);
 
   // Both server and client need this map, so init it before launching client
-  init_node_id_to_name_map();
+  init_raft_node_id_to_name_map();
 
   if (!is_raft_server()) {
     // Run client
@@ -252,10 +240,7 @@ int main(int argc, char **argv) {
         c.server.commit_latency.update(commit_usec * 10);
       }
 
-      if (kAppCollectTimeEntries) {
-        c.server.time_entry_vec.push_back(
-            TimeEntry(TimeEntryType::kCommitted, erpc::rdtsc()));
-      }
+      if (kAppTimeEnt) c.server.time_ents.emplace_back(TimeEntType::kCommitted);
 
       // XXX: Is this correct, or should we send response in _apply_log()
       // callback? This doesn't adversely affect failure-free performance.
@@ -267,17 +252,17 @@ int main(int argc, char **argv) {
     }
   }
 
-  // This is OK even when kAppCollectTimeEntries = false
+  // This is OK even when kAppTimeEnt = false
   printf("smr: Printing first 1000 of %zu time entries.\n",
-         c.server.time_entry_vec.size());
-  size_t num_print = std::min(c.server.time_entry_vec.size(), 1000ul);
+         c.server.time_ents.size());
+  size_t num_print = std::min(c.server.time_ents.size(), 1000ul);
 
   if (num_print > 0) {
-    size_t base_tsc = c.server.time_entry_vec[0].tsc;
+    size_t base_tsc = c.server.time_ents[0].tsc;
     double freq_ghz = c.rpc->get_freq_ghz();
     for (size_t i = 0; i < num_print; i++) {
       printf("%s\n",
-             c.server.time_entry_vec[i].to_string(base_tsc, freq_ghz).c_str());
+             c.server.time_ents[i].to_string(base_tsc, freq_ghz).c_str());
     }
   }
 

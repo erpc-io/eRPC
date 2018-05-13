@@ -7,6 +7,7 @@
 
 #include "congestion.h"
 
+// Each incast thread creates one session to machine 0
 void connect_sessions_func_incast(AppContext *c) {
   assert(FLAGS_process_id != 0);
   assert(c->thread_id < FLAGS_incast_threads_other);
@@ -125,18 +126,18 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
     // Publish stats
     auto &stats = c.app_stats[c.thread_id];
     stats.incast_gbps = c.incast_tx_bytes * 8 / ns;
-    stats.re_tx = c.rpc->get_num_re_tx(c.session_num_vec[0]);
-    assert(stats.regular_50_us == 0);
-    assert(stats.regular_99_us == 0);
+    stats.re_tx = c.rpc->get_num_re_tx_cumulative();
+    assert(stats.regular_50_us == 0 && stats.regular_99_us == 0 &&
+           stats.regular_999_us == 0);
 
     // Reset stats for next iteration
     c.incast_tx_bytes = 0;
-    c.rpc->reset_num_re_tx(c.session_num_vec[0]);
+    c.rpc->reset_num_re_tx_cumulative();
 
     erpc::Timely *timely_0 = c.rpc->get_timely(0);
 
     printf(
-        "congestion: Inacst thread %zu: Tput %.2f Gbps. "
+        "congestion: Incast thread %zu: Tput %.2f Gbps. "
         "Retransmissions %zu. "
         "Session 0 Timely: {{%.1f, %.1f, %.1f} us, %.2f Gbps}. "
         "Credits %zu (best = 32).\n",
@@ -148,21 +149,28 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
 
     if (c.thread_id == 0) {
       app_stats_t accum_stats;
-      for (size_t i = 0;
-           i < FLAGS_incast_threads_other + FLAGS_regular_threads_other; i++) {
+      std::vector<double> incast_gbps_vec;  // For stddev computation
+
+      for (size_t i = 0; i < tot_threads_other(); i++) {
         // Stats published by all threads
-        accum_stats.incast_gbps += c.app_stats[i].incast_gbps;
         accum_stats.re_tx += c.app_stats[i].re_tx;
 
-        if (i >= FLAGS_incast_threads_other) {
+        if (i < FLAGS_incast_threads_other) {
+          // Stats published by only incast threads
+          accum_stats.incast_gbps += c.app_stats[i].incast_gbps;
+          incast_gbps_vec.push_back(c.app_stats[i].incast_gbps);
+        } else {
           // Stats published by only regular threads
           accum_stats.regular_50_us += c.app_stats[i].regular_50_us;
           accum_stats.regular_99_us += c.app_stats[i].regular_99_us;
+          accum_stats.regular_999_us += c.app_stats[i].regular_999_us;
         }
       }
 
+      accum_stats.incast_gbps_stddev = erpc::stddev(incast_gbps_vec);
       accum_stats.regular_50_us /= FLAGS_regular_threads_other;
       accum_stats.regular_99_us /= FLAGS_regular_threads_other;
+      accum_stats.regular_999_us /= FLAGS_regular_threads_other;
 
       c.tmp_stat->write(accum_stats.to_string());
     }

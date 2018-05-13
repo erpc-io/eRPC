@@ -15,7 +15,6 @@
 // Raft callback for applying an entry to the FSM
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            int) {
-  assert(udata != nullptr && ety != nullptr);
   assert(!raft_entry_is_cfg_change(ety));
 
   // We're applying an entry to the application's state machine, so we're sure
@@ -26,7 +25,6 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
   assert(client_req->key[0] == client_req->value[0]);
 
   auto *c = static_cast<AppContext *>(udata);
-  assert(c->check_magic());
 
   if (kAppVerbose) {
     printf("smr: Applying log entry %s received at Raft server %u [%s].\n",
@@ -40,8 +38,7 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 
   auto result = table->set(key_hash, *ft_key,
                            reinterpret_cast<char *>(&client_req->value));
-  erpc::rt_assert(result == mica::table::Result::kSuccess,
-                  "MICA insert failed");
+  erpc::rt_assert(result == mica::table::Result::kSuccess, "KV insert failed");
   return 0;
 }
 
@@ -51,19 +48,16 @@ static int __raft_persist_vote(raft_server_t *, void *, const int) {
 }
 
 // Raft callback for saving term field to persistent storage
-static int __raft_persist_term(raft_server_t *, void *, const int) {
+static int __raft_persist_term(raft_server_t *, void *, const int, const int) {
   return 0;  // Ignored
 }
 
 // Raft callback for appending an item to the log
 static int __raft_logentry_offer(raft_server_t *, void *udata,
                                  raft_entry_t *ety, int) {
-  assert(udata != nullptr && ety != nullptr);
   assert(!raft_entry_is_cfg_change(ety));
 
   auto *c = static_cast<AppContext *>(udata);
-  assert(c->check_magic());
-
   c->server.raft_log.push_back(*ety);
   return 0;  // Ignored
 }
@@ -73,9 +67,7 @@ static int __raft_logentry_offer(raft_server_t *, void *udata,
 // log entries.
 static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
                                int) {
-  assert(udata != nullptr);
   auto *c = static_cast<AppContext *>(udata);
-  assert(c->check_magic());
 
   raft_entry_t &entry = c->server.raft_log.back();
   if (likely(entry.data.len == sizeof(client_req_t))) {
@@ -129,11 +121,7 @@ void set_raft_callbacks(AppContext *c) {
 
   // Providing a non-null console log callback is expensive, even if we do
   // nothing in the callback.
-  if (kAppEnableRaftConsoleLog) {
-    raft_funcs.log = __raft_log;
-  } else {
-    raft_funcs.log = nullptr;
-  }
+  raft_funcs.log = kAppEnableRaftConsoleLog ? __raft_log : nullptr;
 
   // Callback udata = context
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));

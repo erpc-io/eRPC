@@ -91,7 +91,6 @@
  * Unsetting `TESTING` disables support to inject eRPC faults at runtime.
 
 ## Short-term TODOs
- * Use TX flush on client-side retransmission
  * Session reset and machine failure detection broke when I changed session
    management to use UDP instead of ENet.
  * In `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
@@ -102,11 +101,12 @@
  * Use `rt_assert` in src and apps.
  * In IBTransport, check if MLX environment vars are set. Do it in constructor.
  * RFR sending needs to be paced, so we cannot use `send_rfr_now`.
- * Handle `poll_cq` and `post_send` failures in IBTransport. Do it by moving
-   RpcDatapathErrCode from rpc.h to common.h, and using it in IBTransport.
  * Do we need separate `rx_burst()` and `post_recvs()` functions in Transport?
 
 ## Long-term TODOs
+ * Fix compilation of `mica_test`. It gets incomplete type errors for MICA in
+   YouCompleteMe, and `pthread_create missing` error with DPERF=ON.
+ * Sync modded and original mlx4 drivers, similar to mlx5.
  * Enable marking an Rpc object as server-only. Such an Rpc object can bypass
    packet loss detection code in the event loop.
  * Handle MsgBuffer allocation failures in eRPC.

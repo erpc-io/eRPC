@@ -32,8 +32,8 @@ typedef mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
 static_assert(sizeof(FixedTable::ft_key_t) == kAppKeySize, "");
 
 // Debug/measurement
-static constexpr bool kAppCollectTimeEntries = false;
-static constexpr bool kAppMeasureCommitLatency = false;  // Leader latency
+static constexpr bool kAppTimeEnt = false;
+static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
 
@@ -43,15 +43,10 @@ static constexpr size_t kAppNumaNode = 0;
 
 // We run FLAGS_num_processes processes in the cluster, of which the first
 // FLAGS_num_raft_servers are Raft servers, and the remaining are Raft clients.
-DEFINE_uint64(num_raft_servers, 0,
-              "Number of Raft servers (i.e., non-client machines)");
-static bool validate_num_raft_servers(const char *, uint64_t num_raft_servers) {
-  return num_raft_servers > 0 && num_raft_servers % 2 == 1;
-}
-DEFINE_validator(num_raft_servers, &validate_num_raft_servers);
+DEFINE_uint64(num_raft_servers, 0, "Number of Raft servers");
 
 // Return true iff this machine is a Raft server (leader or follower)
-bool is_raft_server() { return FLAGS_machine_id < FLAGS_num_raft_servers; }
+bool is_raft_server() { return FLAGS_process_id < FLAGS_num_raft_servers; }
 
 /// The eRPC request types
 enum class ReqType : uint8_t {
@@ -135,7 +130,7 @@ class AppContext {
     std::vector<raft_entry_t> raft_log;  // The Raft log, vector is OK
     size_t raft_periodic_tsc;            // rdtsc timestamp
     leader_saveinfo_t leader_saveinfo;   // Info for the ongoing commit request
-    std::vector<TimeEntry> time_entry_vec;
+    std::vector<TimeEnt> time_ents;
 
     // Pools
     AppMemPool<client_req_t> rsm_cmd_buf_pool;  // Pool for SMR commands
@@ -168,24 +163,17 @@ class AppContext {
   erpc::Rpc<erpc::CTransport> *rpc = nullptr;
   erpc::FastRand fast_rand;
   size_t num_sm_resps = 0;
-
-  // Magic
-  static constexpr size_t kAppContextMagic = 0x3185;
-  volatile size_t magic = kAppContextMagic;  // Avoid optimizing check_magic()
-  bool check_magic() const { return magic == kAppContextMagic; }
 };
 
-// Generate a deterministic, random-ish node ID from a machine's hostname
-int get_raft_node_id_from_hostname(std::string hostname) {
-  uint32_t hash = CityHash32(hostname.c_str(), hostname.length());
+// Generate a deterministic, random-ish node ID from a process's URI
+int get_raft_node_id_from_uri(std::string uri) {
+  uint32_t hash = CityHash32(uri.c_str(), uri.length());
   return static_cast<int>(hash);
 }
 
 // eRPC session management handler
 void sm_handler(int session_num, erpc::SmEventType sm_event_type,
                 erpc::SmErrType sm_err_type, void *_context) {
-  assert(_context != nullptr);
-
   auto *c = static_cast<AppContext *>(_context);
   c->num_sm_resps++;
 

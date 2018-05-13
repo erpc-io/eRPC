@@ -6,7 +6,7 @@ if [ "$#" -ne 1 ]; then
 	exit
 fi
 
-bad_nodes=""
+bad_nodes="hp097"
 
 # Create a map from node hostnames to switch IDs
 for ((i = 1; i <= $1; i++)); do
@@ -26,7 +26,6 @@ for ((i = 1; i <= $1; i++)); do
 
     echo "$hostname $switch_id" >> temp
   fi
-
   ) &
 done
 wait

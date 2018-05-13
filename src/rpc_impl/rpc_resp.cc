@@ -73,16 +73,7 @@ template <class TTr>
 void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
                                    size_t rx_tsc) {
   assert(in_dispatch());
-  if (unlikely(pkthdr->req_num > sslot->cur_req_num)) {
-    LOG_ERROR(
-        "Rpc %u, lsn %u (%s): Received wrong order response %s."
-        "sslot %zu/%s. Exiting.\n",
-        rpc_id, sslot->session->local_session_num,
-        sslot->session->get_remote_hostname().c_str(),
-        pkthdr->to_string().c_str(), sslot->cur_req_num,
-        sslot->progress_str().c_str());
-    exit(-1);
-  }
+  assert(pkthdr->req_num <= sslot->cur_req_num);
 
   // Handle reordering
   if (unlikely(!in_order_client(sslot, pkthdr))) {
@@ -98,9 +89,11 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   auto &ci = sslot->client_info;
   MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
 
+  // Update clien tracking metadata
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   ci.num_rx++;
+  ci.progress_tsc = ev_loop_tsc;
 
   // Special handling for single-packet respones
   if (likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
@@ -112,8 +105,6 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
 
     // Fall through to invoke continuation
   } else {
-    ci.progress_tsc = ev_loop_tsc;
-
     // This is an in-order response packet. So, we still have the request.
     MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
 

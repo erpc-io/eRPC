@@ -28,27 +28,36 @@ DEFINE_double(incast_throttle, 0, "If not 0, fair share fraction for incasts");
 
 // Non-incast traffic flags
 DEFINE_uint64(regular_threads_other, 0, "Threads sending regular traffic");
-DEFINE_uint64(regular_concurrency, 0, "Concurrent batches per thread");
+DEFINE_uint64(regular_concurrency, 0, "Concurrent requests per regular thread");
 DEFINE_uint64(regular_req_size, 0, "Reqular request data size");
 DEFINE_uint64(regular_resp_size, 0, "Regular response data size");
 
+size_t tot_threads_other() {
+  return FLAGS_incast_threads_other + FLAGS_regular_threads_other;
+}
+
 struct app_stats_t {
-  double incast_gbps;
-  size_t re_tx;
-  double regular_50_us;
-  double regular_99_us;
-  size_t pad[4];
+  double incast_gbps;         // All incast threads
+  double incast_gbps_stddev;  // Only thread 0
+  size_t re_tx;               // All incast and regular threads
+  double regular_50_us;       // All regular threads
+  double regular_99_us;       // All regular threads
+  double regular_999_us;      // All regular threads
+  size_t pad[2];
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
   static std::string get_template_str() {
-    return "incast_gbps re_tx regular_50_us regular_99_us";
+    return "incast_gbps incast_gbps_stddev re_tx regular_50_us regular_99_us "
+           "regular_999_us";
   }
 
   /// Return a space-separated string of all stats
   std::string to_string() {
-    return std::to_string(incast_gbps) + " " + std::to_string(re_tx) + " " +
-           std::to_string(regular_50_us) + " " + std::to_string(regular_99_us);
+    return std::to_string(incast_gbps) + " " +
+           std::to_string(incast_gbps_stddev) + " " + std::to_string(re_tx) +
+           " " + std::to_string(regular_50_us) + " " +
+           std::to_string(regular_99_us) + " " + std::to_string(regular_999_us);
   }
 
   /// Threads publish stats selectively, so must accumulate manually
@@ -63,7 +72,7 @@ class AppContext : public BasicAppContext {
   app_stats_t* app_stats;   // Common stats array for all threads
 
   size_t incast_tx_bytes = 0;     // Total incast bytes sent
-  erpc::Latency regular_latency;  // Latency percentiles for regular traffic
+  erpc::Latency regular_latency;  // Latency for regular traffic (x10)
 
   uint64_t req_ts[kAppMaxConcurrency];  // Per-request timestamps
   erpc::MsgBuffer req_msgbuf[kAppMaxConcurrency];

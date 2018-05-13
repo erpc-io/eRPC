@@ -1,37 +1,34 @@
 /**
  * @file regular_impl.h
- * @brief The regular traffic component
+ * @brief The regular traffic component. Each regular thread keeps
+ * FLAGS_regular_concurrency requests outstanding.
  */
 #ifndef REGULAR_IMPL_H
 #define REGULAR_IMPL_H
 
 #include "congestion.h"
 
+// Create a session to each *peer* regular thread in the cluster
 void connect_sessions_func_regular(AppContext *c) {
   assert(FLAGS_process_id != 0);
   assert(c->thread_id >= FLAGS_incast_threads_other);
 
-  c->session_num_vec.resize(
-      (FLAGS_regular_threads_other * (FLAGS_num_processes - 1)) - 1);
+  c->session_num_vec.resize(FLAGS_num_processes - 2);
 
   size_t session_idx = 0;
   for (size_t p_i = 1; p_i < FLAGS_num_processes; p_i++) {
-    for (size_t t_i = FLAGS_incast_threads_other;
-         t_i < FLAGS_incast_threads_other + FLAGS_regular_threads_other;
-         t_i++) {
-      if (p_i == FLAGS_process_id && t_i == c->thread_id) continue;
+    if (p_i == FLAGS_process_id) continue;
 
-      c->session_num_vec.at(session_idx) =
-          c->rpc->create_session(erpc::get_uri_for_process(p_i), t_i);
-      erpc::rt_assert(c->session_num_vec[session_idx] >= 0);
+    c->session_num_vec[session_idx] =
+        c->rpc->create_session(erpc::get_uri_for_process(p_i), c->thread_id);
+    erpc::rt_assert(c->session_num_vec[session_idx] >= 0);
 
-      if (kAppVerbose) {
-        printf("congestion: Regular thread %zu: Creating session to %zu/%zu.\n",
-               c->thread_id, p_i, t_i);
-      }
-
-      session_idx++;
+    if (kAppVerbose) {
+      printf("congestion: Regular thread %zu: Creating session to %zu.\n",
+             c->thread_id, p_i);
     }
+
+    session_idx++;
   }
   assert(session_idx == c->session_num_vec.size());
 
@@ -85,7 +82,7 @@ void cont_regular(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   auto *c = static_cast<AppContext *>(_context);
   double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
-  c->regular_latency.update(usec);
+  c->regular_latency.update(usec * 10.0);
 
   assert(resp_msgbuf->get_data_size() == FLAGS_regular_resp_size);
   erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte);  // Touch
@@ -135,18 +132,20 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
     // Publish stats
     auto &stats = c.app_stats[c.thread_id];
     assert(stats.incast_gbps == 0);
-    stats.re_tx = c.rpc->get_num_re_tx(c.session_num_vec[0]);
-    stats.regular_50_us = c.regular_latency.perc(0.50);
-    stats.regular_99_us = c.regular_latency.perc(0.99);
+    stats.re_tx = c.rpc->get_num_re_tx_cumulative();
+    stats.regular_50_us = c.regular_latency.perc(0.50) / 10.0;
+    stats.regular_99_us = c.regular_latency.perc(0.99) / 10.0;
+    stats.regular_999_us = c.regular_latency.perc(0.999) / 10.0;
 
     // Reset stats for next iteration
-    c.rpc->reset_num_re_tx(c.session_num_vec[0]);
+    c.rpc->reset_num_re_tx_cumulative();
     c.regular_latency.reset();
 
     printf(
         "congestion: Regular thread %zu: Retransmissions %zu. "
-        "Latency {%.1f us, %.1f us}.\n",
-        c.thread_id, stats.re_tx, stats.regular_50_us, stats.regular_99_us);
+        "Latency {%.1f, %.1f, %.1f us}.\n",
+        c.thread_id, stats.re_tx, stats.regular_50_us, stats.regular_99_us,
+        stats.regular_999_us);
     // An incast thread will write to tmp_stat
   }
   // We don't disconnect sessions

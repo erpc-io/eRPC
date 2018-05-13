@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <cmath>
 #include <limits>
+#include <numeric>
+#include <vector>
+#include "common.h"
 
 namespace erpc {
 
@@ -42,6 +45,18 @@ static constexpr size_t ceil(double num) {
   return (static_cast<double>(static_cast<size_t>(num)) == num)
              ? static_cast<size_t>(num)
              : static_cast<size_t>(num) + ((num > 0) ? 1 : 0);
+}
+
+/// Compute the standard deviation of a vector
+static double stddev(std::vector<double> v) {
+  if (unlikely(v.empty())) return 0;
+  double sum = std::accumulate(v.begin(), v.end(), 0.0);
+  double mean = sum / v.size();
+  double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
+  double var = sq_sum / v.size() - (mean * mean);
+  if (unlikely(var < 0)) return 0.0;  // This can happen when var ~ 0
+
+  return std::sqrt(var);
 }
 
 }  /// End erpc

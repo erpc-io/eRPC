@@ -240,6 +240,12 @@ class Rpc {
   /// Reset the cumulative retransmission counter
   void reset_num_re_tx_cumulative() { pkt_loss_stats.num_re_tx = 0; }
 
+  /// Return the number of still-in-wheel events
+  size_t get_num_still_in_wheel() { return pkt_loss_stats.still_in_wheel; }
+
+  /// Reset the still-in-wheel counter
+  void reset_num_still_in_wheel() { pkt_loss_stats.still_in_wheel = 0; }
+
   /// Return the number of retransmissions for a connected session
   size_t get_num_re_tx(int session_num) {
     Session *session = session_vec[static_cast<size_t>(session_num)];
