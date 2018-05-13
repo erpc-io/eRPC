@@ -44,6 +44,7 @@ flags = [
     '-I' + str(home_dir) + '/eRPC/third_party',
     '-I' + str(home_dir) + '/eRPC/mica/src',
     '-I' + str(home_dir) + '/masstree-beta',
+    '-isystem', '/proj/ron-PG0/akalia/dpdk-stable-17.11.2/x86_64-native-linuxapp-gcc/include',
     '-Wall',
     '-Werror',
     '-Wextra',
