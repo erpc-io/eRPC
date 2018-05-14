@@ -9,7 +9,7 @@
 
 namespace erpc {
 
-// Return line with index \p from \p filename. Throw exception if no such line.
+// Return the nth line from a file, with leading and trailing space trimmed
 static std::string get_line_n(std::string filename, size_t n) {
   std::ifstream in(filename.c_str());
 
@@ -24,6 +24,7 @@ static std::string get_line_n(std::string filename, size_t n) {
   std::getline(in, s);
   erpc::rt_assert(!s.empty(), "Insufficient lines in " + filename);
 
+  boost::algorithm::trim(s);
   return s;
 }
 
