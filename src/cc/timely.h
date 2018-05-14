@@ -9,6 +9,7 @@
 #define ERPC_TIMELY_H
 
 #include <iomanip>
+#include "cc/timely_sweep_params.h"
 #include "common.h"
 #include "util/latency.h"
 #include "util/timer.h"
@@ -37,7 +38,6 @@ class Timely {
   static constexpr bool kVerbose = false;
   static constexpr bool kRecord = false;        ///< Fast-record Timely steps
   static constexpr bool kLatencyStats = false;  ///< Track per-packet RTT stats
-  static constexpr bool kPatched = true;        ///< Patch from ECN-vs-delay
 
   // Config
   static constexpr double kMaxRate = kBandwidth;
@@ -47,9 +47,6 @@ class Timely {
   static constexpr double kMinRTT = 2;
   static constexpr double kTLow = 50;
   static constexpr double kTHigh = 1000;
-
-  static constexpr double kEwmaAlpha = .875;  // From ECN-vs-delay
-  static constexpr double kBeta = kPatched ? .008 : .8;
   static constexpr size_t kHaiThresh = 5;
 
   double rate = kMaxRate;
