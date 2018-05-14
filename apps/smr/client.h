@@ -1,6 +1,6 @@
 /**
  * @file client.h
- * @brief The client for the replicated service
+ * @brief Client code and RPC handlers for client-issued RPCs
  */
 
 #include "smr.h"
@@ -9,6 +9,91 @@
 #define CLIENT_H
 
 void client_cont(erpc::RespHandle *, void *, size_t);  // Forward declaration
+
+// Send a response to the client. This does not free any non-eRPC memory.
+void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
+                          client_resp_t *client_resp) {
+  if (kAppVerbose) {
+    printf("smr: Sending reply to client: %s [%s].\n",
+           client_resp->to_string().c_str(),
+           erpc::get_formatted_time().c_str());
+  }
+
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+  auto *_client_resp = reinterpret_cast<client_resp_t *>(resp_msgbuf.buf);
+  *_client_resp = *client_resp;
+
+  c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(client_resp_t));
+  req_handle->prealloc_used = true;
+  c->rpc->enqueue_response(req_handle);
+}
+
+void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
+  auto *c = static_cast<AppContext *>(_context);
+
+  // We need leader_sav to start commit latency measurement, but we won't mark
+  // it in_use until checking that this node is the leader
+  leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
+
+  if (kAppMeasureCommitLatency) leader_sav.start_tsc = erpc::rdtsc();
+  if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kClientReq);
+
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
+  const auto *client_req = reinterpret_cast<client_req_t *>(req_msgbuf->buf);
+
+  // Check if it's OK to receive the client's request
+  raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
+  if (unlikely(leader == nullptr)) {
+    printf(
+        "smr: Received request %s from client, but leader is unknown. "
+        "Asking client to retry later.\n",
+        client_req->to_string().c_str());
+
+    client_resp_t err_resp;
+    err_resp.resp_type = ClientRespType::kFailTryAgain;
+    send_client_response(c, req_handle, &err_resp);
+    return;
+  }
+
+  int leader_node_id = raft_node_get_id(leader);
+  if (unlikely(leader_node_id != c->server.node_id)) {
+    printf(
+        "smr: Received request %s from client, "
+        "but leader is %s (not me). Redirecting client.\n",
+        client_req->to_string().c_str(),
+        node_id_to_name_map.at(leader_node_id).c_str());
+
+    client_resp_t err_resp;
+    err_resp.resp_type = ClientRespType::kFailRedirect;
+    err_resp.leader_node_id = leader_node_id;
+    send_client_response(c, req_handle, &err_resp);
+    return;
+  }
+
+  // We're the leader
+  if (kAppVerbose) {
+    printf("smr: Received request %s from client [%s].\n",
+           client_req->to_string().c_str(), erpc::get_formatted_time().c_str());
+  }
+
+  assert(!leader_sav.in_use);
+  leader_sav.in_use = true;
+  leader_sav.req_handle = req_handle;
+
+  client_req_t *rsm_cmd_buf = c->server.rsm_cmd_buf_pool.alloc();
+  *rsm_cmd_buf = *client_req;
+
+  // Receive a log entry. msg_entry can be stack-resident, but not its buf.
+  msg_entry_t ent;
+  ent.type = RAFT_LOGTYPE_NORMAL;
+  ent.id = FLAGS_process_id;
+  ent.data.buf = static_cast<void *>(rsm_cmd_buf);
+  ent.data.len = sizeof(client_req_t);
+
+  int e = raft_recv_entry(c->server.raft, &ent, &leader_sav.msg_entry_response);
+  erpc::rt_assert(e == 0);
+}
 
 // Change the leader to a different Raft server that we are connected to
 void change_leader_to_any(AppContext *c) {
