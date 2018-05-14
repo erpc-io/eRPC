@@ -36,8 +36,8 @@ class Timely {
   // Debugging
   static constexpr bool kVerbose = false;
   static constexpr bool kRecord = false;        ///< Fast-record Timely steps
-  static constexpr bool kLatencyStats = false;  ///< Track average RTT
-  static constexpr bool kPatched = true;        ///< Patch from ECN-vs-delay
+  static constexpr bool kLatencyStats = true;  ///< Track per-packet RTT stats
+  static constexpr bool kPatched = false;        ///< Patch from ECN-vs-delay
 
   // Config
   static constexpr double kMaxRate = kBandwidth;
@@ -49,7 +49,7 @@ class Timely {
   static constexpr double kTHigh = 1000;
 
   static constexpr double kEwmaAlpha = .875;  // From ECN-vs-delay
-  static constexpr double kBeta = kPatched ? .008 : .8;
+  static constexpr double kBeta = kPatched ? .008 : .08;
   static constexpr size_t kHaiThresh = 5;
 
   double rate = kMaxRate;
