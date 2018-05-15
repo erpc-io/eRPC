@@ -39,7 +39,7 @@ wait
 
 # Allow the app to run
 app_sec=`echo "scale=1; $autorun_test_ms / 1000" | bc -l`
-sleep_sec=`echo "scale=1; $app_sec + 10" | bc -l`
+sleep_sec=`echo "scale=1; $app_sec + 5" | bc -l`
 blue "run-all: Sleeping for $sleep_sec seconds. App will run for $app_sec seconds."
 sleep $sleep_sec
 
