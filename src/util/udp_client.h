@@ -50,7 +50,10 @@ class UDPClient {
       int r =
           getaddrinfo(rem_hostname.c_str(), port_str, &hints, &rem_addrinfo);
       if (r != 0 || rem_addrinfo == nullptr) {
-        throw std::runtime_error("UDPClient: Failed to resolve " + remote_uri);
+        char issue_msg[1000];
+        sprintf(issue_msg, "Failed to resolve %s. getaddrinfo error = %s.",
+                remote_uri.c_str(), gai_strerror(r));
+        throw std::runtime_error(issue_msg);
       }
 
       addrinfo_map[remote_uri] = rem_addrinfo;
