@@ -9,7 +9,7 @@ tmpdir="/tmp/${autorun_app}_errors"
 rm -rf $tmpdir
 mkdir $tmpdir
 
-echo "proc-err: Fetching out and err files to $tmpdir"
+echo "fetch-err: Fetching out and err files to $tmpdir"
 process_idx=0
 while [ $process_idx -lt $autorun_num_processes ]; do
   name=${autorun_name_list[$process_idx]}
@@ -25,4 +25,7 @@ while [ $process_idx -lt $autorun_num_processes ]; do
 done
 
 wait
-echo "proc-err: Finished fetching files to $tmpdir/out-X and $tmpdir/err-X"
+
+echo "fetch-err: Finished fetching files to $tmpdir/out-X and $tmpdir/err-X"
+echo "fetch-err: grepping for exceptions"
+grep -r what /tmp/${autorun_app}_errors/
