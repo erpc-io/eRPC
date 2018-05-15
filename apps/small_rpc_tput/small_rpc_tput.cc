@@ -10,7 +10,7 @@
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
 static constexpr bool kAppMeasureLatency = false;
-static constexpr double kAppLatFac = 10.0;       // Precision factor for latency
+static constexpr double kAppLatFac = 3.0;        // Precision factor for latency
 static constexpr bool kAppPayloadCheck = false;  // Check full request/response
 
 // Optimization knobs. Set to true to disable optimization.
@@ -240,7 +240,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     size_t req_tsc = bc.req_tsc[tag.s.msgbuf_i];
     double req_lat_us =
         erpc::to_usec(erpc::rdtsc() - req_tsc, c->rpc->get_freq_ghz());
-    c->latency.update(static_cast<size_t>(req_lat_us * 10));
+    c->latency.update(static_cast<size_t>(req_lat_us * kAppLatFac));
   }
 
   if (bc.num_resps_rcvd == FLAGS_batch_size) {
