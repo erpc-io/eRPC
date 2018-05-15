@@ -10,6 +10,7 @@
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
 static constexpr bool kAppMeasureLatency = false;
+static constexpr double kAppLatFac = 10.0;       // Precision factor for latency
 static constexpr bool kAppPayloadCheck = false;  // Check full request/response
 
 // Optimization knobs. Set to true to disable optimization.
@@ -58,19 +59,45 @@ class BatchContext {
 struct app_stats_t {
   double mrps;
   size_t num_re_tx;
-  size_t pad[6];
+
+  // Used only if latency stats are enabled
+  double lat_us_50;
+  double lat_us_99;
+  double lat_us_999;
+  double lat_us_9999;
+  size_t pad[2];
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
-  static std::string get_template_str() { return "mrps num_re_tx"; }
+  static std::string get_template_str() {
+    std::string ret = "mrps num_re_tx";
+    if (kAppMeasureLatency) {
+      ret += " lat_us_50 lat_us_99 lat_us_999 lat_us_9999";
+    }
+    return ret;
+  }
+
   std::string to_string() {
-    return std::to_string(mrps) + " " + std::to_string(num_re_tx);
+    auto ret = std::to_string(mrps) + " " + std::to_string(num_re_tx);
+    if (kAppMeasureLatency) {
+      return ret + " " + std::to_string(lat_us_50) + " " +
+             std::to_string(lat_us_99) + " " + std::to_string(lat_us_999) +
+             " " + std::to_string(lat_us_9999);
+    }
+
+    return ret;
   }
 
   /// Accumulate stats
   app_stats_t &operator+=(const app_stats_t &rhs) {
     this->mrps += rhs.mrps;
     this->num_re_tx += rhs.num_re_tx;
+    if (kAppMeasureLatency) {
+      this->lat_us_50 += rhs.lat_us_50;
+      this->lat_us_99 += rhs.lat_us_99;
+      this->lat_us_999 += rhs.lat_us_999;
+      this->lat_us_9999 += rhs.lat_us_9999;
+    }
     return *this;
   }
 };
@@ -239,7 +266,7 @@ void connect_sessions(AppContext &c) {
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
       if (FLAGS_process_id == p_i && c.thread_id == t_i) continue;
       int session_num = c.rpc->create_session(remote_uri, t_i);
-      assert(session_num >= 0);
+      erpc::rt_assert(session_num >= 0, "Failed to create session");
       c.session_num_vec.push_back(session_num);
     }
   }
@@ -277,13 +304,19 @@ void print_stats(AppContext &c) {
   double tput_mrps = c.stat_resp_rx_tot / (seconds * 1000000);
   c.app_stats[c.thread_id].mrps = tput_mrps;
   c.app_stats[c.thread_id].num_re_tx = c.rpc->get_num_re_tx_cumulative();
+  if (kAppMeasureLatency) {
+    c.app_stats[c.thread_id].lat_us_50 = c.latency.perc(0.50) / kAppLatFac;
+    c.app_stats[c.thread_id].lat_us_99 = c.latency.perc(0.99) / kAppLatFac;
+    c.app_stats[c.thread_id].lat_us_999 = c.latency.perc(0.999) / kAppLatFac;
+    c.app_stats[c.thread_id].lat_us_9999 = c.latency.perc(0.9999) / kAppLatFac;
+  }
 
   size_t num_sessions = c.session_num_vec.size();
 
   // Optional stats
   char lat_stat[100];
-  sprintf(lat_stat, "[%.2f, %.2f us]", c.latency.perc(.50) / 10.0,
-          c.latency.perc(.99) / 10.0);
+  sprintf(lat_stat, "[%.2f, %.2f us]", c.latency.perc(.50) / kAppLatFac,
+          c.latency.perc(.99) / kAppLatFac);
   char rate_stat[100];
   sprintf(rate_stat, "[%.2f, %.2f, %.2f, %.2f Gbps]",
           erpc::kCcRateComp ? session_tput.at(num_sessions * 0.00) : -1,
@@ -304,6 +337,12 @@ void print_stats(AppContext &c) {
   if (c.thread_id == 0) {
     app_stats_t accum;
     for (size_t i = 0; i < FLAGS_num_threads; i++) accum += c.app_stats[i];
+    if (kAppMeasureLatency) {
+      accum.lat_us_50 /= FLAGS_num_threads;
+      accum.lat_us_99 /= FLAGS_num_threads;
+      accum.lat_us_999 /= FLAGS_num_threads;
+      accum.lat_us_9999 /= FLAGS_num_threads;
+    }
     c.tmp_stat->write(accum.to_string());
   }
 
