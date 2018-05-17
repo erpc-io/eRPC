@@ -384,7 +384,7 @@ class Rpc {
   inline bool can_bypass_wheel(SSlot *sslot) const {
     if (!kCcPacing) return true;
     if (kTesting) return faults.hard_wheel_bypass;
-    if (kCcOptTimelyBypass) {
+    if (kCcOptWheelBypass) {
       return sslot->client_info.wheel_count == 0 &&
              sslot->session->is_uncongested();
     }
