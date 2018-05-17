@@ -76,7 +76,7 @@ for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
   ((processed_files+=1))
 done
 
-for ((col_idx = 1; col_idx < $num_columns; col_idx++)); do
+for ((col_idx = 1; col_idx <= $num_columns; col_idx++)); do
   col_avg_all_files=`cat col_avg_$col_idx | avg.awk`
   col_stddev_all_files=`cat col_avg_$col_idx | stddev.awk`
   blue "proc-out: Final column ${col_name[$col_idx]} average = $col_avg_all_files, stddev $col_stddev_all_files"
