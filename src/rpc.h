@@ -828,14 +828,8 @@ class Rpc {
   inline void update_timely_rate(SSlot *sslot, size_t pkt_num, size_t rx_tsc) {
     size_t rtt_tsc =
         rx_tsc - sslot->client_info.tx_ts[pkt_num % kSessionCredits];
-
-    Timely &timely = sslot->session->client_info.cc.timely;
-    if (kCcOptTimelyBypass &&
-        (timely.rate == Timely::kMaxRate && rtt_tsc <= timely.t_low_tsc)) {
-      return;
-    }
-
-    timely.update_rate(rx_tsc, rtt_tsc);
+    // This might use Timely bypass
+    sslot->session->client_info.cc.timely.update_rate(rx_tsc, rtt_tsc);
   }
 
   // rpc_cr.cc

@@ -95,6 +95,15 @@ class Timely {
   void update_rate(size_t _rdtsc, size_t sample_rtt_tsc) {
     assert(_rdtsc >= 1000000000 && _rdtsc >= last_update_tsc);  // Sanity check
 
+    if (kCcOptTimelyBypass &&
+        (rate == Timely::kMaxRate && sample_rtt_tsc <= t_low_tsc)) {
+      // Bypass expensive computation, but include the latency sample in stats.
+      if (kLatencyStats) {
+        latency.update(static_cast<size_t>(to_usec(sample_rtt_tsc, freq_ghz)));
+      }
+      return;
+    }
+
     // Sample RTT can be lower than min RTT during retransmissions
     if (unlikely(sample_rtt_tsc < min_rtt_tsc)) return;
 
