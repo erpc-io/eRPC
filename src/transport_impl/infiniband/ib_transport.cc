@@ -247,10 +247,10 @@ void IBTransport::init_verbs_structs() {
 
   int probe_ret = ibv_post_recv(qp, nullptr, &bad_wr);
   if (probe_ret != kModdedProbeRet) {
-    LOG_WARN("Warning. No driver support for fast RECVs.\n");
+    LOG_WARN("Modded driver unavailable. Performance will be low.\n");
     use_fast_recv = false;
   } else {
-    LOG_INFO("Driver supports fast RECVs.\n");
+    LOG_WARN("Modded driver available.\n");
     use_fast_recv = true;
   }
 }
