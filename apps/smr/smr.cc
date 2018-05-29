@@ -4,6 +4,8 @@
 #include "callbacks.h"
 #include "client.h"
 #include "requestvote.h"
+#include "server.h"
+#include "util/numautils.h"
 
 void init_raft_node_id_to_name_map() {
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
@@ -11,79 +13,6 @@ void init_raft_node_id_to_name_map() {
     int raft_node_id = get_raft_node_id_from_uri(uri);
     node_id_to_name_map[raft_node_id] = erpc::trim_hostname(uri);
   }
-}
-
-void init_raft(AppContext *c) {
-  c->server.raft = raft_new();
-  erpc::rt_assert(c->server.raft != nullptr);
-
-  if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
-  c->server.raft_periodic_tsc = erpc::rdtsc();
-
-  set_raft_callbacks(c);
-
-  std::string my_uri = erpc::get_uri_for_process(FLAGS_process_id);
-  c->server.node_id = get_raft_node_id_from_uri(my_uri);
-  printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
-
-  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string uri = erpc::get_uri_for_process(i);
-    int raft_node_id = get_raft_node_id_from_uri(uri);
-
-    if (i == FLAGS_process_id) {
-      // Add self. user_data = nullptr, peer_is_self = 1
-      raft_add_node(c->server.raft, nullptr, c->server.node_id, 1);
-    } else {
-      // Add a non-self node. peer_is_self = 0
-      raft_add_node(c->server.raft, static_cast<void *>(&c->conn_vec[i]),
-                    raft_node_id, 0);
-    }
-  }
-}
-
-void init_erpc(AppContext *c, erpc::Nexus *nexus) {
-  nexus->register_req_func(
-      static_cast<uint8_t>(ReqType::kRequestVote),
-      erpc::ReqFunc(requestvote_handler, erpc::ReqFuncType::kForeground));
-
-  nexus->register_req_func(
-      static_cast<uint8_t>(ReqType::kAppendEntries),
-      erpc::ReqFunc(appendentries_handler, erpc::ReqFuncType::kForeground));
-
-  nexus->register_req_func(
-      static_cast<uint8_t>(ReqType::kClientReq),
-      erpc::ReqFunc(client_req_handler, erpc::ReqFuncType::kForeground));
-
-  // Thread ID = 0
-  c->rpc = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(c), 0,
-                                           sm_handler, kAppPhyPort);
-
-  c->rpc->retry_connect_on_invalid_rpc_id = true;
-
-  // Create a session to each Raft server, excluding self
-  for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    if (i == FLAGS_process_id) continue;
-    std::string uri = erpc::get_uri_for_process(i);
-    printf("smr: Creating session to %s, index = %zu.\n", uri.c_str(), i);
-
-    c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num = c->rpc->create_session(uri, 0);
-    assert(c->conn_vec[i].session_num >= 0);
-  }
-
-  while (c->num_sm_resps != FLAGS_num_raft_servers - 1) {
-    c->rpc->run_event_loop(200);  // 200 ms
-    if (ctrl_c_pressed == 1) {
-      delete c->rpc;
-      exit(0);
-    }
-  }
-}
-
-void init_mica(AppContext *c) {
-  auto config = mica::util::Config::load_file("apps/smr/kv_store.json");
-  c->server.table = new FixedTable(config.get("table"), kAppValueSize,
-                                   c->rpc->get_huge_alloc());
 }
 
 int main(int argc, char **argv) {
@@ -102,86 +31,8 @@ int main(int argc, char **argv) {
   // Both server and client need this map, so init it before launching client
   init_raft_node_id_to_name_map();
 
-  if (!is_raft_server()) {
-    // Run client
-    auto client_thread = std::thread(client_func, 0, &nexus, &c);
-    client_thread.join();
-    return 0;
-  }
-  assert(is_raft_server());  // Handle client before this point
-
-  // The Raft server must be initialized before running the eRPC event loop,
-  // including running it for session management.
-  init_raft(&c);
-
-  init_erpc(&c, &nexus);  // Initialize eRPC
-  init_mica(&c);          // Initialize the key-value store
-
-  // The main loop
-  size_t loop_tsc = erpc::rdtsc();
-  while (ctrl_c_pressed == 0) {
-    if (erpc::rdtsc() - loop_tsc > 3000000000ull) {
-      erpc::Latency &commit_latency = c.server.commit_latency;
-      printf(
-          "smr: Leader commit latency (us) = "
-          "{%.2f median, %.2f 99%%}. Log size = %zu.\n",
-          kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
-          kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
-          c.server.raft_log.size());
-
-      loop_tsc = erpc::rdtsc();
-      commit_latency.reset();
-    }
-
-    call_raft_periodic(&c);
-    c.rpc->run_event_loop_once();
-
-    leader_saveinfo_t &leader_sav = c.server.leader_saveinfo;
-    if (!leader_sav.in_use) continue;  // We didn't get a client request
-
-    int commit_status = raft_msg_entry_response_committed(
-        c.server.raft, &leader_sav.msg_entry_response);
-    assert(commit_status == 0 || commit_status == 1);
-
-    if (commit_status == 1) {
-      // Committed: Send a response
-      raft_apply_all(c.server.raft);
-
-      leader_sav.in_use = false;
-      if (kAppMeasureCommitLatency) {
-        size_t commit_cycles = erpc::rdtsc() - leader_sav.start_tsc;
-        double commit_usec =
-            erpc::to_usec(commit_cycles, c.rpc->get_freq_ghz());
-        c.server.commit_latency.update(commit_usec * 10);
-      }
-
-      if (kAppTimeEnt) c.server.time_ents.emplace_back(TimeEntType::kCommitted);
-
-      // XXX: Is this correct, or should we send response in _apply_log()
-      // callback? This doesn't adversely affect failure-free performance.
-      client_resp_t client_resp;
-      client_resp.resp_type = ClientRespType::kSuccess;
-
-      erpc::ReqHandle *req_handle = leader_sav.req_handle;
-      send_client_response(&c, req_handle, &client_resp);  // Prints message
-    }
-  }
-
-  // This is OK even when kAppTimeEnt = false
-  printf("smr: Printing first 1000 of %zu time entries.\n",
-         c.server.time_ents.size());
-  size_t num_print = std::min(c.server.time_ents.size(), 1000ul);
-
-  if (num_print > 0) {
-    size_t base_tsc = c.server.time_ents[0].tsc;
-    double freq_ghz = c.rpc->get_freq_ghz();
-    for (size_t i = 0; i < num_print; i++) {
-      printf("%s\n",
-             c.server.time_ents[i].to_string(base_tsc, freq_ghz).c_str());
-    }
-  }
-
-  printf("smr: Final log size (including uncommitted entries) = %zu.\n",
-         c.server.raft_log.size());
-  delete c.rpc;
+  auto thread =
+      std::thread(is_raft_server() ? server_func : client_func, 0, &nexus, &c);
+  erpc::bind_to_core(thread, 0, 0);
+  thread.join();
 }
