@@ -22,13 +22,13 @@ static constexpr bool kCcRateComp = ENABLE_CC;  ///< Perform rate computation
 static constexpr bool kCcPacing = ENABLE_CC;    ///< Use rate limiter for pacing
 
 /// Sample RDTSC once per RX/TX batch for RTT measurements
-static constexpr bool kCcOptBatchTsc = false;
+static constexpr bool kCcOptBatchTsc = ENABLE_CC_OPTS;
 
 /// Bypass timing wheel if a session is uncongested
-static constexpr bool kCcOptWheelBypass = false;
+static constexpr bool kCcOptWheelBypass = ENABLE_CC_OPTS;
 
 /// Bypass Timely rate update if session is uncongested and RTT is below T_low
-static constexpr bool kCcOptTimelyBypass = false;
+static constexpr bool kCcOptTimelyBypass = ENABLE_CC_OPTS;
 
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
