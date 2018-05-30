@@ -14,9 +14,9 @@ export MLX5_SHUT_UP_BF=0
 export MLX_QP_ALLOC_TYPE="HUGE"
 export MLX_CQ_ALLOC_TYPE="HUGE"
 
-# Install faster modded driver. This is not a requirement.
-# XXX: Auto-choose between libmlx5 and libmlx4
-blue "Installing modded driver"
+# Install faster modded drivers. This is not a requirement.
+blue "Installing modded drivers"
+./drivers/libmlx4-41mlnx1/update-driver.sh
 ./drivers/libmlx5-41mlnx1/update-driver.sh
 
 # Check arguments

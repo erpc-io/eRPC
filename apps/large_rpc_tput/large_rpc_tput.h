@@ -31,21 +31,24 @@ struct app_stats_t {
   double rx_gbps;
   double tx_gbps;
   size_t re_tx;
-  double avg_us;
-  double _99_us;
-  size_t pad[3];
+  double rtt_50_us;  // Median packet RTT
+  double rtt_99_us;  // 99th percentile packet RTT
+  double rpc_50_us;
+  double rpc_99_us;
+  size_t pad[1];
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
   static std::string get_template_str() {
-    return "rx_gbps tx_gbps re_tx avg_us _99_us";
+    return "rx_gbps tx_gbps re_tx rtt_50_us rtt_99_us rpc_50_us rpc_99_us";
   }
 
   /// Return a space-separated string of all stats
   std::string to_string() {
     return std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) + " " +
-           std::to_string(re_tx) + " " + std::to_string(avg_us) + " " +
-           std::to_string(_99_us);
+           std::to_string(re_tx) + " " + std::to_string(rtt_50_us) + " " +
+           std::to_string(rtt_99_us) + " " + std::to_string(rpc_50_us) + " " +
+           std::to_string(rpc_99_us);
   }
 
   /// Accumulate stats
@@ -53,8 +56,10 @@ struct app_stats_t {
     this->rx_gbps += rhs.rx_gbps;
     this->tx_gbps += rhs.tx_gbps;
     this->re_tx += rhs.re_tx;
-    this->avg_us += rhs.avg_us;
-    this->_99_us += rhs._99_us;
+    this->rtt_50_us += rhs.rtt_50_us;
+    this->rtt_99_us += rhs.rtt_99_us;
+    this->rpc_50_us += rhs.rpc_50_us;
+    this->rpc_99_us += rhs.rpc_99_us;
     return *this;
   }
 };

@@ -31,6 +31,8 @@ for ((i = 0; i < $autorun_num_processes; i++)); do
     source scripts/utils.sh; \
     export autorun_app=$autorun_app; \
     drop_shm; \
+    sudo ./drivers/libmlx5-41mlnx1/update-driver.sh; \
+    sudo ./drivers/libmlx4-41mlnx1/update-driver.sh; \
     sudo nohup numactl --physcpubind $numa_node --membind $numa_node \
     ./build/$autorun_app $app_args --process_id $i --numa_node $numa_node \
     > $out_file 2> $err_file < /dev/null &" &
@@ -39,7 +41,7 @@ wait
 
 # Allow the app to run
 app_sec=`echo "scale=1; $autorun_test_ms / 1000" | bc -l`
-sleep_sec=`echo "scale=1; $app_sec + 10" | bc -l`
+sleep_sec=`echo "scale=1; $app_sec + 5" | bc -l`
 blue "run-all: Sleeping for $sleep_sec seconds. App will run for $app_sec seconds."
 sleep $sleep_sec
 

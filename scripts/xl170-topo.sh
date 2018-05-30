@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Prints the nodes under each switch in CloudLab's xl170 cluster
 source $(dirname $0)/utils.sh
 if [ "$#" -ne 1 ]; then
   echo "Illegal number of parameters"
@@ -7,6 +8,9 @@ if [ "$#" -ne 1 ]; then
 fi
 
 bad_nodes="hp097"
+topodir="/tmp/xl170_topo"
+rm -rf $topodir
+mkdir $topodir
 
 # Create a map from node hostnames to switch IDs
 for ((i = 1; i <= $1; i++)); do
@@ -34,9 +38,18 @@ wait
 # Print out the nodes under each switch
 echo ""
 for ((switch_i = 0; switch_i < 5; switch_i++)); do
+  nodes_file=$topodir/switch_$switch_i
   count=`cat temp | grep " $switch_i" | wc -l`
   blue "Under switch $switch_i ($count nodes):"
-  cat temp | grep " $switch_i" | cut -d' ' -f 1 | sort -n
+  cat temp | grep " $switch_i" | cut -d' ' -f 1 | sort -n > $nodes_file
+  sed -e 's/$/ 31850 0/' -i $nodes_file  # Append UDP port and NUMA node
+  cat $nodes_file
 done
 
+# Create an file with interleaved nodes
+rm -f tmp_switch_interleaved
+paste -d '\n' $topodir/* > tmp_switch_interleaved
+mv tmp_switch_interleaved $topodir/switch_interleaved
+
+echo "Topology files written to $topodir"
 rm temp

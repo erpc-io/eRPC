@@ -1,14 +1,12 @@
 /**
  * @file client.h
- * @brief The client for the replicated service
+ * @brief Client code and RPC handlers for client-issued RPCs
  */
 
 #include "smr.h"
 
 #ifndef CLIENT_H
 #define CLIENT_H
-
-void client_cont(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
 // Change the leader to a different Raft server that we are connected to
 void change_leader_to_any(AppContext *c) {
@@ -50,6 +48,8 @@ bool change_leader_to_node(AppContext *c, int raft_node_id) {
   printf("smr: Client could not find Raft node %d. Exiting.\n", raft_node_id);
   exit(0);
 }
+
+void client_cont(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
 void send_req_one(AppContext *c) {
   c->client.req_start_tsc = erpc::rdtsc();

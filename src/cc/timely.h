@@ -9,6 +9,7 @@
 #define ERPC_TIMELY_H
 
 #include <iomanip>
+#include "cc/timely_sweep_params.h"
 #include "common.h"
 #include "util/latency.h"
 #include "util/timer.h"
@@ -36,8 +37,7 @@ class Timely {
   // Debugging
   static constexpr bool kVerbose = false;
   static constexpr bool kRecord = false;        ///< Fast-record Timely steps
-  static constexpr bool kLatencyStats = false;  ///< Track average RTT
-  static constexpr bool kPatched = true;        ///< Patch from ECN-vs-delay
+  static constexpr bool kLatencyStats = false;  ///< Track per-packet RTT stats
 
   // Config
   static constexpr double kMaxRate = kBandwidth;
@@ -47,9 +47,6 @@ class Timely {
   static constexpr double kMinRTT = 2;
   static constexpr double kTLow = 50;
   static constexpr double kTHigh = 1000;
-
-  static constexpr double kEwmaAlpha = .875;  // From ECN-vs-delay
-  static constexpr double kBeta = kPatched ? .008 : .8;
   static constexpr size_t kHaiThresh = 5;
 
   double rate = kMaxRate;
@@ -97,6 +94,15 @@ class Timely {
    */
   void update_rate(size_t _rdtsc, size_t sample_rtt_tsc) {
     assert(_rdtsc >= 1000000000 && _rdtsc >= last_update_tsc);  // Sanity check
+
+    if (kCcOptTimelyBypass &&
+        (rate == Timely::kMaxRate && sample_rtt_tsc <= t_low_tsc)) {
+      // Bypass expensive computation, but include the latency sample in stats.
+      if (kLatencyStats) {
+        latency.update(static_cast<size_t>(to_usec(sample_rtt_tsc, freq_ghz)));
+      }
+      return;
+    }
 
     // Sample RTT can be lower than min RTT during retransmissions
     if (unlikely(sample_rtt_tsc < min_rtt_tsc)) return;

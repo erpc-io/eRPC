@@ -7,6 +7,8 @@
 # val_1 val_2 ... val_N
 #
 # The names and values must be space-separated. Names should be a single word.
+#
+# This requires the awk scripts from anujkaliaiitd/systemish
 
 source $(dirname $0)/utils.sh
 source $(dirname $0)/autorun_parse.sh
@@ -31,27 +33,23 @@ wait
 echo "proc-out: Finished fetching files."
 
 header_line=`cat $tmpdir/* | head -1`
-blue "proc-out: Header = [$header_line]"
-
-# Create a map of column names in the stats file
-col_idx="0"
-for name in $header_line; do
-  col_name[$col_idx]=$name
-  echo "Column $col_idx = ${col_name[$col_idx]}"
-  ((col_idx+=1))
-done
-
 num_columns=`echo $header_line | wc -w`
+blue "proc-out: Header = [$header_line]"
 echo "proc-out: Detected $num_columns columns"
 
-# Sum of per-file average for each column. Averaging rows is incorrect.
-for ((col_idx = 0; col_idx < $num_columns; col_idx++)); do
-  col_sum_of_avgs[$col_idx]="0.0"
+# Sum of per-file average, and sum of (per-file average)^2 for each column.
+# Averaging all rows across all files is incorrect.
+for ((col_idx = 1; col_idx <= $num_columns; col_idx++)); do
+  col_name[$col_idx]=`echo $header_line | col.awk $col_idx`
 done
 
 # Process the fetched stats files
 processed_files="0"
 ignored_files="0"
+
+# The per-file column averages for column i are stored in file "col_avg_i" 
+rm -f col_avg*
+
 for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
   filename_short=`echo $filename | rev | cut -d'/' -f 1 | rev`  # foo/bar/xxx
   echo "proc-out: Processing file $filename_short"
@@ -66,24 +64,24 @@ for filename in `ls $tmpdir/* | sort -t '-' -k 2 -g`; do
 
   # Strip out first 4 and last 4 lines, and save rest for processing to tmp file
   awk -v nr="$(wc -l < $filename)" 'NR > 4 && NR < (nr - 4)' $filename > proc_out_tmp
-  remaining_rows=`cat proc_out_tmp | wc -l`
 
   file_avg_str=""  # Average of each column for this file
-  for ((col_idx = 0; col_idx < $num_columns; col_idx++)); do
-    awk_col_idx=`expr $col_idx + 1` # 1-based
-    file_avg=`awk -v col=$awk_col_idx '{ total += $col } END { printf "%.3f", total / NR  }' proc_out_tmp`
-    col_sum_of_avgs[$col_idx]=`echo "scale=3; ${col_sum_of_avgs[$col_idx]} + $file_avg" | bc -l`
-    file_avg_str=`echo $file_avg_str ${col_name[$col_idx]}:$file_avg, `
+  for ((col_idx = 1; col_idx <= $num_columns; col_idx++)); do
+    col_avg_file=`cat proc_out_tmp | col.awk $col_idx | avg.awk`
+    echo $col_avg_file >> col_avg_$col_idx
+    file_avg_str=`echo $file_avg_str ${col_name[$col_idx]}:$col_avg_file, `
   done
 
   echo "proc-out: Column averages for $filename_short = $file_avg_str"
   ((processed_files+=1))
 done
 
-for ((col_idx = 0; col_idx < $num_columns; col_idx++)); do
-  col_avg=`echo "scale=3; ${col_sum_of_avgs[$col_idx]} / $processed_files" | bc -l`
-  blue "proc-out: Final column ${col_name[$col_idx]} average = $col_avg"
+for ((col_idx = 1; col_idx <= $num_columns; col_idx++)); do
+  col_avg_all_files=`cat col_avg_$col_idx | avg.awk`
+  col_stddev_all_files=`cat col_avg_$col_idx | stddev.awk`
+  blue "proc-out: Final column ${col_name[$col_idx]} average = $col_avg_all_files, stddev $col_stddev_all_files"
 done
 
 blue "proc-out: Processed files = $processed_files, ignored files = $ignored_files"
 rm -f proc_out_tmp
+rm -f col_avg*

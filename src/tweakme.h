@@ -15,7 +15,7 @@ static constexpr size_t kRpcRTOUs = 5000;
 
 // Congestion control
 #define ENABLE_CC true
-#define ENABLE_CC_OPTS false
+#define ENABLE_CC_OPTS true
 
 static constexpr bool kCcRTT = ENABLE_CC;       ///< Measure per-packet RTT
 static constexpr bool kCcRateComp = ENABLE_CC;  ///< Perform rate computation
