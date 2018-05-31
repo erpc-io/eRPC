@@ -62,11 +62,18 @@ void req_handler_regular(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
 
-  req_handle->prealloc_used = true;
-  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
-  c->rpc->resize_msg_buffer(&resp_msgbuf, FLAGS_regular_resp_size);
+  if (FLAGS_regular_resp_size <= erpc::CTransport::kMaxDataPerPkt) {
+    req_handle->prealloc_used = true;
+    erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+    c->rpc->resize_msg_buffer(&resp_msgbuf, FLAGS_regular_resp_size);
+    resp_msgbuf.buf[0] = req_msgbuf->buf[0];  // Touch the response
+  } else {
+    req_handle->prealloc_used = false;
+    erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
+    resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_regular_resp_size);
+    resp_msgbuf.buf[0] = req_msgbuf->buf[0];  // Touch the response
+  }
 
-  resp_msgbuf.buf[0] = req_msgbuf->buf[0];  // Touch the response
   c->rpc->enqueue_response(req_handle);
 }
 

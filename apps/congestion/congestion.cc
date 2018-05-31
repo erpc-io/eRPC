@@ -26,9 +26,11 @@
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  erpc::rt_assert(FLAGS_num_processes >= 3);
+
+  erpc::rt_assert(FLAGS_num_processes >= 3, "Too few processes");
   erpc::rt_assert(FLAGS_process_id < FLAGS_num_processes, "Invalid process ID");
-  erpc::rt_assert(FLAGS_regular_concurrency <= kAppMaxConcurrency);
+  erpc::rt_assert(FLAGS_regular_concurrency <= kAppMaxConcurrency,
+                  "Invalid concurrency");
 
   // Supporting zero threads is troublesome (e.g., who prints the stats?)
   erpc::rt_assert(FLAGS_incast_threads_zero >= 1, "Need > 0 incast threads");
