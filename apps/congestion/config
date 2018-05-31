@@ -7,7 +7,8 @@
 --incast_throttle 0
 --regular_threads_other 1
 --regular_concurrency 1
---regular_req_size 32
---regular_resp_size 32
+--regular_req_size 64000
+--regular_resp_size 64000
+--regular_latency_divisor 3.0
 --numa_0_ports 0
 --numa_1_ports 1

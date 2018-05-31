@@ -85,11 +85,10 @@ void cont_regular(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     printf("congestion: Received regular resp for msgbuf %zu.\n", msgbuf_idx);
   }
 
-  // Measure latency. 1 us granularity is sufficient for large RPC latency.
   auto *c = static_cast<AppContext *>(_context);
   double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
-  c->regular_latency.update(usec * 10.0);
+  c->regular_latency.update(usec / FLAGS_regular_latency_divisor);
 
   assert(resp_msgbuf->get_data_size() == FLAGS_regular_resp_size);
   erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte);  // Touch
@@ -140,9 +139,12 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
     auto &stats = c.app_stats[c.thread_id];
     assert(stats.incast_gbps == 0);
     stats.re_tx = c.rpc->get_num_re_tx_cumulative();
-    stats.regular_50_us = c.regular_latency.perc(0.50) / 10.0;
-    stats.regular_99_us = c.regular_latency.perc(0.99) / 10.0;
-    stats.regular_999_us = c.regular_latency.perc(0.999) / 10.0;
+    stats.regular_50_us =
+        c.regular_latency.perc(0.50) * FLAGS_regular_latency_divisor;
+    stats.regular_99_us =
+        c.regular_latency.perc(0.99) * FLAGS_regular_latency_divisor;
+    stats.regular_999_us =
+        c.regular_latency.perc(0.999) * FLAGS_regular_latency_divisor;
 
     // Reset stats for next iteration
     c.rpc->reset_num_re_tx_cumulative();

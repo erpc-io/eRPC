@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
   erpc::rt_assert(FLAGS_incast_threads_zero >= 1, "Need > 0 incast threads");
   erpc::rt_assert(FLAGS_incast_threads_other >= 1, "Need > 0 incast threads");
   erpc::rt_assert(FLAGS_regular_threads_other >= 1, "Need > 0 regular threads");
+  erpc::rt_assert(FLAGS_regular_latency_divisor >= 1.0, "Invalid latency div");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
