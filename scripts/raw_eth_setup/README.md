@@ -1,1 +1,1 @@
-Scripts to bring up Ethernet links.
+Scripts to bring up Mellanox Ethernet links on FAWN cluster.
