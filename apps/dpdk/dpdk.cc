@@ -1,15 +1,5 @@
 #include "common.h"
 
-#define __STDC_LIMIT_MACROS
-#include <arpa/inet.h>
-#include <errno.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#pragma GCC diagnostic ignored "-Wconversion"
 #include <rte_common.h>
 #include <rte_config.h>
 #include <rte_errno.h>
@@ -18,8 +8,17 @@
 #include <rte_memcpy.h>
 #include <rte_ring.h>
 #include <rte_version.h>
-#pragma GCC diagnostic warning "-Wconversion"
 
+static std::string mac_to_string(const uint8_t* mac) {
+  std::ostringstream ret;
+  for (size_t i = 0; i < 6; i++) {
+    ret << std::hex << static_cast<uint32_t>(mac[i]);
+    if (i != 5) ret << ":";
+  }
+  return ret.str();
+}
+
+static constexpr size_t kAppMTU = 1024;
 static constexpr size_t kAppPortId = 0;
 
 // Number of descriptors to allocate for the tx/rx rings
@@ -39,7 +38,7 @@ static constexpr size_t kAppMbufSize =
      RTE_PKTMBUF_HEADROOM);
 
 int main() {
-  const char* argv[] = {"rc", "-c", "1", "-n", "1", NULL};
+  const char* argv[] = {"rc", "-c", "1", "-n", "1", nullptr};
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1;
   int ret = rte_eal_init(argc, const_cast<char**>(argv));
   erpc::rt_assert(ret >= 0, "rte_eal_init failed");
@@ -53,72 +52,51 @@ int main() {
       rte_pktmbuf_pool_create("mbuf_pool", kAppNumMbufs, kAppNumCacheMbufs, 0,
                               kAppMbufSize, kAppNumaNode);
 
-  if (pktmbuf_pool == nullptr) {
-    printf("Failed to create mbuf pool. Error = %s\n", rte_strerror(rte_errno));
-    exit(-1);
-  } else {
-    printf("Mempool creation succeeded\n");
-  }
+  erpc::rt_assert(pktmbuf_pool != nullptr,
+                  "Failed to create mempool. Error = " +
+                      std::string(rte_strerror(rte_errno)));
 
-  /*
   struct ether_addr mac;
-  struct rte_eth_conf portConf;
-
-
-  // create an memory pool for accommodating packet buffers
-
-  // Read the MAC address from the NIC via DPDK.
-  rte_eth_macaddr_get(portId, &mac);
-  localMac.construct(mac.addr_bytes);
-  locatorString = format("dpdk:mac=%s", localMac->toString().c_str());
+  rte_eth_macaddr_get(kAppPortId, &mac);
+  printf("Ether addr = %s\n", mac_to_string(mac.addr_bytes).c_str());
 
   // configure some default NIC port parameters
-  memset(&portConf, 0, sizeof(portConf));
-  portConf.rxmode.max_rx_pkt_len = ETHER_MAX_VLAN_FRAME_LEN;
-  rte_eth_dev_configure(portId, 1, 1, &portConf);
+  struct rte_eth_conf port_conf;
+  memset(&port_conf, 0, sizeof(port_conf));
+  port_conf.rxmode.max_rx_pkt_len = ETHER_MAX_VLAN_FRAME_LEN;
+  rte_eth_dev_configure(kAppPortId, 1, 1, &port_conf);
 
   // Set up a NIC/HW-based filter on the ethernet type so that only
   // traffic to a particular port is received by this driver.
   struct rte_eth_ethertype_filter filter;
-  ret = rte_eth_dev_filter_supported(portId, RTE_ETH_FILTER_ETHERTYPE);
-  if (ret < 0) {
-    LOG(NOTICE, "ethertype filter is not supported on port %u.", portId);
-    hasHardwareFilter = false;
-  } else {
-    memset(&filter, 0, sizeof(filter));
-    ret = rte_eth_dev_filter_ctrl(portId, RTE_ETH_FILTER_ETHERTYPE,
-                                  RTE_ETH_FILTER_ADD, &filter);
-    if (ret < 0) {
-      LOG(WARNING, "failed to add ethertype filter\n");
-      hasHardwareFilter = false;
-    }
-  }
+  ret = rte_eth_dev_filter_supported(kAppPortId, RTE_ETH_FILTER_ETHERTYPE);
+  erpc::rt_assert(ret >= 0, "Ethertype filter not supported");
 
-  // setup and initialize the receive and transmit NIC queues,
-  // and activate the port.
-  rte_eth_rx_queue_setup(portId, 0, NDESC, 0, NULL, mbufPool);
-  rte_eth_tx_queue_setup(portId, 0, NDESC, 0, NULL);
+  memset(&filter, 0, sizeof(filter));
+  ret = rte_eth_dev_filter_ctrl(kAppPortId, RTE_ETH_FILTER_ETHERTYPE,
+                                RTE_ETH_FILTER_ADD, &filter);
+  erpc::rt_assert(ret >= 0, "Failed to add ethertype filter");
 
-  // set the MTU that the NIC port should support
-  ret = rte_eth_dev_set_mtu(portId, MAX_PAYLOAD_SIZE);
-  if (ret != 0) {
-    throw DriverException(
-        HERE, format("Failed to set the MTU on Ethernet port  %u: %s", portId,
-                     rte_strerror(rte_errno)));
-  }
+  rte_eth_rx_queue_setup(kAppPortId, 0, kAppNumRingDesc, 0, nullptr,
+                         pktmbuf_pool);
+  rte_eth_tx_queue_setup(kAppPortId, 0, kAppNumRingDesc, 0, nullptr);
 
-  ret = rte_eth_dev_start(portId);
-  if (ret != 0) {
-    throw DriverException(HERE, format("Couldn't start port %u, error %d (%s)",
-                                       portId, ret, strerror(ret)));
-  }
+  ret = rte_eth_dev_set_mtu(kAppPortId, kAppMTU);
+  erpc::rt_assert(ret >= 0, "Failed to set MTU");
 
+  ret = rte_eth_dev_start(kAppPortId);
+  erpc::rt_assert(ret >= 0, "Failed to start port");
+
+  printf("Success\n");
+
+  /*
   // Retrieve the link speed and compute information based on it.
   struct rte_eth_link link;
-  rte_eth_link_get(portId, &link);
+  rte_eth_link_get(kAppPortId, &link);
   if (!link.link_status) {
     throw DriverException(
-        HERE, format("Failed to detect a link on Ethernet port %u", portId));
+        HERE, format("Failed to detect a link on Ethernet port %u",
+  kAppPortId));
   }
   if (link.link_speed != ETH_SPEED_NUM_NONE) {
     // Be conservative about the link speed. We use bandwidth in
@@ -146,7 +124,7 @@ int main() {
   // create an in-memory ring, used as a software loopback in order to handle
   // packets that are addressed to the localhost.
   loopbackRing = rte_ring_create("dpdk_loopback_ring", 4096, SOCKET_ID_ANY, 0);
-  if (NULL == loopbackRing) {
+  if (nullptr == loopbackRing) {
     throw DriverException(HERE, format("Failed to allocate loopback ring: %s",
                                        rte_strerror(rte_errno)));
   }
