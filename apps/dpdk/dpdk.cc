@@ -22,6 +22,22 @@
 
 static constexpr size_t kAppPortId = 0;
 
+// Number of descriptors to allocate for the tx/rx rings
+static constexpr size_t kAppNumRingDesc = 256;
+
+// Maximum number of packet buffers that the memory pool can hold. The
+// documentation of `rte_mempool_create` suggests that the optimum value
+// (in terms of memory usage) of this number is a power of two minus one.
+static constexpr size_t kAppNumMbufs = 8191;
+static constexpr size_t kAppNumCacheMbufs = 32;
+
+static constexpr size_t kAppNumaNode = 0;
+
+// Per-element size for the packet buffer memory pool
+static constexpr size_t kAppMbufSize =
+    (2048 + static_cast<uint32_t>(sizeof(struct rte_mbuf)) +
+     RTE_PKTMBUF_HEADROOM);
+
 int main() {
   const char* argv[] = {"rc", "-c", "1", "-n", "1", NULL};
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1;
@@ -29,9 +45,20 @@ int main() {
   erpc::rt_assert(ret >= 0, "rte_eal_init failed");
   printf("DPDK initialized\n");
 
-  uint16_t num_ports = rte_eth_dev_count();
+  uint16_t num_ports = rte_eth_dev_count_avail();
   printf("%u DPDK ports available\n", num_ports);
   erpc::rt_assert(num_ports > kAppPortId, "Too few ports");
+
+  rte_mempool* pktmbuf_pool =
+      rte_pktmbuf_pool_create("mbuf_pool", kAppNumMbufs, kAppNumCacheMbufs, 0,
+                              kAppMbufSize, kAppNumaNode);
+
+  if (pktmbuf_pool == nullptr) {
+    printf("Failed to create mbuf pool. Error = %s\n", rte_strerror(rte_errno));
+    exit(-1);
+  } else {
+    printf("Mempool creation succeeded\n");
+  }
 
   /*
   struct ether_addr mac;
@@ -39,16 +66,6 @@ int main() {
 
 
   // create an memory pool for accommodating packet buffers
-  mbufPool = rte_mempool_create("mbuf_pool", NB_MBUF, MBUF_SIZE, 32,
-                                sizeof32(struct rte_pktmbuf_pool_private),
-                                rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init,
-                                NULL, rte_socket_id(), 0);
-
-  if (!mbufPool) {
-    throw DriverException(
-        HERE, format("Failed to allocate memory for packet buffers: %s",
-                     rte_strerror(rte_errno)));
-  }
 
   // Read the MAC address from the NIC via DPDK.
   rte_eth_macaddr_get(portId, &mac);
