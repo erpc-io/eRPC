@@ -31,6 +31,8 @@ static constexpr size_t kAppNumMbufs = 8191;
 static constexpr size_t kAppNumCacheMbufs = 32;
 
 static constexpr size_t kAppNumaNode = 0;
+static constexpr size_t kAppNumRxQueues = 1;
+static constexpr size_t kAppNumTxQueues = 1;
 
 // Per-element size for the packet buffer memory pool
 static constexpr size_t kAppMbufSize =
@@ -64,7 +66,8 @@ int main() {
   struct rte_eth_conf port_conf;
   memset(&port_conf, 0, sizeof(port_conf));
   port_conf.rxmode.max_rx_pkt_len = ETHER_MAX_VLAN_FRAME_LEN;
-  rte_eth_dev_configure(kAppPortId, 1, 1, &port_conf);
+  rte_eth_dev_configure(kAppPortId, kAppNumRxQueues, kAppNumTxQueues,
+                        &port_conf);
 
   // Set up a NIC/HW-based filter on the ethernet type so that only
   // traffic to a particular port is received by this driver.
@@ -77,9 +80,13 @@ int main() {
                                 RTE_ETH_FILTER_ADD, &filter);
   erpc::rt_assert(ret >= 0, "Failed to add ethertype filter");
 
-  rte_eth_rx_queue_setup(kAppPortId, 0, kAppNumRingDesc, 0, nullptr,
-                         pktmbuf_pool);
-  rte_eth_tx_queue_setup(kAppPortId, 0, kAppNumRingDesc, 0, nullptr);
+  struct rte_eth_txconf* tx_conf = nullptr;
+  struct rte_eth_rxconf* rx_conf = nullptr;
+  uint16_t rx_queue_id = 0, tx_queue_id = 0;
+  rte_eth_rx_queue_setup(kAppPortId, rx_queue_id, kAppNumRingDesc, kAppNumaNode,
+                         rx_conf, pktmbuf_pool);
+  rte_eth_tx_queue_setup(kAppPortId, tx_queue_id, kAppNumRingDesc, kAppNumaNode,
+                         tx_conf);
 
   ret = rte_eth_dev_set_mtu(kAppPortId, kAppMTU);
   erpc::rt_assert(ret >= 0, "Failed to set MTU");
