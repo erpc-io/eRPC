@@ -1,48 +1,50 @@
-#include "common.h"
+#include "eth_helpers.h"
+#include "util/rand.h"
 
-#include <rte_common.h>
-#include <rte_config.h>
-#include <rte_errno.h>
-#include <rte_ethdev.h>
-#include <rte_mbuf.h>
-#include <rte_memcpy.h>
-#include <rte_ring.h>
-#include <rte_version.h>
+void send_packets(struct rte_mempool *pktmbuf_pool, erpc::FastRand &fastrand) {
+  rte_mbuf *tx_mbufs[kAppTxBatchSize];
+  for (size_t i = 0; i < kAppTxBatchSize; i++) {
+    tx_mbufs[i] = rte_pktmbuf_alloc(pktmbuf_pool);
+    erpc::rt_assert(tx_mbufs[i] != nullptr);
 
-static std::string mac_to_string(const uint8_t* mac) {
-  std::ostringstream ret;
-  for (size_t i = 0; i < 6; i++) {
-    ret << std::hex << static_cast<uint32_t>(mac[i]);
-    if (i != 5) ret << ":";
+    uint8_t *pkt = rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *);
+
+    auto *eth_hdr = reinterpret_cast<ether_hdr *>(pkt);
+    auto *ip_hdr = reinterpret_cast<ipv4_hdr *>(pkt + sizeof(ether_hdr));
+
+    memset(eth_hdr->s_addr.addr_bytes, 0, 6);
+    memset(eth_hdr->d_addr.addr_bytes, 0, 6);
+    eth_hdr->ether_type = htons(ETHER_TYPE_IPv4);
+
+    ip_hdr->src_addr = fastrand.next_u32();
+    ip_hdr->dst_addr = fastrand.next_u32();
+    ip_hdr->version_ihl = 0x40 | 0x05;
+
+    tx_mbufs[i]->nb_segs = 1;
+    tx_mbufs[i]->pkt_len = 60;
+    tx_mbufs[i]->data_len = 60;
   }
-  return ret.str();
+
+  size_t nb_tx_new =
+      rte_eth_tx_burst(kAppPortId, kAppTxQueueId, tx_mbufs, kAppTxBatchSize);
+
+  for (size_t i = nb_tx_new; i < kAppTxBatchSize; i++) {
+    rte_pktmbuf_free(tx_mbufs[i]);
+  }
 }
 
-static constexpr size_t kAppMTU = 1024;
-static constexpr size_t kAppPortId = 0;
-
-// Number of descriptors to allocate for the tx/rx rings
-static constexpr size_t kAppNumRingDesc = 256;
-
-// Maximum number of packet buffers that the memory pool can hold. The
-// documentation of `rte_mempool_create` suggests that the optimum value
-// (in terms of memory usage) of this number is a power of two minus one.
-static constexpr size_t kAppNumMbufs = 8191;
-static constexpr size_t kAppNumCacheMbufs = 32;
-
-static constexpr size_t kAppNumaNode = 0;
-static constexpr size_t kAppNumRxQueues = 1;
-static constexpr size_t kAppNumTxQueues = 1;
-
-// Per-element size for the packet buffer memory pool
-static constexpr size_t kAppMbufSize =
-    (2048 + static_cast<uint32_t>(sizeof(struct rte_mbuf)) +
-     RTE_PKTMBUF_HEADROOM);
+void receive_packets() {
+  struct rte_mbuf *rx_pkts[kAppRxBatchSize];
+  size_t nb_rx = rte_eth_rx_burst(kAppPortId, 0, rx_pkts, kAppRxBatchSize);
+  if (nb_rx > 0) printf("nb_rx = %zu\n", nb_rx);
+}
 
 int main() {
-  const char* argv[] = {"rc", "-c", "1", "-n", "1", nullptr};
+  erpc::FastRand fastrand;
+
+  const char *argv[] = {"rc", "-c", "1", "-n", "1", nullptr};
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1;
-  int ret = rte_eal_init(argc, const_cast<char**>(argv));
+  int ret = rte_eal_init(argc, const_cast<char **>(argv));
   erpc::rt_assert(ret >= 0, "rte_eal_init failed");
   printf("DPDK initialized\n");
 
@@ -50,7 +52,7 @@ int main() {
   printf("%u DPDK ports available\n", num_ports);
   erpc::rt_assert(num_ports > kAppPortId, "Too few ports");
 
-  rte_mempool* pktmbuf_pool =
+  rte_mempool *pktmbuf_pool =
       rte_pktmbuf_pool_create("mbuf_pool", kAppNumMbufs, kAppNumCacheMbufs, 0,
                               kAppMbufSize, kAppNumaNode);
 
@@ -69,29 +71,17 @@ int main() {
   rte_eth_dev_configure(kAppPortId, kAppNumRxQueues, kAppNumTxQueues,
                         &port_conf);
 
-  // Set up a NIC/HW-based filter on the ethernet type so that only
-  // traffic to a particular port is received by this driver.
-  struct rte_eth_ethertype_filter filter;
-  ret = rte_eth_dev_filter_supported(kAppPortId, RTE_ETH_FILTER_ETHERTYPE);
-  erpc::rt_assert(ret >= 0, "Ethertype filter not supported");
-
-  memset(&filter, 0, sizeof(filter));
-  ret = rte_eth_dev_filter_ctrl(kAppPortId, RTE_ETH_FILTER_ETHERTYPE,
-                                RTE_ETH_FILTER_ADD, &filter);
-  erpc::rt_assert(ret >= 0, "Failed to add ethertype filter");
-
-  struct rte_eth_txconf* tx_conf = nullptr;
-  struct rte_eth_rxconf* rx_conf = nullptr;
-  uint16_t rx_queue_id = 0, tx_queue_id = 0;
-  rte_eth_rx_queue_setup(kAppPortId, rx_queue_id, kAppNumRingDesc, kAppNumaNode,
-                         rx_conf, pktmbuf_pool);
-  rte_eth_tx_queue_setup(kAppPortId, tx_queue_id, kAppNumRingDesc, kAppNumaNode,
-                         tx_conf);
+  struct rte_eth_txconf *tx_conf = nullptr;
+  struct rte_eth_rxconf *rx_conf = nullptr;
+  rte_eth_rx_queue_setup(kAppPortId, kAppRxQueueId, kAppNumRingDesc,
+                         kAppNumaNode, rx_conf, pktmbuf_pool);
+  rte_eth_tx_queue_setup(kAppPortId, kAppTxQueueId, kAppNumRingDesc,
+                         kAppNumaNode, tx_conf);
 
   ret = rte_eth_dev_set_mtu(kAppPortId, kAppMTU);
   erpc::rt_assert(ret >= 0, "Failed to set MTU");
 
-  ret = rte_eth_dev_start(kAppPortId);
+  ret = rte_eth_dev_start(kAppPortId);  // This starts the RX/TX queues
   erpc::rt_assert(ret >= 0, "Failed to start port");
 
   // Retrieve the link speed and compute information based on it.
@@ -100,4 +90,11 @@ int main() {
   erpc::rt_assert(link.link_status > 0, "Failed to detect link");
   erpc::rt_assert(link.link_speed != ETH_SPEED_NUM_NONE, "Failed to get bw");
   printf("Link bandwidth = %u Mbps\n", link.link_speed);
+
+  rte_eth_promiscuous_enable(kAppPortId);
+
+  while (true) {
+    send_packets(pktmbuf_pool, fastrand);
+    receive_packets();
+  }
 }
