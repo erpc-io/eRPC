@@ -10,8 +10,8 @@ sudo ifconfig enp24s0f1 down
 sudo $dpdk/usertools/dpdk-devbind.py --bind=igb_uio enp24s0f1
 
 # Create hugepage mount
-sudo mkdir -p /mnt/huge
-grep -s /mnt/huge /proc/mounts > /dev/null
-if [ $? -ne 0 ] ; then
-	sudo mount -t hugetlbfs nodev /mnt/huge
-fi
+# sudo mkdir -p /mnt/huge
+# grep -s /mnt/huge /proc/mounts > /dev/null
+# if [ $? -ne 0 ] ; then
+# sudo mount -t hugetlbfs nodev /mnt/huge
+# fi
