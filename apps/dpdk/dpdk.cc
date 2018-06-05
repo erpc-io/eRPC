@@ -1,7 +1,54 @@
+#include <rte_common.h>
+#include <rte_config.h>
+#include <rte_errno.h>
+#include <rte_ethdev.h>
+#include <rte_ip.h>
+#include <rte_mbuf.h>
+#include <rte_memcpy.h>
+#include <rte_ring.h>
+#include <rte_version.h>
+#include <string>
+#include "common.h"
 #include "eth_helpers.h"
 #include "util/rand.h"
 
-void send_packets(struct rte_mempool *pktmbuf_pool, erpc::FastRand &fastrand) {
+#include <gflags/gflags.h>
+DEFINE_uint64(is_sender, 0, "is_sender");
+
+static constexpr size_t kAppMTU = 1024;
+static constexpr size_t kAppPortId = 0;
+
+static constexpr size_t kAppNumRingDesc = 256;
+
+static constexpr size_t kAppRxBatchSize = 32;
+static constexpr size_t kAppTxBatchSize = 32;
+static constexpr size_t kAppDataSize = 16;  // App-level data size
+
+// Maximum number of packet buffers that the memory pool can hold. The
+// documentation of `rte_mempool_create` suggests that the optimum value
+// (in terms of memory usage) of this number is a power of two minus one.
+static constexpr size_t kAppNumMbufs = 8191;
+static constexpr size_t kAppNumCacheMbufs = 32;
+
+static constexpr size_t kAppNumaNode = 0;
+static constexpr size_t kAppNumRxQueues = 1;
+static constexpr size_t kAppNumTxQueues = 1;
+
+static constexpr size_t kAppRxQueueId = 0;
+static constexpr size_t kAppTxQueueId = 0;
+
+uint8_t kDstMAC[6] = {0x3c, 0xfd, 0xfe, 0x56, 0x07, 0x42};
+char kDstIP[] = "10.10.1.1";
+
+uint8_t kSrcMAC[6] = {0x3c, 0xfd, 0xfe, 0x56, 0x19, 0x82};
+char kSrcIP[] = "10.10.1.2";
+
+// Per-element size for the packet buffer memory pool
+static constexpr size_t kAppMbufSize =
+    (2048 + static_cast<uint32_t>(sizeof(struct rte_mbuf)) +
+     RTE_PKTMBUF_HEADROOM);
+
+void send_packets(struct rte_mempool *pktmbuf_pool) {
   rte_mbuf *tx_mbufs[kAppTxBatchSize];
   for (size_t i = 0; i < kAppTxBatchSize; i++) {
     tx_mbufs[i] = rte_pktmbuf_alloc(pktmbuf_pool);
@@ -9,20 +56,20 @@ void send_packets(struct rte_mempool *pktmbuf_pool, erpc::FastRand &fastrand) {
 
     uint8_t *pkt = rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *);
 
-    auto *eth_hdr = reinterpret_cast<ether_hdr *>(pkt);
-    auto *ip_hdr = reinterpret_cast<ipv4_hdr *>(pkt + sizeof(ether_hdr));
+    // For now, don't use DPDK's header defines
+    auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(pkt);
+    auto *ip_hdr = reinterpret_cast<ipv4_hdr_t *>(pkt + sizeof(eth_hdr_t));
+    auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(pkt + sizeof(eth_hdr_t) +
+                                                  sizeof(ipv4_hdr_t));
 
-    memset(eth_hdr->s_addr.addr_bytes, 0, 6);
-    memset(eth_hdr->d_addr.addr_bytes, 0, 6);
-    eth_hdr->ether_type = htons(ETHER_TYPE_IPv4);
-
-    ip_hdr->src_addr = fastrand.next_u32();
-    ip_hdr->dst_addr = fastrand.next_u32();
-    ip_hdr->version_ihl = 0x40 | 0x05;
+    gen_eth_header(eth_hdr, kSrcMAC, kDstMAC);
+    gen_ipv4_header(ip_hdr, ip_from_str(kSrcIP), ip_from_str(kDstIP),
+                    kAppDataSize);
+    gen_udp_header(udp_hdr, 31850, 31850, kAppDataSize);
 
     tx_mbufs[i]->nb_segs = 1;
-    tx_mbufs[i]->pkt_len = 60;
-    tx_mbufs[i]->data_len = 60;
+    tx_mbufs[i]->pkt_len = kTotHdrSz + kAppDataSize;
+    tx_mbufs[i]->data_len = tx_mbufs[i]->pkt_len;
   }
 
   size_t nb_tx_new =
@@ -39,17 +86,15 @@ void receive_packets() {
   if (nb_rx > 0) printf("nb_rx = %zu\n", nb_rx);
 }
 
-int main() {
-  erpc::FastRand fastrand;
+int main(int argc, char **argv) {
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  const char *argv[] = {"rc", "-c", "1", "-n", "1", nullptr};
-  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1;
-  int ret = rte_eal_init(argc, const_cast<char **>(argv));
+  const char *rte_argv[] = {"rc", "-c", "1", "-n", "1", nullptr};
+  int rte_argc = static_cast<int>(sizeof(argv) / sizeof(argv[0])) - 1;
+  int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
   erpc::rt_assert(ret >= 0, "rte_eal_init failed");
-  printf("DPDK initialized\n");
 
   uint16_t num_ports = rte_eth_dev_count_avail();
-  printf("%u DPDK ports available\n", num_ports);
   erpc::rt_assert(num_ports > kAppPortId, "Too few ports");
 
   rte_mempool *pktmbuf_pool =
@@ -94,7 +139,6 @@ int main() {
   rte_eth_promiscuous_enable(kAppPortId);
 
   while (true) {
-    send_packets(pktmbuf_pool, fastrand);
-    receive_packets();
+    FLAGS_is_sender == 1 ? send_packets(pktmbuf_pool) : receive_packets();
   }
 }

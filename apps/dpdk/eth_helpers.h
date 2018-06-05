@@ -1,51 +1,11 @@
 #include <arpa/inet.h>
 #include <assert.h>
-#include <rte_common.h>
-#include <rte_config.h>
-#include <rte_errno.h>
-#include <rte_ethdev.h>
-#include <rte_ip.h>
-#include <rte_mbuf.h>
-#include <rte_memcpy.h>
-#include <rte_ring.h>
-#include <rte_version.h>
+#include <string.h>
+#include <sstream>
 #include <string>
-#include "common.h"
-
-static constexpr size_t kAppMTU = 1024;
-static constexpr size_t kAppPortId = 0;
-
-static constexpr size_t kAppNumRingDesc = 256;
-
-static constexpr size_t kAppRxBatchSize = 32;
-static constexpr size_t kAppTxBatchSize = 32;
-
-// Maximum number of packet buffers that the memory pool can hold. The
-// documentation of `rte_mempool_create` suggests that the optimum value
-// (in terms of memory usage) of this number is a power of two minus one.
-static constexpr size_t kAppNumMbufs = 8191;
-static constexpr size_t kAppNumCacheMbufs = 32;
-
-static constexpr size_t kAppNumaNode = 0;
-static constexpr size_t kAppNumRxQueues = 1;
-static constexpr size_t kAppNumTxQueues = 1;
-
-static constexpr size_t kAppRxQueueId = 0;
-static constexpr size_t kAppTxQueueId = 0;
 
 static constexpr uint16_t kIPEtherType = 0x800;
 static constexpr uint16_t kIPHdrProtocol = 0x11;
-
-uint8_t kDstMAC[6] = {0x3c, 0xfd, 0xfe, 0x56, 0x07, 0x42};
-char kDstIP[] = "10.10.1.1";
-
-uint8_t kSrcMAC[6] = {0x3c, 0xfd, 0xfe, 0x56, 0x19, 0x82};
-char kSrcIP[] = "10.10.1.2";
-
-// Per-element size for the packet buffer memory pool
-static constexpr size_t kAppMbufSize =
-    (2048 + static_cast<uint32_t>(sizeof(struct rte_mbuf)) +
-     RTE_PKTMBUF_HEADROOM);
 
 struct eth_hdr_t {
   uint8_t dst_mac[6];
