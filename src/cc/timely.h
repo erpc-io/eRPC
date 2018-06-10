@@ -5,8 +5,7 @@
  * Units: Microseconds or TSC for time, bytes/sec for throughput
  */
 
-#ifndef ERPC_TIMELY_H
-#define ERPC_TIMELY_H
+#pragma once
 
 #include <iomanip>
 #include "cc/timely_sweep_params.h"
@@ -201,5 +200,3 @@ class Timely {
   }
 };
 }  // End erpc
-
-#endif  // ERPC_TIMELY_H

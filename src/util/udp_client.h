@@ -1,5 +1,4 @@
-#ifndef ERPC_UDP_CLIENT_H
-#define ERPC_UDP_CLIENT_H
+#pragma once
 
 #include <netdb.h>
 #include <string.h>
@@ -85,5 +84,3 @@ class UDPClient {
 };
 
 }  // End erpc
-
-#endif  // UDP_CLIENT_H

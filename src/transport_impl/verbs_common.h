@@ -2,8 +2,7 @@
  * @file verbs_common.h
  * @brief Common definitions for ibverbs-based transports
  */
-#ifndef ERPC_VERBS_COMMON_H
-#define ERPC_VERBS_COMMON_H
+#pragma once
 
 #include <infiniband/verbs.h>
 #include <string>
@@ -106,5 +105,3 @@ static inline void poll_cq_one_helper(struct ibv_cq *cq) {
 }
 
 }  // End erpc
-
-#endif  // ERPC_VERBS_COMMON_H

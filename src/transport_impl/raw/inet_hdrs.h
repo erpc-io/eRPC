@@ -1,5 +1,4 @@
-#ifndef ERPC_INET_HDRS_H
-#define ERPC_INET_HDRS_H
+#pragma once
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -217,5 +216,3 @@ static std::string ibdev2netdev(std::string ibdev_name) {
 }
 
 }  // End erpc
-
-#endif  // ERPC_INET_HDRS_H

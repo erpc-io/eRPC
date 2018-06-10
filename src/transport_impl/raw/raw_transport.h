@@ -2,8 +2,7 @@
  * @file raw_transport.h
  * @brief Transport for Mellanox verbs-based raw Ethernet
  */
-#ifndef ERPC_RAW_TRANSPORT_H
-#define ERPC_RAW_TRANSPORT_H
+#pragma once
 
 #include "inet_hdrs.h"
 #include "mlx5_defs.h"
@@ -248,5 +247,3 @@ class RawTransport : public Transport {
 };
 
 }  // End erpc
-
-#endif  // ERPC_RAW_TRANSPORT_H

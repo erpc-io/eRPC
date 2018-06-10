@@ -3,8 +3,7 @@
  * @brief Mellanox headers from Mellanox OFED 4.2
  */
 
-#ifndef ERPC_MLX5_DEFS_H
-#define ERPC_MLX5_DEFS_H
+#pragma once
 
 #include <infiniband/verbs_exp.h>
 #include <inttypes.h>
@@ -177,5 +176,3 @@ struct mlx5_cq {
 };
 
 }  // End erpc
-
-#endif  // ERPC_MLX5_DEFS_H
