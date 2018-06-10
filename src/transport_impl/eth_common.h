@@ -1,3 +1,8 @@
+/**
+ * @file eth_common.h
+ * @brief Common definitons for Ethernet-based transports
+ */
+
 #pragma once
 
 #include <arpa/inet.h>
@@ -14,14 +19,56 @@
 #include <sstream>
 #include <string>
 #include "common.h"
+#include "transport.h"
 
 namespace erpc {
 
 static constexpr uint16_t kIPEtherType = 0x800;
 static constexpr uint16_t kIPHdrProtocol = 0x11;
 
-static std::string mac_to_string(const uint8_t*);  // Foward declaration
-static std::string ipv4_to_string(uint32_t);       // Forward declaration
+/// The datapath destination UDP port for Rpc ID x is based on
+/// kBaseEthUDPPort and the Rpc's NUMA node
+static constexpr uint16_t kBaseEthUDPPort = 10000;
+
+static std::string mac_to_string(const uint8_t* mac) {
+  std::ostringstream ret;
+  for (size_t i = 0; i < 6; i++) {
+    ret << std::hex << static_cast<uint32_t>(mac[i]);
+    if (i != 5) ret << ":";
+  }
+  return ret.str();
+}
+
+static uint32_t ipv4_from_str(const char* ip) {
+  uint32_t addr;
+  int ret = inet_pton(AF_INET, ip, &addr);
+  rt_assert(ret == 1, "inet_pton() failed for " + std::string(ip));
+  return addr;
+}
+
+static std::string ipv4_to_string(uint32_t ipv4_addr) {
+  char str[INET_ADDRSTRLEN];
+  const char* ret = inet_ntop(AF_INET, &ipv4_addr, str, sizeof(str));
+  rt_assert(ret == str, "inet_ntop failed");
+  str[INET_ADDRSTRLEN - 1] = 0;  // Null-terminate
+  return str;
+}
+
+/// eRPC session endpoint routing info for Ethernet-based transports
+struct eth_routing_info_t {
+  uint8_t mac[6];
+  uint32_t ipv4_addr;
+  uint16_t udp_port;
+
+  std::string to_string() {
+    std::ostringstream ret;
+    ret << "[MAC " << mac_to_string(mac) << ", IP " << ipv4_to_string(ipv4_addr)
+        << ", UDP port " << std::to_string(udp_port) << "]";
+
+    return std::string(ret.str());
+  }
+};
+static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
 
 struct eth_hdr_t {
   uint8_t dst_mac[6];
@@ -127,31 +174,6 @@ static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
   udp_hdr->dst_port = htons(dst_port);
   udp_hdr->len = htons(sizeof(udp_hdr_t) + data_size);
   udp_hdr->check = 0;
-}
-
-static std::string mac_to_string(const uint8_t* mac) {
-  std::ostringstream ret;
-  for (size_t i = 0; i < 6; i++) {
-    ret << std::hex << static_cast<uint32_t>(mac[i]);
-    if (i != 5) ret << ":";
-  }
-  return ret.str();
-}
-
-static uint32_t ipv4_from_str(const char* ip) {
-  uint32_t addr;
-  int ret = inet_pton(AF_INET, ip, &addr);
-  rt_assert(ret == 1, "inet_pton() failed for " + std::string(ip));
-  return addr;
-}
-
-static std::string ipv4_to_string(uint32_t ipv4_addr) {
-  static_assert(INET_ADDRSTRLEN == 16, "");
-  char str[INET_ADDRSTRLEN];
-  const char* ret = inet_ntop(AF_INET, &ipv4_addr, str, sizeof(str));
-  rt_assert(ret == str, "inet_ntop failed");
-  str[INET_ADDRSTRLEN - 1] = 0;  // Null-terminate
-  return str;
 }
 
 /// Return the IPv4 address of a kernel-visible interface
