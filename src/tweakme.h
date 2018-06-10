@@ -2,8 +2,7 @@
  * @file tweakme.h
  * @brief Tweak this file to modify eRPC's behavior
  */
-#ifndef ERPC_TWEAKME_H
-#define ERPC_TWEAKME_H
+#pragma once
 
 #include <assert.h>
 #include <stdlib.h>
@@ -49,5 +48,3 @@ static constexpr double kBandwidth = 3.125 * 1000 * 1000 * 1000;  // 25 Gbps
 
 static constexpr bool kDatapathStats = false;
 }
-
-#endif  // ERPC_CONFIG_H

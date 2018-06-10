@@ -1,5 +1,4 @@
-#ifndef ERPC_SSLOT_H
-#define ERPC_SSLOT_H
+#pragma once
 
 #include "msg_buffer.h"
 #include "ops.h"
@@ -132,5 +131,3 @@ class RespHandle : public SSlot {
   }
 };
 }
-
-#endif  // ERPC_SSLOT_H

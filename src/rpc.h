@@ -1,5 +1,4 @@
-#ifndef ERPC_RPC_H
-#define ERPC_RPC_H
+#pragma once
 
 #include "cc/timing_wheel.h"
 #include "common.h"
@@ -991,5 +990,3 @@ class Rpc {
   template class Rpc<RawTransport>;
 
 }  // End erpc
-
-#endif  // ERPC_RPC_H

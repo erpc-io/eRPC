@@ -2,8 +2,7 @@
  * @file ops.h
  * @brief User-defined eRPC request handler and continuation types
  */
-#ifndef ERPC_OPS_H
-#define ERPC_OPS_H
+#pragma once
 
 #include "msg_buffer.h"
 
@@ -71,5 +70,3 @@ struct enq_req_args_t {
         cont_etid(cont_etid) {}
 };
 }
-
-#endif  // ERPC_OPS_H

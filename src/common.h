@@ -2,8 +2,7 @@
  * @file common.h
  * @brief Common header file with convenience definitions
  */
-#ifndef ERPC_COMMON_H
-#define ERPC_COMMON_H
+#pragma once
 
 #include <assert.h>
 #include <stdint.h>
@@ -96,5 +95,3 @@ static inline void dpath_stat_inc(size_t &stat, size_t val) {
   if (kDatapathStats) stat += val;
 }
 }  // End erpc
-
-#endif

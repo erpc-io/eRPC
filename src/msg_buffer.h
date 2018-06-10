@@ -1,5 +1,4 @@
-#ifndef ERPC_MSG_BUFFER_H
-#define ERPC_MSG_BUFFER_H
+#pragma once
 
 #include "common.h"
 #include "pkthdr.h"
@@ -156,5 +155,3 @@ class MsgBuffer {
   size_t num_pkts;       ///< Current number of packets in this MsgBuffer
 };
 }
-
-#endif  // ERPC_MSG_BUFFER_H

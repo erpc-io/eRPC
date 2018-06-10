@@ -2,8 +2,7 @@
  * @file transport.h
  * @brief General definitions for all transport types.
  */
-#ifndef ERPC_TRANSPORT_H
-#define ERPC_TRANSPORT_H
+#pragma once
 
 #include <functional>
 #include "common.h"
@@ -172,7 +171,4 @@ class Transport {
     size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called
   } testing;
 };
-
 }  // End erpc
-
-#endif  // ERPC_TRANSPORT_H

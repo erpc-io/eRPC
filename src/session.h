@@ -1,5 +1,4 @@
-#ifndef ERPC_SESSION_H
-#define ERPC_SESSION_H
+#pragma once
 
 #include <limits>
 #include <mutex>
@@ -139,5 +138,3 @@ class Session {
 };
 
 }  // End erpc
-
-#endif  // ERPC_SESSION_H
