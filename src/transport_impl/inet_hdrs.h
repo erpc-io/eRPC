@@ -2,7 +2,6 @@
 
 #include <arpa/inet.h>
 #include <assert.h>
-#include <dirent.h>
 #include <ifaddrs.h>
 #include <linux/if_arp.h>
 #include <linux/if_packet.h>
@@ -155,7 +154,7 @@ static std::string ipv4_to_string(uint32_t ipv4_addr) {
   return str;
 }
 
-/// Return the IPv4 address of an interface
+/// Return the IPv4 address of a kernel-visible interface
 static uint32_t get_interface_ipv4_addr(std::string interface) {
   struct ifaddrs *ifaddr, *ifa;
   rt_assert(getifaddrs(&ifaddr) == 0);
@@ -173,7 +172,7 @@ static uint32_t get_interface_ipv4_addr(std::string interface) {
   return ipv4_addr;
 }
 
-/// Fill the MAC address of an interface
+/// Fill the MAC address of kernel-visible interface
 static void fill_interface_mac(std::string interface, uint8_t* mac) {
   struct ifreq ifr;
   ifr.ifr_addr.sa_family = AF_INET;
@@ -189,30 +188,6 @@ static void fill_interface_mac(std::string interface, uint8_t* mac) {
   for (size_t i = 0; i < 6; i++) {
     mac[i] = static_cast<uint8_t>(ifr.ifr_hwaddr.sa_data[i]);
   }
-}
-
-/// Return the net interface for a verbs device (e.g., mlx5_0 -> enp4s0f0)
-static std::string ibdev2netdev(std::string ibdev_name) {
-  std::string dev_dir = "/sys/class/infiniband/" + ibdev_name + "/device/net";
-
-  std::vector<std::string> net_ifaces;
-  DIR* dp;
-  struct dirent* dirp;
-  dp = opendir(dev_dir.c_str());
-  rt_assert(dp != nullptr, "Failed to open directory " + dev_dir);
-
-  while (true) {
-    dirp = readdir(dp);
-    if (dirp == nullptr) break;
-
-    if (strcmp(dirp->d_name, ".") == 0) continue;
-    if (strcmp(dirp->d_name, "..") == 0) continue;
-    net_ifaces.push_back(std::string(dirp->d_name));
-  }
-  closedir(dp);
-
-  rt_assert(net_ifaces.size() > 0, "Directory " + dev_dir + " is empty");
-  return net_ifaces[0];
 }
 
 }  // End erpc

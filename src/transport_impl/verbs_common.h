@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include <dirent.h>
 #include <infiniband/verbs.h>
 #include <string>
 #include "transport.h"
@@ -62,10 +63,8 @@ static Transport::MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
   return Transport::MemRegInfo(mr, mr->lkey);
 }
 
-/**
- * @brief A function wrapper used to generate this transport's
- * \p dereg_mr_func
- */
+/// A function wrapper used to generate a verbs transport's memory
+/// deregistration function
 static void ibv_dereg_mr_wrapper(Transport::MemRegInfo mr) {
   struct ibv_mr *ib_mr = reinterpret_cast<struct ibv_mr *>(mr.transport_mr);
   size_t size = ib_mr->length;
@@ -102,6 +101,30 @@ static inline void poll_cq_one_helper(struct ibv_cq *cq) {
     assert(false);
     exit(-1);
   }
+}
+
+/// Return the net interface for a verbs device (e.g., mlx5_0 -> enp4s0f0)
+static std::string ibdev2netdev(std::string ibdev_name) {
+  std::string dev_dir = "/sys/class/infiniband/" + ibdev_name + "/device/net";
+
+  std::vector<std::string> net_ifaces;
+  DIR* dp;
+  struct dirent* dirp;
+  dp = opendir(dev_dir.c_str());
+  rt_assert(dp != nullptr, "Failed to open directory " + dev_dir);
+
+  while (true) {
+    dirp = readdir(dp);
+    if (dirp == nullptr) break;
+
+    if (strcmp(dirp->d_name, ".") == 0) continue;
+    if (strcmp(dirp->d_name, "..") == 0) continue;
+    net_ifaces.push_back(std::string(dirp->d_name));
+  }
+  closedir(dp);
+
+  rt_assert(net_ifaces.size() > 0, "Directory " + dev_dir + " is empty");
+  return net_ifaces[0];
 }
 
 }  // End erpc

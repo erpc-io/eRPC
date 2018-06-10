@@ -4,9 +4,9 @@
  */
 #pragma once
 
-#include "inet_hdrs.h"
 #include "mlx5_defs.h"
 #include "transport.h"
+#include "transport_impl/inet_hdrs.h"
 #include "transport_impl/verbs_common.h"
 #include "util/barrier.h"
 #include "util/logger.h"
