@@ -11,9 +11,9 @@ constexpr size_t DpdkTransport::kMaxDataPerPkt;
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
-RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
-                           FILE *trace_file)
-    : Transport(TransportType::kRaw, rpc_id, phy_port, numa_node, trace_file),
+DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
+                             FILE *trace_file)
+    : Transport(TransportType::kDpdk, rpc_id, phy_port, numa_node, trace_file),
       rx_flow_udp_port(kBaseEthUDPPort + (256u * numa_node) + rpc_id) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
@@ -30,8 +30,8 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
       mac_to_string(resolve.mac_addr).c_str(), resolve.dev_port_id);
 }
 
-void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
-                                            uint8_t **rx_ring) {
+void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
+                                             uint8_t **rx_ring) {
   this->huge_alloc = huge_alloc;
 
   init_recvs(rx_ring);
@@ -43,43 +43,11 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 // memory regions.
 //
 // We only need to clean up non-hugepage structures.
-RawTransport::~RawTransport() {
+DpdkTransport::~DpdkTransport() {
   LOG_INFO("Destroying transport for ID %u\n", rpc_id);
-
-  if (kDumb) {
-    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP");
-    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ");
-
-    struct ibv_exp_release_intf_params rel_intf_params;
-    memset(&rel_intf_params, 0, sizeof(rel_intf_params));
-    exit_assert(
-        ibv_exp_release_intf(resolve.ib_ctx, wq_family, &rel_intf_params) == 0,
-        "Failed to release interface");
-
-    exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
-                "Failed to destroy RECV flow");
-
-    exit_assert(ibv_destroy_qp(mp_recv_qp) == 0,
-                "Failed to destroy MP RECV QP");
-
-    exit_assert(ibv_exp_destroy_rwq_ind_table(ind_tbl) == 0,
-                "Failed to destroy indirection table");
-
-    exit_assert(ibv_exp_destroy_wq(wq) == 0, "Failed to destroy WQ");
-  } else {
-    exit_assert(ibv_exp_destroy_flow(recv_flow) == 0,
-                "Failed to destroy RECV flow");
-
-    exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP");
-    exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ");
-  }
-
-  exit_assert(ibv_destroy_cq(recv_cq) == 0, "Failed to destroy RECV CQ");
-  exit_assert(ibv_dealloc_pd(pd) == 0, "Failed to destroy PD. Leaked MRs?");
-  exit_assert(ibv_close_device(resolve.ib_ctx) == 0, "Failed to close device");
 }
 
-void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
+void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ri = reinterpret_cast<raw_routing_info_t *>(routing_info);
   memcpy(ri->mac, resolve.mac_addr, 6);
@@ -88,7 +56,7 @@ void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
 }
 
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
-bool RawTransport::resolve_remote_routing_info(
+bool DpdkTransport::resolve_remote_routing_info(
     RoutingInfo *routing_info) const {
   auto *ri = reinterpret_cast<raw_routing_info_t *>(routing_info);
   uint8_t remote_mac[6];
@@ -109,7 +77,7 @@ bool RawTransport::resolve_remote_routing_info(
   return true;
 }
 
-void RawTransport::resolve_phy_port() {
+void DpdkTransport::resolve_phy_port() {
   std::ostringstream xmsg;  // The exception message
   int num_devices = 0;
   struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
@@ -191,7 +159,7 @@ void RawTransport::resolve_phy_port() {
 }
 
 /// Initialize QPs used for SENDs only
-void RawTransport::init_send_qp() {
+void DpdkTransport::init_send_qp() {
   assert(resolve.ib_ctx != nullptr && pd != nullptr);
 
   struct ibv_exp_cq_init_attr cq_init_attr;
@@ -240,7 +208,7 @@ void RawTransport::init_send_qp() {
 }
 
 /// Initialize a multi-packet RECV QP
-void RawTransport::init_mp_recv_qp() {
+void DpdkTransport::init_mp_recv_qp() {
   assert(kDumb && resolve.ib_ctx != nullptr && pd != nullptr);
 
   // Init CQ. Its size MUST be one so that we get two CQEs in mlx5.
@@ -333,7 +301,7 @@ void RawTransport::init_mp_recv_qp() {
   rt_assert(mp_recv_qp != nullptr, "Failed to create RECV QP");
 }
 
-void RawTransport::install_flow_rule() {
+void DpdkTransport::install_flow_rule() {
   struct ibv_qp *qp_for_flow = kDumb ? mp_recv_qp : qp;
   assert(qp_for_flow != nullptr);
 
@@ -385,7 +353,7 @@ void RawTransport::install_flow_rule() {
   rt_assert(recv_flow != nullptr, "Failed to create RECV flow");
 }
 
-void RawTransport::map_mlx5_overrunning_recv_cqes() {
+void DpdkTransport::map_mlx5_overrunning_recv_cqes() {
   assert(kDumb);
 
   // This cast works for mlx5 where ibv_cq is the first member of mlx5_cq.
@@ -416,7 +384,7 @@ void RawTransport::map_mlx5_overrunning_recv_cqes() {
   snapshot_cqe(&recv_cqe_arr[kRecvCQDepth - 1], prev_snapshot);
 }
 
-void RawTransport::init_verbs_structs() {
+void DpdkTransport::init_verbs_structs() {
   assert(resolve.ib_ctx != nullptr && resolve.device_id != -1);
 
   // Create protection domain, send CQ, and recv CQ
@@ -429,14 +397,14 @@ void RawTransport::init_verbs_structs() {
   if (kDumb) map_mlx5_overrunning_recv_cqes();
 }
 
-void RawTransport::init_mem_reg_funcs() {
+void DpdkTransport::init_mem_reg_funcs() {
   using namespace std::placeholders;
   assert(pd != nullptr);
   reg_mr_func = std::bind(ibv_reg_mr_wrapper, pd, _1, _2);
   dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
 }
 
-void RawTransport::init_recvs(uint8_t **rx_ring) {
+void DpdkTransport::init_recvs(uint8_t **rx_ring) {
   // In the dumbpipe mode, this function must be called only after mapping and
   // initializing the RECV CQEs. The NIC can DMA as soon as we post RECVs.
   if (kDumb) assert(recv_cqe_arr != nullptr);
@@ -495,7 +463,7 @@ void RawTransport::init_recvs(uint8_t **rx_ring) {
   }
 }
 
-void RawTransport::init_sends() {
+void DpdkTransport::init_sends() {
   for (size_t i = 0; i < kPostlist; i++) {
     send_wr[i].next = &send_wr[i + 1];
     send_wr[i].opcode = IBV_WR_SEND;

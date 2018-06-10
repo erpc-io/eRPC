@@ -21,9 +21,8 @@ class DpdkTransport : public Transport {
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
 
   DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
-               FILE *trace_file);
+                FILE *trace_file);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
-
 
   ~DpdkTransport();
 
@@ -57,7 +56,7 @@ class DpdkTransport : public Transport {
 
   /// In the dumbpipe mode, initialze the multi-packet RECV QP
   void init_mp_recv_qp();
-  void install_flow_rule();               ///< Install the UDP destination flow
+  void install_flow_rule();  ///< Install the UDP destination flow
 
   /// Initialize constant fields of RECV descriptors, fill in the Rpc's
   /// RX ring, and fill the RECV queue.
@@ -66,8 +65,8 @@ class DpdkTransport : public Transport {
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
-    uint32_t ipv4_addr;       ///< The port's IPv4 address
-    uint8_t mac_addr[6];      ///< The port's MAC address
+    uint32_t ipv4_addr;   ///< The port's IPv4 address
+    uint8_t mac_addr[6];  ///< The port's MAC address
   } resolve;
 };
 
