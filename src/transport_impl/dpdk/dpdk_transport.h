@@ -9,6 +9,13 @@
 #include "util/barrier.h"
 #include "util/logger.h"
 
+#include <rte_common.h>
+#include <rte_config.h>
+#include <rte_errno.h>
+#include <rte_ethdev.h>
+#include <rte_ip.h>
+#include <rte_mbuf.h>
+
 namespace erpc {
 
 class DpdkTransport : public Transport {
@@ -16,6 +23,22 @@ class DpdkTransport : public Transport {
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kDPDK;
   static constexpr size_t kMTU = 1024;
+  static constexpr size_t kMaxQueues = 32;
+
+  static constexpr size_t kNumTxRingDesc = 128;
+  static constexpr size_t kRxBatchSize = 32;
+  static constexpr size_t kTxBatchSize = 32;
+
+  static constexpr size_t kNumMbufs = (kNumRxRingEntries * 2 - 1);
+  const char *kTempIp = "10.10.1.1";  // XXX: Temporary IP for everyone
+
+  // XXX: ixgbe does not support fast free offload, but i40e does
+  static constexpr uint32_t kOffloads = DEV_TX_OFFLOAD_MULTI_SEGS;
+
+  /// Per-element size for the packet buffer memory pool
+  static constexpr size_t kMbufSize =
+      (kMTU + static_cast<uint32_t>(sizeof(struct rte_mbuf)) +
+       RTE_PKTMBUF_HEADROOM);
 
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
@@ -40,28 +63,26 @@ class DpdkTransport : public Transport {
   void post_recvs(size_t num_recvs);
 
  private:
+  /// Perform once-per-process DPDK initialization
+  void do_per_process_dpdk_init();
+
   /**
    * @brief Resolve fields in \p resolve using \p phy_port
    * @throw runtime_error if the port cannot be resolved
    */
   void resolve_phy_port();
+  void init_mempool_and_queues();
+  void install_flow_rule();  ///< Install the UDP destination flow
 
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
 
-  /// Initialize structures that do not require eRPC hugepages: device
-  /// context, protection domain, and queue pairs.
-  void init_verbs_structs();
-  void init_send_qp();  ///< Iniitalize the SEND QP
+  const uint16_t rx_flow_udp_port;
+  size_t qp_id;  ///< The DPDK RX/TX queue pair for this transport endpoint
 
-  /// In the dumbpipe mode, initialze the multi-packet RECV QP
-  void init_mp_recv_qp();
-  void install_flow_rule();  ///< Install the UDP destination flow
-
-  /// Initialize constant fields of RECV descriptors, fill in the Rpc's
-  /// RX ring, and fill the RECV queue.
-  void init_recvs(uint8_t **rx_ring);
-  void init_sends();  ///< Initialize constant fields of SEND work requests
+  // We don't use DPDK's lcore threads, so a shared mempool with per-lcore
+  // cache won't work. Instead, we use per-thread pools with zero cached mbufs.
+  rte_mempool *mempool;
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
