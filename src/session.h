@@ -20,6 +20,7 @@ namespace erpc {
 // from accessing session members.
 class IBTransport;
 class RawTransport;
+class DpdkTransport;
 
 template <typename T>
 class Rpc;
@@ -28,6 +29,7 @@ class Rpc;
 class Session {
   friend class Rpc<IBTransport>;
   friend class Rpc<RawTransport>;
+  friend class Rpc<DpdkTransport>;
 
  public:
   enum class Role : int { kServer, kClient };

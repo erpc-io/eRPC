@@ -10,6 +10,7 @@ namespace erpc {
 // Forward declarations for friendship
 class IBTransport;
 class RawTransport;
+class DpdkTransport;
 class Session;
 
 template <typename T>
@@ -19,9 +20,11 @@ class Rpc;
 class MsgBuffer {
   friend class IBTransport;
   friend class RawTransport;
+  friend class DpdkTransport;
   friend class Session;
   friend class Rpc<IBTransport>;
   friend class Rpc<RawTransport>;
+  friend class Rpc<DpdkTransport>;
 
  public:
   MsgBuffer() {}

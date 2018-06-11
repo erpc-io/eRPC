@@ -34,17 +34,18 @@ static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 // Pick a transport. This is hard to control from CMake.
 class IBTransport;
 class RawTransport;
+class DpdkTransport;
 
-// 56 Gbps InfiniBand
 // typedef IBTransport CTransport;
 // static constexpr size_t kHeadroom = 0;
-// static constexpr double kBandwidth = 7.0 * 1000 * 1000 * 1000;
 
-// 40 Ethernet
-typedef RawTransport CTransport;
+// typedef RawTransport CTransport;
+// static constexpr size_t kHeadroom = 40;
+
+typedef DpdkTransport CTransport;
 static constexpr size_t kHeadroom = 40;
-// static constexpr double kBandwidth = 5.0 * 1000 * 1000 * 1000;  // 40 Gbps
-static constexpr double kBandwidth = 3.125 * 1000 * 1000 * 1000;  // 25 Gbps
+
+static constexpr double kBandwidth = (10.0) * (1000 * 1000 * 1000 / 8.0);
 
 static constexpr bool kDatapathStats = false;
 }

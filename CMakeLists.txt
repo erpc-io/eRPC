@@ -149,6 +149,8 @@ set(SOURCES
   src/transport_impl/infiniband/ib_transport_datapath.cc
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
+  src/transport_impl/dpdk/dpdk_transport.cc
+  src/transport_impl/dpdk/dpdk_transport_datapath.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
