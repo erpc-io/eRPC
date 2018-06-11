@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "config.h"
 #include "tweakme.h"
 
 namespace erpc {

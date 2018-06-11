@@ -31,20 +31,6 @@ static constexpr bool kCcOptTimelyBypass = ENABLE_CC_OPTS;
 
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
-// Pick a transport. This is hard to control from CMake.
-class IBTransport;
-class RawTransport;
-class DpdkTransport;
-
-// typedef IBTransport CTransport;
-// static constexpr size_t kHeadroom = 0;
-
-// typedef RawTransport CTransport;
-// static constexpr size_t kHeadroom = 40;
-
-typedef DpdkTransport CTransport;
-static constexpr size_t kHeadroom = 40;
-
 static constexpr double kBandwidth = (10.0) * (1000 * 1000 * 1000 / 8.0);
 
 static constexpr bool kDatapathStats = false;

@@ -1,0 +1,12 @@
+#pragma once
+
+namespace erpc {
+
+// Pick a transport. This is hard to control from CMake.
+class IBTransport;
+class RawTransport;
+class DpdkTransport;
+
+typedef ${CONFIG_TRANSPORT} CTransport;
+static constexpr size_t kHeadroom = ${CONFIG_HEADROOM};
+}

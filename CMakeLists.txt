@@ -36,10 +36,24 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(COMPILE_ERPC_LIB ON)
 
 # Options exposed to the user
+set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(PERF "Compile for performance" OFF)
-set(TRANSPORT "infiniband" CACHE STRING "Datapath transport (infiniband/roce/raw)")
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
+
+# Profile-guided optimization
+if(TRANSPORT STREQUAL "infiniband")
+  SET(CONFIG_TRANSPORT "IBTransport")
+  SET(CONFIG_HEADROOM 0)
+elseif(TRANSPORT STREQUAL "raw")
+  SET(CONFIG_TRANSPORT "RawTransport")
+  SET(CONFIG_HEADROOM 40)
+elseif(TRANSPORT STREQUAL "dpdk")
+  SET(CONFIG_TRANSPORT "DpdkTransport")
+  SET(CONFIG_HEADROOM 40)
+endif()
+
+configure_file(src/config.h.in src/config.h)
 
 # Parse the user-exposed options
 if(PERF)
