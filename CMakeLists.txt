@@ -52,6 +52,7 @@ elseif(TRANSPORT STREQUAL "dpdk")
   SET(CONFIG_TRANSPORT "DpdkTransport")
   SET(CONFIG_HEADROOM 40)
 endif()
+MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
 
 configure_file(src/config.h.in src/config.h)
 
@@ -128,7 +129,7 @@ else(TESTING)
   add_definitions(-DTESTING=false)
 endif(TESTING)
 
-# LTO
+# Link-time optimization
 if(LTO)
   MESSAGE(STATUS "LTO is enabled. Tests won't be compiled.")
   SET(COMPILE_ERPC_LIB OFF)
@@ -213,6 +214,19 @@ set(UTIL_TESTS
   timely_test
   numautil_test)
 
+# DPDK libraries
+if(TRANSPORT STREQUAL "dpdk")
+  set(DPDK_HOME "$ENV{HOME}/dpdk")
+  include_directories(SYSTEM ${DPDK_HOME}/x86_64-native-linuxapp-gcc/include)
+  add_definitions(-include rte_config.h)
+  link_directories(${LINK_DIRECTORIES} ${DPDK_HOME}/x86_64-native-linuxapp-gcc/lib)
+  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive)
+  set(LIBRARIES ${LIBRARIES} rte_kvargs rte_mbuf rte_ethdev rte_mempool rte_mempool_ring rte_ring rte_eal rte_hash rte_pci rte_bus_pci rte_bus_vdev)
+  set(LIBRARIES ${LIBRARIES} rte_pmd_i40e rte_pmd_ixgbe rte_pmd_ring)
+  set(LIBRARIES ${LIBRARIES} -Wl,--no-whole-archive)
+  set(LIBRARIES ${LIBRARIES} rt dl)
+endif()
+
 # Compile the tests
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling eRPC as a library")
@@ -266,16 +280,6 @@ elseif(APP STREQUAL "masstree_analytics")
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
-elseif(APP STREQUAL "dpdk")
-  set(DPDK_HOME "/users/akalia/dpdk")
-  include_directories(SYSTEM ${DPDK_HOME}/x86_64-native-linuxapp-gcc/include)
-  add_definitions(-include rte_config.h)
-  link_directories(${LINK_DIRECTORIES} ${DPDK_HOME}/x86_64-native-linuxapp-gcc/lib)
-  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive)
-  set(LIBRARIES ${LIBRARIES} rte_kvargs rte_mbuf rte_ethdev rte_mempool rte_mempool_ring rte_ring rte_eal rte_hash rte_pci rte_bus_pci rte_bus_vdev)
-  set(LIBRARIES ${LIBRARIES} rte_pmd_i40e rte_pmd_ixgbe rte_pmd_ring)
-  set(LIBRARIES ${LIBRARIES} -Wl,--no-whole-archive)
-  set(LIBRARIES ${LIBRARIES} rt dl)
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO

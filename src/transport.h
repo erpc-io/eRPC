@@ -93,8 +93,8 @@ class Transport {
             FILE* trace_file);
 
   /**
-   * @brief Initialize transport structures that require hugepages, and fill
-   * the RX ring.
+   * @brief Initialize transport structures that require hugepages, and
+   * fill/save the RX ring.
    *
    * @throw runtime_error if initialization fails. This exception is caught
    * in the parent Rpc, which then deletes \p huge_alloc so we don't need to.

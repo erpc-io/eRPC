@@ -40,12 +40,13 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   init_mempool_and_queues();
   install_flow_rule();
 
-  LOG_WARN(
-      "Created for ID %u. Device (%s, %s). IPv4 %s, MAC %s. "
-      "port %d.\n",
-      rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
-      ipv4_to_string(resolve.ipv4_addr).c_str(),
-      mac_to_string(resolve.mac_addr).c_str(), resolve.dev_port_id);
+  LOG_WARN("DpdkTransport created for ID %u", rpc_id);
+}
+
+void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
+                                             uint8_t **rx_ring) {
+  this->huge_alloc = huge_alloc;
+  this->rx_ring = rx_ring;
 }
 
 // The transport destructor is called after \p huge_alloc has already been
