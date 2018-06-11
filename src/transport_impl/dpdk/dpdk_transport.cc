@@ -25,8 +25,12 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   {
     eal_init_lock.lock();
     if (eal_initialized == 1) {
+      LOG_INFO("Rpc %u skipping DPDK initialization, queues ID = %zu.\n",
+               rpc_id, avialable_qp_id);
       qp_id = avialable_qp_id++;
     } else {
+      LOG_INFO("Rpc %u initializing DPDK, queues ID = %zu.\n", rpc_id,
+               avialable_qp_id);
       do_per_process_dpdk_init();
 
       eal_initialized = true;
@@ -39,6 +43,7 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   resolve_phy_port();
   init_mempool_and_queues();
   install_flow_rule();
+  init_mem_reg_funcs();
 
   LOG_WARN("DpdkTransport created for ID %u", rpc_id);
 }
@@ -56,14 +61,18 @@ void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 // We only need to clean up non-hugepage structures.
 DpdkTransport::~DpdkTransport() {
   LOG_INFO("Destroying transport for ID %u\n", rpc_id);
+
+  rte_mempool_free(mempool);
 }
 
 void DpdkTransport::init_mempool_and_queues() {
   std::string pname = "mempool-rpc-" + std::to_string(rpc_id);
+  printf("Creating mempool %s\n", pname.c_str());
+
   mempool = rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
                                     0 /* headroom */, kMbufSize, numa_node);
   rt_assert(mempool != nullptr,
-            "Mempool create failed " + std::string(rte_strerror(rte_errno)));
+            "Mempool create failed: " + std::string(rte_strerror(rte_errno)));
 
   rte_eth_rxconf eth_rx_conf;
   memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
@@ -75,7 +84,7 @@ void DpdkTransport::init_mempool_and_queues() {
 
   int ret = rte_eth_rx_queue_setup(phy_port, qp_id, kNumRxRingEntries,
                                    numa_node, &eth_rx_conf, mempool);
-  rt_assert(ret == 0, "Failed to setup RX queue " + std::to_string(qp_id));
+  rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(qp_id));
 
   rte_eth_txconf eth_tx_conf;
   memset(&eth_tx_conf, 0, sizeof(eth_tx_conf));
@@ -88,7 +97,7 @@ void DpdkTransport::init_mempool_and_queues() {
   eth_tx_conf.offloads = kOffloads;
   ret = rte_eth_tx_queue_setup(phy_port, qp_id, kNumTxRingDesc, numa_node,
                                &eth_tx_conf);
-  rt_assert(ret == 0, "Failed to setup TX queue " + std::to_string(qp_id));
+  rt_assert(ret == 0, "Failed to setup TX queue: " + std::to_string(qp_id));
 }
 
 void DpdkTransport::resolve_phy_port() {
