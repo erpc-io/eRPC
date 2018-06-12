@@ -88,7 +88,7 @@ void DpdkTransport::do_per_process_dpdk_init() {
   eth_conf.fdir_conf.drop_queue = 0;
 
   ret = rte_eth_dev_configure(phy_port, kMaxQueues, kMaxQueues, &eth_conf);
-  rt_assert(ret == 0, "Dev config err " + std::string(rte_strerror(rte_errno)));
+  rt_assert(ret == 0, "Ethdev configuration error: ", strerror(-1 * ret));
 
   // FILTER_SET fails for ixgbe, even though it supports flow director. As a
   // workaround, don't call FILTER_SET if ntuple filter is supported.
@@ -129,8 +129,7 @@ void DpdkTransport::init_mempool_and_queues() {
   std::string pname = "mempool-rpc-" + std::to_string(rpc_id);
   mempool = rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
                                     0 /* headroom */, kMbufSize, numa_node);
-  rt_assert(mempool != nullptr,
-            "Mempool create failed: " + std::string(rte_strerror(rte_errno)));
+  rt_assert(mempool != nullptr, "Mempool create failed: " + dpdk_strerror());
 
   rte_eth_rxconf eth_rx_conf;
   memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
@@ -196,9 +195,11 @@ bool DpdkTransport::resolve_remote_routing_info(
   return true;
 }
 
+// Install a rule for rx_flow_udp_port
 void DpdkTransport::install_flow_rule() {
-  // Install a rule for rx_flow_udp_port
-  int ret;
+  LOG_WARN("Rpc %u installing flow rule. Flow RX UDP port = %u.\n", rpc_id,
+           rx_flow_udp_port);
+
   if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
     // Use 5-tuple filter for ixgbe even though it technically supports
     // FILTER_FDIR. I couldn't get FILTER_FDIR to work with ixgbe.
@@ -212,8 +213,9 @@ void DpdkTransport::install_flow_rule() {
     ntuple.priority = 1;
     ntuple.queue = qp_id;
 
-    ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_NTUPLE,
-                                  RTE_ETH_FILTER_ADD, &ntuple);
+    int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_NTUPLE,
+                                      RTE_ETH_FILTER_ADD, &ntuple);
+    rt_assert(ret == 0, "Failed to add 5-tuple entry: ", strerror(-1 * ret));
   } else if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
     // Use fdir filter for i40e (5-tuple not supported)
     rte_eth_fdir_filter filter;
@@ -226,15 +228,12 @@ void DpdkTransport::install_flow_rule() {
     filter.action.behavior = RTE_ETH_FDIR_ACCEPT;
     filter.action.report_status = RTE_ETH_FDIR_NO_REPORT_STATUS;
 
-    ret = rte_eth_dev_filter_ctrl(qp_id, RTE_ETH_FILTER_FDIR,
-                                  RTE_ETH_FILTER_ADD, &filter);
+    int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
+                                      RTE_ETH_FILTER_ADD, &filter);
+    rt_assert(ret == 0, "Failed to add fdir entry: ", strerror(-1 * ret));
   } else {
     rt_assert(false, "No flow director filters supported");
-    ret = -1;
   }
-
-  rt_assert(ret == 0,
-            "Failed to add fdir entry " + std::string(rte_strerror(errno)));
 }
 
 /// A dummy memory registration function

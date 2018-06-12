@@ -58,6 +58,10 @@ class DpdkTransport : public Transport {
     return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
   }
 
+  static std::string dpdk_strerror() {
+    return std::string(rte_strerror(rte_errno));
+  }
+
   // raw_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
   void tx_flush();
