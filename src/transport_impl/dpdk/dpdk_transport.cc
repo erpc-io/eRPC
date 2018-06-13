@@ -210,8 +210,8 @@ bool DpdkTransport::resolve_remote_routing_info(
 
 // Install a rule for rx_flow_udp_port
 void DpdkTransport::install_flow_rule() {
-  LOG_WARN("Rpc %u installing flow rule. Flow RX UDP port = %u.\n", rpc_id,
-           rx_flow_udp_port);
+  LOG_WARN("Rpc %u installing flow rule. Queue %zu, RX UDP port = %u.\n",
+           rpc_id, qp_id, rx_flow_udp_port);
 
   if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
     // Use 5-tuple filter for ixgbe even though it technically supports

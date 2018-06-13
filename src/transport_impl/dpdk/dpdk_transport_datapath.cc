@@ -44,6 +44,12 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
     tx_mbufs[i]->nb_segs = 1;
     tx_mbufs[i]->pkt_len = pkt_size;
     tx_mbufs[i]->data_len = pkt_size;
+
+    LOG_TRACE(
+        "eRPC DpdkTransport: Sending packet (idx = %zu, drop = %u). "
+        "pkthdr = %s. Frame header = %s.\n",
+        i, item.drop, pkthdr->to_string().c_str(),
+        frame_header_to_string(&pkthdr->headroom[0]).c_str());
   }
 
   size_t nb_tx_new = rte_eth_tx_burst(phy_port, qp_id, tx_mbufs, num_pkts);
@@ -70,10 +76,23 @@ size_t DpdkTransport::rx_burst() {
   struct rte_mbuf *rx_pkts[kRxBatchSize];
   size_t nb_rx_new = rte_eth_rx_burst(phy_port, qp_id, rx_pkts, kRxBatchSize);
 
+  if (nb_rx_new == 0) {
+    LOG_TRACE("eRPC DpdkTransport: Received zero packets.\n");
+    usleep(1000);
+  }
+
   for (size_t i = 0; i < nb_rx_new; i++) {
     rx_ring[rx_ring_head] = rte_pktmbuf_mtod(rx_pkts[i], uint8_t *);
     assert(rx_ring[rx_ring_head] ==
            reinterpret_cast<uint8_t *>(rx_pkts[i] + RTE_PKTMBUF_HEADROOM));
+
+    auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
+    _unused(pkthdr);
+    LOG_TRACE(
+        "eRPC DpdkTransport: Received pkt. pkthdr = %s. Frame header = %s.\n",
+        pkthdr->to_string().c_str(),
+        frame_header_to_string(&pkthdr->headroom[0]).c_str());
+
     rx_ring_head = (rx_ring_head + 1) % kNumRxRingEntries;
   }
 
