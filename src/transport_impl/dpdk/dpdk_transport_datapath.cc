@@ -3,7 +3,63 @@
 
 namespace erpc {
 
-void DpdkTransport::tx_burst(const tx_burst_item_t *, size_t) {}
+void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
+                             size_t num_pkts) {
+  rte_mbuf *tx_mbufs[kPostlist];
+
+  for (size_t i = 0; i < num_pkts; i++) {
+    const tx_burst_item_t &item = tx_burst_arr[i];
+    const MsgBuffer *msg_buffer = item.msg_buffer;
+    assert(msg_buffer->is_valid());  // Can be fake for control packets
+    assert(item.pkt_idx == 0);       // Only single-sge packets for now
+
+    size_t pkt_size = msg_buffer->get_pkt_size<kMaxDataPerPkt>(0);
+    pkthdr_t *pkthdr = msg_buffer->get_pkthdr_0();
+
+    // We can do an 8-byte aligned memcpy as the 2-byte UDP csum is already 0
+    static constexpr size_t hdr_copy_sz = kInetHdrsTotSize - 2;
+    static_assert(hdr_copy_sz == 40, "");
+    memcpy(&pkthdr->headroom[0], item.routing_info, hdr_copy_sz);
+
+    if (kTesting && item.drop) {
+      // XXX: Can this cause performance problems?
+      auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(pkthdr->headroom);
+      memset(&eth_hdr->dst_mac, 0, sizeof(eth_hdr->dst_mac));
+    }
+
+    auto *ipv4_hdr =
+        reinterpret_cast<ipv4_hdr_t *>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
+    assert(ipv4_hdr->check == 0);
+    ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
+
+    auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
+    assert(udp_hdr->check == 0);
+    udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
+
+    // Do a copy :(
+    tx_mbufs[i] = rte_pktmbuf_alloc(mempool);
+    assert(tx_mbufs[i] != nullptr);
+    memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *), pkthdr, pkt_size);
+
+    tx_mbufs[i]->nb_segs = 1;
+    tx_mbufs[i]->pkt_len = pkt_size;
+    tx_mbufs[i]->data_len = pkt_size;
+  }
+
+  size_t nb_tx_new = rte_eth_tx_burst(phy_port, qp_id, tx_mbufs, num_pkts);
+  if (unlikely(nb_tx_new != num_pkts)) {
+    size_t retry_count = 0;
+    while (nb_tx_new != num_pkts) {
+      nb_tx_new += rte_eth_tx_burst(phy_port, qp_id, &tx_mbufs[nb_tx_new],
+                                    num_pkts - nb_tx_new);
+      retry_count++;
+      if (retry_count == 1000000000) {
+        LOG_INFO("Rpc %u stuck in rte_eth_tx_burst", rpc_id);
+        retry_count = 0;
+      }
+    }
+  }
+}
 
 void DpdkTransport::tx_flush() {
   // Nothing to do because we don't zero-copy for now
