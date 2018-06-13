@@ -1,14 +1,17 @@
 eRPC is a fast and general-purpose RPC library for kernel-bypass fabrics.
+We have a [preprint](https://arxiv.org/pdf/1806.00680.pdf) that describes the
+system.
+
 Some highlights:
  * Multiple supported fabrics: UDP (PFC is recommended), InfiniBand, and RoCE
  * Performance for small RPCs: ~10 million 32-byte RPCs/second per CPU core
  * Low latency: 2.5 microseconds round-trip RPC latency
  * High bandwidth for large RPC: 40 Gbps transfer per CPU core for 8 MB RPCs
  * Scalability: 12000 or more RPC sessions per server
- * End-to-end congestion control
+ * End-to-end congestion control that tolerates 100-way incasts
  * Nested RPCs, and long-running background RPCs
- * A port of [Raft](https://github.com/willemt/raft) as an example, with
-   5.3 microseconds of client-measured latency
+ * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
+   replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
 ## Requirements
  * A C++11 compiler, specified in `CMakeLists.txt`. clang and gcc have been
@@ -20,7 +23,7 @@ Some highlights:
      * ConnectX-4 or newer Mellanox Ethernet NICs. Non-Mellanox Ethernet NICs
        are not supported.
      * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode.
-     * PRs for unsupported NICs (e.g., via DPDK) are welcome.
+     * Support for other NICs via DPDK is under development.
    * InfiniBand mode: Any InfiniBand-compliant NICs
    * RoCE mode: Any RoCE-compilant NICs
    * Mellanox NIC drivers:
