@@ -9,8 +9,13 @@ namespace erpc {
 
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 
+/// The set of queue IDs in use by Rpc objects in this process
 static std::set<size_t> used_qp_ids;
-static std::mutex eal_init_lock;
+
+/// mempool_arr[i] is the mempool to use for queue i
+rte_mempool *mempool_arr[DpdkTransport::kMaxQueues];
+
+static std::mutex eal_lock;
 static bool eal_initialized;
 
 // Initialize the protection domain, queue pair, and memory registration and
@@ -24,12 +29,13 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
   {
-    eal_init_lock.lock();
+    eal_lock.lock();
 
     rt_assert(used_qp_ids.size() < kMaxQueues, "No queues left");
     for (size_t i = 0; i < kMaxQueues; i++) {
       if (used_qp_ids.count(i) == 0) {
         qp_id = i;
+        mempool = mempool_arr[qp_id];
         break;
       }
     }
@@ -44,11 +50,10 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
       eal_initialized = true;
     }
 
-    eal_init_lock.unlock();
+    eal_lock.unlock();
   }
 
   resolve_phy_port();
-  init_mempool_and_queues();
   install_flow_rule();
   init_mem_reg_funcs();
 
@@ -105,6 +110,46 @@ void DpdkTransport::do_per_process_dpdk_init() {
                                   RTE_ETH_FILTER_SET, &fi);
     rt_assert(ret == 0, "Failed to configure flow director fields");
   }
+
+  // Set up all RX and TX queues and start the device. This can't be done later
+  // on a per-thread basis since we must start the device to use any queue.
+  // Once the device is started, more queues cannot be added without stopping
+  // and reconfiguring the device.
+  for (size_t i = 0; i < kMaxQueues; i++) {
+    std::string pname = "mempool-rpc-" + std::to_string(i);
+    mempool_arr[i] =
+        rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
+                                0 /* headroom */, kMbufSize, numa_node);
+    rt_assert(mempool_arr[i] != nullptr,
+              "Mempool create failed: " + dpdk_strerror());
+
+    rte_eth_rxconf eth_rx_conf;
+    memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
+    eth_rx_conf.rx_thresh.pthresh = 8;
+    eth_rx_conf.rx_thresh.hthresh = 0;
+    eth_rx_conf.rx_thresh.wthresh = 0;
+    eth_rx_conf.rx_free_thresh = 0;
+    eth_rx_conf.rx_drop_en = 0;
+
+    int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
+                                     &eth_rx_conf, mempool_arr[i]);
+    rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(i));
+
+    rte_eth_txconf eth_tx_conf;
+    memset(&eth_tx_conf, 0, sizeof(eth_tx_conf));
+    eth_tx_conf.tx_thresh.pthresh = 32;
+    eth_tx_conf.tx_thresh.hthresh = 0;
+    eth_tx_conf.tx_thresh.wthresh = 0;
+    eth_tx_conf.tx_free_thresh = 0;
+    eth_tx_conf.tx_rs_thresh = 0;
+    eth_tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;  // Use offloads below instead
+    eth_tx_conf.offloads = kOffloads;
+    ret = rte_eth_tx_queue_setup(phy_port, i, kNumTxRingDesc, numa_node,
+                                 &eth_tx_conf);
+    rt_assert(ret == 0, "Failed to setup TX queue: " + std::to_string(i));
+  }
+
+  rte_eth_dev_start(phy_port);
 }
 
 void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
@@ -119,42 +164,10 @@ DpdkTransport::~DpdkTransport() {
   rte_mempool_free(mempool);
 
   {
-    eal_init_lock.lock();
+    eal_lock.lock();
     used_qp_ids.erase(used_qp_ids.find(qp_id));
-    eal_init_lock.unlock();
+    eal_lock.unlock();
   }
-}
-
-void DpdkTransport::init_mempool_and_queues() {
-  std::string pname = "mempool-rpc-" + std::to_string(rpc_id);
-  mempool = rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
-                                    0 /* headroom */, kMbufSize, numa_node);
-  rt_assert(mempool != nullptr, "Mempool create failed: " + dpdk_strerror());
-
-  rte_eth_rxconf eth_rx_conf;
-  memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
-  eth_rx_conf.rx_thresh.pthresh = 8;
-  eth_rx_conf.rx_thresh.hthresh = 0;
-  eth_rx_conf.rx_thresh.wthresh = 0;
-  eth_rx_conf.rx_free_thresh = 0;
-  eth_rx_conf.rx_drop_en = 0;
-
-  int ret = rte_eth_rx_queue_setup(phy_port, qp_id, kNumRxRingEntries,
-                                   numa_node, &eth_rx_conf, mempool);
-  rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(qp_id));
-
-  rte_eth_txconf eth_tx_conf;
-  memset(&eth_tx_conf, 0, sizeof(eth_tx_conf));
-  eth_tx_conf.tx_thresh.pthresh = 32;
-  eth_tx_conf.tx_thresh.hthresh = 0;
-  eth_tx_conf.tx_thresh.wthresh = 0;
-  eth_tx_conf.tx_free_thresh = 0;
-  eth_tx_conf.tx_rs_thresh = 0;
-  eth_tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;  // Use offloads below instead
-  eth_tx_conf.offloads = kOffloads;
-  ret = rte_eth_tx_queue_setup(phy_port, qp_id, kNumTxRingDesc, numa_node,
-                               &eth_tx_conf);
-  rt_assert(ret == 0, "Failed to setup TX queue: " + std::to_string(qp_id));
 }
 
 void DpdkTransport::resolve_phy_port() {

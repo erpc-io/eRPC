@@ -80,7 +80,6 @@ class DpdkTransport : public Transport {
    * @throw runtime_error if the port cannot be resolved
    */
   void resolve_phy_port();
-  void init_mempool_and_queues();
   void install_flow_rule();  ///< Install the UDP destination flow
 
   /// Initialize the memory registration and deregistration functions
