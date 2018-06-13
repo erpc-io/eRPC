@@ -31,6 +31,9 @@ class DpdkTransport : public Transport {
   /// For now, this is just for Rpc to size its array of control Msgbufs
   static constexpr size_t kUnsigBatch = 32;
 
+  /// Maximum number of packets received in rx_burst
+  static constexpr size_t kRxBatchSize = 32;
+
   static constexpr size_t kNumMbufs = (kNumRxRingEntries * 2 - 1);
   const char *kTempIp = "10.10.1.1";  // XXX: Temporary IP for everyone
 
@@ -86,7 +89,8 @@ class DpdkTransport : public Transport {
   /// For DPDK, the RX ring buffers might not always be used in a circular
   /// order. Instead, we write pointers to the Rpc's RX ring.
   uint8_t **rx_ring;
-  size_t rx_ring_head = 0;
+
+  size_t rx_ring_head = 0, rx_ring_tail = 0;
 
   const uint16_t rx_flow_udp_port;
   size_t qp_id;  ///< The DPDK RX/TX queue pair for this transport endpoint
