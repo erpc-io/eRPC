@@ -52,7 +52,7 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   install_flow_rule();
   init_mem_reg_funcs();
 
-  LOG_WARN("DpdkTransport created for ID %u", rpc_id);
+  LOG_WARN("DpdkTransport created for ID %u.\n", rpc_id);
 }
 
 void DpdkTransport::do_per_process_dpdk_init() {

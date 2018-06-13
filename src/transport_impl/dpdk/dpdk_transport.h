@@ -23,7 +23,7 @@ class DpdkTransport : public Transport {
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kDPDK;
   static constexpr size_t kMTU = 1024;
-  static constexpr size_t kMaxQueues = 32;
+  static constexpr size_t kMaxQueues = 16;
 
   static constexpr size_t kNumTxRingDesc = 128;
   static constexpr size_t kPostlist = 32;
