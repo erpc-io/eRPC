@@ -42,8 +42,8 @@ class DpdkTransport : public Transport {
 
   /// Per-element size for the packet buffer memory pool
   static constexpr size_t kMbufSize =
-      (kMTU + static_cast<uint32_t>(sizeof(struct rte_mbuf)) +
-       RTE_PKTMBUF_HEADROOM);
+      (static_cast<uint32_t>(sizeof(struct rte_mbuf)) + RTE_PKTMBUF_HEADROOM +
+       kMTU);
 
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));

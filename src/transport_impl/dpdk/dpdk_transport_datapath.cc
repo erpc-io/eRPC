@@ -84,7 +84,8 @@ size_t DpdkTransport::rx_burst() {
   for (size_t i = 0; i < nb_rx_new; i++) {
     rx_ring[rx_ring_head] = rte_pktmbuf_mtod(rx_pkts[i], uint8_t *);
     assert(rx_ring[rx_ring_head] ==
-           reinterpret_cast<uint8_t *>(rx_pkts[i] + RTE_PKTMBUF_HEADROOM));
+           reinterpret_cast<uint8_t *>(rx_pkts[i]) + sizeof(rte_mbuf) +
+               RTE_PKTMBUF_HEADROOM);
 
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     _unused(pkthdr);

@@ -16,7 +16,7 @@ static std::set<size_t> used_qp_ids;
 rte_mempool *mempool_arr[DpdkTransport::kMaxQueues];
 
 static std::mutex eal_lock;
-static bool eal_initialized;
+static volatile bool eal_initialized;
 
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
@@ -29,17 +29,8 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
   {
+    // The first thread to grab the lock initializes DPDK
     eal_lock.lock();
-
-    rt_assert(used_qp_ids.size() < kMaxQueues, "No queues left");
-    for (size_t i = 0; i < kMaxQueues; i++) {
-      if (used_qp_ids.count(i) == 0) {
-        qp_id = i;
-        mempool = mempool_arr[qp_id];
-        break;
-      }
-    }
-    used_qp_ids.insert(qp_id);
 
     if (eal_initialized) {
       LOG_INFO("Rpc %u skipping DPDK initialization, queues ID = %zu.\n",
@@ -49,6 +40,17 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
       do_per_process_dpdk_init();
       eal_initialized = true;
     }
+
+    // If we are here, EAL is initialized
+    rt_assert(used_qp_ids.size() < kMaxQueues, "No queues left");
+    for (size_t i = 0; i < kMaxQueues; i++) {
+      if (used_qp_ids.count(i) == 0) {
+        qp_id = i;
+        mempool = mempool_arr[qp_id];
+        break;
+      }
+    }
+    used_qp_ids.insert(qp_id);
 
     eal_lock.unlock();
   }
@@ -119,7 +121,7 @@ void DpdkTransport::do_per_process_dpdk_init() {
     std::string pname = "mempool-rpc-" + std::to_string(i);
     mempool_arr[i] =
         rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
-                                0 /* headroom */, kMbufSize, numa_node);
+                                0 /* priv size */, kMbufSize, numa_node);
     rt_assert(mempool_arr[i] != nullptr,
               "Mempool create failed: " + dpdk_strerror());
 
