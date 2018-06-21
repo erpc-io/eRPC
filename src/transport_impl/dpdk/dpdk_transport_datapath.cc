@@ -76,16 +76,9 @@ size_t DpdkTransport::rx_burst() {
   struct rte_mbuf *rx_pkts[kRxBatchSize];
   size_t nb_rx_new = rte_eth_rx_burst(phy_port, qp_id, rx_pkts, kRxBatchSize);
 
-  if (nb_rx_new == 0) {
-    LOG_TRACE("eRPC DpdkTransport: Received zero packets.\n");
-    usleep(1000);
-  }
-
   for (size_t i = 0; i < nb_rx_new; i++) {
     rx_ring[rx_ring_head] = rte_pktmbuf_mtod(rx_pkts[i], uint8_t *);
-    assert(rx_ring[rx_ring_head] ==
-           reinterpret_cast<uint8_t *>(rx_pkts[i]) + sizeof(rte_mbuf) +
-               RTE_PKTMBUF_HEADROOM);
+    assert(dpdk_dtom(rx_ring[rx_ring_head]) == rx_pkts[i]);
 
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     _unused(pkthdr);
@@ -102,8 +95,7 @@ size_t DpdkTransport::rx_burst() {
 
 void DpdkTransport::post_recvs(size_t num_recvs) {
   for (size_t i = 0; i < num_recvs; i++) {
-    uint8_t *mtod = rx_ring[rx_ring_tail];
-    auto *mbuf = reinterpret_cast<rte_mbuf *>(mtod - RTE_PKTMBUF_HEADROOM);
+    auto *mbuf = dpdk_dtom(rx_ring[rx_ring_tail]);
 #if DEBUG
     rte_mbuf_sanity_check(mbuf, true /* is_header */);
 #endif

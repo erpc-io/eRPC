@@ -65,6 +65,12 @@ class DpdkTransport : public Transport {
     return std::string(rte_strerror(rte_errno));
   }
 
+  /// Convert an RX ring data pointer to its corresponding DPDK mbuf pointer
+  static rte_mbuf *dpdk_dtom(uint8_t *data) {
+    return reinterpret_cast<rte_mbuf *>(data - RTE_PKTMBUF_HEADROOM -
+                                        sizeof(rte_mbuf));
+  }
+
   // raw_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
   void tx_flush();
