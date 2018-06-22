@@ -2,8 +2,7 @@
  * @file tweakme.h
  * @brief Tweak this file to modify eRPC's behavior
  */
-#ifndef ERPC_TWEAKME_H
-#define ERPC_TWEAKME_H
+#pragma once
 
 #include <assert.h>
 #include <stdlib.h>
@@ -32,22 +31,7 @@ static constexpr bool kCcOptTimelyBypass = ENABLE_CC_OPTS;
 
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
-// Pick a transport. This is hard to control from CMake.
-class IBTransport;
-class RawTransport;
-
-// 56 Gbps InfiniBand
-// typedef IBTransport CTransport;
-// static constexpr size_t kHeadroom = 0;
-// static constexpr double kBandwidth = 7.0 * 1000 * 1000 * 1000;
-
-// 40 Ethernet
-typedef RawTransport CTransport;
-static constexpr size_t kHeadroom = 40;
-// static constexpr double kBandwidth = 5.0 * 1000 * 1000 * 1000;  // 40 Gbps
-static constexpr double kBandwidth = 3.125 * 1000 * 1000 * 1000;  // 25 Gbps
+static constexpr double kBandwidth = (10.0) * (1000 * 1000 * 1000 / 8.0);
 
 static constexpr bool kDatapathStats = false;
 }
-
-#endif  // ERPC_CONFIG_H

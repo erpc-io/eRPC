@@ -1,5 +1,4 @@
-#ifndef FIXED_QUEUE_H
-#define FIXED_QUEUE_H
+#pragma once
 
 #include <assert.h>
 #include <queue>
@@ -49,5 +48,3 @@ class FixedQueue {
 };
 
 }  // End erpc
-
-#endif  // FIXED_QUEUE_H

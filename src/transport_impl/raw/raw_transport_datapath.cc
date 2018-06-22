@@ -58,15 +58,16 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     static_assert(hdr_copy_sz == 40, "");
     memcpy(&pkthdr->headroom[0], item.routing_info, hdr_copy_sz);
 
-    auto* ipv4_hdr =
-        reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
-    assert(ipv4_hdr->check == 0);
-    ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
     if (kTesting && item.drop) {
       // XXX: Can this cause performance problems?
       auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(pkthdr->headroom);
       memset(&eth_hdr->dst_mac, 0, sizeof(eth_hdr->dst_mac));
     }
+
+    auto* ipv4_hdr =
+        reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
+    assert(ipv4_hdr->check == 0);
+    ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
 
     auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
     assert(udp_hdr->check == 0);

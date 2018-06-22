@@ -325,7 +325,7 @@ void print_stats(AppContext &c) {
           erpc::kCcRateComp ? session_tput.at(num_sessions * 0.95) : -1);
 
   printf(
-      "Process %zu, thread %zu: %.2f Mrps, re_tx = %zu, still_in_wheel = %zu. "
+      "Process %zu, thread %zu: %.3f Mrps, re_tx = %zu, still_in_wheel = %zu. "
       "RX: %zuK resps, %zuK reqs. Resps/batch: min %zuK, max %zuK. "
       "Latency: %s. Rate = %s.\n",
       FLAGS_process_id, c.thread_id, tput_mrps,

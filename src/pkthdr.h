@@ -1,5 +1,4 @@
-#ifndef ERPC_PKTHDR_H
-#define ERPC_PKTHDR_H
+#pragma once
 
 #include "common.h"
 
@@ -111,5 +110,3 @@ struct pkthdr_t {
 
 static_assert(sizeof(pkthdr_t) % sizeof(size_t) == 0, "");
 }
-
-#endif  // ERPC_PKTHDR_H

@@ -1,3 +1,5 @@
+#pragma once
+
 /***************************************************************************
  *   Copyright (C) 2008 by H-Store Project                                 *
  *   Brown University                                                      *
@@ -14,9 +16,6 @@
  * @brief Logging macros that can be optimized out
  * @author Hideaki, modified by Anuj
  */
-
-#ifndef ERPC_LOGGER_H
-#define ERPC_LOGGER_H
 
 #include <ctime>
 #include <string>
@@ -143,5 +142,3 @@ static void output_log_header(FILE *stream, int level) {
 static bool is_log_level_reasonable() { return LOG_LEVEL <= LOG_LEVEL_INFO; }
 
 }  // End erpc
-
-#endif  // ERPC_LOGGER_H

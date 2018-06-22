@@ -1,26 +1,27 @@
-eRPC is a fast and general-purpose RPC library for kernel-bypass fabrics.
+eRPC is a fast and general-purpose RPC library for datacenter networks.
+We have a [preprint](https://arxiv.org/pdf/1806.00680.pdf) that describes the
+system.
+
 Some highlights:
- * Multiple supported fabrics: UDP (PFC is recommended), InfiniBand, and RoCE
+ * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
  * Performance for small RPCs: ~10 million 32-byte RPCs/second per CPU core
  * Low latency: 2.5 microseconds round-trip RPC latency
  * High bandwidth for large RPC: 40 Gbps transfer per CPU core for 8 MB RPCs
  * Scalability: 12000 or more RPC sessions per server
- * End-to-end congestion control
+ * End-to-end congestion control that tolerates 100-way incasts
  * Nested RPCs, and long-running background RPCs
- * A port of [Raft](https://github.com/willemt/raft) as an example, with
-   5.3 microseconds of client-measured latency
+ * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
+   replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
 ## Requirements
- * A C++11 compiler, specified in `CMakeLists.txt`. clang and gcc have been
-   tested.
+ * A C++11 compiler
  * See `scripts/packages.sh` for a list of required software packages.
- * Unlimited SHM limits, and at least 2048 huge pages on every NUMA node.
+ * Unlimited SHM limits, and at least 512 huge pages on every NUMA node.
  * Supported NICs:
    * UDP over Ethernet mode:
-     * ConnectX-4 or newer Mellanox Ethernet NICs. Non-Mellanox Ethernet NICs
-       are not supported.
-     * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode.
-     * PRs for unsupported NICs (e.g., via DPDK) are welcome.
+     * ConnectX-4 or newer Mellanox Ethernet NIC
+     * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
+     * Support for other NICs via DPDK is under development
    * InfiniBand mode: Any InfiniBand-compliant NICs
    * RoCE mode: Any RoCE-compilant NICs
    * Mellanox NIC drivers:
@@ -34,12 +35,20 @@ Some highlights:
         * `modprobe mlx4_ib ib_uverbs`
      * For Connect-IB and newer NICs, use `mlx4` by `mlx5`.
 
+## eRPC quickstart
+ * Build and run the test suite:
+   `cmake . -DPERF=OFF -DTRANSPORT=infiniband; make -j; sudo ctest`.
+   Here, `infiniband` should be replaced with `raw` for Mellanox Ethernet NICs,
+   or `dpdk` for Intel Ethernet NICs.
+ * Generate the documentation: `doxygen`
+ * Running the hello world application in `apps/hello`:
+   * Compile the eRPC library using CMake.
+   * This application requires two machines. Set `kServerHostname` and
+     `kClientHostname` to the IP addresses of your machines.
+   * Build the application using `make`.
+   * Run `./server` at the server, and `./client` at the client.
+
 ## eRPC configuration
- * `src/tweakme.h` defines parameters that govern eRPC's behavior.
-   * `CTransport` defines which fabric transport eRPC is compiled for. It can
-      be set to `IBTransport` for InfiniBand, or `RawTransport` for Mellanox's
-      "Raw" Ethernet transport. `kHeadroom` must be set accordingly.
-   * Parameters with the `kCc` prefix govern eRPC's congestion control behavior.
  * Since compilation is slow, the CMake build compiles only one application,
    defined by the contents of `scripts/autorun_app_file`. This file should
    contain the name of a directory in `apps` (e.g., `small_rpc_tput`).
@@ -51,16 +60,6 @@ Some highlights:
  * Each application directory in `apps` (except `hello`) contains a config file
    that must contain the flags defined in `apps/apps_common.h`. In addition, it
    may contain any application-specific flags.
-
-## eRPC quickstart
- * Build and run the test suite: `cmake . -DPERF=OFF; make -j; sudo ctest`.
- * Generate the documentation: `doxygen`
- * Running the hello world application in `apps/hello`:
-   * Compile the eRPC library using CMake.
-   * This application requires two machines. Set `kServerHostname` and
-     `kClientHostname` to the IP addresses of your machines.
-   * Build the application using `make`.
-   * Run `./server` at the server, and `./client` at the client.
 
 ## Running the applications
  * The `apps` directory contains a suite of benchmarks and examples.

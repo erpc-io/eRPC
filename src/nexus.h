@@ -1,5 +1,4 @@
-#ifndef ERPC_NEXUS_H
-#define ERPC_NEXUS_H
+#pragma once
 
 #include <unistd.h>
 #include <unordered_map>
@@ -144,5 +143,3 @@ class Nexus {
   std::thread bg_thread_arr[kMaxBgThreads];  ///< Background thread context
 };
 }  // End erpc
-
-#endif  // ERPC_RPC_H

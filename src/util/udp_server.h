@@ -1,5 +1,4 @@
-#ifndef ERPC_UDP_SERVER_H
-#define ERPC_UDP_SERVER_H
+#pragma once
 
 #include <netdb.h>
 #include <sys/socket.h>
@@ -70,5 +69,3 @@ class UDPServer {
 };
 
 }  // End erpc
-
-#endif  // ERPC_UDP_SERVER_H

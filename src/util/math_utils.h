@@ -1,5 +1,4 @@
-#ifndef ERPC_MATH_UTILS_H
-#define ERPC_MATH_UTILS_H
+#pragma once
 
 #include <assert.h>
 #include <stdint.h>
@@ -60,5 +59,3 @@ static double stddev(std::vector<double> v) {
 }
 
 }  /// End erpc
-
-#endif  // ERPC_MATH_UTILS_H

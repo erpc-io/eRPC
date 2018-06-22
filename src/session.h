@@ -1,5 +1,4 @@
-#ifndef ERPC_SESSION_H
-#define ERPC_SESSION_H
+#pragma once
 
 #include <limits>
 #include <mutex>
@@ -21,6 +20,7 @@ namespace erpc {
 // from accessing session members.
 class IBTransport;
 class RawTransport;
+class DpdkTransport;
 
 template <typename T>
 class Rpc;
@@ -29,6 +29,7 @@ class Rpc;
 class Session {
   friend class Rpc<IBTransport>;
   friend class Rpc<RawTransport>;
+  friend class Rpc<DpdkTransport>;
 
  public:
   enum class Role : int { kServer, kClient };
@@ -139,5 +140,3 @@ class Session {
 };
 
 }  // End erpc
-
-#endif  // ERPC_SESSION_H

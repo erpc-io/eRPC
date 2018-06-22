@@ -1,5 +1,4 @@
-#ifndef ERPC_MEMPOOL_H
-#define ERPC_MEMPOOL_H
+#pragma once
 
 #include "common.h"
 #include "util/huge_alloc.h"
@@ -43,5 +42,3 @@ class MemPool {
   ~MemPool() {}
 };
 }
-
-#endif  // ERPC_MEMPOOL_H

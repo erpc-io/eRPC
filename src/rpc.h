@@ -1,5 +1,4 @@
-#ifndef ERPC_RPC_H
-#define ERPC_RPC_H
+#pragma once
 
 #include "cc/timing_wheel.h"
 #include "common.h"
@@ -912,8 +911,13 @@ class Rpc {
   Transport::tx_burst_item_t tx_burst_arr[TTr::kPostlist];  ///< Tx batch info
   size_t tx_batch_i = 0;  ///< The batch index for TX burst array
 
-  uint8_t *rx_ring[TTr::kNumRxRingEntries];  ///< The transport's RX ring
-  size_t rx_ring_head = 0;                   ///< Current unused RX ring buffer
+  /// On calling rx_burst(), Transport fills-in packet buffer pointers into the
+  /// RX ring. Some transports such as InfiniBand and Raw reuse RX ring packet
+  /// buffers in a circular order, so the ring's pointers remain unchanged
+  /// after initialization. Other transports (e.g., DPDK) update rx_ring on
+  /// every successful rx_burst.
+  uint8_t *rx_ring[TTr::kNumRxRingEntries];
+  size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
 
   std::vector<SSlot *> stallq;  ///< Req sslots stalled for credits
 
@@ -986,10 +990,8 @@ class Rpc {
 };
 
 // This goes at the end of every Rpc implementation file to force compilation.
-#define FORCE_COMPILE_TRANSPORTS   \
-  template class Rpc<IBTransport>; \
-  template class Rpc<RawTransport>;
-
+#define FORCE_COMPILE_TRANSPORTS    \
+  template class Rpc<IBTransport>;  \
+  template class Rpc<RawTransport>; \
+  template class Rpc<DpdkTransport>;
 }  // End erpc
-
-#endif  // ERPC_RPC_H

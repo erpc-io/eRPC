@@ -1,5 +1,4 @@
-#ifndef ERPC_AUTORUN_HELPERS_H
-#define ERPC_AUTORUN_HELPERS_H
+#pragma once
 
 #include <boost/algorithm/string.hpp>
 #include <fstream>
@@ -91,5 +90,3 @@ static std::string get_uri_for_process(size_t process_i) {
 }
 
 }  // End erpc
-
-#endif  // ERPC_AUTORUN_HELPERS_H

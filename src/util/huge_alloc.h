@@ -1,5 +1,4 @@
-#ifndef ERPC_HUGE_ALLOC_H
-#define ERPC_HUGE_ALLOC_H
+#pragma once
 
 #include <errno.h>
 #include <malloc.h>
@@ -241,5 +240,3 @@ class HugeAlloc {
 };
 
 }  // End erpc
-
-#endif  // ERPC_HUGE_ALLOC_H

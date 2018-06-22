@@ -31,6 +31,7 @@ DEFINE_uint64(regular_threads_other, 0, "Threads sending regular traffic");
 DEFINE_uint64(regular_concurrency, 0, "Concurrent requests per regular thread");
 DEFINE_uint64(regular_req_size, 0, "Reqular request data size");
 DEFINE_uint64(regular_resp_size, 0, "Regular response data size");
+DEFINE_double(regular_latency_divisor, 1.0, "Latency precision factor");
 
 size_t tot_threads_other() {
   return FLAGS_incast_threads_other + FLAGS_regular_threads_other;
@@ -72,7 +73,7 @@ class AppContext : public BasicAppContext {
   app_stats_t* app_stats;   // Common stats array for all threads
 
   size_t incast_tx_bytes = 0;     // Total incast bytes sent
-  erpc::Latency regular_latency;  // Latency for regular traffic (x10)
+  erpc::Latency regular_latency;  // Latency for regular traffic
 
   uint64_t req_ts[kAppMaxConcurrency];  // Per-request timestamps
   erpc::MsgBuffer req_msgbuf[kAppMaxConcurrency];

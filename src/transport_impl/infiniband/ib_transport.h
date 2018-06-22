@@ -2,8 +2,7 @@
  * @file ib_transport.h
  * @brief UD transport for InfiniBand or RoCE
  */
-#ifndef ERPC_INFINIBAND_TRANSPORT_H
-#define ERPC_INFINIBAND_TRANSPORT_H
+#pragma once
 
 #include "transport.h"
 #include "transport_impl/verbs_common.h"
@@ -183,5 +182,3 @@ class IBTransport : public Transport {
 };
 
 }  // End erpc
-
-#endif  // ERPC_INFINIBAND_TRANSPORT_H
