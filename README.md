@@ -15,7 +15,8 @@ Some highlights:
 
 ## Requirements
  * A C++11 compiler
- * See `scripts/packages.sh` for a list of required software packages.
+ * See `scripts/packages.sh` for a list of required software packages. For DPDK,
+   we currently expect the latest stable DPDK in `${HOME}/dpdk`.
  * Unlimited SHM limits, and at least 512 huge pages on every NUMA node.
  * Supported NICs:
    * UDP over Ethernet mode:
