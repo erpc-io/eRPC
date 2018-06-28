@@ -57,9 +57,7 @@ Some highlights:
    using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
  * Each application directory in `apps` contains a config file
    that must specify all flags defined in `apps/apps_common.h`. For example,
-   `num_processes` specifies the total number of eRPC processes in the cluster
-   In addition, the config file may contain flags that are specific to an
-   application.
+   `num_processes` specifies the total number of eRPC processes in the cluster.
  * The URIs of eRPC processes in the cluster are specified in
    `scripts/autorun_process_file`. Each line in this file must be
    `<hostname> <management udp port> <numa_node>`. One eRPC process is allowed
