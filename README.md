@@ -48,34 +48,32 @@ Some highlights:
    * Build the application using `make`.
    * Run `./server` at the server, and `./client` at the client.
 
-## eRPC configuration
- * Since compilation is slow, the CMake build compiles only one application,
-   defined by the contents of `scripts/autorun_app_file`. This file should
-   contain the name of a directory in `apps` (e.g., `small_rpc_tput`).
+## Configuring and running the provided applications
+ * The `apps` directory contains a suite of benchmarks and examples. The
+   instructions below are for this suite of applications. eRPC can also be
+   simply linked as a library instead (see `apps/hello` for an example).
+ * To build an application, change the contents of `scripts/autorun_app_file`
+   to one of the available directory names in `apps`. Then generate a Makefile
+   using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
+ * Each application directory in `apps` contains a config file
+   that must specify all flags defined in `apps/apps_common.h`. For example,
+   `num_processes` specifies the total number of eRPC processes in the cluster
+   In addition, the config file may contain flags that are specific to an
+   application.
  * The URIs of eRPC processes in the cluster are specified in
    `scripts/autorun_process_file`. Each line in this file must be
    `<hostname> <management udp port> <numa_node>`. One eRPC process is allowed
    per NUMA node. See `scripts/gen_autorun_process_file.sh` for how to generate
    this file.
- * Each application directory in `apps` (except `hello`) contains a config file
-   that must contain the flags defined in `apps/apps_common.h`. In addition, it
-   may contain any application-specific flags.
-
-## Running the applications
- * The `apps` directory contains a suite of benchmarks and examples.
- * To build an application, change the contents of `scripts/autorun_app_file`
-   to one of the available applications. Then generate a Makefile using
-   `cmake . -DPERF=ON/OFF`
- * The number of processes used in an eRPC app is passed as a command line flag
-   (see `num_processes` in `apps/apps_common.h`). `scripts/do.sh` is used to
-   run apps manually.
+ * `scripts/do.sh` is used to run apps manually.
    * With single-CPU machines: `num_processes` machines are needed.
      Run `scripts/do.sh <i> 0` on machine `i` in `{0, ..., num_processes - 1}`.
    * With dual-CPU machines: `num_machines = ceil(num_processes / 2)` machines
      are needed. Run `scripts/do.sh <i> <i % 2>` on machine i in
      `{0, ..., num_machines - 1}`.
- * To automatically run an app, use `scripts/run-all.sh`. Application
-   statistics generated in a run can be analysed using `scripts/proc-out.sh`.
+ * To automatically run an app for all processes in `scripts/autorun_process_file`,
+   run `scripts/run-all.sh`. Application statistics generated in a run can be
+   analysed using `scripts/proc-out.sh`.
 
 ## Getting help
  * GitHub issues are preferred over email.
