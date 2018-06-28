@@ -63,13 +63,13 @@ Some highlights:
    `<hostname> <management udp port> <numa_node>`. One eRPC process is allowed
    per NUMA node. See `scripts/gen_autorun_process_file.sh` for how to generate
    this file.
- * `scripts/do.sh` is used to run apps manually.
+ * Run `scripts/do.sh` for each process:
    * With single-CPU machines: `num_processes` machines are needed.
      Run `scripts/do.sh <i> 0` on machine `i` in `{0, ..., num_processes - 1}`.
    * With dual-CPU machines: `num_machines = ceil(num_processes / 2)` machines
      are needed. Run `scripts/do.sh <i> <i % 2>` on machine i in
      `{0, ..., num_machines - 1}`.
- * To automatically run an app for all processes in `scripts/autorun_process_file`,
+ * To automatically run an app at all processes in `scripts/autorun_process_file`,
    run `scripts/run-all.sh`. Application statistics generated in a run can be
    analysed using `scripts/proc-out.sh`.
 
