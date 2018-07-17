@@ -164,10 +164,14 @@ set(SOURCES
   src/transport_impl/infiniband/ib_transport_datapath.cc
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
-  src/transport_impl/dpdk/dpdk_transport.cc
-  src/transport_impl/dpdk/dpdk_transport_datapath.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
+
+if(TRANSPORT STREQUAL "dpdk")
+  set(SOURCES ${SOURCES}
+    src/transport_impl/dpdk/dpdk_transport.cc
+    src/transport_impl/dpdk/dpdk_transport_datapath.cc)
+endif()
 
 # MICA sources
 set(MICA_SOURCES
@@ -217,6 +221,7 @@ set(UTIL_TESTS
 # DPDK libraries
 if(TRANSPORT STREQUAL "dpdk")
   set(DPDK_HOME "$ENV{HOME}/dpdk")
+  add_definitions(-DDPDK=true)
   include_directories(SYSTEM ${DPDK_HOME}/x86_64-native-linuxapp-gcc/include)
   add_definitions(-include rte_config.h)
   link_directories(${LINK_DIRECTORIES} ${DPDK_HOME}/x86_64-native-linuxapp-gcc/lib)
@@ -225,6 +230,8 @@ if(TRANSPORT STREQUAL "dpdk")
   set(LIBRARIES ${LIBRARIES} rte_pmd_i40e rte_pmd_ixgbe rte_pmd_ring)
   set(LIBRARIES ${LIBRARIES} -Wl,--no-whole-archive)
   set(LIBRARIES ${LIBRARIES} rt dl)
+else()
+  add_definitions(-DDPDK=false)
 endif()
 
 # Compile the tests

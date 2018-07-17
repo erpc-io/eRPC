@@ -28,9 +28,9 @@ static constexpr double kWheelSlotWidthUs = .5;  ///< Duration per wheel slot
 static constexpr double kWheelHorizonUs =
     1000000 * (kSessionCredits * CTransport::kMTU) / Timely::kMinRate;
 
-/// This ensures that packets for an sslot undergoing retransmission are rarely
-/// in the wheel. This is recommended but not required.
-static_assert(kWheelHorizonUs <= kRpcRTOUs, "");
+// This ensures that packets for an sslot undergoing retransmission are rarely
+// in the wheel. This is recommended but not required.
+// static_assert(kWheelHorizonUs <= kRpcRTOUs, "");
 
 static constexpr size_t kWheelNumWslots =
     1 + erpc::ceil(kWheelHorizonUs / kWheelSlotWidthUs);

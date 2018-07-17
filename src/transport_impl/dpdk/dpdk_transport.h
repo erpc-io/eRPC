@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#if DPDK == true
+
 #include "transport.h"
 #include "transport_impl/eth_common.h"
 #include "util/barrier.h"
@@ -112,3 +114,5 @@ class DpdkTransport : public Transport {
 };
 
 }  // End erpc
+
+#endif
