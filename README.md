@@ -42,11 +42,10 @@ Some highlights:
    Here, `infiniband` should be replaced with `raw` for Mellanox Ethernet NICs,
    or `dpdk` for Intel Ethernet NICs.
  * Generate the documentation: `doxygen`
- * Running the hello world application in `apps/hello`:
-   * Compile the eRPC library using CMake.
+ * Run the `hello_world` application:
+   * Run `make` in `hello_world`
    * This application requires two machines. Set `kServerHostname` and
      `kClientHostname` to the IP addresses of your machines.
-   * Build the application using `make`.
    * Run `./server` at the server, and `./client` at the client.
 
 ## Configuring and running the provided applications
