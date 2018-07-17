@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file timely-sweep-params.h
  * @brief Timely parameters that need to be sweeped

@@ -36,10 +36,25 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(COMPILE_ERPC_LIB ON)
 
 # Options exposed to the user
+set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(PERF "Compile for performance" OFF)
-set(TRANSPORT "infiniband" CACHE STRING "Datapath transport (infiniband/roce/raw)")
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
+
+# Profile-guided optimization
+if(TRANSPORT STREQUAL "infiniband")
+  SET(CONFIG_TRANSPORT "IBTransport")
+  SET(CONFIG_HEADROOM 0)
+elseif(TRANSPORT STREQUAL "raw")
+  SET(CONFIG_TRANSPORT "RawTransport")
+  SET(CONFIG_HEADROOM 40)
+elseif(TRANSPORT STREQUAL "dpdk")
+  SET(CONFIG_TRANSPORT "DpdkTransport")
+  SET(CONFIG_HEADROOM 40)
+endif()
+MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
+
+configure_file(src/config.h.in src/config.h)
 
 # Parse the user-exposed options
 if(PERF)
@@ -114,7 +129,7 @@ else(TESTING)
   add_definitions(-DTESTING=false)
 endif(TESTING)
 
-# LTO
+# Link-time optimization
 if(LTO)
   MESSAGE(STATUS "LTO is enabled. Tests won't be compiled.")
   SET(COMPILE_ERPC_LIB OFF)
@@ -149,6 +164,8 @@ set(SOURCES
   src/transport_impl/infiniband/ib_transport_datapath.cc
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
+  src/transport_impl/dpdk/dpdk_transport.cc
+  src/transport_impl/dpdk/dpdk_transport_datapath.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
@@ -196,6 +213,19 @@ set(UTIL_TESTS
   fixed_vector_test
   timely_test
   numautil_test)
+
+# DPDK libraries
+if(TRANSPORT STREQUAL "dpdk")
+  set(DPDK_HOME "$ENV{HOME}/dpdk")
+  include_directories(SYSTEM ${DPDK_HOME}/x86_64-native-linuxapp-gcc/include)
+  add_definitions(-include rte_config.h)
+  link_directories(${LINK_DIRECTORIES} ${DPDK_HOME}/x86_64-native-linuxapp-gcc/lib)
+  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive)
+  set(LIBRARIES ${LIBRARIES} rte_kvargs rte_mbuf rte_ethdev rte_mempool rte_mempool_ring rte_ring rte_eal rte_hash rte_pci rte_bus_pci rte_bus_vdev)
+  set(LIBRARIES ${LIBRARIES} rte_pmd_i40e rte_pmd_ixgbe rte_pmd_ring)
+  set(LIBRARIES ${LIBRARIES} -Wl,--no-whole-archive)
+  set(LIBRARIES ${LIBRARIES} rt dl)
+endif()
 
 # Compile the tests
 if(COMPILE_ERPC_LIB)
@@ -250,16 +280,6 @@ elseif(APP STREQUAL "masstree_analytics")
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
-elseif(APP STREQUAL "dpdk")
-  set(DPDK_HOME "/users/akalia/dpdk")
-  include_directories(SYSTEM ${DPDK_HOME}/x86_64-native-linuxapp-gcc/include)
-  add_definitions(-include rte_config.h)
-  link_directories(${LINK_DIRECTORIES} ${DPDK_HOME}/x86_64-native-linuxapp-gcc/lib)
-  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive)
-  set(LIBRARIES ${LIBRARIES} rte_kvargs rte_mbuf rte_ethdev rte_mempool rte_mempool_ring rte_ring rte_eal rte_hash rte_pci rte_bus_pci rte_bus_vdev)
-  set(LIBRARIES ${LIBRARIES} rte_pmd_i40e rte_pmd_ixgbe rte_pmd_ring)
-  set(LIBRARIES ${LIBRARIES} -Wl,--no-whole-archive)
-  set(LIBRARIES ${LIBRARIES} rt dl)
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO

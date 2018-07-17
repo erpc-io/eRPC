@@ -1,5 +1,4 @@
-#ifndef ERPC_RAND_H
-#define ERPC_RAND_H
+#pragma once
 
 #include <random>
 
@@ -33,5 +32,3 @@ class FastRand {
 };
 
 }  // End erpc
-
-#endif  // ERPC_RAND_H

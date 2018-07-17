@@ -3,8 +3,7 @@
  * @author MICA authors, akalia
  */
 
-#ifndef LATENCY_H
-#define LATENCY_H
+#pragma once
 
 #include <assert.h>
 #include <inttypes.h>
@@ -173,5 +172,3 @@ class Latency {
   size_t bin5_;
 };
 }
-
-#endif

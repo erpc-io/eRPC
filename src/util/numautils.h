@@ -1,5 +1,4 @@
-#ifndef ERPC_MISC_H
-#define ERPC_MISC_H
+#pragma once
 
 #include <numa.h>
 #include <stdio.h>
@@ -40,5 +39,3 @@ static void bind_to_core(std::thread &thread, size_t numa_node,
 }
 
 }  // End erpc
-
-#endif

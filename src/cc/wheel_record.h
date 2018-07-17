@@ -1,5 +1,4 @@
-#ifndef ERPC_WHEEL_RECORD_H
-#define ERPC_WHEEL_RECORD_H
+#pragma once
 
 #include "common.h"
 #include "util/timer.h"
@@ -39,5 +38,3 @@ struct wheel_record_t {
   }
 };
 }
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef ERPC_BARRIER_H
-#define ERPC_BARRIER_H
+#pragma once
 
 namespace erpc {
 
@@ -23,5 +22,3 @@ static void cpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx,
 }
 
 }  // End erpc
-
-#endif  // ERPC_BARRIER_H

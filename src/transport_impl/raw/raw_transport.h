@@ -2,12 +2,11 @@
  * @file raw_transport.h
  * @brief Transport for Mellanox verbs-based raw Ethernet
  */
-#ifndef ERPC_RAW_TRANSPORT_H
-#define ERPC_RAW_TRANSPORT_H
+#pragma once
 
-#include "inet_hdrs.h"
 #include "mlx5_defs.h"
 #include "transport.h"
+#include "transport_impl/eth_common.h"
 #include "transport_impl/verbs_common.h"
 #include "util/barrier.h"
 #include "util/logger.h"
@@ -25,9 +24,6 @@ class RawTransport : public Transport {
   /// Enable fast RECV posting (FaSST, OSDI 16). This requires the modded
   /// driver. This is irrelevant if dumbpipe optimizations are enabled.
   static constexpr bool kFastRecv = false;
-
-  /// RPC ID i uses destination UDP port based on kBaseRawUDPPort and numa node.
-  static constexpr uint16_t kBaseRawUDPPort = 10000;
 
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kRaw;
@@ -67,14 +63,6 @@ class RawTransport : public Transport {
 
   /// RECVs batched before posting. Relevant only for non-dumbpipe mode.
   static constexpr size_t kRecvSlack = 32;
-
-  /// Session endpoint routing info for raw Ethernet.
-  struct raw_routing_info_t {
-    uint8_t mac[6];
-    uint32_t ipv4_addr;
-    uint16_t udp_port;
-  };
-  static_assert(sizeof(raw_routing_info_t) <= kMaxRoutingInfoSize, "");
 
   /// A consistent snapshot of CQE fields in host endian format. Used only with
   /// the dumbpipe optimization.
@@ -133,15 +121,8 @@ class RawTransport : public Transport {
   void fill_local_routing_info(RoutingInfo *routing_info) const;
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
 
-  static std::string routing_info_str(RoutingInfo *routing_info) {
-    auto *ri = reinterpret_cast<raw_routing_info_t *>(routing_info);
-
-    std::ostringstream ret;
-    ret << "[MAC " << mac_to_string(ri->mac) << ", IP "
-        << ipv4_to_string(ri->ipv4_addr) << ", UDP port "
-        << std::to_string(ri->udp_port) << "]";
-
-    return std::string(ret.str());
+  static std::string routing_info_str(RoutingInfo *ri) {
+    return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
   }
 
   // raw_transport_datapath.cc
@@ -248,5 +229,3 @@ class RawTransport : public Transport {
 };
 
 }  // End erpc
-
-#endif  // ERPC_RAW_TRANSPORT_H

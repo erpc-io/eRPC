@@ -1,5 +1,4 @@
-#ifndef ERPC_BUFFER_H
-#define ERPC_BUFFER_H
+#pragma once
 
 #include "common.h"
 
@@ -32,5 +31,3 @@ class Buffer {
 };
 
 }  // End erpc
-
-#endif  // ERPC_BUFFER_H

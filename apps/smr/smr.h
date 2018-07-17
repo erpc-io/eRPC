@@ -23,8 +23,8 @@ extern "C" {
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
 static_assert(erpc::is_power_of_two(kAppNumKeys), "");
 
-static constexpr size_t kAppKeySize = 64;
-static constexpr size_t kAppValueSize = 16;
+static constexpr size_t kAppKeySize = 16;
+static constexpr size_t kAppValueSize = 64;
 static_assert(kAppKeySize % sizeof(size_t) == 0, "");
 static_assert(kAppValueSize % sizeof(size_t) == 0, "");
 

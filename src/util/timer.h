@@ -3,8 +3,7 @@
  * @brief Helper functions for timers
  */
 
-#ifndef ERPC_TIMER_H
-#define ERPC_TIMER_H
+#pragma once
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -135,5 +134,3 @@ class TscTimer {
   }
 };
 }  /// End erpc
-
-#endif  // ERPC_TIMER_H

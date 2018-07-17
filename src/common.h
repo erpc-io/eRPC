@@ -2,8 +2,7 @@
  * @file common.h
  * @brief Common header file with convenience definitions
  */
-#ifndef ERPC_COMMON_H
-#define ERPC_COMMON_H
+#pragma once
 
 #include <assert.h>
 #include <stdint.h>
@@ -18,6 +17,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "config.h"
 #include "tweakme.h"
 
 namespace erpc {
@@ -72,6 +72,13 @@ static std::string trim_hostname(std::string hostname) {
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
+static inline void rt_assert(bool condition, std::string throw_str, char *s) {
+  if (unlikely(!condition)) {
+    throw std::runtime_error(throw_str + std::string(s));
+  }
+}
+
+/// Check a condition at runtime. If the condition is false, throw exception.
 static inline void rt_assert(bool condition, std::string throw_str) {
   if (unlikely(!condition)) throw std::runtime_error(throw_str);
 }
@@ -96,5 +103,3 @@ static inline void dpath_stat_inc(size_t &stat, size_t val) {
   if (kDatapathStats) stat += val;
 }
 }  // End erpc
-
-#endif

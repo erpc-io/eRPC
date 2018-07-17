@@ -8,8 +8,7 @@
  * a chain may be empty or partially full.
  */
 
-#ifndef ERPC_TIMING_WHEEL_H
-#define ERPC_TIMING_WHEEL_H
+#pragma once
 
 #include <iomanip>
 #include <queue>
@@ -17,6 +16,7 @@
 #include "common.h"
 #include "sm_types.h"
 #include "sslot.h"
+#include "transport_impl/dpdk/dpdk_transport.h"
 #include "transport_impl/infiniband/ib_transport.h"
 #include "transport_impl/raw/raw_transport.h"
 #include "util/mempool.h"
@@ -246,5 +246,3 @@ class TimingWheel {
   std::queue<wheel_ent_t> ready_queue;
 };
 }
-
-#endif  // ERPC_TIMING_WHEEL_H

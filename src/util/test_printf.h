@@ -1,5 +1,4 @@
-#ifndef ERPC_TEST_COUT
-#define ERPC_TEST_COUT
+#pragma once
 
 #include <gtest/gtest.h>
 #include <string>
@@ -22,5 +21,3 @@ extern void ColoredPrintf(GTestColor color, const char *fmt, ...);
     fflush(stderr);                                                         \
     fflush(stdout);                                                         \
   } while (0)
-
-#endif  // ERPC_TEST_COUT

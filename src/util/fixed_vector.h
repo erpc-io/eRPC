@@ -1,5 +1,4 @@
-#ifndef FIXED_VECTOR_H
-#define FIXED_VECTOR_H
+#pragma once
 
 #include <assert.h>
 #include "common.h"
@@ -49,5 +48,3 @@ class FixedVector {
 };
 
 }  // End erpc
-
-#endif  // FIXED_VECTOR_H

@@ -1,5 +1,4 @@
-#ifndef ERPC_SSLOT_H
-#define ERPC_SSLOT_H
+#pragma once
 
 #include "msg_buffer.h"
 #include "ops.h"
@@ -10,6 +9,7 @@ namespace erpc {
 // Forward declarations for friendship
 class IBTransport;
 class RawTransport;
+class DpdkTransport;
 class Session;
 class Nexus;
 
@@ -22,6 +22,7 @@ class SSlot {
   friend class Nexus;
   friend class Rpc<IBTransport>;
   friend class Rpc<RawTransport>;
+  friend class Rpc<DpdkTransport>;
   friend class ReqHandle;
   friend class RespHandle;
 
@@ -132,5 +133,3 @@ class RespHandle : public SSlot {
   }
 };
 }
-
-#endif  // ERPC_SSLOT_H

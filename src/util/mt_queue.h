@@ -1,5 +1,4 @@
-#ifndef MT_QUEUE_H
-#define MT_QUEUE_H
+#pragma once
 
 #include <stdlib.h>
 #include <mutex>
@@ -50,5 +49,3 @@ class MtQueue {
 };
 
 }  // End erpc
-
-#endif  // MT_QUEUE_H

@@ -1,5 +1,4 @@
-#ifndef ERPC_TLS_REGISTRY_H
-#define ERPC_TLS_REGISTRY_H
+#pragma once
 
 #include <atomic>
 #include "common.h"
@@ -21,5 +20,3 @@ class TlsRegistry {
   size_t get_etid() const;
 };  // End erpc
 }
-
-#endif

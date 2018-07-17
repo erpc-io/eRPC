@@ -2,8 +2,7 @@
  * @file transport.h
  * @brief General definitions for all transport types.
  */
-#ifndef ERPC_TRANSPORT_H
-#define ERPC_TRANSPORT_H
+#pragma once
 
 #include <functional>
 #include "common.h"
@@ -60,7 +59,7 @@ class Transport {
   typedef std::function<MemRegInfo(void*, size_t)> reg_mr_func_t;
   typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
 
-  enum class TransportType { kInfiniBand, kRoCE, kRaw, kInvalid };
+  enum class TransportType { kInfiniBand, kRoCE, kRaw, kDPDK, kInvalid };
 
   static std::string get_name(TransportType transport_type) {
     switch (transport_type) {
@@ -70,6 +69,8 @@ class Transport {
         return "[RoCE]";
       case TransportType::kRaw:
         return "[Raw Ethernet]";
+      case TransportType::kDPDK:
+        return "[DPDK]";
       case TransportType::kInvalid:
         return "[Invalid]";
     }
@@ -92,8 +93,8 @@ class Transport {
             FILE* trace_file);
 
   /**
-   * @brief Initialize transport structures that require hugepages, and fill
-   * the RX ring.
+   * @brief Initialize transport structures that require hugepages, and
+   * fill/save the RX ring.
    *
    * @throw runtime_error if initialization fails. This exception is caught
    * in the parent Rpc, which then deletes \p huge_alloc so we don't need to.
@@ -172,7 +173,4 @@ class Transport {
     size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called
   } testing;
 };
-
 }  // End erpc
-
-#endif  // ERPC_TRANSPORT_H

@@ -39,7 +39,7 @@ struct BasicFixedTableConfig {
   // reset_stats().
   static constexpr bool kCollectStats = false;
 
-  static constexpr size_t kKeySize = 64;
+  static constexpr size_t kKeySize = 16;
 };
 
 template <class StaticConfig = BasicFixedTableConfig>
@@ -62,12 +62,14 @@ class FixedTable {
         return qword[0] == other.qword[0] && qword[1] == other.qword[1];
       }
 
+      /*
       if (StaticConfig::kKeySize == 64) {
         return qword[0] == other.qword[0] && qword[1] == other.qword[1] &&
                qword[2] == other.qword[2] && qword[3] == other.qword[3] &&
                qword[4] == other.qword[4] && qword[5] == other.qword[5] &&
                qword[6] == other.qword[6] && qword[7] == other.qword[7];
       }
+      */
     }
 
     bool operator!=(const ft_key_t& other) const {
