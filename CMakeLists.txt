@@ -4,7 +4,7 @@ project(eRPC)
 # Pick a compiler
 #set(CMAKE_CXX_COMPILER clang++-6.0)
 #set(CMAKE_CXX_COMPILER g++)
-set(CMAKE_CXX_COMPILER g++-7)
+set(CMAKE_CXX_COMPILER g++-8)
 
 add_definitions(-std=c++11)
 
@@ -18,7 +18,7 @@ add_definitions(-Wno-keyword-macro)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread gflags papi)
+set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread gflags)
 
 # Testing
 enable_testing()
