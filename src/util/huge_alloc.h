@@ -56,6 +56,8 @@ enum class DoRegister { kTrue, kFalse };
  */
 class HugeAlloc {
  public:
+  static constexpr const char *alloc_fail_help_str =
+      "This could be due to insufficient huge pages or SHM limits.";
   static const size_t kMinClassSize = 64;     /// Min allocation size
   static const size_t kMinClassBitShift = 6;  /// For division by kMinClassSize
   static_assert((kMinClassSize >> kMinClassBitShift) == 1, "");
@@ -239,4 +241,4 @@ class HugeAlloc {
   } stats;
 };
 
-}  // End erpc
+}  // namespace erpc
