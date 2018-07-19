@@ -17,7 +17,7 @@ fi
 sudo insmod "$dpdk"/x86_64-native-linuxapp-gcc/kmod/igb_uio.ko
 
 # Bind CloudLab's experimental interface (10.*.*.*) to DPDK
-(cd $(dirname $0); make ifname --silent)
+(cd $(dirname $0); rm ifname; g++ -std=c++11 -o ifname ifname.cc)
 ifname=`"$(dirname $0)"/ifname 10.`
 echo "Binding interface "$ifname" to DPDK"
 
