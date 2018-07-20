@@ -1,0 +1,97 @@
+%{!?_with_valgrind: %define _with_valgrind 0}
+%{!?_disable_valgrind: %define _disable_valgrind 0}
+
+%if 0%{?rhel} != 0
+%if 0%{_disable_valgrind} == 0
+%define _with_valgrind 1
+%endif
+%endif
+
+Name: libmlx5
+Version: 41mlnx1
+Release: 1%{?dist}
+Summary: Mellanox ConnectX-IB InfiniBand HCA Userspace Driver
+
+Group: System Environment/Libraries
+License: GPLv2 or BSD
+Url: http://openfabrics.org/
+Source: http://openfabrics.org/downloads/mlx5/%{name}-%{version}.tar.gz
+BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+
+BuildRequires: libibverbs-devel >= 1.1-0.1.rc2
+Requires(post): /sbin/ldconfig
+Requires(postun): /sbin/ldconfig
+%if %{_with_valgrind}
+BuildRequires: valgrind-devel
+%endif
+
+%description
+libmlx5 provides a device-specific userspace driver for Mellanox
+ConnectX HCAs for use with the libibverbs library.
+
+%package devel
+Summary: Development files for the libmlx5 driver
+Group: System Environment/Libraries
+Requires: %{name} = %{version}-%{release}
+Provides: libmlx5-static = %{version}-%{release}
+
+%description devel
+Static version of libmlx5 that may be linked directly to an
+application, which may be useful for debugging.
+
+%prep
+%setup -q -n %{name}-@VERSION@
+
+%build
+%if %{_with_valgrind}
+%configure %{?configure_options} --libdir=%{_libdir}/mlnx_ofed/valgrind --with-valgrind
+make %{?_smp_mflags}
+make DESTDIR=$RPM_BUILD_DIR/%{name}-%{version}/valgrind install
+rm -f $RPM_BUILD_DIR/%{name}-%{version}/valgrind/%{_libdir}/mlnx_ofed/valgrind/*.*a
+make clean
+%endif
+
+%configure %{configure_options}
+make %{?_smp_mflags}
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make DESTDIR=%{buildroot} install
+%if %{_with_valgrind}
+mkdir -p %{buildroot}/%{_libdir}/mlnx_ofed
+cp -a $RPM_BUILD_DIR/%{name}-%{version}/valgrind/%{_libdir}/mlnx_ofed/valgrind %{buildroot}/%{_libdir}/mlnx_ofed
+%endif
+# remove unpackaged files from the buildroot
+rm -f $RPM_BUILD_ROOT%{_libdir}/*.la
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post -p /sbin/ldconfig
+
+%postun -p /sbin/ldconfig
+
+%files
+%defattr(-,root,root,-)
+%{_libdir}/libmlx5*.so.*
+%{_libdir}/libmlx5-rdmav2.so
+%if %{_with_valgrind}
+%{_libdir}/mlnx_ofed/valgrind/libmlx5*.so.*
+%{_libdir}/mlnx_ofed/valgrind/libmlx5-rdmav2.so
+%endif
+%{_sysconfdir}/libibverbs.d/mlx5.driver
+%doc AUTHORS COPYING README
+
+%files devel
+%defattr(-,root,root,-)
+%{_libdir}/libmlx5.a
+%{_libdir}/libmlx5.so
+%if %{_with_valgrind}
+%{_libdir}/mlnx_ofed/valgrind/libmlx5.so
+%endif
+%{_prefix}/include/infiniband/
+
+%changelog
+* Mon Mar 26 2012 Eli Cohen <eli@mellanox.com> - 1.0.0
+- First version
+
