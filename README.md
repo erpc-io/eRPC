@@ -13,28 +13,10 @@ Some highlights:
  * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
    replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
-## Requirements
- * A C++11 compiler
+## Software requirements
  * See `scripts/packages.sh` for a list of required software packages. For DPDK,
    we currently expect the latest stable DPDK in `${HOME}/dpdk`.
- * Unlimited SHM limits, and at least 512 huge pages on every NUMA node.
- * Supported NICs:
-   * UDP over Ethernet mode:
-     * ConnectX-4 or newer Mellanox Ethernet NIC
-     * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
-     * Support for other NICs via DPDK is under development
-   * InfiniBand mode: Any InfiniBand-compliant NICs
-   * RoCE mode: Any RoCE-compilant NICs
-   * Mellanox NIC drivers:
-     * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
-       optimized for eRPC are available in the `drivers` directory, but they are
-       primarily for expert use.
-     * Upstream drivers work as well. This requires installing the `ibverbs` and
-       `mlx4` userspace packages, and enabling the `mlx4_ib` and `ib_uverbs`
-       kernel drivers. On Ubuntu, the incantation is:
-        * `apt install libmlx4-dev libibverbs-dev`
-        * `modprobe mlx4_ib ib_uverbs`
-     * For Connect-IB and newer NICs, use `mlx4` by `mlx5`.
+ * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
 ## eRPC quickstart
  * Build and run the test suite:
@@ -47,6 +29,20 @@ Some highlights:
    * This application requires two machines. Set `kServerHostname` and
      `kClientHostname` to the IP addresses of your machines.
    * Run `./server` at the server, and `./client` at the client.
+
+## Supported NICs:
+ * UDP over Ethernet mode (`DTRANSPORT=raw`):
+   * ConnectX-4 or newer Mellanox Ethernet NICs
+   * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
+   * Support for other NICs via DPDK is under development
+ * InfiniBand mode (`DTRANSPORT=infiniband`): Any InfiniBand-compliant NICs
+ * RoCE mode: Any RoCE-compilant NICs
+ * Mellanox NIC drivers:
+   * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
+     optimized for eRPC are available in the `drivers` directory.
+   * Upstream drivers work as well. On Ubuntu, the incantation is:
+      * `apt install libmlx4-dev libmlx5-dev libibverbs-dev`
+      * `modprobe mlx4_ib mlx5_ib ib_uverbs`
 
 ## Configuring and running the provided applications
  * The `apps` directory contains a suite of benchmarks and examples. The
@@ -69,9 +65,9 @@ Some highlights:
    * With dual-CPU machines: `num_machines = ceil(num_processes / 2)` machines
      are needed. Run `scripts/do.sh <i> <i % 2>` on machine i in
      `{0, ..., num_machines - 1}`.
- * To automatically run an app at all processes in `scripts/autorun_process_file`,
-   run `scripts/run-all.sh`. Application statistics generated in a run can be
-   analysed using `scripts/proc-out.sh`.
+ * To automatically run an application at all processes in
+   `scripts/autorun_process_file`, run `scripts/run-all.sh`. Application
+   statistics generated in a run can be collected using `scripts/proc-out.sh`.
 
 ## Getting help
  * GitHub issues are preferred over email.
