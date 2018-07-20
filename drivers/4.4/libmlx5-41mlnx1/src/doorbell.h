@@ -146,7 +146,7 @@ static inline int __ring_db(struct mlx5_qp *qp, const int db_method, uint32_t cu
 	qp->mpw.state = MLX5_MPW_STATE_CLOSED;
 
 	switch (db_method) {
-	case MLX5_DB_METHOD_DEDIC_BF_1_THREAD:
+	default:
 		/* This QP is used by one thread and it uses dedicated blue-flame */
 
 		/* Use wc_wmb to make sure old BF-copy is not passing current DB record */
@@ -155,7 +155,7 @@ static inline int __ring_db(struct mlx5_qp *qp, const int db_method, uint32_t cu
 
 		/* This wc_wmb ensures ordering between DB record and BF copy */
 		wc_wmb();
-		if (size <= bf->buf_size / 64) {
+		if (1) {
 			mlx5_bf_copy(bf->reg + bf->offset, seg,
 				     size * 64, qp);
 
@@ -167,6 +167,7 @@ static inline int __ring_db(struct mlx5_qp *qp, const int db_method, uint32_t cu
 		bf->offset ^= bf->buf_size;
 		break;
 
+#if 0 // Unused doorbell modes
 	case MLX5_DB_METHOD_DEDIC_BF:
 		/* The QP has dedicated blue-flame */
 
@@ -243,6 +244,7 @@ static inline int __ring_db(struct mlx5_qp *qp, const int db_method, uint32_t cu
 		wmb();
 		mlx5_write64((__be32 *)seg, bf->reg + bf->offset, &bf->lock);
 		break;
+#endif
 	}
 
 	return 0;

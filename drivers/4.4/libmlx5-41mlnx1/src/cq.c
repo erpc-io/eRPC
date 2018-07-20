@@ -45,6 +45,7 @@
 
 #include <infiniband/opcode.h>
 
+#include <assert.h>
 #include "mlx5.h"
 #include "wqe.h"
 #include "doorbell.h"
@@ -145,13 +146,13 @@ static inline void *get_sw_cqe(struct mlx5_cq *cq, int n, int cqe_mask)
 static inline struct mlx5_cqe64 *get_next_cqe(struct mlx5_cq *cq, const int cqe_sz)
 {
 	unsigned idx = cq->cons_index & cq->ibv_cq.cqe;
-	void *cqe = cq->active_buf->buf + idx * cqe_sz;
+	void *cqe = cq->active_buf->buf + idx * 64;
 	struct mlx5_cqe64 *cqe64;
 
-	if (unlikely(cq->compressed_left))
+	if (unlikely(0))
 		return &cq->next_decomp_cqe64;
 
-	if (unlikely(cq->peer_enabled)) {
+	if (unlikely(0)) {
 		struct mlx5_peek_entry *tmp;
 
 		while (cq->peer_peek_table[idx]) {
@@ -166,7 +167,7 @@ static inline struct mlx5_cqe64 *get_next_cqe(struct mlx5_cq *cq, const int cqe_
 		}
 	}
 
-	cqe64 = (cqe_sz == 64) ? cqe : cqe + 64;
+	cqe64 = cqe;
 
 	if (likely((cqe64->op_own) >> 4 != MLX5_CQE_INVALID) &&
 	    !((cqe64->op_own & MLX5_CQE_OWNER_MASK) ^ !!(cq->cons_index & (cq->ibv_cq.cqe + 1)))) {
@@ -293,14 +294,14 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 			    enum mlx5_rsc_type type,
 			    uint64_t *exp_wc_flags)
 {
+  //assert(srq == NULL);  Commented for perf, but true
 	uint16_t	wqe_ctr;
 	struct mlx5_wq *wq;
-	uint8_t g;
 	int err = 0;
-	int cqe_format = mlx5_get_cqe_format(cqe);
 	uint32_t byte_cnt = ntohl(cqe->byte_cnt);
 
-	if (srq) {
+	if (0) {
+	  int cqe_format = mlx5_get_cqe_format(cqe);
 		#ifdef MLX5_DEBUG
 		FILE *fp = to_mctx(srq->vsrq.srq.context)->dbg_fp;
 		#endif
@@ -334,18 +335,20 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 	} else {
 		wq	  = &qp->rq;
 		wqe_ctr = wq->tail & (wq->wqe_cnt - 1);
-		wc->wr_id = wq->wrid[wqe_ctr];
-		wc->byte_len = byte_cnt;
+    __builtin_prefetch((void *)(wq->wrid[wqe_ctr]), 0, 3);
 		++wq->tail;
-		if (cqe_format == MLX5_INLINE_DATA32_SEG)
+		if (0)
 			err = mlx5_copy_to_recv_wqe(qp, wqe_ctr, cqe,
 						    byte_cnt);
-		else if (cqe_format == MLX5_INLINE_DATA64_SEG)
+		else if (0)
 			err = mlx5_copy_to_recv_wqe(qp, wqe_ctr, cqe - 1,
 						    byte_cnt);
 	}
 	if (err)
 		return err;
+
+#if 0 // Unneeded fields of wc
+	wc->byte_len = ntohl(cqe->byte_cnt);
 
 	switch (cqe->op_own >> 4) {
 	case MLX5_CQE_RESP_WR_IMM:
@@ -387,6 +390,7 @@ static inline int handle_responder(struct ibv_wc *wc, struct mlx5_cqe64 *cqe,
 	}
 
 	wc->pkey_index     = ntohl(cqe->imm_inval_pkey) & 0xffff;
+#endif
 
 	return IBV_WC_SUCCESS;
 }
@@ -1011,40 +1015,26 @@ static inline int mlx5_poll_one(struct mlx5_cq *cq,
 				uint32_t wc_size,
 				int cqe_ver)
 {
+  // assert(cqe_ver == 1);  // Commented for perf, but true
+  // assert(*cur_srq == NULL);  // Commented for perf, but true
+
 	struct mlx5_cqe64 *cqe64;
 	struct mlx5_wq *wq;
 	uint16_t wqe_ctr;
-	void *cqe;
 	uint32_t rsn;
-	uint32_t srqn_uidx;
 	int idx;
 	uint8_t opcode;
-	struct mlx5_err_cqe *ecqe;
-	int err;
 	int requestor;
 	int responder;
-	int is_srq = 0;
 	struct mlx5_context *mctx = to_mctx(cq->ibv_cq.context);
 	struct mlx5_qp *mqp = NULL;
-	struct mlx5_rwq *rwq = NULL;
-	struct mlx5_dct *mdct;
 	uint64_t exp_wc_flags = 0;
 	enum mlx5_rsc_type type = MLX5_RSC_TYPE_INVAL;
-	int cqe_format;
-	uint8_t l3_hdr;
-	int timestamp_en = cq->creation_flags &
-		MLX5_CQ_CREATION_FLAG_COMPLETION_TIMESTAMP;
 
-repoll:
 	cqe64 = get_next_cqe(cq, cq->cqe_sz);
 	if (!cqe64)
 		return CQ_EMPTY;
 
-	cqe_format = mlx5_get_cqe_format(cqe64);
-	if (unlikely(cqe_format == MLX5_COMPRESSED)) {
-		cqe64 = mlx5_decompress_cqe(cq);
-		timestamp_en = 0;
-	}
 	++cq->cons_index;
 
 	/*
@@ -1053,7 +1043,7 @@ repoll:
 	 */
 	rmb();
 
-#ifdef MLX5_DEBUG
+#if 0
 	if (mlx5_debug_mask & MLX5_DBG_CQ_CQE) {
 		FILE *fp = mctx->dbg_fp;
 
@@ -1070,14 +1060,14 @@ repoll:
 		return CQ_POLL_ERR;
 
 	rsn = ntohl(cqe64->sop_drop_qpn) & 0xffffff;
-	srqn_uidx = ntohl(cqe64->srqn_uidx) & 0xffffff;
-	if (cqe_ver) {
-		if (!*cur_rsc || (srqn_uidx != (*cur_rsc)->rsn)) {
-			*cur_rsc = mlx5_find_uidx(mctx, srqn_uidx);
+	if (1) {
+		if (!*cur_rsc) {
+			*cur_rsc = mlx5_find_uidx(mctx, 0);
 			if (unlikely(!*cur_rsc))
 				return CQ_POLL_ERR;
 		}
 	} else {
+#if 0
 		if (responder && srqn_uidx) {
 			is_srq = 1;
 			if (!*cur_srq || (srqn_uidx != (*cur_srq)->srqn)) {
@@ -1092,6 +1082,7 @@ repoll:
 			if (unlikely(!*cur_rsc && !srqn_uidx))
 				return CQ_POLL_ERR;
 		}
+#endif
 	}
 
 	if (*cur_rsc) {
@@ -1102,11 +1093,11 @@ repoll:
 				wc->qp = &mqp->verbs_qp.qp;
 				exp_wc_flags |= IBV_EXP_WC_QP;
 			}
-			if (cqe_ver && responder && mqp->verbs_qp.qp.srq) {
+			if (cqe_ver && responder && 0) {
 				*cur_srq = to_msrq(mqp->verbs_qp.qp.srq);
-				is_srq = 1;
 			}
 			break;
+#if 0  // Unused queue types
 		case MLX5_RSC_TYPE_DCT:
 			mdct = (struct mlx5_dct *)*cur_rsc;
 			is_srq = 1;
@@ -1126,13 +1117,14 @@ repoll:
 		case MLX5_RSC_TYPE_MP_RWQ:
 			rwq = (struct mlx5_rwq *)*cur_rsc;
 			break;
+#endif
 		default:
 			return CQ_POLL_ERR;
 		}
 		type = (*cur_rsc)->type;
 	}
 
-	if (is_srq && likely(offsetof(struct ibv_exp_wc, srq) < wc_size)) {
+	if (0 && likely(offsetof(struct ibv_exp_wc, srq) < wc_size)) {
 		wc->srq = &(*cur_srq)->vsrq.srq;
 		exp_wc_flags |= IBV_EXP_WC_SRQ;
 	}
@@ -1141,14 +1133,16 @@ repoll:
 
 	switch (opcode) {
 	case MLX5_CQE_REQ:
-		if (unlikely(!mqp)) {
+    // post_send() completion
+		if (0) {
 			fprintf(stderr, "all requestors are kinds of QPs\n");
 			return CQ_POLL_ERR;
 		}
 		wq = &mqp->sq;
 		wqe_ctr = ntohs(cqe64->wqe_counter);
 		idx = wqe_ctr & (wq->wqe_cnt - 1);
-		handle_good_req((struct ibv_wc *)wc, cqe64, wq, idx);
+		//handle_good_req((struct ibv_wc *)wc, cqe64, wq, idx); // Unused wc fields
+#if 0
 		if (cqe_format == MLX5_INLINE_DATA32_SEG) {
 			cqe = cqe64;
 			err = mlx5_copy_to_send_wqe(mqp, wqe_ctr, cqe,
@@ -1160,44 +1154,18 @@ repoll:
 		} else {
 			err = 0;
 		}
+#endif
 
 		wc->wr_id = wq->wrid[idx];
 		wq->tail = mqp->gen_data.wqe_head[idx] + 1;
-		wc->status = err;
+		wc->status = 0;
 		break;
 	case MLX5_CQE_RESP_SEND:
-		/* In case of a FILLER CQE, count the number of consumed strides
-		 * for the relevant WQE. If all strides have been consumed,
-		 * release the WQE for SW reuse and return a WC. Otherwise,
-		 * re-poll the next WQE.
-		 */
-		if (unlikely(is_srq && (*cur_srq)->mp_wr.strides_per_wqe)) {
-			uint32_t cqe_byte_cnt = ntohl(cqe64->byte_cnt);
+    // post_recv() completion
+		handle_responder((struct ibv_wc *)wc, cqe64, mqp, NULL, type, &exp_wc_flags);
+		break;
 
-			if (unlikely(cqe_byte_cnt & MP_RQ_FILLER_FIELD_MASK)) {
-				wqe_ctr = ntohs(cqe64->wqe_counter);
-				count_mp_wr_strides(&(*cur_srq)->mp_wr, wqe_ctr,
-						    cqe_byte_cnt);
-				if (likely(
-				    is_mp_wr_consumed(&(*cur_srq)->mp_wr,
-						      wqe_ctr))) {
-					wc->wr_id = (*cur_srq)->wrid[wqe_ctr];
-					wc->exp_opcode = IBV_EXP_WC_RECV_NOP;
-					exp_wc_flags |=
-						IBV_EXP_WC_MP_WR_CONSUMED;
-					mlx5_free_srq_wqe(*cur_srq, wqe_ctr);
-					break;
-				}
-
-				/* Inavlid the current WC, so repoll will have a
-				 * clean WC.
-				 */
-				exp_wc_flags = 0;
-				goto repoll;
-			}
-		}
-		/* Fall through */
-	case MLX5_CQE_RESP_WR_IMM:
+#if 0  // Unsupported CQE types
 	case MLX5_CQE_RESP_SEND_IMM:
 	case MLX5_CQE_RESP_SEND_INV:
 		if (cqe64->app == MLX5_CQE_APP_TAG_MATCHING) {
@@ -1295,9 +1263,13 @@ repoll:
 			}
 		}
 		break;
-		}
+#endif
+  default:
+    return CQ_POLL_ERR;
+
 	}
 
+#if 0  // Unneeded WC flags
 	if (unlikely(timestamp_en)) {
 		wc->timestamp = ntohll(cqe64->timestamp);
 		exp_wc_flags |= IBV_EXP_WC_WITH_TIMESTAMP;
@@ -1311,6 +1283,7 @@ repoll:
 		cqe64->op_own = MLX5_CQE_INVALID << 4;
 		wmb();
 	}
+#endif
 
 	return CQ_OK;
 }
@@ -1418,7 +1391,7 @@ static inline int poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 	int err = CQ_OK;
 	void *twc;
 
-	if (cq->stall_enable) {
+	if (0) {
 		if (cq->stall_adaptive_enable) {
 			if (cq->stall_last_count)
 				mlx5_stall_cycles_poll_cq(cq->stall_last_count + cq->stall_cycles);
@@ -1428,7 +1401,6 @@ static inline int poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 		}
 	}
 
-	mlx5_lock(&cq->lock);
 
 	for (npolled = 0, twc = wc; npolled < ne; ++npolled, twc += wc_size) {
 		err = mlx5_poll_one(cq, &rsc, &srq, twc, wc_size, cqe_ver);
@@ -1438,9 +1410,8 @@ static inline int poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 
 	mlx5_update_cons_index(cq);
 
-	mlx5_unlock(&cq->lock);
 
-	if (cq->stall_enable) {
+	if (0) {
 		if (cq->stall_adaptive_enable) {
 			if (npolled == 0) {
 				cq->stall_cycles = max(cq->stall_cycles-mlx5_stall_cq_dec_step,
@@ -2548,4 +2519,10 @@ struct ibv_exp_cq_family_v1 *mlx5_get_poll_cq_family(struct mlx5_cq *cq,
 		return &mlx5_poll_cq_family_unsafe_v1_tbl[cqe_size];
 
 	return &mlx5_poll_cq_family_unsafe_tbl[cqe_size];
+}
+
+void avoid_unused_funcs_warning() {
+	mlx5_handle_error_cqe(NULL, NULL);
+	dump_cqe(NULL, NULL);
+	mlx5_set_bad_wc_opcode(NULL, NULL, 0, NULL);
 }
