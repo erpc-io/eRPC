@@ -113,6 +113,6 @@ class DpdkTransport : public Transport {
   } resolve;
 };
 
-}  // End erpc
+}  // namespace erpc
 
 #endif

@@ -270,4 +270,4 @@ static SmPkt sm_construct_resp(const SmPkt &req_sm_pkt, SmErrType err_type) {
   resp_sm_pkt.err_type = err_type;
   return resp_sm_pkt;
 }
-}  // End erpc
+}  // namespace erpc

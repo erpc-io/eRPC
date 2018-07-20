@@ -177,4 +177,4 @@ void IBTransport::post_recvs(size_t num_recvs) {
   recvs_to_post = 0;
 }
 
-}  // End erpc
+}  // namespace erpc

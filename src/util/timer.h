@@ -133,4 +133,4 @@ class TscTimer {
     return to_nsec(avg_cycles(), freq_ghz);
   }
 };
-}  /// End erpc
+}  // namespace erpc

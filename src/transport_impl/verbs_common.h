@@ -108,8 +108,8 @@ static std::string ibdev2netdev(std::string ibdev_name) {
   std::string dev_dir = "/sys/class/infiniband/" + ibdev_name + "/device/net";
 
   std::vector<std::string> net_ifaces;
-  DIR* dp;
-  struct dirent* dirp;
+  DIR *dp;
+  struct dirent *dirp;
   dp = opendir(dev_dir.c_str());
   rt_assert(dp != nullptr, "Failed to open directory " + dev_dir);
 
@@ -127,4 +127,4 @@ static std::string ibdev2netdev(std::string ibdev_name) {
   return net_ifaces[0];
 }
 
-}  // End erpc
+}  // namespace erpc

@@ -212,4 +212,4 @@ static void fill_interface_mac(std::string interface, uint8_t* mac) {
   }
 }
 
-}  // End erpc
+}  // namespace erpc

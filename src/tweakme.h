@@ -34,4 +34,4 @@ static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 static constexpr double kBandwidth = (10.0) * (1000 * 1000 * 1000 / 8.0);
 
 static constexpr bool kDatapathStats = false;
-}
+}  // namespace erpc

@@ -47,4 +47,4 @@ class FixedVector {
   size_t free_index = 0;  // Index of the first free slot
 };
 
-}  // End erpc
+}  // namespace erpc

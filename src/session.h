@@ -139,4 +139,4 @@ class Session {
   } client_info;
 };
 
-}  // End erpc
+}  // namespace erpc

@@ -23,4 +23,4 @@ size_t TlsRegistry::get_etid() const {
   return etid;
 }
 
-}  // End erpc
+}  // namespace erpc

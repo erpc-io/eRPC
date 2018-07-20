@@ -68,4 +68,4 @@ class UDPServer {
   int sock_fd = -1;
 };
 
-}  // End erpc
+}  // namespace erpc

@@ -89,4 +89,4 @@ static std::string get_uri_for_process(size_t process_i) {
   return hostname + ":" + udp_port_str;
 }
 
-}  // End erpc
+}  // namespace erpc

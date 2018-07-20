@@ -83,4 +83,4 @@ void Rpc<TTr>::send_sm_req_st(Session *session) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

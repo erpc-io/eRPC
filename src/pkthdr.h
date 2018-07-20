@@ -109,4 +109,4 @@ struct pkthdr_t {
 } __attribute__((packed));
 
 static_assert(sizeof(pkthdr_t) % sizeof(size_t) == 0, "");
-}
+}  // namespace erpc

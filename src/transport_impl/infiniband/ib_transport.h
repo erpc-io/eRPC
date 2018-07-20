@@ -181,4 +181,4 @@ class IBTransport : public Transport {
   bool fast_recv_used = false;
 };
 
-}  // End erpc
+}  // namespace erpc

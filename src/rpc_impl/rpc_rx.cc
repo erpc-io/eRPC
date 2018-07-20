@@ -90,4 +90,4 @@ void Rpc<TTr>::submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

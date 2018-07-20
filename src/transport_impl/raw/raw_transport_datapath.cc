@@ -257,4 +257,4 @@ void RawTransport::post_recvs(size_t num_recvs) {
 
   // Nothing should be here
 }
-}  // End erpc
+}  // namespace erpc

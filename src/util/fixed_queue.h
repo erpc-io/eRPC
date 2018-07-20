@@ -47,4 +47,4 @@ class FixedQueue {
   std::queue<T> queue;
 };
 
-}  // End erpc
+}  // namespace erpc

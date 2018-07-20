@@ -199,4 +199,4 @@ class Timely {
     return (r / 8) * (1000 * 1000 * 1000);
   }
 };
-}  // End erpc
+}  // namespace erpc

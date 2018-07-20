@@ -41,9 +41,8 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
 
     // If there's a response in this sslot, we've finished sending it
     if (sslot.tx_msgbuf != nullptr) {
-      assert(sslot.server_info.num_rx ==
-             sslot.server_info.sav_num_req_pkts + sslot.tx_msgbuf->num_pkts -
-                 1);
+      assert(sslot.server_info.num_rx == sslot.server_info.sav_num_req_pkts +
+                                             sslot.tx_msgbuf->num_pkts - 1);
     }
   }
 
@@ -94,4 +93,4 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

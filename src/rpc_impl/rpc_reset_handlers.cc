@@ -134,4 +134,4 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

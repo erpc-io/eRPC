@@ -141,4 +141,4 @@ static void output_log_header(FILE *stream, int level) {
 /// print an unreasonable number of log messages.
 static bool is_log_level_reasonable() { return LOG_LEVEL <= LOG_LEVEL_INFO; }
 
-}  // End erpc
+}  // namespace erpc

@@ -69,4 +69,4 @@ struct enq_req_args_t {
         tag(tag),
         cont_etid(cont_etid) {}
 };
-}
+}  // namespace erpc

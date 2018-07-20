@@ -105,4 +105,4 @@ void DpdkTransport::post_recvs(size_t num_recvs) {
   }
 }
 
-}  // End erpc
+}  // namespace erpc

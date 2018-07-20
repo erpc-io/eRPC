@@ -157,4 +157,4 @@ class MsgBuffer {
   size_t max_num_pkts;   ///< Max number of packets in this MsgBuffer
   size_t num_pkts;       ///< Current number of packets in this MsgBuffer
 };
-}
+}  // namespace erpc

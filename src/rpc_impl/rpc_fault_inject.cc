@@ -28,4 +28,4 @@ void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double p) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

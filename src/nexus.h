@@ -140,4 +140,4 @@ class Nexus {
   MtQueue<BgWorkItem> bg_req_queue[kMaxBgThreads];  ///< Background req queues
   std::thread bg_thread_arr[kMaxBgThreads];  ///< Background thread context
 };
-}  // End erpc
+}  // namespace erpc

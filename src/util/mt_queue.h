@@ -48,4 +48,4 @@ class MtQueue {
   std::mutex _lock;
 };
 
-}  // End erpc
+}  // namespace erpc

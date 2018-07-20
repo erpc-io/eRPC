@@ -132,4 +132,4 @@ class RespHandle : public SSlot {
     return client_info.resp_msgbuf;
   }
 };
-}
+}  // namespace erpc

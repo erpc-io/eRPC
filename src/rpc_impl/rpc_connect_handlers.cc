@@ -217,4 +217,4 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

@@ -13,4 +13,4 @@ Transport::Transport(TransportType transport_type, uint8_t rpc_id,
 
 Transport::~Transport() {}
 
-}  // End erpc
+}  // namespace erpc

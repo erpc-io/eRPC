@@ -1001,4 +1001,4 @@ class Rpc {
   template class Rpc<RawTransport>;
 #endif
 
-}  // End erpc
+}  // namespace erpc

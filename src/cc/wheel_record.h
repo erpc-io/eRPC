@@ -37,4 +37,4 @@ struct wheel_record_t {
     return ret.str();
   }
 };
-}
+}  // namespace erpc

@@ -64,4 +64,4 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
   return;
 }
 
-}  // End erpc
+}  // namespace erpc
