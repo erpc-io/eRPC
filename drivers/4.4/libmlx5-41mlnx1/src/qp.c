@@ -45,6 +45,7 @@
 #include "mlx5.h"
 #include "doorbell.h"
 #include "wqe.h"
+#include "modded_drivers.h"
 
 enum {
 	MLX5_OPCODE_BASIC	= 0x00010000,
@@ -513,7 +514,7 @@ static inline int set_data_ptr_seg(struct mlx5_wqe_data_seg *dseg, struct ibv_sg
 			    struct mlx5_qp *qp,
 			    int offset)
 {
-	if (unlikely(sg->lkey == ODP_GLOBAL_R_LKEY || sg->lkey == ODP_GLOBAL_W_LKEY))
+	if (0)
 		return set_odp_data_ptr_seg(dseg, sg, qp);
 
 	dseg->byte_count = htonl(sg->length - offset);
@@ -596,16 +597,15 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 			 void *wqe, int *sz,
 			 int idx, int offset, int is_tso)
 {
-	struct mlx5_context *ctx = to_mctx(qp->verbs_qp.qp.context);
 	struct mlx5_wqe_data_seg *dpseg = wqe;
 	struct ibv_sge *psge;
 	int i;
 #ifdef MLX5_DEBUG
 	FILE *fp = to_mctx(qp->verbs_qp.qp.context)->dbg_fp;
 #endif
-	uint32_t max_tso = ctx->max_tso;
 
 	for (i = idx; i < num_sge; ++i) {
+#if 0
 		if (unlikely(is_tso)) {
 			if (unlikely(max_tso < sg_list[i].length)) {
 				mlx5_dbg(fp, MLX5_DBG_QP_SEND,
@@ -615,15 +615,16 @@ static inline int set_data_non_inl_seg(struct mlx5_qp *qp, int num_sge, struct i
 			}
 			max_tso -= sg_list[i].length;
 		}
+#endif
 
 		if (unlikely(dpseg == qp->gen_data.sqend))
 			dpseg = mlx5_get_send_wqe(qp, 0);
 
-		if (likely(sg_list[i].length)) {
+		if (1) {
 			psge = sg_list + i;
 
-			if (unlikely(set_data_ptr_seg(dpseg, psge, qp,
-						      offset))) {
+			set_data_ptr_seg(dpseg, psge, qp, offset);
+			if (0) {
 				mlx5_dbg(fp, MLX5_DBG_QP_SEND, "failed allocating memory for implicit lkey structure\n");
 				return ENOMEM;
 			}
@@ -679,7 +680,7 @@ static inline int set_data_seg(struct mlx5_qp *qp, void *seg, int *sz, int is_in
 	if (is_inl)
 		return set_data_inl_seg(qp, num_sge, sg_list, seg, sz, idx,
 					offset);
-	if (unlikely(atom_arg))
+	if (0)
 		return set_data_atom_seg(qp, num_sge, sg_list, seg, sz, atom_arg);
 
 	return set_data_non_inl_seg(qp, num_sge, sg_list, seg, sz, idx, offset, is_tso);
@@ -1352,8 +1353,8 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	int err = 0;
 	int size = 0;
 	int num_sge = wr->num_sge;
-	int inl_hdr_size = to_mctx(qp->verbs_qp.qp.context)->eth_min_inline_size;
-	int inl_hdr_copy_size = 0;
+	int inl_hdr_size = MLX5_ETH_INLINE_HEADER_SIZE;  // 18 bytes
+	int inl_hdr_copy_size = MLX5_ETH_INLINE_HEADER_SIZE;
 	int i = 0;
 	uint8_t fm_ce_se;
 #ifdef MLX5_DEBUG
@@ -1367,17 +1368,21 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 	*((uint64_t *)eseg) = 0;
 	eseg->rsvd2 = 0;
 
-	if (exp_send_flags & IBV_EXP_SEND_IP_CSUM)
+	if (0)
 		eseg->cs_flags = MLX5_ETH_WQE_L3_CSUM | MLX5_ETH_WQE_L4_CSUM;
 
-	if (wr->exp_opcode == IBV_EXP_WR_TSO) {
+	if (0) {
 		err = set_tso_eth_seg(&seg, wr, qp, &size);
 	} else {
 		/* The first bytes of the headers should be copied to the
 		 * inline-headers of the ETH segment.
 		 */
-		if (likely(wr->sg_list[0].length >= MLX5_ETH_INLINE_HEADER_SIZE)) {
-			inl_hdr_copy_size = inl_hdr_size;
+
+		// 1. wqe_min_eth_inline is 0 and 18 for ConnectX-5 and ConnectX-4,
+		//    respectively, so we are safe by always copying. The memcpy below won't
+		//    call glibc's memcpy.
+		// 2. We never have an sge with length < MLX5_ETH_INLINE_HEADER_SIZE
+		if (1) {
 			memcpy(eseg->inline_hdr_start,
 			       (void *)(uintptr_t)wr->sg_list[0].addr,
 			       inl_hdr_copy_size);
@@ -1420,7 +1425,8 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 		/* If we copied all the sge into the inline-headers, then we need to
 		 * start copying from the next sge into the data-segment.
 		 */
-		if (unlikely(wr->sg_list[i].length == inl_hdr_copy_size)) {
+		// Each SGE has more data than inl_hdr_copy_size (18 bytes)
+		if (0) {
 			++i;
 			inl_hdr_copy_size = 0;
 		}
@@ -1438,11 +1444,11 @@ static int __mlx5_post_send_one_raw_packet(struct ibv_exp_send_wr *wr,
 					     (IBV_SEND_SOLICITED |
 					      IBV_SEND_SIGNALED |
 					      IBV_SEND_FENCE)];
-	fm_ce_se |= get_fence(qp->gen_data.fm_cache, wr);
+	//fm_ce_se |= get_fence(qp->gen_data.fm_cache, wr);
 	set_ctrl_seg_sig(ctrl, &qp->ctrl_seg,
-			 MLX5_IB_OPCODE_GET_OP(mlx5_ib_opcode[wr->exp_opcode]),
+			 MLX5_IB_OPCODE_GET_OP(mlx5_ib_opcode[IBV_WR_SEND]),
 			 qp->gen_data.scur_post, 0, size, fm_ce_se,
-			 send_ieth(wr));
+       0);  // Immediate data is 0
 
 	qp->gen_data.fm_cache = 0;
 	*total_size = size;
@@ -2161,16 +2167,14 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 #ifdef MLX5_DEBUG
 	FILE *fp = to_mctx(ibqp->context)->dbg_fp;
 #endif
-	mlx5_lock(&qp->sq.lock);
 
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
 		idx = qp->gen_data.scur_post & (qp->sq.wqe_cnt - 1);
 		seg = mlx5_get_send_wqe(qp, idx);
 
-		exp_send_flags = is_exp_wr ? wr->exp_send_flags : ((struct ibv_send_wr *)wr)->send_flags;
+		exp_send_flags = ((struct ibv_send_wr *)wr)->send_flags;
 
-		if (unlikely(!(qp->gen_data.create_flags & IBV_EXP_QP_CREATE_IGNORE_SQ_OVERFLOW) &&
-			     mlx5_wq_overflow(0, nreq, qp))) {
+		if (0) {
 			mlx5_dbg(fp, MLX5_DBG_QP_SEND, "work queue overflow\n");
 			errno = ENOMEM;
 			err = errno;
@@ -2178,7 +2182,7 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 			goto out;
 		}
 
-		if (unlikely(wr->num_sge > qp->sq.max_gs)) {
+		if (0) {
 			mlx5_dbg(fp, MLX5_DBG_QP_SEND, "max gs exceeded %d (max = %d)\n",
 				 wr->num_sge, qp->sq.max_gs);
 			errno = ENOMEM;
@@ -2189,7 +2193,7 @@ static inline int __mlx5_post_send(struct ibv_qp *ibqp, struct ibv_exp_send_wr *
 
 
 
-		err = qp->gen_data.post_send_one(wr, qp, exp_send_flags, seg, &size);
+		err = __mlx5_post_send_one_raw_packet(wr, qp, exp_send_flags, seg, &size);
 		if (unlikely(err)) {
 			errno = err;
 			*bad_wr = wr;
@@ -2214,8 +2218,7 @@ out:
 	if (likely(nreq)) {
 		qp->sq.head += nreq;
 
-		if (unlikely(qp->gen_data.create_flags
-					& CREATE_FLAG_NO_DOORBELL)) {
+		if (0) {
 			/* Controlled or peer-direct qp */
 			wmb();
 			if (qp->peer_enabled) {
@@ -2230,7 +2233,6 @@ out:
 
 post_send_no_db:
 
-	mlx5_unlock(&qp->sq.lock);
 
 	return err;
 }
@@ -2439,6 +2441,18 @@ int mlx5_post_recv(struct ibv_qp *ibqp, struct ibv_recv_wr *wr,
 #ifdef MLX5_DEBUG
 	FILE *fp = to_mctx(ibqp->context)->dbg_fp;
 #endif
+
+  if (wr == NULL && (*bad_wr) != NULL &&
+			(*bad_wr)->wr_id == ERPC_MAGIC_WRID_FOR_FAST_RECV) {
+    /* Handle fast RECV */
+    struct mlx5_qp *qp = to_mqp(ibqp);
+    int nreq = (*bad_wr)->num_sge;
+    qp->rq.head += nreq;
+
+    wmb();
+    qp->gen_data.db[MLX5_RCV_DBR] = htonl(qp->rq.head & 0xffff);
+    return 0;
+  }
 
 	mlx5_lock(&qp->rq.lock);
 
