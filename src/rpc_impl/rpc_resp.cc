@@ -89,13 +89,13 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   auto &ci = sslot->client_info;
   MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
 
-  // Update clien tracking metadata
+  // Update client tracking metadata
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
   ci.num_rx++;
   ci.progress_tsc = ev_loop_tsc;
 
-  // Special handling for single-packet respones
+  // Special handling for single-packet responses
   if (likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
 
@@ -109,7 +109,7 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     MsgBuffer *req_msgbuf = sslot->tx_msgbuf;
 
     if (pkthdr->pkt_num == req_msgbuf->num_pkts - 1) {
-      // This is the first response packet. Resize and copy eRPC header.
+      // This is the first response packet. Size the response and copy header.
       resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
       memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
              sizeof(pkthdr_t) - kHeadroom);
@@ -146,4 +146,4 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc
