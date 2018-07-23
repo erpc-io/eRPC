@@ -75,7 +75,8 @@ class Nexus {
    *
    * @return 0 on success, negative errno on failure.
    */
-  int register_req_func(uint8_t req_type, ReqFunc req_func);
+  int register_req_func(uint8_t req_type, erpc_req_func_t req_func,
+                        ReqFuncType req_func_type = ReqFuncType::kForeground);
 
  private:
   /// Background thread context

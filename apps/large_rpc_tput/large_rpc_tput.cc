@@ -274,8 +274,7 @@ int main(int argc, char **argv) {
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
-  nexus.register_req_func(
-      kAppReqType, erpc::ReqFunc(req_handler, erpc::ReqFuncType::kForeground));
+  nexus.register_req_func(kAppReqType, req_handler);
 
   size_t num_threads = FLAGS_process_id == 0 ? FLAGS_num_proc_0_threads
                                              : FLAGS_num_proc_other_threads;

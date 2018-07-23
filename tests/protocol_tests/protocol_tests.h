@@ -41,8 +41,8 @@ class RpcTest : public ::testing::Test {
 
     nexus = new Nexus("localhost:31850", kTestNumaNode, 0);
     rt_assert(nexus != nullptr, "Failed to create nexus");
-    nexus->register_req_func(kTestReqType,
-                             ReqFunc(req_handler, ReqFuncType::kForeground));
+    nexus->register_req_func(kTestReqType, req_handler,
+                             ReqFuncType::kForeground);
     nexus->kill_switch = true;  // Kill SM thread
 
     rpc = new Rpc<CTransport>(nexus, nullptr, kTestRpcId, sm_handler,
@@ -187,4 +187,4 @@ static void cont_func(RespHandle *resp_handle, void *_context, size_t) {
   context->rpc->release_response(resp_handle);
 }
 
-}  // End erpc
+}  // namespace erpc
