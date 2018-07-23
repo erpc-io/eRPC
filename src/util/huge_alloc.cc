@@ -87,7 +87,7 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
         case ENOMEM:
           // Out of memory - this is OK
           LOG_WARN(
-              "eRPC HugeAlloc: Insufficient memory. Can't reserve %lu MB.\n",
+              "eRPC HugeAlloc: Insufficient hugepages. Can't reserve %lu MB.\n",
               size / MB(1));
           return Buffer(nullptr, 0, 0);
 
@@ -225,4 +225,4 @@ void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
     exit(-1);
   }
 }
-}  // End erpc
+}  // namespace erpc

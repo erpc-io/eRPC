@@ -102,4 +102,4 @@ static inline void exit_assert(bool condition, std::string error_msg) {
 static inline void dpath_stat_inc(size_t &stat, size_t val) {
   if (kDatapathStats) stat += val;
 }
-}  // End erpc
+}  // namespace erpc

@@ -150,4 +150,4 @@ int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
   arr_req_func = app_req_func;
   return 0;
 }
-}  // End erpc
+}  // namespace erpc

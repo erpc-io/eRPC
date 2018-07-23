@@ -28,9 +28,9 @@ static constexpr double kWheelSlotWidthUs = .5;  ///< Duration per wheel slot
 static constexpr double kWheelHorizonUs =
     1000000 * (kSessionCredits * CTransport::kMTU) / Timely::kMinRate;
 
-/// This ensures that packets for an sslot undergoing retransmission are rarely
-/// in the wheel. This is recommended but not required.
-static_assert(kWheelHorizonUs <= kRpcRTOUs, "");
+// This ensures that packets for an sslot undergoing retransmission are rarely
+// in the wheel. This is recommended but not required.
+// static_assert(kWheelHorizonUs <= kRpcRTOUs, "");
 
 static constexpr size_t kWheelNumWslots =
     1 + erpc::ceil(kWheelHorizonUs / kWheelSlotWidthUs);
@@ -78,7 +78,9 @@ class TimingWheel {
     // wheel_buffer is leaked by the wheel, and deleted later with the allocator
     Buffer wheel_buffer = huge_alloc->alloc_raw(
         kWheelNumWslots * sizeof(wheel_bkt_t), DoRegister::kFalse);
-    rt_assert(wheel_buffer.buf != nullptr, "Failed to allocate wheel");
+    rt_assert(wheel_buffer.buf != nullptr,
+              std::string("Failed to allocate wheel. ") +
+                  HugeAlloc::alloc_fail_help_str);
 
     size_t base_tsc = rdtsc();
     wheel = reinterpret_cast<wheel_bkt_t *>(wheel_buffer.buf);
@@ -245,4 +247,4 @@ class TimingWheel {
   std::vector<wheel_record_t> record_vec;  ///< Used only with kWheelRecord
   std::queue<wheel_ent_t> ready_queue;
 };
-}
+}  // namespace erpc

@@ -66,4 +66,4 @@ void Rpc<TTr>::process_rfr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

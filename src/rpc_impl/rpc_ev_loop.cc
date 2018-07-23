@@ -51,4 +51,4 @@ void Rpc<TTr>::run_event_loop_timeout_st(size_t timeout_ms) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

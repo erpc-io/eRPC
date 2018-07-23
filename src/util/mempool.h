@@ -41,4 +41,4 @@ class MemPool {
   /// Cleanup is done when owner deletes huge_alloc
   ~MemPool() {}
 };
-}
+}  // namespace erpc

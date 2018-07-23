@@ -31,4 +31,4 @@ class FastRand {
   }
 };
 
-}  // End erpc
+}  // namespace erpc

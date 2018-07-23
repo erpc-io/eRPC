@@ -1,0 +1,220 @@
+libmlx5 (41mlnx1-OFED.4.4.0.1.7.44100) unstable; urgency=low
+
+  * Roll 41mlnx1-1
+
+ -- Alaa Hleihel <alaa@mellanox.com>  Sun, 07 May 2017 18:03:10 +0200
+
+libmlx5 (1.2.1mlnx1-1) unstable; urgency=low
+
+  * Roll 1.2.1mlnx1-1
+
+ -- Alaa Hleihel <alaa@mellanox.com>  Tue, 09 Aug 2016 18:47:10 +0200
+
+libmlx5 (1.0.2mlnx1-1) unstable; urgency=low
+
+  * adjust mlx5_hw.h to survive -Werror during autotools
+  * Add support for compact AV
+  * fix warning in print with wrong type at mlx5_dbg
+  * Added report of GRH in wc_flags to DC CQE.
+  * configure.ac: Not compiling with valgrind if flag not set
+  * Fix masked atomic args check while post send
+  * fix bug of setting ctrl_seg opc_mod to wrong variable
+  * Add ConnectX-4 device
+
+ -- Alaa Hleihel <alaa@mellanox.com>  Wed, 15 Apr 2015 18:47:10 +0200
+
+libmlx5 (1.0.1mlnx2-1) unstable; urgency=low
+
+  * libmlx5: ibv_exp_create_mr with IBV_EXP_MR_SIGNATURE_EN return error.
+  * libmlx5: revert the endianess fix for immediate data
+  * libmlx5: fix gcc version query define
+  * libmlx5: use wc_auto_evict_size instead of wc_flush
+  * libmlx5:Fixed Immediate data endianness.
+  * libmlx5: copy the correct pd into odp_data.pd
+  * libmlx5: fix debug mode
+  * libmlx5: fix bug in umr
+  * Replace getenv to use ibv_exp_getenv
+  * libmlx5: fix contiguous page registration size.
+  * libmlx5: valgrind errors on modify_cq
+  * libmlx5: fix compilation bugs for old gcc
+  * Modify to use verbs specific getenv
+  * libmlx5: fixed overrun bug in resize cq
+  * libmlx5: Add general and code restructuring optimizations
+  * libmlx5: Reset opmod for each wr
+  * libmlx5: Optimize usage of memory barrier and locks
+  * libmlx5: destroy remote implicit rkey during PD deallocation
+  * libmlx5.spec.in: Changed valgrind libs DESTDIR
+  * Added valgrind support
+  * fixed and added valgrind Macros
+  * Adding experimental dereg_mr support
+  * libmlx5: added support to choose specific addr when using contig_pages
+  * libmlx5: fixed wraparound problem in umr creation
+  * libmlx5: added -Werror to Makefile.am
+  * libmlx5: Fix send wq calculation
+  * libmlx5: added max_inl_send_klmx check in create qp
+  * libmlx5: UMR API change
+  * libmlx5: Fix create qp errno value from EINVAL to ENOMEM
+  * libmlx5: Handle send queue wraparound in extended atomics
+  * libmlx5: fail on create QP if enable umr without comp_mask
+  * libmlx5: add check max device sge when creating QP
+  * libmlx5: update opcode in bad completion
+  * libmlx5: corrections after changes in ibv_exp_prefetch_attr
+  * libmlx5: change return value on ibv_post_srq_recv
+  * libmlx5: fix segfault on modify QP
+  * libmlx5: Verify max atomic arg size
+  * libmlx5: Fix failure to set inline for invalidate
+  * libmlx5.spec.in: use %{_prefix} instead of /usr
+  * libmlx5.spec.in: Support configure_options.
+  * Makefile.am: add implicit_lkey.h to noinst_HEADERS
+  * libibverbs: Fix immediate error detection base on IB spec
+  * libmlx5: Avoid creating AH with DLID 0
+  * configure: Update AM_INIT_AUTOMAKE to support new auto tools.
+  * libmlx5: fix compilation warning on 32bit arch
+  * libmlx5: remove attr_size from ibv_exp_prefetch_mr verbs.
+  * libmlx5: prefetch implicit rkey MRs when registering a relaxed MR
+  * libxml5: Properly set the parameters of mrs created implicitly.
+  * libmlx5: Fix broken build on XEN server
+  * libmlx5: Fail post send if not in RTS
+  * libmlx5: Fix HW limitation in atomic response scatter entry
+  * libmlx5: Add missing fp in case of debug build
+  * libmlx5: Indicate UMR support at create
+  * libmlx5: fix compilation warning on Xen.
+  * libmlx5: fix compilation warning on newer gcc.
+  * libmlx5: fix compilation warning on 32bit arch
+  * libmlx5: add remote implicit mr support.
+  * libmlx5: Add implicit-lkey support.
+  * libmlx5: add support for the new ibv_exp_prefetch_mr verb.
+  * libmlx5: use $includedir to search for include files.
+  * libmlx5: change ibv_exp_reg_mr to call ibv_cmd_exp_reg_mr.
+  * libmlx5: fix reported size of verbs device struct.
+  * libmlx5: Add completion opcodes for masked atomic operations
+  * libmlx5: Fix bug taking args from wrong place
+  * libmlx5: Re-work UMR API
+  * libmlx5: Fix wrong calculation of translation size
+  * libmlx5: Add work completio opcode for UMR ops
+  * libmlx5: Fix DC size report to be a mask value
+  * BUILD: fix make checkdist and install datahook to respect $prefix
+  * libmlx5: Fix alignment problem
+  * libmlx5: Minor fixes to post send
+  * libmlx5: Use correct comp_mask in inline KLMs indication
+  * libmlx5: Fix compilation issues on 32 bit archs
+  * libmlx5: Add UMR support
+  * libmlx5: Add support for send NOP
+  * libmlx5: Simplify extended atomics API
+  * libmlx5: Fix compiler warning - unsued varaible
+  * scripts/expose_libmlx5_headers: install to the correct directory
+  * libmlx5: Fix endianess of atomics > 8 bytes
+  * libmlx5: Add support for Connect-IB virtual function
+  * libmlx5: Fix point type in ext_cmp_swp and ext_fetch_add
+  * libmlx5: fix 32b host compilation issue
+  * libmlx5: Add extended atomic support
+  * scripts/expose_libmlx5_headers: update the structures.txt file.
+  * libmlx5: Avoid overflow on mlx5_get_block_order()
+  * Revert "libmlx5: Fix log function to avoid overflow"
+  * Revert "libmlx5: Fix corner case in mlx5_get_block_order"
+  * libmlx5: Fix workaround for XRC
+  * libmlx5: Fix seg fault in poll_cq
+  * libmlx5: Fix corner case in mlx5_get_block_order
+  * libmlx5: Fix broken report on srq_qp
+  * libmlx5: fix refcnt for xrc
+  * libmlx5: Fix overflow on flag mask
+  * libmlx5: Fix log function to avoid overflow
+  * libmlx5: Fix variable overflow
+  * libmlx5: Return SRQ number in src_qp for XRC legacy
+  * libmlx5:update qp state on exp modify qp
+  * libmlx5: improve experimental interface
+  * libmlx5: Clear destroyed QP for resource table
+  * Change imm_data to ex.imm_data
+  * libmlx5: change wc_size from int to uint32_t.
+  * libmlx5: Fix sq overhead calculation
+  * libmlx5: Drain DCT CQEs when destroyed
+  * libmlx5.spec.in: Remove hard coded name and version from the Source
+
+ -- Vladimir Sokolovsky <vlad@mellanox.com>  Wed, 10 Dec 2014 10:53:10 +0200
+
+libmlx5 (1.0.1mlnx1-1) unstable; urgency=low
+
+  * libmlx5: Fix reported max SGE
+  * libmlx5: Add support for experimental atomics
+  * libmlx5: Fix corruption of legacy xrc domain
+  * libmlx5: added a new script that exposes specific structures, enumerations and defines from the libmlx5 sources to a new header file.
+  * libmlx5: Fix return codes from post send/recv
+  * libmlx5: Use new mlx5_alloc_ucontext to allow BF
+  * libmlx5: fix write on non existing exp_wc_flags field
+  * libmlx5: Add support for ARM DCT
+  * libmlx5: Align verbs interface with upstream
+  * libmlx5: add ibv_exp_reg_mr experimental verb
+  * libmlx5: Change legacy extended verbs to experimental verbs
+  * libmlx5: Change legacy extended uverbs to experimental uverbs
+  * Enable contigous pages for Control resources by default
+  * libmlx5: Do not publish support for IBV_CALC_OP_MAXLOC
+  * libmlx5: Follow API changes in libibverbs
+  * libmlx5: Fix memory leak in destroy DCT
+  * libmlx5: Optimize post send for CD operations
+  * libmlx5: Remove valgrind statement from mlx5_poll_one
+  * libmlx5: Fix valgrind error on Debian 7.1
+  * libmlx5: Fix overflow handling in resize CQ
+  * libmlx5: Fix leak in destory srq
+  * libmlx5: Fix destroy DCT
+  * libmlx5: Fix resize CQ
+  * libmlx5: Add missing defines
+  * libmlx5: Change sandy bridge work around algorithm
+  * libmlx5: add debian support to EXTRA_DIST
+  * libmlx5: add support for "git review" command line gerrit tool
+  * libmlx5: Fix "make distcheck"
+  * libmlx5: Fix create QP extended flow
+  * libmlx5: Fix resize CQ missing mask
+  * libmlx5: Add Cross-channel capability
+  * libmlx5: Add mlx5_post_task
+  * libmlx5: Add CALC capabilities information into mlx5_query_device_ex
+  * libmlx5: Support Cross-channel capability in mlx5_drv_create_qp
+  * libmlx5: Add new opcodes to support Cross-channel
+  * libmlx5: Add support for inline receive new API
+  * mlx5: Add support for reading DC capabilites
+  * libmlx5: Fix XRC poll CQ flow
+  * libmlx5: Return DC related objects in query
+  * Revert "Revert "libmlx5: Remove deprecated enum IBV_QPT_DCT""
+  * Revert "libmlx5: Remove deprecated enum IBV_QPT_DCT"
+  * libmlx5: Remove deprecated enum IBV_QPT_DCT
+  * libmlx5: Move DC calls to experimental verbs files
+  * libmlx5: Avoid clearing unused struct
+  * libmlx5: Fix justified compile warnings on debian
+  * libmlx5: Modify support for DC
+  * libmlx5: Change call to experimental create qp
+  * libmlx5: Add support for resize cq
+  * libmlx5: poll cq may report grh indication for non UD QPs
+  * libmlx5: Remove/rename mentions of mlx4
+  * libmlx5: Fix broken uuar allocator
+  * libmlx5: Add support for create CQ extended
+  * libmlx5: add support for modify cq
+  * libmlx5: add support for query device extended
+  * libmlx5: avoid free of un-allocated pointer
+  * Avoid allocating receive buffer for QPs without recieve queue
+  * Fix signature calculation on receive queues
+  * Disable atomic operations
+  * libmlx5: Avoid returning negative values of errno
+  * libmlx5: fix srq free in destroy qp
+  * call mlx5_store/clear_qp() only when there are wqes
+  * libmlx5: Add adaptive stall mechanism for cq in sandy bridge
+  * libmlx5: On destroy qp remove pending cqe only by their qpn
+  * Fix copy to scat
+  * Fix leak in destroy SRQ
+  * libmlx5: Fix scatter to CQE
+  * libmlx5: XRC compat support
+  * Fix returned values in create QP
+  * libmlx5: Add DC support
+  * Work around for recovery problem in UoF
+  * Fix failure when mixed SRQ and QP report to CQ
+  * Add env varialbe to shut down blueflame
+  * Change dfault SB loop count
+  * Control action on error CQE
+  * mlx5: add XRC support
+  * mlx5: move call to single_threaded_app() to mlx5.c
+
+ -- Vladimir Sokolovsky <vlad@mellanox.com>  Sun, 23 Mar 2014 14:16:10 +0200
+
+libmlx5 (1.0.0-1) unstable; urgency=low
+
+  * New Mellanox release.
+
+ -- Vladimir Sokolovsky <vlad@mellanox.com>  Mon, 7 Jan 2013 13:38:10 +0200

@@ -38,4 +38,4 @@ static void bind_to_core(std::thread &thread, size_t numa_node,
   rt_assert(rc == 0, "Error setting thread affinity");
 }
 
-}  // End erpc
+}  // namespace erpc

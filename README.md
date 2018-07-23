@@ -13,27 +13,10 @@ Some highlights:
  * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
    replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
-## Requirements
- * A C++11 compiler
- * See `scripts/packages.sh` for a list of required software packages.
- * Unlimited SHM limits, and at least 512 huge pages on every NUMA node.
- * Supported NICs:
-   * UDP over Ethernet mode:
-     * ConnectX-4 or newer Mellanox Ethernet NIC
-     * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
-     * Support for other NICs via DPDK is under development
-   * InfiniBand mode: Any InfiniBand-compliant NICs
-   * RoCE mode: Any RoCE-compilant NICs
-   * Mellanox NIC drivers:
-     * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
-       optimized for eRPC are available in the `drivers` directory, but they are
-       primarily for expert use.
-     * Upstream drivers work as well. This requires installing the `ibverbs` and
-       `mlx4` userspace packages, and enabling the `mlx4_ib` and `ib_uverbs`
-       kernel drivers. On Ubuntu, the incantation is:
-        * `apt install libmlx4-dev libibverbs-dev`
-        * `modprobe mlx4_ib ib_uverbs`
-     * For Connect-IB and newer NICs, use `mlx4` by `mlx5`.
+## Software requirements
+ * See `scripts/packages.sh` for a list of required software packages. For DPDK,
+   we currently expect the latest stable DPDK in `${HOME}/dpdk`.
+ * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
 ## eRPC quickstart
  * Build and run the test suite:
@@ -41,41 +24,50 @@ Some highlights:
    Here, `infiniband` should be replaced with `raw` for Mellanox Ethernet NICs,
    or `dpdk` for Intel Ethernet NICs.
  * Generate the documentation: `doxygen`
- * Running the hello world application in `apps/hello`:
-   * Compile the eRPC library using CMake.
+ * Run the `hello_world` application:
+   * Run `make` in `hello_world`
    * This application requires two machines. Set `kServerHostname` and
      `kClientHostname` to the IP addresses of your machines.
-   * Build the application using `make`.
    * Run `./server` at the server, and `./client` at the client.
 
-## eRPC configuration
- * Since compilation is slow, the CMake build compiles only one application,
-   defined by the contents of `scripts/autorun_app_file`. This file should
-   contain the name of a directory in `apps` (e.g., `small_rpc_tput`).
+## Supported NICs:
+ * UDP over Ethernet mode (`DTRANSPORT=raw`):
+   * ConnectX-4 or newer Mellanox Ethernet NICs
+   * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
+   * Support for other NICs via DPDK is under development
+ * InfiniBand mode (`DTRANSPORT=infiniband`): Any InfiniBand-compliant NICs
+ * RoCE mode: Any RoCE-compilant NICs
+ * Mellanox NIC drivers:
+   * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
+     optimized for eRPC are available in the `drivers` directory.
+   * Upstream drivers work as well. On Ubuntu, the incantation is:
+      * `apt install libmlx4-dev libmlx5-dev libibverbs-dev`
+      * `modprobe mlx4_ib mlx5_ib ib_uverbs`
+
+## Configuring and running the provided applications
+ * The `apps` directory contains a suite of benchmarks and examples. The
+   instructions below are for this suite of applications. eRPC can also be
+   simply linked as a library instead (see `apps/hello` for an example).
+ * To build an application, change the contents of `scripts/autorun_app_file`
+   to one of the available directory names in `apps`. Then generate a Makefile
+   using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
+ * Each application directory in `apps` contains a config file
+   that must specify all flags defined in `apps/apps_common.h`. For example,
+   `num_processes` specifies the total number of eRPC processes in the cluster.
  * The URIs of eRPC processes in the cluster are specified in
    `scripts/autorun_process_file`. Each line in this file must be
    `<hostname> <management udp port> <numa_node>`. One eRPC process is allowed
    per NUMA node. See `scripts/gen_autorun_process_file.sh` for how to generate
    this file.
- * Each application directory in `apps` (except `hello`) contains a config file
-   that must contain the flags defined in `apps/apps_common.h`. In addition, it
-   may contain any application-specific flags.
-
-## Running the applications
- * The `apps` directory contains a suite of benchmarks and examples.
- * To build an application, change the contents of `scripts/autorun_app_file`
-   to one of the available applications. Then generate a Makefile using
-   `cmake . -DPERF=ON/OFF`
- * The number of processes used in an eRPC app is passed as a command line flag
-   (see `num_processes` in `apps/apps_common.h`). `scripts/do.sh` is used to
-   run apps manually.
+ * Run `scripts/do.sh` for each process:
    * With single-CPU machines: `num_processes` machines are needed.
      Run `scripts/do.sh <i> 0` on machine `i` in `{0, ..., num_processes - 1}`.
    * With dual-CPU machines: `num_machines = ceil(num_processes / 2)` machines
      are needed. Run `scripts/do.sh <i> <i % 2>` on machine i in
      `{0, ..., num_machines - 1}`.
- * To automatically run an app, use `scripts/run-all.sh`. Application
-   statistics generated in a run can be analysed using `scripts/proc-out.sh`.
+ * To automatically run an application at all processes in
+   `scripts/autorun_process_file`, run `scripts/run-all.sh`. Application
+   statistics generated in a run can be collected using `scripts/proc-out.sh`.
 
 ## Getting help
  * GitHub issues are preferred over email.

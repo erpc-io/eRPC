@@ -30,4 +30,4 @@ class Buffer {
   uint32_t lkey;      ///< The memory registration lkey
 };
 
-}  // End erpc
+}  // namespace erpc

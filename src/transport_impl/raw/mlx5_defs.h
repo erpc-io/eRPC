@@ -175,4 +175,4 @@ struct mlx5_cq {
   struct mlx5_peek_entry *peer_peek_free;
 };
 
-}  // End erpc
+}  // namespace erpc

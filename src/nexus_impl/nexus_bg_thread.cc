@@ -1,5 +1,5 @@
-#include "nexus.h"
 #include "common.h"
+#include "nexus.h"
 #include "ops.h"
 #include "session.h"
 #include "util/mt_queue.h"
@@ -40,4 +40,4 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
   return;
 }
 
-}  // End erpc
+}  // namespace erpc

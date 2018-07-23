@@ -228,4 +228,4 @@ class RawTransport : public Transport {
   struct ibv_wc recv_wc[kRQDepth];
 };
 
-}  // End erpc
+}  // namespace erpc

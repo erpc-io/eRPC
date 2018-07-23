@@ -21,8 +21,8 @@ function gen_apt() {
 function gen_utah() {
   process_ids=`seq 1 $1`
   for process_i in $process_ids; do
-    #echo akalianode-$process_i.RDMA.ron-PG0.utah.cloudlab.us 31850 0 >> autorun_process_file
-    echo 10.10.1.$process_i 31850 0 >> autorun_process_file
+    echo akalianode-$process_i.RDMA.ron-PG0.utah.cloudlab.us 31850 0 >> autorun_process_file
+    #echo 10.10.1.$process_i 31850 0 >> autorun_process_file
   done
 }
 
@@ -37,4 +37,5 @@ function gen_clemson() {
 
 rm -f autorun_process_file
 #gen_apt $1
-gen_clemson $1
+gen_utah $1
+#gen_clemson $1

@@ -21,4 +21,4 @@ static void cpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx,
                : "0"(*eax), "2"(*ecx));
 }
 
-}  // End erpc
+}  // namespace erpc

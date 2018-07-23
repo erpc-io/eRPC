@@ -173,4 +173,4 @@ class Transport {
     size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called
   } testing;
 };
-}  // End erpc
+}  // namespace erpc

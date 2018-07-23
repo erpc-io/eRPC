@@ -89,4 +89,4 @@ void Rpc<TTr>::process_bg_queues_release_response_st() {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

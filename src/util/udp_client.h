@@ -83,4 +83,4 @@ class UDPClient {
   bool enable_recording_flag = false;  ///< Flag to enable recording for testing
 };
 
-}  // End erpc
+}  // namespace erpc

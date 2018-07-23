@@ -1,0 +1,2 @@
+usr/lib/libmlx5*.so.*
+etc/libibverbs.d/mlx5.driver

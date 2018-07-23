@@ -50,4 +50,4 @@ void Rpc<TTr>::kick_rfr_st(SSlot *sslot) {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

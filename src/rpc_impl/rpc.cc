@@ -70,7 +70,9 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     ctrl_msgbuf = alloc_msg_buffer(8);  // alloc_msg_buffer() requires size > 0
     if (ctrl_msgbuf.buf == nullptr) {
       delete huge_alloc;
-      throw std::runtime_error("Failed to allocate control msgbufs");
+      throw std::runtime_error(
+          std::string("Failed to allocate control msgbufs. ") +
+          HugeAlloc::alloc_fail_help_str);
     }
   }
 
@@ -113,4 +115,4 @@ Rpc<TTr>::~Rpc() {
 
 FORCE_COMPILE_TRANSPORTS
 
-}  // End erpc
+}  // namespace erpc

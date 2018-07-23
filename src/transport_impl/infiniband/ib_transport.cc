@@ -270,7 +270,8 @@ void IBTransport::init_recvs(uint8_t **rx_ring) {
   ring_extent = huge_alloc->alloc_raw(ring_extent_size, DoRegister::kTrue);
   if (ring_extent.buf == nullptr) {
     xmsg << "Failed to allocate " << std::setprecision(2)
-         << 1.0 * ring_extent_size / MB(1) << "MB for ring buffers.";
+         << 1.0 * ring_extent_size / MB(1) << "MB for ring buffers. "
+         << HugeAlloc::alloc_fail_help_str;
     throw std::runtime_error(xmsg.str());
   }
 
@@ -317,4 +318,4 @@ void IBTransport::init_sends() {
   }
 }
 
-}  // End erpc
+}  // namespace erpc

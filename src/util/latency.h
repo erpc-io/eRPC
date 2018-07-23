@@ -171,4 +171,4 @@ class Latency {
   // [3968, inf) us
   size_t bin5_;
 };
-}
+}  // namespace erpc

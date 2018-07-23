@@ -264,4 +264,4 @@ void DpdkTransport::init_mem_reg_funcs() {
   reg_mr_func = std::bind(dpdk_reg_mr_wrapper, _1, _2);
   dereg_mr_func = std::bind(dpdk_dereg_mr_wrapper, _1);
 }
-}  // End erpc
+}  // namespace erpc
