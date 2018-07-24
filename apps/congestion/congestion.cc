@@ -40,12 +40,8 @@ int main(int argc, char **argv) {
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
-  nexus.register_req_func(
-      kAppReqTypeIncast,
-      erpc::ReqFunc(req_handler_incast, erpc::ReqFuncType::kForeground));
-  nexus.register_req_func(
-      kAppReqTypeRegular,
-      erpc::ReqFunc(req_handler_regular, erpc::ReqFuncType::kForeground));
+  nexus.register_req_func(kAppReqTypeIncast, req_handler_incast);
+  nexus.register_req_func(kAppReqTypeRegular, req_handler_regular);
 
   size_t num_threads = FLAGS_process_id == 0 ? FLAGS_incast_threads_zero
                                              : FLAGS_incast_threads_other +

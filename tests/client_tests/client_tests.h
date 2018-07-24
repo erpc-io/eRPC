@@ -223,8 +223,7 @@ void launch_server_client_threads(
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
-    nexus.register_req_func(info.req_type,
-                            ReqFunc(info.req_func, info.req_func_type));
+    nexus.register_req_func(info.req_type, info.req_func, info.req_func_type);
   }
 
   num_servers_up = 0;

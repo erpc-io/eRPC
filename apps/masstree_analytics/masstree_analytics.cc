@@ -275,15 +275,14 @@ int main(int argc, char **argv) {
                       FLAGS_process_id, FLAGS_numa_node,
                       FLAGS_num_server_bg_threads);
 
-    nexus.register_req_func(
-        kAppPointReqType,
-        erpc::ReqFunc(point_req_handler, erpc::ReqFuncType::kForeground));
+    nexus.register_req_func(kAppPointReqType, point_req_handler,
+                            erpc::ReqFuncType::kForeground);
 
     auto range_handler_type = FLAGS_num_server_bg_threads > 0
                                   ? erpc::ReqFuncType::kForeground
                                   : erpc::ReqFuncType::kBackground;
-    nexus.register_req_func(
-        kAppRangeReqType, erpc::ReqFunc(range_req_handler, range_handler_type));
+    nexus.register_req_func(kAppRangeReqType, range_req_handler,
+                            range_handler_type);
 
     std::vector<std::thread> thread_arr(FLAGS_num_server_fg_threads);
     for (size_t i = 0; i < FLAGS_num_server_fg_threads; i++) {

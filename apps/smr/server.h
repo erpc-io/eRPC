@@ -127,17 +127,14 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
 }
 
 void init_erpc(AppContext *c, erpc::Nexus *nexus) {
-  nexus->register_req_func(
-      static_cast<uint8_t>(ReqType::kRequestVote),
-      erpc::ReqFunc(requestvote_handler, erpc::ReqFuncType::kForeground));
+  nexus->register_req_func(static_cast<uint8_t>(ReqType::kRequestVote),
+                           requestvote_handler);
 
-  nexus->register_req_func(
-      static_cast<uint8_t>(ReqType::kAppendEntries),
-      erpc::ReqFunc(appendentries_handler, erpc::ReqFuncType::kForeground));
+  nexus->register_req_func(static_cast<uint8_t>(ReqType::kAppendEntries),
+                           appendentries_handler);
 
-  nexus->register_req_func(
-      static_cast<uint8_t>(ReqType::kClientReq),
-      erpc::ReqFunc(client_req_handler, erpc::ReqFuncType::kForeground));
+  nexus->register_req_func(static_cast<uint8_t>(ReqType::kClientReq),
+                           client_req_handler);
 
   // Thread ID = 0
   c->rpc = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(c), 0,

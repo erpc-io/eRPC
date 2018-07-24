@@ -115,7 +115,8 @@ void Nexus::unregister_hook(Hook *hook) {
   nexus_lock.unlock();
 }
 
-int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
+int Nexus::register_req_func(uint8_t req_type, erpc_req_func_t req_func,
+                             ReqFuncType req_func_type) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
   sprintf(issue_msg,
           "eRPC Nexus: Failed to register handlers for request type %u. Issue",
@@ -129,25 +130,22 @@ int Nexus::register_req_func(uint8_t req_type, ReqFunc app_req_func) {
 
   ReqFunc &arr_req_func = req_func_arr[req_type];
 
-  // Check if this request type is already registered
   if (req_func_arr[req_type].is_registered()) {
     LOG_WARN("%s: Handler for this request type already exists.\n", issue_msg);
     return -EEXIST;
   }
 
-  // Check if the application's Ops is valid
-  if (app_req_func.req_func == nullptr) {
+  if (req_func == nullptr) {
     LOG_WARN("%s: Invalid handler.\n", issue_msg);
     return -EINVAL;
   }
 
-  // If the request handler runs in the background, we must have bg threads
-  if (app_req_func.is_background() && num_bg_threads == 0) {
+  if (req_func_type == ReqFuncType::kBackground && num_bg_threads == 0) {
     LOG_WARN("%s: Background threads not available.\n", issue_msg);
     return -EPERM;
   }
 
-  arr_req_func = app_req_func;
+  arr_req_func = ReqFunc(req_func, req_func_type);
   return 0;
 }
 }  // namespace erpc
