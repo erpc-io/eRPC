@@ -14,8 +14,11 @@ Some highlights:
    replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
 ## Software requirements
- * See `scripts/packages.sh` for a list of required software packages. For DPDK,
-   we currently expect the latest stable DPDK in `${HOME}/dpdk`.
+ * See `scripts/packages.sh` for a list of required software packages.
+ * NIC-specific requirements:
+   * For Mellanox NICs, install the latest
+     [Mellanox OFED](http://www.mellanox.com/page/products_dyn?product_family=26).
+   * For DPDK, place the latest DPDK in `${HOME}/dpdk`.
  * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
 ## eRPC quickstart
@@ -37,12 +40,8 @@ Some highlights:
    * Support for other NICs via DPDK is under development
  * InfiniBand mode (`DTRANSPORT=infiniband`): Any InfiniBand-compliant NICs
  * RoCE mode: Any RoCE-compilant NICs
- * Mellanox NIC drivers:
-   * It's best to use drivers from Mellanox OFED. Mellanox drivers specially
-     optimized for eRPC are available in the `drivers` directory.
-   * Upstream drivers work as well. On Ubuntu, the incantation is:
-      * `apt install libmlx4-dev libmlx5-dev libibverbs-dev`
-      * `modprobe mlx4_ib mlx5_ib ib_uverbs`
+ * Mellanox drivers specially optimized for eRPC are available in the `drivers`
+   directory.
 
 ## Configuring and running the provided applications
  * The `apps` directory contains a suite of benchmarks and examples. The
