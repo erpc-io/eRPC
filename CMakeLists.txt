@@ -264,7 +264,13 @@ if(COMPILE_ERPC_LIB)
 endif()
 
 # The app to compile. Only one app is compiled to reduce compile time.
-file(STRINGS "scripts/autorun_app_file" APP)
+if(EXISTS "${ROOT}/scripts/autorun_app_file")
+  file(STRINGS "scripts/autorun_app_file" APP)
+else()
+  MESSAGE(STATUS "No autorun_app_file found. No application will be compiled.")
+  return()
+endif()
+
 message(STATUS "Compiling app = " ${APP})
 
 # Add app-specific defines now, isolating them from the tests
