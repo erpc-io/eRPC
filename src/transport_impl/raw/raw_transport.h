@@ -165,7 +165,10 @@ class RawTransport : public Transport {
   /// Initialize structures that do not require eRPC hugepages: device
   /// context, protection domain, and queue pairs.
   void init_verbs_structs();
-  void init_send_qp();  ///< Iniitalize the SEND QP
+
+  /// Initialize a SEND queue, and a RECV queue if multi-packet RECVs are
+  /// disabled
+  void init_basic_qp();
 
   /// In the dumbpipe mode, initialze the multi-packet RECV QP
   void init_mp_recv_qp();

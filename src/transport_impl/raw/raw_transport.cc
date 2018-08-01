@@ -190,8 +190,7 @@ void RawTransport::resolve_phy_port() {
   throw std::runtime_error(xmsg.str());
 }
 
-/// Initialize QPs used for SENDs only
-void RawTransport::init_send_qp() {
+void RawTransport::init_basic_qp() {
   assert(resolve.ib_ctx != nullptr && pd != nullptr);
 
   struct ibv_exp_cq_init_attr cq_init_attr;
@@ -423,7 +422,7 @@ void RawTransport::init_verbs_structs() {
   pd = ibv_alloc_pd(resolve.ib_ctx);
   rt_assert(pd != nullptr, "Failed to allocate PD");
 
-  init_send_qp();
+  init_basic_qp();
   if (kDumb) init_mp_recv_qp();
   install_flow_rule();
   if (kDumb) map_mlx5_overrunning_recv_cqes();
