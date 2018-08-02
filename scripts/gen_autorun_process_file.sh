@@ -35,7 +35,15 @@ function gen_clemson() {
   done
 }
 
+# Generate process names for the Intel cluster
+function gen_intel() {
+  echo 192.168.18.2 31850 0 >> autorun_process_file
+  echo 192.168.18.4 31850 0 >> autorun_process_file
+  echo 192.168.18.6 31850 0 >> autorun_process_file
+}
+
 rm -f autorun_process_file
 #gen_apt $1
-gen_utah $1
+#gen_utah $1
 #gen_clemson $1
+gen_intel

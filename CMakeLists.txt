@@ -264,7 +264,7 @@ if(COMPILE_ERPC_LIB)
 endif()
 
 # The app to compile. Only one app is compiled to reduce compile time.
-if(EXISTS "${ROOT}/scripts/autorun_app_file")
+if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/autorun_app_file")
   file(STRINGS "scripts/autorun_app_file" APP)
 else()
   MESSAGE(STATUS "No autorun_app_file found. No application will be compiled.")
