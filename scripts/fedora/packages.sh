@@ -10,11 +10,7 @@
 ###
 
 sudo dnf -y install gcc-c++ cmake numactl-devel numactl bc gflags-devel \
-  boost-devel
-
-# GTest is special for some reason
-sudo dnf -y install gtest gtest-devel
-#(cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
+  boost-devel gtest gtest-devel
 
 ###
 ### Optional convenience packages
@@ -25,7 +21,7 @@ sudo dnf -y upgrade vim-minimal
 sudo dnf -y install vim-enhanced
 
 # General packages not specific to eRPC
-sudo dnf -y install htop memcached memcached-devel git-clang-format \
+sudo dnf -y install ripgrep htop memcached memcached-devel git-clang-format \
   ctags-etags the_silver_searcher sloccount calc
 
 # Fuzzy find configuration
