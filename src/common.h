@@ -64,11 +64,15 @@ static constexpr size_t kInvalidBgETid = kMaxBgThreads;
 
 // Simple methods
 
-/// Trim a hostname to the part before the first dot
-static std::string trim_hostname(std::string hostname) {
-  std::vector<std::string> split;
-  boost::split(split, hostname, boost::is_any_of("."));
-  return split.at(0);
+/// Reduce hostname length for CloudLab/Emulab hostnames. For non-akalia users,
+/// this returns the original hostname.
+static std::string trim_hostname(const std::string hostname) {
+  if (hostname.find("akalia") != std::string::npos) {
+    std::vector<std::string> split;
+    boost::split(split, hostname, boost::is_any_of("."));
+    return split.at(0);
+  }
+  return hostname;
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
