@@ -154,10 +154,10 @@ class RawTransport : public Transport {
 
  private:
   /**
-   * @brief Resolve fields in \p resolve using \p phy_port
+   * @brief Resolve fields specific to Raw transport in \p resolve
    * @throw runtime_error if the port cannot be resolved
    */
-  void resolve_phy_port();
+  void raw_resolve_phy_port();
 
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
@@ -181,11 +181,8 @@ class RawTransport : public Transport {
   void init_sends();  ///< Initialize constant fields of SEND work requests
 
   /// Info resolved from \p phy_port, must be filled by constructor.
-  struct {
-    int device_id = -1;  ///< Device index in list of verbs devices
-    struct ibv_context *ib_ctx = nullptr;  ///< The verbs device context
-    uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
-
+  class RawResolve : public VerbsResolve {
+   public:
     std::string ibdev_name;   ///< Verbs device name (e.g., mlx5_0)
     std::string netdev_name;  ///< Verbs device name (e.g., enp4s0f0, ib0 etc)
     uint32_t ipv4_addr;       ///< The port's IPv4 address

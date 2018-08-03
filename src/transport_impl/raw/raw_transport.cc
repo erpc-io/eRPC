@@ -18,7 +18,9 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
-  resolve_phy_port();
+  common_resolve_phy_port(phy_port, kMTU, kTransportType, resolve);
+  raw_resolve_phy_port();
+
   init_verbs_structs();
   init_mem_reg_funcs();
 
@@ -109,90 +111,14 @@ bool RawTransport::resolve_remote_routing_info(
   return true;
 }
 
-void RawTransport::resolve_phy_port() {
-  std::ostringstream xmsg;  // The exception message
-  int num_devices = 0;
-  struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
-  rt_assert(dev_list != nullptr, "Failed to get device list");
-
-  // Traverse the device list
-  int ports_to_discover = phy_port;
-
-  for (int dev_i = 0; dev_i < num_devices; dev_i++) {
-    struct ibv_context *ib_ctx = ibv_open_device(dev_list[dev_i]);
-    rt_assert(ib_ctx != nullptr, "Failed to open dev " + std::to_string(dev_i));
-
-    struct ibv_device_attr device_attr;
-    memset(&device_attr, 0, sizeof(device_attr));
-    if (ibv_query_device(ib_ctx, &device_attr) != 0) {
-      xmsg << "Failed to query device " << std::to_string(dev_i);
-      throw std::runtime_error(xmsg.str());
-    }
-
-    for (uint8_t port_i = 1; port_i <= device_attr.phys_port_cnt; port_i++) {
-      // Count this port only if it is enabled
-      struct ibv_port_attr port_attr;
-      if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
-        xmsg << "Failed to query port " << std::to_string(port_i)
-             << " on device " << ib_ctx->device->name;
-        throw std::runtime_error(xmsg.str());
-      }
-
-      if (port_attr.phys_state != IBV_PORT_ACTIVE &&
-          port_attr.phys_state != IBV_PORT_ACTIVE_DEFER) {
-        continue;
-      }
-
-      if (ports_to_discover == 0) {
-        // Resolution succeeded. Check if the link layer matches.
-        if (port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
-          throw std::runtime_error(
-              "Transport type required is raw Ethernet but port L2 is " +
-              link_layer_str(port_attr.link_layer));
-        }
-
-        // Check the class's constant MTU
-        size_t active_mtu = enum_to_mtu(port_attr.active_mtu);
-        if (kMTU > active_mtu) {
-          throw std::runtime_error("Transport's required MTU is " +
-                                   std::to_string(kMTU) + ", active_mtu is " +
-                                   std::to_string(active_mtu));
-        }
-
-        LOG_INFO("Port %u resolved to device %s, port %u\n", phy_port,
-                 ib_ctx->device->name, port_i);
-
-        resolve.device_id = dev_i;
-        resolve.ib_ctx = ib_ctx;
-        resolve.dev_port_id = port_i;
-
-        resolve.ibdev_name = std::string(ib_ctx->device->name);
-        resolve.netdev_name = ibdev2netdev(resolve.ibdev_name);
-        resolve.ipv4_addr = get_interface_ipv4_addr(resolve.netdev_name);
-        fill_interface_mac(resolve.netdev_name, resolve.mac_addr);
-
-        return;
-      }
-
-      ports_to_discover--;
-    }
-
-    // Thank you Mario, but our port is in another device
-    if (ibv_close_device(ib_ctx) != 0) {
-      xmsg << "Failed to close device " << ib_ctx->device->name;
-      throw std::runtime_error(xmsg.str());
-    }
-  }
-
-  // If we are here, port resolution has failed
-  assert(resolve.ib_ctx == nullptr);
-  xmsg << "Failed to resolve RoCE port index " << std::to_string(phy_port);
-  throw std::runtime_error(xmsg.str());
+void RawTransport::raw_resolve_phy_port() {
+  resolve.ibdev_name = std::string(resolve.ib_ctx->device->name);
+  resolve.netdev_name = ibdev2netdev(resolve.ibdev_name);
+  resolve.ipv4_addr = get_interface_ipv4_addr(resolve.netdev_name);
+  fill_interface_mac(resolve.netdev_name, resolve.mac_addr);
 }
 
 void RawTransport::init_basic_qp() {
-  assert(resolve.ib_ctx != nullptr && pd != nullptr);
-
   struct ibv_exp_cq_init_attr cq_init_attr;
   memset(&cq_init_attr, 0, sizeof(cq_init_attr));
   send_cq = ibv_exp_create_cq(resolve.ib_ctx, kSQDepth, nullptr, nullptr, 0,

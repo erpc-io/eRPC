@@ -17,6 +17,15 @@ static constexpr uint64_t kMagicWrIDForFastRecv = 3185;
 static constexpr uint64_t kModdedProbeWrID = 3186;
 static constexpr int kModdedProbeRet = 3187;
 
+/// Common information for verbs-based transports, resolved from a port ID
+class VerbsResolve {
+ public:
+  int device_id = -1;  ///< Device index in list of verbs devices
+  struct ibv_context *ib_ctx = nullptr;  ///< The verbs device context
+  uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
+  size_t bandwidth = 0;     ///< Link bandwidth in bytes per second
+};
+
 static size_t enum_to_mtu(enum ibv_mtu mtu) {
   switch (mtu) {
     case IBV_MTU_256:
@@ -125,6 +134,97 @@ static std::string ibdev2netdev(std::string ibdev_name) {
 
   rt_assert(net_ifaces.size() > 0, "Directory " + dev_dir + " is empty");
   return net_ifaces[0];
+}
+
+static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
+                                    Transport::TransportType transport_type,
+                                    VerbsResolve &resolve) {
+  std::ostringstream xmsg;  // The exception message
+  int num_devices = 0;
+  struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
+  rt_assert(dev_list != nullptr, "Failed to get device list");
+
+  // Traverse the device list
+  int ports_to_discover = phy_port;
+
+  for (int dev_i = 0; dev_i < num_devices; dev_i++) {
+    struct ibv_context *ib_ctx = ibv_open_device(dev_list[dev_i]);
+    rt_assert(ib_ctx != nullptr, "Failed to open dev " + std::to_string(dev_i));
+
+    struct ibv_device_attr device_attr;
+    memset(&device_attr, 0, sizeof(device_attr));
+    if (ibv_query_device(ib_ctx, &device_attr) != 0) {
+      xmsg << "Failed to query device " << std::to_string(dev_i);
+      throw std::runtime_error(xmsg.str());
+    }
+
+    for (uint8_t port_i = 1; port_i <= device_attr.phys_port_cnt; port_i++) {
+      // Count this port only if it is enabled
+      struct ibv_port_attr port_attr;
+      if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
+        xmsg << "Failed to query port " << std::to_string(port_i)
+             << " on device " << ib_ctx->device->name;
+        throw std::runtime_error(xmsg.str());
+      }
+
+      if (port_attr.phys_state != IBV_PORT_ACTIVE &&
+          port_attr.phys_state != IBV_PORT_ACTIVE_DEFER) {
+        continue;
+      }
+
+      if (ports_to_discover == 0) {
+        // Resolution succeeded. Check if the link layer matches.
+        switch (transport_type) {
+          case Transport::TransportType::kRaw:
+          case Transport::TransportType::kRoCE:
+            if (port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
+              throw std::runtime_error(
+                  "Transport type required is raw Ethernet but port L2 is " +
+                  link_layer_str(port_attr.link_layer));
+            }
+            break;
+          case Transport::TransportType::kInfiniBand:
+            if (port_attr.link_layer != IBV_LINK_LAYER_INFINIBAND) {
+              throw std::runtime_error(
+                  "Transport type required is InfiniBand but port L2 is " +
+                  link_layer_str(port_attr.link_layer));
+            }
+            break;
+          default:
+            exit_assert(false, "Not a verbs transport");
+        }
+
+        // Check the MTU
+        size_t active_mtu = enum_to_mtu(port_attr.active_mtu);
+        if (mtu > active_mtu) {
+          throw std::runtime_error("Transport's required MTU is " +
+                                   std::to_string(mtu) + ", active_mtu is " +
+                                   std::to_string(active_mtu));
+        }
+
+        LOG_INFO("Port %u resolved to device %s, port %u\n", phy_port,
+                 ib_ctx->device->name, port_i);
+
+        resolve.device_id = dev_i;
+        resolve.ib_ctx = ib_ctx;
+        resolve.dev_port_id = port_i;
+        return;
+      }
+
+      ports_to_discover--;
+    }
+
+    // Thank you Mario, but our port is in another device
+    if (ibv_close_device(ib_ctx) != 0) {
+      xmsg << "Failed to close device " << ib_ctx->device->name;
+      throw std::runtime_error(xmsg.str());
+    }
+  }
+
+  // If we are here, port resolution has failed
+  assert(resolve.ib_ctx == nullptr);
+  xmsg << "Failed to resolve RoCE port index " << std::to_string(phy_port);
+  throw std::runtime_error(xmsg.str());
 }
 
 }  // namespace erpc

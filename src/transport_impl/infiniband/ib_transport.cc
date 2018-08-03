@@ -16,7 +16,10 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
     : Transport(TransportType::kInfiniBand, rpc_id, phy_port, numa_node,
                 trace_file) {
   rt_assert(kHeadroom == 0, "Invalid packet header headroom for InfiniBand");
-  resolve_phy_port();
+
+  common_resolve_phy_port(phy_port, kMTU, kTransportType, resolve);
+  ib_resolve_phy_port();
+
   init_verbs_structs();
   init_mem_reg_funcs();
 
@@ -83,94 +86,23 @@ bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
   return (ib_rinfo->ah != nullptr);
 }
 
-void IBTransport::resolve_phy_port() {
+void IBTransport::ib_resolve_phy_port() {
   std::ostringstream xmsg;  // The exception message
-  int num_devices = 0;
-  struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
-  rt_assert(dev_list != nullptr, "Failed to get device list");
+  struct ibv_port_attr port_attr;
 
-  // Traverse the device list
-  int ports_to_discover = phy_port;
-
-  for (int dev_i = 0; dev_i < num_devices; dev_i++) {
-    struct ibv_context *ib_ctx = ibv_open_device(dev_list[dev_i]);
-    rt_assert(ib_ctx != nullptr, "Failed to open dev " + std::to_string(dev_i));
-
-    struct ibv_device_attr device_attr;
-    memset(&device_attr, 0, sizeof(device_attr));
-    if (ibv_query_device(ib_ctx, &device_attr) != 0) {
-      xmsg << "Failed to query device " << std::to_string(dev_i);
-      throw std::runtime_error(xmsg.str());
-    }
-
-    for (uint8_t port_i = 1; port_i <= device_attr.phys_port_cnt; port_i++) {
-      // Count this port only if it is enabled
-      struct ibv_port_attr port_attr;
-      if (ibv_query_port(ib_ctx, port_i, &port_attr) != 0) {
-        xmsg << "Failed to query port " << std::to_string(port_i)
-             << " on device " << ib_ctx->device->name;
-        throw std::runtime_error(xmsg.str());
-      }
-
-      if (port_attr.phys_state != IBV_PORT_ACTIVE &&
-          port_attr.phys_state != IBV_PORT_ACTIVE_DEFER) {
-        continue;
-      }
-
-      if (ports_to_discover == 0) {
-        // Resolution succeeded. Check if the link layer matches.
-        if (is_infiniband() &&
-            port_attr.link_layer != IBV_LINK_LAYER_INFINIBAND) {
-          throw std::runtime_error(
-              "Transport type required is InfiniBand but port link layer is " +
-              link_layer_str(port_attr.link_layer));
-        }
-
-        if (is_roce() && port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
-          throw std::runtime_error(
-              "Transport type required is RoCE but port link layer is " +
-              link_layer_str(port_attr.link_layer));
-        }
-
-        // Check the class's constant MTU
-        size_t active_mtu = enum_to_mtu(port_attr.active_mtu);
-        if (kMTU > active_mtu) {
-          throw std::runtime_error("Transport's required MTU is " +
-                                   std::to_string(kMTU) + ", active_mtu is " +
-                                   std::to_string(active_mtu));
-        }
-
-        LOG_INFO("Port %u resolved to device %s, port %u\n", phy_port,
-                 ib_ctx->device->name, port_i);
-
-        resolve.device_id = dev_i;
-        resolve.ib_ctx = ib_ctx;
-        resolve.dev_port_id = port_i;
-        resolve.port_lid = port_attr.lid;
-
-        // Resolve and cache the ibv_gid struct for RoCE
-        if (is_roce()) {
-          int ret = ibv_query_gid(ib_ctx, resolve.dev_port_id, 0, &resolve.gid);
-          rt_assert(ret == 0, "Failed to query GID");
-        }
-
-        return;
-      }
-
-      ports_to_discover--;
-    }
-
-    // Thank you Mario, but our port is in another device
-    if (ibv_close_device(ib_ctx) != 0) {
-      xmsg << "Failed to close device " << ib_ctx->device->name;
-      throw std::runtime_error(xmsg.str());
-    }
+  if (ibv_query_port(resolve.ib_ctx, resolve.dev_port_id, &port_attr) != 0) {
+    xmsg << "Failed to query port " << std::to_string(resolve.dev_port_id)
+         << " on device " << resolve.ib_ctx->device->name;
+    throw std::runtime_error(xmsg.str());
   }
 
-  // If we are here, port resolution has failed
-  assert(resolve.ib_ctx == nullptr);
-  xmsg << "Failed to resolve RoCE port index " << std::to_string(phy_port);
-  throw std::runtime_error(xmsg.str());
+  resolve.port_lid = port_attr.lid;
+
+  if (is_roce()) {
+    int ret =
+        ibv_query_gid(resolve.ib_ctx, resolve.dev_port_id, 0, &resolve.gid);
+    rt_assert(ret == 0, "Failed to query GID");
+  }
 }
 
 void IBTransport::init_verbs_structs() {

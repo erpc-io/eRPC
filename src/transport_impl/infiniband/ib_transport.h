@@ -115,10 +115,10 @@ class IBTransport : public Transport {
 
  private:
   /**
-   * @brief Resolve fields in \p resolve using \p phy_port
+   * @brief Resolve InfiniBand-specific fields in \p resolve
    * @throw runtime_error if the port cannot be resolved
    */
-  void resolve_phy_port();
+  void ib_resolve_phy_port();
 
   /**
    * @brief Initialize structures that do not require eRPC hugepages: device
@@ -138,20 +138,12 @@ class IBTransport : public Transport {
   void init_sends();  ///< Initialize constant fields of SEND work requests
 
   static bool is_roce() { return kTransportType == TransportType::kRoCE; }
-  static bool is_infiniband() {
-    return kTransportType == TransportType::kInfiniBand;
-  }
 
-  // ibverbs helper functions
-
-  /// ibverbs info resolved from \p phy_port, must be filled by constructor.
-  struct {
-    int device_id = -1;  ///< Device index in list of verbs devices
-    struct ibv_context *ib_ctx = nullptr;  ///< The verbs device context
-    uint8_t dev_port_id = 0;  ///< 1-based port ID in device. 0 is invalid.
-    uint16_t port_lid = 0;    ///< LID of phy_port. 0 is invalid.
-
-    union ibv_gid gid;  ///< GID, used only for RoCE
+  /// Info resolved from \p phy_port, must be filled by constructor.
+  class IBResolve : public VerbsResolve {
+   public:
+    uint16_t port_lid = 0;  ///< Port LID. 0 is invalid.
+    union ibv_gid gid;      ///< GID, used only for RoCE
   } resolve;
 
   struct ibv_pd *pd = nullptr;
