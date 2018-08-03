@@ -85,8 +85,6 @@ bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
 
 void IBTransport::resolve_phy_port() {
   std::ostringstream xmsg;  // The exception message
-
-  // Get the device list
   int num_devices = 0;
   struct ibv_device **dev_list = ibv_get_device_list(&num_devices);
   rt_assert(dev_list != nullptr, "Failed to get device list");
@@ -101,7 +99,7 @@ void IBTransport::resolve_phy_port() {
     struct ibv_device_attr device_attr;
     memset(&device_attr, 0, sizeof(device_attr));
     if (ibv_query_device(ib_ctx, &device_attr) != 0) {
-      xmsg << "Failed to query InfiniBand device " << std::to_string(dev_i);
+      xmsg << "Failed to query device " << std::to_string(dev_i);
       throw std::runtime_error(xmsg.str());
     }
 
@@ -142,6 +140,9 @@ void IBTransport::resolve_phy_port() {
                                    std::to_string(active_mtu));
         }
 
+        LOG_INFO("Port %u resolved to device %s, port %u\n", phy_port,
+                 ib_ctx->device->name, port_i);
+
         resolve.device_id = dev_i;
         resolve.ib_ctx = ib_ctx;
         resolve.dev_port_id = port_i;
@@ -161,15 +162,14 @@ void IBTransport::resolve_phy_port() {
 
     // Thank you Mario, but our port is in another device
     if (ibv_close_device(ib_ctx) != 0) {
-      xmsg << "eRPC Failed to close device" << ib_ctx->device->name;
+      xmsg << "Failed to close device " << ib_ctx->device->name;
       throw std::runtime_error(xmsg.str());
     }
   }
 
   // If we are here, port resolution has failed
   assert(resolve.ib_ctx == nullptr);
-  xmsg << "Failed to resolve InfiniBand port index "
-       << std::to_string(phy_port);
+  xmsg << "Failed to resolve RoCE port index " << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
 
