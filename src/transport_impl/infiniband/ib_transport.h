@@ -70,6 +70,7 @@ class IBTransport : public Transport {
 
   void fill_local_routing_info(RoutingInfo *routing_info) const;
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
+  size_t get_bandwidth() const { return resolve.bandwidth; }
 
   static std::string routing_info_str(RoutingInfo *routing_info) {
     auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);

@@ -152,6 +152,9 @@ class Transport {
    */
   bool resolve_remote_routing_info(RoutingInfo* routing_info) const;
 
+  /// Return the link bandwidth (bytes per second)
+  size_t get_bandwidth() const;
+
   /// Return a string representation of \p routing_info
   static std::string routing_info_str(RoutingInfo* routing_info);
 
