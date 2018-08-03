@@ -202,12 +202,59 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
                                    std::to_string(active_mtu));
         }
 
-        LOG_INFO("Port %u resolved to device %s, port %u\n", phy_port,
-                 ib_ctx->device->name, port_i);
-
         resolve.device_id = dev_i;
         resolve.ib_ctx = ib_ctx;
         resolve.dev_port_id = port_i;
+
+        // Compute the bandwidth
+        double gbps_per_lane = -1;
+        switch (port_attr.active_speed) {
+          case 1:
+            gbps_per_lane = 2.5;
+            break;
+          case 2:
+            gbps_per_lane = 5.0;
+            break;
+          case 4:
+            gbps_per_lane = 10.0;
+            break;
+          case 8:
+            gbps_per_lane = 10.0;
+            break;
+          case 16:
+            gbps_per_lane = 14.0;
+            break;
+          case 32:
+            gbps_per_lane = 25.0;
+            break;
+          default:
+            rt_assert(false, "Invalid active speed");
+        };
+
+        size_t num_lanes = SIZE_MAX;
+        switch (port_attr.active_width) {
+          case 1:
+            num_lanes = 1;
+            break;
+          case 2:
+            num_lanes = 4;
+            break;
+          case 4:
+            num_lanes = 8;
+            break;
+          case 8:
+            num_lanes = 12;
+            break;
+          default:
+            rt_assert(false, "Invalid active width");
+        };
+
+        double total_gbps = num_lanes * gbps_per_lane;
+        resolve.bandwidth = total_gbps * (1000 * 1000 * 1000) / 8.0;
+
+        LOG_INFO("Port %u resolved to device %s, port %u. Speed = %.2f Gbps.\n",
+                 phy_port, ib_ctx->device->name, port_i, total_gbps);
+
         return;
       }
 
