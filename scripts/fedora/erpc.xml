@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
-  <short>My service</short>
-  <description>This option allows eRPC to use port 31850.</description>
+  <short>eRPC service</short>
+  <description>This option allows eRPC to use port 31850-31851.</description>
   <port protocol="udp" port="31850"/>
+  <port protocol="udp" port="31851"/>
 </service>
