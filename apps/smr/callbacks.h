@@ -14,7 +14,7 @@
 
 // Raft callback for applying an entry to the FSM
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
-                           int) {
+                           raft_index_t) {
   assert(!raft_entry_is_cfg_change(ety));
 
   // We're applying an entry to the application's state machine, so we're sure
@@ -48,13 +48,14 @@ static int __raft_persist_vote(raft_server_t *, void *, const int) {
 }
 
 // Raft callback for saving term field to persistent storage
-static int __raft_persist_term(raft_server_t *, void *, const int, const int) {
+static int __raft_persist_term(raft_server_t *, void *, raft_term_t,
+                               raft_node_id_t) {
   return 0;  // Ignored
 }
 
 // Raft callback for appending an item to the log
 static int __raft_logentry_offer(raft_server_t *, void *udata,
-                                 raft_entry_t *ety, int) {
+                                 raft_entry_t *ety, raft_index_t) {
   assert(!raft_entry_is_cfg_change(ety));
 
   auto *c = static_cast<AppContext *>(udata);
@@ -66,7 +67,7 @@ static int __raft_logentry_offer(raft_server_t *, void *udata,
 // when an invalid leader finds a valid leader and has to delete superseded
 // log entries.
 static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
-                               int) {
+                               raft_index_t) {
   auto *c = static_cast<AppContext *>(udata);
 
   raft_entry_t &entry = c->server.raft_log.back();
@@ -85,7 +86,8 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
 
 // Raft callback for removing the first entry from the log. This is provided to
 // support log compaction in the future.
-static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *, int) {
+static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *,
+                                raft_index_t) {
   printf("smr: Ignoring __raft_logentry_poll callback.\n");
   return 0;
 }
