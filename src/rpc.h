@@ -357,9 +357,7 @@ class Rpc {
     // 2. Ignore if the corresponding client pkt for pkthdr is still in wheel.
     if (unlikely(pkthdr->pkt_num >= ci.num_tx)) return false;
 
-    const bool _in_wheel =
-        ci.wslot_idx[pkthdr->pkt_num % kSessionCredits] != kWheelInvalidWslot;
-    if (kCcPacing && unlikely(_in_wheel)) {
+    if (kCcPacing && unlikely(ci.in_wheel[pkthdr->pkt_num % kSessionCredits])) {
       pkt_loss_stats.still_in_wheel++;
       return false;
     }
@@ -581,9 +579,8 @@ class Rpc {
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
-    uint16_t wslot_idx =
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
-    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
+    wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
+    sslot->client_info.in_wheel[pkt_num % kSessionCredits] = true;
     sslot->client_info.wheel_count++;
   }
 
@@ -599,9 +596,8 @@ class Rpc {
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
-    uint16_t wslot_idx =
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
-    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
+    wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
+    sslot->client_info.in_wheel[pkt_num % kSessionCredits] = true;
     sslot->client_info.wheel_count++;
   }
 

@@ -69,9 +69,10 @@ class SSlot {
 
       // Fields for congestion control, cold if CC is disabled.
 
-      /// Per-packet wheel index
-      std::array<uint16_t, kSessionCredits> wslot_idx;
-      size_t wheel_count;  ///< Number of packets in wheel slots or ready queue
+      /// Packet number n is in the wheel (including its ready queue) iff
+      /// in_wheel[n % kSessionCredits] is true
+      std::array<bool, kSessionCredits> in_wheel;
+      size_t wheel_count;  ///< Number of packets in the wheel (or ready queue)
 
       /// Per-packet TX timestamp. Indexed by pkt_num % kSessionCredits.
       std::array<size_t, kSessionCredits> tx_ts;

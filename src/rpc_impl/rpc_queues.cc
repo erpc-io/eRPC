@@ -47,7 +47,7 @@ void Rpc<TTr>::process_wheel_st() {
     }
 
     sslot->client_info.wheel_count--;
-    sslot->client_info.wslot_idx[crd_i] = kWheelInvalidWslot;
+    sslot->client_info.in_wheel[crd_i] = false;
     wheel->ready_queue.pop();
   }
 }

@@ -62,7 +62,7 @@ class Session {
       sslot.cur_req_num = sslot_i;  // 1st req num = (+kSessionReqWindow)
 
       if (is_client()) {
-        for (auto &x : sslot.client_info.wslot_idx) x = kWheelInvalidWslot;
+        for (auto &x : sslot.client_info.in_wheel) x = false;
         sslot.client_info.cont_etid = kInvalidBgETid;  // Continuations in fg
       } else {
         sslot.server_info.req_type = kInvalidReqType;

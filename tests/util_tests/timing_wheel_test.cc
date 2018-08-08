@@ -63,45 +63,6 @@ TEST_F(TimingWheelTest, Basic) {
   ASSERT_EQ(wheel->ready_queue.size(), 1);
 }
 
-TEST_F(TimingWheelTest, DeleteOne) {
-  // Insert one entry and delete it
-  wheel_ent_t ent = TimingWheel::get_dummy_ent();
-  size_t ref_tsc = rdtsc();
-  size_t abs_tx_tsc = ref_tsc + wheel->wslot_width_tsc;
-  size_t wslot_idx = wheel->insert(ent, ref_tsc, abs_tx_tsc);
-  wheel->delete_from_wslot(wslot_idx, reinterpret_cast<SSlot *>(ent.sslot));
-
-  wheel->reap(abs_tx_tsc + wheel->wslot_width_tsc);
-  ASSERT_EQ(wheel->ready_queue.size(), 0);
-}
-
-TEST_F(TimingWheelTest, DeleteMany) {
-  // We'll insert around kNumEntriesPerWslot entries per wheel slot used
-  static constexpr size_t kNumEntries = 1000;
-  static constexpr size_t kNumEntriesPerWslot = kWheelBucketCap * 5;
-  static_assert(kNumEntries < kWheelNumWslots, "");
-
-  wheel_ent_t ent = TimingWheel::get_dummy_ent();
-  std::array<uint16_t, kNumEntries> wslot_idx_arr;
-
-  size_t ref_tsc = rdtsc();
-  size_t delta = 0;
-  for (size_t i = 0; i < kNumEntries; i++) {
-    delta += (wheel->wslot_width_tsc / kNumEntriesPerWslot);
-    wslot_idx_arr[i] = wheel->insert(ent, ref_tsc, ref_tsc + delta);
-  }
-
-  std::random_shuffle(wslot_idx_arr.begin(), wslot_idx_arr.end());
-  for (size_t i = 0; i < kNumEntries; i++) {
-    wheel->delete_from_wslot(wslot_idx_arr[i],
-                             reinterpret_cast<SSlot *>(ent.sslot));
-  }
-
-  // (ref_tsc + delta) is the maximum requested absolute TX TSC
-  wheel->reap((ref_tsc + delta) + wheel->wslot_width_tsc);
-  ASSERT_EQ(wheel->ready_queue.size(), 0);
-}
-
 // This is not a fixture test because we use a different wheel for each rate
 TEST(TimingWheelRateTest, RateTest) {
   const std::vector<double> target_gbps = {1.0, 5.0, 10.0, 20.0, 40.0, 80.0};

@@ -35,10 +35,6 @@ static constexpr double kWheelHorizonUs =
 static constexpr size_t kWheelNumWslots =
     1 + erpc::ceil(kWheelHorizonUs / kWheelSlotWidthUs);
 
-/// Session slots track wheel slots. UINT16_MAX is an invalid wheel index.
-static_assert(kWheelNumWslots < UINT16_MAX, "");
-static constexpr uint16_t kWheelInvalidWslot = UINT16_MAX;
-
 static constexpr bool kWheelRecord = false;  ///< Fast-record wheel actions
 
 /// One entry in a timing wheel bucket
@@ -127,7 +123,7 @@ class TimingWheel {
    * @param ref_tsc A recent timestamp
    * @param desired_tx_tsc The desired time for packet transmission
    */
-  inline uint16_t insert(const wheel_ent_t &ent, size_t ref_tsc,
+  inline void insert(const wheel_ent_t &ent, size_t ref_tsc,
                          size_t desired_tx_tsc) {
     assert(desired_tx_tsc >= ref_tsc);
     assert(desired_tx_tsc - ref_tsc <= horizon_tsc);  // Horizon definition
@@ -150,37 +146,6 @@ class TimingWheel {
     if (kWheelRecord) record_vec.emplace_back(ent.pkt_num, desired_tx_tsc);
 
     insert_into_wslot(dst_wslot, ent);
-    return dst_wslot;
-  }
-
-  /// Delete all (zero or more) occurences of an sslot from a wheel slot. This
-  /// might leave some buckets in the wheel slot chain empty.
-  void delete_from_wslot(size_t ws_i, const SSlot *sslot) {
-    wheel_bkt_t *bkt = &wheel[ws_i];
-    while (bkt != nullptr) {
-      size_t write_i = 0;
-      for (size_t i = 0; i < bkt->num_entries; i++) {
-        if (bkt->entry[i].sslot != reinterpret_cast<size_t>(sslot)) {
-          bkt->entry[write_i++] = bkt->entry[i];
-        }
-      }
-
-      bkt->num_entries = write_i;
-      bkt = bkt->next;
-    }
-  }
-
-  /// Delete all (zero or more) occurences of an sslot from a wheel's ready
-  /// queue.
-  void delete_from_ready_queue(const SSlot *sslot) {
-    const size_t size = ready_queue.size();
-    for (size_t i = 0; i < size; i++) {
-      wheel_ent_t ent = ready_queue.front();
-      ready_queue.pop();
-      if (reinterpret_cast<SSlot *>(ent.sslot) != sslot) {
-        ready_queue.push(ent);
-      }
-    }
   }
 
  private:
