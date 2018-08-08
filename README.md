@@ -5,9 +5,9 @@ system.
 Some highlights:
  * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
  * Performance for small RPCs: ~10 million 32-byte RPCs/second per CPU core
- * Low latency: 2.5 microseconds round-trip RPC latency
+ * Low latency: 2.3 microseconds round-trip RPC latency with UDP over Ethernet
  * High bandwidth for large RPC: 40 Gbps transfer per CPU core for 8 MB RPCs
- * Scalability: 12000 or more RPC sessions per server
+ * Scalability: 20000 RPC sessions per server
  * End-to-end congestion control that tolerates 100-way incasts
  * Nested RPCs, and long-running background RPCs
  * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
@@ -28,10 +28,10 @@ Some highlights:
    or `dpdk` for Intel Ethernet NICs.
  * Generate the documentation: `doxygen`
  * Run the `hello_world` application:
-   * Run `make` in `hello_world`
-   * This application requires two machines. Set `kServerHostname` and
-     `kClientHostname` to the IP addresses of your machines.
-   * Run `./server` at the server, and `./client` at the client.
+   * `cd hello_world`
+   * Edit the server and client hostnames in `common.h` 
+   * `make`
+   * Run `./server` at the server, and `./client` at the client
 
 ## Supported NICs:
  * UDP over Ethernet mode (`DTRANSPORT=raw`):
