@@ -136,6 +136,8 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   assert(sslot->client_info.wheel_count == 0);
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
+  delete_from_active_rpc_list(*sslot);
+
   if (ci.cont_etid == kInvalidBgETid) {
     ci.cont_func(static_cast<RespHandle *>(sslot), context, ci.tag);
   } else {

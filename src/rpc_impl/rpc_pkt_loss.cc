@@ -11,31 +11,27 @@ template <class TTr>
 void Rpc<TTr>::pkt_loss_scan_st() {
   assert(in_dispatch());
 
+  // Datapath packet loss
+  SSlot *cur = root_sentinel.client_info.next;
+  while (cur != &tail_sentinel) {
+    // Don't retransmit if we're just stalled on credits
+    if (cur->client_info.num_tx == cur->client_info.num_rx) {
+      cur = cur->client_info.next;
+      continue;
+    }
+
+    size_t cycles_elapsed = ev_loop_tsc - cur->client_info.progress_tsc;
+    if (cycles_elapsed > rpc_rto_cycles) pkt_loss_retransmit_st(cur);
+
+    cur = cur->client_info.next;
+  }
+
+  // Management packet loss
   for (Session *session : session_vec) {
     // Process only client sessions
     if (session == nullptr || session->is_server()) continue;
 
     switch (session->state) {
-      case SessionState::kConnected: {
-        // Datapath packet loss detection
-        for (SSlot &sslot : session->sslot_arr) {
-          if (sslot.tx_msgbuf == nullptr) continue;  // Response received
-
-          // This can happen if:
-          // (a) We're stalled on credits: stall queue will make progress.
-          // (c) We have received the full response and a background thread
-          //     currently owns sslot. In this case, the bg thread cannot modify
-          //     num_rx or num_tx.
-          if (sslot.client_info.num_tx == sslot.client_info.num_rx) continue;
-
-          assert(sslot.tx_msgbuf->get_req_num() == sslot.cur_req_num);
-
-          size_t cycles_elapsed = ev_loop_tsc - sslot.client_info.progress_tsc;
-          if (cycles_elapsed > rpc_rto_cycles) pkt_loss_retransmit_st(&sslot);
-        }
-
-        break;
-      }
       case SessionState::kConnectInProgress:
       case SessionState::kDisconnectInProgress: {
         // Session management packet loss detection
@@ -44,7 +40,7 @@ void Rpc<TTr>::pkt_loss_scan_st() {
         if (ms_elapsed > kSMTimeoutMs) send_sm_req_st(session);
         break;
       }
-      case SessionState::kResetInProgress:
+      default:
         break;
     }
   }

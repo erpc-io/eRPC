@@ -5,9 +5,9 @@ system.
 Some highlights:
  * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
  * Performance for small RPCs: ~10 million 32-byte RPCs/second per CPU core
- * Low latency: 2.5 microseconds round-trip RPC latency
+ * Low latency: 2.3 microseconds round-trip RPC latency with UDP over Ethernet
  * High bandwidth for large RPC: 40 Gbps transfer per CPU core for 8 MB RPCs
- * Scalability: 12000 or more RPC sessions per server
+ * Scalability: 20000 RPC sessions per server
  * End-to-end congestion control that tolerates 100-way incasts
  * Nested RPCs, and long-running background RPCs
  * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
@@ -28,10 +28,10 @@ Some highlights:
    or `dpdk` for Intel Ethernet NICs.
  * Generate the documentation: `doxygen`
  * Run the `hello_world` application:
-   * Run `make` in `hello_world`
-   * This application requires two machines. Set `kServerHostname` and
-     `kClientHostname` to the IP addresses of your machines.
-   * Run `./server` at the server, and `./client` at the client.
+   * `cd hello_world`
+   * Edit the server and client hostnames in `common.h` 
+   * `make`
+   * Run `./server` at the server, and `./client` at the client
 
 ## Supported NICs:
  * UDP over Ethernet mode (`DTRANSPORT=raw`):
@@ -46,11 +46,11 @@ Some highlights:
 ## Configuring and running the provided applications
  * The `apps` directory contains a suite of benchmarks and examples. The
    instructions below are for this suite of applications. eRPC can also be
-   simply linked as a library instead (see `apps/hello` for an example).
+   simply linked as a library instead (see `hello_world/` for an example).
  * To build an application, change the contents of `scripts/autorun_app_file`
-   to one of the available directory names in `apps`. Then generate a Makefile
+   to one of the available directory names in `apps/`. Then generate a Makefile
    using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
- * Each application directory in `apps` contains a config file
+ * Each application directory in `apps/` contains a config file
    that must specify all flags defined in `apps/apps_common.h`. For example,
    `num_processes` specifies the total number of eRPC processes in the cluster.
  * The URIs of eRPC processes in the cluster are specified in

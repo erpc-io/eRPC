@@ -357,9 +357,7 @@ class Rpc {
     // 2. Ignore if the corresponding client pkt for pkthdr is still in wheel.
     if (unlikely(pkthdr->pkt_num >= ci.num_tx)) return false;
 
-    const bool _in_wheel =
-        ci.wslot_idx[pkthdr->pkt_num % kSessionCredits] != kWheelInvalidWslot;
-    if (kCcPacing && unlikely(_in_wheel)) {
+    if (kCcPacing && unlikely(ci.in_wheel[pkthdr->pkt_num % kSessionCredits])) {
       pkt_loss_stats.still_in_wheel++;
       return false;
     }
@@ -395,6 +393,23 @@ class Rpc {
   void drain_tx_batch_and_dma_queue() {
     if (tx_batch_i > 0) do_tx_burst_st();
     transport->tx_flush();
+  }
+
+  /// Add an RPC slot to the list of active RPCs
+  inline void add_to_active_rpc_list(SSlot &sslot) {
+    SSlot *prev_tail = tail_sentinel.client_info.prev;
+
+    prev_tail->client_info.next = &sslot;
+    sslot.client_info.prev = prev_tail;
+
+    sslot.client_info.next = &tail_sentinel;
+    tail_sentinel.client_info.prev = &sslot;
+  }
+
+  /// Delete an active RPC slot from the list of active RPCs
+  inline void delete_from_active_rpc_list(SSlot &sslot) {
+    sslot.client_info.prev->client_info.next = sslot.client_info.next;
+    sslot.client_info.next->client_info.prev = sslot.client_info.prev;
   }
 
   // rpc_kick.cc
@@ -581,9 +596,8 @@ class Rpc {
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
-    uint16_t wslot_idx =
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
-    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
+    wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
+    sslot->client_info.in_wheel[pkt_num % kSessionCredits] = true;
     sslot->client_info.wheel_count++;
   }
 
@@ -599,9 +613,8 @@ class Rpc {
            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
            to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
-    uint16_t wslot_idx =
-        wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
-    sslot->client_info.wslot_idx[pkt_num % kSessionCredits] = wslot_idx;
+    wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
+    sslot->client_info.in_wheel[pkt_num % kSessionCredits] = true;
     sslot->client_info.wheel_count++;
   }
 
@@ -921,8 +934,15 @@ class Rpc {
 
   std::vector<SSlot *> stallq;  ///< Req sslots stalled for credits
 
-  size_t ev_loop_tsc;        ///< TSC taken at each iteration of the ev loop
+  size_t ev_loop_tsc;  ///< TSC taken at each iteration of the ev loop
+
+  // Packet loss
   size_t pkt_loss_scan_tsc;  ///< Timestamp of the previous scan for lost pkts
+
+  /// The doubly-linked list of active RPCs. An RPC slot is added to this list
+  /// when the request is enqueued. The slot is deleted from this list when its
+  /// continuation is invoked or queued to a background thread.
+  SSlot root_sentinel, tail_sentinel;
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
