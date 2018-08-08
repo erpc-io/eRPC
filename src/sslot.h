@@ -67,6 +67,9 @@ class SSlot {
       size_t progress_tsc;  ///< Last TSC at which this request made progress
       size_t cont_etid;     ///< eRPC thread ID to run the continuation on
 
+      /// Pointers for the intrusive doubly-linked list of active RPCs
+      SSlot *prev, *next;
+
       // Fields for congestion control, cold if CC is disabled.
 
       /// Packet number n is in the wheel (including its ready queue) iff

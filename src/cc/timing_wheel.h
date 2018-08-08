@@ -124,7 +124,7 @@ class TimingWheel {
    * @param desired_tx_tsc The desired time for packet transmission
    */
   inline void insert(const wheel_ent_t &ent, size_t ref_tsc,
-                         size_t desired_tx_tsc) {
+                     size_t desired_tx_tsc) {
     assert(desired_tx_tsc >= ref_tsc);
     assert(desired_tx_tsc - ref_tsc <= horizon_tsc);  // Horizon definition
 

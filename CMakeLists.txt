@@ -199,6 +199,7 @@ set(CLIENT_TESTS
 
 set(PROTOCOL_TESTS
   rpc_sm_test
+  rpc_list_test
   rpc_req_test
   rpc_resp_test
   rpc_cr_test

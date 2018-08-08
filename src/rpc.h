@@ -395,6 +395,23 @@ class Rpc {
     transport->tx_flush();
   }
 
+  /// Add an RPC slot to the list of active RPCs
+  inline void add_to_active_rpc_list(SSlot &sslot) {
+    SSlot *prev_tail = tail_sentinel.client_info.prev;
+
+    prev_tail->client_info.next = &sslot;
+    sslot.client_info.prev = prev_tail;
+
+    sslot.client_info.next = &tail_sentinel;
+    tail_sentinel.client_info.prev = &sslot;
+  }
+
+  /// Delete an active RPC slot from the list of active RPCs
+  inline void delete_from_active_rpc_list(SSlot &sslot) {
+    sslot.client_info.prev->client_info.next = sslot.client_info.next;
+    sslot.client_info.next->client_info.prev = sslot.client_info.prev;
+  }
+
   // rpc_kick.cc
 
   /// Enqueue client packets for a sslot that has at least one credit and
@@ -917,8 +934,13 @@ class Rpc {
 
   std::vector<SSlot *> stallq;  ///< Req sslots stalled for credits
 
-  size_t ev_loop_tsc;        ///< TSC taken at each iteration of the ev loop
+  size_t ev_loop_tsc;  ///< TSC taken at each iteration of the ev loop
+
+  // Packet loss
   size_t pkt_loss_scan_tsc;  ///< Timestamp of the previous scan for lost pkts
+
+  ///< Sentinels for the doubly-linked list of active RPCs
+  SSlot root_sentinel, tail_sentinel;
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
