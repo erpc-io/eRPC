@@ -24,9 +24,9 @@ class AppContext : public BasicAppContext {
 static constexpr double kPktDropProb = 0.3;
 
 /// Configuration for controlling the test
-size_t config_num_iters;         ///< The number of iterations
-size_t config_num_rpcs;  ///< Number of Rpcs per iteration
-size_t config_num_bg_threads;    ///< Number of background threads
+size_t config_num_iters;       ///< The number of iterations
+size_t config_num_rpcs;        ///< Number of Rpcs per iteration
+size_t config_num_bg_threads;  ///< Number of background threads
 
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
