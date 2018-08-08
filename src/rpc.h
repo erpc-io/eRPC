@@ -939,7 +939,9 @@ class Rpc {
   // Packet loss
   size_t pkt_loss_scan_tsc;  ///< Timestamp of the previous scan for lost pkts
 
-  ///< Sentinels for the doubly-linked list of active RPCs
+  /// The doubly-linked list of active RPCs. An RPC slot is added to this list
+  /// when the request is enqueued. The slot is deleted from this list when its
+  /// continuation is invoked or queued to a background thread.
   SSlot root_sentinel, tail_sentinel;
 
   // Allocator
