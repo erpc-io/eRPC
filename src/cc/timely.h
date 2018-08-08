@@ -39,7 +39,6 @@ class Timely {
   static constexpr bool kLatencyStats = false;  ///< Track per-packet RTT stats
 
   // Config
-  static constexpr double kMaxRate = kBandwidth;
   static constexpr double kMinRate = 15.0 * 1000 * 1000;
   static constexpr double kAddRate = 5.0 * 1000 * 1000;
 
@@ -48,7 +47,7 @@ class Timely {
   static constexpr double kTHigh = 1000;
   static constexpr size_t kHaiThresh = 5;
 
-  double rate = kMaxRate;
+  double rate = 0.0;  ///< The current sending rate
   size_t neg_gradient_count = 0;
   double prev_rtt = kMinRTT;
   double avg_rtt_diff = 0.0;
@@ -58,6 +57,7 @@ class Timely {
   double min_rtt_tsc = 0.0;
   double t_low_tsc = 0.0;
   double freq_ghz = 0.0;
+  double link_bandwidth = 0.0;
 
   // For latency stats
   Latency latency;
@@ -67,12 +67,14 @@ class Timely {
   std::vector<timely_record_t> record_vec;
 
   Timely() {}
-  Timely(double freq_ghz)
+  Timely(double freq_ghz, double link_bandwidth)
       : last_update_tsc(rdtsc()),
         min_rtt_tsc(kMinRTT * freq_ghz * 1000),
         t_low_tsc(kTLow * freq_ghz * 1000),
         freq_ghz(freq_ghz),
+        link_bandwidth(link_bandwidth),
         create_tsc(rdtsc()) {
+    rate = link_bandwidth;  // Start sending at the max rate
     if (kRecord) record_vec.reserve(1000000);
   }
 
@@ -95,7 +97,7 @@ class Timely {
     assert(_rdtsc >= 1000000000 && _rdtsc >= last_update_tsc);  // Sanity check
 
     if (kCcOptTimelyBypass &&
-        (rate == Timely::kMaxRate && sample_rtt_tsc <= t_low_tsc)) {
+        (rate == link_bandwidth && sample_rtt_tsc <= t_low_tsc)) {
       // Bypass expensive computation, but include the latency sample in stats.
       if (kLatencyStats) {
         latency.update(static_cast<size_t>(to_usec(sample_rtt_tsc, freq_ghz)));
@@ -154,7 +156,7 @@ class Timely {
     }
 
     rate = std::max(new_rate, rate * 0.5);
-    rate = std::min(rate, double(kMaxRate));
+    rate = std::min(rate, link_bandwidth);
     rate = std::max(rate, double(kMinRate));
 
     prev_rtt = sample_rtt;
@@ -162,8 +164,7 @@ class Timely {
 
     // Debug/stats code goes here
     if (kLatencyStats) latency.update(static_cast<size_t>(sample_rtt));
-
-    if (kRecord && rate != kMaxRate) {
+    if (kRecord && rate != link_bandwidth) {
       record_vec.emplace_back(sample_rtt, rate);
     }
 

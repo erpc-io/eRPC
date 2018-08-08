@@ -1,9 +1,11 @@
 #include "cc/timely.h"
 using namespace erpc;
 
+static constexpr double kLinkBandwidth = 56.0 * 1000 * 1000 * 1000 / 8;
+
 void test(size_t mean_rtt, size_t random_add_rtt) {
   double freq_ghz = measure_rdtsc_freq();
-  Timely timely(freq_ghz);
+  Timely timely(freq_ghz, kLinkBandwidth);
 
   std::vector<double> sample_us;
   for (size_t i = 0; i < 2000; i++) {

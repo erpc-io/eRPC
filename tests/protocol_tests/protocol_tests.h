@@ -24,6 +24,7 @@ static constexpr size_t kTestReqType = 1;
 static constexpr size_t kTestTag = 0;
 static constexpr size_t kTestSmallMsgSize = 32;
 static constexpr size_t kTestLargeMsgSize = KB(128);
+static constexpr double kTestLinkBandwidth = 56.0 * 1000 * 1000 * 1000 / 8;
 
 static void req_handler(ReqHandle *, void *);  // Defined in each test.cc
 
@@ -83,7 +84,7 @@ class RpcTest : public ::testing::Test {
   Session *create_client_session_init(const SessionEndpoint client,
                                       const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kClient, kTestUniqToken,
-                                rpc->get_freq_ghz());
+                                rpc->get_freq_ghz(), kTestLinkBandwidth);
     session->state = SessionState::kConnectInProgress;
     session->local_session_num = rpc->session_vec.size();
 
@@ -117,7 +118,7 @@ class RpcTest : public ::testing::Test {
   Session *create_server_session_init(const SessionEndpoint client,
                                       const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kServer, kTestUniqToken,
-                                rpc->get_freq_ghz());
+                                rpc->get_freq_ghz(), kTestLinkBandwidth);
     session->state = SessionState::kConnected;
     session->client = client;
     session->server = server;

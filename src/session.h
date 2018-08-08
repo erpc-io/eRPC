@@ -35,12 +35,16 @@ class Session {
   enum class Role : int { kServer, kClient };
 
  private:
-  Session(Role role, conn_req_uniq_token_t uniq_token, double freq_ghz)
-      : role(role), uniq_token(uniq_token), freq_ghz(freq_ghz) {
+  Session(Role role, conn_req_uniq_token_t uniq_token, double freq_ghz,
+          double link_bandwidth)
+      : role(role),
+        uniq_token(uniq_token),
+        freq_ghz(freq_ghz),
+        link_bandwidth(link_bandwidth) {
     remote_routing_info =
         is_client() ? &server.routing_info : &client.routing_info;
 
-    if (is_client()) client_info.cc.timely = Timely(freq_ghz);
+    if (is_client()) client_info.cc.timely = Timely(freq_ghz, link_bandwidth);
 
     // Arrange the free slot vector so that slots are popped in order
     for (size_t i = 0; i < kSessionReqWindow; i++) {
@@ -93,7 +97,7 @@ class Session {
 
   /// Return true iff this session is uncongested
   inline bool is_uncongested() const {
-    return client_info.cc.timely.rate == Timely::kMaxRate;
+    return client_info.cc.timely.rate == link_bandwidth;
   }
 
   /// Return the hostname of the remote endpoint for a connected session
@@ -105,6 +109,7 @@ class Session {
   const Role role;  ///< The role (server/client) of this session endpoint
   const conn_req_uniq_token_t uniq_token;  ///< A cluster-wide unique token
   const double freq_ghz;                   ///< TSC frequency
+  const double link_bandwidth;  ///< Link bandwidth in bytes per second
   SessionState state;  ///< The management state of this session endpoint
   SessionEndpoint client, server;  ///< Read-only endpoint metadata
 

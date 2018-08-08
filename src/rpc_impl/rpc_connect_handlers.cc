@@ -75,8 +75,8 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   }
 
   // If we are here, create a new session and fill preallocated MsgBuffers
-  auto *session =
-      new Session(Session::Role::kServer, sm_pkt.uniq_token, get_freq_ghz());
+  auto *session = new Session(Session::Role::kServer, sm_pkt.uniq_token,
+                              get_freq_ghz(), transport->get_bandwidth());
   session->state = SessionState::kConnected;
 
   for (size_t i = 0; i < kSessionReqWindow; i++) {
