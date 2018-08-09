@@ -33,7 +33,8 @@ for ((i = 0; i < $autorun_num_processes; i++)); do
     drop_shm; \
     sudo ./drivers/4.4/libmlx5-41mlnx1/update-driver.sh; \
     sudo ./drivers/4.2/libmlx4-41mlnx1/update-driver.sh; \
-    sudo nohup numactl --physcpubind $numa_node --membind $numa_node \
+    sudo -E env LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
+    nohup numactl --physcpubind $numa_node --membind $numa_node \
     ./build/$autorun_app $app_args --process_id $i --numa_node $numa_node \
     > $out_file 2> $err_file < /dev/null &" &
 done
