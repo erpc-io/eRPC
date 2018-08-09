@@ -1,6 +1,7 @@
 #ifndef SMR_H
 #define SMR_H
 
+#include <stddef.h>
 extern "C" {
 #include <raft/raft.h>
 }
