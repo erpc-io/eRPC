@@ -12,6 +12,11 @@
 #include "requestvote.h"
 #include "smr.h"
 
+static int __raft_send_snapshot(raft_server_t *, void *, raft_node_t *) {
+  erpc::rt_assert(false, "Snapshots not supported");
+  return -1;
+}
+
 // Raft callback for applying an entry to the FSM
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            raft_index_t) {
@@ -54,8 +59,8 @@ static int __raft_persist_term(raft_server_t *, void *, raft_term_t,
 }
 
 // Raft callback for appending an item to the log
-static int __raft_logentry_offer(raft_server_t *, void *udata,
-                                 raft_entry_t *ety, raft_index_t) {
+static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
+                            raft_index_t) {
   assert(!raft_entry_is_cfg_change(ety));
 
   auto *c = static_cast<AppContext *>(udata);
@@ -63,11 +68,19 @@ static int __raft_logentry_offer(raft_server_t *, void *udata,
   return 0;  // Ignored
 }
 
+// Raft callback for removing the first entry from the log. This is provided to
+// support log compaction in the future.
+static int __raft_log_poll(raft_server_t *, void *, raft_entry_t *,
+                           raft_index_t) {
+  erpc::rt_assert(false, "Log compaction not supported");
+  return -1;
+}
+
 // Raft callback for deleting the most recent entry from the log. This happens
 // when an invalid leader finds a valid leader and has to delete superseded
 // log entries.
-static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
-                               raft_index_t) {
+static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *,
+                          raft_index_t) {
   auto *c = static_cast<AppContext *>(udata);
 
   raft_entry_t &entry = c->server.raft_log.back();
@@ -84,12 +97,11 @@ static int __raft_logentry_pop(raft_server_t *, void *udata, raft_entry_t *,
   return 0;
 }
 
-// Raft callback for removing the first entry from the log. This is provided to
-// support log compaction in the future.
-static int __raft_logentry_poll(raft_server_t *, void *, raft_entry_t *,
-                                raft_index_t) {
-  printf("smr: Ignoring __raft_logentry_poll callback.\n");
-  return 0;
+// Raft callback for determining which node this configuration log entry affects
+static int __raft_log_get_node_id(raft_server_t *, void *, raft_entry_t *,
+                                  raft_index_t) {
+  erpc::rt_assert(false, "Configuration change not supported");
+  return -1;
 }
 
 // Non-voting node now has enough logs to be able to vote. Append a finalization
@@ -98,6 +110,13 @@ static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
                                            raft_node_t *) {
   printf("smr: Ignoring __raft_node_has_sufficient_logs callback.\n");
   return 0;
+}
+
+// Callback for being notified of membership changes. Implementing this callback
+// is optional.
+static void __raft_notify_membership_event(raft_server_t *, void *,
+                                           raft_node_t *, raft_membership_e) {
+  printf("smr: Ignoring __raft_notify_membership_event callback .\n");
 }
 
 // Raft callback for displaying debugging information
@@ -113,13 +132,16 @@ void set_raft_callbacks(AppContext *c) {
   raft_cbs_t raft_funcs;
   raft_funcs.send_requestvote = __raft_send_requestvote;
   raft_funcs.send_appendentries = __raft_send_appendentries;
+  raft_funcs.send_snapshot = __raft_send_snapshot;
   raft_funcs.applylog = __raft_applylog;
   raft_funcs.persist_vote = __raft_persist_vote;
   raft_funcs.persist_term = __raft_persist_term;
-  raft_funcs.log_offer = __raft_logentry_offer;
-  raft_funcs.log_poll = __raft_logentry_poll;
-  raft_funcs.log_pop = __raft_logentry_pop;
+  raft_funcs.log_offer = __raft_log_offer;
+  raft_funcs.log_poll = __raft_log_poll;
+  raft_funcs.log_pop = __raft_log_pop;
+  raft_funcs.log_get_node_id = __raft_log_get_node_id;
   raft_funcs.node_has_sufficient_logs = __raft_node_has_sufficient_logs;
+  raft_funcs.notify_membership_event = __raft_notify_membership_event;
 
   // Providing a non-null console log callback is expensive, even if we do
   // nothing in the callback.
