@@ -45,8 +45,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   req_handle->prealloc_used = false;
 
   // eRPC will free the MsgBuffer
-  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
-  assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
+  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer_or_die(req_size);
   memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, req_size);
 
   size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
@@ -103,35 +102,31 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
 
 void client_thread(Nexus *nexus, size_t num_sessions) {
   // Create the Rpc and connect the session
-  AppContext context;
-  client_connect_sessions(nexus, context, num_sessions, basic_sm_handler);
+  AppContext c;
+  client_connect_sessions(nexus, c, num_sessions, basic_sm_handler);
 
-  Rpc<CTransport> *rpc = context.rpc;
+  Rpc<CTransport> *rpc = c.rpc;
 
   // Start by filling the request window
   for (size_t i = 0; i < kSessionReqWindow; i++) {
-    context.req_msgbuf[i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
-    assert(context.req_msgbuf[i].buf != nullptr);
-
-    context.resp_msgbuf[i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
-    assert(context.resp_msgbuf[i].buf != nullptr);
-
-    enqueue_request_helper(&context, i);
+    c.req_msgbuf[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
+    c.resp_msgbuf[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
+    enqueue_request_helper(&c, i);
   }
 
-  wait_for_rpc_resps_or_timeout(context, kTestNumReqs, nexus->freq_ghz);
-  assert(context.num_rpc_resps == kTestNumReqs);
+  wait_for_rpc_resps_or_timeout(c, kTestNumReqs, nexus->freq_ghz);
+  assert(c.num_rpc_resps == kTestNumReqs);
 
   for (size_t i = 0; i < kSessionReqWindow; i++) {
-    rpc->free_msg_buffer(context.req_msgbuf[i]);
+    rpc->free_msg_buffer(c.req_msgbuf[i]);
   }
 
   // Disconnect the sessions
-  context.num_sm_resps = 0;
+  c.num_sm_resps = 0;
   for (size_t i = 0; i < num_sessions; i++) {
-    rpc->destroy_session(context.session_num_arr[0]);
+    rpc->destroy_session(c.session_num_arr[0]);
   }
-  wait_for_sm_resps_or_timeout(context, num_sessions, nexus->freq_ghz);
+  wait_for_sm_resps_or_timeout(c, num_sessions, nexus->freq_ghz);
 
   // Free resources
   delete rpc;

@@ -125,8 +125,7 @@ class RpcTest : public ::testing::Test {
 
     for (SSlot &sslot : session->sslot_arr) {
       sslot.pre_resp_msgbuf =
-          rpc->alloc_msg_buffer(rpc->transport->kMaxDataPerPkt);
-      rt_assert(sslot.pre_resp_msgbuf.buf != nullptr, "Prealloc failed");
+          rpc->alloc_msg_buffer_or_die(rpc->transport->kMaxDataPerPkt);
     }
 
     auto &remote_rinfo = session->client.routing_info;

@@ -86,11 +86,10 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
       new PrimaryReqInfo(req_size_cp, req_handle_cp, context->rpc->get_etid());
 
   // Allocate request and response MsgBuffers for the request to the backup
-  srv_req_info->req_msgbuf_pb = context->rpc->alloc_msg_buffer(req_size_cp);
-  assert(srv_req_info->req_msgbuf_pb.buf != nullptr);
-
-  srv_req_info->resp_msgbuf_pb = context->rpc->alloc_msg_buffer(req_size_cp);
-  assert(srv_req_info->resp_msgbuf_pb.buf != nullptr);
+  srv_req_info->req_msgbuf_pb =
+      context->rpc->alloc_msg_buffer_or_die(req_size_cp);
+  srv_req_info->resp_msgbuf_pb =
+      context->rpc->alloc_msg_buffer_or_die(req_size_cp);
 
   // Request to backup = client-to-server request + 1
   for (size_t i = 0; i < req_size_cp; i++) {
@@ -118,8 +117,7 @@ void req_handler_pb(ReqHandle *req_handle, void *_context) {
               context->rpc->get_rpc_id(), req_size);
 
   // eRPC will free dyn_resp_msgbuf
-  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size);
-  assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
+  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer_or_die(req_size);
 
   // Response to primary = request + 1
   for (size_t i = 0; i < req_size; i++) {
@@ -157,8 +155,8 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
   }
 
   // eRPC will free dyn_resp_msgbuf
-  req_handle_cp->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(req_size_cp);
-  assert(req_handle_cp->dyn_resp_msgbuf.buf != nullptr);
+  req_handle_cp->dyn_resp_msgbuf =
+      context->rpc->alloc_msg_buffer_or_die(req_size_cp);
 
   // Response to client = server-to-server response + 1
   for (size_t i = 0; i < req_size_cp; i++) {
@@ -250,12 +248,11 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
 
   // Start by filling the request window
   for (size_t i = 0; i < kSessionReqWindow; i++) {
-    context.req_msgbuf[i] = rpc->alloc_msg_buffer(Rpc<CTransport>::kMaxMsgSize);
-    assert(context.req_msgbuf[i].buf != nullptr);
+    context.req_msgbuf[i] =
+        rpc->alloc_msg_buffer_or_die(Rpc<CTransport>::kMaxMsgSize);
 
     context.resp_msgbuf[i] =
-        rpc->alloc_msg_buffer(Rpc<CTransport>::kMaxMsgSize);
-    assert(context.resp_msgbuf[i].buf != nullptr);
+        rpc->alloc_msg_buffer_or_die(Rpc<CTransport>::kMaxMsgSize);
 
     client_request_helper(&context, i);
   }

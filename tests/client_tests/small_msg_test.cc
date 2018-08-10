@@ -74,12 +74,9 @@ void generic_test_func(Nexus *nexus, size_t) {
   size_t tot_reqs_per_iter = config_num_sessions * config_rpcs_per_session;
   std::vector<MsgBuffer> req_msgbufs(tot_reqs_per_iter);
   std::vector<MsgBuffer> resp_msgbufs(tot_reqs_per_iter);
-  for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    req_msgbufs[req_i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
-    assert(req_msgbufs[req_i].buf != nullptr);
-
-    resp_msgbufs[req_i] = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
-    assert(resp_msgbufs[req_i].buf != nullptr);
+  for (size_t i = 0; i < tot_reqs_per_iter; i++) {
+    req_msgbufs[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_data_per_pkt());
+    resp_msgbufs[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_data_per_pkt());
   }
 
   // The main request-issuing loop

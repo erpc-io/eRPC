@@ -32,8 +32,8 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   size_t resp_size = req_msgbuf->get_data_size();
 
   // MsgBuffer allocation is thread safe
-  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(resp_size);
-  assert(req_handle->dyn_resp_msgbuf.buf != nullptr);
+  req_handle->dyn_resp_msgbuf =
+      context->rpc->alloc_msg_buffer_or_die(resp_size);
   memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
   req_handle->prealloc_used = false;
 
@@ -86,11 +86,8 @@ void generic_test_func(Nexus *nexus, size_t) {
   std::vector<MsgBuffer> req_msgbufs(tot_reqs_per_iter);
   std::vector<MsgBuffer> resp_msgbufs(tot_reqs_per_iter);
   for (size_t req_i = 0; req_i < tot_reqs_per_iter; req_i++) {
-    req_msgbufs[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
-    assert(req_msgbufs[req_i].buf != nullptr);
-
-    resp_msgbufs[req_i] = rpc->alloc_msg_buffer(rpc->get_max_msg_size());
-    assert(resp_msgbufs[req_i].buf != nullptr);
+    req_msgbufs[req_i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
+    resp_msgbufs[req_i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
   }
 
   // The main request-issuing loop
