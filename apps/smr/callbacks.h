@@ -40,7 +40,7 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 
   auto result = table->set(key_hash, *ft_key,
                            reinterpret_cast<char *>(&client_req->value));
-  erpc::rt_assert(result == mica::table::Result::kSuccess, "KV insert failed");
+  erpc::rt_assert(result == mica::table::Result::kSuccess);
   return 0;
 }
 
