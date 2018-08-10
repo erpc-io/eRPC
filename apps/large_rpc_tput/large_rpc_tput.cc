@@ -59,8 +59,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   // Use dynamic response
   req_handle->prealloc_used = false;
   erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
-  resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_resp_size);  // Freed by eRPC
-  assert(resp_msgbuf.buf != nullptr);
+  resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(FLAGS_resp_size);
 
   // Touch the response
   if (kAppServerMemsetResp) {

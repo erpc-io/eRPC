@@ -62,8 +62,7 @@ void req_handler_incast(erpc::ReqHandle *req_handle, void *_context) {
 
   req_handle->prealloc_used = false;
   erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
-  resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_incast_resp_size);  // eRPC frees
-  assert(resp_msgbuf.buf != nullptr);
+  resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(FLAGS_incast_resp_size);
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   resp_msgbuf.buf[0] = req_msgbuf->buf[0];  // Touch the response
@@ -107,10 +106,8 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
   connect_sessions_func_incast(&c);
   printf("congestion: Incast thread %zu: Sessions connected.\n", thread_id);
 
-  c.resp_msgbuf[0] = rpc.alloc_msg_buffer(FLAGS_incast_resp_size);
-  erpc::rt_assert(c.resp_msgbuf[0].buf != nullptr, "Alloc failed");
-  c.req_msgbuf[0] = rpc.alloc_msg_buffer(FLAGS_incast_req_size);
-  erpc::rt_assert(c.req_msgbuf[0].buf != nullptr, "Alloc failed");
+  c.resp_msgbuf[0] = rpc.alloc_msg_buffer_or_die(FLAGS_incast_resp_size);
+  c.req_msgbuf[0] = rpc.alloc_msg_buffer_or_die(FLAGS_incast_req_size);
   memset(c.req_msgbuf[0].buf, kAppDataByte, FLAGS_incast_req_size);
 
   send_req_incast(&c, 0);

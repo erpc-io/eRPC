@@ -80,17 +80,12 @@ class AppContext : public BasicAppContext {
 
 // Allocate request and response MsgBuffers
 void alloc_req_resp_msg_buffers(AppContext *c) {
-  assert(c != nullptr);
-  assert(c->rpc != nullptr);
-
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_req_window; msgbuf_idx++) {
-    auto &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
-    req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(req_t));
-    erpc::rt_assert(req_msgbuf.buf != nullptr, "Request msgbuf alloc failed");
+    c->client.req_msgbuf[msgbuf_idx] =
+        c->rpc->alloc_msg_buffer_or_die(sizeof(req_t));
 
-    auto &resp_msgbuf = c->client.resp_msgbuf[msgbuf_idx];
-    resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(resp_t));
-    erpc::rt_assert(resp_msgbuf.buf != nullptr, "Response msgbuf alloc failed");
+    c->client.resp_msgbuf[msgbuf_idx] =
+        c->rpc->alloc_msg_buffer_or_die(sizeof(resp_t));
   }
 }
 

@@ -119,10 +119,8 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
   printf("congestion: Regular thread %zu: Sessions connected.\n", thread_id);
 
   for (size_t i = 0; i < FLAGS_regular_concurrency; i++) {
-    c.resp_msgbuf[i] = rpc.alloc_msg_buffer(FLAGS_regular_resp_size);
-    erpc::rt_assert(c.resp_msgbuf[i].buf != nullptr, "Alloc failed");
-    c.req_msgbuf[i] = rpc.alloc_msg_buffer(FLAGS_regular_req_size);
-    erpc::rt_assert(c.req_msgbuf[i].buf != nullptr, "Alloc failed");
+    c.resp_msgbuf[i] = rpc.alloc_msg_buffer_or_die(FLAGS_regular_resp_size);
+    c.req_msgbuf[i] = rpc.alloc_msg_buffer_or_die(FLAGS_regular_req_size);
     memset(c.req_msgbuf[i].buf, kAppDataByte, FLAGS_regular_req_size);
   }
 

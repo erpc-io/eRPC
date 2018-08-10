@@ -196,10 +196,8 @@ void ping_all_blocking(BasicAppContext &c) {
   std::set<std::string> hostname_set;
   erpc::MsgBuffer ping_req, ping_resp;
 
-  ping_req = c.rpc->alloc_msg_buffer(kPingMsgSize);
-  assert(ping_req.buf != nullptr);
-  ping_resp = c.rpc->alloc_msg_buffer(kPingMsgSize);
-  assert(ping_resp.buf != nullptr);
+  ping_req = c.rpc->alloc_msg_buffer_or_die(kPingMsgSize);
+  ping_resp = c.rpc->alloc_msg_buffer_or_die(kPingMsgSize);
 
   for (int &session_num : c.session_num_vec) {
     auto srv_hostname = c.rpc->get_remote_hostname(session_num);
