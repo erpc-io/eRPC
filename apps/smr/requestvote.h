@@ -29,13 +29,12 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
          node_id_to_name_map[rv_req->node_id].c_str(),
          erpc::get_formatted_time().c_str());
 
-  // This does a linear search, which is OK for a small number of Raft servers
-  raft_node_t *requester_node = raft_get_node(c->server.raft, rv_req->node_id);
-  assert(requester_node != nullptr);
-
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(app_rv_resp_t));
   req_handle->prealloc_used = true;
+
+  // This does a linear search, which is OK for a small number of Raft servers
+  raft_node_t *requester_node = raft_get_node(c->server.raft, rv_req->node_id);
 
   // rv_req->msg_rv is valid only for the duration of this handler, which is OK
   // as msg_requestvote_t does not contain any dynamically allocated members.
@@ -64,7 +63,7 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
          node_id_to_name_map[raft_node_get_id(node)].c_str(),
          erpc::get_formatted_time().c_str());
 
-  auto *rrt = new raft_req_tag_t();
+  raft_req_tag_t *rrt = c->server.raft_req_tag_pool.alloc();
   rrt->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(app_rv_req_t));
   erpc::rt_assert(rrt->req_msgbuf.buf != nullptr);
 
@@ -110,7 +109,6 @@ void requestvote_cont(erpc::RespHandle *resp_handle, void *_context,
 
   c->rpc->free_msg_buffer(rrt->req_msgbuf);
   c->rpc->free_msg_buffer(rrt->resp_msgbuf);
-  delete rrt;  // Free allocated memory, XXX: Remove when we use pool
-
+  c->server.raft_req_tag_pool.free(rrt);
   c->rpc->release_response(resp_handle);
 }

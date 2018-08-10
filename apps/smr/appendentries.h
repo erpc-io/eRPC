@@ -201,6 +201,5 @@ void appendentries_cont(erpc::RespHandle *resp_handle, void *_context,
   c->rpc->free_msg_buffer(rrt->req_msgbuf);
   c->rpc->free_msg_buffer(rrt->resp_msgbuf);
   c->server.raft_req_tag_pool.free(rrt);
-
   c->rpc->release_response(resp_handle);
 }
