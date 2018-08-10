@@ -3,10 +3,8 @@
  * @brief Handlers for appendentries RPC
  */
 
+#pragma once
 #include "smr.h"
-
-#ifndef APPENDENTRIES_H
-#define APPENDENTRIES_H
 
 // The appendentries request sent over eRPC
 struct app_ae_req_t {
@@ -206,5 +204,3 @@ void appendentries_cont(erpc::RespHandle *resp_handle, void *_context,
 
   c->rpc->release_response(resp_handle);
 }
-
-#endif

@@ -1,5 +1,9 @@
-#ifndef SMR_H
-#define SMR_H
+/**
+ * @file smr.h
+ * @brief Common code for SMR client and server
+ */
+
+#pragma once
 
 #include <stddef.h>
 extern "C" {
@@ -93,6 +97,11 @@ struct client_resp_t {
     }
     return "Invalid";
   }
+
+  client_resp_t(){};
+  client_resp_t(ClientRespType resp_type) : resp_type(resp_type) {}
+  client_resp_t(ClientRespType resp_type, int leader_node_id)
+      : resp_type(resp_type), leader_node_id(leader_node_id) {}
 };
 
 class AppContext;  // Forward declaration
@@ -224,5 +233,3 @@ inline void call_raft_periodic(AppContext *c) {
     raft_periodic(c->server.raft, 0);
   }
 }
-
-#endif

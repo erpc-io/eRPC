@@ -3,10 +3,8 @@
  * @brief Handlers for requestvote RPC
  */
 
+#pragma once
 #include "smr.h"
-
-#ifndef REQUESTVOTE_H
-#define REQUESTVOTE_H
 
 // The appendentries request sent over eRPC
 struct app_rv_req_t {
@@ -116,5 +114,3 @@ void requestvote_cont(erpc::RespHandle *resp_handle, void *_context,
 
   c->rpc->release_response(resp_handle);
 }
-
-#endif

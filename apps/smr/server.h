@@ -1,17 +1,15 @@
 /**
- *
  * @file server.h
  * @brief Server code
  */
+
+#pragma once
 
 #include "appendentries.h"
 #include "callbacks.h"
 #include "client.h"
 #include "requestvote.h"
 #include "smr.h"
-
-#ifndef SERVER_H
-#define SERVER_H
 
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
@@ -43,16 +41,14 @@ void init_raft(AppContext *c) {
 
 // Send a response to the client. This does not free any non-eRPC memory.
 void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
-                          client_resp_t *client_resp) {
+                          client_resp_t &client_resp) {
   if (kAppVerbose) {
     printf("smr: Sending reply to client: %s [%s].\n",
-           client_resp->to_string().c_str(),
-           erpc::get_formatted_time().c_str());
+           client_resp.to_string().c_str(), erpc::get_formatted_time().c_str());
   }
 
-  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
-  auto *_client_resp = reinterpret_cast<client_resp_t *>(resp_msgbuf.buf);
-  *_client_resp = *client_resp;
+  *reinterpret_cast<client_resp_t *>(req_handle->pre_resp_msgbuf.buf) =
+      client_resp;
 
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(client_resp_t));
   req_handle->prealloc_used = true;
@@ -81,9 +77,8 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
         "Asking client to retry later.\n",
         client_req->to_string().c_str());
 
-    client_resp_t err_resp;
-    err_resp.resp_type = ClientRespType::kFailTryAgain;
-    send_client_response(c, req_handle, &err_resp);
+    client_resp_t err_resp(ClientRespType::kFailTryAgain);
+    send_client_response(c, req_handle, err_resp);
     return;
   }
 
@@ -95,10 +90,8 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
         client_req->to_string().c_str(),
         node_id_to_name_map.at(leader_node_id).c_str());
 
-    client_resp_t err_resp;
-    err_resp.resp_type = ClientRespType::kFailRedirect;
-    err_resp.leader_node_id = leader_node_id;
-    send_client_response(c, req_handle, &err_resp);
+    client_resp_t err_resp(ClientRespType::kFailRedirect, leader_node_id);
+    send_client_response(c, req_handle, err_resp);
     return;
   }
 
@@ -219,11 +212,10 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
 
       // XXX: Is this correct, or should we send response in _apply_log()
       // callback? This doesn't adversely affect failure-free performance.
-      client_resp_t client_resp;
-      client_resp.resp_type = ClientRespType::kSuccess;
+      client_resp_t client_resp(ClientRespType::kSuccess);
 
       erpc::ReqHandle *req_handle = leader_sav.req_handle;
-      send_client_response(c, req_handle, &client_resp);  // Prints message
+      send_client_response(c, req_handle, client_resp);
     }
   }
 
@@ -245,5 +237,3 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
          c->server.raft_log.size());
   delete c->rpc;
 }
-
-#endif

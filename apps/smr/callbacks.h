@@ -1,12 +1,9 @@
 /**
  * @file callbacks.h
- * Simple callbacks for Raft. Log persistence callbacks are ignored since we
- * don't maintain an application-level persisent log. Note that internally,
- * Raft maintains an in-memory log.
+ * Callbacks for Raft
  */
 
-#ifndef CALLBACKS_H
-#define CALLBACKS_H
+#pragma once
 
 #include "appendentries.h"
 #include "requestvote.h"
@@ -150,5 +147,3 @@ void set_raft_callbacks(AppContext *c) {
   // Callback udata = context
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
 }
-
-#endif

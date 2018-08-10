@@ -3,10 +3,8 @@
  * @brief Client code and RPC handlers for client-issued RPCs
  */
 
+#pragma once
 #include "smr.h"
-
-#ifndef CLIENT_H
-#define CLIENT_H
 
 // Change the leader to a different Raft server that we are connected to
 void change_leader_to_any(AppContext *c) {
@@ -197,5 +195,3 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
 
   delete c->rpc;
 }
-
-#endif

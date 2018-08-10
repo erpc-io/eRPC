@@ -3,8 +3,7 @@
  * @brief A class to record event timestamps with low overhead
  */
 
-#ifndef TIME_ENTRY_H
-#define TIME_ENTRY_H
+#pragma once
 
 #include <stdlib.h>
 #include "rpc.h"
@@ -54,5 +53,3 @@ class TimeEnt {
     return ret;
   }
 };
-
-#endif  // TIME_ENTRY_H
