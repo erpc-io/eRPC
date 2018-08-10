@@ -106,6 +106,13 @@ class Rpc {
     return msg_buffer;
   }
 
+  /// Identical to alloc_msg_buffer, but dies on failure
+  inline MsgBuffer alloc_msg_buffer_or_die(size_t max_data_size) {
+    MsgBuffer m = alloc_msg_buffer(max_data_size);
+    rt_assert(m.buf != nullptr);
+    return m;
+  }
+
   /// Resize a MsgBuffer to a smaller size than its max allocation, including
   /// zero size. This does not modify the MsgBuffer's packet headers.
   static inline void resize_msg_buffer(MsgBuffer *msg_buffer,

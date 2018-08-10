@@ -23,8 +23,6 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(req_msgbuf->get_data_size() == sizeof(app_rv_req_t));
 
   auto *rv_req = reinterpret_cast<app_rv_req_t *>(req_msgbuf->buf);
-  assert(node_id_to_name_map.count(rv_req->node_id) != 0);
-
   printf("smr: Received requestvote request from %s [%s].\n",
          node_id_to_name_map[rv_req->node_id].c_str(),
          erpc::get_formatted_time().c_str());
@@ -64,12 +62,8 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
          erpc::get_formatted_time().c_str());
 
   raft_req_tag_t *rrt = c->server.raft_req_tag_pool.alloc();
-  rrt->req_msgbuf = c->rpc->alloc_msg_buffer(sizeof(app_rv_req_t));
-  erpc::rt_assert(rrt->req_msgbuf.buf != nullptr);
-
-  rrt->resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(app_rv_resp_t));
-  erpc::rt_assert(rrt->resp_msgbuf.buf != nullptr);
-
+  rrt->req_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_rv_req_t));
+  rrt->resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_rv_resp_t));
   rrt->node = node;
 
   auto *rv_req = reinterpret_cast<app_rv_req_t *>(rrt->req_msgbuf.buf);

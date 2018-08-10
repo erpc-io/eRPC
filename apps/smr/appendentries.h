@@ -135,12 +135,8 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   erpc::rt_assert(req_size <= c->rpc->get_max_msg_size());
 
   raft_req_tag_t *rrt = c->server.raft_req_tag_pool.alloc();
-  rrt->req_msgbuf = c->rpc->alloc_msg_buffer(req_size);
-  erpc::rt_assert(rrt->req_msgbuf.buf != nullptr);
-
-  rrt->resp_msgbuf = c->rpc->alloc_msg_buffer(sizeof(app_ae_resp_t));
-  erpc::rt_assert(rrt->resp_msgbuf.buf != nullptr);
-
+  rrt->req_msgbuf = c->rpc->alloc_msg_buffer_or_die(req_size);
+  rrt->resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_ae_resp_t));
   rrt->node = node;
 
   // Fill in the appendentries request header
