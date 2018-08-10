@@ -175,8 +175,10 @@ class AppContext {
   size_t num_sm_resps = 0;
 };
 
-// Generate a deterministic, random-ish node ID from a process's URI
-int get_raft_node_id_from_uri(std::string uri) {
+// Generate a deterministic, random-ish node ID for a process. Process IDs are
+// unique at the cluster level. XXX: This can collide!
+static int get_raft_node_id_for_process(size_t process_id) {
+  std::string uri = erpc::get_uri_for_process(process_id);
   uint32_t hash = CityHash32(uri.c_str(), uri.length());
   return static_cast<int>(hash);
 }

@@ -31,10 +31,7 @@ void change_leader_to_any(AppContext *c) {
 bool change_leader_to_node(AppContext *c, int raft_node_id) {
   // Pick the next session to a Raft server that is not disconnected
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string uri = erpc::get_uri_for_process(i);
-    int _raft_node_id = get_raft_node_id_from_uri(uri);
-
-    if (_raft_node_id == raft_node_id) {
+    if (raft_node_id == get_raft_node_id_for_process(i)) {
       // Ignore if we're being redirected to a failed Raft server
       if (c->conn_vec[i].disconnected) return false;
 

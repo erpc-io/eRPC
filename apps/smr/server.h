@@ -20,13 +20,11 @@ void init_raft(AppContext *c) {
 
   set_raft_callbacks(c);
 
-  std::string my_uri = erpc::get_uri_for_process(FLAGS_process_id);
-  c->server.node_id = get_raft_node_id_from_uri(my_uri);
+  c->server.node_id = get_raft_node_id_for_process(FLAGS_process_id);
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
-    std::string uri = erpc::get_uri_for_process(i);
-    int raft_node_id = get_raft_node_id_from_uri(uri);
+    int raft_node_id = get_raft_node_id_for_process(i);
 
     if (i == FLAGS_process_id) {
       // Add self. user_data = nullptr, peer_is_self = 1
@@ -47,10 +45,12 @@ void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
            client_resp.to_string().c_str(), erpc::get_formatted_time().c_str());
   }
 
-  *reinterpret_cast<client_resp_t *>(req_handle->pre_resp_msgbuf.buf) =
-      client_resp;
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+  auto *_client_resp = reinterpret_cast<client_resp_t *>(resp_msgbuf.buf);
+  *_client_resp = client_resp;
 
-  c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(client_resp_t));
+  c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                            sizeof(client_resp_t));
   req_handle->prealloc_used = true;
   c->rpc->enqueue_response(req_handle);
 }
