@@ -11,7 +11,6 @@
 
 using namespace erpc;
 
-static constexpr size_t kTestMTU = 1024;
 static constexpr size_t kTestPktSize = 1024;
 static constexpr size_t kTestNumPkts = 8000;
 
@@ -34,7 +33,6 @@ class TimingWheelTest : public ::testing::Test {
     alloc = new HugeAlloc(MB(2), 0, reg_mr_func, dereg_mr_func);
 
     timing_wheel_args_t args;
-    args.mtu = kTestMTU;
     args.freq_ghz = measure_rdtsc_freq();
     args.huge_alloc = alloc;
     wheel = new TimingWheel(args);
@@ -80,7 +78,6 @@ TEST(TimingWheelRateTest, RateTest) {
     // each iteration
     HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
     timing_wheel_args_t args;
-    args.mtu = kTestMTU;
     args.freq_ghz = freq_ghz;
     args.huge_alloc = &alloc;
 

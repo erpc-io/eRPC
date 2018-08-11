@@ -183,9 +183,17 @@ class FixedTable {
 
   mutable Stats stats_;
 };
-
-// Instantiate required FixedTable classes so they get compiled for the linker
-template class FixedTable<BasicFixedTableConfig>;
 }  // namespace table
 }  // namespace mica
+
+#include "fixedtable_impl/bucket.h"
+#include "fixedtable_impl/del.h"
+#include "fixedtable_impl/get.h"
+#include "fixedtable_impl/info.h"
+#include "fixedtable_impl/init.h"
+#include "fixedtable_impl/item.h"
+#include "fixedtable_impl/lock.h"
+#include "fixedtable_impl/prefetch.h"
+#include "fixedtable_impl/set.h"
+
 #endif

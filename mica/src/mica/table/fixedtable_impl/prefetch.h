@@ -1,4 +1,4 @@
-#include "mica/table/fixedtable.h"
+#pragma once
 
 namespace mica {
 namespace table {

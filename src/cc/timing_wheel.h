@@ -57,7 +57,6 @@ struct wheel_bkt_t {
 static_assert(sizeof(wheel_bkt_t) == 64, "");
 
 struct timing_wheel_args_t {
-  size_t mtu;
   double freq_ghz;
   HugeAlloc *huge_alloc;
 };
@@ -65,8 +64,7 @@ struct timing_wheel_args_t {
 class TimingWheel {
  public:
   TimingWheel(timing_wheel_args_t args)
-      : mtu(args.mtu),
-        freq_ghz(args.freq_ghz),
+      : freq_ghz(args.freq_ghz),
         wslot_width_tsc(us_to_cycles(kWheelSlotWidthUs, freq_ghz)),
         horizon_tsc(us_to_cycles(kWheelHorizonUs, freq_ghz)),
         huge_alloc(args.huge_alloc),
@@ -198,7 +196,6 @@ class TimingWheel {
     return bkt;
   }
 
-  const size_t mtu;
   const double freq_ghz;         ///< TSC freq, used only for us/tsc conversion
   const size_t wslot_width_tsc;  ///< Time-granularity in TSC units
   const size_t horizon_tsc;      ///< Horizon in TSC units

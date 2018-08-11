@@ -175,15 +175,6 @@ endif()
 
 # MICA sources
 set(MICA_SOURCES
-  mica/src/mica/table/fixedtable_impl/get.cc
-  mica/src/mica/table/fixedtable_impl/del.cc
-  mica/src/mica/table/fixedtable_impl/bucket.cc
-  mica/src/mica/table/fixedtable_impl/set.cc
-  mica/src/mica/table/fixedtable_impl/prefetch.cc
-  mica/src/mica/table/fixedtable_impl/init.cc
-  mica/src/mica/table/fixedtable_impl/lock.cc
-  mica/src/mica/table/fixedtable_impl/info.cc
-  mica/src/mica/table/fixedtable_impl/item.cc
   mica/src/mica/util/cityhash/city_mod.cc
   mica/src/mica/util/config.cc)
 

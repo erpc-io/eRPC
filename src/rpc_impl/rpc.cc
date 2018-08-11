@@ -58,7 +58,6 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   wheel = nullptr;
   if (kCcPacing) {
     timing_wheel_args_t args;
-    args.mtu = TTr::kMTU;
     args.freq_ghz = freq_ghz;
     args.huge_alloc = huge_alloc;
 
