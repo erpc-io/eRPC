@@ -45,11 +45,6 @@ struct BasicFixedTableConfig {
 template <class StaticConfig = BasicFixedTableConfig>
 class FixedTable {
  public:
-  // Other key sizes require more operator (==) definitions below
-  static_assert(StaticConfig::kKeySize == 8 || StaticConfig::kKeySize == 16 ||
-                    StaticConfig::kKeySize == 64,
-                "");
-
   struct ft_key_t {
     size_t qword[StaticConfig::kKeySize / 8];
 

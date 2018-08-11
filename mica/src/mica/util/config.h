@@ -11,6 +11,7 @@
 #pragma GCC diagnostic ignored "-Wconversion"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
+#pragma GCC diagnostic ignored "-Wexpansion-to-defined"
 #include "mica/util/rapidjson/document.h"
 #pragma GCC diagnostic pop
 
