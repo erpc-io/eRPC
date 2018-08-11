@@ -137,13 +137,15 @@ class AppContext {
   struct {
     int node_id = -1;  // This server's Raft node ID
     raft_server_t *raft = nullptr;
-    std::vector<raft_entry_t> raft_log;  // The Raft log, vector is OK
-    size_t raft_periodic_tsc;            // rdtsc timestamp
-    leader_saveinfo_t leader_saveinfo;   // Info for the ongoing commit request
+    size_t raft_periodic_tsc;           // rdtsc timestamp
+    leader_saveinfo_t leader_saveinfo;  // Info for the ongoing commit request
     std::vector<TimeEnt> time_ents;
 
-    // Pools
-    AppMemPool<client_req_t> rsm_cmd_buf_pool;  // Pool for SMR commands
+    // The in-memory Raft log is a vector of raft_entry_t entries. Each such
+    // entry has a pointer to a pool-allocated client_req_t object.
+    std::vector<raft_entry_t> raft_log;
+    AppMemPool<client_req_t> rsm_cmd_buf_pool;
+
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
 
     // App state
