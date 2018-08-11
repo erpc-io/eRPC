@@ -54,39 +54,11 @@ class FixedTable {
     size_t qword[StaticConfig::kKeySize / 8];
 
     bool operator==(const ft_key_t& other) const {
-      if (StaticConfig::kKeySize == 8) {
-        return qword[0] == other.qword[0];
-      }
-
-      if (StaticConfig::kKeySize == 16) {
-        return qword[0] == other.qword[0] && qword[1] == other.qword[1];
-      }
-
-      /*
-      if (StaticConfig::kKeySize == 64) {
-        return qword[0] == other.qword[0] && qword[1] == other.qword[1] &&
-               qword[2] == other.qword[2] && qword[3] == other.qword[3] &&
-               qword[4] == other.qword[4] && qword[5] == other.qword[5] &&
-               qword[6] == other.qword[6] && qword[7] == other.qword[7];
-      }
-      */
+      return memcmp(qword, other.qword, StaticConfig::kKeySize) == 0;
     }
 
     bool operator!=(const ft_key_t& other) const {
-      if (StaticConfig::kKeySize == 8) {
-        return qword[0] != other.qword[0];
-      }
-
-      if (StaticConfig::kKeySize == 16) {
-        return qword[0] != other.qword[0] || qword[1] != other.qword[1];
-      }
-
-      if (StaticConfig::kKeySize == 64) {
-        return qword[0] != other.qword[0] || qword[1] != other.qword[1] ||
-               qword[2] != other.qword[2] || qword[3] != other.qword[3] ||
-               qword[4] != other.qword[4] || qword[5] != other.qword[5] ||
-               qword[6] != other.qword[6] || qword[7] != other.qword[7];
-      }
+      return memcmp(qword, other.qword, StaticConfig::kKeySize) != 0;
     }
   };
 
@@ -129,9 +101,8 @@ class FixedTable {
     ft_key_t key_arr[StaticConfig::kBucketCap];
   };
 
-  static_assert(sizeof(Bucket) ==
-                    sizeof(uint64_t) +
-                        StaticConfig::kBucketCap * sizeof(ft_key_t),
+  static_assert(sizeof(Bucket) == sizeof(uint64_t) + StaticConfig::kBucketCap *
+                                                         sizeof(ft_key_t),
                 "");
 
   size_t bkt_size_with_val;  // Size of the buckets with value
@@ -220,6 +191,6 @@ class FixedTable {
 
 // Instantiate required FixedTable classes so they get compiled for the linker
 template class FixedTable<BasicFixedTableConfig>;
-}
-}
+}  // namespace table
+}  // namespace mica
 #endif
