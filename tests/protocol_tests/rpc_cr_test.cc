@@ -68,7 +68,7 @@ TEST_F(RpcTest, process_expl_cr_st) {
   expl_cr.pkt_num = 0;
 }
 
-}  // End erpc
+}  // namespace erpc
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

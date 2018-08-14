@@ -137,8 +137,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
       LOG_WARN("%s: None. Session reset in progress.\n", issue_msg);
       return 0;
 
-    default:
-      throw std::runtime_error("Invalid session state");
+    default: throw std::runtime_error("Invalid session state");
   }
 }
 

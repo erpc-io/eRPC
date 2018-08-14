@@ -133,7 +133,7 @@ TEST_F(RpcTest, process_large_req_one_st) {
   ASSERT_EQ(rpc->transport->testing.tx_flush_count, 0);
 }
 
-}  // End erpc
+}  // namespace erpc
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

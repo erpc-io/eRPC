@@ -28,31 +28,21 @@ class VerbsResolve {
 
 static size_t enum_to_mtu(enum ibv_mtu mtu) {
   switch (mtu) {
-    case IBV_MTU_256:
-      return 256;
-    case IBV_MTU_512:
-      return 512;
-    case IBV_MTU_1024:
-      return 1024;
-    case IBV_MTU_2048:
-      return 2048;
-    case IBV_MTU_4096:
-      return 4096;
-    default:
-      return 0;
+    case IBV_MTU_256: return 256;
+    case IBV_MTU_512: return 512;
+    case IBV_MTU_1024: return 1024;
+    case IBV_MTU_2048: return 2048;
+    case IBV_MTU_4096: return 4096;
+    default: return 0;
   }
 }
 
 static std::string link_layer_str(uint8_t link_layer) {
   switch (link_layer) {
-    case IBV_LINK_LAYER_UNSPECIFIED:
-      return "[Unspecified]";
-    case IBV_LINK_LAYER_INFINIBAND:
-      return "[InfiniBand]";
-    case IBV_LINK_LAYER_ETHERNET:
-      return "[Ethernet]";
-    default:
-      return "[Invalid]";
+    case IBV_LINK_LAYER_UNSPECIFIED: return "[Unspecified]";
+    case IBV_LINK_LAYER_INFINIBAND: return "[InfiniBand]";
+    case IBV_LINK_LAYER_ETHERNET: return "[Ethernet]";
+    default: return "[Invalid]";
   }
 }
 
@@ -190,8 +180,7 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
                   link_layer_str(port_attr.link_layer));
             }
             break;
-          default:
-            exit_assert(false, "Not a verbs transport");
+          default: exit_assert(false, "Not a verbs transport");
         }
 
         // Check the MTU
@@ -209,44 +198,22 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
         // Compute the bandwidth
         double gbps_per_lane = -1;
         switch (port_attr.active_speed) {
-          case 1:
-            gbps_per_lane = 2.5;
-            break;
-          case 2:
-            gbps_per_lane = 5.0;
-            break;
-          case 4:
-            gbps_per_lane = 10.0;
-            break;
-          case 8:
-            gbps_per_lane = 10.0;
-            break;
-          case 16:
-            gbps_per_lane = 14.0;
-            break;
-          case 32:
-            gbps_per_lane = 25.0;
-            break;
-          default:
-            rt_assert(false, "Invalid active speed");
+          case 1: gbps_per_lane = 2.5; break;
+          case 2: gbps_per_lane = 5.0; break;
+          case 4: gbps_per_lane = 10.0; break;
+          case 8: gbps_per_lane = 10.0; break;
+          case 16: gbps_per_lane = 14.0; break;
+          case 32: gbps_per_lane = 25.0; break;
+          default: rt_assert(false, "Invalid active speed");
         };
 
         size_t num_lanes = SIZE_MAX;
         switch (port_attr.active_width) {
-          case 1:
-            num_lanes = 1;
-            break;
-          case 2:
-            num_lanes = 4;
-            break;
-          case 4:
-            num_lanes = 8;
-            break;
-          case 8:
-            num_lanes = 12;
-            break;
-          default:
-            rt_assert(false, "Invalid active width");
+          case 1: num_lanes = 1; break;
+          case 2: num_lanes = 4; break;
+          case 4: num_lanes = 8; break;
+          case 8: num_lanes = 12; break;
+          default: rt_assert(false, "Invalid active width");
         };
 
         double total_gbps = num_lanes * gbps_per_lane;

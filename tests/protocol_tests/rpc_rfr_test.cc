@@ -72,7 +72,7 @@ TEST_F(RpcTest, process_rfr_st) {
   rfr.pkt_num -= 2u;
 }
 
-}  // End erpc
+}  // namespace erpc
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

@@ -244,7 +244,7 @@ TEST_F(RpcSmTest, create_session_st) {
   ASSERT_LT(session_num, 0);
 }
 
-}  // End erpc
+}  // namespace erpc
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

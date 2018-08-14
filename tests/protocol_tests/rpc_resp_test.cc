@@ -60,7 +60,7 @@ TEST_F(RpcTest, process_resp_one_LARGE_st) {
   // TODO
 }
 
-}  // End erpc
+}  // namespace erpc
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

@@ -28,24 +28,12 @@ class TimeEnt {
     std::string ret;
 
     switch (type) {
-      case TimeEntType::kClientReq:
-        ret = "client_req";
-        break;
-      case TimeEntType::kSendAeReq:
-        ret = "send_appendentries_req";
-        break;
-      case TimeEntType::kRecvAeReq:
-        ret = "recv_appendentries_req";
-        break;
-      case TimeEntType::kSendAeResp:
-        ret = "send_appendentries_resp";
-        break;
-      case TimeEntType::kRecvAeResp:
-        ret = "recv_appendentries_resp";
-        break;
-      case TimeEntType::kCommitted:
-        ret = "committed";
-        break;
+      case TimeEntType::kClientReq: ret = "client_req"; break;
+      case TimeEntType::kSendAeReq: ret = "send_appendentries_req"; break;
+      case TimeEntType::kRecvAeReq: ret = "recv_appendentries_req"; break;
+      case TimeEntType::kSendAeResp: ret = "send_appendentries_resp"; break;
+      case TimeEntType::kRecvAeResp: ret = "recv_appendentries_resp"; break;
+      case TimeEntType::kCommitted: ret = "committed"; break;
     }
 
     double usec = erpc::to_usec(tsc - base_tsc, freq_ghz);

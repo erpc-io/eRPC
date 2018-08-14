@@ -14,20 +14,11 @@ void Rpc<TTr>::handle_sm_rx_st() {
   while (queue.size > 0) {
     const SmPkt sm_pkt = queue.unlocked_pop();  // Lock is held only briefly
     switch (sm_pkt.pkt_type) {
-      case SmPktType::kConnectReq:
-        handle_connect_req_st(sm_pkt);
-        break;
-      case SmPktType::kConnectResp:
-        handle_connect_resp_st(sm_pkt);
-        break;
-      case SmPktType::kDisconnectReq:
-        handle_disconnect_req_st(sm_pkt);
-        break;
-      case SmPktType::kDisconnectResp:
-        handle_disconnect_resp_st(sm_pkt);
-        break;
-      default:
-        throw std::runtime_error("Invalid packet type");
+      case SmPktType::kConnectReq: handle_connect_req_st(sm_pkt); break;
+      case SmPktType::kConnectResp: handle_connect_resp_st(sm_pkt); break;
+      case SmPktType::kDisconnectReq: handle_disconnect_req_st(sm_pkt); break;
+      case SmPktType::kDisconnectResp: handle_disconnect_resp_st(sm_pkt); break;
+      default: throw std::runtime_error("Invalid packet type");
     }
   }
 }

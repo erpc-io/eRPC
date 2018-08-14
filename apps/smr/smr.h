@@ -68,14 +68,9 @@ struct client_req_t {
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[Key (";
-    for (size_t k : key) {
-      ret << std::to_string(k) << " ";
-    }
-    ret << "), Value (";
-    for (size_t v : value) {
-      ret << std::to_string(v) << " ";
-    }
-    ret << ")]";
+    for (size_t k : key) ret << std::to_string(k) << "), ";
+    ret << "Value (";
+    for (size_t v : value) ret << std::to_string(v) << ")] ";
     return ret.str();
   }
 };
@@ -88,12 +83,10 @@ struct client_resp_t {
 
   std::string to_string() const {
     switch (resp_type) {
-      case ClientRespType::kSuccess:
-        return "success";
+      case ClientRespType::kSuccess: return "success";
       case ClientRespType::kFailRedirect:
         return "failed: redirect to node " + std::to_string(leader_node_id);
-      case ClientRespType::kFailTryAgain:
-        return "failed: try again";
+      case ClientRespType::kFailTryAgain: return "failed: try again";
     }
     return "Invalid";
   }

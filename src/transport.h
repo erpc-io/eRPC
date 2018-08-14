@@ -63,16 +63,11 @@ class Transport {
 
   static std::string get_name(TransportType transport_type) {
     switch (transport_type) {
-      case TransportType::kInfiniBand:
-        return "[InfiniBand]";
-      case TransportType::kRoCE:
-        return "[RoCE]";
-      case TransportType::kRaw:
-        return "[Raw Ethernet]";
-      case TransportType::kDPDK:
-        return "[DPDK]";
-      case TransportType::kInvalid:
-        return "[Invalid]";
+      case TransportType::kInfiniBand: return "[InfiniBand]";
+      case TransportType::kRoCE: return "[RoCE]";
+      case TransportType::kRaw: return "[Raw Ethernet]";
+      case TransportType::kDPDK: return "[DPDK]";
+      case TransportType::kInvalid: return "[Invalid]";
     }
     throw std::runtime_error("eRPC: Invalid transport");
   }

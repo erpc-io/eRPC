@@ -36,7 +36,8 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 
   size_t key_hash = mica::util::hash(&client_req->key, kAppKeySize);
   FixedTable *table = c->server.table;
-  FixedTable::ft_key_t *ft_key = reinterpret_cast<FixedTable::ft_key_t *>(client_req->key);
+  FixedTable::ft_key_t *ft_key =
+      reinterpret_cast<FixedTable::ft_key_t *>(client_req->key);
 
   auto result = table->set(key_hash, *ft_key,
                            reinterpret_cast<char *>(&client_req->value));

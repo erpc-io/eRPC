@@ -119,7 +119,7 @@ TEST_F(RpcClientKickTest, kick_st_rfr_pkts) {
   }
 }
 
-}  // End erpc
+}  // namespace erpc
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

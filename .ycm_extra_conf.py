@@ -44,7 +44,7 @@ flags = [
     '-I' + str(home_dir) + '/eRPC/third_party',
     '-I' + str(home_dir) + '/eRPC/mica/src',
     '-I' + str(home_dir) + '/masstree-beta',
-    '-isystem' + str(homedir) + '/dpdk/x86_64-native-linuxapp-gcc/include',
+    '-isystem' + str(home_dir) + '/dpdk/x86_64-native-linuxapp-gcc/include',
     '-Wall',
     '-Werror',
     '-Wextra',

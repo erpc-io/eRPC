@@ -40,8 +40,7 @@ void Rpc<TTr>::pkt_loss_scan_st() {
         if (ms_elapsed > kSMTimeoutMs) send_sm_req_st(session);
         break;
       }
-      default:
-        break;
+      default: break;
     }
   }
 }

@@ -243,7 +243,7 @@ TEST_F(RawTransportTest, mac_filter_test) {
   }
   ASSERT_EQ(num_rx, 0);
 }
-}  // End erpc
+}  // namespace erpc
 
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);

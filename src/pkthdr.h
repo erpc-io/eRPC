@@ -34,14 +34,10 @@ enum PktType : uint64_t {
 
 static std::string pkt_type_str(uint64_t pkt_type) {
   switch (pkt_type) {
-    case kPktTypeReq:
-      return "REQ";
-    case kPktTypeRFR:
-      return "RFR";
-    case kPktTypeExplCR:
-      return "CR";
-    case kPktTypeResp:
-      return "RESP";
+    case kPktTypeReq: return "REQ";
+    case kPktTypeRFR: return "RFR";
+    case kPktTypeExplCR: return "CR";
+    case kPktTypeResp: return "RESP";
   }
 
   throw std::runtime_error("Invalid packet type.");

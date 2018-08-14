@@ -112,26 +112,13 @@ static void output_log_header(FILE *stream, int level) {
 
   const char *type;
   switch (level) {
-    case LOG_LEVEL_ERROR:
-      type = "ERROR";
-      break;
-    case LOG_LEVEL_WARN:
-      type = "WARNG";
-      break;
-    case LOG_LEVEL_INFO:
-      type = "INFOR";
-      break;
-    case LOG_LEVEL_REORDER:
-      type = "REORD";
-      break;
-    case LOG_LEVEL_TRACE:
-      type = "TRACE";
-      break;
-    case LOG_LEVEL_CC:
-      type = "CONGC";
-      break;
-    default:
-      type = "UNKWN";
+    case LOG_LEVEL_ERROR: type = "ERROR"; break;
+    case LOG_LEVEL_WARN: type = "WARNG"; break;
+    case LOG_LEVEL_INFO: type = "INFOR"; break;
+    case LOG_LEVEL_REORDER: type = "REORD"; break;
+    case LOG_LEVEL_TRACE: type = "TRACE"; break;
+    case LOG_LEVEL_CC: type = "CONGC"; break;
+    default: type = "UNKWN";
   }
 
   fprintf(stream, "%s %s: ", formatted_time.c_str(), type);

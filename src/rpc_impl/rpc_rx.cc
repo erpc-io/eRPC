@@ -56,9 +56,7 @@ void Rpc<TTr>::process_comps_st() {
         process_resp_one_st(sslot, pkthdr, rx_tsc);
         break;
       }
-      case PktType::kPktTypeRFR:
-        process_rfr_st(sslot, pkthdr);
-        break;
+      case PktType::kPktTypeRFR: process_rfr_st(sslot, pkthdr); break;
       case PktType::kPktTypeExplCR: {
         size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
         process_expl_cr_st(sslot, pkthdr, rx_tsc);
