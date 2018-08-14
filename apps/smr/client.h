@@ -64,7 +64,7 @@ void send_req_one(AppContext *c) {
   connection_t &conn = c->conn_vec[c->client.leader_idx];
   c->rpc->enqueue_request(
       conn.session_num, static_cast<uint8_t>(ReqType::kClientReq),
-      &c->client.req_msgbuf, &c->client.resp_msgbuf, client_cont, 0);  // 0 tag
+      &c->client.req_msgbuf, &c->client.resp_msgbuf, client_cont, 0 /* tag */);
 }
 
 void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
