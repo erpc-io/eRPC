@@ -27,13 +27,11 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_requestvote_response_t));
   req_handle->prealloc_used = true;
 
-  // This does a linear search, which is OK for a small number of Raft servers
-  raft_node_t *requester_node = raft_get_node(c->server.raft, rv_req->node_id);
-
   // rv_req->msg_rv is valid only for the duration of this handler, which is OK
   // as msg_requestvote_t does not contain any dynamically allocated members.
   int e = raft_recv_requestvote(
-      c->server.raft, requester_node, &rv_req->msg_rv,
+      c->server.raft, raft_get_node(c->server.raft, rv_req->node_id),
+      &rv_req->msg_rv,
       reinterpret_cast<msg_requestvote_response_t *>(resp_msgbuf.buf));
   erpc::rt_assert(e == 0);
 

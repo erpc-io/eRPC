@@ -21,11 +21,10 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kRecvAeReq);
 
-  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  uint8_t *buf = req_msgbuf->buf;
-
   // We'll use the msg_appendentries_t in the request MsgBuffer for
   // raft_recv_appendentries(), but we need to fill out its @entries first.
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  uint8_t *buf = req_msgbuf->buf;
   auto *ae_req = reinterpret_cast<app_appendentries_t *>(buf);
   msg_appendentries_t msg_ae = ae_req->msg_ae;
   assert(msg_ae.entries == nullptr);
@@ -43,16 +42,12 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   static constexpr size_t kStaticMsgEntryArrSize = 16;
   msg_entry_t static_msg_entry_arr[kStaticMsgEntryArrSize];
 
-  if (is_keepalive) {
-    assert(req_msgbuf->get_data_size() == sizeof(app_appendentries_t));
-  } else {
+  if (!is_keepalive) {
     // Non-keepalive appendentries requests contain app-defined log entries
     buf += sizeof(app_appendentries_t);
-    if (n_entries <= kStaticMsgEntryArrSize) {
-      msg_ae.entries = static_msg_entry_arr;
-    } else {
-      msg_ae.entries = new msg_entry_t[n_entries];  // Freed conditionally below
-    }
+    msg_ae.entries = n_entries <= kStaticMsgEntryArrSize
+                         ? static_msg_entry_arr
+                         : new msg_entry_t[n_entries];
 
     // Invariant: buf points to a msg_entry_t, followed by its buffer
     for (size_t i = 0; i < n_entries; i++) {
@@ -72,10 +67,6 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
     assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());
   }
 
-  // This does a linear search, which is OK for a small number of Raft servers
-  raft_node_t *requester_node = raft_get_node(c->server.raft, ae_req->node_id);
-  erpc::rt_assert(requester_node != nullptr);
-
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_appendentries_response_t));
   req_handle->prealloc_used = true;
@@ -84,14 +75,11 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   // raft_recv_appendentries. The actual bufs in the appendentries request
   // need to be long-lived.
   int e = raft_recv_appendentries(
-      c->server.raft, requester_node, &msg_ae,
+      c->server.raft, raft_get_node(c->server.raft, ae_req->node_id), &msg_ae,
       reinterpret_cast<msg_appendentries_response_t *>(resp_msgbuf.buf));
   erpc::rt_assert(e == 0);
 
-  if (n_entries > kStaticMsgEntryArrSize) {
-    assert(msg_ae.entries != nullptr && msg_ae.entries != static_msg_entry_arr);
-    delete[] msg_ae.entries;
-  }
+  if (n_entries > kStaticMsgEntryArrSize) delete[] msg_ae.entries;
 
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kSendAeResp);
   c->rpc->enqueue_response(req_handle);

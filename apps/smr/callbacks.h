@@ -63,7 +63,7 @@ static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
 
   auto *c = static_cast<AppContext *>(udata);
   c->server.raft_log.push_back(*ety);
-  return 0;  // Ignored
+  return 0;
 }
 
 // Raft callback for removing the first entry from the log. This is provided to

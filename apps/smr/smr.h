@@ -139,7 +139,7 @@ class AppContext {
     std::vector<raft_entry_t> raft_log;
     AppMemPool<client_req_t> rsm_cmd_buf_pool;
 
-    // Request tags used by RPCs exchanged among Raft servers
+    // Request tags used for RPCs exchanged among Raft servers
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
 
     // App state
