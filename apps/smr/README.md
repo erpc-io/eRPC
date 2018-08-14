@@ -1,7 +1,9 @@
 ## General notes
- * `willemt/raft` must be installed for this application. The upstream
-   `willemt/raft` does not provide an installation script; use the `install.sh`
-   script from `anujkaliaiitd/raft` instead.
+
+## Implementation notes
+ * `willemt/raft` must be installed at the system-level for this application.
+   The upstream `willemt/raft` does not provide a installation script; for now,
+   use the `install.sh` script from `anujkaliaiitd/raft` instead.
  * A replicated key-value store is implemented with the following constraints:
    * Only PUTs are supported
    * Only one client is allowed
@@ -15,8 +17,6 @@
       * Use multiple eRPC requests to transmit one appendentries request.
       * Increase eRPC's maximum message size. This requires straightforward
         changes to packet header bits and the hugepage allocator.
-
-## Notes to run
  * Wait for the leader (machine 0) to get elected before starting the client.
    Not doing so can cause some weird issues like segfaults. Leader change seems
    to work, but that's not terribly important to our evaluation.

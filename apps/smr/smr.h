@@ -218,7 +218,7 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 inline void call_raft_periodic(AppContext *c) {
   // raft_periodic() takes the number of msec elapsed since the last call. This
-  // is done for timeouts which are > 100 msec, so this approximation is fine.
+  // is done for ~100 msec timeouts, so this approximation is fine.
   size_t cur_tsc = erpc::rdtsc();
 
   // Assume TSC freqency is around 2.8 GHz. 1 ms = 2.8 * 100,000 ticks.
