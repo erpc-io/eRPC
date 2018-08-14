@@ -6,29 +6,25 @@
 #pragma once
 #include "smr.h"
 
-// The appendentries request sent over eRPC
-struct app_rv_req_t {
+// With eRPC, there is currently no way for an RPC server to access connection
+// data for a request, so the client's Raft node ID is included in the request.
+struct app_requestvote_t {
   int node_id;
   msg_requestvote_t msg_rv;
-};
-
-// The appendentries response sent over eRPC
-struct app_rv_resp_t {
-  msg_requestvote_response_t msg_rv_resp;
 };
 
 void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  assert(req_msgbuf->get_data_size() == sizeof(app_rv_req_t));
+  assert(req_msgbuf->get_data_size() == sizeof(app_requestvote_t));
 
-  auto *rv_req = reinterpret_cast<app_rv_req_t *>(req_msgbuf->buf);
+  auto *rv_req = reinterpret_cast<app_requestvote_t *>(req_msgbuf->buf);
   printf("smr: Received requestvote request from %s [%s].\n",
          node_id_to_name_map[rv_req->node_id].c_str(),
          erpc::get_formatted_time().c_str());
 
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
-  c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(app_rv_resp_t));
+  c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_requestvote_response_t));
   req_handle->prealloc_used = true;
 
   // This does a linear search, which is OK for a small number of Raft servers
@@ -38,7 +34,7 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   // as msg_requestvote_t does not contain any dynamically allocated members.
   int e = raft_recv_requestvote(
       c->server.raft, requester_node, &rv_req->msg_rv,
-      &reinterpret_cast<app_rv_resp_t *>(resp_msgbuf.buf)->msg_rv_resp);
+      reinterpret_cast<msg_requestvote_response_t *>(resp_msgbuf.buf));
   erpc::rt_assert(e == 0);
 
   c->rpc->enqueue_response(req_handle);
@@ -62,11 +58,11 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
          erpc::get_formatted_time().c_str());
 
   raft_req_tag_t *rrt = c->server.raft_req_tag_pool.alloc();
-  rrt->req_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_rv_req_t));
-  rrt->resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_rv_resp_t));
+  rrt->req_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_requestvote_t));
+  rrt->resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_requestvote_t));
   rrt->node = node;
 
-  auto *rv_req = reinterpret_cast<app_rv_req_t *>(rrt->req_msgbuf.buf);
+  auto *rv_req = reinterpret_cast<app_requestvote_t *>(rrt->req_msgbuf.buf);
   rv_req->node_id = c->server.node_id;
   rv_req->msg_rv = *msg_rv;
 
@@ -84,15 +80,13 @@ void requestvote_cont(erpc::RespHandle *resp_handle, void *_context,
 
   if (likely(rrt->resp_msgbuf.get_data_size() > 0)) {
     // The RPC was successful
-    assert(rrt->resp_msgbuf.get_data_size() == sizeof(app_rv_resp_t));
-
     printf("smr: Received requestvote response from node %s [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
            erpc::get_formatted_time().c_str());
 
     int e = raft_recv_requestvote_response(
         c->server.raft, rrt->node,
-        &reinterpret_cast<app_rv_resp_t *>(rrt->resp_msgbuf.buf)->msg_rv_resp);
+        reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf));
     erpc::rt_assert(e == 0);  // XXX: Doc says: Shutdown if e != 0
   } else {
     // This is a continuation-with-failure
