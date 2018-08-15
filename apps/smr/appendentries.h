@@ -13,73 +13,116 @@ struct app_appendentries_t {
   msg_appendentries_t msg_ae;
   // If ae.n_entries > 0, the msg_entry_t structs are serialized here. Each
   // msg_entry_t struct's buf is placed immediately after the struct.
+
+  // Serialize the ingredients of an app_appendentries_t into a network buffer
+  static void serialize(erpc::MsgBuffer &req_msgbuf, int node_id,
+                        msg_appendentries_t *msg_ae) {
+    uint8_t *buf = req_msgbuf.buf;
+    auto *srlz = reinterpret_cast<app_appendentries_t *>(req_msgbuf.buf);
+
+    // Copy the whole-message header
+    srlz->node_id = node_id;
+    srlz->msg_ae = *msg_ae;
+    srlz->msg_ae.entries = nullptr;  // Was local pointer
+    buf += sizeof(app_appendentries_t);
+
+    // Serialize each entry in the message
+    for (size_t i = 0; i < static_cast<size_t>(msg_ae->n_entries); i++) {
+      // Copy the entry header
+      *reinterpret_cast<msg_entry_t *>(buf) = msg_ae->entries[i];
+      reinterpret_cast<msg_entry_t *>(buf)->data.buf = nullptr;  // Local ptr
+      buf += sizeof(msg_entry_t);
+
+      // Copy the entry data
+      assert(msg_ae->entries[i].data.len == sizeof(client_req_t));
+      memcpy(buf, msg_ae->entries[i].data.buf, sizeof(client_req_t));
+      buf += sizeof(client_req_t);
+    }
+
+    assert(buf == req_msgbuf.buf + req_msgbuf.get_data_size());
+  }
+
+  static constexpr size_t kStaticMsgEntryArrSize = 16;
+
+  // Unpack an appendentries request message received at the server.
+  //  * The buffers for entries the unpacked message come from the mempool.
+  //  * The entries array for the unpacked message is dynamically allocated
+  //    if there are too many entries. Caller must free if so.
+  static void unpack(const erpc::MsgBuffer *req_msgbuf,
+                     msg_entry_t *static_msg_entry_arr,
+                     AppMemPool<client_req_t> &rsm_cmd_buf_pool) {
+    uint8_t *buf = req_msgbuf->buf;
+    auto *ae_req = reinterpret_cast<app_appendentries_t *>(buf);
+    msg_appendentries_t &msg_ae = ae_req->msg_ae;
+    assert(msg_ae.entries == nullptr);
+
+    size_t n_entries = static_cast<size_t>(msg_ae.n_entries);
+    bool is_keepalive = (n_entries == 0);
+
+    if (!is_keepalive) {
+      // Non-keepalive appendentries requests contain app-defined log entries
+      buf += sizeof(app_appendentries_t);
+      msg_ae.entries = n_entries <= kStaticMsgEntryArrSize
+                           ? static_msg_entry_arr
+                           : new msg_entry_t[n_entries];
+
+      // Invariant: buf points to a msg_entry_t, followed by its buffer
+      for (size_t i = 0; i < n_entries; i++) {
+        msg_ae.entries[i] = *(reinterpret_cast<msg_entry_t *>(buf));
+        buf += sizeof(msg_entry_t);
+
+        assert(msg_ae.entries[i].data.buf == nullptr);
+        msg_ae.entries[i].data.buf = rsm_cmd_buf_pool.alloc();
+
+        // Copy out each SMR command buffer from the request msgbuf since the
+        // msgbuf is valid for this function only.
+        assert(msg_ae.entries[i].data.len == sizeof(client_req_t));
+        memcpy(msg_ae.entries[i].data.buf, buf, sizeof(client_req_t));
+        buf += sizeof(client_req_t);
+      }
+
+      assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());
+    }
+  }
 };
 
 // appendentries request format is like so:
 // node ID, msg_appendentries_t, [{size, buf}]
 void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kRecvAeReq);
 
-  // We'll use the msg_appendentries_t in the request MsgBuffer for
-  // raft_recv_appendentries(), but we need to fill out its @entries first.
-  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  uint8_t *buf = req_msgbuf->buf;
-  auto *ae_req = reinterpret_cast<app_appendentries_t *>(buf);
-  msg_appendentries_t msg_ae = ae_req->msg_ae;
-  assert(msg_ae.entries == nullptr);
+  // Reconstruct an app_appendentries_t in req_msgbuf. The entry buffers the
+  // unpacked message are long-lived (pool-allocated). The unpacker may choose
+  // to not use static_msg_entry_arr for the unpacked entries, in which case
+  // we free the dynamic memory later below.
+  msg_entry_t static_msg_entry_arr[app_appendentries_t::kStaticMsgEntryArrSize];
+  app_appendentries_t::unpack(req_msgbuf, static_msg_entry_arr,
+                              c->server.rsm_cmd_buf_pool);
 
-  size_t n_entries = static_cast<size_t>(msg_ae.n_entries);
-  bool is_keepalive = (n_entries == 0);
+  auto *ae_req = reinterpret_cast<app_appendentries_t *>(req_msgbuf->buf);
+  msg_appendentries_t &msg_ae = ae_req->msg_ae;
+
   if (kAppVerbose) {
     printf("smr: Received appendentries (%s) req from node %s [%s].\n",
-           is_keepalive ? "keepalive" : "non-keepalive",
+           msg_ae.n_entries == 0 ? "keepalive" : "non-keepalive",
            node_id_to_name_map[ae_req->node_id].c_str(),
            erpc::get_formatted_time().c_str());
-  }
-
-  // Avoid malloc for n_entries < kStaticMsgEntryArrSize
-  static constexpr size_t kStaticMsgEntryArrSize = 16;
-  msg_entry_t static_msg_entry_arr[kStaticMsgEntryArrSize];
-
-  if (!is_keepalive) {
-    // Non-keepalive appendentries requests contain app-defined log entries
-    buf += sizeof(app_appendentries_t);
-    msg_ae.entries = n_entries <= kStaticMsgEntryArrSize
-                         ? static_msg_entry_arr
-                         : new msg_entry_t[n_entries];
-
-    // Invariant: buf points to a msg_entry_t, followed by its buffer
-    for (size_t i = 0; i < n_entries; i++) {
-      msg_ae.entries[i] = *(reinterpret_cast<msg_entry_t *>(buf));
-      assert(msg_ae.entries[i].data.buf == nullptr);
-      assert(msg_ae.entries[i].data.len == sizeof(client_req_t));
-
-      // Copy out each SMR command buffer from the request msgbuf since the
-      // msgbuf is valid for this function only.
-      msg_ae.entries[i].data.buf = c->server.rsm_cmd_buf_pool.alloc();
-      memcpy(msg_ae.entries[i].data.buf, buf + sizeof(msg_entry_t),
-             sizeof(client_req_t));
-
-      buf += (sizeof(msg_entry_t) + sizeof(client_req_t));
-    }
-
-    assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());
   }
 
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_appendentries_response_t));
   req_handle->prealloc_used = true;
 
-  // The appendentries request and response structs need to valid only for
-  // raft_recv_appendentries. The actual bufs in the appendentries request
-  // need to be long-lived.
+  // Only the buffers for entries in the append
   int e = raft_recv_appendentries(
       c->server.raft, raft_get_node(c->server.raft, ae_req->node_id), &msg_ae,
       reinterpret_cast<msg_appendentries_response_t *>(resp_msgbuf.buf));
   erpc::rt_assert(e == 0);
 
-  if (n_entries > kStaticMsgEntryArrSize) delete[] msg_ae.entries;
+  if (msg_ae.entries != static_msg_entry_arr) delete[] msg_ae.entries;
 
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kSendAeResp);
   c->rpc->enqueue_response(req_handle);
@@ -124,27 +167,8 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
       c->rpc->alloc_msg_buffer_or_die(sizeof(msg_appendentries_response_t));
   rrt->node = node;
 
-  // Fill in the appendentries request header
-  auto *ae_req = reinterpret_cast<app_appendentries_t *>(rrt->req_msgbuf.buf);
+  app_appendentries_t::serialize(rrt->req_msgbuf, c->server.node_id, msg_ae);
 
-  ae_req->node_id = c->server.node_id;
-  ae_req->msg_ae = *msg_ae;
-  ae_req->msg_ae.entries = nullptr;  // Was local pointer
-
-  // Serialize each entry
-  uint8_t *buf = rrt->req_msgbuf.buf + sizeof(app_appendentries_t);
-  for (size_t i = 0; i < static_cast<size_t>(msg_ae->n_entries); i++) {
-    auto *msg_entry = reinterpret_cast<msg_entry_t *>(buf);
-    *msg_entry = msg_ae->entries[i];
-    msg_entry->data.buf = nullptr;  // Was local pointer
-    buf += sizeof(msg_entry_t);
-
-    assert(msg_ae->entries[i].data.len == sizeof(client_req_t));
-    memcpy(buf, msg_ae->entries[i].data.buf, sizeof(client_req_t));
-    buf += sizeof(client_req_t);
-  }
-
-  assert(buf == rrt->req_msgbuf.buf + rrt->req_msgbuf.get_data_size());
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kSendAeReq);
   c->rpc->enqueue_request(conn->session_num,
                           static_cast<uint8_t>(ReqType::kAppendEntries),

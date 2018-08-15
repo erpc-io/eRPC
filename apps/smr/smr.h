@@ -68,9 +68,10 @@ struct client_req_t {
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[Key (";
-    for (size_t k : key) ret << std::to_string(k) << "), ";
-    ret << "Value (";
-    for (size_t v : value) ret << std::to_string(v) << ")] ";
+    for (size_t k : key) ret << std::to_string(k) << ", ";
+    ret << "), Value (";
+    for (size_t v : value) ret << std::to_string(v) << ", ";
+    ret << ")]";
     return ret.str();
   }
 };
