@@ -211,11 +211,21 @@ set(UTIL_TESTS
 
 # DPDK libraries
 if(TRANSPORT STREQUAL "dpdk")
-  set(DPDK_HOME "$ENV{HOME}/dpdk")
+  if(NOT ENV{RTE_SDK})
+    message(FATAL_ERROR "RTE_SDK must be set")
+  endif() 
+
+  if(NOT ENV{RTE_TARGET})
+    message(FATAL_ERROR "RTE_TARGET must be set")
+  endif() 
+
+  set(RTE_SDK "$ENV{RTE_SDK}")
+  set(RTE_TARGET "$ENV{RTE_TARGET}")
+
+  include_directories(SYSTEM ${RTE_SDK}/${RTE_TARGET}/include)
+  link_directories(${LINK_DIRECTORIES} ${RTE_SDK}/${RTE_TARGET}/lib)
   add_definitions(-DDPDK=true)
-  include_directories(SYSTEM ${DPDK_HOME}/x86_64-native-linuxapp-gcc/include)
   add_definitions(-include rte_config.h)
-  link_directories(${LINK_DIRECTORIES} ${DPDK_HOME}/x86_64-native-linuxapp-gcc/lib)
   set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive)
   set(LIBRARIES ${LIBRARIES} rte_kvargs rte_mbuf rte_ethdev rte_mempool
     rte_mempool_ring rte_ring rte_eal rte_hash rte_pci rte_bus_pci rte_bus_vdev

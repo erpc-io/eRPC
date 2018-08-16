@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Script to bind an Intel Ethernet NIC to DPDK on any CloudLab cluster
 dpdk=~/dpdk
 
 if [ ! -d "$dpdk" ]; then
