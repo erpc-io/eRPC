@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 2.8)
 project(eRPC)
 
 # Pick a compiler
@@ -211,11 +211,11 @@ set(UTIL_TESTS
 
 # DPDK libraries
 if(TRANSPORT STREQUAL "dpdk")
-  if(NOT ENV{RTE_SDK})
+  if(NOT DEFINED ENV{RTE_SDK})
     message(FATAL_ERROR "RTE_SDK must be set")
   endif() 
 
-  if(NOT ENV{RTE_TARGET})
+  if(NOT DEFINED ENV{RTE_TARGET})
     message(FATAL_ERROR "RTE_TARGET must be set")
   endif() 
 
