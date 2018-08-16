@@ -33,7 +33,7 @@ void set_raft_callbacks(AppContext *c) {
   raft_funcs.node_has_sufficient_logs = __raft_node_has_sufficient_logs;
   raft_funcs.notify_membership_event = __raft_notify_membership_event;
 
-  // Any non-null callback will require vsnprintf in willemt/raft
+  // Any non-null console callback will require vsnprintf in willemt/raft
   raft_funcs.log = kAppEnableRaftConsoleLog ? __raft_console_log : nullptr;
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
 }
@@ -48,6 +48,8 @@ void map_pmem_log(AppContext *c) {
                   "pmem_map_file() failed. " + std::string(strerror(errno)));
   erpc::rt_assert(c->server.pmem.mapped_len >= GB(32), "Raft log too short");
   erpc::rt_assert(is_pmem == 1, "Raft log file is not pmem");
+
+  c->server.pmem.v_num_entries = 0;
 
   // Initialize persistent metadata pointers and reset them to zero
   uint8_t *cur = c->server.pmem.p_buf;

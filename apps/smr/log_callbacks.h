@@ -65,7 +65,7 @@ static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
   return 0;
 }
 
-// Raft callback for appending an item to the log
+// Raft callback for applying an entry to the log
 static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
                             raft_index_t) {
   assert(!raft_entry_is_cfg_change(ety));
