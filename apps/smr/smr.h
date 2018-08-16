@@ -5,18 +5,12 @@
 
 #pragma once
 
-// If enabled, Raft logs are written to persistent memory via libpmem
-#define SMR_USE_PMEM true
-
 #include <stddef.h>
 extern "C" {
 #include <raft/raft.h>
 }
 
-#if SMR_USE_PMEM
 #include <libpmem.h>
-#endif
-
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +24,8 @@ extern "C" {
 #include "mica/util/hash.h"
 
 #include "util/autorun_helpers.h"
+
+static constexpr bool kUsePmem = true;
 
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
@@ -147,25 +143,27 @@ class AppContext {
     // mode, these entries are copied to the DAX file.
     AppMemPool<client_req_t> log_entry_pool;
 
-#if SMR_USE_PMEM
-    // The presistent memory Raft log is a linear memory chunk that starts
-    // with persistent metadata records.
-    uint8_t *p_buf;        // The start of the mapped file
-    size_t mapped_len;     // Length of the mapped log file
-    size_t v_num_entries;  // Volatile record for number of entries
+    // The presistent memory Raft log, used only if persistent memory is
+    // enabled. This is a linear memory chunk that starts with persistent
+    // metadata records.
+    struct {
+      uint8_t *p_buf;        // The start of the mapped file
+      size_t mapped_len;     // Length of the mapped log file
+      size_t v_num_entries;  // Volatile record for number of entries
 
-    // Persistent metadata records
-    raft_node_id_t *p_voted_for;  // Persistent record for persist-vote
-    raft_term_t *p_term;          // Persistent record for perist-term
-    size_t *p_num_entries;        // Persistent record for number of log entries
+      // Persistent metadata records
+      raft_node_id_t *p_voted_for;  // Persistent record for persist-vote
+      raft_term_t *p_term;          // Persistent record for perist-term
+      size_t *p_num_entries;  // Persistent record for number of log entries
 
-    // The persistent log
-    uint8_t *p_log_base;
-#else
-    // The in-memory Raft log is a vector of raft_entry_t entries. Each such
-    // entry has a pointer to log entries allocated from log_entry_pool.
-    std::vector<raft_entry_t> raft_log;
-#endif
+      // The persistent log
+      uint8_t *p_log_base;
+    } pmem;
+
+    // The volatile in-memory Raft log, used only if persistent memory is
+    // enabled. This is a vector of raft_entry_t entries. Each such entry has a
+    // pointer to volatile log entries allocated from log_entry_pool.
+    std::vector<raft_entry_t> dram_raft_log;
 
     // Request tags used for RPCs exchanged among Raft servers
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
@@ -179,11 +177,8 @@ class AppContext {
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
 
     size_t get_num_log_entries() const {
-#if SMR_USE_PMEM
-      return v_num_entries;
-#else
-      return raft_log.size();
-#endif
+      if (kUsePmem) return pmem.v_num_entries;
+      return dram_raft_log.size();
     }
   } server;
 

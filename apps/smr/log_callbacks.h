@@ -71,13 +71,11 @@ static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
   assert(!raft_entry_is_cfg_change(ety));
   auto *c = static_cast<AppContext *>(udata);
 
-#if SMR_USE_PMEM
-  _unused(c);
+  if (kUsePmem) {
+  } else {
+    c->server.dram_raft_log.push_back(*ety);
+  }
   return 0;
-#else
-  c->server.raft_log.push_back(*ety);
-  return 0;
-#endif
 }
 
 // Raft callback for removing the first entry from the log. This is provided to
@@ -95,20 +93,19 @@ static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *,
                           raft_index_t) {
   auto *c = static_cast<AppContext *>(udata);
 
-#if SMR_USE_PMEM
-  _unused(c);
-#else
-  raft_entry_t &entry = c->server.raft_log.back();
-  if (likely(entry.data.len == sizeof(client_req_t))) {
-    // Handle pool-allocated buffers separately
-    assert(entry.data.buf != nullptr);
-    c->server.log_entry_pool.free(static_cast<client_req_t *>(entry.data.buf));
+  if (kUsePmem) {
   } else {
-    if (entry.data.buf != nullptr) free(entry.data.buf);
+    raft_entry_t &entry = c->server.dram_raft_log.back();
+    if (likely(entry.data.len == sizeof(client_req_t))) {
+      // Handle pool-allocated buffers separately
+      assert(entry.data.buf != nullptr);
+      c->server.log_entry_pool.free(
+          static_cast<client_req_t *>(entry.data.buf));
+    } else {
+      if (entry.data.buf != nullptr) free(entry.data.buf);
+    }
+    c->server.dram_raft_log.pop_back();
   }
-
-  c->server.raft_log.pop_back();
-#endif
 
   return 0;
 }

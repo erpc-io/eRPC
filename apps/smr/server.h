@@ -38,32 +38,30 @@ void set_raft_callbacks(AppContext *c) {
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
 }
 
-#if SMR_USE_PMEM
 void map_pmem_log(AppContext *c) {
   int is_pmem;
-  c->server.p_buf = reinterpret_cast<uint8_t *>(
+  c->server.pmem.p_buf = reinterpret_cast<uint8_t *>(
       pmem_map_file("/mnt/pmem12/raft_log", 0 /* length */, 0 /* flags */, 0666,
-                    &c->server.mapped_len, &is_pmem));
+                    &c->server.pmem.mapped_len, &is_pmem));
 
-  erpc::rt_assert(c->server.p_buf != nullptr,
+  erpc::rt_assert(c->server.pmem.p_buf != nullptr,
                   "pmem_map_file() failed. " + std::string(strerror(errno)));
-  erpc::rt_assert(c->server.mapped_len >= GB(32), "Raft log too short");
+  erpc::rt_assert(c->server.pmem.mapped_len >= GB(32), "Raft log too short");
   erpc::rt_assert(is_pmem == 1, "Raft log file is not pmem");
 
   // Initialize persistent metadata pointers and reset them to zero
-  uint8_t *cur = c->server.p_buf;
-  c->server.p_voted_for = reinterpret_cast<raft_node_id_t *>(cur);
+  uint8_t *cur = c->server.pmem.p_buf;
+  c->server.pmem.p_voted_for = reinterpret_cast<raft_node_id_t *>(cur);
   cur += sizeof(raft_node_id_t);
-  c->server.p_term = reinterpret_cast<raft_term_t *>(cur);
+  c->server.pmem.p_term = reinterpret_cast<raft_term_t *>(cur);
   cur += sizeof(raft_term_t);
-  c->server.p_num_entries = reinterpret_cast<size_t *>(cur);
+  c->server.pmem.p_num_entries = reinterpret_cast<size_t *>(cur);
   cur += sizeof(size_t);
-  pmem_memset_persist(c->server.p_buf, 0,
-                      static_cast<size_t>(cur - c->server.p_buf));
+  pmem_memset_persist(c->server.pmem.p_buf, 0,
+                      static_cast<size_t>(cur - c->server.pmem.p_buf));
 
-  c->server.p_log_base = cur;
+  c->server.pmem.p_log_base = cur;
 }
-#endif
 
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
