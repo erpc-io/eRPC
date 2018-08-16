@@ -45,13 +45,13 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 // Raft callback for saving voted_for field to persistent storage.
 static int __raft_persist_vote(raft_server_t *, void *udata,
                                raft_node_id_t voted_for) {
-#if SMR_USE_PMEM
-  auto *c = static_cast<AppContext *>(udata);
-  pmem_memcpy_persist(&c->server.p_voted_for, &voted_for, sizeof(voted_for));
-#else
-  _unused(udata);
-  _unused(voted_for);
-#endif
+  if (kUsePmem) {
+    auto *c = static_cast<AppContext *>(udata);
+    pmem_memcpy_persist(&c->server.pmem.p_voted_for, &voted_for,
+                        sizeof(voted_for));
+  }
+
+  // Ignored for DRAM mode
   return 0;
 }
 

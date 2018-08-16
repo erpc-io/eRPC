@@ -71,9 +71,7 @@ void init_raft(AppContext *c) {
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
 
   set_raft_callbacks(c);
-#if SMR_USE_PMEM
-  map_pmem_log(c);
-#endif
+  if (kUsePmem) map_pmem_log(c);
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     int raft_node_id = get_raft_node_id_for_process(i);
