@@ -10,7 +10,7 @@
 ###
 
 sudo dnf -y install gcc-c++ cmake numactl-devel numactl bc gflags-devel \
-  boost-devel gtest gtest-devel
+  boost-devel gtest gtest-devel libpmem libpmem-devel
 
 ###
 ### Optional convenience packages

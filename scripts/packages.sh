@@ -16,6 +16,10 @@ sudo apt -y install g++-8 cmake libnuma-dev numactl bc libgflags-dev
 sudo apt -y install libgtest-dev
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
 
+# libpmem currently requires a ppa
+sudo add-apt-repository -y ppa:ahasenack/nvdimm-update
+sudo apt -y install libpmem-dev
+
 ###
 ### Optional convenience packages
 ###
