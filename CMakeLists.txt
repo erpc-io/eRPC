@@ -268,7 +268,7 @@ message(STATUS "Compiling app = " ${APP})
 # Add app-specific defines now, isolating them from the tests
 if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
-  set(LIBRARIES ${LIBRARIES} raft)
+  set(LIBRARIES ${LIBRARIES} raft pmem)
   set(APP_ADDITIONAL_SOURCES third_party/cityhash/city_mod.cc)
   # MICA
   include_directories(mica/src)

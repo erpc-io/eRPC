@@ -148,10 +148,19 @@ class AppContext {
     AppMemPool<client_req_t> log_entry_pool;
 
 #if SMR_USE_PMEM
-    // The presistent memory Raft log is a linear memory chunk
-    uint8_t *pbuf;       // The persistent memory buffer
-    size_t mapped_len;   // Length of the mapped log file
-    size_t num_entries;  // Number of entries currently in the log
+    // The presistent memory Raft log is a linear memory chunk that starts
+    // with persistent metadata records.
+    uint8_t *p_buf;        // The start of the mapped file
+    size_t mapped_len;     // Length of the mapped log file
+    size_t v_num_entries;  // Volatile record for number of entries
+
+    // Persistent metadata records
+    raft_node_id_t *p_voted_for;  // Persistent record for persist-vote
+    raft_term_t *p_term;          // Persistent record for perist-term
+    size_t *p_num_entries;        // Persistent record for number of log entries
+
+    // The persistent log
+    uint8_t *p_log_base;
 #else
     // The in-memory Raft log is a vector of raft_entry_t entries. Each such
     // entry has a pointer to log entries allocated from log_entry_pool.
@@ -171,7 +180,7 @@ class AppContext {
 
     size_t get_num_log_entries() const {
 #if SMR_USE_PMEM
-      return num_entries;
+      return v_num_entries;
 #else
       return raft_log.size();
 #endif

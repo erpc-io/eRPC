@@ -43,14 +43,26 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 }
 
 // Raft callback for saving voted_for field to persistent storage.
-static int __raft_persist_vote(raft_server_t *, void *, const int) {
-  return 0;  // Ignored
+static int __raft_persist_vote(raft_server_t *, void *udata,
+                               raft_node_id_t voted_for) {
+#if SMR_USE_PMEM
+  auto *c = static_cast<AppContext *>(udata);
+  pmem_memcpy_persist(&c->server.p_voted_for, &voted_for, sizeof(voted_for));
+#else
+  _unused(udata);
+  _unused(voted_for);
+#endif
+  return 0;
 }
 
 // Raft callback for saving term field to persistent storage
-static int __raft_persist_term(raft_server_t *, void *, raft_term_t,
-                               raft_node_id_t) {
-  return 0;  // Ignored
+static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
+                               raft_node_id_t voted_for) {
+  // XXX: This requires atomically committing voted_for and term => hard
+  _unused(udata);
+  _unused(term);
+  _unused(voted_for);
+  return 0;
 }
 
 // Raft callback for appending an item to the log

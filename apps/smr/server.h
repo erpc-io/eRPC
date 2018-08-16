@@ -38,17 +38,44 @@ void set_raft_callbacks(AppContext *c) {
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
 }
 
+#if SMR_USE_PMEM
+void map_pmem_log(AppContext *c) {
+  int is_pmem;
+  c->server.p_buf = reinterpret_cast<uint8_t *>(
+      pmem_map_file("/mnt/pmem12/raft_log", 0 /* length */, 0 /* flags */, 0666,
+                    &c->server.mapped_len, &is_pmem));
+
+  erpc::rt_assert(c->server.p_buf != nullptr,
+                  "pmem_map_file() failed. " + std::string(strerror(errno)));
+  erpc::rt_assert(c->server.mapped_len >= GB(32), "Raft log too short");
+  erpc::rt_assert(is_pmem == 1, "Raft log file is not pmem");
+
+  // Initialize persistent metadata pointers and reset them to zero
+  uint8_t *cur = c->server.p_buf;
+  c->server.p_voted_for = reinterpret_cast<raft_node_id_t *>(cur);
+  cur += sizeof(raft_node_id_t);
+  c->server.p_term = reinterpret_cast<raft_term_t *>(cur);
+  cur += sizeof(raft_term_t);
+  c->server.p_num_entries = reinterpret_cast<size_t *>(cur);
+  cur += sizeof(size_t);
+  pmem_memset_persist(c->server.p_buf, 0,
+                      static_cast<size_t>(cur - c->server.p_buf));
+
+  c->server.p_log_base = cur;
+}
+#endif
+
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
   erpc::rt_assert(c->server.raft != nullptr);
 
-  if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
-  c->server.raft_periodic_tsc = erpc::rdtsc();
-
-  set_raft_callbacks(c);
-
   c->server.node_id = get_raft_node_id_for_process(FLAGS_process_id);
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
+
+  set_raft_callbacks(c);
+#if SMR_USE_PMEM
+  map_pmem_log(c);
+#endif
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     int raft_node_id = get_raft_node_id_for_process(i);
@@ -62,6 +89,9 @@ void init_raft(AppContext *c) {
                     raft_node_id, 0);
     }
   }
+
+  if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
+  c->server.raft_periodic_tsc = erpc::rdtsc();
 }
 
 // Send a response to the client. This does not free any non-eRPC memory.
@@ -190,7 +220,7 @@ void init_mica(AppContext *c) {
 
 void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
   // The Raft server must be initialized before running the eRPC event loop,
-  // including running it for session management.
+  // including running it for eRPC session management.
   init_raft(c);
 
   init_erpc(c, nexus);  // Initialize eRPC
