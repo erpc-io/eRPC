@@ -133,7 +133,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   leader_sav.req_handle = req_handle;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
-  client_req_t *rsm_cmd_buf = c->server.rsm_cmd_buf_pool.alloc();
+  client_req_t *rsm_cmd_buf = c->server.log_entry_pool.alloc();
   *rsm_cmd_buf = *client_req;
 
   msg_entry_t ent;
@@ -203,10 +203,10 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
       erpc::Latency &commit_latency = c->server.commit_latency;
       printf(
           "smr: Leader commit latency (us) = "
-          "{%.2f median, %.2f 99%%}. Log size = %zu.\n",
+          "{%.2f median, %.2f 99%%}. Number of log entries = %zu.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
-          c->server.raft_log.size());
+          c->server.get_num_log_entries());
 
       loop_tsc = erpc::rdtsc();
       commit_latency.reset();
@@ -261,6 +261,6 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
   }
 
   printf("smr: Final log size (including uncommitted entries) = %zu.\n",
-         c->server.raft_log.size());
+         c->server.get_num_log_entries());
   delete c->rpc;
 }

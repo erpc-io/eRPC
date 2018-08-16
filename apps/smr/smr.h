@@ -5,10 +5,17 @@
 
 #pragma once
 
+// If enabled, Raft logs are written to persistent memory via libpmem
+#define SMR_USE_PMEM true
+
 #include <stddef.h>
 extern "C" {
 #include <raft/raft.h>
 }
+
+#if SMR_USE_PMEM
+#include <libpmem.h>
+#endif
 
 #include <signal.h>
 #include <stdio.h>
@@ -135,10 +142,21 @@ class AppContext {
     leader_saveinfo_t leader_saveinfo;  // Info for the ongoing commit request
     std::vector<TimeEnt> time_ents;
 
+    // An in-memory pool for Raft entry data. In non-persistent mode, the Raft
+    // log contains pointers to buffers allocated from this pool. In persistent
+    // mode, these entries are copied to the DAX file.
+    AppMemPool<client_req_t> log_entry_pool;
+
+#if SMR_USE_PMEM
+    // The presistent memory Raft log is a linear memory chunk
+    uint8_t *pbuf;       // The persistent memory buffer
+    size_t mapped_len;   // Length of the mapped log file
+    size_t num_entries;  // Number of entries currently in the log
+#else
     // The in-memory Raft log is a vector of raft_entry_t entries. Each such
-    // entry has a pointer to a pool-allocated client_req_t object.
+    // entry has a pointer to log entries allocated from log_entry_pool.
     std::vector<raft_entry_t> raft_log;
-    AppMemPool<client_req_t> rsm_cmd_buf_pool;
+#endif
 
     // Request tags used for RPCs exchanged among Raft servers
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
@@ -150,6 +168,14 @@ class AppContext {
     erpc::Latency commit_latency;            // Amplification factor = 10
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
+
+    size_t get_num_log_entries() const {
+#if SMR_USE_PMEM
+      return num_entries;
+#else
+      return raft_log.size();
+#endif
+    }
   } server;
 
   // SMR client members

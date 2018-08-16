@@ -50,7 +50,7 @@ struct app_appendentries_t {
   //    if there are too many entries. Caller must free if so.
   static void unpack(const erpc::MsgBuffer *req_msgbuf,
                      msg_entry_t *static_msg_entry_arr,
-                     AppMemPool<client_req_t> &rsm_cmd_buf_pool) {
+                     AppMemPool<client_req_t> &log_entry_pool) {
     uint8_t *buf = req_msgbuf->buf;
     auto *ae_req = reinterpret_cast<app_appendentries_t *>(buf);
     msg_appendentries_t &msg_ae = ae_req->msg_ae;
@@ -72,7 +72,7 @@ struct app_appendentries_t {
         buf += sizeof(msg_entry_t);
 
         assert(msg_ae.entries[i].data.buf == nullptr);
-        msg_ae.entries[i].data.buf = rsm_cmd_buf_pool.alloc();
+        msg_ae.entries[i].data.buf = log_entry_pool.alloc();
 
         // Copy out each SMR command buffer from the request msgbuf since the
         // msgbuf is valid for this function only.
@@ -100,7 +100,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   // we free the dynamic memory later below.
   msg_entry_t static_msg_entry_arr[app_appendentries_t::kStaticMsgEntryArrSize];
   app_appendentries_t::unpack(req_msgbuf, static_msg_entry_arr,
-                              c->server.rsm_cmd_buf_pool);
+                              c->server.log_entry_pool);
 
   auto *ae_req = reinterpret_cast<app_appendentries_t *>(req_msgbuf->buf);
   msg_appendentries_t &msg_ae = ae_req->msg_ae;
