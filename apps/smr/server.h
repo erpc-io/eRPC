@@ -6,10 +6,37 @@
 #pragma once
 
 #include "appendentries.h"
-#include "callbacks.h"
-#include "client.h"
+#include "log_callbacks.h"
 #include "requestvote.h"
 #include "smr.h"
+
+// Raft callback for displaying debugging information
+void __raft_console_log(raft_server_t *, raft_node_t *, void *,
+                        const char *buf) {
+  if (kAppVerbose) {
+    printf("raft: %s [%s].\n", buf, erpc::get_formatted_time().c_str());
+  }
+}
+
+void set_raft_callbacks(AppContext *c) {
+  raft_cbs_t raft_funcs;
+  raft_funcs.send_requestvote = __raft_send_requestvote;
+  raft_funcs.send_appendentries = __raft_send_appendentries;
+  raft_funcs.send_snapshot = __raft_send_snapshot;
+  raft_funcs.applylog = __raft_applylog;
+  raft_funcs.persist_vote = __raft_persist_vote;
+  raft_funcs.persist_term = __raft_persist_term;
+  raft_funcs.log_offer = __raft_log_offer;
+  raft_funcs.log_poll = __raft_log_poll;
+  raft_funcs.log_pop = __raft_log_pop;
+  raft_funcs.log_get_node_id = __raft_log_get_node_id;
+  raft_funcs.node_has_sufficient_logs = __raft_node_has_sufficient_logs;
+  raft_funcs.notify_membership_event = __raft_notify_membership_event;
+
+  // Any non-null callback will require vsnprintf in willemt/raft
+  raft_funcs.log = kAppEnableRaftConsoleLog ? __raft_console_log : nullptr;
+  raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
+}
 
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();

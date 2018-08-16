@@ -1,9 +1,6 @@
 #include "smr.h"
 #include <util/autorun_helpers.h>
-#include "appendentries.h"
-#include "callbacks.h"
 #include "client.h"
-#include "requestvote.h"
 #include "server.h"
 #include "util/numautils.h"
 
