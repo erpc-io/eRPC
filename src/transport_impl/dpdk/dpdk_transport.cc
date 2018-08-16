@@ -178,6 +178,17 @@ void DpdkTransport::resolve_phy_port() {
   memcpy(resolve.mac_addr, &mac.addr_bytes, sizeof(resolve.mac_addr));
 
   resolve.ipv4_addr = ipv4_from_str(kTempIp);
+
+  // Resolve bandwidth
+  struct rte_eth_link link;
+  rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
+  rt_assert(link.link_status == ETH_LINK_UP, "Link down");
+
+  // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.
+  rt_assert(link.link_speed >= 10000, "Link too slow");
+  LOG_INFO("Port %u bandwidth is %u Mbps\n", phy_port, link.link_speed);
+
+  resolve.bandwidth = static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
 }
 
 void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {

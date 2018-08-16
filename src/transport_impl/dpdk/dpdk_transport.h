@@ -58,6 +58,7 @@ class DpdkTransport : public Transport {
 
   void fill_local_routing_info(RoutingInfo *routing_info) const;
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
+  size_t get_bandwidth() const { return resolve.bandwidth; }
 
   static std::string routing_info_str(RoutingInfo *ri) {
     return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
@@ -108,8 +109,9 @@ class DpdkTransport : public Transport {
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
-    uint32_t ipv4_addr;   ///< The port's IPv4 address
-    uint8_t mac_addr[6];  ///< The port's MAC address
+    uint32_t ipv4_addr;    ///< The port's IPv4 address
+    uint8_t mac_addr[6];   ///< The port's MAC address
+    size_t bandwidth = 0;  ///< Link bandwidth in bytes per second
   } resolve;
 };
 
