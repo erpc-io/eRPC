@@ -16,9 +16,10 @@ Some highlights:
 ## Software requirements
  * See `scripts/packages.sh` for a list of required software packages.
  * NIC-specific requirements:
-   * For Mellanox NICs, install the latest
+   * Mellanox NICs: Install the latest
      [Mellanox OFED](http://www.mellanox.com/page/products_dyn?product_family=26).
-   * For DPDK, place the latest DPDK in `${HOME}/dpdk`.
+   * Non-Mellanox DPDK-compatible NICs: Set DPDK's `RTE_SDK` and `RTE_TARGET`
+     environment variables.
  * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
 ## eRPC quickstart

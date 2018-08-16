@@ -7,7 +7,6 @@
 
 #include <gflags/gflags.h>
 #include <boost/algorithm/string.hpp>
-#include <fstream>
 #include <set>
 #include "rpc.h"
 #include "util/latency.h"
@@ -93,16 +92,20 @@ class TmpStat {
                     std::to_string(FLAGS_process_id);
 
     printf("Writing stats to file %s\n", filename.c_str());
-    stat_file = std::ofstream(filename);
-    stat_file << header << std::endl;
+    stat_file = fopen(filename.c_str(), "w");
+    erpc::rt_assert(stat_file != nullptr, "Failed to open stat file");
+
+    fprintf(stat_file, "%s\n", header.c_str());
   }
 
   ~TmpStat() {
-    stat_file.flush();
-    stat_file.close();
+    fflush(stat_file);
+    fclose(stat_file);
   }
 
-  void write(std::string stat) { stat_file << stat << std::endl; }
+  void write(std::string stat) {
+    fprintf(stat_file, "%s\n", stat.c_str());
+  }
 
  private:
   bool contains_newline(std::string line) {
@@ -112,7 +115,7 @@ class TmpStat {
     return false;
   }
 
-  std::ofstream stat_file;
+  FILE *stat_file;
 };
 
 // Per-thread application context
