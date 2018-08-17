@@ -18,7 +18,14 @@ add_definitions(-Wno-keyword-macro)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa ibverbs pthread gflags)
+set(LIBRARIES ${LIBRARIES} rt numa pthread gflags ibverbs dpdk)
+
+# DPDK include directory
+find_path(DPDK_INCLUDE_DIR rte_config.h PATH_SUFFIXES dpdk)
+if (NOT DPDK_INCLUDE_DIR)
+  message(FATAL_ERROR "DPDK include directory not found")
+endif()
+include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
 # Testing
 enable_testing()
@@ -159,18 +166,14 @@ set(SOURCES
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/transport_impl/transport.cc
+  src/transport_impl/dpdk/dpdk_transport.cc
+  src/transport_impl/dpdk/dpdk_transport_datapath.cc
   src/transport_impl/infiniband/ib_transport.cc
   src/transport_impl/infiniband/ib_transport_datapath.cc
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
-
-if(TRANSPORT STREQUAL "dpdk")
-  set(SOURCES ${SOURCES}
-    src/transport_impl/dpdk/dpdk_transport.cc
-    src/transport_impl/dpdk/dpdk_transport_datapath.cc)
-endif()
 
 # MICA sources
 set(MICA_SOURCES
@@ -208,33 +211,6 @@ set(UTIL_TESTS
   fixed_vector_test
   timely_test
   numautil_test)
-
-# DPDK libraries
-if(TRANSPORT STREQUAL "dpdk")
-  if(NOT DEFINED ENV{RTE_SDK})
-    message(FATAL_ERROR "RTE_SDK must be set")
-  endif() 
-
-  if(NOT DEFINED ENV{RTE_TARGET})
-    message(FATAL_ERROR "RTE_TARGET must be set")
-  endif() 
-
-  set(RTE_SDK "$ENV{RTE_SDK}")
-  set(RTE_TARGET "$ENV{RTE_TARGET}")
-
-  include_directories(SYSTEM ${RTE_SDK}/${RTE_TARGET}/include)
-  link_directories(${LINK_DIRECTORIES} ${RTE_SDK}/${RTE_TARGET}/lib)
-  add_definitions(-DDPDK=true)
-  add_definitions(-include rte_config.h)
-  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive)
-  set(LIBRARIES ${LIBRARIES} rte_kvargs rte_mbuf rte_ethdev rte_mempool
-    rte_mempool_ring rte_ring rte_eal rte_hash rte_pci rte_bus_pci rte_bus_vdev
-    rte_pmd_i40e rte_pmd_ixgbe rte_pmd_ring)
-  set(LIBRARIES ${LIBRARIES} -Wl,--no-whole-archive)
-  set(LIBRARIES ${LIBRARIES} rt dl)
-else()
-  add_definitions(-DDPDK=false)
-endif()
 
 # Compile the tests
 if(COMPILE_ERPC_LIB)

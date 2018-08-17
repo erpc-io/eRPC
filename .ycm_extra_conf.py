@@ -39,12 +39,11 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
-    '-DDPDK=true',
     '-I' + str(home_dir) + '/eRPC/src',
     '-I' + str(home_dir) + '/eRPC/third_party',
     '-I' + str(home_dir) + '/eRPC/mica/src',
     '-I' + str(home_dir) + '/masstree-beta',
-    '-isystem' + str(home_dir) + '/dpdk/x86_64-native-linuxapp-gcc/include',
+    '-isystem' + '/usr/include/dpdk',
     '-Wall',
     '-Werror',
     '-Wextra',

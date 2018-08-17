@@ -68,7 +68,7 @@ void DpdkTransport::do_per_process_dpdk_init() {
   int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
   rt_assert(ret >= 0, "rte_eal_init failed");
 
-  uint16_t num_ports = rte_eth_dev_count_avail();
+  uint16_t num_ports = rte_eth_dev_count();  // Deprecated
   rt_assert(num_ports > phy_port, "Too few ports");
 
   rte_eth_dev_info dev_info;
@@ -184,11 +184,15 @@ void DpdkTransport::resolve_phy_port() {
   rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
   rt_assert(link.link_status == ETH_LINK_UP, "Link down");
 
+  // XXX: For x710 and DPDK 17.11, link_speed is zero, so hard code 10 Gbps for
+  // now.
+  //
   // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.
-  rt_assert(link.link_speed >= 10000, "Link too slow");
-  LOG_INFO("Port %u bandwidth is %u Mbps\n", phy_port, link.link_speed);
-
-  resolve.bandwidth = static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
+  // rt_assert(link.link_speed >= 10000, "Link too slow");
+  // LOG_INFO("Port %u bandwidth is %u Mbps\n", phy_port, link.link_speed);
+  // resolve.bandwidth =
+  // static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
+  resolve.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
 }
 
 void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
