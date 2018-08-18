@@ -20,16 +20,20 @@ add_definitions(-g)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags ibverbs dpdk)
 
-# DPDK include directory
-find_path(DPDK_INCLUDE_DIR rte_config.h PATH_SUFFIXES dpdk)
-if (NOT DPDK_INCLUDE_DIR)
-  message(FATAL_ERROR "DPDK include directory not found")
-endif()
-include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
-
 # Testing
 enable_testing()
 find_package(GTest REQUIRED)
+
+# DPDK include directory. Locating rte_config.h does not work on some systems.
+# Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked from
+# the real dpdk include directory (/usr/include/dpdk/).
+find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+if (DPDK_INCLUDE_DIR)
+  message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+else()
+  message(FATAL_ERROR "DPDK include directory not found")
+endif()
+include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party)
