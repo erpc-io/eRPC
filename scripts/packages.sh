@@ -20,6 +20,10 @@ sudo apt -y install libgtest-dev
 sudo add-apt-repository -y ppa:ahasenack/nvdimm-update
 sudo apt -y install libpmem-dev
 
+# ppa for DPDK 17.11 if needed
+sudo add-apt-repository -y ppa:nbritton/dpdk
+sudo apt -y install dpdk libdpdk-dev
+
 ###
 ### Optional convenience packages
 ###

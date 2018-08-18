@@ -14,12 +14,12 @@ Some highlights:
    replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
 ## Software requirements
- * See `scripts/packages.sh` for a list of required software packages.
- * NIC-specific requirements:
-   * Mellanox NICs: Install the latest
-     [Mellanox OFED](http://www.mellanox.com/page/products_dyn?product_family=26).
-   * Non-Mellanox DPDK-compatible NICs: Set DPDK's `RTE_SDK` and `RTE_TARGET`
-     environment variables.
+ * Install the latest Mellanox OFED.
+ * See `scripts/packages.sh` for a list of other required software packages and
+   hints to install them on Ubuntu. See `scripts/fedora/` and `scripts/centos/`
+   for other distros.
+ * DPDK 17.11 or newer must be installed system-wide (e.g.,
+   `apt install dpdk libdpdk-dev`).
  * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
 ## eRPC quickstart
