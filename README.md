@@ -19,7 +19,7 @@ Some highlights:
    hints to install them on Ubuntu. See `scripts/fedora/` and `scripts/centos/`
    for other distros.
  * DPDK 17.11 or newer must be installed system-wide (e.g.,
-   `apt install dpdk libdpdk-dev`).
+   `apt install dpdk libdpdk-dev dpdk-igb-uio-dkms`).
  * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
 ## eRPC quickstart

@@ -22,7 +22,7 @@ sudo apt -y install libpmem-dev
 
 # ppa for DPDK 17.11 if needed
 sudo add-apt-repository -y ppa:nbritton/dpdk
-sudo apt -y install dpdk libdpdk-dev
+sudo apt -y install dpdk libdpdk-dev dpdk-igb-uio-dkms
 
 ###
 ### Optional convenience packages
