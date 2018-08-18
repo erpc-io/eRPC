@@ -1,21 +1,7 @@
 #!/usr/bin/env bash
 # Script to bind an Intel Ethernet NIC to DPDK on any CloudLab cluster
-dpdk=~/dpdk
 
-if [ ! -d "$dpdk" ]; then
-  echo "DPDK directory "$dpdk" does not exist"
-  exit
-fi
-
-# Load DPDK kernel modules
-sudo modprobe uio
-
-if [ ! -f "$dpdk"/x86_64-native-linuxapp-gcc/kmod/igb_uio.ko ]; then
-  echo "igb_uio not found in $dpdk"
-  exit
-fi
-
-sudo insmod "$dpdk"/x86_64-native-linuxapp-gcc/kmod/igb_uio.ko
+sudo modprobe uio igb_uio
 
 # Bind CloudLab's experimental interface (10.*.*.*) to DPDK
 (cd $(dirname $0); rm ifname; g++ -std=c++11 -o ifname ifname.cc)
@@ -23,7 +9,7 @@ ifname=`"$(dirname $0)"/ifname 10.`
 echo "Binding interface "$ifname" to DPDK"
 
 sudo ifconfig "$ifname" down
-sudo "$dpdk"/usertools/dpdk-devbind.py --bind=igb_uio "$ifname"
+sudo dpdk-devbind --bind=igb_uio "$ifname"
 
 # Create hugepage mount
 # sudo mkdir -p /mnt/huge
