@@ -63,7 +63,9 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
 }
 
 void DpdkTransport::do_per_process_dpdk_init() {
-  const char *rte_argv[] = {"-c", "1", "-n", "4", "--log-level", "0", nullptr};
+  // n: channels, m: maximum memory in gigabytes
+  const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
+                            "0",  "-m", "2048", nullptr};
   int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
   int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
   rt_assert(ret >= 0, "rte_eal_init failed");
