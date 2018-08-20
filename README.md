@@ -15,11 +15,10 @@ Some highlights:
 
 ## Software requirements
  * Toolchain: A C++11 compiler and CMake 2.8+
- * NIC drivers: The latest Mellanox OFED, and a system-wide DPDK installation
-   (`apt install dpdk libdpdk-dev dpdk-igb-uio-dkms`).
- * See `scripts/packages.sh` for a list of other required software packages and
-   hints to install them on Ubuntu. See `scripts/fedora/` and `scripts/centos/`
-   for other distros.
+ * The latest NIC drivers: Mellanox OFED, and a system-wide DPDK installation.
+   Upstream versions of `libibverbs` _won't_ work due to missing experimental
+   features, but upstream DPDK is fine.
+ * See `scripts/packages/` for required software packages for your distro.
  * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
 ## eRPC quickstart

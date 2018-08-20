@@ -79,18 +79,12 @@
      requested RPC ID running, and `retry_connect_on_invalid_rpc_id` is set.
 
 ## Compile-time optimization notes:
- * Optimizations for `small_rpc_tput`:
-   * Each of these optimizations can help a fair bit (5-10%) individually, but
-     the benefits do not stack.
-   * Disable datapath checks and datapath stats.
-   * Use O2 intead of O3. Try profile-guided optimization.
-   * Use power-of-two number of sessions and avoid Lemire's trick in app.
  * Optimizations for `consensus`:
    * Set session request window to 1, or implement Rpc flush.
    * Set transport max inline size to 120 bytes for ConnectX-3.
- * Unsetting `TESTING` disables support to inject eRPC faults at runtime.
 
 ## Short-term TODOs
+ * Session management timeouts should not scan all sessions.
  * Session reset and machine failure detection broke when I changed session
    management to use UDP instead of ENet.
  * In `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
