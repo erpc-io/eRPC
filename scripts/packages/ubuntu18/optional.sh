@@ -1,36 +1,14 @@
 #!/bin/bash
 #
-# This script sets up a fresh Ubuntu 18.04 box for eRPC.
-#
-# For best perforamance, Mellanox OFED should be installed by downloading from
-# Mellanox. However, eRPC should work with upstream mlx* packages as well
+# Convenience packages for eRPC development, and application-specific packages
 
-###
-### Required packages
-###
-
-sudo apt update
-sudo apt -y install g++-8 cmake libnuma-dev numactl bc libgflags-dev
-
-# GTest is special for some reason
-sudo apt -y install libgtest-dev
-(cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
+# General packages not specific to eRPC
+sudo apt install -y numactl bc htop memcached libmemcached-dev clang-format \
+  exuberant-ctags silversearcher-ag sloccount apcalc
 
 # libpmem currently requires a ppa
 sudo add-apt-repository -y ppa:ahasenack/nvdimm-update
 sudo apt -y install libpmem-dev
-
-# ppa for DPDK 17.11 if needed
-sudo add-apt-repository -y ppa:nbritton/dpdk
-sudo apt -y install dpdk libdpdk-dev dpdk-igb-uio-dkms
-
-###
-### Optional convenience packages
-###
-
-# General packages not specific to eRPC
-sudo apt install -y htop memcached libmemcached-dev clang-format \
-  exuberant-ctags silversearcher-ag sloccount apcalc
 
 # Fuzzy find configuration
 git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf

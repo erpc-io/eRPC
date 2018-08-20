@@ -13,8 +13,7 @@ sudo apt -y install g++-8 cmake
 sudo apt -y install libnuma-dev libgflags-dev libgtest-dev
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
 
-# Verbs drivers
-sudo apt -y install libibverbs-dev ibverbs-providers 
-
 # DPDK drivers
 sudo apt -y install dpdk libdpdk-dev dpdk-igb-uio-dkms
+
+# Verbs drivers must be installed from Mellanox OFED
