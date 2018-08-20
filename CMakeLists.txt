@@ -31,7 +31,7 @@ find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
 if (DPDK_INCLUDE_DIR)
   message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
 else()
-  message(FATAL_ERROR "DPDK include directory not found")
+  message(FATAL_ERROR "DPDK include directory not found. Please install DPDK.")
 endif()
 include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
