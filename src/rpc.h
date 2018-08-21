@@ -305,13 +305,6 @@ class Rpc {
   void handle_disconnect_req_st(const SmPkt &);
   void handle_disconnect_resp_st(const SmPkt &);
 
-  /**
-   * @brief Try to reset sessions connected to \p rem_hostname.
-   * @return True if all such sessions was reset successfully. False if the
-   * reset event needs to be queued and processed later.
-   */
-  bool handle_reset_st(const std::string rem_hostname);
-
   /// Try to reset a client session. If this is not currently possible, the
   /// session state must be set to reset-in-progress.
   bool handle_reset_client_st(Session *session);

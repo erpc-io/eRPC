@@ -7,37 +7,6 @@
 namespace erpc {
 
 template <class TTr>
-bool Rpc<TTr>::handle_reset_st(const std::string reset_rem_hostname) {
-  assert(in_dispatch());
-  LOG_INFO("Rpc %u: Handling reset event for remote hostname = %s.\n", rpc_id,
-           reset_rem_hostname.c_str());
-
-  drain_tx_batch_and_dma_queue();
-
-  bool success_all = true;
-
-  for (Session *session : session_vec) {
-    // Filter sessions connected to the reset hostname
-    if (session == nullptr) continue;
-
-    bool success_one;
-    if (session->is_client()) {
-      if (session->server.hostname != reset_rem_hostname) continue;
-      success_one = handle_reset_client_st(session);
-    } else {
-      if (session->client.hostname != reset_rem_hostname) continue;
-      success_one = handle_reset_server_st(session);
-    }
-
-    // If reset succeeds, the session is freed
-    if (!success_one) assert(session->state == SessionState::kResetInProgress);
-    success_all &= success_one;
-  }
-
-  return success_all;
-}
-
-template <class TTr>
 bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   assert(in_dispatch());
   assert(session->is_client());
