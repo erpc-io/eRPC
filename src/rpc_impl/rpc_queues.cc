@@ -56,7 +56,7 @@ template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
   assert(in_dispatch());
   auto &queue = bg_queues.enqueue_request;
-  size_t cmds_to_process = queue.size;  // We might re-add to the queue
+  const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
 
   for (size_t i = 0; i < cmds_to_process; i++) {
     enq_req_args_t args = queue.unlocked_pop();
@@ -68,9 +68,10 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
   assert(in_dispatch());
-  MtQueue<ReqHandle *> &queue = bg_queues.enqueue_response;
+  auto &queue = bg_queues.enqueue_response;
+  const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
 
-  while (queue.size > 0) {
+  for (size_t i = 0; i < cmds_to_process; i++) {
     ReqHandle *req_handle = queue.unlocked_pop();
     enqueue_response(req_handle);
   }
@@ -79,9 +80,10 @@ void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_release_response_st() {
   assert(in_dispatch());
-  MtQueue<RespHandle *> &queue = bg_queues.release_response;
+  auto &queue = bg_queues.release_response;
+  const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
 
-  while (queue.size > 0) {
+  for (size_t i = 0; i < cmds_to_process; i++) {
     RespHandle *resp_handle = queue.unlocked_pop();
     release_response(resp_handle);
   }
