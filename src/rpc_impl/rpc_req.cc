@@ -242,7 +242,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   sslot->server_info.req_func_type = req_func.req_func_type;
 
   // req_msgbuf here is independent of the RX ring, so don't make another copy
-  if (!req_func.is_background()) {
+  if (likely(!req_func.is_background())) {
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
   } else {
     submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
