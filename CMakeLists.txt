@@ -18,7 +18,7 @@ add_definitions(-Wno-keyword-macro)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa pthread gflags ibverbs dpdk)
+set(LIBRARIES ${LIBRARIES} rt numa pthread gflags ibverbs dpdk dl)
 
 # Testing
 enable_testing()

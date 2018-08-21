@@ -1,6 +1,7 @@
 #include <iomanip>
 #include <stdexcept>
 
+#include <rte_version.h>
 #include <set>
 #include "dpdk_transport.h"
 #include "util/huge_alloc.h"
@@ -70,7 +71,11 @@ void DpdkTransport::do_per_process_dpdk_init() {
   int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
   rt_assert(ret >= 0, "rte_eal_init failed");
 
-  uint16_t num_ports = rte_eth_dev_count();  // Deprecated
+#if RTE_VER_YEAR < 18
+  uint16_t num_ports = rte_eth_dev_count();
+#else
+  uint16_t num_ports = rte_eth_dev_count_avail();
+#endif
   rt_assert(num_ports > phy_port, "Too few ports");
 
   rte_eth_dev_info dev_info;
@@ -84,7 +89,9 @@ void DpdkTransport::do_per_process_dpdk_init() {
 
   eth_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
   eth_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+#if RTE_VER_YEAR < 18
   eth_conf.rxmode.ignore_offload_bitfield = 1;  // Use offloads below instead
+#endif
   eth_conf.rxmode.offloads = 0;
 
   eth_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
@@ -146,7 +153,9 @@ void DpdkTransport::do_per_process_dpdk_init() {
     eth_tx_conf.tx_thresh.wthresh = 0;
     eth_tx_conf.tx_free_thresh = 0;
     eth_tx_conf.tx_rs_thresh = 0;
+#if RTE_VER_YEAR < 18
     eth_tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;  // Use offloads below instead
+#endif
     eth_tx_conf.offloads = kOffloads;
     ret = rte_eth_tx_queue_setup(phy_port, i, kNumTxRingDesc, numa_node,
                                  &eth_tx_conf);

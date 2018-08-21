@@ -44,6 +44,7 @@ flags = [
     '-I' + str(home_dir) + '/eRPC/mica/src',
     '-I' + str(home_dir) + '/masstree-beta',
     '-isystem' + '/usr/include/dpdk',
+    '-isystem' + '/usr/local/include/dpdk',
     '-Wall',
     '-Werror',
     '-Wextra',
