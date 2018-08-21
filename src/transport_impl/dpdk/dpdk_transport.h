@@ -28,7 +28,10 @@ class DpdkTransport : public Transport {
   static constexpr size_t kNumTxRingDesc = 128;
   static constexpr size_t kPostlist = 32;
 
-  /// For now, this is just for Rpc to size its array of control Msgbufs
+  // The PMD may inline internally, but this class doesn't do it
+  static constexpr size_t kMaxInline = 0;
+
+  // For now, this is just for erpc::Rpc to size its array of control Msgbufs
   static constexpr size_t kUnsigBatch = 32;
 
   /// Maximum number of packets received in rx_burst
