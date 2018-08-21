@@ -977,8 +977,11 @@ class Rpc {
   UDPClient<SmPkt> udp_client;  ///< UDP endpoint used to send SM packets
   Nexus::Hook nexus_hook;       ///< A hook shared with the Nexus
 
-  /// The insert-only map of unique tokens received in session connect
-  /// requests, to the session's index in the session vector.
+  /// To avoid allocating a new session on receiving a duplicate session
+  /// connect request, the server remembers all (! XXX) the unique connect
+  /// requests it has received. To accomplish this, the client generates a
+  /// globally-unique (! XXX) token for the first copy of its connect request.
+  /// The server saves maps this token to the index of the allocated session.
   std::map<conn_req_uniq_token_t, uint16_t> conn_req_token_map;
 
   /// All the faults that can be injected into eRPC for testing
