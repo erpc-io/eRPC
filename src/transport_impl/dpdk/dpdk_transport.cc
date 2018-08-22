@@ -65,21 +65,6 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   LOG_WARN("DpdkTransport created for ID %u.\n", rpc_id);
 }
 
-static void check_supported_filters(uint8_t phy_port) {
-  size_t num_filter_types = 0;
-  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
-    LOG_INFO("Port %u supports flow director filter.\n", phy_port);
-    num_filter_types++;
-  }
-
-  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
-    LOG_INFO("Port %u supports ntuple filter.\n", phy_port);
-    num_filter_types++;
-  }
-
-  rt_assert(num_filter_types > 0, "No filters supported");
-}
-
 void DpdkTransport::do_per_process_dpdk_init() {
   // n: channels, m: maximum memory in gigabytes
   const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
@@ -123,11 +108,9 @@ void DpdkTransport::do_per_process_dpdk_init() {
   ret = rte_eth_dev_configure(phy_port, kMaxQueues, kMaxQueues, &eth_conf);
   rt_assert(ret == 0, "Ethdev configuration error: ", strerror(-1 * ret));
 
-  check_supported_filters(phy_port);
-
-  // FILTER_SET fails for ixgbe, even though it supports flow director. As a
-  // workaround, don't call FILTER_SET if ntuple filter is supported.
-  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) != 0) {
+  // Set flow director fields if flow director is supported. It's OK if the
+  // FILTER_SET command fails (e.g., on ConnectX-4 NICs).
+  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
     struct rte_eth_fdir_filter_info fi;
     memset(&fi, 0, sizeof(fi));
     fi.info_type = RTE_ETH_FDIR_FILTER_INPUT_SET_SELECT;
@@ -138,7 +121,9 @@ void DpdkTransport::do_per_process_dpdk_init() {
     fi.info.input_set_conf.op = RTE_ETH_INPUT_SET_SELECT;
     ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
                                   RTE_ETH_FILTER_SET, &fi);
-    rt_assert(ret == 0, "Failed to configure flow director fields");
+    if (ret != 0) {
+      LOG_WARN("Failed to set fdir fields. This could be survivable.\n");
+    }
   }
 
   // Set up all RX and TX queues and start the device. This can't be done later
@@ -214,15 +199,18 @@ void DpdkTransport::resolve_phy_port() {
   rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
   rt_assert(link.link_status == ETH_LINK_UP, "Link down");
 
-  // XXX: For x710 and DPDK 17.11, link_speed is zero, so hard code 10 Gbps for
-  // now.
-  //
-  // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.
-  // rt_assert(link.link_speed >= 10000, "Link too slow");
-  // LOG_INFO("Port %u bandwidth is %u Mbps\n", phy_port, link.link_speed);
-  // resolve.bandwidth =
-  // static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
-  resolve.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
+  if (link.link_speed != ETH_SPEED_NUM_NONE) {
+    // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.
+    rt_assert(link.link_speed >= 10000, "Link too slow");
+    LOG_INFO("Port %u bandwidth reported by DPDK = %u Mbps\n", phy_port,
+             link.link_speed);
+    resolve.bandwidth =
+        static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
+  } else {
+    LOG_INFO("Port %u bandwidth not reported by DPDK. Using default 10 Gbps.\n",
+             phy_port);
+    resolve.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
+  }
 }
 
 void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
@@ -257,12 +245,11 @@ bool DpdkTransport::resolve_remote_routing_info(
 
 // Install a rule for rx_flow_udp_port
 void DpdkTransport::install_flow_rule() {
-  LOG_WARN("Rpc %u installing flow rule. Queue %zu, RX UDP port = %u.\n",
-           rpc_id, qp_id, rx_flow_udp_port);
+  bool installed = false;
 
+  // Try the simplest filter first. I couldn't get FILTER_FDIR to work with
+  // ixgbe, although it technically supports flow director.
   if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
-    // Use 5-tuple filter for ixgbe even though it technically supports
-    // FILTER_FDIR. I couldn't get FILTER_FDIR to work with ixgbe.
     struct rte_eth_ntuple_filter ntuple;
     memset(&ntuple, 0, sizeof(ntuple));
     ntuple.flags = RTE_5TUPLE_FLAGS;
@@ -275,8 +262,18 @@ void DpdkTransport::install_flow_rule() {
 
     int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_NTUPLE,
                                       RTE_ETH_FILTER_ADD, &ntuple);
-    rt_assert(ret == 0, "Failed to add 5-tuple entry: ", strerror(-1 * ret));
-  } else if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
+    if (ret != 0) {
+      LOG_WARN("Failed to add ntuple filter. This could be survivable.\n");
+    } else {
+      LOG_WARN(
+          "Rpc %u installed ntuple flow rule. Queue %zu, RX UDP port = %u.\n",
+          rpc_id, qp_id, rx_flow_udp_port);
+    }
+    installed = (ret == 0);
+  }
+
+  if (!installed &&
+      rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
     // Use fdir filter for i40e (5-tuple not supported)
     rte_eth_fdir_filter filter;
     memset(&filter, 0, sizeof(filter));
@@ -290,9 +287,11 @@ void DpdkTransport::install_flow_rule() {
 
     int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
                                       RTE_ETH_FILTER_ADD, &filter);
-    rt_assert(ret == 0, "Failed to add fdir entry: ", strerror(-1 * ret));
-  } else {
-    rt_assert(false, "No flow director filters supported");
+    rt_assert(ret == 0, "Failed to add flow rule: ", strerror(-1 * ret));
+
+    LOG_WARN(
+        "Rpc %u installed flow-director rule. Queue %zu, RX UDP port = %u.\n",
+        rpc_id, qp_id, rx_flow_udp_port);
   }
 }
 
