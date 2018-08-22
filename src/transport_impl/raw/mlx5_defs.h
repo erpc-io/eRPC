@@ -5,6 +5,8 @@
 
 #pragma once
 
+#ifndef DPDK
+
 #include <infiniband/verbs_exp.h>
 #include <inttypes.h>
 #include <linux/types.h>
@@ -176,3 +178,5 @@ struct mlx5_cq {
 };
 
 }  // namespace erpc
+
+#endif

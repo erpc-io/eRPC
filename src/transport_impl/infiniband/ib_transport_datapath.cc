@@ -1,3 +1,5 @@
+#ifndef DPDK
+
 #include "ib_transport.h"
 
 namespace erpc {
@@ -178,3 +180,5 @@ void IBTransport::post_recvs(size_t num_recvs) {
 }
 
 }  // namespace erpc
+
+#endif

@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#ifndef DPDK
+
 #include "transport.h"
 #include "transport_impl/verbs_common.h"
 #include "util/logger.h"
@@ -175,3 +177,5 @@ class IBTransport : public Transport {
 };
 
 }  // namespace erpc
+
+#endif

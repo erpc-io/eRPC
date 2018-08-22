@@ -18,22 +18,11 @@ add_definitions(-Wno-keyword-macro)
 add_definitions(-march=native)
 add_definitions(-g)
 
-set(LIBRARIES ${LIBRARIES} rt numa pthread gflags ibverbs dpdk dl)
+set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
 # Testing
 enable_testing()
 find_package(GTest REQUIRED)
-
-# DPDK include directory. Locating rte_config.h does not work on some systems.
-# Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked from
-# the real dpdk include directory (/usr/include/dpdk/).
-find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
-if (DPDK_INCLUDE_DIR)
-  message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
-else()
-  message(FATAL_ERROR "DPDK include directory not found. Please install DPDK.")
-endif()
-include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party)
@@ -50,21 +39,6 @@ set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(PERF "Compile for performance" OFF)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
-
-# Profile-guided optimization
-if(TRANSPORT STREQUAL "infiniband")
-  SET(CONFIG_TRANSPORT "IBTransport")
-  SET(CONFIG_HEADROOM 0)
-elseif(TRANSPORT STREQUAL "raw")
-  SET(CONFIG_TRANSPORT "RawTransport")
-  SET(CONFIG_HEADROOM 40)
-elseif(TRANSPORT STREQUAL "dpdk")
-  SET(CONFIG_TRANSPORT "DpdkTransport")
-  SET(CONFIG_HEADROOM 40)
-endif()
-MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
-
-configure_file(src/config.h.in src/config.h)
 
 # Parse the user-exposed options
 if(PERF)
@@ -170,14 +144,47 @@ set(SOURCES
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/transport_impl/transport.cc
-  src/transport_impl/dpdk/dpdk_transport.cc
-  src/transport_impl/dpdk/dpdk_transport_datapath.cc
-  src/transport_impl/infiniband/ib_transport.cc
-  src/transport_impl/infiniband/ib_transport_datapath.cc
-  src/transport_impl/raw/raw_transport.cc
-  src/transport_impl/raw/raw_transport_datapath.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
+
+# Transport-specific. DPDK does not play well with Mellanox OFED.
+if(TRANSPORT STREQUAL "dpdk")
+  add_definitions(-DDPDK=true)
+  set(LIBRARIES ${LIBRARIES} dpdk dl)
+  set(SOURCES ${SOURCES}
+    src/transport_impl/dpdk/dpdk_transport.cc
+    src/transport_impl/dpdk/dpdk_transport_datapath.cc)
+  SET(CONFIG_TRANSPORT "DpdkTransport")
+  SET(CONFIG_HEADROOM 40)
+
+  # DPDK include directory. Locating rte_config.h does not work on some systems.
+  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+  # from the real DPDK include directory (/usr/include/dpdk/).
+  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  if (DPDK_INCLUDE_DIR)
+    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+  else()
+    message(FATAL_ERROR "DPDK include directory not found. Please install DPDK.")
+  endif()
+  include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+else()
+  set(LIBRARIES ${LIBRARIES} ibverbs)
+  set(SOURCES ${SOURCES}
+    src/transport_impl/infiniband/ib_transport.cc
+    src/transport_impl/infiniband/ib_transport_datapath.cc
+    src/transport_impl/raw/raw_transport.cc
+    src/transport_impl/raw/raw_transport_datapath.cc)
+  if(TRANSPORT STREQUAL "raw")
+    SET(CONFIG_TRANSPORT "RawTransport")
+    SET(CONFIG_HEADROOM 40)
+  elseif(TRANSPORT STREQUAL "infiniband")
+    SET(CONFIG_TRANSPORT "IBTransport")
+    SET(CONFIG_HEADROOM 0)
+  endif()
+endif()
+
+MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
+configure_file(src/config.h.in src/config.h)
 
 # MICA sources
 set(MICA_SOURCES
@@ -203,8 +210,10 @@ set(PROTOCOL_TESTS
   rpc_rfr_test
   rpc_kick_test)
 
-set(TRANSPORT_TESTS
-  raw_transport_test)
+if(TRANSPORT STREQUAL "raw")
+  set(TRANSPORT_TESTS
+    raw_transport_test)
+endif()
 
 # These are not run using ctest
 set(UTIL_TESTS

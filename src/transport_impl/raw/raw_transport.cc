@@ -1,3 +1,5 @@
+#ifndef DPDK
+
 #include <iomanip>
 #include <stdexcept>
 
@@ -430,3 +432,5 @@ void RawTransport::init_sends() {
 }
 
 }  // namespace erpc
+
+#endif

@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#ifndef DPDK
+
 #include <dirent.h>
 #include <infiniband/verbs.h>
 #include <string>
@@ -240,5 +242,6 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
   xmsg << "Failed to resolve RoCE port index " << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
-
 }  // namespace erpc
+
+#endif

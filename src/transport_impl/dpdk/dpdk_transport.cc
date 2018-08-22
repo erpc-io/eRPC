@@ -1,3 +1,5 @@
+#ifdef DPDK
+
 #include <iomanip>
 #include <stdexcept>
 
@@ -291,3 +293,5 @@ void DpdkTransport::init_mem_reg_funcs() {
   dereg_mr_func = std::bind(dpdk_dereg_mr_wrapper, _1);
 }
 }  // namespace erpc
+
+#endif

@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#ifndef DPDK
+
 #include "mlx5_defs.h"
 #include "transport.h"
 #include "transport_impl/eth_common.h"
@@ -230,3 +232,5 @@ class RawTransport : public Transport {
 };
 
 }  // namespace erpc
+
+#endif

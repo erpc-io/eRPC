@@ -1,3 +1,5 @@
+#ifdef DPDK
+
 #include "dpdk_transport.h"
 #include "util/huge_alloc.h"
 
@@ -106,3 +108,5 @@ void DpdkTransport::post_recvs(size_t num_recvs) {
 }
 
 }  // namespace erpc
+
+#endif

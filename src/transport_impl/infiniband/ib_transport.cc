@@ -1,3 +1,5 @@
+#ifndef DPDK
+
 #include <iomanip>
 #include <stdexcept>
 
@@ -251,3 +253,5 @@ void IBTransport::init_sends() {
 }
 
 }  // namespace erpc
+
+#endif

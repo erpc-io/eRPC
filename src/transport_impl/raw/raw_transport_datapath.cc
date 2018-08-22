@@ -1,3 +1,5 @@
+#ifndef DPDK
+
 #include "raw_transport.h"
 #include "util/huge_alloc.h"
 
@@ -258,3 +260,5 @@ void RawTransport::post_recvs(size_t num_recvs) {
   // Nothing should be here
 }
 }  // namespace erpc
+
+#endif
