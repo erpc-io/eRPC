@@ -15,9 +15,9 @@ Some highlights:
 
 ## Software requirements
  * Toolchain: A C++11 compiler and CMake 2.8+
- * The latest NIC drivers: Mellanox OFED, and a system-wide DPDK installation.
-   Upstream versions of `libibverbs` _won't_ work due to missing experimental
-   features, but upstream DPDK is fine.
+ * Install _exactly one_ of the following, mutually-incompatible packages:
+   * Mellanox OFED for Mellanox NICs
+   * System-wide DPDK for other DPDK-compatible NICs
  * See `scripts/packages/` for required software packages for your distro.
  * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
 
