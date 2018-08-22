@@ -65,6 +65,21 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   LOG_WARN("DpdkTransport created for ID %u.\n", rpc_id);
 }
 
+static void check_supported_filters(uint8_t phy_port) {
+  size_t num_filter_types = 0;
+  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
+    LOG_INFO("Port %u supports flow director filter.\n", phy_port);
+    num_filter_types++;
+  }
+
+  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
+    LOG_INFO("Port %u supports ntuple filter.\n", phy_port);
+    num_filter_types++;
+  }
+
+  rt_assert(num_filter_types > 0, "No filters supported");
+}
+
 void DpdkTransport::do_per_process_dpdk_init() {
   // n: channels, m: maximum memory in gigabytes
   const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
@@ -107,6 +122,8 @@ void DpdkTransport::do_per_process_dpdk_init() {
 
   ret = rte_eth_dev_configure(phy_port, kMaxQueues, kMaxQueues, &eth_conf);
   rt_assert(ret == 0, "Ethdev configuration error: ", strerror(-1 * ret));
+
+  check_supported_filters(phy_port);
 
   // FILTER_SET fails for ixgbe, even though it supports flow director. As a
   // workaround, don't call FILTER_SET if ntuple filter is supported.
