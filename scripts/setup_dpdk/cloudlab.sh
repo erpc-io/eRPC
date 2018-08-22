@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Script to bind an Intel Ethernet NIC to DPDK on any CloudLab cluster
 
-sudo modprobe igb_uio
+sudo modprobe uio igb_uio
 
 # Bind CloudLab's experimental interface (10.*.*.*) to DPDK
 (cd $(dirname $0); rm ifname; g++ -std=c++11 -o ifname ifname.cc)
