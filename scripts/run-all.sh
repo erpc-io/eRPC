@@ -25,7 +25,7 @@ for ((i = 0; i < $autorun_num_processes; i++)); do
   err_file="$autorun_err_prefix-$i"
 
   echo "run-all: Starting process-$i on $name, NUMA $numa_node"
-	ssh -oStrictHostKeyChecking=no $name "\
+  ssh -oStrictHostKeyChecking=no $name "\
     sudo rm -rf /tmp/${autorun_app}*; \
     cd $autorun_erpc_home; \
     source scripts/utils.sh; \
