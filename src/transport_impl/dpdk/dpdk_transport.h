@@ -84,8 +84,9 @@ class DpdkTransport : public Transport {
   void post_recvs(size_t num_recvs);
 
  private:
-  /// Perform once-per-process DPDK initialization
-  void do_per_process_dpdk_init();
+  /// Do DPDK initialization for \p phy_port. \p phy_port must not have been
+  /// initialized.
+  void setup_phy_port();
 
   /**
    * @brief Resolve fields in \p resolve using \p phy_port

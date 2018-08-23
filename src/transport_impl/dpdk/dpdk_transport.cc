@@ -12,14 +12,15 @@ namespace erpc {
 
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 
-/// The set of queue IDs in use by Rpc objects in this process
-static std::set<size_t> used_qp_ids;
-
-/// mempool_arr[i] is the mempool to use for queue i
-rte_mempool *mempool_arr[DpdkTransport::kMaxQueues];
-
 static std::mutex eal_lock;
 static volatile bool eal_initialized;
+static volatile bool port_initialized[RTE_MAX_ETHPORTS];
+
+/// The set of queue IDs in use by Rpc objects in this process
+static std::set<size_t> used_qp_ids[RTE_MAX_ETHPORTS];
+
+/// mempool_arr[i][j] is the mempool to use for port i, queue j
+rte_mempool *mempool_arr[RTE_MAX_ETHPORTS][DpdkTransport::kMaxQueues];
 
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
@@ -40,20 +41,30 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
                rpc_id, qp_id);
     } else {
       LOG_INFO("Rpc %u initializing DPDK, queues ID = %zu.\n", rpc_id, qp_id);
-      do_per_process_dpdk_init();
+
+      // n: channels, m: maximum memory in gigabytes
+      const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
+                                "0",  "-m", "2048", nullptr};
+      int rte_argc =
+          static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
+      int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
+      rt_assert(ret >= 0, "rte_eal_init failed");
+
       eal_initialized = true;
     }
 
-    // If we are here, EAL is initialized
-    rt_assert(used_qp_ids.size() < kMaxQueues, "No queues left");
+    if (!port_initialized[phy_port]) setup_phy_port();
+
+    // If we are here, EAL and phy_port are initialized
+    rt_assert(used_qp_ids[phy_port].size() < kMaxQueues, "No queues left");
     for (size_t i = 0; i < kMaxQueues; i++) {
-      if (used_qp_ids.count(i) == 0) {
+      if (used_qp_ids[phy_port].count(i) == 0) {
         qp_id = i;
-        mempool = mempool_arr[qp_id];
+        mempool = mempool_arr[phy_port][qp_id];
         break;
       }
     }
-    used_qp_ids.insert(qp_id);
+    used_qp_ids[phy_port].insert(qp_id);
 
     eal_lock.unlock();
   }
@@ -65,14 +76,7 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   LOG_WARN("DpdkTransport created for ID %u.\n", rpc_id);
 }
 
-void DpdkTransport::do_per_process_dpdk_init() {
-  // n: channels, m: maximum memory in gigabytes
-  const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
-                            "0",  "-m", "2048", nullptr};
-  int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
-  int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
-  rt_assert(ret >= 0, "rte_eal_init failed");
-
+void DpdkTransport::setup_phy_port() {
 #if RTE_VER_YEAR < 18
   uint16_t num_ports = rte_eth_dev_count();
 #else
@@ -82,7 +86,7 @@ void DpdkTransport::do_per_process_dpdk_init() {
 
   char port_name[RTE_ETH_NAME_MAX_LEN];
   rte_eth_dev_get_name_by_port(phy_port, port_name);
-  LOG_INFO("Using port %s\n", port_name);
+  LOG_INFO("Initializing port %s\n", port_name);
 
   rte_eth_dev_info dev_info;
   rte_eth_dev_info_get(phy_port, &dev_info);
@@ -109,7 +113,7 @@ void DpdkTransport::do_per_process_dpdk_init() {
   eth_conf.fdir_conf.mask.dst_port_mask = 0xffff;
   eth_conf.fdir_conf.drop_queue = 0;
 
-  ret = rte_eth_dev_configure(phy_port, kMaxQueues, kMaxQueues, &eth_conf);
+  int ret = rte_eth_dev_configure(phy_port, kMaxQueues, kMaxQueues, &eth_conf);
   rt_assert(ret == 0, "Ethdev configuration error: ", strerror(-1 * ret));
 
   // Set flow director fields if flow director is supported. It's OK if the
@@ -136,7 +140,7 @@ void DpdkTransport::do_per_process_dpdk_init() {
   // and reconfiguring the device.
   for (size_t i = 0; i < kMaxQueues; i++) {
     std::string pname = "mempool-rpc-" + std::to_string(i);
-    mempool_arr[i] =
+    mempool_arr[phy_port][i] =
         rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
                                 0 /* priv size */, kMbufSize, numa_node);
     rt_assert(mempool_arr[i] != nullptr,
@@ -151,7 +155,7 @@ void DpdkTransport::do_per_process_dpdk_init() {
     eth_rx_conf.rx_drop_en = 0;
 
     int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
-                                     &eth_rx_conf, mempool_arr[i]);
+                                     &eth_rx_conf, mempool_arr[phy_port][i]);
     rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(i));
 
     rte_eth_txconf eth_tx_conf;
@@ -186,7 +190,7 @@ DpdkTransport::~DpdkTransport() {
 
   {
     eal_lock.lock();
-    used_qp_ids.erase(used_qp_ids.find(qp_id));
+    used_qp_ids[phy_port].erase(used_qp_ids[phy_port].find(qp_id));
     eal_lock.unlock();
   }
 }
