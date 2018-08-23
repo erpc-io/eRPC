@@ -40,7 +40,7 @@ void simple_disconnect(Nexus *nexus, size_t) {
   AppContext context;
   context.rpc =
       new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestPhyPort);
+                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
   auto *rpc = context.rpc;
 
   // Create the session
@@ -86,7 +86,7 @@ void disconnect_multi(Nexus *nexus, size_t) {
   AppContext context;
   context.rpc =
       new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestPhyPort);
+                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
   auto *rpc = context.rpc;
 
   // The number of sessions we can create before running out of ring buffers
@@ -140,7 +140,7 @@ void disconnect_remote_error(Nexus *nexus, size_t) {
   AppContext context;
   context.rpc =
       new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestPhyPort);
+                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
   auto *rpc = context.rpc;
 
   // Create a session that uses an invalid remote port
@@ -173,7 +173,7 @@ void disconnect_local_error(Nexus *nexus, size_t) {
   AppContext context;
   context.rpc =
       new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestPhyPort);
+                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
   auto *rpc = context.rpc;
 
   // Force Rpc to fail remote routing info resolution at client

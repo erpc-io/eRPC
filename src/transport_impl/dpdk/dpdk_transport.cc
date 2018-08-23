@@ -53,7 +53,10 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
       eal_initialized = true;
     }
 
-    if (!port_initialized[phy_port]) setup_phy_port();
+    if (!port_initialized[phy_port]) {
+      port_initialized[phy_port] = true;
+      setup_phy_port();
+    }
 
     // If we are here, EAL and phy_port are initialized
     rt_assert(used_qp_ids[phy_port].size() < kMaxQueues, "No queues left");
@@ -139,11 +142,12 @@ void DpdkTransport::setup_phy_port() {
   // Once the device is started, more queues cannot be added without stopping
   // and reconfiguring the device.
   for (size_t i = 0; i < kMaxQueues; i++) {
-    std::string pname = "mempool-rpc-" + std::to_string(i);
+    std::string pname =
+        "mempool-erpc-" + std::to_string(phy_port) + "-" + std::to_string(i);
     mempool_arr[phy_port][i] =
         rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
                                 0 /* priv size */, kMbufSize, numa_node);
-    rt_assert(mempool_arr[i] != nullptr,
+    rt_assert(mempool_arr[phy_port][i] != nullptr,
               "Mempool create failed: " + dpdk_strerror());
 
     rte_eth_rxconf eth_rx_conf;

@@ -12,9 +12,17 @@ using namespace erpc;
 static constexpr size_t kTestEventLoopMs = 200;
 static constexpr size_t kTestMaxEventLoopMs = 20000;  // 20 seconds
 static constexpr uint8_t kTestClientRpcId = 100;
+
+// Running unit tests with DPDK requires two ports
+#ifdef DPDK
 static constexpr uint8_t kTestServerRpcId = 200;
+#else
+static constexpr uint8_t kTestServerRpcId = kTestClientRpcId;
+#endif
+
 static constexpr uint8_t kTestReqType = 3;
-static constexpr uint8_t kTestPhyPort = 0;
+static constexpr uint8_t kTestClientPhyPort = 0;
+static constexpr uint8_t kTestServerPhyPort = 1;
 static constexpr size_t kTestNumaNode = 0;
 
 // Shared between client and server thread
@@ -126,7 +134,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
   context.is_client = false;
 
   Rpc<CTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
-                      kTestPhyPort);
+                      kTestServerPhyPort);
   if (kTesting) rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
 
   context.rpc = &rpc;
@@ -273,8 +281,9 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
   while (!all_servers_ready) usleep(1);
 
   context.is_client = true;
-  context.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                                    kTestClientRpcId, sm_handler, kTestPhyPort);
+  context.rpc =
+      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
+                          kTestClientRpcId, sm_handler, kTestClientPhyPort);
 
   // Connect the sessions
   context.session_num_arr = new int[num_sessions];

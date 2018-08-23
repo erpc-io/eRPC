@@ -30,9 +30,9 @@ void test_sm_handler(int session_num, SmEventType sm_event_type,
 void simple_connect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext context;
-  context.rpc =
-      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &test_sm_handler, kTestPhyPort);
+  context.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&context),
+                                    kTestClientRpcId, &test_sm_handler,
+                                    kTestClientPhyPort);
 
   // Connect the session
   context.exp_err = SmErrType::kNoError;
