@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-killall ib_write_bw
+source $(dirname $0)/opcode.sh
+killall $opcode
 
 # Check arguments
 if [ "$#" -ne 1 ]; then
@@ -10,6 +11,6 @@ fi
 size=`expr 1024 \* $1`
 
 # We need tx-depth=1 to have only one WRITE in flight
-ib_write_bw --gid-index=0 --port=3185 --ib-dev=mlx5_0 --ib-port=1 \
+$opcode --gid-index=0 --port=3185 --ib-dev=mlx5_0 --ib-port=1 \
   --tx-depth=1 --report_gbits --run_infinitely --duration=1 \
   --size=$size fawn-pluto0
