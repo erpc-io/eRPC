@@ -45,11 +45,11 @@
      This is used to invoke failure continuations during session resets.
 
 ## DPDK notes
- * The Ubuntu DPDK package is incompatible with Mellanox OFED. The main issue
+ * Ubuntu's DPDK package is incompatible with Mellanox OFED. The main issue
    is that Mellanox OFED ships with experimental features (`ibv_exp_*`) that
-   have different names in `ibverbs-providers` (maintained in `rdma-core`),
-   which is installed by DPDK. For example, headers for multi-packet RQs are
-   in `verbs_exp.h` in Mellanox OFED, but in `mlx5dv.h` in `ibverbs-providers`.
+   have different names in the upstream `libibverbs-dev` used by Ubuntu DPDK.
+   For example, headers for multi-packet RQs are in `verbs_exp.h` in Mellanox
+   OFED, but in `mlx5dv.h` in `ibverbs-providers`.
  * eRPC does not work in Azure as of August 2018: The DPDK driver for ConnectX-3
    NICs does not support any flow steering filters. It might be possible to use
    ConnectX-3 NICs in Ethernet mode with Mellanox's Raw transport, but the
