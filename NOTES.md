@@ -1,7 +1,6 @@
 ## Code notes
  * The packet number carried in packet headers may not match the packet's index
    in MsgBuffers.
- * If a function throws an exception, its documentation should say so.
  * The Rpc object cannot be destroyed by a background thread or while the
    foreground thread is in the event loop (i.e., by the request handler or
    continuation user code). This means that an initially valid Rpc object will
@@ -44,6 +43,17 @@
      that the sslot is not waiting for a response. Similarly, a non-null value
      of `sslot->tx_msgbuf` indicates that the sslot is waiting for a response.
      This is used to invoke failure continuations during session resets.
+
+## DPDK notes
+ * The Ubuntu DPDK package is incompatible with Mellanox OFED. The main issue
+   is that Mellanox OFED ships with experimental features (`ibv_exp_*`) that
+   have different names in `ibverbs-providers` (maintained in `rdma-core`),
+   which is installed by DPDK. For example, headers for multi-packet RQs are
+   in `verbs_exp.h` in Mellanox OFED, but in `mlx5dv.h` in `ibverbs-providers`.
+ * eRPC does not work in Azure as of August 2018: The DPDK driver for ConnectX-3
+   NICs does not support any flow steering filters. It might be possible to use
+   ConnectX-3 NICs in Ethernet mode with Mellanox's Raw transport, but the
+   current Raw transport implementation assumes `mlx5`.
 
 ## RPC failures
  * On session reset, the client may get continuation-with-failure callbacks.
@@ -105,7 +115,7 @@
    packet loss detection code in the event loop.
  * Handle MsgBuffer allocation failures in eRPC.
  * Create session objects from a hugepage-backed pool to reduce TLB misses.
- * The first packet size limit should be much smaller than MTU to improve RTT
+ * The first packet size limit could be smaller than MTU to improve RTT
    measurement accuracy (e.g., it could be around 256 bytes). This will need
    many changes, mostly to code that uses TTr::kMaxDataPerPkt.
    * We must ensure that a small response message packet or a credit return
@@ -115,7 +125,5 @@
      receiver can match RTT.
 
 ## Longer-term TODOs
- * Replace exit(-1) in non-destructor code with `rt_assert` IF it doesn't
-   reduce perf (`rt_assert` takes a string argument - does that cause overhead?)
  * Optimize `pkthdr_0` filling using preconstructed headers.
  * Need to have a test for session management request timeouts.
