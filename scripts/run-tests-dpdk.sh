@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
+#
 # Run all tests one by one in separate processes. This is needed because it is
-# difficult to repeatedly cleanup and reinitialize DPDK in one process.
+# difficult to repeatedly cleanup and reinitialize DPDK in one process, and
+# gtest does not support running test cases in separate processes.
 #
 # Run this script from the eRPC/ folder
 

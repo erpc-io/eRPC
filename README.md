@@ -6,7 +6,7 @@ Some highlights:
  * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
  * Performance for small RPCs: ~10 million 32-byte RPCs/second per CPU core
  * Low latency: 2.3 microseconds round-trip RPC latency with UDP over Ethernet
- * High bandwidth for large RPC: 40 Gbps transfer per CPU core for 8 MB RPCs
+ * High bandwidth for large RPC: 40 Gbps per CPU core for 8 MB RPCs
  * Scalability: 20000 RPC sessions per server
  * End-to-end congestion control that tolerates 100-way incasts
  * Nested RPCs, and long-running background RPCs
@@ -24,20 +24,22 @@ Some highlights:
 ## eRPC quickstart
  * Build and run the test suite:
    `cmake . -DPERF=OFF -DTRANSPORT=infiniband; make -j; sudo ctest`.
-   Here, `infiniband` should be replaced with `raw` for Mellanox Ethernet NICs,
-   or `dpdk` for Intel Ethernet NICs.
- * Generate the documentation: `doxygen`
+   * Here, `infiniband` should be replaced with `raw` for Mellanox Ethernet
+     NICs, or `dpdk` for Intel Ethernet NICs.
+   * A machine with two ports is needed to run the unit tests if DPDK is chosen.
+     Run `scripts/run-tests-dpdk.sh` instead of `ctest`.
  * Run the `hello_world` application:
    * `cd hello_world`
    * Edit the server and client hostnames in `common.h` 
    * `make`
    * Run `./server` at the server, and `./client` at the client
+ * Generate the documentation: `doxygen`
 
 ## Supported NICs:
- * UDP over Ethernet mode (`DTRANSPORT=raw`):
-   * ConnectX-4 or newer Mellanox Ethernet NICs
+ * UDP over Ethernet mode:
+   * ConnectX-4 or newer Mellanox Ethernet NICs: Use `DTRANSPORT=raw`
+   * Any NIC supported by DPDK: Use `DTRANSPORT=dpdk`
    * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
-   * Support for other NICs via DPDK is under development
  * InfiniBand mode (`DTRANSPORT=infiniband`): Any InfiniBand-compliant NICs
  * RoCE mode: Any RoCE-compilant NICs
  * Mellanox drivers specially optimized for eRPC are available in the `drivers`
