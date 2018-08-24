@@ -38,8 +38,8 @@ Some highlights:
 ## Supported NICs:
  * UDP over Ethernet mode:
    * ConnectX-4 or newer Mellanox Ethernet NICs: Use `DTRANSPORT=raw`
-   * Any DPDK-compatible NICs: Use `DTRANSPORT=dpdk`. Although Mellanox NICs
-     support DPDK, `raw` transport is faster for them.
+   * Any DPDK-compatible NICs: Use `DTRANSPORT=dpdk`. `raw` transport is faster
+     for Mellanox NICs, which also support DPDK.
    * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
  * InfiniBand mode (`DTRANSPORT=infiniband`): Any InfiniBand-compliant NICs
  * RoCE mode: Any RoCE-compilant NICs
