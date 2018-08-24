@@ -87,14 +87,12 @@ void DpdkTransport::setup_phy_port() {
 #endif
   rt_assert(num_ports > phy_port, "Too few ports");
 
-  char port_name[RTE_ETH_NAME_MAX_LEN];
-  rte_eth_dev_get_name_by_port(phy_port, port_name);
-  LOG_INFO("Initializing port %s\n", port_name);
-
   rte_eth_dev_info dev_info;
   rte_eth_dev_info_get(phy_port, &dev_info);
   rt_assert(dev_info.rx_desc_lim.nb_max >= kNumRxRingEntries,
             "Device RX ring too small");
+  LOG_INFO("Initializing port %u with driver %s\n", phy_port,
+           dev_info.driver_name);
 
   // Create per-thread RX and TX queues
   rte_eth_conf eth_conf;
