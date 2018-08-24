@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Print the name of an interface whose IP address starts with 10.
+// Print the names of interfaces whose IP address starts with 10. This is useful
+// to list experimental interface names on CloudLab.
 int main() {
   struct ifaddrs *addrs;
   getifaddrs(&addrs);
@@ -22,13 +23,11 @@ int main() {
 
       // Check for 10.
       if (ip_addr[0] == '1' && ip_addr[1] == '0' && ip_addr[2] == '.') {
-        printf("%s\n", iap->ifa_name);
-        freeifaddrs(addrs);
-        return 0;
+        printf("%s ", iap->ifa_name);
       }
     }
   }
-
+  printf("\n");
   freeifaddrs(addrs);
   return 0;
 }
