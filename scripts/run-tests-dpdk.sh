@@ -7,6 +7,7 @@
 source $(dirname $0)/utils.sh
 
 exe_list=`ls build | grep test | tr '\n' ' '`
+#exe_list=large_msg_test
 blue "run-dpdk-tests: Found test executables:"
 echo "$exe_list"
 

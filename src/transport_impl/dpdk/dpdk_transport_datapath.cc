@@ -68,7 +68,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
       tx_mbufs[i]->next = rte_pktmbuf_alloc(mempool);
       assert(tx_mbufs[i]->next != nullptr);
       tx_mbufs[i]->next->data_len = pkt_size - sizeof(pkthdr_t);
-      memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *),
+      memcpy(rte_pktmbuf_mtod(tx_mbufs[i]->next, uint8_t *),
              &msg_buffer->buf[item.pkt_idx * kMaxDataPerPkt],
              pkt_size - sizeof(pkthdr_t));
     }
