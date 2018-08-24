@@ -50,6 +50,11 @@
    have different names in the upstream `libibverbs-dev` used by Ubuntu DPDK.
    For example, headers for multi-packet RQs are in `verbs_exp.h` in Mellanox
    OFED, but in `mlx5dv.h` in `ibverbs-providers`.
+ * DPDK does not allow loopback. (Strangely, loopback works with Mellanox's
+   Raw Ethernet transport, but not with DPDK, which internally uses Raw. This
+   could because all QPs in the mlx5 PMD use the same device context, whereas
+   eRPC's RawTransport uses separate device contexts.) A machine with multiple
+   ports is needed unit-test with DPDK.
  * eRPC does not work in Azure as of August 2018: The DPDK driver for ConnectX-3
    NICs does not support any flow steering filters. It might be possible to use
    ConnectX-3 NICs in Ethernet mode with Mellanox's Raw transport, but the
