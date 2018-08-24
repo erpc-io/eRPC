@@ -97,6 +97,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
 
 void DpdkTransport::tx_flush() {
   // Nothing to do because we don't zero-copy for now
+  testing.tx_flush_count++;
   return;
 }
 
