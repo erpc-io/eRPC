@@ -5,6 +5,30 @@
 
 namespace erpc {
 
+static void format_pkthdr(pkthdr_t *pkthdr,
+                          const Transport::tx_burst_item_t &item,
+                          const size_t pkt_size) {
+  // We can do an 8-byte aligned memcpy as the 2-byte UDP csum is already 0
+  static constexpr size_t hdr_copy_sz = kInetHdrsTotSize - 2;
+  static_assert(hdr_copy_sz == 40, "");
+  memcpy(&pkthdr->headroom[0], item.routing_info, hdr_copy_sz);
+
+  if (kTesting && item.drop) {
+    // XXX: Can this cause performance problems?
+    auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(pkthdr->headroom);
+    memset(&eth_hdr->dst_mac, 0, sizeof(eth_hdr->dst_mac));
+  }
+
+  auto *ipv4_hdr =
+      reinterpret_cast<ipv4_hdr_t *>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
+  assert(ipv4_hdr->check == 0);
+  ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
+
+  auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
+  assert(udp_hdr->check == 0);
+  udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
+}
+
 void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
                              size_t num_pkts) {
   rte_mbuf *tx_mbufs[kPostlist];
@@ -13,39 +37,41 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
     const tx_burst_item_t &item = tx_burst_arr[i];
     const MsgBuffer *msg_buffer = item.msg_buffer;
     assert(msg_buffer->is_valid());  // Can be fake for control packets
-    assert(item.pkt_idx == 0);       // Only single-sge packets for now
 
-    size_t pkt_size = msg_buffer->get_pkt_size<kMaxDataPerPkt>(0);
-    pkthdr_t *pkthdr = msg_buffer->get_pkthdr_0();
-
-    // We can do an 8-byte aligned memcpy as the 2-byte UDP csum is already 0
-    static constexpr size_t hdr_copy_sz = kInetHdrsTotSize - 2;
-    static_assert(hdr_copy_sz == 40, "");
-    memcpy(&pkthdr->headroom[0], item.routing_info, hdr_copy_sz);
-
-    if (kTesting && item.drop) {
-      // XXX: Can this cause performance problems?
-      auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(pkthdr->headroom);
-      memset(&eth_hdr->dst_mac, 0, sizeof(eth_hdr->dst_mac));
-    }
-
-    auto *ipv4_hdr =
-        reinterpret_cast<ipv4_hdr_t *>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
-    assert(ipv4_hdr->check == 0);
-    ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
-
-    auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
-    assert(udp_hdr->check == 0);
-    udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
-
-    // Do a copy :(
     tx_mbufs[i] = rte_pktmbuf_alloc(mempool);
     assert(tx_mbufs[i] != nullptr);
-    memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *), pkthdr, pkt_size);
 
-    tx_mbufs[i]->nb_segs = 1;
-    tx_mbufs[i]->pkt_len = pkt_size;
-    tx_mbufs[i]->data_len = pkt_size;
+    pkthdr_t *pkthdr;
+    if (item.pkt_idx == 0) {
+      // This is the first packet, so we need only one seg. This can be CR/RFR.
+      pkthdr = msg_buffer->get_pkthdr_0();
+      const size_t pkt_size = msg_buffer->get_pkt_size<kMaxDataPerPkt>(0);
+      format_pkthdr(pkthdr, item, pkt_size);
+
+      tx_mbufs[i]->nb_segs = 1;
+      tx_mbufs[i]->pkt_len = pkt_size;
+      tx_mbufs[i]->data_len = pkt_size;
+      memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *), pkthdr, pkt_size);
+    } else {
+      // This is not the first packet, so we need 2 segments.
+      pkthdr = msg_buffer->get_pkthdr_n(item.pkt_idx);
+      const size_t pkt_size =
+          msg_buffer->get_pkt_size<kMaxDataPerPkt>(item.pkt_idx);
+      format_pkthdr(pkthdr, item, pkt_size);
+
+      tx_mbufs[i]->nb_segs = 2;
+      tx_mbufs[i]->pkt_len = pkt_size;
+      tx_mbufs[i]->data_len = sizeof(pkthdr_t);
+      memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *), pkthdr,
+             sizeof(pkthdr_t));
+
+      tx_mbufs[i]->next = rte_pktmbuf_alloc(mempool);
+      assert(tx_mbufs[i]->next != nullptr);
+      tx_mbufs[i]->next->data_len = pkt_size - sizeof(pkthdr_t);
+      memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *),
+             &msg_buffer->buf[item.pkt_idx * kMaxDataPerPkt],
+             pkt_size - sizeof(pkthdr_t));
+    }
 
     LOG_TRACE(
         "eRPC DpdkTransport: Sending packet (idx = %zu, drop = %u). "
@@ -61,7 +87,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
       nb_tx_new += rte_eth_tx_burst(phy_port, qp_id, &tx_mbufs[nb_tx_new],
                                     num_pkts - nb_tx_new);
       retry_count++;
-      if (retry_count == 1000000000) {
+      if (unlikely(retry_count == 1000000000)) {
         LOG_INFO("Rpc %u stuck in rte_eth_tx_burst", rpc_id);
         retry_count = 0;
       }
