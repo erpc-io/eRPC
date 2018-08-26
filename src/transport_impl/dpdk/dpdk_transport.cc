@@ -208,7 +208,8 @@ void DpdkTransport::resolve_phy_port() {
   // Resolve bandwidth
   struct rte_eth_link link;
   rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
-  rt_assert(link.link_status == ETH_LINK_UP, "Link down");
+  rt_assert(link.link_status == ETH_LINK_UP,
+            "Port " + std::to_string(phy_port) + " is down.");
 
   if (link.link_speed != ETH_SPEED_NUM_NONE) {
     // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.

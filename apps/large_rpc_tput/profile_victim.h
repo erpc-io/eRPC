@@ -44,7 +44,7 @@ void connect_sessions_func_victim(AppContext *c) {
     erpc::Timely *timely_0 = c->rpc->get_timely(c->session_num_vec[0]);
     double num_incast_flows =
         ((FLAGS_num_processes - 2) * FLAGS_num_proc_other_threads) - 1;
-    double fair_share = erpc::kBandwidth / num_incast_flows;
+    double fair_share = c->rpc->get_bandwidth() / num_incast_flows;
     timely_0->rate = fair_share * FLAGS_throttle_fraction;
   }
 }

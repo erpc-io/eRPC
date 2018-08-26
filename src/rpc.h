@@ -240,20 +240,25 @@ class Rpc {
     return &session->client_info.cc.timely;
   }
 
+  /// Return the physical link bandwidth (bytes per second)
+  size_t get_bandwidth() const { return transport->get_bandwidth(); }
+
   /// Return the cumulative retransmission counter
-  size_t get_num_re_tx_cumulative() { return pkt_loss_stats.num_re_tx; }
+  size_t get_num_re_tx_cumulative() const { return pkt_loss_stats.num_re_tx; }
 
   /// Reset the cumulative retransmission counter
   void reset_num_re_tx_cumulative() { pkt_loss_stats.num_re_tx = 0; }
 
   /// Return the number of still-in-wheel events
-  size_t get_num_still_in_wheel() { return pkt_loss_stats.still_in_wheel; }
+  size_t get_num_still_in_wheel() const {
+    return pkt_loss_stats.still_in_wheel;
+  }
 
   /// Reset the still-in-wheel counter
   void reset_num_still_in_wheel() { pkt_loss_stats.still_in_wheel = 0; }
 
   /// Return the number of retransmissions for a connected session
-  size_t get_num_re_tx(int session_num) {
+  size_t get_num_re_tx(int session_num) const {
     Session *session = session_vec[static_cast<size_t>(session_num)];
     return session->client_info.num_re_tx;
   }
