@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
+#
 # Run all tests one by one in separate processes. This is needed because it is
-# difficult to repeatedly cleanup and reinitialize DPDK in one process.
+# difficult to repeatedly cleanup and reinitialize DPDK in one process, and
+# gtest does not support running test cases in separate processes.
 #
 # Run this script from the eRPC/ folder
 
 source $(dirname $0)/utils.sh
 
 exe_list=`ls build | grep test | tr '\n' ' '`
+#exe_list=large_msg_test
 blue "run-dpdk-tests: Found test executables:"
 echo "$exe_list"
 
