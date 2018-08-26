@@ -39,8 +39,9 @@ class DpdkTransport : public Transport {
   /// Maximum number of packets received in rx_burst
   static constexpr size_t kRxBatchSize = 32;
 
+  /// Number of mbufs in each mempool (one per Transport instance). The DPDK
+  /// docs recommend power-of-two minus one mbufs per pool for best utilization.
   static constexpr size_t kNumMbufs = (kNumRxRingEntries * 2 - 1);
-  const char *kTempIp = "10.10.1.1";  // XXX: Temporary IP for everyone
 
   // XXX: ixgbe does not support fast free offload, but i40e does
   static constexpr uint32_t kOffloads = DEV_TX_OFFLOAD_MULTI_SEGS;

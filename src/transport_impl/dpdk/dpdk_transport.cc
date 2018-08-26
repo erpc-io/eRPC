@@ -204,7 +204,8 @@ void DpdkTransport::resolve_phy_port() {
   rte_eth_macaddr_get(phy_port, &mac);
   memcpy(resolve.mac_addr, &mac.addr_bytes, sizeof(resolve.mac_addr));
 
-  resolve.ipv4_addr = ipv4_from_str(kTempIp);
+  // Use the 32 LSBs of the MAC address as the IP address
+  memcpy(&resolve.ipv4_addr, &resolve.mac_addr[2], sizeof(resolve.ipv4_addr));
 
   // Resolve bandwidth
   struct rte_eth_link link;
@@ -214,15 +215,19 @@ void DpdkTransport::resolve_phy_port() {
   if (link.link_speed != ETH_SPEED_NUM_NONE) {
     // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.
     rt_assert(link.link_speed >= 10000, "Link too slow");
-    LOG_INFO("Port %u bandwidth reported by DPDK = %u Mbps\n", phy_port,
-             link.link_speed);
     resolve.bandwidth =
         static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
   } else {
-    LOG_INFO("Port %u bandwidth not reported by DPDK. Using default 10 Gbps.\n",
+    LOG_WARN("Port %u bandwidth not reported by DPDK. Using default 10 Gbps.\n",
              phy_port);
+    link.link_speed = 10000;
     resolve.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
   }
+
+  LOG_INFO("Resolved port %u: MAC %s, IPv4 %s, bandwidth %.1f Gbps\n", phy_port,
+           mac_to_string(resolve.mac_addr).c_str(),
+           ipv4_to_string(resolve.ipv4_addr).c_str(),
+           resolve.bandwidth * 8.0 / (1000 * 1000 * 1000));
 }
 
 void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
@@ -267,6 +272,8 @@ void DpdkTransport::install_flow_rule() {
     ntuple.flags = RTE_5TUPLE_FLAGS;
     ntuple.dst_port = rte_cpu_to_be_16(rx_flow_udp_port);
     ntuple.dst_port_mask = UINT16_MAX;
+    ntuple.dst_ip = rte_cpu_to_be_32(resolve.ipv4_addr);
+    ntuple.dst_ip_mask = UINT32_MAX;
     ntuple.proto = IPPROTO_UDP;
     ntuple.proto_mask = UINT8_MAX;
     ntuple.priority = 1;
@@ -292,7 +299,7 @@ void DpdkTransport::install_flow_rule() {
     filter.soft_id = qp_id;
     filter.input.flow_type = RTE_ETH_FLOW_NONFRAG_IPV4_UDP;
     filter.input.flow.udp4_flow.dst_port = rte_cpu_to_be_16(rx_flow_udp_port);
-    filter.input.flow.udp4_flow.ip.dst_ip = ipv4_from_str(kTempIp);
+    filter.input.flow.udp4_flow.ip.dst_ip = rte_cpu_to_be_32(resolve.ipv4_addr);
     filter.action.rx_queue = qp_id;
     filter.action.behavior = RTE_ETH_FDIR_ACCEPT;
     filter.action.report_status = RTE_ETH_FDIR_NO_REPORT_STATUS;

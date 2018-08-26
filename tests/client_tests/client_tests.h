@@ -12,17 +12,16 @@ using namespace erpc;
 static constexpr size_t kTestEventLoopMs = 200;
 static constexpr size_t kTestMaxEventLoopMs = 20000;  // 20 seconds
 static constexpr uint8_t kTestClientRpcId = 100;
+static constexpr uint8_t kTestServerRpcId = 200;
+static constexpr uint8_t kTestReqType = 3;
 
 // Running unit tests with DPDK requires two ports
+static constexpr uint8_t kTestClientPhyPort = 1;
 #ifdef DPDK
-static constexpr uint8_t kTestServerRpcId = 200;
+static constexpr uint8_t kTestServerPhyPort = kTestClientPhyPort;
 #else
-static constexpr uint8_t kTestServerRpcId = kTestClientRpcId;
+static constexpr uint8_t kTestServerPhyPort = kTestClientPhyPort;
 #endif
-
-static constexpr uint8_t kTestReqType = 3;
-static constexpr uint8_t kTestClientPhyPort = 0;
-static constexpr uint8_t kTestServerPhyPort = 1;
 static constexpr size_t kTestNumaNode = 0;
 
 // Shared between client and server thread
