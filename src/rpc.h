@@ -243,20 +243,6 @@ class Rpc {
   /// Return the physical link bandwidth (bytes per second)
   size_t get_bandwidth() const { return transport->get_bandwidth(); }
 
-  /// Return the cumulative retransmission counter
-  size_t get_num_re_tx_cumulative() const { return pkt_loss_stats.num_re_tx; }
-
-  /// Reset the cumulative retransmission counter
-  void reset_num_re_tx_cumulative() { pkt_loss_stats.num_re_tx = 0; }
-
-  /// Return the number of still-in-wheel events
-  size_t get_num_still_in_wheel() const {
-    return pkt_loss_stats.still_in_wheel;
-  }
-
-  /// Reset the still-in-wheel counter
-  void reset_num_still_in_wheel() { pkt_loss_stats.still_in_wheel = 0; }
-
   /// Return the number of retransmissions for a connected session
   size_t get_num_re_tx(int session_num) const {
     Session *session = session_vec[static_cast<size_t>(session_num)];
@@ -359,11 +345,11 @@ class Rpc {
 
     // Ignore spurious packets received as a consequence of rollback:
     // 1. We've only sent pkts up to (ci.num_tx - 1). Ignore later packets.
-    // 2. Ignore if the corresponding client pkt for pkthdr is still in wheel.
+    // 2. Ignore if the corresponding client packet for pkthdr is still in wheel
     if (unlikely(pkthdr->pkt_num >= ci.num_tx)) return false;
 
     if (kCcPacing && unlikely(ci.in_wheel[pkthdr->pkt_num % kSessionCredits])) {
-      pkt_loss_stats.still_in_wheel++;
+      pkt_loss_stats.still_in_wheel_during_retx++;
       return false;
     }
 
@@ -1012,8 +998,11 @@ class Rpc {
 
  public:
   struct {
-    size_t num_re_tx = 0;
-    size_t still_in_wheel = 0;
+    size_t num_re_tx = 0;  /// Total retransmissions across all sessions
+
+    /// Number of times we could not retranmsit a request, or we had to drop
+    /// a received packet, because a request reference was still in the wheel.
+    size_t still_in_wheel_during_retx = 0;
   } pkt_loss_stats;
 };
 

@@ -136,7 +136,7 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
     // Publish stats
     auto &stats = c.app_stats[c.thread_id];
     assert(stats.incast_gbps == 0);
-    stats.re_tx = c.rpc->get_num_re_tx_cumulative();
+    stats.re_tx = c.rpc->pkt_loss_stats.num_re_tx;
     stats.regular_50_us =
         c.regular_latency.perc(0.50) * FLAGS_regular_latency_divisor;
     stats.regular_99_us =
@@ -145,7 +145,7 @@ void thread_func_regular(size_t thread_id, app_stats_t *app_stats,
         c.regular_latency.perc(0.999) * FLAGS_regular_latency_divisor;
 
     // Reset stats for next iteration
-    c.rpc->reset_num_re_tx_cumulative();
+    c.rpc->pkt_loss_stats.num_re_tx = 0;
     c.regular_latency.reset();
 
     printf(

@@ -123,13 +123,13 @@ void thread_func_incast_other(size_t thread_id, app_stats_t *app_stats,
     // Publish stats
     auto &stats = c.app_stats[c.thread_id];
     stats.incast_gbps = c.incast_tx_bytes * 8 / ns;
-    stats.re_tx = c.rpc->get_num_re_tx_cumulative();
+    stats.re_tx = c.rpc->pkt_loss_stats.num_re_tx;
     assert(stats.regular_50_us == 0 && stats.regular_99_us == 0 &&
            stats.regular_999_us == 0);
 
     // Reset stats for next iteration
     c.incast_tx_bytes = 0;
-    c.rpc->reset_num_re_tx_cumulative();
+    c.rpc->pkt_loss_stats.num_re_tx = 0;
 
     erpc::Timely *timely_0 = c.rpc->get_timely(0);
 

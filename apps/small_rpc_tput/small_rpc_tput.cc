@@ -303,7 +303,7 @@ void print_stats(AppContext &c) {
 
   double tput_mrps = c.stat_resp_rx_tot / (seconds * 1000000);
   c.app_stats[c.thread_id].mrps = tput_mrps;
-  c.app_stats[c.thread_id].num_re_tx = c.rpc->get_num_re_tx_cumulative();
+  c.app_stats[c.thread_id].num_re_tx = c.rpc->pkt_loss_stats.num_re_tx;
   if (kAppMeasureLatency) {
     c.app_stats[c.thread_id].lat_us_50 = c.latency.perc(0.50) / kAppLatFac;
     c.app_stats[c.thread_id].lat_us_99 = c.latency.perc(0.99) / kAppLatFac;
@@ -329,7 +329,8 @@ void print_stats(AppContext &c) {
       "RX: %zuK resps, %zuK reqs. Resps/batch: min %zuK, max %zuK. "
       "Latency: %s. Rate = %s.\n",
       FLAGS_process_id, c.thread_id, tput_mrps,
-      c.app_stats[c.thread_id].num_re_tx, c.rpc->pkt_loss_stats.still_in_wheel,
+      c.app_stats[c.thread_id].num_re_tx,
+      c.rpc->pkt_loss_stats.still_in_wheel_during_retx,
       c.stat_resp_rx_tot / 1000, c.stat_req_rx_tot / 1000, min_resps / 1000,
       max_resps / 1000, kAppMeasureLatency ? lat_stat : "N/A",
       erpc::kCcRateComp ? rate_stat : "N/A");
@@ -348,7 +349,7 @@ void print_stats(AppContext &c) {
 
   c.stat_resp_rx_tot = 0;
   c.stat_req_rx_tot = 0;
-  c.rpc->reset_num_re_tx_cumulative();
+  c.rpc->pkt_loss_stats.num_re_tx = 0;
   c.latency.reset();
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
