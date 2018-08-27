@@ -31,7 +31,7 @@ Some highlights:
  * Run the `hello_world` application:
    * `cd hello_world`
    * Edit the server and client hostnames in `common.h` 
-   * `make`
+   * If you chose `DTRANSPORT=dpdk`, run `make dpdk`. Else, run `make verbs`.
    * Run `./server` at the server, and `./client` at the client
  * Generate the documentation: `doxygen`
 
