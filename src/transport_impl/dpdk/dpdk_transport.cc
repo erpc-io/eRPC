@@ -142,7 +142,7 @@ void DpdkTransport::setup_phy_port() {
     ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
                                   RTE_ETH_FILTER_SET, &fi);
     if (ret != 0) {
-      LOG_WARN("Failed to set fdir fields. This could be survivable.\n");
+      LOG_WARN("Failed to set flow director fields. Could be survivable...\n");
     }
   }
 
