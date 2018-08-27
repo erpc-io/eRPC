@@ -49,10 +49,12 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
 
+  // Bind the session management thread to the last lcore on numa_node
+  size_t sm_thread_lcore_index = num_lcores_per_numa_node() - 1;
   LOG_INFO("eRPC Nexus: Launching session management thread on core %zu.\n",
-           kNexusSmThreadCore);
+           get_lcores_for_numa_node(numa_node).at(sm_thread_lcore_index));
   sm_thread = std::thread(sm_thread_func, sm_thread_ctx);
-  bind_to_core(sm_thread, 0, kNexusSmThreadCore);  // NUMA 0
+  bind_to_core(sm_thread, numa_node, sm_thread_lcore_index);
 
   LOG_INFO("eRPC Nexus: Created with UDP port %u, hostname %s.\n", sm_udp_port,
            hostname.c_str());

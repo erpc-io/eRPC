@@ -7,6 +7,13 @@
 
 namespace erpc {
 
+/// Return the number of logical cores per NUMA node
+static size_t num_lcores_per_numa_node() {
+  return static_cast<size_t>(numa_num_configured_cpus() /
+                             numa_num_configured_nodes());
+}
+
+/// Return a list of logical cores in \p numa_node
 static std::vector<size_t> get_lcores_for_numa_node(size_t numa_node) {
   rt_assert(numa_node <= static_cast<size_t>(numa_max_node()));
 
@@ -22,7 +29,7 @@ static std::vector<size_t> get_lcores_for_numa_node(size_t numa_node) {
   return ret;
 }
 
-/// Bind thread to core \p numa_local_index on this NUMA node
+/// Bind \p thread to core with index \p numa_local_index on \p numa_node
 static void bind_to_core(std::thread &thread, size_t numa_node,
                          size_t numa_local_index) {
   cpu_set_t cpuset;
