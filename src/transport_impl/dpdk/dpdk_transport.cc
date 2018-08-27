@@ -92,8 +92,8 @@ void DpdkTransport::setup_phy_port() {
     fprintf(stderr,
             "Port %u (0-based) requested, but only %u DPDK ports available. If "
             "you have a DPDK-bound port, ensure that (a) the NIC's NUMA node "
-            "has huge pages, and (b) the process is not bound "
-            "(e.g., via numactl) to a different NUMA node.\n",
+            "has huge pages, and (b) the process is not pinned "
+            "(e.g., via numactl) to a different NUMA node than the NIC's.\n",
             phy_port, num_ports);
     rt_assert(false);
   }
