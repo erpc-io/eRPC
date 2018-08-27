@@ -4,7 +4,9 @@
 #
 # 2. This assumes that DPDK is installed system-wide and the DPDK headers are
 #    available in `/usr/include/dpdk/`
-
+error:
+	@echo "Please choose one of the following targets: verbs, dpdk, clean"
+	@exit 2
 verbs:
 	g++ -g -std=c++11 -march=native -o server server.cc -I ../src -L ../build -lerpc -libverbs -lpthread -lnuma -ldpdk -ldl
 	g++ -g -std=c++11 -march=native -o client client.cc -I ../src -L ../build -lerpc -libverbs -lpthread -lnuma -ldpdk -ldl
