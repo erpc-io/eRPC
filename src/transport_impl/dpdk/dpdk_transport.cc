@@ -88,7 +88,7 @@ void DpdkTransport::setup_phy_port() {
 
   // Hint: If dpdk-devbind shows available ports, this can sometimes happen
   // if we numactl-membind the process to a different NUMA node than the NIC's.
-  if (phy_port <= num_ports) {
+  if (phy_port >= num_ports) {
     fprintf(stderr,
             "Port %u (0-based) requested, but only %u DPDK ports available. If "
             "you have a DPDK-bound port, ensure that (a) the NIC's NUMA node "
