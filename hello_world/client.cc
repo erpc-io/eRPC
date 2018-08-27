@@ -20,9 +20,8 @@ int main() {
 
   while (!rpc->is_connected(session_num)) rpc->run_event_loop_once();
 
-  printf("Message size = %zu\n", kMsgSize);
-  auto req = rpc->alloc_msg_buffer(kMsgSize);
-  auto resp = rpc->alloc_msg_buffer(kMsgSize);
+  auto req = rpc->alloc_msg_buffer_or_die(kMsgSize);
+  auto resp = rpc->alloc_msg_buffer_or_die(kMsgSize);
 
   rpc->enqueue_request(session_num, kReqType, &req, &resp, cont_func, 0);
   rpc->run_event_loop(100);
