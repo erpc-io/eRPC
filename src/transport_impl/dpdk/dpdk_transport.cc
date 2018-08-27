@@ -85,7 +85,12 @@ void DpdkTransport::setup_phy_port() {
 #else
   uint16_t num_ports = rte_eth_dev_count_avail();
 #endif
-  rt_assert(num_ports > phy_port, "Too few ports");
+
+  // Hint: If dpdk-devbind shows available ports, this can sometimes happen
+  // if we numactl-membind the process to a different NUMA node than the NIC's.
+  rt_assert(num_ports > phy_port,
+            "Port " + std::to_string(phy_port) + " (0-based) requested, but "
+            "only " + std::to_string(num_ports) + " DPDK ports available.");
 
   rte_eth_dev_info dev_info;
   rte_eth_dev_info_get(phy_port, &dev_info);

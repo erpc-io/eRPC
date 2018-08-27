@@ -9,5 +9,5 @@
 --profile incast
 --throttle 0
 --throttle_fraction 0.9
---numa_0_ports 1
+--numa_0_ports 0
 --numa_1_ports 1
