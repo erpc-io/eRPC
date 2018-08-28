@@ -67,7 +67,7 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
 
   // Transport type mismatch
   SmPkt ttm_conn_req = conn_req;
-  ttm_conn_req.server.transport_type = Transport::TransportType::kInvalid;
+  ttm_conn_req.server.transport_type = TransportType::kInvalid;
   rpc->handle_connect_req_st(ttm_conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kInvalidTransport);
 
