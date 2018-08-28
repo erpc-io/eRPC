@@ -144,6 +144,7 @@ set(SOURCES
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/transport_impl/transport.cc
+  src/util/cityhash/city_mod.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
