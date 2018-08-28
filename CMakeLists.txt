@@ -148,6 +148,7 @@ set(SOURCES
   src/util/tls_registry.cc)
 
 # Transport-specific. DPDK does not play well with Mellanox OFED.
+MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
 if(TRANSPORT STREQUAL "dpdk")
   find_library(DPDK_LIB dpdk)
   if(NOT DPDK_LIB)
@@ -193,7 +194,6 @@ else()
   endif()
 endif()
 
-MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
 configure_file(src/config.h.in src/config.h)
 
 # MICA sources
