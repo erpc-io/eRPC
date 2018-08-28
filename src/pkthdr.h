@@ -1,6 +1,8 @@
 #pragma once
 
 #include "common.h"
+#include "transport_impl/eth_common.h"
+#include "util/cityhash/city.h"
 
 namespace erpc {
 
@@ -90,6 +92,18 @@ struct pkthdr_t {
         << "msz " << std::to_string(msg_size) << "]";
 
     return ret.str();
+  }
+
+  /// Return a hash code of this packet header after resetting modifications
+  /// performed by the network
+  uint32_t hashcode() const {
+    pkthdr_t temp = *this;
+    if (kHeadroom == 40) {
+      auto *ipv4_hdr =
+          reinterpret_cast<ipv4_hdr_t *>(&temp.headroom[0] + sizeof(eth_hdr_t));
+      ipv4_hdr->ttl = 128;
+    }
+    return CityHash32(reinterpret_cast<char *>(&temp), sizeof(pkthdr_t));
   }
 
   /// Return a pointer to the eRPC header in this packet header

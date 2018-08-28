@@ -19,7 +19,6 @@
 #include <sstream>
 #include <string>
 #include "common.h"
-#include "transport.h"
 
 namespace erpc {
 
@@ -54,7 +53,9 @@ static std::string ipv4_to_string(uint32_t ipv4_addr) {
   return str;
 }
 
-/// eRPC session endpoint routing info for Ethernet-based transports
+/// eRPC session endpoint routing info for Ethernet-based transports. This
+/// must be smaller than kMaxRoutingInfoSize, but a static assert would cause
+/// a circular dependency.
 struct eth_routing_info_t {
   uint8_t mac[6];
   uint32_t ipv4_addr;
@@ -68,7 +69,6 @@ struct eth_routing_info_t {
     return std::string(ret.str());
   }
 };
-static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
 
 struct eth_hdr_t {
   uint8_t dst_mac[6];

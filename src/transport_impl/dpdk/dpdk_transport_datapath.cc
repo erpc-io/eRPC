@@ -5,6 +5,9 @@
 
 namespace erpc {
 
+// Print the pkthdr's hash code instead of the complete frame in trace log
+static constexpr bool kTraceHashCode = false;
+
 static void format_pkthdr(pkthdr_t *pkthdr,
                           const Transport::tx_burst_item_t &item,
                           const size_t pkt_size) {
@@ -74,10 +77,10 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
     }
 
     LOG_TRACE(
-        "eRPC DpdkTransport: Sending packet (idx = %zu, drop = %u). "
-        "pkthdr = %s. Frame header = %s.\n",
+        "  Transport: TX (idx = %zu, drop = %u). pkthdr = %s. Frame  = %s.\n",
         i, item.drop, pkthdr->to_string().c_str(),
-        frame_header_to_string(&pkthdr->headroom[0]).c_str());
+        kTraceHashCode ? std::to_string(pkthdr->hashcode()).c_str()
+                       : frame_header_to_string(&pkthdr->headroom[0]).c_str());
   }
 
   size_t nb_tx_new = rte_eth_tx_burst(phy_port, qp_id, tx_mbufs, num_pkts);
@@ -111,10 +114,15 @@ size_t DpdkTransport::rx_burst() {
 
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     _unused(pkthdr);
-    LOG_TRACE(
-        "eRPC DpdkTransport: Received pkt. pkthdr = %s. Frame header = %s.\n",
-        pkthdr->to_string().c_str(),
-        frame_header_to_string(&pkthdr->headroom[0]).c_str());
+    LOG_TRACE("  Transport: RX pkthdr = %s. Frame = %s.\n",
+              pkthdr->to_string().c_str(),
+              kTraceHashCode
+                  ? std::to_string(pkthdr->hashcode()).c_str()
+                  : frame_header_to_string(&pkthdr->headroom[0]).c_str());
+
+    auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(
+        &pkthdr->headroom[0] + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
+    assert(udp_hdr->dst_port == rx_flow_udp_port);
 
     rx_ring_head = (rx_ring_head + 1) % kNumRxRingEntries;
   }
