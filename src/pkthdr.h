@@ -4,9 +4,16 @@
 
 namespace erpc {
 
-/// We need a non-zero array size for headroom, even when kHeadroom is zero.
-/// We could use (kHeadroom + 1) bytes, but using (kHeadroom + 2) bytes allows
-/// space for the two-byte UDP checksum.
+// Explanation of the headroom hack:
+//
+// Transports may need different amounts of space for the application-provided
+// network header. This "headroom" space is zero for InfiniBand since the driver
+// internally creates a header, and 42 bytes for UDP (i.e., L2+L3+L4 headers).
+//
+// Since we cannot have a zero-length array in C++, the headroom space is
+// calculated as (kHeadroom + 2) bytes, where kHeadroom is zero for InfiniBand
+// and 40 for UDP. We could have used (kHeadroom + 1) bytes, but (kHeadroom + 2)
+// simplifies things by fitting the entire UDP header.
 static constexpr size_t kHeadroomHackBits = 16;
 
 static constexpr size_t kMsgSizeBits = 24;  ///< Bits for message size
