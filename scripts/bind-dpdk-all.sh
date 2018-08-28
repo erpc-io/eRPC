@@ -4,14 +4,14 @@ source $(dirname $0)/autorun_parse.sh
 
 for ((i = 0; i < $autorun_num_processes; i++)); do
   name=${autorun_name_list[$i]}
-	ssh -oStrictHostKeyChecking=no $name "\
+  ssh -oStrictHostKeyChecking=no $name "\
     cd $autorun_erpc_home; sudo ./scripts/setup_dpdk/cloudlab.sh" &
 done
 wait
 
 blue "Printing dpdk-devbind results on all nodes..."
 for ((i = 0; i < $autorun_num_processes; i++)); do
-	ret=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} "\
+  ret=`ssh -oStrictHostKeyChecking=no ${autorun_name_list[$i]} "\
     dpdk-devbind -s | grep unused=ixgbe"`
   echo "Machine ${autorun_name_list[$i]}: $ret"
   if [ -z "$ret" ]; then
