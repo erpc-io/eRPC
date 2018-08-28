@@ -106,7 +106,7 @@ class DpdkTransport : public Transport {
   size_t rx_ring_head = 0, rx_ring_tail = 0;
 
   const uint16_t rx_flow_udp_port;
-  size_t qp_id;  ///< The DPDK RX/TX queue pair for this transport endpoint
+  size_t qp_id = SIZE_MAX;  ///< The RX/TX queue pair for this Transport
 
   // We don't use DPDK's lcore threads, so a shared mempool with per-lcore
   // cache won't work. Instead, we use per-thread pools with zero cached mbufs.
