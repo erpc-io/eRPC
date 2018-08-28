@@ -88,7 +88,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
                                     num_pkts - nb_tx_new);
       retry_count++;
       if (unlikely(retry_count == 1000000000)) {
-        LOG_INFO("Rpc %u stuck in rte_eth_tx_burst", rpc_id);
+        LOG_WARN("Rpc %u stuck in rte_eth_tx_burst", rpc_id);
         retry_count = 0;
       }
     }

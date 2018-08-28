@@ -36,6 +36,17 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
     // The first thread to grab the lock initializes DPDK
     eal_lock.lock();
 
+    // Get an available queue on phy_port
+    rt_assert(used_qp_ids[phy_port].size() < kMaxQueues, "No queues left");
+    for (size_t i = 0; i < kMaxQueues; i++) {
+      if (used_qp_ids[phy_port].count(i) == 0) {
+        qp_id = i;
+        mempool = mempool_arr[phy_port][qp_id];
+        break;
+      }
+    }
+    used_qp_ids[phy_port].insert(qp_id);
+
     if (eal_initialized) {
       LOG_INFO("Rpc %u skipping DPDK initialization, queues ID = %zu.\n",
                rpc_id, qp_id);
@@ -57,17 +68,6 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
       port_initialized[phy_port] = true;
       setup_phy_port();
     }
-
-    // If we are here, EAL and phy_port are initialized
-    rt_assert(used_qp_ids[phy_port].size() < kMaxQueues, "No queues left");
-    for (size_t i = 0; i < kMaxQueues; i++) {
-      if (used_qp_ids[phy_port].count(i) == 0) {
-        qp_id = i;
-        mempool = mempool_arr[phy_port][qp_id];
-        break;
-      }
-    }
-    used_qp_ids[phy_port].insert(qp_id);
 
     eal_lock.unlock();
   }
