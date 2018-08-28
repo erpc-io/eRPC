@@ -122,7 +122,7 @@ size_t DpdkTransport::rx_burst() {
 
     auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(
         &pkthdr->headroom[0] + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
-    assert(udp_hdr->dst_port == rx_flow_udp_port);
+    assert(ntohs(udp_hdr->dst_port) == rx_flow_udp_port);
 
     rx_ring_head = (rx_ring_head + 1) % kNumRxRingEntries;
   }
