@@ -10,7 +10,7 @@ sudo apt update
 sudo apt -y install g++-8 cmake
 
 # General libs
-sudo apt -y install libnuma-dev libgflags-dev libgtest-dev
+sudo apt -y install libnuma-dev libgflags-dev libgtest-dev libboost-dev
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
 
 # DPDK drivers
