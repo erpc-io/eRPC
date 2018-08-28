@@ -129,8 +129,7 @@ int get_rand_session_num(AppContext *c) {
 
 void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
-// Try to send requests for batch_i. If requests are successfully sent,
-// increment the batch's num_reqs_sent.
+// Send all requests for a batch
 void send_reqs(AppContext *c, size_t batch_i) {
   assert(batch_i < FLAGS_concurrency);
   BatchContext &bc = c->batch_arr[batch_i];
@@ -254,8 +253,16 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
 }
 
 void connect_sessions(AppContext &c) {
-  // Create a session to each thread in the cluster except self
+  // Create a session to each thread in the cluster except to:
+  // (a) all threads on this machine if DPDK is used (because no loopback), or
+  // (b) this thread if a non-DPDK transport is used.
   for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
+    if ((erpc::CTransport::kTransportType == erpc::TransportType::kDPDK) &&
+        (p_i == FLAGS_process_id)) {
+      printf("Not creating session to self process\n");
+      continue;
+    }
+
     std::string remote_uri = erpc::get_uri_for_process(p_i);
 
     if (FLAGS_sm_verbose == 1) {
@@ -270,9 +277,6 @@ void connect_sessions(AppContext &c) {
       c.session_num_vec.push_back(session_num);
     }
   }
-
-  erpc::rt_assert(c.session_num_vec.size() ==
-                  FLAGS_num_processes * FLAGS_num_threads - 1);
 
   while (c.num_sm_resps != c.session_num_vec.size()) {
     c.rpc->run_event_loop(kAppEvLoopMs);
@@ -377,11 +381,8 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
     BatchContext &bc = c.batch_arr[i];
     for (size_t j = 0; j < FLAGS_batch_size; j++) {
-      bc.req_msgbuf[j] = rpc.alloc_msg_buffer(FLAGS_msg_size);
-      assert(bc.req_msgbuf[j].buf != nullptr);
-
-      bc.resp_msgbuf[j] = rpc.alloc_msg_buffer(FLAGS_msg_size);
-      assert(bc.resp_msgbuf[j].buf != nullptr);
+      bc.req_msgbuf[j] = rpc.alloc_msg_buffer_or_die(FLAGS_msg_size);
+      bc.resp_msgbuf[j] = rpc.alloc_msg_buffer_or_die(FLAGS_msg_size);
     }
   }
 
@@ -409,6 +410,7 @@ int main(int argc, char **argv) {
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid cncrrncy.");
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
 
+  // We create a bit fewer sessions
   const size_t num_sessions = 2 * FLAGS_num_processes * FLAGS_num_threads;
   erpc::rt_assert(num_sessions * erpc::kSessionCredits <=
                       erpc::Transport::kNumRxRingEntries,
