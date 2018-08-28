@@ -161,7 +161,7 @@ static std::string sm_event_type_str(SmEventType event_type) {
 /// Basic metadata about a session end point, sent in session management packets
 class SessionEndpoint {
  public:
-  Transport::TransportType transport_type;
+  TransportType transport_type;
   char hostname[kMaxHostnameLen];  ///< DNS-resolvable hostname
   uint16_t sm_udp_port;            ///< Management UDP port
   uint8_t rpc_id;                  ///< ID of the owner

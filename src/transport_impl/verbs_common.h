@@ -129,7 +129,7 @@ static std::string ibdev2netdev(std::string ibdev_name) {
 }
 
 static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
-                                    Transport::TransportType transport_type,
+                                    TransportType transport_type,
                                     VerbsResolve &resolve) {
   std::ostringstream xmsg;  // The exception message
   int num_devices = 0;
@@ -167,15 +167,15 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
       if (ports_to_discover == 0) {
         // Resolution succeeded. Check if the link layer matches.
         switch (transport_type) {
-          case Transport::TransportType::kRaw:
-          case Transport::TransportType::kRoCE:
+          case TransportType::kRaw:
+          case TansportType::kRoCE:
             if (port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
               throw std::runtime_error(
                   "Transport type required is raw Ethernet but port L2 is " +
                   link_layer_str(port_attr.link_layer));
             }
             break;
-          case Transport::TransportType::kInfiniBand:
+          case TransportType::kInfiniBand:
             if (port_attr.link_layer != IBV_LINK_LAYER_INFINIBAND) {
               throw std::runtime_error(
                   "Transport type required is InfiniBand but port L2 is " +

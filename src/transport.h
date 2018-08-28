@@ -15,7 +15,9 @@ namespace erpc {
 
 class HugeAlloc;  // Forward declaration: HugeAlloc needs MemRegInfo
 
-/// Generic mostly-reliable transport
+enum class TransportType { kInfiniBand, kRoCE, kRaw, kDPDK, kInvalid };
+
+/// Generic unreliable transport
 class Transport {
  public:
   static constexpr size_t kNumRxRingEntries = 4096;
@@ -58,8 +60,6 @@ class Transport {
   /// Generic types for memory registration and deregistration functions.
   typedef std::function<MemRegInfo(void*, size_t)> reg_mr_func_t;
   typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
-
-  enum class TransportType { kInfiniBand, kRoCE, kRaw, kDPDK, kInvalid };
 
   static std::string get_name(TransportType transport_type) {
     switch (transport_type) {
