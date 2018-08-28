@@ -149,6 +149,11 @@ set(SOURCES
 
 # Transport-specific. DPDK does not play well with Mellanox OFED.
 if(TRANSPORT STREQUAL "dpdk")
+  find_library(DPDK_LIB dpdk)
+  if(NOT DPDK_LIB)
+    message(FATAL_ERROR "dpdk library not found")
+  endif()
+
   add_definitions(-DDPDK=true)
   set(LIBRARIES ${LIBRARIES} dpdk dl)
   set(SOURCES ${SOURCES}
@@ -168,6 +173,11 @@ if(TRANSPORT STREQUAL "dpdk")
   endif()
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 else()
+  find_library(IBVERBS_LIB ibverbs)
+  if(NOT IBVERBS_LIB)
+    message(FATAL_ERROR "ibverbs library not found")
+  endif()
+
   set(LIBRARIES ${LIBRARIES} ibverbs)
   set(SOURCES ${SOURCES}
     src/transport_impl/infiniband/ib_transport.cc
