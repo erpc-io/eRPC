@@ -16,6 +16,12 @@ app_config=$autorun_erpc_home/apps/$autorun_app/config
 assert_file_exists $app_config
 app_args=`cat $app_config | tr '\n' ' '`
 
+# Install modded drivers (or not)
+# modded_drivers_cmd="\
+#   sudo ./drivers/4.4/libmlx5-41mlnx1/update-driver.sh; \
+#   sudo ./drivers/4.2/libmlx4-41mlnx1/update-driver.sh;"
+modded_drivers_cmd=""
+
 for ((i = 0; i < $autorun_num_processes; i++)); do
   name=${autorun_name_list[$i]}
   # We don't need the UDP port - the C++ code figures it out
@@ -31,8 +37,7 @@ for ((i = 0; i < $autorun_num_processes; i++)); do
     source scripts/utils.sh; \
     export autorun_app=$autorun_app; \
     drop_shm; \
-    sudo ./drivers/4.4/libmlx5-41mlnx1/update-driver.sh; \
-    sudo ./drivers/4.2/libmlx4-41mlnx1/update-driver.sh; \
+    $modded_drivers_cmd; \
     sudo -E env LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
     nohup numactl --physcpubind $numa_node --membind $numa_node \
     ./build/$autorun_app $app_args --process_id $i --numa_node $numa_node \
