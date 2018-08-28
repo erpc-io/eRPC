@@ -96,6 +96,7 @@ class TmpStat {
     erpc::rt_assert(stat_file != nullptr, "Failed to open stat file");
 
     fprintf(stat_file, "%s\n", header.c_str());
+    fflush(stat_file);
   }
 
   ~TmpStat() {
@@ -105,6 +106,7 @@ class TmpStat {
 
   void write(std::string stat) {
     fprintf(stat_file, "%s\n", stat.c_str());
+    fflush(stat_file);
   }
 
  private:
