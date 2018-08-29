@@ -111,6 +111,26 @@ struct pkthdr_t {
     return reinterpret_cast<uint8_t *>(this) + kHeadroom;
   }
 
+  /// Get the Ethernet header from this packet header
+  inline eth_hdr_t *get_eth_hdr() {
+    assert(kHeadroom == 40);
+    return reinterpret_cast<eth_hdr_t *>(&this->headroom[0]);
+  }
+
+  /// Get the IPv4 header from this packet header
+  inline ipv4_hdr_t *get_ipv4_hdr() {
+    assert(kHeadroom == 40);
+    return reinterpret_cast<ipv4_hdr_t *>(&this->headroom[0] +
+                                          sizeof(eth_hdr_t));
+  }
+
+  /// Get the UDP header from this packet header
+  inline udp_hdr_t *get_udp_hdr() {
+    assert(kHeadroom == 40);
+    return reinterpret_cast<udp_hdr_t *>(
+        &this->headroom[0] + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
+  }
+
   /// Return a const pointer to the eRPC header in this const packet header
   inline const uint8_t *ehdrptr() const {
     return reinterpret_cast<const uint8_t *>(this) + kHeadroom;
