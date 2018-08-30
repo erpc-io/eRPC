@@ -168,7 +168,7 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
         // Resolution succeeded. Check if the link layer matches.
         switch (transport_type) {
           case TransportType::kRaw:
-          case TansportType::kRoCE:
+          case TransportType::kRoCE:
             if (port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
               throw std::runtime_error(
                   "Transport type required is raw Ethernet but port L2 is " +
