@@ -18,16 +18,15 @@ static void format_pkthdr(pkthdr_t *pkthdr,
 
   if (kTesting && item.drop) {
     // XXX: Can this cause performance problems?
-    auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(pkthdr->headroom);
+    eth_hdr_t *eth_hdr = pkthdr->get_eth_hdr();
     memset(&eth_hdr->dst_mac, 0, sizeof(eth_hdr->dst_mac));
   }
 
-  auto *ipv4_hdr =
-      reinterpret_cast<ipv4_hdr_t *>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
+  ipv4_hdr_t *ipv4_hdr = pkthdr->get_ipv4_hdr();
   assert(ipv4_hdr->check == 0);
   ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
 
-  auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
+  udp_hdr_t *udp_hdr = pkthdr->get_udp_hdr();
   assert(udp_hdr->check == 0);
   udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
 }
@@ -120,9 +119,18 @@ size_t DpdkTransport::rx_burst() {
                   ? std::to_string(pkthdr->hashcode()).c_str()
                   : frame_header_to_string(&pkthdr->headroom[0]).c_str());
 
-    auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(
-        &pkthdr->headroom[0] + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
-    assert(ntohs(udp_hdr->dst_port) == rx_flow_udp_port);
+#if DEBUG
+    if (unlikely(ntohl(pkthdr->get_ipv4_hdr()->dst_ip) != resolve.ipv4_addr ||
+                 ntohs(pkthdr->get_udp_hdr()->dst_port) == rx_flow_udp_port)) {
+      LOG_ERROR("Invalid packet. Pkt: %u %s %s. Me: %u %s %s\n",
+                ntohs(pkthdr->get_udp_hdr()->dst_port),
+                ipv4_to_string(ntohl(pkthdr->get_ipv4_hdr()->dst_ip)).c_str(),
+                mac_to_string(pkthdr->get_eth_hdr()->dst_mac).c_str(),
+                rx_flow_udp_port, ipv4_to_string(resolve.ipv4_addr).c_str(),
+                mac_to_string(resolve.mac_addr).c_str());
+      exit(-1);
+    }
+#endif
 
     rx_ring_head = (rx_ring_head + 1) % kNumRxRingEntries;
   }

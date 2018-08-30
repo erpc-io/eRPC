@@ -20,15 +20,14 @@ static volatile bool port_initialized[RTE_MAX_ETHPORTS];
 static std::set<size_t> used_qp_ids[RTE_MAX_ETHPORTS];
 
 /// mempool_arr[i][j] is the mempool to use for port i, queue j
-rte_mempool *mempool_arr[RTE_MAX_ETHPORTS][DpdkTransport::kMaxQueues];
+rte_mempool *mempool_arr[RTE_MAX_ETHPORTS][DpdkTransport::kMaxQueuesPerPort];
 
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
 DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
                              FILE *trace_file)
-    : Transport(TransportType::kDPDK, rpc_id, phy_port, numa_node, trace_file),
-      rx_flow_udp_port(kBaseEthUDPPort + (256u * numa_node) + rpc_id) {
+    : Transport(TransportType::kDPDK, rpc_id, phy_port, numa_node, trace_file) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
@@ -38,10 +37,12 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
 
     // Get an available queue on phy_port. This does not require phy_port to
     // be initialized.
-    rt_assert(used_qp_ids[phy_port].size() < kMaxQueues, "No queues left");
-    for (size_t i = 0; i < kMaxQueues; i++) {
+    rt_assert(used_qp_ids[phy_port].size() < kMaxQueuesPerPort,
+              "No queues left on port " + std::to_string(phy_port));
+    for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
       if (used_qp_ids[phy_port].count(i) == 0) {
         qp_id = i;
+        rx_flow_udp_port = udp_port_for_queue(phy_port, qp_id);
         break;
       }
     }
@@ -76,11 +77,10 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   }
 
   resolve_phy_port();
-  install_flow_rule();
   init_mem_reg_funcs();
 
-  LOG_WARN("DpdkTransport created for Rpc ID %u, queues ID %zu\n",
-           rpc_id, qp_id);
+  LOG_WARN("DpdkTransport created for Rpc ID %u, queue %zu, udp port = %u\n",
+           rpc_id, qp_id, rx_flow_udp_port);
 }
 
 void DpdkTransport::setup_phy_port() {
@@ -129,7 +129,8 @@ void DpdkTransport::setup_phy_port() {
   eth_conf.fdir_conf.mask.dst_port_mask = 0xffff;
   eth_conf.fdir_conf.drop_queue = 0;
 
-  int ret = rte_eth_dev_configure(phy_port, kMaxQueues, kMaxQueues, &eth_conf);
+  int ret = rte_eth_dev_configure(phy_port, kMaxQueuesPerPort,
+                                  kMaxQueuesPerPort, &eth_conf);
   rt_assert(ret == 0, "Ethdev configuration error: ", strerror(-1 * ret));
 
   // Set flow director fields if flow director is supported. It's OK if the
@@ -154,7 +155,7 @@ void DpdkTransport::setup_phy_port() {
   // on a per-thread basis since we must start the device to use any queue.
   // Once the device is started, more queues cannot be added without stopping
   // and reconfiguring the device.
-  for (size_t i = 0; i < kMaxQueues; i++) {
+  for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
     std::string pname =
         "mempool-erpc-" + std::to_string(phy_port) + "-" + std::to_string(i);
     mempool_arr[phy_port][i] =
@@ -189,6 +190,9 @@ void DpdkTransport::setup_phy_port() {
     ret = rte_eth_tx_queue_setup(phy_port, i, kNumTxRingDesc, numa_node,
                                  &eth_tx_conf);
     rt_assert(ret == 0, "Failed to setup TX queue: " + std::to_string(i));
+
+    install_flow_rule(phy_port, i, get_port_ipv4_addr(phy_port),
+                      udp_port_for_queue(phy_port, i));
   }
 
   rte_eth_dev_start(phy_port);
@@ -217,8 +221,7 @@ void DpdkTransport::resolve_phy_port() {
   rte_eth_macaddr_get(phy_port, &mac);
   memcpy(resolve.mac_addr, &mac.addr_bytes, sizeof(resolve.mac_addr));
 
-  // Use the 32 LSBs of the MAC address as the IP address
-  memcpy(&resolve.ipv4_addr, &resolve.mac_addr[2], sizeof(resolve.ipv4_addr));
+  resolve.ipv4_addr = get_port_ipv4_addr(phy_port);
 
   // Resolve bandwidth
   struct rte_eth_link link;
@@ -272,60 +275,6 @@ bool DpdkTransport::resolve_remote_routing_info(
   auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
   gen_udp_header(udp_hdr, rx_flow_udp_port, remote_udp_port, 0);
   return true;
-}
-
-// Install a rule for rx_flow_udp_port
-void DpdkTransport::install_flow_rule() {
-  bool installed = false;
-
-  // Try the simplest filter first. I couldn't get FILTER_FDIR to work with
-  // ixgbe, although it technically supports flow director.
-  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
-    struct rte_eth_ntuple_filter ntuple;
-    memset(&ntuple, 0, sizeof(ntuple));
-    ntuple.flags = RTE_5TUPLE_FLAGS;
-    ntuple.dst_port = rte_cpu_to_be_16(rx_flow_udp_port);
-    ntuple.dst_port_mask = UINT16_MAX;
-    ntuple.dst_ip = rte_cpu_to_be_32(resolve.ipv4_addr);
-    ntuple.dst_ip_mask = UINT32_MAX;
-    ntuple.proto = IPPROTO_UDP;
-    ntuple.proto_mask = UINT8_MAX;
-    ntuple.priority = 1;
-    ntuple.queue = qp_id;
-
-    int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_NTUPLE,
-                                      RTE_ETH_FILTER_ADD, &ntuple);
-    if (ret != 0) {
-      LOG_WARN("Failed to add ntuple filter. This could be survivable.\n");
-    } else {
-      LOG_WARN(
-          "Rpc %u installed ntuple flow rule. Queue %zu, RX UDP port = %u.\n",
-          rpc_id, qp_id, rx_flow_udp_port);
-    }
-    installed = (ret == 0);
-  }
-
-  if (!installed &&
-      rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
-    // Use fdir filter for i40e (5-tuple not supported)
-    rte_eth_fdir_filter filter;
-    memset(&filter, 0, sizeof(filter));
-    filter.soft_id = qp_id;
-    filter.input.flow_type = RTE_ETH_FLOW_NONFRAG_IPV4_UDP;
-    filter.input.flow.udp4_flow.dst_port = rte_cpu_to_be_16(rx_flow_udp_port);
-    filter.input.flow.udp4_flow.ip.dst_ip = rte_cpu_to_be_32(resolve.ipv4_addr);
-    filter.action.rx_queue = qp_id;
-    filter.action.behavior = RTE_ETH_FDIR_ACCEPT;
-    filter.action.report_status = RTE_ETH_FDIR_NO_REPORT_STATUS;
-
-    int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
-                                      RTE_ETH_FILTER_ADD, &filter);
-    rt_assert(ret == 0, "Failed to add flow rule: ", strerror(-1 * ret));
-
-    LOG_WARN(
-        "Rpc %u installed flow-director rule. Queue %zu, RX UDP port = %u.\n",
-        rpc_id, qp_id, rx_flow_udp_port);
-  }
 }
 
 /// A dummy memory registration function

@@ -259,7 +259,6 @@ void connect_sessions(AppContext &c) {
   for (size_t p_i = 0; p_i < FLAGS_num_processes; p_i++) {
     if ((erpc::CTransport::kTransportType == erpc::TransportType::kDPDK) &&
         (p_i == FLAGS_process_id)) {
-      printf("Not creating session to self process\n");
       continue;
     }
 

@@ -25,7 +25,7 @@ class DpdkTransport : public Transport {
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kDPDK;
   static constexpr size_t kMTU = 1024;
-  static constexpr size_t kMaxQueues = 16;
+  static constexpr size_t kMaxQueuesPerPort = 16;
 
   static constexpr size_t kNumTxRingDesc = 128;
   static constexpr size_t kPostlist = 32;
@@ -78,6 +78,21 @@ class DpdkTransport : public Transport {
                                         sizeof(rte_mbuf));
   }
 
+  /// Return the UDP port to use for queue \p qp_id on DPDK port \p phy_port
+  static uint16_t udp_port_for_queue(size_t phy_port, size_t qp_id) {
+    return kBaseEthUDPPort + (phy_port * kMaxQueuesPerPort) + qp_id;
+  }
+
+  /// Use the 32 LSBs of the MAC address as the IP address
+  static uint32_t get_port_ipv4_addr(size_t phy_port) {
+    struct ether_addr mac;
+    rte_eth_macaddr_get(phy_port, &mac);
+
+    uint32_t ret;
+    memcpy(&ret, &mac.addr_bytes[2], sizeof(ret));
+    return ret;
+  }
+
   // raw_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
   void tx_flush();
@@ -94,7 +109,59 @@ class DpdkTransport : public Transport {
    * @throw runtime_error if the port cannot be resolved
    */
   void resolve_phy_port();
-  void install_flow_rule();  ///< Install the UDP destination flow
+
+  /// Install a flow rule for queue \p qp_id on port \p phy_port
+  static void install_flow_rule(size_t phy_port, size_t qp_id,
+                                uint32_t ipv4_addr, size_t udp_port) {
+    bool installed = false;
+
+    // Try the simplest filter first. I couldn't get FILTER_FDIR to work with
+    // ixgbe, although it technically supports flow director.
+    if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
+      struct rte_eth_ntuple_filter ntuple;
+      memset(&ntuple, 0, sizeof(ntuple));
+      ntuple.flags = RTE_5TUPLE_FLAGS;
+      ntuple.dst_port = rte_cpu_to_be_16(udp_port);
+      ntuple.dst_port_mask = UINT16_MAX;
+      ntuple.dst_ip = rte_cpu_to_be_32(ipv4_addr);
+      ntuple.dst_ip_mask = UINT32_MAX;
+      ntuple.proto = IPPROTO_UDP;
+      ntuple.proto_mask = UINT8_MAX;
+      ntuple.priority = 1;
+      ntuple.queue = qp_id;
+
+      int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_NTUPLE,
+                                        RTE_ETH_FILTER_ADD, &ntuple);
+      if (ret != 0) {
+        LOG_WARN("Failed to add ntuple filter. This could be survivable.\n");
+      } else {
+        LOG_WARN("Installed ntuple flow rule. Queue %zu, RX UDP port = %zu.\n",
+                 qp_id, udp_port);
+      }
+      installed = (ret == 0);
+    }
+
+    if (!installed &&
+        rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
+      // Use fdir filter for i40e (5-tuple not supported)
+      rte_eth_fdir_filter filter;
+      memset(&filter, 0, sizeof(filter));
+      filter.soft_id = qp_id;
+      filter.input.flow_type = RTE_ETH_FLOW_NONFRAG_IPV4_UDP;
+      filter.input.flow.udp4_flow.dst_port = rte_cpu_to_be_16(udp_port);
+      filter.input.flow.udp4_flow.ip.dst_ip = rte_cpu_to_be_32(ipv4_addr);
+      filter.action.rx_queue = qp_id;
+      filter.action.behavior = RTE_ETH_FDIR_ACCEPT;
+      filter.action.report_status = RTE_ETH_FDIR_NO_REPORT_STATUS;
+
+      int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
+                                        RTE_ETH_FILTER_ADD, &filter);
+      rt_assert(ret == 0, "Failed to add flow rule: ", strerror(-1 * ret));
+
+      LOG_WARN("Installed flow-director rule. Queue %zu, RX UDP port = %zu.\n",
+               qp_id, udp_port);
+    }
+  }
 
   /// Initialize the memory registration and deregistration functions
   void init_mem_reg_funcs();
@@ -105,7 +172,7 @@ class DpdkTransport : public Transport {
 
   size_t rx_ring_head = 0, rx_ring_tail = 0;
 
-  const uint16_t rx_flow_udp_port;
+  uint16_t rx_flow_udp_port = 0;
   size_t qp_id = SIZE_MAX;  ///< The RX/TX queue pair for this Transport
 
   // We don't use DPDK's lcore threads, so a shared mempool with per-lcore
