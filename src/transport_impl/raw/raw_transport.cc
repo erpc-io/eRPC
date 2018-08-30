@@ -27,11 +27,11 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   init_mem_reg_funcs();
 
   LOG_WARN(
-      "RawTransport reated for Rpc ID %u. Device (%s, %s). IPv4 %s, MAC %s. "
-      "Port %d.\n",
+      "RawTransport created for Rpc ID %u. Device %s/%s, port %d. "
+      "IPv4 %s, MAC %s. RX UDP port %u.\n",
       rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
-      ipv4_to_string(htonl(resolve.ipv4_addr)).c_str(),
-      mac_to_string(resolve.mac_addr).c_str(), resolve.dev_port_id);
+      resolve.dev_port_id, ipv4_to_string(htonl(resolve.ipv4_addr)).c_str(),
+      mac_to_string(resolve.mac_addr).c_str(), rx_flow_udp_port);
 }
 
 void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
