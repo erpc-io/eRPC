@@ -54,9 +54,9 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
     } else {
       LOG_INFO("Rpc %u initializing DPDK, queues ID = %zu.\n", rpc_id, qp_id);
 
-      // n: channels, m: maximum memory in gigabytes
+      // n: channels, m: maximum memory in megabytes
       const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
-                                "0",  "-m", "2048", nullptr};
+                                "0",  "-m", "1024", nullptr};
       int rte_argc =
           static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
