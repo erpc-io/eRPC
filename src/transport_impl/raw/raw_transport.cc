@@ -30,7 +30,7 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
       "Created for ID %u. Device (%s, %s). IPv4 %s, MAC %s. "
       "port %d.\n",
       rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
-      ipv4_to_string(resolve.ipv4_addr).c_str(),
+      ipv4_to_string(ntohl(resolve.ipv4_addr)).c_str(),
       mac_to_string(resolve.mac_addr).c_str(), resolve.dev_port_id);
 }
 

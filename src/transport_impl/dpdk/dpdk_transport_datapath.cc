@@ -121,10 +121,10 @@ size_t DpdkTransport::rx_burst() {
 
 #if DEBUG
     if (unlikely(ntohl(pkthdr->get_ipv4_hdr()->dst_ip) != resolve.ipv4_addr ||
-                 ntohs(pkthdr->get_udp_hdr()->dst_port) == rx_flow_udp_port)) {
+                 ntohs(pkthdr->get_udp_hdr()->dst_port) != rx_flow_udp_port)) {
       LOG_ERROR("Invalid packet. Pkt: %u %s %s. Me: %u %s %s\n",
                 ntohs(pkthdr->get_udp_hdr()->dst_port),
-                ipv4_to_string(ntohl(pkthdr->get_ipv4_hdr()->dst_ip)).c_str(),
+                ipv4_to_string(pkthdr->get_ipv4_hdr()->dst_ip).c_str(),
                 mac_to_string(pkthdr->get_eth_hdr()->dst_mac).c_str(),
                 rx_flow_udp_port, ipv4_to_string(resolve.ipv4_addr).c_str(),
                 mac_to_string(resolve.mac_addr).c_str());

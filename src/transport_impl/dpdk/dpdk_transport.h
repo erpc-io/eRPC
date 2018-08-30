@@ -83,8 +83,10 @@ class DpdkTransport : public Transport {
     return kBaseEthUDPPort + (phy_port * kMaxQueuesPerPort) + qp_id;
   }
 
-  /// Use the 32 LSBs of the MAC address as the IP address
+  /// Get the IPv4 address for \p phy_port. The returned IPv4 address is assumed
+  /// to be in host-byte order.
   static uint32_t get_port_ipv4_addr(size_t phy_port) {
+    // For now, we use the LSBs of the port's MAC address
     struct ether_addr mac;
     rte_eth_macaddr_get(phy_port, &mac);
 
@@ -110,9 +112,10 @@ class DpdkTransport : public Transport {
    */
   void resolve_phy_port();
 
-  /// Install a flow rule for queue \p qp_id on port \p phy_port
+  /// Install a flow rule for queue \p qp_id on port \p phy_port. The IPv4 and
+  /// UDP address are in host-byte order.
   static void install_flow_rule(size_t phy_port, size_t qp_id,
-                                uint32_t ipv4_addr, size_t udp_port) {
+                                uint32_t ipv4_addr, uint16_t udp_port) {
     bool installed = false;
 
     // Try the simplest filter first. I couldn't get FILTER_FDIR to work with
@@ -135,7 +138,7 @@ class DpdkTransport : public Transport {
       if (ret != 0) {
         LOG_WARN("Failed to add ntuple filter. This could be survivable.\n");
       } else {
-        LOG_WARN("Installed ntuple flow rule. Queue %zu, RX UDP port = %zu.\n",
+        LOG_WARN("Installed ntuple flow rule. Queue %zu, RX UDP port = %u.\n",
                  qp_id, udp_port);
       }
       installed = (ret == 0);
@@ -158,7 +161,7 @@ class DpdkTransport : public Transport {
                                         RTE_ETH_FILTER_ADD, &filter);
       rt_assert(ret == 0, "Failed to add flow rule: ", strerror(-1 * ret));
 
-      LOG_WARN("Installed flow-director rule. Queue %zu, RX UDP port = %zu.\n",
+      LOG_WARN("Installed flow-director rule. Queue %zu, RX UDP port = %u.\n",
                qp_id, udp_port);
     }
   }

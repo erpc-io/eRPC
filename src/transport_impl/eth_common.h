@@ -38,6 +38,7 @@ static std::string mac_to_string(const uint8_t* mac) {
   return ret.str();
 }
 
+/// Get the network-byte-order IPv4 address from a human-readable IP string
 static uint32_t ipv4_from_str(const char* ip) {
   uint32_t addr;
   int ret = inet_pton(AF_INET, ip, &addr);
@@ -45,6 +46,7 @@ static uint32_t ipv4_from_str(const char* ip) {
   return addr;
 }
 
+/// Convert a network-byte-order IPv4 address to a human-readable IP string
 static std::string ipv4_to_string(uint32_t ipv4_addr) {
   char str[INET_ADDRSTRLEN];
   const char* ret = inet_ntop(AF_INET, &ipv4_addr, str, sizeof(str));
@@ -53,9 +55,9 @@ static std::string ipv4_to_string(uint32_t ipv4_addr) {
   return str;
 }
 
-/// eRPC session endpoint routing info for Ethernet-based transports. This
-/// must be smaller than kMaxRoutingInfoSize, but a static assert would cause
-/// a circular dependency.
+/// eRPC session endpoint routing info for Ethernet-based transports. The MAC
+/// address is in the byte order retrived from the driver. The IPv4 address and
+/// UDP port are in host-byte order.
 struct eth_routing_info_t {
   uint8_t mac[6];
   uint32_t ipv4_addr;
@@ -68,6 +70,8 @@ struct eth_routing_info_t {
 
     return std::string(ret.str());
   }
+  // This must be smaller than Transport::kMaxRoutingInfoSize, but a static
+  // assert here causes a circular dependency.
 };
 
 struct eth_hdr_t {

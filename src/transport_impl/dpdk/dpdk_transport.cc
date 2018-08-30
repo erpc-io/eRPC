@@ -243,7 +243,7 @@ void DpdkTransport::resolve_phy_port() {
 
   LOG_INFO("Resolved port %u: MAC %s, IPv4 %s, bandwidth %.1f Gbps\n", phy_port,
            mac_to_string(resolve.mac_addr).c_str(),
-           ipv4_to_string(resolve.ipv4_addr).c_str(),
+           ipv4_to_string(htonl(resolve.ipv4_addr)).c_str(),
            resolve.bandwidth * 8.0 / (1000 * 1000 * 1000));
 }
 
