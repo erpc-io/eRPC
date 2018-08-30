@@ -152,8 +152,8 @@ static void gen_eth_header(eth_hdr_t* eth_header, const uint8_t* src_mac,
   eth_header->eth_type = htons(kIPEtherType);
 }
 
-/// Format the IPv4 header for a UDP packet. Note that \p data_size is the
-/// payload size in the UDP packet.
+/// Format the IPv4 header for a UDP packet. All value arguments are in
+/// host-byte order. \p data_size is the data payload size in the UDP packet.
 static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
                             uint32_t dst_ip, uint16_t data_size) {
   ipv4_hdr->version = 4;
@@ -165,13 +165,13 @@ static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
   ipv4_hdr->frag_off = htons(0);
   ipv4_hdr->ttl = 128;
   ipv4_hdr->protocol = kIPHdrProtocol;
-  ipv4_hdr->src_ip = src_ip;
-  ipv4_hdr->dst_ip = dst_ip;
+  ipv4_hdr->src_ip = htonl(src_ip);
+  ipv4_hdr->dst_ip = htonl(dst_ip);
   ipv4_hdr->check = 0;
 }
 
-/// Format the UDP header for a UDP packet. Note that \p data_size is the
-/// payload size in the UDP packet.
+/// Format the UDP header for a UDP packet. All value arguments are in host-byte
+/// order. \p data_size is the data payload size in the UDP packet.
 static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
                            uint16_t dst_port, uint16_t data_size) {
   udp_hdr->src_port = htons(src_port);
@@ -180,7 +180,7 @@ static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
   udp_hdr->check = 0;
 }
 
-/// Return the IPv4 address of a kernel-visible interface
+/// Return the IPv4 address of a kernel-visible interface in network-byte order
 static uint32_t get_interface_ipv4_addr(std::string interface) {
   struct ifaddrs *ifaddr, *ifa;
   rt_assert(getifaddrs(&ifaddr) == 0);
