@@ -12,8 +12,8 @@ void Rpc<TTr>::pkt_loss_scan_st() {
   assert(in_dispatch());
 
   // Datapath packet loss
-  SSlot *cur = root_sentinel.client_info.next;
-  while (cur != &tail_sentinel) {
+  SSlot *cur = active_rpcs_root_sentinel.client_info.next;
+  while (cur != &active_rpcs_tail_sentinel) {
     // Don't retransmit if we're just stalled on credits
     if (cur->client_info.num_tx == cur->client_info.num_rx) {
       cur = cur->client_info.next;

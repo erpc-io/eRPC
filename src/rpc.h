@@ -388,13 +388,13 @@ class Rpc {
 
   /// Add an RPC slot to the list of active RPCs
   inline void add_to_active_rpc_list(SSlot &sslot) {
-    SSlot *prev_tail = tail_sentinel.client_info.prev;
+    SSlot *prev_tail = active_rpcs_tail_sentinel.client_info.prev;
 
     prev_tail->client_info.next = &sslot;
     sslot.client_info.prev = prev_tail;
 
-    sslot.client_info.next = &tail_sentinel;
-    tail_sentinel.client_info.prev = &sslot;
+    sslot.client_info.next = &active_rpcs_tail_sentinel;
+    active_rpcs_tail_sentinel.client_info.prev = &sslot;
   }
 
   /// Delete an active RPC slot from the list of active RPCs
@@ -933,7 +933,9 @@ class Rpc {
   /// The doubly-linked list of active RPCs. An RPC slot is added to this list
   /// when the request is enqueued. The slot is deleted from this list when its
   /// continuation is invoked or queued to a background thread.
-  SSlot root_sentinel, tail_sentinel;
+  /// Having permanent root and tail sentinels allows adding and deleting slots
+  /// from the list without conditional statements.
+  SSlot active_rpcs_root_sentinel, active_rpcs_tail_sentinel;
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
