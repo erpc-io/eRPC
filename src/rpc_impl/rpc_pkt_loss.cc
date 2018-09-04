@@ -27,9 +27,9 @@ void Rpc<TTr>::pkt_loss_scan_st() {
   }
 
   // Management packet loss
-  for (Session *session : session_vec) {
-    // Process only client sessions
-    if (session == nullptr || session->is_server()) continue;
+  for (uint16_t session_num : sm_pending_reqs) {
+    Session *session = session_vec[session_num];
+    if (session == nullptr) continue;  // XXX: Can this happen?
 
     switch (session->state) {
       case SessionState::kConnectInProgress:

@@ -281,9 +281,9 @@ class Rpc {
   /// determined using the packet's type.
   void sm_pkt_udp_tx_st(const SmPkt &);
 
-  /// Send a session management request for this session and set the SM request
-  /// timestamp.
-  /// The SM request type is computed using the session state
+  /// Send a session management request for a client session. This includes
+  /// saving retransmission information for the request. The SM request type is
+  /// computed using the session state
   void send_sm_req_st(Session *);
 
   //
@@ -964,11 +964,14 @@ class Rpc {
   Nexus::Hook nexus_hook;       ///< A hook shared with the Nexus
 
   /// To avoid allocating a new session on receiving a duplicate session
-  /// connect request, the server remembers all (! XXX) the unique connect
+  /// connect request, the server remembers all (XXX) the unique connect
   /// requests it has received. To accomplish this, the client generates a
-  /// globally-unique (! XXX) token for the first copy of its connect request.
+  /// globally-unique (XXX) token for the first copy of its connect request.
   /// The server saves maps this token to the index of the allocated session.
   std::map<conn_req_uniq_token_t, uint16_t> conn_req_token_map;
+
+  /// Sessions for which a session management request is outstanding
+  std::set<uint16_t> sm_pending_reqs;
 
   /// All the faults that can be injected into eRPC for testing
   struct {
