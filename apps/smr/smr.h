@@ -17,8 +17,8 @@ extern "C" {
 #include <set>
 
 #include "../apps_common.h"
-#include "cityhash/city.h"
 #include "time_entry.h"
+#include "util/cityhash/city.h"
 
 #include "mica/table/fixedtable.h"
 #include "mica/util/hash.h"
