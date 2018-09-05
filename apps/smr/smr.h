@@ -168,11 +168,11 @@ class AppContext {
 
         // This is a hack. In __raft_persist_term, we must atomically commit
         // both the term and the vote. raft_term_t is eight bytes, so the
-        // combined size (12 bytes) exceeds the atomic write length (eight
-        // bytes). This is simplified by shrinking the term to 4 bytes, and
-        // atomically doing an 8-byte write to both \p term and \p voted_for.
-        uint32_t *term;             // Record for perist-term
-        raft_node_id_t *voted_for;  // Record for persist-vote
+        // combined size (12 B) exceeds the atomic write length (8 B). This is
+        // simplified by shrinking the term to 4 B, and atomically doing an
+        // 8-byte write to both \p term and \p voted_for.
+        uint32_t *term;             // The latest term the server has seen
+        raft_node_id_t *voted_for;  // Node that received vote in current term
 
         size_t *num_entries;  // Record for number of log entries
       } p;
