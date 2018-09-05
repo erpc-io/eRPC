@@ -138,10 +138,10 @@ class AppContext {
     leader_saveinfo_t leader_saveinfo;  // Info for the ongoing commit request
     std::vector<TimeEnt> time_ents;
 
-    // An in-memory pool for Raft entry data. In non-persistent mode, the Raft
-    // log contains pointers to buffers allocated from this pool. In persistent
-    // mode, these entries are copied to the DAX file.
-    AppMemPool<client_req_t> log_entry_pool;
+    // An in-memory pool for application data for Raft log records. In DRAM
+    // mode, the Raft log contains pointers to buffers allocated from this pool.
+    // In persistent mode, these entries are copied to the DAX file.
+    AppMemPool<client_req_t> log_entry_appdata_pool;
 
     // The presistent memory Raft log, used only if persistent memory is
     // enabled. This is a linear memory chunk that starts with persistent
@@ -173,9 +173,9 @@ class AppContext {
 
     } pmem;
 
-    // The volatile in-memory Raft log, used only if persistent memory is
-    // enabled. This is a vector of raft_entry_t entries. Each such entry has a
-    // pointer to volatile log entries allocated from log_entry_pool.
+    // The volatile in-memory Raft log, used only in DRAM mode. Each entry in
+    // this log has a pointer to a volatile application data buffer allocated
+    // from log_entry_appdata_pool.
     std::vector<raft_entry_t> dram_raft_log;
 
     // Request tags used for RPCs exchanged among Raft servers

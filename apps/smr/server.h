@@ -161,13 +161,13 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   leader_sav.req_handle = req_handle;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
-  client_req_t *rsm_cmd_buf = c->server.log_entry_pool.alloc();
-  *rsm_cmd_buf = *client_req;
+  client_req_t *log_entry_appdata = c->server.log_entry_appdata_pool.alloc();
+  *log_entry_appdata = *client_req;
 
   msg_entry_t ent;
   ent.type = RAFT_LOGTYPE_NORMAL;
   ent.id = FLAGS_process_id;
-  ent.data.buf = static_cast<void *>(rsm_cmd_buf);
+  ent.data.buf = log_entry_appdata;
   ent.data.len = sizeof(client_req_t);
 
   int e = raft_recv_entry(c->server.raft, &ent, &leader_sav.msg_entry_response);

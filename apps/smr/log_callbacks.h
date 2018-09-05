@@ -51,8 +51,7 @@ static int __raft_persist_vote(raft_server_t *, void *udata,
                         sizeof(voted_for));
   }
 
-  // Ignored for DRAM mode
-  return 0;
+  return 0;  // Ignored for DRAM mode
 }
 
 // Raft callback for saving term and voted_for field to persistent storage
@@ -64,14 +63,13 @@ static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
     erpc::rt_assert(reinterpret_cast<uint8_t *>(c->server.pmem.p.voted_for) ==
                     reinterpret_cast<uint8_t *>(c->server.pmem.p.term) + 4);
 
-    // 8-byte atomic
+    // 8-byte atomic commit
     uint32_t to_persist[2];
     to_persist[0] = term;
-    to_persist[1] = voted_for;
-    pmem_memcpy_persist(c->server.pmem.p.term, &to_persist,
-                        sizeof(uint32_t) * 2);
+    to_persist[1] = static_cast<uint32_t>(voted_for);
+    pmem_memcpy_persist(c->server.pmem.p.term, &to_persist, sizeof(size_t));
   }
-  return 0;
+  return 0;  // Ignored for DRAM mode
 }
 
 // Raft callback for applying an entry to the log
@@ -108,7 +106,7 @@ static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *,
     if (likely(entry.data.len == sizeof(client_req_t))) {
       // Handle pool-allocated buffers separately
       assert(entry.data.buf != nullptr);
-      c->server.log_entry_pool.free(
+      c->server.log_entry_appdata_pool.free(
           static_cast<client_req_t *>(entry.data.buf));
     } else {
       if (entry.data.buf != nullptr) free(entry.data.buf);
