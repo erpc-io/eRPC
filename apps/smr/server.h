@@ -62,7 +62,8 @@ void map_pmem_log(AppContext *c) {
   pmem_memset_persist(c->server.pmem.v.buf, 0,
                       static_cast<size_t>(cur - c->server.pmem.v.buf));
 
-  c->server.pmem.v.log_entries_base = cur;
+  c->server.pmem.v.log_entries_base =
+      reinterpret_cast<pmem_ser_logentry_t *>(cur);
 }
 
 void init_raft(AppContext *c) {

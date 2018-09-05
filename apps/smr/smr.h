@@ -127,6 +127,12 @@ struct leader_saveinfo_t {
   msg_entry_response_t msg_entry_response;  // Used to check commit status
 };
 
+// A log entry serialized into persistent memory
+struct pmem_ser_logentry_t {
+  raft_entry_t raft_entry;
+  client_req_t client_req;
+};
+
 // Context for both servers and clients
 class AppContext {
  public:
@@ -149,10 +155,10 @@ class AppContext {
     struct {
       // Volatile records
       struct {
-        uint8_t *buf;               // The start of the mapped file
-        size_t mapped_len;          // Length of the mapped log file
-        size_t num_entries;         // Volatile record for number of entries
-        uint8_t *log_entries_base;  // Start of log entries in the mapped file
+        uint8_t *buf;        // The start of the mapped file
+        size_t mapped_len;   // Length of the mapped log file
+        size_t num_entries;  // Volatile record for number of entries
+        pmem_ser_logentry_t *log_entries_base;  // Log entries in the file
       } v;
 
       // Persistent metadata records
