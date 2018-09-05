@@ -147,17 +147,30 @@ class AppContext {
     // enabled. This is a linear memory chunk that starts with persistent
     // metadata records.
     struct {
-      uint8_t *p_buf;        // The start of the mapped file
-      size_t mapped_len;     // Length of the mapped log file
-      size_t v_num_entries;  // Volatile record for number of entries
+      // Volatile records
+      struct {
+        uint8_t *buf;               // The start of the mapped file
+        size_t mapped_len;          // Length of the mapped log file
+        size_t num_entries;         // Volatile record for number of entries
+        uint8_t *log_entries_base;  // Start of log entries in the mapped file
+      } v;
 
       // Persistent metadata records
-      raft_node_id_t *p_voted_for;  // Persistent record for persist-vote
-      raft_term_t *p_term;          // Persistent record for perist-term
-      size_t *p_num_entries;  // Persistent record for number of log entries
+      struct {
+        static_assert(sizeof(raft_node_id_t) == 4, "");
+        static_assert(sizeof(raft_term_t) == 8, "");
 
-      // The persistent log
-      uint8_t *p_log_base;
+        // This is a hack. In __raft_persist_term, we must atomically commit
+        // both the term and the vote. raft_term_t is eight bytes, so the
+        // combined size (12 bytes) exceeds the atomic write length (eight
+        // bytes). This is simplified by shrinking the term to 4 bytes, and
+        // atomically doing an 8-byte write to both \p term and \p voted_for.
+        uint32_t *term;             // Record for perist-term
+        raft_node_id_t *voted_for;  // Record for persist-vote
+
+        size_t *num_entries;  // Record for number of log entries
+      } p;
+
     } pmem;
 
     // The volatile in-memory Raft log, used only if persistent memory is
@@ -177,7 +190,7 @@ class AppContext {
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
 
     size_t get_num_log_entries() const {
-      if (kUsePmem) return pmem.v_num_entries;
+      if (kUsePmem) return pmem.v.num_entries;
       return dram_raft_log.size();
     }
   } server;

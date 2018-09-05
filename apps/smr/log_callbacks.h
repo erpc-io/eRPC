@@ -47,7 +47,7 @@ static int __raft_persist_vote(raft_server_t *, void *udata,
                                raft_node_id_t voted_for) {
   if (kUsePmem) {
     auto *c = static_cast<AppContext *>(udata);
-    pmem_memcpy_persist(&c->server.pmem.p_voted_for, &voted_for,
+    pmem_memcpy_persist(c->server.pmem.p.voted_for, &voted_for,
                         sizeof(voted_for));
   }
 
@@ -55,13 +55,22 @@ static int __raft_persist_vote(raft_server_t *, void *udata,
   return 0;
 }
 
-// Raft callback for saving term field to persistent storage
+// Raft callback for saving term and voted_for field to persistent storage
 static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
                                raft_node_id_t voted_for) {
-  // XXX: This requires atomically committing voted_for and term => hard
-  _unused(udata);
-  _unused(term);
-  _unused(voted_for);
+  erpc::rt_assert(term < UINT32_MAX, "Term too large");
+  if (kUsePmem) {
+    auto *c = static_cast<AppContext *>(udata);
+    erpc::rt_assert(reinterpret_cast<uint8_t *>(c->server.pmem.p.voted_for) ==
+                    reinterpret_cast<uint8_t *>(c->server.pmem.p.term) + 4);
+
+    // 8-byte atomic
+    uint32_t to_persist[2];
+    to_persist[0] = term;
+    to_persist[1] = voted_for;
+    pmem_memcpy_persist(c->server.pmem.p.term, &to_persist,
+                        sizeof(uint32_t) * 2);
+  }
   return 0;
 }
 
