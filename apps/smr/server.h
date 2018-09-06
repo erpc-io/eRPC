@@ -107,6 +107,7 @@ void init_raft(AppContext *c) {
   }
 
   if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
+  c->server.cycles_per_msec = erpc::ms_to_cycles(1, erpc::measure_rdtsc_freq());
   c->server.raft_periodic_tsc = erpc::rdtsc();
 }
 
@@ -232,6 +233,24 @@ void init_mica(AppContext *c) {
   auto config = mica::util::Config::load_file("apps/smr/kv_store.json");
   c->server.table = new FixedTable(config.get("table"), kAppValueSize,
                                    c->rpc->get_huge_alloc());
+}
+
+inline void call_raft_periodic(AppContext *c) {
+  // raft_periodic() uses msec_elapsed for only request and election timeouts.
+  // msec_elapsed is in integer milliseconds which does not work for us because
+  // we invoke raft_periodic() much work frequently. Instead, we accumulate
+  // cycles over calls to raft_periodic().
+
+  size_t cur_tsc = erpc::rdtsc();
+  size_t msec_elapsed =
+      (cur_tsc - c->server.raft_periodic_tsc) / c->server.cycles_per_msec;
+
+  if (msec_elapsed > 0) {
+    c->server.raft_periodic_tsc = cur_tsc;
+    raft_periodic(c->server.raft, msec_elapsed);
+  } else {
+    raft_periodic(c->server.raft, 0);
+  }
 }
 
 void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {

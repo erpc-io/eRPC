@@ -167,6 +167,7 @@ static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
 // Callback for being notified of membership changes. Implementing this callback
 // is optional.
 static void __raft_notify_membership_event(raft_server_t *, void *,
-                                           raft_node_t *, raft_membership_e) {
+                                           raft_node_t *, raft_entry_t *,
+                                           raft_membership_e) {
   printf("smr: Ignoring __raft_notify_membership_event callback .\n");
 }

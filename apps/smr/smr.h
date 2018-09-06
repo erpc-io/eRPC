@@ -147,7 +147,12 @@ class AppContext {
   struct {
     int node_id = -1;  // This server's Raft node ID
     raft_server_t *raft = nullptr;
-    size_t raft_periodic_tsc;           // rdtsc timestamp
+
+    // Time since last invocation of raft_periodic() with a non-zero
+    // msec_elapsed argument
+    size_t raft_periodic_tsc;
+    size_t cycles_per_msec;  // rdtsc cycles in one millisecond
+
     leader_saveinfo_t leader_saveinfo;  // Info for the ongoing commit request
     std::vector<TimeEnt> time_ents;
 
@@ -273,19 +278,3 @@ std::unordered_map<int, std::string> node_id_to_name_map;
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
-
-inline void call_raft_periodic(AppContext *c) {
-  // raft_periodic() takes the number of msec elapsed since the last call. This
-  // is done for ~100 msec timeouts, so this approximation is fine.
-  size_t cur_tsc = erpc::rdtsc();
-
-  // Assume TSC freqency is around 2.8 GHz. 1 ms = 2.8 * 100,000 ticks.
-  bool msec_elapsed = (erpc::rdtsc() - c->server.raft_periodic_tsc > 2800000);
-
-  if (msec_elapsed) {
-    c->server.raft_periodic_tsc = cur_tsc;
-    raft_periodic(c->server.raft, 1);
-  } else {
-    raft_periodic(c->server.raft, 0);
-  }
-}
