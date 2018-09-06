@@ -25,7 +25,7 @@ extern "C" {
 
 #include "util/autorun_helpers.h"
 
-static constexpr bool kUsePmem = false;
+static constexpr bool kUsePmem = true;
 
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA

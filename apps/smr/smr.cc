@@ -24,6 +24,6 @@ int main(int argc, char **argv) {
 
   auto thread =
       std::thread(is_raft_server() ? server_func : client_func, 0, &nexus, &c);
-  erpc::bind_to_core(thread, 0, 0);
+  erpc::bind_to_core(thread, FLAGS_numa_node, 0);
   thread.join();
 }
