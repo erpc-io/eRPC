@@ -89,6 +89,17 @@ void init_raft(AppContext *c) {
     }
   }
 
+  // Raft log entries start from index 1, so insert a garbage entry. This will
+  // never be accessed, so existing or random contents are fine.
+  if (kUsePmem) {
+    c->server.pmem.v.num_entries = 1;
+    pmem_memcpy_persist(c->server.pmem.p.num_entries,
+                        &c->server.pmem.v.num_entries,
+                        sizeof(c->server.pmem.v.num_entries));
+  } else {
+    c->server.dram_raft_log.push_back(raft_entry_t());
+  }
+
   if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
   c->server.raft_periodic_tsc = erpc::rdtsc();
 }
