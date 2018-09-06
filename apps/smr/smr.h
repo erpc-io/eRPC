@@ -17,15 +17,15 @@ extern "C" {
 #include <set>
 
 #include "../apps_common.h"
+#include "mica/util/cityhash/city.h"
 #include "time_entry.h"
-#include "util/cityhash/city.h"
 
 #include "mica/table/fixedtable.h"
 #include "mica/util/hash.h"
 
 #include "util/autorun_helpers.h"
 
-static constexpr bool kUsePmem = true;
+static constexpr bool kUsePmem = false;
 
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA

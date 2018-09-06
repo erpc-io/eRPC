@@ -144,7 +144,6 @@ set(SOURCES
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/transport_impl/transport.cc
-  src/util/cityhash/city_mod.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
@@ -279,7 +278,6 @@ message(STATUS "Compiling app = " ${APP})
 if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
   set(LIBRARIES ${LIBRARIES} raft pmem)
-  set(APP_ADDITIONAL_SOURCES third_party/cityhash/city_mod.cc)
   # MICA
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
@@ -289,7 +287,6 @@ elseif(APP STREQUAL "masstree_analytics")
   include_directories(SYSTEM $ENV{HOME}/masstree-beta)
   add_definitions(-include $ENV{HOME}/masstree-beta/config.h)
   set(APP_ADDITIONAL_SOURCES
-    third_party/cityhash/city_mod.cc
     apps/masstree_analytics/mt_index_api.cc)
   set(LIBRARIES ${LIBRARIES} masstree)
 elseif(APP STREQUAL "mica_test")
