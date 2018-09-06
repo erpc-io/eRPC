@@ -11,6 +11,51 @@ static int __raft_send_snapshot(raft_server_t *, void *, raft_node_t *) {
   return -1;
 }
 
+// Raft callback for applying an entry to the log at position \p entry_idx
+static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
+                            raft_index_t entry_idx) {
+  assert(!raft_entry_is_cfg_change(ety));
+  auto *c = static_cast<AppContext *>(udata);
+
+  if (kUsePmem) {
+    erpc::rt_assert(static_cast<size_t>(entry_idx) ==
+                    c->server.pmem.v.num_entries);
+
+    // Make a volatile copy
+    pmem_ser_logentry_t v_log_entry;
+    v_log_entry.raft_entry = *ety;
+    v_log_entry.client_req = *reinterpret_cast<client_req_t *>(ety->data.buf);
+    erpc::rt_assert(ety->data.len == sizeof(client_req_t));
+
+    pmem_ser_logentry_t *p_log_entry_ptr =
+        &c->server.pmem.v.log_entries_base[c->server.pmem.v.num_entries];
+    c->server.pmem.v.num_entries++;
+
+    size_t cycles_start = 0;
+    if (kAppMeasurePmemLatency) cycles_start = erpc::rdtsc();
+
+    // First update log data, then log tail
+    pmem_memcpy_persist(p_log_entry_ptr, &v_log_entry, sizeof(v_log_entry));
+    pmem_memcpy_persist(c->server.pmem.p.num_entries,
+                        &c->server.pmem.v.num_entries,
+                        sizeof(c->server.pmem.v.num_entries));
+
+    if (kAppMeasurePmemLatency) {
+      size_t ns =
+          erpc::to_nsec(erpc::rdtsc() - cycles_start, c->rpc->get_freq_ghz());
+      if (unlikely(ns > kAppPmemNsecMax)) {
+        fprintf(stderr, "%zu ns is larger than expected pmem latency.\n", ns);
+      }
+      hdr_record_value(c->server.pmem_nsec_hdr, static_cast<int64_t>(ns));
+    }
+  } else {
+    erpc::rt_assert(static_cast<size_t>(entry_idx) ==
+                    c->server.dram_raft_log.size());
+    c->server.dram_raft_log.push_back(*ety);
+  }
+  return 0;
+}
+
 // Raft callback for applying an entry to the FSM
 static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
                            raft_index_t) {
@@ -70,39 +115,6 @@ static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
     pmem_memcpy_persist(c->server.pmem.p.term, &to_persist, sizeof(size_t));
   }
   return 0;  // Ignored for DRAM mode
-}
-
-// Raft callback for applying an entry to the log at position \p entry_idx
-static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
-                            raft_index_t entry_idx) {
-  assert(!raft_entry_is_cfg_change(ety));
-  auto *c = static_cast<AppContext *>(udata);
-
-  if (kUsePmem) {
-    erpc::rt_assert(static_cast<size_t>(entry_idx) ==
-                    c->server.pmem.v.num_entries);
-
-    // Make a volatile copy
-    pmem_ser_logentry_t v_log_entry;
-    v_log_entry.raft_entry = *ety;
-    v_log_entry.client_req = *reinterpret_cast<client_req_t *>(ety->data.buf);
-    erpc::rt_assert(ety->data.len == sizeof(client_req_t));
-
-    pmem_ser_logentry_t *p_log_entry_ptr =
-        &c->server.pmem.v.log_entries_base[c->server.pmem.v.num_entries];
-    c->server.pmem.v.num_entries++;
-
-    // First update log data, then log tail
-    pmem_memcpy_persist(p_log_entry_ptr, &v_log_entry, sizeof(v_log_entry));
-    pmem_memcpy_persist(c->server.pmem.p.num_entries,
-                        &c->server.pmem.v.num_entries,
-                        sizeof(c->server.pmem.v.num_entries));
-  } else {
-    erpc::rt_assert(static_cast<size_t>(entry_idx) ==
-                    c->server.dram_raft_log.size());
-    c->server.dram_raft_log.push_back(*ety);
-  }
-  return 0;
 }
 
 // Raft callback for removing the first entry from the log. This is provided to

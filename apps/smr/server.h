@@ -100,6 +100,12 @@ void init_raft(AppContext *c) {
     c->server.dram_raft_log.push_back(raft_entry_t());
   }
 
+  if (kAppMeasurePmemLatency) {
+    int ret = hdr_init(kAppPmemNsecMin, kAppPmemNsecMax, kAppPmemNsecPrecision,
+                       &c->server.pmem_nsec_hdr);
+    erpc::rt_assert(ret == 0);
+  }
+
   if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
   c->server.raft_periodic_tsc = erpc::rdtsc();
 }
@@ -241,12 +247,27 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
   while (ctrl_c_pressed == 0) {
     if (erpc::rdtsc() - loop_tsc > 3000000000ull) {
       erpc::Latency &commit_latency = c->server.commit_latency;
+
+      std::string pmem_latency_str = "N/A";
+      if (kUsePmem && kAppMeasurePmemLatency) {
+        char msg[1000];
+        hdr_histogram *hist = c->server.pmem_nsec_hdr;
+        sprintf(msg, "%zu ns 50%%, %zu ns 99%%, %.zu ns 99.9%%",
+                hdr_value_at_percentile(hist, 50),
+                hdr_value_at_percentile(hist, 99),
+                hdr_value_at_percentile(hist, 99.9));
+        pmem_latency_str = std::string(msg);
+
+        hdr_reset(hist);
+      }
+
       printf(
           "smr: Leader commit latency (us) = "
-          "{%.2f median, %.2f 99%%}. Number of log entries = %zu.\n",
+          "{%.2f median, %.2f 99%%}. Number of log entries = %zu. "
+          "Pmem latency = %s.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
-          c->server.get_num_log_entries());
+          c->server.get_num_log_entries(), pmem_latency_str.c_str());
 
       loop_tsc = erpc::rdtsc();
       commit_latency.reset();

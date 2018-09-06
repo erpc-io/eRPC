@@ -277,7 +277,7 @@ message(STATUS "Compiling app = " ${APP})
 # Add app-specific defines now, isolating them from the tests
 if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
-  set(LIBRARIES ${LIBRARIES} raft pmem)
+  set(LIBRARIES ${LIBRARIES} raft pmem hdr_histogram_static)
   # MICA
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})

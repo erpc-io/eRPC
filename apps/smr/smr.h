@@ -10,6 +10,7 @@ extern "C" {
 #include <raft/raft.h>
 }
 
+#include <hdr/hdr_histogram.h>
 #include <libpmem.h>
 #include <signal.h>
 #include <stdio.h>
@@ -44,6 +45,12 @@ static constexpr bool kAppTimeEnt = false;
 static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
+
+// Persistent memory latency
+static constexpr bool kAppMeasurePmemLatency = true;  // Persistent mem latency
+static constexpr int64_t kAppPmemNsecMin = 1;         // Min = 1 ns
+static constexpr int64_t kAppPmemNsecMax = 1000000;   // Min = 10 us
+static constexpr size_t kAppPmemNsecPrecision = 2;  // Within 1 ns if < 1000 ns
 
 // eRPC defines
 static constexpr size_t kAppPhyPort = 0;
@@ -191,7 +198,8 @@ class AppContext {
     FixedTable *table = nullptr;
 
     // Stats
-    erpc::Latency commit_latency;            // Amplification factor = 10
+    erpc::Latency commit_latency;  // Amplification factor = 10
+    hdr_histogram *pmem_nsec_hdr;  // Statistics for persistent memory latency
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
 
