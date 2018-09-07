@@ -229,6 +229,8 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
       exit(0);
     }
   }
+
+  printf("smr: All sessions connected\n");
 }
 
 void init_mica(AppContext *c) {
@@ -249,8 +251,6 @@ inline void call_raft_periodic(AppContext *c) {
 
   if (msec_elapsed > 0) {
     c->server.raft_periodic_tsc = cur_tsc;
-    printf("msec elapsed = %zu at time %s\n", msec_elapsed,
-           erpc::get_formatted_time().c_str());
     raft_periodic(c->server.raft, msec_elapsed);
   } else {
     raft_periodic(c->server.raft, 0);
@@ -300,7 +300,11 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
     c->rpc->run_event_loop_once();
 
     leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
-    if (!leader_sav.in_use) continue;  // We didn't get a client request
+    if (!leader_sav.in_use) {
+      // Either we are the leader and don't have an active request, or we
+      // are a follower
+      continue;
+    }
 
     int commit_status = raft_msg_entry_response_committed(
         c->server.raft, &leader_sav.msg_entry_response);
