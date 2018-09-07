@@ -275,7 +275,7 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
       if (kUsePmem && kAppMeasurePmemLatency) {
         char msg[1000];
         hdr_histogram *hist = c->server.pmem_nsec_hdr;
-        sprintf(msg, "%zu ns 50%%, %zu ns 99%%, %.zu ns 99.9%%",
+        sprintf(msg, "%zu ns 50%%, %zu ns 99%%, %zu ns 99.9%%",
                 hdr_value_at_percentile(hist, 50),
                 hdr_value_at_percentile(hist, 99),
                 hdr_value_at_percentile(hist, 99.9));
