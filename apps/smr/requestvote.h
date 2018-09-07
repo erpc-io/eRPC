@@ -13,27 +13,54 @@ struct app_requestvote_t {
   msg_requestvote_t msg_rv;
 };
 
+// Return a string representation of a requestvote request message
+static std::string msg_requestvote_string(msg_requestvote_t *msg_rv) {
+  std::ostringstream ret;
+  ret << "[candidate_id " << node_id_to_name_map[msg_rv->candidate_id] << ", "
+      << "last log idx " << std::to_string(msg_rv->last_log_idx) << ", "
+      << "last log term " << std::to_string(msg_rv->last_log_term) << ", "
+      << "term " << std::to_string(msg_rv->term) << "]";
+  return ret.str();
+}
+
+// Return a string representation of a requestvote request message
+static std::string msg_requestvote_response_string(
+    msg_requestvote_response_t *msg_rv_resp) {
+  std::ostringstream ret;
+  ret << "[term " << std::to_string(msg_rv_resp->term) << ", "
+      << "vote granted " << std::to_string(msg_rv_resp->vote_granted) << "]";
+  return ret.str();
+}
+
 void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(app_requestvote_t));
 
   auto *rv_req = reinterpret_cast<app_requestvote_t *>(req_msgbuf->buf);
-  printf("smr: Received requestvote request from %s [%s].\n",
+  printf("smr: Received requestvote request from %s: %s [%s].\n",
          node_id_to_name_map[rv_req->node_id].c_str(),
+         msg_requestvote_string(&rv_req->msg_rv).c_str(),
          erpc::get_formatted_time().c_str());
 
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_requestvote_response_t));
   req_handle->prealloc_used = true;
 
+  auto *rv_resp =
+      reinterpret_cast<msg_requestvote_response_t *>(resp_msgbuf.buf);
+
   // rv_req->msg_rv is valid only for the duration of this handler, which is OK
   // as msg_requestvote_t does not contain any dynamically allocated members.
-  int e = raft_recv_requestvote(
-      c->server.raft, raft_get_node(c->server.raft, rv_req->node_id),
-      &rv_req->msg_rv,
-      reinterpret_cast<msg_requestvote_response_t *>(resp_msgbuf.buf));
+  int e = raft_recv_requestvote(c->server.raft,
+                                raft_get_node(c->server.raft, rv_req->node_id),
+                                &rv_req->msg_rv, rv_resp);
   erpc::rt_assert(e == 0);
+
+  printf("smr: Sending requestvote request to %s: %s [%s].\n",
+         node_id_to_name_map[rv_req->node_id].c_str(),
+         msg_requestvote_response_string(rv_resp).c_str(),
+         erpc::get_formatted_time().c_str());
 
   c->rpc->enqueue_response(req_handle);
 }
@@ -76,15 +103,18 @@ void requestvote_cont(erpc::RespHandle *resp_handle, void *_context,
   auto *c = static_cast<AppContext *>(_context);
   auto *rrt = reinterpret_cast<raft_req_tag_t *>(tag);
 
+  auto *msg_rv_resp =
+      reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf);
+
   if (likely(rrt->resp_msgbuf.get_data_size() > 0)) {
     // The RPC was successful
-    printf("smr: Received requestvote response from node %s [%s].\n",
+    printf("smr: Received requestvote response from node %s: %s [%s].\n",
            node_id_to_name_map[raft_node_get_id(rrt->node)].c_str(),
+           msg_requestvote_response_string(msg_rv_resp).c_str(),
            erpc::get_formatted_time().c_str());
 
-    int e = raft_recv_requestvote_response(
-        c->server.raft, rrt->node,
-        reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf));
+    int e =
+        raft_recv_requestvote_response(c->server.raft, rrt->node, msg_rv_resp);
     erpc::rt_assert(e == 0);  // XXX: Doc says: Shutdown if e != 0
   } else {
     // This is a continuation-with-failure
