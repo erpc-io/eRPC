@@ -57,7 +57,7 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
                                 &rv_req->msg_rv, rv_resp);
   erpc::rt_assert(e == 0);
 
-  printf("smr: Sending requestvote request to %s: %s [%s].\n",
+  printf("smr: Sending requestvote response to %s: %s [%s].\n",
          node_id_to_name_map[rv_req->node_id].c_str(),
          msg_requestvote_response_string(rv_resp).c_str(),
          erpc::get_formatted_time().c_str());

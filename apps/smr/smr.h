@@ -46,11 +46,19 @@ static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
 
-// Persistent memory latency
+// Persistent memory latency HDR histogram
 static constexpr bool kAppMeasurePmemLatency = true;  // Persistent mem latency
 static constexpr int64_t kAppPmemNsecMin = 1;         // Min = 1 ns
 static constexpr int64_t kAppPmemNsecMax = 1000000;   // Min = 10 us
-static constexpr size_t kAppPmemNsecPrecision = 2;  // Within 1 ns if < 1000 ns
+
+// The latency reported by the HDR histogram will be precise within:
+// * 1 ns if the sample is less than 100 ns
+// * 10 ns if the sample is less than 1000 ns
+// * ...
+static constexpr size_t kAppPmemNsecPrecision = 2;
+
+// willemt/raft uses a very large 1000 ms election timeout
+static constexpr size_t kAppRaftElectionTimeoutMsec = 1000;
 
 // eRPC defines
 static constexpr size_t kAppPhyPort = 0;

@@ -68,6 +68,8 @@ void map_pmem_log(AppContext *c) {
 
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
+  raft_set_election_timeout(c->server.raft, kAppRaftElectionTimeoutMsec);
+
   erpc::rt_assert(c->server.raft != nullptr);
 
   c->server.node_id = get_raft_node_id_for_process(FLAGS_process_id);
@@ -247,6 +249,8 @@ inline void call_raft_periodic(AppContext *c) {
 
   if (msec_elapsed > 0) {
     c->server.raft_periodic_tsc = cur_tsc;
+    printf("msec elapsed = %zu at time %s\n", msec_elapsed,
+           erpc::get_formatted_time().c_str());
     raft_periodic(c->server.raft, msec_elapsed);
   } else {
     raft_periodic(c->server.raft, 0);
