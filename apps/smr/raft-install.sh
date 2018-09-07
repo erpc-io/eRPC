@@ -1,9 +1,9 @@
 #!/bin/bash
+# 
+# willemt/raft does not have an install command, so use this.
 #
-# willemt/raft's Makefile contains flags for code coverage that we don't need.
-# This compiles a more optimized library.
-#
-# willemt/raft does not have an install command. This does.
+# willemt/raft's Makefile contains flags for code coverage that cause slowness.
+# This compiles a more optimized library by overriding the Makefile's CFLAGS.
 
 rm -rf /tmp/raft
 git clone https://github.com/willemt/raft.git /tmp/raft

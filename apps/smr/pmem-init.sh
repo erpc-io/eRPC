@@ -5,7 +5,7 @@
 # This assumes that there are two pmem regions. Check with:
 #   sudo ipmctl show -region
 #
-# To initialize two regions:
+# To configure the system with two regions:
 #   sudo ipmctl create -goal MemoryMode=0
 #   sudo reboot
 
