@@ -2,8 +2,7 @@
  * @file apps_common.h
  * @brief Common code for apps
  */
-#ifndef APPS_COMMON_H
-#define APPS_COMMON_H
+#pragma once
 
 #include <gflags/gflags.h>
 #include <boost/algorithm/string.hpp>
@@ -228,5 +227,3 @@ void ping_all_blocking(BasicAppContext &c) {
     }
   }
 }
-
-#endif  // APPS_COMMON_H
