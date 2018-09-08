@@ -11,7 +11,7 @@ static int __raft_send_snapshot(raft_server_t *, void *, raft_node_t *) {
   return -1;
 }
 
-// Raft callback for applying an entry to the log at position \p entry_idx
+// Raft callback for setting the log entry at \p entry_idx to \p *ety
 static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
                             raft_index_t entry_idx) {
   assert(!raft_entry_is_cfg_change(ety));
