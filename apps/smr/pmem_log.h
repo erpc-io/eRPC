@@ -86,15 +86,15 @@ class PmemLog {
 
     v.log_entries_base = reinterpret_cast<T *>(cur);
 
-    // Raft log entries start from index 1, so insert a garbage entry. This will
-    // never be accessed, so a garbage entry is fine.
-    append(T());
-
     if (kMeasureLatency) {
       int ret = hdr_init(kLatencyNsecMin, kLatencyNsecMax,
                          kLatencyNsecPrecision, &nsec_hdr);
       erpc::rt_assert(ret == 0);
     }
+
+    // Raft log entries start from index 1, so insert a garbage entry. This will
+    // never be accessed, so a garbage entry is fine.
+    append(T());
   }
 
   // Truncate the log so that the new size is \p num_entries
