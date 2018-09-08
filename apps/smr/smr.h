@@ -172,6 +172,10 @@ class AppContext {
     // The presistent memory Raft log, used only if persistent memory is
     // enabled. This is a linear memory chunk that starts with persistent
     // metadata records.
+    //
+    // In DRAM mode, the user need not provide a log because willemt/raft
+    // internally maintains a log. This log contains pointers to volatile bufs
+    // allocated from log_entry_appdata_pool.
     struct {
       // Volatile records
       struct {
@@ -199,11 +203,6 @@ class AppContext {
 
     } pmem;
 
-    // The volatile in-memory Raft log, used only in DRAM mode. Each entry in
-    // this log has a pointer to a volatile application data buffer allocated
-    // from log_entry_appdata_pool.
-    std::vector<raft_entry_t> dram_raft_log;
-
     // Request tags used for RPCs exchanged among Raft servers
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
 
@@ -215,11 +214,6 @@ class AppContext {
     hdr_histogram *pmem_nsec_hdr;  // Statistics for persistent memory latency
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
-
-    size_t get_num_log_entries() const {
-      if (kUsePmem) return pmem.v.num_entries;
-      return dram_raft_log.size();
-    }
   } server;
 
   // SMR client members

@@ -98,8 +98,6 @@ void init_raft(AppContext *c) {
     pmem_memcpy_persist(c->server.pmem.p.num_entries,
                         &c->server.pmem.v.num_entries,
                         sizeof(c->server.pmem.v.num_entries));
-  } else {
-    c->server.dram_raft_log.push_back(raft_entry_t());
   }
 
   if (kAppMeasurePmemLatency) {
@@ -290,7 +288,7 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
           "Pmem latency = %s.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
-          c->server.get_num_log_entries(), pmem_latency_str.c_str());
+          raft_get_log_count(c->server.raft), pmem_latency_str.c_str());
 
       loop_tsc = erpc::rdtsc();
       commit_latency.reset();
@@ -349,6 +347,6 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
   }
 
   printf("smr: Final log size (including uncommitted entries) = %zu.\n",
-         c->server.get_num_log_entries());
+         raft_get_log_count(c->server.raft));
   delete c->rpc;
 }

@@ -15,9 +15,9 @@ static int __raft_send_snapshot(raft_server_t *, void *, raft_node_t *) {
 static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
                             raft_index_t entry_idx) {
   assert(!raft_entry_is_cfg_change(ety));
-  auto *c = static_cast<AppContext *>(udata);
 
   if (kUsePmem) {
+    auto *c = static_cast<AppContext *>(udata);
     erpc::rt_assert(static_cast<size_t>(entry_idx) ==
                     c->server.pmem.v.num_entries);
 
@@ -48,12 +48,9 @@ static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
       }
       hdr_record_value(c->server.pmem_nsec_hdr, static_cast<int64_t>(ns));
     }
-  } else {
-    erpc::rt_assert(static_cast<size_t>(entry_idx) ==
-                    c->server.dram_raft_log.size());
-    c->server.dram_raft_log.push_back(*ety);
   }
-  return 0;
+
+  return 0;  // Unneeded for DRAM mode
 }
 
 // Raft callback for applying an entry to the FSM
@@ -96,7 +93,7 @@ static int __raft_persist_vote(raft_server_t *, void *udata,
                         sizeof(voted_for));
   }
 
-  return 0;  // Ignored for DRAM mode
+  return 0;  // Unneeded for DRAM mode
 }
 
 // Raft callback for saving term and voted_for field to persistent storage
@@ -114,7 +111,7 @@ static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
     to_persist[1] = static_cast<uint32_t>(voted_for);
     pmem_memcpy_persist(c->server.pmem.p.term, &to_persist, sizeof(size_t));
   }
-  return 0;  // Ignored for DRAM mode
+  return 0;  // Unneeded for DRAM mode
 }
 
 // Raft callback for removing the first entry from the log. This is provided to
@@ -128,22 +125,20 @@ static int __raft_log_poll(raft_server_t *, void *, raft_entry_t *,
 // Raft callback for deleting the most recent entry from the log. This happens
 // when an invalid leader finds a valid leader and has to delete superseded
 // log entries.
-static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *,
+static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *ety,
                           raft_index_t) {
   auto *c = static_cast<AppContext *>(udata);
 
   if (kUsePmem) {
   } else {
-    raft_entry_t &entry = c->server.dram_raft_log.back();
-    if (likely(entry.data.len == sizeof(client_req_t))) {
+    if (likely(ety->data.len == sizeof(client_req_t))) {
       // Handle pool-allocated buffers separately
-      assert(entry.data.buf != nullptr);
+      assert(ety->data.buf != nullptr);
       c->server.log_entry_appdata_pool.free(
-          static_cast<client_req_t *>(entry.data.buf));
+          static_cast<client_req_t *>(ety->data.buf));
     } else {
-      if (entry.data.buf != nullptr) free(entry.data.buf);
+      if (ety->data.buf != nullptr) free(ety->data.buf);
     }
-    c->server.dram_raft_log.pop_back();
   }
 
   return 0;
