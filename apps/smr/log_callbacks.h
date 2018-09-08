@@ -14,40 +14,20 @@ static int __raft_send_snapshot(raft_server_t *, void *, raft_node_t *) {
 // Raft callback for setting the log entry at \p entry_idx to \p *ety
 static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
                             raft_index_t entry_idx) {
+  // We currently handle only application log entries
   assert(!raft_entry_is_cfg_change(ety));
+  assert(ety->data.len == sizeof(client_req_t));
 
   if (kUsePmem) {
     auto *c = static_cast<AppContext *>(udata);
+
+    // During failures, willemt/raft uses log_pop() to pop old entries instead
+    // of directly overwriting them. This is also the behavior of LogCabin.
     erpc::rt_assert(static_cast<size_t>(entry_idx) ==
-                    c->server.pmem.v.num_entries);
+                    c->server.pmem_log->get_num_entries());
 
-    // Make a volatile copy
-    pmem_ser_logentry_t v_log_entry;
-    v_log_entry.raft_entry = *ety;
-    v_log_entry.client_req = *reinterpret_cast<client_req_t *>(ety->data.buf);
-    erpc::rt_assert(ety->data.len == sizeof(client_req_t));
-
-    pmem_ser_logentry_t *p_log_entry_ptr =
-        &c->server.pmem.v.log_entries_base[c->server.pmem.v.num_entries];
-    c->server.pmem.v.num_entries++;
-
-    size_t cycles_start = 0;
-    if (kAppMeasurePmemLatency) cycles_start = erpc::rdtsc();
-
-    // First update log data, then log tail
-    pmem_memcpy_persist(p_log_entry_ptr, &v_log_entry, sizeof(v_log_entry));
-    pmem_memcpy_persist(c->server.pmem.p.num_entries,
-                        &c->server.pmem.v.num_entries,
-                        sizeof(c->server.pmem.v.num_entries));
-
-    if (kAppMeasurePmemLatency) {
-      size_t ns =
-          erpc::to_nsec(erpc::rdtsc() - cycles_start, c->rpc->get_freq_ghz());
-      if (unlikely(ns > kAppPmemNsecMax)) {
-        fprintf(stderr, "%zu ns is larger than expected pmem latency.\n", ns);
-      }
-      hdr_record_value(c->server.pmem_nsec_hdr, static_cast<int64_t>(ns));
-    }
+    c->server.pmem_log->append(pmem_ser_logentry_t(
+        *ety, *reinterpret_cast<client_req_t *>(ety->data.buf)));
   }
 
   return 0;  // Unneeded for DRAM mode
@@ -89,8 +69,7 @@ static int __raft_persist_vote(raft_server_t *, void *udata,
                                raft_node_id_t voted_for) {
   if (kUsePmem) {
     auto *c = static_cast<AppContext *>(udata);
-    pmem_memcpy_persist(c->server.pmem.p.voted_for, &voted_for,
-                        sizeof(voted_for));
+    c->server.pmem_log->persist_vote(voted_for);
   }
 
   return 0;  // Unneeded for DRAM mode
@@ -102,14 +81,7 @@ static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
   erpc::rt_assert(term < UINT32_MAX, "Term too large");
   if (kUsePmem) {
     auto *c = static_cast<AppContext *>(udata);
-    erpc::rt_assert(reinterpret_cast<uint8_t *>(c->server.pmem.p.voted_for) ==
-                    reinterpret_cast<uint8_t *>(c->server.pmem.p.term) + 4);
-
-    // 8-byte atomic commit
-    uint32_t to_persist[2];
-    to_persist[0] = term;
-    to_persist[1] = static_cast<uint32_t>(voted_for);
-    pmem_memcpy_persist(c->server.pmem.p.term, &to_persist, sizeof(size_t));
+    c->server.pmem_log->persist_term(term, voted_for);
   }
   return 0;  // Unneeded for DRAM mode
 }
@@ -128,17 +100,16 @@ static int __raft_log_poll(raft_server_t *, void *, raft_entry_t *,
 static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *ety,
                           raft_index_t) {
   auto *c = static_cast<AppContext *>(udata);
+  if (kUsePmem) c->server.pmem_log->pop();
 
-  if (kUsePmem) {
+  // We must the entry's application data buffer regardless of pmem
+  if (likely(ety->data.len == sizeof(client_req_t))) {
+    // Handle pool-allocated buffers separately
+    assert(ety->data.buf != nullptr);
+    c->server.log_entry_appdata_pool.free(
+        static_cast<client_req_t *>(ety->data.buf));
   } else {
-    if (likely(ety->data.len == sizeof(client_req_t))) {
-      // Handle pool-allocated buffers separately
-      assert(ety->data.buf != nullptr);
-      c->server.log_entry_appdata_pool.free(
-          static_cast<client_req_t *>(ety->data.buf));
-    } else {
-      if (ety->data.buf != nullptr) free(ety->data.buf);
-    }
+    if (ety->data.buf != nullptr) free(ety->data.buf);
   }
 
   return 0;
@@ -164,5 +135,5 @@ static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
 static void __raft_notify_membership_event(raft_server_t *, void *,
                                            raft_node_t *, raft_entry_t *,
                                            raft_membership_e) {
-  printf("smr: Ignoring __raft_notify_membership_event callback .\n");
+  printf("smr: Ignoring __raft_notify_membership_event callback.\n");
 }

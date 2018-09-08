@@ -38,34 +38,6 @@ void set_raft_callbacks(AppContext *c) {
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
 }
 
-void map_pmem_log(AppContext *c) {
-  int is_pmem;
-  c->server.pmem.v.buf = reinterpret_cast<uint8_t *>(
-      pmem_map_file("/mnt/pmem12/raft_log", 0 /* length */, 0 /* flags */, 0666,
-                    &c->server.pmem.v.mapped_len, &is_pmem));
-
-  erpc::rt_assert(c->server.pmem.v.buf != nullptr,
-                  "pmem_map_file() failed. " + std::string(strerror(errno)));
-  erpc::rt_assert(c->server.pmem.v.mapped_len >= GB(32), "Raft log too short");
-  erpc::rt_assert(is_pmem == 1, "Raft log file is not pmem");
-
-  c->server.pmem.v.num_entries = 0;
-
-  // Initialize persistent metadata pointers and reset them to zero
-  uint8_t *cur = c->server.pmem.v.buf;
-  c->server.pmem.p.term = reinterpret_cast<uint32_t *>(cur);
-  cur += sizeof(uint32_t);
-  c->server.pmem.p.voted_for = reinterpret_cast<raft_node_id_t *>(cur);
-  cur += sizeof(raft_node_id_t);
-  c->server.pmem.p.num_entries = reinterpret_cast<size_t *>(cur);
-  cur += sizeof(size_t);
-  pmem_memset_persist(c->server.pmem.v.buf, 0,
-                      static_cast<size_t>(cur - c->server.pmem.v.buf));
-
-  c->server.pmem.v.log_entries_base =
-      reinterpret_cast<pmem_ser_logentry_t *>(cur);
-}
-
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
   raft_set_election_timeout(c->server.raft, kAppRaftElectionTimeoutMsec);
@@ -76,7 +48,10 @@ void init_raft(AppContext *c) {
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
 
   set_raft_callbacks(c);
-  if (kUsePmem) map_pmem_log(c);
+  if (kUsePmem) {
+    c->server.pmem_log = new PmemLog<pmem_ser_logentry_t>(
+        "/mnt/pmem12/raft_log", erpc::measure_rdtsc_freq());
+  }
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     int raft_node_id = get_raft_node_id_for_process(i);
@@ -89,21 +64,6 @@ void init_raft(AppContext *c) {
       raft_add_node(c->server.raft, static_cast<void *>(&c->conn_vec[i]),
                     raft_node_id, 0);
     }
-  }
-
-  // Raft log entries start from index 1, so insert a garbage entry. This will
-  // never be accessed, so existing or random contents are fine.
-  if (kUsePmem) {
-    c->server.pmem.v.num_entries = 1;
-    pmem_memcpy_persist(c->server.pmem.p.num_entries,
-                        &c->server.pmem.v.num_entries,
-                        sizeof(c->server.pmem.v.num_entries));
-  }
-
-  if (kAppMeasurePmemLatency) {
-    int ret = hdr_init(kAppPmemNsecMin, kAppPmemNsecMax, kAppPmemNsecPrecision,
-                       &c->server.pmem_nsec_hdr);
-    erpc::rt_assert(ret == 0);
   }
 
   if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
@@ -269,26 +229,14 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
     if (erpc::rdtsc() - loop_tsc > 3000000000ull) {
       erpc::Latency &commit_latency = c->server.commit_latency;
 
-      std::string pmem_latency_str = "N/A";
-      if (kUsePmem && kAppMeasurePmemLatency) {
-        char msg[1000];
-        hdr_histogram *hist = c->server.pmem_nsec_hdr;
-        sprintf(msg, "%zu ns 50%%, %zu ns 99%%, %zu ns 99.9%%",
-                hdr_value_at_percentile(hist, 50),
-                hdr_value_at_percentile(hist, 99),
-                hdr_value_at_percentile(hist, 99.9));
-        pmem_latency_str = std::string(msg);
-
-        hdr_reset(hist);
-      }
-
       printf(
           "smr: Leader commit latency (us) = "
           "{%.2f median, %.2f 99%%}. Number of log entries = %zu. "
           "Pmem latency = %s.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
-          raft_get_log_count(c->server.raft), pmem_latency_str.c_str());
+          raft_get_log_count(c->server.raft),
+          kUsePmem ? "-" : c->server.pmem_log->get_lat_str_and_reset().c_str());
 
       loop_tsc = erpc::rdtsc();
       commit_latency.reset();

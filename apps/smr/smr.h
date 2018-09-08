@@ -24,6 +24,7 @@ extern "C" {
 #include "mica/table/fixedtable.h"
 #include "mica/util/hash.h"
 
+#include "pmem_log.h"
 #include "util/autorun_helpers.h"
 
 static constexpr bool kUsePmem = true;
@@ -45,17 +46,6 @@ static constexpr bool kAppTimeEnt = false;
 static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
-
-// Persistent memory latency HDR histogram
-static constexpr bool kAppMeasurePmemLatency = true;  // Persistent mem latency
-static constexpr int64_t kAppPmemNsecMin = 1;         // Min = 1 ns
-static constexpr int64_t kAppPmemNsecMax = 1000000;   // Min = 10 us
-
-// The latency reported by the HDR histogram will be precise within:
-// * 1 ns if the sample is less than 100 ns
-// * 10 ns if the sample is less than 1000 ns
-// * ...
-static constexpr size_t kAppPmemNsecPrecision = 2;
 
 // willemt/raft uses a very large 1000 ms election timeout
 static constexpr size_t kAppRaftElectionTimeoutMsec = 1000;
@@ -146,6 +136,10 @@ struct leader_saveinfo_t {
 struct pmem_ser_logentry_t {
   raft_entry_t raft_entry;
   client_req_t client_req;
+
+  pmem_ser_logentry_t() {}
+  pmem_ser_logentry_t(raft_entry_t r, client_req_t c)
+      : raft_entry(r), client_req(c) {}
 };
 
 // Context for both servers and clients
@@ -169,39 +163,12 @@ class AppContext {
     // In persistent mode, these entries are copied to the DAX file.
     AppMemPool<client_req_t> log_entry_appdata_pool;
 
-    // The presistent memory Raft log, used only if persistent memory is
-    // enabled. This is a linear memory chunk that starts with persistent
-    // metadata records.
+    // The presistent memory Raft log, used only if pmem is enabled.
     //
     // In DRAM mode, the user need not provide a log because willemt/raft
     // internally maintains a log. This log contains pointers to volatile bufs
     // allocated from log_entry_appdata_pool.
-    struct {
-      // Volatile records
-      struct {
-        uint8_t *buf;        // The start of the mapped file
-        size_t mapped_len;   // Length of the mapped log file
-        size_t num_entries;  // Volatile record for number of entries
-        pmem_ser_logentry_t *log_entries_base;  // Log entries in the file
-      } v;
-
-      // Persistent metadata records
-      struct {
-        static_assert(sizeof(raft_node_id_t) == 4, "");
-        static_assert(sizeof(raft_term_t) == 8, "");
-
-        // This is a hack. In __raft_persist_term, we must atomically commit
-        // both the term and the vote. raft_term_t is eight bytes, so the
-        // combined size (12 B) exceeds the atomic write length (8 B). This is
-        // simplified by shrinking the term to 4 B, and atomically doing an
-        // 8-byte write to both \p term and \p voted_for.
-        uint32_t *term;             // The latest term the server has seen
-        raft_node_id_t *voted_for;  // Node that received vote in current term
-
-        size_t *num_entries;  // Record for number of log entries
-      } p;
-
-    } pmem;
+    PmemLog<pmem_ser_logentry_t> *pmem_log;
 
     // Request tags used for RPCs exchanged among Raft servers
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
@@ -210,8 +177,7 @@ class AppContext {
     FixedTable *table = nullptr;
 
     // Stats
-    erpc::Latency commit_latency;  // Amplification factor = 10
-    hdr_histogram *pmem_nsec_hdr;  // Statistics for persistent memory latency
+    erpc::Latency commit_latency;            // Amplification factor = 10
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
   } server;
