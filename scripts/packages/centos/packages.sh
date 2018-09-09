@@ -34,7 +34,7 @@ sudo curl -L https://copr.fedorainfracloud.org/coprs/mcepl/vim8/repo/epel-7/mcep
 sudo yum -y update vim*
 
 # General packages not specific to eRPC
-sudo yum -y install htop memcached memcached-devel ctags-etags \
+sudo yum -y install htop memcached libmemcached-devel ctags-etags \
   the_silver_searcher sloccount calc
 
 # Fuzzy find configuration
