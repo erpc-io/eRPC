@@ -19,7 +19,9 @@ class HdrHistogramAmp {
 
   inline void record_value(double v) { hdr_record_value(hist, v * AMP); }
 
-  void percentile(double p) { return hdr_value_at_percentile(hist, p) * AMP; }
+  double percentile(double p) {
+    return hdr_value_at_percentile(hist, p) * (AMP * 1.0);
+  }
 
   void reset() { hdr_reset(hist); }
 

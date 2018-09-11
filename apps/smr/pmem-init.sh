@@ -9,8 +9,9 @@
 #   sudo ipmctl create -goal MemoryMode=0
 #   sudo reboot
 
-sudo ndctl create-namespace --mode fsdax --region 12
-sudo ndctl create-namespace --mode fsdax --region 13
+# Use these if /dev/pmem12 and /dev/pmem13 are unavailable
+#sudo ndctl create-namespace --mode fsdax --region 12
+#sudo ndctl create-namespace --mode fsdax --region 13
 
 # Format an ext4 filesystem because the device contains garbage:
 sudo mkfs.ext4 /dev/pmem12
