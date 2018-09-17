@@ -1013,12 +1013,5 @@ class Rpc {
 };
 
 // This goes at the end of every Rpc implementation file to force compilation
-#ifdef DPDK
-#define FORCE_COMPILE_TRANSPORTS template class Rpc<DpdkTransport>;
-#else
-#define FORCE_COMPILE_TRANSPORTS   \
-  template class Rpc<IBTransport>; \
-  template class Rpc<RawTransport>;
-#endif
-
+#define FORCE_COMPILE_TRANSPORTS template class Rpc<CTransport>;
 }  // namespace erpc

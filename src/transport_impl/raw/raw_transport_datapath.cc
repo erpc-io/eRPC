@@ -1,4 +1,4 @@
-#ifndef DPDK
+#ifdef RAW
 
 #include "raw_transport.h"
 #include "util/huge_alloc.h"

@@ -1,4 +1,4 @@
-#ifndef DPDK
+#ifdef RAW
 
 #include <iomanip>
 #include <stdexcept>

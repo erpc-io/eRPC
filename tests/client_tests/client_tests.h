@@ -16,7 +16,7 @@ static constexpr uint8_t kTestServerRpcId = 200;
 static constexpr uint8_t kTestReqType = 3;
 
 // Running unit tests with DPDK requires two ports
-static constexpr uint8_t kTestClientPhyPort = 1;
+static constexpr uint8_t kTestClientPhyPort = 0;
 #ifdef DPDK
 static constexpr uint8_t kTestServerPhyPort = kTestClientPhyPort + 1;
 #else

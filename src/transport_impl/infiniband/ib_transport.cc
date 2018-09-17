@@ -1,4 +1,4 @@
-#ifndef DPDK
+#ifdef INFINIBAND
 
 #include <iomanip>
 #include <stdexcept>

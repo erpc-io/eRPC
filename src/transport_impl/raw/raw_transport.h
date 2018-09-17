@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifndef DPDK
+#ifdef RAW
 
 #include "mlx5_defs.h"
 #include "transport.h"
