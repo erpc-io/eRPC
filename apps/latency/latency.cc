@@ -12,7 +12,9 @@ static constexpr bool kAppVerbose = false;    // Print debug info on datapath
 static constexpr double kAppLatFac = 10.0;    // Precision factor for latency
 static constexpr size_t kAppReqType = 1;      // eRPC request type
 
-DEFINE_uint64(msg_size, 0, "Request and response size");
+static constexpr size_t kAppRespSize = 8;
+static constexpr size_t kAppMinReqSize = 64;
+static constexpr size_t kAppMaxReqSize = 1024;
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
@@ -21,6 +23,7 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 class AppContext : public BasicAppContext {
  public:
   size_t start_tsc;
+  size_t req_size;  // Between kAppMinReqSize and kAppMaxReqSize
   erpc::Latency latency;
   erpc::MsgBuffer req_msgbuf, resp_msgbuf;
   ~AppContext() {}
@@ -29,12 +32,11 @@ class AppContext : public BasicAppContext {
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   _unused(req_msgbuf);
-  assert(req_msgbuf->get_data_size() == FLAGS_msg_size);
 
   auto *c = static_cast<AppContext *>(_context);
   req_handle->prealloc_used = true;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                 FLAGS_msg_size);
+                                                 kAppRespSize);
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -79,7 +81,7 @@ inline void send_req(AppContext &c) {
 
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t) {
   const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf->get_data_size() == FLAGS_msg_size);
+  assert(resp_msgbuf->get_data_size() == kAppRespSize);
   _unused(resp_msgbuf);
 
   auto *c = static_cast<AppContext *>(_context);
@@ -102,21 +104,30 @@ void client_func(erpc::Nexus *nexus) {
 
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
+  c.req_size = kAppMinReqSize;
 
-  c.req_msgbuf = rpc.alloc_msg_buffer_or_die(FLAGS_msg_size);
-  c.resp_msgbuf = rpc.alloc_msg_buffer_or_die(FLAGS_msg_size);
+  c.req_msgbuf = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
+  c.resp_msgbuf = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
+  c.rpc->resize_msg_buffer(&c.req_msgbuf, c.req_size);
+  c.rpc->resize_msg_buffer(&c.resp_msgbuf, c.req_size);
 
   connect_session(c);
 
   printf("Process %zu: Session connected. Starting work.\n", FLAGS_process_id);
-  printf("lat_us_50 lat_us_99 lat_us_99.9\n");
+  printf("req_size lat_us_50 lat_us_99 lat_us_99.9\n");
 
   send_req(c);
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(kAppEvLoopMs);  // 1 second
     if (ctrl_c_pressed == 1) break;
-    printf("%.1f %.1f %.1f\n", c.latency.perc(.5) / kAppLatFac,
+    printf("%zu %.1f %.1f %.1f\n", c.req_size, c.latency.perc(.5) / kAppLatFac,
            c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac);
+
+    c.req_size *= 2;
+    if (c.req_size > kAppMaxReqSize) c.req_size = kAppMinReqSize;
+    c.rpc->resize_msg_buffer(&c.req_msgbuf, c.req_size);
+    c.rpc->resize_msg_buffer(&c.resp_msgbuf, c.req_size);
+
     c.latency.reset();
   }
 }
