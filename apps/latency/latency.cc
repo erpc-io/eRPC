@@ -20,7 +20,6 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
-  int session_num;
   size_t start_tsc;
   erpc::Latency latency;
   erpc::MsgBuffer req_msgbuf, resp_msgbuf;
@@ -33,6 +32,8 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   auto *c = static_cast<AppContext *>(_context);
   req_handle->prealloc_used = true;
+  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                 FLAGS_msg_size);
   c->rpc->enqueue_response(req_handle);
 }
 
@@ -41,8 +42,9 @@ void server_func(erpc::Nexus *nexus) {
   uint8_t phy_port = port_vec.at(0);
 
   AppContext c;
-  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0,
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
                                   basic_sm_handler, phy_port);
+  c.rpc = &rpc;
 
   while (true) {
     rpc.run_event_loop(1000);
@@ -57,8 +59,9 @@ void connect_session(AppContext &c) {
            server_uri.c_str());
   }
 
-  c.session_num = c.rpc->create_session(server_uri, 0);
-  erpc::rt_assert(c.session_num >= 0, "Failed to create session");
+  int session_num = c.rpc->create_session(server_uri, 0 /* tid */);
+  erpc::rt_assert(session_num >= 0, "Failed to create session");
+  c.session_num_vec.push_back(session_num);
 
   while (c.num_sm_resps != 1) {
     c.rpc->run_event_loop(kAppEvLoopMs);
@@ -69,7 +72,7 @@ void connect_session(AppContext &c) {
 void app_cont_func(erpc::RespHandle *, void *, size_t);
 inline void send_req(AppContext &c) {
   c.start_tsc = erpc::rdtsc();
-  c.rpc->enqueue_request(c.session_num, kAppReqType, &c.req_msgbuf,
+  c.rpc->enqueue_request(c.session_num_vec[0], kAppReqType, &c.req_msgbuf,
                          &c.resp_msgbuf, app_cont_func, 0);
 }
 
