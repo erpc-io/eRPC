@@ -28,6 +28,7 @@ class AppContext : public BasicAppContext {
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  _unused(req_msgbuf);
   assert(req_msgbuf->get_data_size() == FLAGS_msg_size);
 
   auto *c = static_cast<AppContext *>(_context);
@@ -79,6 +80,7 @@ inline void send_req(AppContext &c) {
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t) {
   const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   assert(resp_msgbuf->get_data_size() == FLAGS_msg_size);
+  _unused(resp_msgbuf);
 
   auto *c = static_cast<AppContext *>(_context);
   c->rpc->release_response(resp_handle);
@@ -86,6 +88,8 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t) {
   double req_lat_us =
       erpc::to_usec(erpc::rdtsc() - c->start_tsc, c->rpc->get_freq_ghz());
   c->latency.update(static_cast<size_t>(req_lat_us * kAppLatFac));
+
+  send_req(*c);
 }
 
 void client_func(erpc::Nexus *nexus) {
@@ -113,6 +117,7 @@ void client_func(erpc::Nexus *nexus) {
     if (ctrl_c_pressed == 1) break;
     printf("%.1f %.1f %.1f\n", c.latency.perc(.5) / kAppLatFac,
            c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac);
+    c.latency.reset();
   }
 }
 
