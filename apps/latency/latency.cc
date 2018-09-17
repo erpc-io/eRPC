@@ -16,24 +16,30 @@ static constexpr size_t kAppRespSize = 8;
 static constexpr size_t kAppMinReqSize = 64;
 static constexpr size_t kAppMaxReqSize = 1024;
 
+// If true, we persist client requests to a persistent log
+static constexpr bool kAppUsePmem = true;
+
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
-// Per-thread application context
-class AppContext : public BasicAppContext {
+class ServerContext : public BasicAppContext {
+  uint8_t *pbuf;
+};
+
+class ClientContext : public BasicAppContext {
  public:
   size_t start_tsc;
   size_t req_size;  // Between kAppMinReqSize and kAppMaxReqSize
   erpc::Latency latency;
   erpc::MsgBuffer req_msgbuf, resp_msgbuf;
-  ~AppContext() {}
+  ~ClientContext() {}
 };
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   _unused(req_msgbuf);
 
-  auto *c = static_cast<AppContext *>(_context);
+  auto *c = static_cast<ServerContext *>(_context);
   req_handle->prealloc_used = true;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                  kAppRespSize);
@@ -44,7 +50,7 @@ void server_func(erpc::Nexus *nexus) {
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   uint8_t phy_port = port_vec.at(0);
 
-  AppContext c;
+  ServerContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
                                   basic_sm_handler, phy_port);
   c.rpc = &rpc;
@@ -55,7 +61,7 @@ void server_func(erpc::Nexus *nexus) {
   }
 }
 
-void connect_session(AppContext &c) {
+void connect_session(ClientContext &c) {
   std::string server_uri = erpc::get_uri_for_process(0);
   if (FLAGS_sm_verbose == 1) {
     printf("Process %zu: Creating session to %s.\n", FLAGS_process_id,
@@ -73,7 +79,7 @@ void connect_session(AppContext &c) {
 }
 
 void app_cont_func(erpc::RespHandle *, void *, size_t);
-inline void send_req(AppContext &c) {
+inline void send_req(ClientContext &c) {
   c.start_tsc = erpc::rdtsc();
   c.rpc->enqueue_request(c.session_num_vec[0], kAppReqType, &c.req_msgbuf,
                          &c.resp_msgbuf, app_cont_func, 0);
@@ -84,7 +90,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t) {
   assert(resp_msgbuf->get_data_size() == kAppRespSize);
   _unused(resp_msgbuf);
 
-  auto *c = static_cast<AppContext *>(_context);
+  auto *c = static_cast<ClientContext *>(_context);
   c->rpc->release_response(resp_handle);
 
   double req_lat_us =
@@ -98,7 +104,7 @@ void client_func(erpc::Nexus *nexus) {
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   uint8_t phy_port = port_vec.at(0);
 
-  AppContext c;
+  ClientContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0,
                                   basic_sm_handler, phy_port);
 
