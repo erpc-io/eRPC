@@ -1,11 +1,13 @@
 #include "util/latency.h"
 #include <gflags/gflags.h>
+#include <libpmem.h>
 #include <signal.h>
 #include <cstring>
 #include "../apps_common.h"
 #include "rpc.h"
 #include "util/autorun_helpers.h"
 #include "util/numautils.h"
+#include "util/pmem.h"
 
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
@@ -18,11 +20,15 @@ static constexpr size_t kAppMaxReqSize = 1024;
 
 // If true, we persist client requests to a persistent log
 static constexpr bool kAppUsePmem = true;
+static constexpr const char *kAppPmemFile = "/dev/dax0.0";
+static constexpr size_t kAppPmemFileSize = GB(4);
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 class ServerContext : public BasicAppContext {
+ public:
+  size_t file_offset = 0;
   uint8_t *pbuf;
 };
 
@@ -37,9 +43,16 @@ class ClientContext : public BasicAppContext {
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  _unused(req_msgbuf);
-
   auto *c = static_cast<ServerContext *>(_context);
+
+  if (kAppUsePmem) {
+    const size_t copy_size = req_msgbuf->get_data_size();
+    if (c->file_offset + copy_size >= kAppPmemFileSize) c->file_offset = 0;
+    pmem_memcpy_persist(&c->pbuf[c->file_offset], req_msgbuf->buf, copy_size);
+
+    c->file_offset += copy_size;
+  }
+
   req_handle->prealloc_used = true;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                  kAppRespSize);
@@ -54,6 +67,13 @@ void server_func(erpc::Nexus *nexus) {
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
                                   basic_sm_handler, phy_port);
   c.rpc = &rpc;
+
+  if (kAppUsePmem) {
+    printf("Mapping pmem file...");
+    c.pbuf = erpc::map_devdax_file(kAppPmemFile, kAppPmemFileSize);
+    pmem_memset_persist(c.pbuf, 0, kAppPmemFileSize);
+    printf("done.\n");
+  }
 
   while (true) {
     rpc.run_event_loop(1000);

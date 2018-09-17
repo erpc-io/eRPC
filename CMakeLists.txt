@@ -292,6 +292,8 @@ elseif(APP STREQUAL "masstree_analytics")
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
+elseif(APP STREQUAL "latency")
+  set(LIBRARIES ${LIBRARIES} pmem)
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO
