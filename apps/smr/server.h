@@ -49,8 +49,8 @@ void init_raft(AppContext *c) {
 
   set_raft_callbacks(c);
   if (kUsePmem) {
-    c->server.pmem_log = new PmemLog<pmem_ser_logentry_t>(
-        "/mnt/pmem12/raft_log", erpc::measure_rdtsc_freq());
+    c->server.pmem_log =
+        new PmemLog<pmem_ser_logentry_t>(erpc::measure_rdtsc_freq());
   }
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
@@ -231,12 +231,10 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
 
       printf(
           "smr: Leader commit latency (us) = "
-          "{%.2f median, %.2f 99%%}. Number of log entries = %zu. "
-          "Pmem latency = %s.\n",
+          "{%.2f median, %.2f 99%%}. Number of log entries = %zu.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
-          raft_get_log_count(c->server.raft),
-          kUsePmem ? "-" : c->server.pmem_log->get_lat_str_and_reset().c_str());
+          raft_get_log_count(c->server.raft));
 
       loop_tsc = erpc::rdtsc();
       commit_latency.reset();

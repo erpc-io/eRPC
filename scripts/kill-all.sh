@@ -6,7 +6,7 @@ blue "Killing $autorun_app everywhere"
 
 for ((i = 0; i < $autorun_num_processes; i++)); do
   name=${autorun_name_list[$i]}
-	ssh -oStrictHostKeyChecking=no $name "sudo killall $autorun_app 1>/dev/null 2>/dev/null" &
+	ssh -oStrictHostKeyChecking=no $name "sudo pkill $autorun_app 1>/dev/null 2>/dev/null" &
 done
 wait
 

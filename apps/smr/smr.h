@@ -10,7 +10,6 @@ extern "C" {
 #include <raft/raft.h>
 }
 
-#include <hdr/hdr_histogram.h>
 #include <libpmem.h>
 #include <signal.h>
 #include <stdio.h>

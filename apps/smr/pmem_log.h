@@ -11,24 +11,16 @@
 extern "C" {
 #include <raft/raft.h>
 }
-#include <hdr/hdr_histogram.h>
 #include "../apps_common.h"
 
 // A persistent memory log that stores objects of type T
 template <class T>
 class PmemLog {
  private:
-  static constexpr bool kMeasureLatency = true;
-  static constexpr int64_t kLatencyNsecMin = 1;        // Min = 1 ns
-  static constexpr int64_t kLatencyNsecMax = 1000000;  // Min = 10 us
+  // The machines are under different DAX configs, so use the one that works
+  static constexpr const char *kPmemLogFileA = "/dev/dax0.0";
+  static constexpr const char *kPmemLogFileB = "/mnt/pmem12/raft_log";
 
-  // The latency reported by the HDR histogram will be precise within:
-  // * 1 ns if the sample is less than 100 ns
-  // * 10 ns if the sample is less than 1000 ns
-  // * ...
-  static constexpr size_t kLatencyNsecPrecision = 2;
-
-  const std::string log_file;
   const double freq_ghz;
 
   // Volatile records
@@ -55,17 +47,20 @@ class PmemLog {
     size_t *num_entries;  // Record for number of log entries
   } p;
 
-  hdr_histogram *nsec_hdr;  // Statistics for latency
-
  public:
   PmemLog() {}
 
-  PmemLog(std::string log_file, double freq_ghz)
-      : log_file(log_file), freq_ghz(freq_ghz) {
+  PmemLog(double freq_ghz) : freq_ghz(freq_ghz) {
     int is_pmem;
     v.buf = reinterpret_cast<uint8_t *>(
-        pmem_map_file(log_file.c_str(), 0 /* length */, 0 /* flags */, 0666,
+        pmem_map_file(kPmemLogFileA, 0 /* length */, 0 /* flags */, 0666,
                       &v.mapped_len, &is_pmem));
+
+    if (v.buf == nullptr) {
+      v.buf = reinterpret_cast<uint8_t *>(
+          pmem_map_file(kPmemLogFileB, 0 /* length */, 0 /* flags */, 0666,
+                        &v.mapped_len, &is_pmem));
+    }
 
     erpc::rt_assert(v.buf != nullptr,
                     "pmem_map_file() failed. " + std::string(strerror(errno)));
@@ -86,12 +81,6 @@ class PmemLog {
 
     v.log_entries_base = reinterpret_cast<T *>(cur);
 
-    if (kMeasureLatency) {
-      int ret = hdr_init(kLatencyNsecMin, kLatencyNsecMax,
-                         kLatencyNsecPrecision, &nsec_hdr);
-      erpc::rt_assert(ret == 0);
-    }
-
     // Raft log entries start from index 1, so insert a garbage entry. This will
     // never be accessed, so a garbage entry is fine.
     append(T());
@@ -106,8 +95,6 @@ class PmemLog {
   void pop() { truncate(v.num_entries - 1); }
 
   void append(const T &entry) {
-    size_t cycles_start = kMeasureLatency ? erpc::rdtsc() : 0;
-
     // First, update data
     T *p_log_entry_ptr = &v.log_entries_base[v.num_entries];
     pmem_memcpy_persist(p_log_entry_ptr, &entry, sizeof(T));
@@ -115,30 +102,9 @@ class PmemLog {
     // Second, update tail
     v.num_entries++;
     pmem_memcpy_persist(p.num_entries, &v.num_entries, sizeof(v.num_entries));
-
-    if (kMeasureLatency) {
-      size_t ns = erpc::to_nsec(erpc::rdtsc() - cycles_start, freq_ghz);
-      if (unlikely(ns > kLatencyNsecMax)) {
-        fprintf(stderr, "%zu ns is larger than expected pmem latency.\n", ns);
-      }
-      hdr_record_value(nsec_hdr, static_cast<int64_t>(ns));
-    }
   }
 
   size_t get_num_entries() const { return v.num_entries; }
-
-  std::string get_lat_str_and_reset() {
-    if (kMeasureLatency) return "N/A";
-
-    char msg[1000];
-    sprintf(msg, "%zu ns 50%%, %zu ns 99%%, %zu ns 99.9%%",
-            hdr_value_at_percentile(nsec_hdr, 50),
-            hdr_value_at_percentile(nsec_hdr, 99),
-            hdr_value_at_percentile(nsec_hdr, 99.9));
-    hdr_reset(nsec_hdr);
-
-    return std::string(msg);
-  }
 
   void persist_vote(raft_node_id_t voted_for) {
     pmem_memcpy_persist(p.voted_for, &voted_for, sizeof(voted_for));

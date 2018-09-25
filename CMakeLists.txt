@@ -97,7 +97,6 @@ endif()
 # Debug mode
 if(DEBUG)
   MESSAGE(STATUS "Debugging is enabled. Perf will be low.")
-  add_definitions(-g)
 else(DEBUG)
   MESSAGE(STATUS "Debugging is disabled.")
   add_definitions(-DNDEBUG)
@@ -277,7 +276,7 @@ message(STATUS "Compiling app = " ${APP})
 # Add app-specific defines now, isolating them from the tests
 if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
-  set(LIBRARIES ${LIBRARIES} raft pmem hdr_histogram_static)
+  set(LIBRARIES ${LIBRARIES} raft pmem)
   # MICA
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
