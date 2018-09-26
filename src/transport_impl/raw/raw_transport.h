@@ -188,7 +188,7 @@ class RawTransport : public Transport {
    public:
     std::string ibdev_name;   ///< Verbs device name (e.g., mlx5_0)
     std::string netdev_name;  ///< Verbs device name (e.g., enp4s0f0, ib0 etc)
-    uint32_t ipv4_addr;       ///< The port's IPv4 address
+    uint32_t ipv4_addr;       ///< The port's IPv4 address in host-byte order
     uint8_t mac_addr[6];      ///< The port's MAC address
   } resolve;
 
