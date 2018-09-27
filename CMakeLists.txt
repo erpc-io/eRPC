@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(eRPC)
 
+include(CMakeDependentOption)
+
 # Pick a compiler
 #set(CMAKE_CXX_COMPILER clang++-6.0)
 #set(CMAKE_CXX_COMPILER g++-8)
@@ -39,17 +41,16 @@ set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(PERF "Compile for performance" OFF)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
+cmake_dependent_option(LTO "Use link time optimization" ON "PERF" OFF)
 
 # Parse the user-exposed options
 if(PERF)
   MESSAGE(STATUS "Compilation optimized for performance.")
   SET(DEBUG OFF)
-  SET(LTO ON)
   SET(TESTING OFF)
 else(PERF)
   MESSAGE(STATUS "Compilation not optimized for performance.")
   SET(DEBUG ON)
-  SET(LTO OFF)
   SET(TESTING ON)
 endif(PERF)
 
@@ -234,11 +235,14 @@ set(UTIL_TESTS
   timely_test
   numautil_test)
 
-# Compile the tests
+# Compile the library
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling eRPC as a library")
   add_library(erpc ${SOURCES})
+endif()
 
+# Compile the tests
+if(TESTING)
   foreach(test_name IN LISTS CLIENT_TESTS)
     add_executable(${test_name} tests/client_tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
