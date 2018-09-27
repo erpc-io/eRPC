@@ -16,8 +16,8 @@ export MLX_CQ_ALLOC_TYPE="HUGE"
 
 # Install faster modded drivers. This is not a requirement.
 blue "Installing modded drivers"
-# ./drivers/4.4/libmlx4-41mlnx1/update-driver.sh
-# ./drivers/4.2/libmlx5-41mlnx1/update-driver.sh
+#./drivers/4.2/libmlx4-41mlnx1/update-driver.sh
+#./drivers/4.4/libmlx5-41mlnx1/update-driver.sh
 
 # Check arguments
 if [ "$#" -gt 3 ] || [ "$#" -lt 2 ]; then
