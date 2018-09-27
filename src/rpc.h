@@ -369,7 +369,7 @@ class Rpc {
     return sslot->client_info.num_tx < sslot->tx_msgbuf->num_pkts;
   }
 
-  /// Return true iff it's currently OK to bypass the wheel for this session
+  /// Return true iff it's currently OK to bypass the wheel for this request
   inline bool can_bypass_wheel(SSlot *sslot) const {
     if (!kCcPacing) return true;
     if (kTesting) return faults.hard_wheel_bypass;
