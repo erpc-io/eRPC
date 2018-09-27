@@ -8,21 +8,13 @@ include(CMakeDependentOption)
 #set(CMAKE_CXX_COMPILER g++-8)
 set(CMAKE_CXX_COMPILER g++)
 
-add_definitions(-std=c++11)
-
-add_definitions(-Wall -Wextra -Werror -pedantic)
-add_definitions(-Wsign-conversion)
-add_definitions(-Wold-style-cast)
-
-add_definitions(-Wno-unused-function)
-add_definitions(-Wno-nested-anon-types)
-add_definitions(-Wno-keyword-macro)
-add_definitions(-march=native)
-add_definitions(-g)
+add_definitions(-std=c++11 -march=native -g)
+add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
+add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
-# Testing
+# Unit tests
 enable_testing()
 find_package(GTest REQUIRED)
 
@@ -33,7 +25,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
-# Compile the ERPC library unless we cannot (profile-guided optimization or LTO)
+# liberpc will be compiled unless profile-guided optimization or LTO is enabled
 set(COMPILE_ERPC_LIB ON)
 
 # Options exposed to the user
@@ -115,7 +107,7 @@ endif(TESTING)
 
 # Link-time optimization
 if(LTO)
-  MESSAGE(STATUS "LTO is enabled. Tests won't be compiled.")
+  MESSAGE(STATUS "LTO is enabled. eRPC library won't be compiled.")
   SET(COMPILE_ERPC_LIB OFF)
   add_definitions(-flto)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
@@ -153,10 +145,12 @@ set(SOURCES
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
+# Transport-specific. Mellanox OFED drivers are the best choice for raw and
+# infiniband, but they do not play well with DPDK. So we compile only one
+# transport. Other transports are exluded using preprocessor macros.
 string(TOUPPER ${TRANSPORT} DEFINE_TRANSPORT)
 add_definitions(-D${DEFINE_TRANSPORT}=true)
 
-# Transport-specific. DPDK does not play well with Mellanox OFED.
 MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
 if(TRANSPORT STREQUAL "dpdk")
   find_library(DPDK_LIB dpdk)
