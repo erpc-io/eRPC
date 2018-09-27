@@ -235,11 +235,14 @@ set(UTIL_TESTS
   timely_test
   numautil_test)
 
-# Compile the tests
+# Compile the library
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling eRPC as a library")
   add_library(erpc ${SOURCES})
+endif()
 
+# Compile the tests
+if(TESTING)
   foreach(test_name IN LISTS CLIENT_TESTS)
     add_executable(${test_name} tests/client_tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
