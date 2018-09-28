@@ -119,14 +119,6 @@ class AppContext : public BasicAppContext {
   ~AppContext() {}
 };
 
-int get_rand_session_num(AppContext *c) {
-  // Lemire's trick
-  uint32_t x = c->fastrand.next_u32();
-  size_t rand_index =
-      (static_cast<size_t>(x) * c->session_num_vec.size()) >> 32;
-  return c->session_num_vec[rand_index];
-}
-
 void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
 
 // Send all requests for a batch
@@ -152,7 +144,7 @@ void send_reqs(AppContext *c, size_t batch_i) {
     if (kAppMeasureLatency) bc.req_tsc[i] = erpc::rdtsc();
 
     tag_t tag(batch_i, i);
-    c->rpc->enqueue_request(get_rand_session_num(c), kAppReqType,
+    c->rpc->enqueue_request(c->fast_get_rand_session_num(), kAppReqType,
                             &bc.req_msgbuf[i], &bc.resp_msgbuf[i],
                             app_cont_func, tag._tag);
   }

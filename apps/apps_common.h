@@ -135,6 +135,13 @@ class BasicAppContext {
   ~BasicAppContext() {
     if (tmp_stat != nullptr) delete tmp_stat;
   }
+
+  // Use Lemire's trick to get a random session number from session_num_vec
+  inline int fast_get_rand_session_num() {
+    uint32_t x = fastrand.next_u32();
+    size_t rand_index = (static_cast<size_t>(x) * session_num_vec.size()) >> 32;
+    return session_num_vec[rand_index];
+  }
 };
 
 // A basic session management handler that expects successful responses
