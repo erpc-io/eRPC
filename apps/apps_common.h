@@ -10,6 +10,10 @@
 #include "rpc.h"
 #include "util/latency.h"
 
+#define Ki(x) (static_cast<size_t>(x) * 1000)
+#define Mi(x) (static_cast<size_t>(x) * 1000 * 1000)
+#define Gi(x) (static_cast<size_t>(x) * 1000 * 1000 * 1000)
+
 //
 // Gflags
 //

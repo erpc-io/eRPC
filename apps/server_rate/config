@@ -1,8 +1,8 @@
---test_ms 20000
+--test_ms 200000
 --sm_verbose 0
 --num_server_threads 1
 --num_client_threads 4
---window_size 16
+--window_size 8
 --req_size 64
 --resp_size 32
 --num_processes 2
