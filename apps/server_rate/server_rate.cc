@@ -24,9 +24,7 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 class ServerContext : public BasicAppContext {
  public:
-  size_t file_offset = 0;
   size_t num_resps = 0;
-  uint8_t *pbuf;
 };
 
 class ClientContext : public BasicAppContext {
