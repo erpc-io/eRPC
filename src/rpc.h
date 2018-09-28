@@ -797,16 +797,19 @@ class Rpc {
   }
 
   /// Return the average number of packets received in a call to rx_burst
-  double get_avg_rx_burst() {
+  double get_avg_rx_batch() {
     if (!kDatapathStats || dpath_stats.rx_burst_calls == 0) return -1.0;
     return dpath_stats.pkts_rx * 1.0 / dpath_stats.rx_burst_calls;
   }
 
   /// Return the average number of packets sent in a call to tx_burst
-  double get_avg_tx_burst() {
+  double get_avg_tx_batch() {
     if (!kDatapathStats || dpath_stats.tx_burst_calls == 0) return -1.0;
     return dpath_stats.pkts_tx * 1.0 / dpath_stats.tx_burst_calls;
   }
+
+  /// Reset all datapath stats to zero
+  void reset_dpath_stats() { memset(&dpath_stats, 0, sizeof(dpath_stats)); }
 
   //
   // Misc private functions

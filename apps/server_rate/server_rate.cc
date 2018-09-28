@@ -67,8 +67,10 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
     rpc.run_event_loop(kAppEvLoopMs);
 
     double seconds = erpc::sec_since(start);
-    printf("thread %zu: %.2f M/s\n", thread_id,
-           c.num_resps / (seconds * 100000));
+    printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,
+           c.num_resps / (seconds * 100000), c.rpc->get_avg_rx_batch(),
+           c.rpc->get_avg_tx_batch());
+    c.rpc->reset_dpath_stats();
 
     if (ctrl_c_pressed == 1) break;
   }
