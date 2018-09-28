@@ -20,7 +20,7 @@ static constexpr size_t kAppMaxReqSize = 1024;
 
 // If true, we persist client requests to a persistent log
 static constexpr bool kAppUsePmem = true;
-static constexpr const char *kAppPmemFile = "/dev/dax0.0";
+static constexpr const char *kAppPmemFile = "/dev/dax12.0";
 static constexpr size_t kAppPmemFileSize = GB(4);
 
 volatile sig_atomic_t ctrl_c_pressed = 0;

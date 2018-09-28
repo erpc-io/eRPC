@@ -24,7 +24,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(wr.sg_list == sgl);
 
     // Set signaling flag. The work request is non-inline by default.
-    wr.send_flags = get_signaled_flag();
+    wr.send_flags = static_cast<int>(get_signaled_flag());
 
     if (item.pkt_idx == 0) {
       // This is the first packet, so we need only 1 SGE. This can be CR/RFR.
