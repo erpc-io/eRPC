@@ -6,7 +6,6 @@
 #include "util/autorun_helpers.h"
 #include "util/latency.h"
 #include "util/numautils.h"
-#include "util/pmem.h"
 
 static constexpr size_t kAppEvLoopMs = 1000;     // Duration of event loop
 static constexpr bool kAppVerbose = false;       // Print debug info on datapath
@@ -19,7 +18,6 @@ DEFINE_uint64(num_client_threads, 1, "Number of threads per client machine");
 DEFINE_uint64(window_size, 1, "Outstanding requests per client");
 DEFINE_uint64(req_size, 64, "Size of request message in bytes");
 DEFINE_uint64(resp_size, 32, "Size of response message in bytes ");
-DEFINE_uint64(client_sweep_sizes, 0, "Try multiple request sizes at client");
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
