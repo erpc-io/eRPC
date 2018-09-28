@@ -22,14 +22,13 @@ class IBTransport : public Transport {
   static constexpr size_t kSQDepth = 128;                ///< Send queue depth
   static constexpr size_t kUnsigBatch = 64;  ///< Selective signaling for SENDs
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
-  static constexpr size_t kMaxInline = 120;  ///< Maximum send wr inline data
+  static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
   static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
   static constexpr size_t kGRHBytes = 40;
 
-  static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
-  static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
-  static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
+  static_assert(kSQDepth >= 2 * kUnsigBatch, "");  // Queue capacity check
+  static_assert(kPostlist <= kUnsigBatch, "");     // Postlist check
 
   // Derived constants
 

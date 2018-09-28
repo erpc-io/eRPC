@@ -58,7 +58,6 @@ class RawTransport : public Transport {
   static_assert(is_power_of_two(kRecvCQDepth), "");
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");  // Queue capacity check
   static_assert(kPostlist <= kUnsigBatch, "");     // Postlist check
-  // static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
 
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));

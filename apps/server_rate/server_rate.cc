@@ -56,7 +56,7 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   uint8_t phy_port = port_vec.at(0);
 
   ServerContext c;
-  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
+  erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, phy_port);
   c.rpc = &rpc;
 
@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < num_threads; i++) {
     threads[i] = std::thread(FLAGS_process_id == 0 ? server_func : client_func,
                              &nexus, i);
-    erpc::bind_to_core(threads[i], FLAGS_numa_node, 0);
+    erpc::bind_to_core(threads[i], FLAGS_numa_node, i);
   }
 
   for (size_t i = 0; i < num_threads; i++) threads[i].join();
