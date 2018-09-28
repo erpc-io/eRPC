@@ -1,6 +1,6 @@
 --test_ms 200000
 --sm_verbose 0
---num_server_threads 1
+--num_server_threads 4
 --num_client_threads 16
 --window_size 8
 --req_size 32
