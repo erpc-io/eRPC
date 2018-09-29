@@ -10,14 +10,14 @@
 #include "util/numautils.h"
 
 static constexpr size_t kAppEvLoopMs = 1000;     // Duration of event loop
-static constexpr bool kAppVerbose = true;        // Print debug info on datapath
+static constexpr bool kAppVerbose = false;       // Print debug info on datapath
 static constexpr double kAppLatFac = 10.0;       // Precision factor for latency
 static constexpr size_t kAppReqType = 1;         // eRPC request type
 static constexpr size_t kAppMaxWindowSize = 32;  // Max pending reqs per client
 static constexpr double kAppMicaOverhead = 0.2;  // Extra bucket fraction
 
 // Maximum requests processed by server before issuing a response
-static constexpr size_t kAppMaxServerBatch = 16;
+static constexpr size_t kAppMaxServerBatch = 1;
 
 DEFINE_string(pmem_file, "/dev/dax12.0", "Persistent memory file path");
 DEFINE_uint64(keys_per_server_thread, 1, "Keys in each server partition");
@@ -125,14 +125,13 @@ inline void process_batch(ServerContext *c) {
       // GET request
       if (!success_arr[i]) {
         c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-        auto &result = reinterpret_cast<Result &>(resp.buf);
-        result = Result::kGetFail;
+        *reinterpret_cast<Result *>(resp.buf) = Result::kGetFail;
       }
     } else {
       // SET request
       c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-      auto &result = reinterpret_cast<Result &>(resp.buf);
-      result = success_arr[i] ? Result::kSetSuccess : Result::kSetFail;
+      *reinterpret_cast<Result *>(resp.buf) =
+          success_arr[i] ? Result::kSetSuccess : Result::kSetFail;
     }
 
     c->rpc->enqueue_response(req_handle);
