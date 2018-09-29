@@ -10,7 +10,7 @@
 #include "util/numautils.h"
 
 static constexpr size_t kAppEvLoopMs = 1000;     // Duration of event loop
-static constexpr bool kAppVerbose = false;       // Print debug info on datapath
+static constexpr bool kAppVerbose = true;        // Print debug info on datapath
 static constexpr double kAppLatFac = 10.0;       // Precision factor for latency
 static constexpr size_t kAppReqType = 1;         // eRPC request type
 static constexpr size_t kAppMaxWindowSize = 32;  // Max pending reqs per client
@@ -34,10 +34,10 @@ class Key {
  public:
   size_t key_frag[2];
   bool operator==(const Key &rhs) const {
-    return memcmp(this, &rhs, sizeof(Key));
+    return memcmp(this, &rhs, sizeof(Key)) == 0;
   }
   bool operator!=(const Key &rhs) const {
-    return !memcmp(this, &rhs, sizeof(Key));
+    return memcmp(this, &rhs, sizeof(Key)) != 0;
   }
   Key() { memset(key_frag, 0, sizeof(Key)); }
 };
@@ -64,7 +64,7 @@ static inline uint64_t fastrange64(uint64_t rand, uint64_t n) {
 
 class ServerContext : public BasicAppContext {
  public:
-  size_t num_reqs = 0;   // Reqs for which the request handler has been called
+  size_t num_reqs = 0;   // Reqs for which the handler has been called
   size_t num_resps = 0;  // Resps for which enqueue_response() has been called
   HashMap *hashmap;
 
@@ -101,7 +101,7 @@ class ClientContext : public BasicAppContext {
     std::ostringstream ret;
     ret << "[get_reqs " << stats.num_get_reqs << ", get_success "
         << stats.num_get_success << ", set_reqs " << stats.num_set_reqs
-        << ", set_success" << stats.num_set_success << "]";
+        << ", set_success " << stats.num_set_success << "]";
     return ret.str();
   }
 
@@ -136,15 +136,15 @@ inline void process_batch(ServerContext *c) {
     }
 
     c->rpc->enqueue_response(req_handle);
+    c->num_resps++;
   }
 }
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
-  c->num_reqs++;
 
   const erpc::MsgBuffer *req = req_handle->get_req_msgbuf();
-  size_t req_size = req->get_req_type();
+  size_t req_size = req->get_data_size();
 
   req_handle->prealloc_used = true;
   erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
@@ -154,16 +154,20 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   // Common for both GETs and SETs
   Key *key = reinterpret_cast<Key *>(req->buf);
+
+  c->req_handle_arr[batch_i] = req_handle;
   c->key_ptr_arr[batch_i] = key;
   c->keyhash_arr[batch_i] = c->hashmap->get_hash(key);
   c->hashmap->prefetch(c->keyhash_arr[batch_i]);
 
   if (req_size == sizeof(Key)) {
+    if (kAppVerbose) printf("Thread %zu: received GET request\n", c->thread_id);
     // GET request
     c->is_set_arr[batch_i] = false;
     Value *value = reinterpret_cast<Value *>(resp.buf);
     c->val_ptr_arr[batch_i] = value;
   } else if (req_size == sizeof(Key) + sizeof(Value)) {
+    if (kAppVerbose) printf("Thread %zu: received SET request\n", c->thread_id);
     // PUT request
     c->is_set_arr[batch_i] = true;
     Value *value = reinterpret_cast<Value *>(req->buf + sizeof(Key));
@@ -172,8 +176,13 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
     assert(false);
   }
 
+  // Tracking
+  c->num_reqs++;
   c->batch_i++;
-  if (c->batch_i == kAppMaxServerBatch) process_batch(c);
+  if (c->batch_i == kAppMaxServerBatch) {
+    process_batch(c);
+    c->batch_i = 0;
+  }
 }
 
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
@@ -195,7 +204,14 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
     struct timespec start;
     clock_gettime(CLOCK_REALTIME, &start);
 
-    for (size_t i = 0; i < MB(1); i++) rpc.run_event_loop_once();
+    for (size_t i = 0; i < MB(1); i++) {
+      size_t num_reqs_start = c.num_reqs;
+      rpc.run_event_loop_once();
+
+      // If no new requests were received in this iteration of the event loop,
+      // and we have responses to send, send them now.
+      if (c.num_reqs == num_reqs_start && c.batch_i > 0) process_batch(&c);
+    }
 
     double seconds = erpc::sec_since(start);
     printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,
@@ -226,8 +242,12 @@ inline void send_req(ClientContext &c, size_t ws_i) {
     case Workload::k5050: is_set = c.pcg() % 2 == 0; break;
   }
   is_set ? c.stats.num_get_reqs++ : c.stats.num_set_reqs++;
+  if (kAppVerbose) {
+    printf("Thread %zu: sending %s request. Window slot %zu\n", c.thread_id,
+           is_set ? "SET" : "GET", ws_i);
+  }
 
-  key->key_frag[0] = fastrange64(c.pcg(), FLAGS_keys_per_server_thread);
+  key->key_frag[0] = 1 + fastrange64(c.pcg(), FLAGS_keys_per_server_thread);
   value->val_frag[0] = key->key_frag[0];
   c.key_arr[ws_i] = *key;
 
@@ -256,6 +276,11 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
       assert(value->val_frag[0] == c->key_arr[ws_i].key_frag[0]);
       c->stats.num_get_success++;
     }
+  }
+
+  if (kAppVerbose) {
+    printf("Thread %zu: received %s response. Window slot %zu\n", c->thread_id,
+           c->is_set_arr[ws_i] ? "SET" : "GET", ws_i);
   }
 
   c->rpc->release_response(resp_handle);
