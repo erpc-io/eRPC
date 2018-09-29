@@ -154,7 +154,7 @@ class HashMap {
     // Initialize the free list of extra buckets
     printf("Initializing extra buckets freelist (%zu buckets)\n",
            num_extra_buckets);
-    extra_bucket_free_list.reserve(num_extra_buckets);
+    extra_bucket_free_list.resize(num_extra_buckets);
     for (size_t i = 0; i < num_extra_buckets; i++) {
       extra_bucket_free_list[i] = i + 1;
     }
@@ -191,12 +191,12 @@ class HashMap {
   }
 
   // Convert a key to a 64-bit value for printing
-  static size_t to_size_t(const Key* k) {
+  static size_t to_size_t_key(const Key* k) {
     return *reinterpret_cast<const size_t*>(k);
   }
 
   // Convert a value to a 64-bit value for printing
-  static size_t to_size_t(const Value* v) {
+  static size_t to_size_t_val(const Value* v) {
     return *reinterpret_cast<const size_t*>(v);
   }
 
@@ -330,9 +330,9 @@ class HashMap {
     size_t item_index = find_item_index(bucket, key, &located_bucket);
 
     if (kPMicaVerbose) {
-      printf("get key %zu, located bucket %p, index %zu, found = %s\n",
-             to_size_t(key), static_cast<void*>(located_bucket), item_index,
-             (item_index == kSlotsPerBucket) ? "yes" : "no");
+      printf("get key %zu (#%zx), located bucket %p, index %zu, found = %s\n",
+             to_size_t_key(key), key_hash, static_cast<void*>(located_bucket),
+             item_index, (item_index == kSlotsPerBucket) ? "yes" : "no");
     }
 
     if (item_index == kSlotsPerBucket) return false;
@@ -346,6 +346,9 @@ class HashMap {
     size_t extra_bucket_index = extra_bucket_free_list.back();
     assert(extra_bucket_index >= 1);
     extra_bucket_free_list.pop_back();
+    if (kPMicaVerbose) {
+      printf(" allocated extra bucket %zu\n", extra_bucket_index);
+    }
 
     // This is an eight-byte operation, so no need in redo log
     pmem_memcpy_persist(&bucket->next_extra_bucket_idx, &extra_bucket_index,
@@ -393,7 +396,9 @@ class HashMap {
     assert(*key != invalid_key);
 
     if (kPMicaVerbose) {
-      printf("set key %zu, value %zu\n", to_size_t(key), to_size_t(value));
+      printf("set key %zu (#%zx), value %zu. freelist sz = %zu\n",
+             to_size_t_key(key), key_hash, to_size_t_val(value),
+             extra_bucket_free_list.size());
     }
 
     size_t bucket_index = key_hash & (num_regular_buckets - 1);
@@ -403,7 +408,8 @@ class HashMap {
 
     if (item_index == kSlotsPerBucket) {
       if (kPMicaVerbose) {
-        printf("  not found in bucket %p\n", static_cast<void*>(bucket));
+        printf("  not found in main bucket %p. traversing chain\n",
+               static_cast<void*>(bucket));
       }
       item_index = get_empty(bucket, &located_bucket);
       if (item_index == kSlotsPerBucket) {
@@ -415,8 +421,8 @@ class HashMap {
     }
 
     if (kPMicaVerbose) {
-      printf("  set key %zu, value %zu success. bucket %p, index %zu\n",
-             to_size_t(key), to_size_t(value),
+      printf("  set key %zu (#%zx), value %zu success. bucket %p, index %zu\n",
+             to_size_t_key(key), key_hash, to_size_t_val(value),
              static_cast<void*>(located_bucket), item_index);
     }
 

@@ -1,8 +1,8 @@
 --test_ms 200000
 --sm_verbose 0
 --pmem_file /dev/dax12.0
---keys_per_server_thread 16
---num_server_threads 4
+--total_keys_mi 1
+--num_server_threads 1
 --num_client_threads 16
 --window_size 8
 --workload get

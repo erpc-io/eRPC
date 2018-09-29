@@ -21,7 +21,7 @@ static constexpr double kAppMicaOverhead = 0.2;  // Extra bucket fraction
 static constexpr size_t kAppMaxServerBatch = 16;
 
 DEFINE_string(pmem_file, "/dev/dax12.0", "Persistent memory file path");
-DEFINE_uint64(keys_per_server_thread, 1, "Keys in each server partition");
+DEFINE_uint64(total_keys_mi, 1, "Total keys hosted by the server, in millions");
 DEFINE_uint64(num_server_threads, 1, "Number of threads at the server machine");
 DEFINE_uint64(num_client_threads, 1, "Number of threads per client machine");
 DEFINE_uint64(window_size, 1, "Outstanding requests per client");
@@ -65,7 +65,9 @@ static inline uint64_t fastrange64(uint64_t rand, uint64_t n) {
 
 class ServerContext : public BasicAppContext {
  public:
+  size_t thread_id;
   size_t num_reqs_tot = 0;  // Reqs for which the handler has been called
+  size_t keys_per_partition;
   HashMap *hashmap;
 
   // Batch info
@@ -88,6 +90,7 @@ class ClientContext : public BasicAppContext {
   size_t num_resps = 0;
   size_t thread_id;
   Workload workload;
+  size_t keys_per_partition;
   pcg64_fast pcg;
 
   size_t start_tsc[kAppMaxWindowSize];
@@ -191,8 +194,8 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   if (c->num_reqs_in_batch == kAppMaxServerBatch) drain_batch(c);
 }
 
-// Populate a map with keys {1, ..., FLAGS_keys_per_server_thread}
-size_t populate(HashMap *hashmap, size_t thread_id) {
+// Populate the partition for this server
+size_t populate(ServerContext &c) {
   bool is_set_arr[pmica::kMaxBatchSize];
   Key key_arr[pmica::kMaxBatchSize];
   Value val_arr[pmica::kMaxBatchSize];
@@ -208,7 +211,7 @@ size_t populate(HashMap *hashmap, size_t thread_id) {
   }
 
   const size_t num_keys_to_insert =
-      erpc::round_up<pmica::kMaxBatchSize>(FLAGS_keys_per_server_thread);
+      erpc::round_up<pmica::kMaxBatchSize>(c.keys_per_partition);
   size_t progress_console_lim = num_keys_to_insert / 10;
 
   for (size_t i = 1; i <= num_keys_to_insert; i += pmica::kMaxBatchSize) {
@@ -218,18 +221,22 @@ size_t populate(HashMap *hashmap, size_t thread_id) {
       val_arr[j].val_frag[0] = i + j;
     }
 
-    hashmap->batch_op_drain(is_set_arr, const_cast<const Key **>(key_ptr_arr),
-                            val_ptr_arr, success_arr, pmica::kMaxBatchSize);
+    c.hashmap->batch_op_drain(is_set_arr, const_cast<const Key **>(key_ptr_arr),
+                              val_ptr_arr, success_arr, pmica::kMaxBatchSize);
 
     if (i >= progress_console_lim) {
-      printf("thread %zu: %.2f percent done\n", thread_id,
+      printf("thread %zu: %.2f percent done\n", c.thread_id,
              i * 1.0 / num_keys_to_insert);
       progress_console_lim += num_keys_to_insert / 10;
     }
 
     for (size_t j = 0; j < pmica::kMaxBatchSize; j++) {
       num_success += success_arr[j];
-      if (!success_arr[j]) return num_success;
+      if (!success_arr[j]) {
+        printf("thread %zu: populate() failed at key %zu of %zu keys\n",
+               c.thread_id, i + j, num_keys_to_insert);
+        return num_success;
+      }
     }
   }
 
@@ -239,15 +246,18 @@ size_t populate(HashMap *hashmap, size_t thread_id) {
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
 
-  const size_t bytes_per_map = HashMap::get_required_bytes(
-      FLAGS_keys_per_server_thread, kAppMicaOverhead);
-
   ServerContext c;
-  c.hashmap = new HashMap(FLAGS_pmem_file, thread_id * bytes_per_map,
-                          FLAGS_keys_per_server_thread, kAppMicaOverhead);
-  const size_t num_keys_inserted = populate(c.hashmap, thread_id);
-  printf("thread %zu: %.2f fraction of keys inserted\n", thread_id,
-         num_keys_inserted * 1.0 / FLAGS_keys_per_server_thread);
+  c.thread_id = thread_id;
+  c.keys_per_partition = FLAGS_total_keys_mi * MB(1) / FLAGS_num_server_threads;
+
+  const size_t bytes_per_parition =
+      HashMap::get_required_bytes(c.keys_per_partition, kAppMicaOverhead);
+  c.hashmap = new HashMap(FLAGS_pmem_file, thread_id * bytes_per_parition,
+                          c.keys_per_partition, kAppMicaOverhead);
+
+  const size_t num_keys_inserted = populate(c);
+  printf("thread %zu: populate() inserted %.2f fraction of keys\n", thread_id,
+         num_keys_inserted * 1.0 / c.keys_per_partition);
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, port_vec.at(0));
@@ -304,7 +314,9 @@ inline void send_req(ClientContext &c, size_t ws_i) {
            is_set ? "SET" : "GET", ws_i);
   }
 
-  key->key_frag[0] = 1 + fastrange64(c.pcg(), FLAGS_keys_per_server_thread);
+  // Choose a random key in a partition. The partition is chosen later when
+  // we randomly select a session.
+  key->key_frag[0] = 1 + fastrange64(c.pcg(), c.keys_per_partition);
   value->val_frag[0] = key->key_frag[0];
   c.key_arr[ws_i] = *key;
 
@@ -384,6 +396,7 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   if (FLAGS_workload == "set") c.workload = Workload::kSets;
   if (FLAGS_workload == "get") c.workload = Workload::kGets;
   if (FLAGS_workload == "5050") c.workload = Workload::k5050;
+  c.keys_per_partition = FLAGS_total_keys_mi * MB(1) / FLAGS_num_server_threads;
   c.pcg = pcg64_fast(pcg_extras::seed_seq_from<std::random_device>{});
 
   rpc.retry_connect_on_invalid_rpc_id = true;
