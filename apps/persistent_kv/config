@@ -2,8 +2,8 @@
 --sm_verbose 0
 --pmem_file /dev/dax12.0
 --keys_per_server_thread 16
---num_server_threads 1
---num_client_threads 1
+--num_server_threads 4
+--num_client_threads 16
 --window_size 8
 --workload get
 --num_processes 2

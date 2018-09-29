@@ -168,7 +168,7 @@ class HashMap {
 
   /// Return the total bytes required for a table with \p num_requested_keys
   /// keys and \p overhead_fraction extra buckets. The returned space includes
-  /// redo log.
+  /// redo log. The returned space is aligned to 256 bytes.
   static size_t get_required_bytes(size_t num_requested_keys,
                                    double overhead_fraction) {
     size_t num_regular_buckets =
@@ -176,7 +176,8 @@ class HashMap {
     size_t num_extra_buckets = num_regular_buckets * overhead_fraction;
     size_t num_total_buckets = num_regular_buckets + num_extra_buckets;
 
-    return sizeof(RedoLog) + num_total_buckets * sizeof(Bucket);
+    size_t tot_size = sizeof(RedoLog) + num_total_buckets * sizeof(Bucket);
+    return roundup<256>(tot_size);
   }
 
   static size_t get_hash(const Key* k) {

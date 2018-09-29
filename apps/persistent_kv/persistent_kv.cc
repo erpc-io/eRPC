@@ -45,7 +45,7 @@ class Key {
 
 class Value {
  public:
-  size_t val_frag[8];
+  size_t val_frag[4];
   Value() { memset(val_frag, 0, sizeof(Value)); }
 };
 typedef pmica::HashMap<Key, Value> HashMap;
@@ -238,7 +238,6 @@ size_t populate(HashMap *hashmap, size_t thread_id) {
 
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
-  uint8_t phy_port = port_vec.at(0);
 
   const size_t bytes_per_map = HashMap::get_required_bytes(
       FLAGS_keys_per_server_thread, kAppMicaOverhead);
@@ -251,15 +250,16 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
          num_keys_inserted * 1.0 / FLAGS_keys_per_server_thread);
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
-                                  basic_sm_handler, phy_port);
+                                  basic_sm_handler, port_vec.at(0));
   c.rpc = &rpc;
+  const double freq_ghz = c.rpc->get_freq_ghz();
+  const size_t tsc_per_sec = erpc::ms_to_cycles(1000, freq_ghz);
 
   while (true) {
     c.stats.num_resps_tot = 0;
-    struct timespec start;
-    clock_gettime(CLOCK_REALTIME, &start);
+    size_t start_tsc = erpc::rdtsc();
 
-    for (size_t i = 0; i < MB(1); i++) {
+    while (erpc::rdtsc() - start_tsc <= tsc_per_sec) {
       size_t num_reqs_tot_start = c.num_reqs_tot;
       rpc.run_event_loop_once();
 
@@ -270,7 +270,7 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
       }
     }
 
-    double seconds = erpc::sec_since(start);
+    const double seconds = erpc::to_sec(erpc::rdtsc() - start_tsc, freq_ghz);
     printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,
            c.stats.num_resps_tot / (seconds * Mi(1)), c.rpc->get_avg_rx_batch(),
            c.rpc->get_avg_tx_batch());
@@ -333,6 +333,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
            resp->get_data_size() == sizeof(Result));
     if (resp->get_data_size() == sizeof(Value)) {
       Value *value = reinterpret_cast<Value *>(resp->buf);
+      _unused(value);
       assert(value->val_frag[0] == c->key_arr[ws_i].key_frag[0]);
       c->stats.num_get_success++;
     }
