@@ -7,6 +7,7 @@
 #include "rpc.h"
 #include "util/autorun_helpers.h"
 #include "util/latency.h"
+#include "util/math_utils.h"
 #include "util/numautils.h"
 
 static constexpr size_t kAppEvLoopMs = 1000;     // Duration of event loop
@@ -206,10 +207,11 @@ size_t populate(HashMap *hashmap, size_t thread_id) {
     val_ptr_arr[i] = &val_arr[i];
   }
 
-  size_t progress_console_lim = FLAGS_keys_per_server_thread / 10;
+  const size_t num_keys_to_insert =
+      erpc::round_up<pmica::kMaxBatchSize>(FLAGS_keys_per_server_thread);
+  size_t progress_console_lim = num_keys_to_insert / 10;
 
-  for (size_t i = 1; i <= FLAGS_keys_per_server_thread;
-       i += pmica::kMaxBatchSize) {
+  for (size_t i = 1; i <= num_keys_to_insert; i += pmica::kMaxBatchSize) {
     for (size_t j = 0; j < pmica::kMaxBatchSize; j++) {
       is_set_arr[j] = true;
       key_arr[j].key_frag[0] = i + j;
@@ -221,8 +223,8 @@ size_t populate(HashMap *hashmap, size_t thread_id) {
 
     if (i >= progress_console_lim) {
       printf("thread %zu: %.2f percent done\n", thread_id,
-             i * 1.0 / FLAGS_keys_per_server_thread);
-      progress_console_lim += FLAGS_keys_per_server_thread / 10;
+             i * 1.0 / num_keys_to_insert);
+      progress_console_lim += num_keys_to_insert / 10;
     }
 
     for (size_t j = 0; j < pmica::kMaxBatchSize; j++) {
@@ -231,7 +233,7 @@ size_t populate(HashMap *hashmap, size_t thread_id) {
     }
   }
 
-  return FLAGS_keys_per_server_thread;  // All keys were added
+  return num_keys_to_insert;  // All keys were added
 }
 
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
@@ -244,7 +246,10 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   ServerContext c;
   c.hashmap = new HashMap(FLAGS_pmem_file, thread_id * bytes_per_map,
                           FLAGS_keys_per_server_thread, kAppMicaOverhead);
-  populate(c.hashmap, thread_id);
+  const size_t num_keys_inserted = populate(c.hashmap, thread_id);
+  printf("thread %zu: %.2f fraction of keys inserted\n", thread_id,
+         num_keys_inserted * 1.0 / FLAGS_keys_per_server_thread);
+
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, phy_port);
   c.rpc = &rpc;
@@ -318,10 +323,12 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
 
   auto *c = static_cast<ClientContext *>(_context);
   if (c->is_set_arr[ws_i]) {
+    // SET response
     assert(resp->get_data_size() == sizeof(Result));
     auto result = *reinterpret_cast<Result *>(resp->buf);
     if (result == Result::kSetSuccess) c->stats.num_set_success++;
   } else {
+    // GET response
     assert(resp->get_data_size() == sizeof(Value) ||
            resp->get_data_size() == sizeof(Result));
     if (resp->get_data_size() == sizeof(Value)) {
