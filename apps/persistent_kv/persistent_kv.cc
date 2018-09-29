@@ -1,6 +1,7 @@
 #include <gflags/gflags.h>
 #include <signal.h>
 #include <cstring>
+#include <pcg/pcg_random.hpp>
 #include "../apps_common.h"
 #include "pmica.h"
 #include "rpc.h"
@@ -44,8 +45,18 @@ class Value {
 };
 typedef pmica::HashMap<Key, Value> HashMap;
 
-enum class Result : size_t { kGetFail = 1, kPutSuccess, kPutFail };
-static_assert(sizeof(Result) != sizeof(Value), "");  // GET response is Value
+enum class Result : size_t { kGetFail = 1, kSetSuccess, kSetFail };
+
+// We use response size to distinguish between response types
+static_assert(sizeof(Result) < sizeof(Value), "");
+
+enum class Workload { kGets, kSets, k5050 };
+
+/// Given a random number \p rand, return a random number
+static inline uint64_t fastrange64(uint64_t rand, uint64_t n) {
+  return static_cast<uint64_t>(
+      static_cast<__uint128_t>(rand) * static_cast<__uint128_t>(n) >> 64);
+}
 
 class ServerContext : public BasicAppContext {
  public:
@@ -57,7 +68,8 @@ class ServerContext : public BasicAppContext {
   size_t batch_i = 0;
   erpc::ReqHandle *req_handle_arr[kAppMaxServerBatch];
   bool is_set_arr[kAppMaxServerBatch];
-  Key key_arr[kAppMaxServerBatch];
+  Key *key_ptr_arr[kAppMaxServerBatch];
+  Value *val_ptr_arr[kAppMaxServerBatch];
   size_t keyhash_arr[kAppMaxServerBatch];
 };
 
@@ -65,31 +77,48 @@ class ClientContext : public BasicAppContext {
  public:
   size_t num_resps = 0;
   size_t thread_id;
+  Workload workload;
+  pcg64_fast pcg;
+
   size_t start_tsc[kAppMaxWindowSize];
-  erpc::Latency latency;
+  Key key_arr[kAppMaxWindowSize];
+  bool is_set_arr[kAppMaxWindowSize];
   erpc::MsgBuffer req_msgbuf[kAppMaxWindowSize], resp_msgbuf[kAppMaxWindowSize];
+
+  struct {
+    size_t num_get_reqs = 0;
+    size_t num_get_success = 0;
+    size_t num_set_reqs = 0;
+    size_t num_set_success = 0;
+  } stats;
+
+  void reset_stats() { memset(&stats, 0, sizeof(stats)); }
+  std::string get_stats_string() {
+    std::ostringstream ret;
+    ret << "[get_reqs " << stats.num_get_reqs << ", get_success "
+        << stats.num_get_success << ", set_reqs " << stats.num_set_reqs
+        << ", set_success" << stats.num_set_success << "]";
+    return ret.str();
+  }
+
+  erpc::Latency latency;
   ~ClientContext() {}
 };
 
 inline void process_batch(ServerContext *c) {
   assert(c->batch_i > 0);
-  Value val_arr[kAppMaxServerBatch];
   bool success_arr[kAppMaxServerBatch];
-  c->hashmap->batch_op_drain_helper(c->is_set_arr, c->keyhash_arr, c->key_arr,
-                                    val_arr, success_arr[i], c->batch_i);
+  c->hashmap->batch_op_drain_helper(c->is_set_arr, c->keyhash_arr,
+                                    const_cast<const Key **>(c->key_ptr_arr),
+                                    c->val_ptr_arr, success_arr, c->batch_i);
 
   for (size_t i = 0; i < c->batch_i; i++) {
     erpc::ReqHandle *req_handle = c->req_handle_arr[i];
     req_handle->prealloc_used = true;
-
-    const erpc::MsgBuffer *req = req_handle->get_req_msgbuf();
     erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
 
     if (!c->is_set_arr[i]) {
       // GET request
-      c->rpc->resize_msg_buffer(&resp, sizeof(Value));
-      auto &value = reinterpret_cast<Value &>(resp.buf);
-      value = val_arr[i];
       if (!success_arr[i]) {
         c->rpc->resize_msg_buffer(&resp, sizeof(Result));
         auto &result = reinterpret_cast<Result &>(resp.buf);
@@ -98,14 +127,8 @@ inline void process_batch(ServerContext *c) {
     } else {
       // SET request
       c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-      auto &key = reinterpret_cast<const Key &>(req->buf);
-      auto &value = reinterpret_cast<Value &>(resp.buf);
-      bool success = c->hashmap->get(key, value);
-      if (!success) {
-        c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-        auto &result = reinterpret_cast<Result &>(resp.buf);
-        result = Result::kGetFail;
-      }
+      auto &result = reinterpret_cast<Result &>(resp.buf);
+      result = success_arr[i] ? Result::kSetSuccess : Result::kSetFail;
     }
 
     c->rpc->enqueue_response(req_handle);
@@ -121,31 +144,32 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   req_handle->prealloc_used = true;
   erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
+  c->rpc->resize_msg_buffer(&resp, sizeof(Value));  // sizeof(Result) is smaller
+
+  const size_t batch_i = c->batch_i;
+
+  // Common for both GETs and SETs
+  Key *key = reinterpret_cast<Key *>(req->buf);
+  c->key_ptr_arr[batch_i] = key;
+  c->keyhash_arr[batch_i] = c->hashmap->get_hash(key);
+  c->hashmap->prefetch(c->keyhash_arr[batch_i]);
+
   if (req_size == sizeof(Key)) {
     // GET request
-    c->rpc->resize_msg_buffer(&resp, sizeof(Value));
-    auto &key = reinterpret_cast<const Key &>(req->buf);
-    auto &value = reinterpret_cast<Value &>(resp.buf);
-    bool success = c->hashmap->get(key, value);
-    if (!success) {
-      c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-      auto &result = reinterpret_cast<Result &>(resp.buf);
-      result = Result::kGetFail;
-    }
-  } else {
+    c->is_set_arr[batch_i] = false;
+    Value *value = reinterpret_cast<Value *>(resp.buf);
+    c->val_ptr_arr[batch_i] = value;
+  } else if (req_size == sizeof(Key) + sizeof(Value)) {
     // PUT request
-    c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-    auto &key = reinterpret_cast<const Key &>(req->buf);
-    auto &value = reinterpret_cast<const Value &>(req->buf);
-    bool success = c->hashmap->set_nodrain(key, value);
-    if (!success) {
-      c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-      auto &result = reinterpret_cast<Result &>(resp.buf);
-      result = Result::kGetFail;
-    }
+    c->is_set_arr[batch_i] = true;
+    Value *value = reinterpret_cast<Value *>(req->buf + sizeof(Key));
+    c->val_ptr_arr[batch_i] = value;
+  } else {
+    assert(false);
   }
 
-  c->rpc->enqueue_response(req_handle);
+  c->batch_i++;
+  if (c->batch_i == kAppMaxServerBatch) process_batch(c);
 }
 
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
@@ -166,7 +190,10 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
     c.num_resps = 0;
     struct timespec start;
     clock_gettime(CLOCK_REALTIME, &start);
-    rpc.run_event_loop(kAppEvLoopMs);
+
+    for (size_t i = 0; i < MB(1); i++) {
+      rpc.run_event_loop(kAppEvLoopMs);
+    }
 
     double seconds = erpc::sec_since(start);
     printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,
@@ -185,17 +212,50 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
 void app_cont_func(erpc::RespHandle *, void *, size_t);
 inline void send_req(ClientContext &c, size_t ws_i) {
   c.start_tsc[ws_i] = erpc::rdtsc();
+
+  erpc::MsgBuffer &req = c.req_msgbuf[ws_i];
+  Key *key = reinterpret_cast<Key *>(req.buf);
+  Value *value = reinterpret_cast<Value *>(req.buf + sizeof(Key));
+
+  bool &is_set = c.is_set_arr[ws_i];
+  switch (c.workload) {
+    case Workload::kGets: is_set = false; break;
+    case Workload::kSets: is_set = true; break;
+    case Workload::k5050: is_set = c.pcg() % 2 == 0; break;
+  }
+  is_set ? c.stats.num_get_reqs++ : c.stats.num_set_reqs++;
+
+  key->key_frag[0] = fastrange64(c.pcg(), FLAGS_keys_per_server_thread);
+  value->val_frag[0] = key->key_frag[0];
+  c.key_arr[ws_i] = *key;
+
+  size_t req_size = is_set ? sizeof(Key) + sizeof(Value) : sizeof(Key);
+  c.rpc->resize_msg_buffer(&req, req_size);
+
   c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppReqType,
                          &c.req_msgbuf[ws_i], &c.resp_msgbuf[ws_i],
                          app_cont_func, ws_i);
 }
 
 void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
-  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf->get_data_size() == FLAGS_resp_size);
-  _unused(resp_msgbuf);
+  const erpc::MsgBuffer *resp = resp_handle->get_resp_msgbuf();
+  _unused(resp);
 
   auto *c = static_cast<ClientContext *>(_context);
+  if (c->is_set_arr[ws_i]) {
+    assert(resp->get_data_size() == sizeof(Result));
+    auto result = *reinterpret_cast<Result *>(resp->buf);
+    if (result == Result::kSetSuccess) c->stats.num_set_success++;
+  } else {
+    assert(resp->get_data_size() == sizeof(Value) ||
+           resp->get_data_size() == sizeof(Result));
+    if (resp->get_data_size() == sizeof(Value)) {
+      Value *value = reinterpret_cast<Value *>(resp->buf);
+      assert(value->val_frag[0] == c->key_arr[ws_i].key_frag[0]);
+      c->stats.num_get_success++;
+    }
+  }
+
   c->rpc->release_response(resp_handle);
 
   double req_lat_us =
@@ -233,6 +293,10 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   ClientContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, phy_port);
+  if (FLAGS_workload == "set") c.workload = Workload::kSets;
+  if (FLAGS_workload == "get") c.workload = Workload::kGets;
+  if (FLAGS_workload == "5050") c.workload = Workload::k5050;
+  c.pcg = pcg64_fast(pcg_extras::seed_seq_from<std::random_device>{});
 
   rpc.retry_connect_on_invalid_rpc_id = true;
   c.rpc = &rpc;
@@ -243,12 +307,12 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   printf("Process %zu, thread %zu: Connected. Starting work.\n",
          FLAGS_process_id, thread_id);
   if (thread_id == 0) {
-    printf("thread_id: median_us 5th_us 99th_us 999th_us Mops\n");
+    printf("thread_id: median_us 5th_us 99th_us 999th_us Mops. Stats.\n");
   }
 
   for (size_t i = 0; i < FLAGS_window_size; i++) {
-    c.req_msgbuf[i] = rpc.alloc_msg_buffer_or_die(FLAGS_req_size);
-    c.resp_msgbuf[i] = rpc.alloc_msg_buffer_or_die(FLAGS_resp_size);
+    c.req_msgbuf[i] = rpc.alloc_msg_buffer_or_die(sizeof(Key) + sizeof(Value));
+    c.resp_msgbuf[i] = rpc.alloc_msg_buffer_or_die(sizeof(Key) + sizeof(Value));
     send_req(c, i);
   }
 
@@ -260,22 +324,24 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
     if (ctrl_c_pressed == 1) break;
 
     double seconds = erpc::sec_since(start);
-    printf("%zu: %.1f %.1f %.1f %.1f %.2f\n", thread_id,
+    printf("%zu: %.1f %.1f %.1f %.1f %.2f. %s\n", thread_id,
            c.latency.perc(.5) / kAppLatFac, c.latency.perc(.05) / kAppLatFac,
            c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac,
-           c.num_resps / (seconds * Mi(1)));
+           c.num_resps / (seconds * Mi(1)), c.get_stats_string().c_str());
 
     c.num_resps = 0;
     c.latency.reset();
+    c.reset_stats();
   }
 }
 
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  static_assert(sizeof(Key) + sizeof(Value) <= erpc::CTransport::kMTU,
+                "KV too large");
 
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
-  erpc::rt_assert(FLAGS_resp_size <= erpc::CTransport::kMTU, "Resp too large");
   erpc::rt_assert(FLAGS_window_size <= kAppMaxWindowSize, "Window too large");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
