@@ -128,17 +128,17 @@ inline void drain_batch(ServerContext *c) {
     req_handle->prealloc_used = true;
     erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
 
-    if (!c->is_set_arr[i]) {
+    if (c->is_set_arr[i]) {
+      // SET request
+      c->rpc->resize_msg_buffer(&resp, sizeof(Result));
+      *reinterpret_cast<Result *>(resp.buf) =
+          success_arr[i] ? Result::kSetSuccess : Result::kSetFail;
+    } else {
       // GET request
       if (!success_arr[i]) {
         c->rpc->resize_msg_buffer(&resp, sizeof(Result));
         *reinterpret_cast<Result *>(resp.buf) = Result::kGetFail;
       }
-    } else {
-      // SET request
-      c->rpc->resize_msg_buffer(&resp, sizeof(Result));
-      *reinterpret_cast<Result *>(resp.buf) =
-          success_arr[i] ? Result::kSetSuccess : Result::kSetFail;
     }
 
     c->rpc->enqueue_response(req_handle);
@@ -190,6 +190,50 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   if (c->num_reqs_in_batch == kAppMaxServerBatch) drain_batch(c);
 }
 
+// Populate a map with keys {1, ..., FLAGS_keys_per_server_thread}
+size_t populate(HashMap *hashmap, size_t thread_id) {
+  bool is_set_arr[pmica::kMaxBatchSize];
+  Key key_arr[pmica::kMaxBatchSize];
+  Value val_arr[pmica::kMaxBatchSize];
+  Key *key_ptr_arr[pmica::kMaxBatchSize];
+  Value *val_ptr_arr[pmica::kMaxBatchSize];
+  bool success_arr[pmica::kMaxBatchSize];
+
+  size_t num_success = 0;
+
+  for (size_t i = 0; i < pmica::kMaxBatchSize; i++) {
+    key_ptr_arr[i] = &key_arr[i];
+    val_ptr_arr[i] = &val_arr[i];
+  }
+
+  size_t progress_console_lim = FLAGS_keys_per_server_thread / 10;
+
+  for (size_t i = 1; i <= FLAGS_keys_per_server_thread;
+       i += pmica::kMaxBatchSize) {
+    for (size_t j = 0; j < pmica::kMaxBatchSize; j++) {
+      is_set_arr[j] = true;
+      key_arr[j].key_frag[0] = i + j;
+      val_arr[j].val_frag[0] = i + j;
+    }
+
+    hashmap->batch_op_drain(is_set_arr, const_cast<const Key **>(key_ptr_arr),
+                            val_ptr_arr, success_arr, pmica::kMaxBatchSize);
+
+    if (i >= progress_console_lim) {
+      printf("thread %zu: %.2f percent done\n", thread_id,
+             i * 1.0 / FLAGS_keys_per_server_thread);
+      progress_console_lim += FLAGS_keys_per_server_thread / 10;
+    }
+
+    for (size_t j = 0; j < pmica::kMaxBatchSize; j++) {
+      num_success += success_arr[j];
+      if (!success_arr[j]) return num_success;
+    }
+  }
+
+  return FLAGS_keys_per_server_thread;  // All keys were added
+}
+
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   uint8_t phy_port = port_vec.at(0);
@@ -200,6 +244,7 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   ServerContext c;
   c.hashmap = new HashMap(FLAGS_pmem_file, thread_id * bytes_per_map,
                           FLAGS_keys_per_server_thread, kAppMicaOverhead);
+  populate(c.hashmap, thread_id);
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, phy_port);
   c.rpc = &rpc;
@@ -248,7 +293,7 @@ inline void send_req(ClientContext &c, size_t ws_i) {
     case Workload::kSets: is_set = true; break;
     case Workload::k5050: is_set = c.pcg() % 2 == 0; break;
   }
-  is_set ? c.stats.num_get_reqs++ : c.stats.num_set_reqs++;
+  is_set ? c.stats.num_set_reqs++ : c.stats.num_get_reqs++;
   if (kAppVerbose) {
     printf("Thread %zu: sending %s request. Window slot %zu\n", c.thread_id,
            is_set ? "SET" : "GET", ws_i);
@@ -261,6 +306,7 @@ inline void send_req(ClientContext &c, size_t ws_i) {
   size_t req_size = is_set ? sizeof(Key) + sizeof(Value) : sizeof(Key);
   c.rpc->resize_msg_buffer(&req, req_size);
 
+  // Send request to a random server
   c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppReqType,
                          &c.req_msgbuf[ws_i], &c.resp_msgbuf[ws_i],
                          app_cont_func, ws_i);
