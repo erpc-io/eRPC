@@ -33,8 +33,12 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 class Key {
  public:
   size_t key_frag[2];
-  bool operator==(const Key &rhs) { return memcmp(this, &rhs, sizeof(Key)); }
-  bool operator!=(const Key &rhs) { return !memcmp(this, &rhs, sizeof(Key)); }
+  bool operator==(const Key &rhs) const {
+    return memcmp(this, &rhs, sizeof(Key));
+  }
+  bool operator!=(const Key &rhs) const {
+    return !memcmp(this, &rhs, sizeof(Key));
+  }
   Key() { memset(key_frag, 0, sizeof(Key)); }
 };
 
@@ -191,9 +195,7 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
     struct timespec start;
     clock_gettime(CLOCK_REALTIME, &start);
 
-    for (size_t i = 0; i < MB(1); i++) {
-      rpc.run_event_loop(kAppEvLoopMs);
-    }
+    for (size_t i = 0; i < MB(1); i++) rpc.run_event_loop_once();
 
     double seconds = erpc::sec_since(start);
     printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,

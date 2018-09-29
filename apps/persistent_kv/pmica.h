@@ -96,7 +96,7 @@ class HashMap {
         pmem_map_file(pmem_file.c_str(), 0 /* length */, 0 /* flags */, 0666,
                       &_mapped_len, &is_pmem));
 
-    rt_assert(pbuf != nullptr, "pmem_map_file() failed");
+    rt_assert(pbuf != nullptr, "pmem_map_file() failed for " + pmem_file);
     rt_assert(reinterpret_cast<size_t>(pbuf) % 256 == 0, "pbuf not aligned");
 
     if (mapped_len - file_offset < reqd_space) {
