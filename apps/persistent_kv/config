@@ -4,8 +4,8 @@
 --keys_per_server_thread 16
 --num_server_threads 1
 --num_client_threads 1
---window_size 1
---workload "get"
+--window_size 8
+--workload get
 --num_processes 2
 --numa_0_ports 0
 --numa_1_ports 1,3

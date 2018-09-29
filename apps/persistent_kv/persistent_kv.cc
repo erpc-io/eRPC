@@ -17,7 +17,7 @@ static constexpr size_t kAppMaxWindowSize = 32;  // Max pending reqs per client
 static constexpr double kAppMicaOverhead = 0.2;  // Extra bucket fraction
 
 // Maximum requests processed by server before issuing a response
-static constexpr size_t kAppMaxServerBatch = 1;
+static constexpr size_t kAppMaxServerBatch = 16;
 
 DEFINE_string(pmem_file, "/dev/dax12.0", "Persistent memory file path");
 DEFINE_uint64(keys_per_server_thread, 1, "Keys in each server partition");
@@ -64,17 +64,22 @@ static inline uint64_t fastrange64(uint64_t rand, uint64_t n) {
 
 class ServerContext : public BasicAppContext {
  public:
-  size_t num_reqs = 0;   // Reqs for which the handler has been called
-  size_t num_resps = 0;  // Resps for which enqueue_response() has been called
+  size_t num_reqs_tot = 0;  // Reqs for which the handler has been called
   HashMap *hashmap;
 
   // Batch info
-  size_t batch_i = 0;
+  size_t num_reqs_in_batch = 0;
   erpc::ReqHandle *req_handle_arr[kAppMaxServerBatch];
   bool is_set_arr[kAppMaxServerBatch];
   Key *key_ptr_arr[kAppMaxServerBatch];
   Value *val_ptr_arr[kAppMaxServerBatch];
   size_t keyhash_arr[kAppMaxServerBatch];
+
+  struct {
+    size_t num_resps_tot = 0;  // Total responses sent
+  } stats;
+
+  void reset_stats() { memset(&stats, 0, sizeof(stats)); }
 };
 
 class ClientContext : public BasicAppContext {
@@ -109,14 +114,16 @@ class ClientContext : public BasicAppContext {
   ~ClientContext() {}
 };
 
-inline void process_batch(ServerContext *c) {
-  assert(c->batch_i > 0);
+// Do hash table operations and send responses for all requests in the batch.
+// This must reset num_reqs_in_batch.
+inline void drain_batch(ServerContext *c) {
+  assert(c->num_reqs_in_batch > 0);
   bool success_arr[kAppMaxServerBatch];
-  c->hashmap->batch_op_drain_helper(c->is_set_arr, c->keyhash_arr,
-                                    const_cast<const Key **>(c->key_ptr_arr),
-                                    c->val_ptr_arr, success_arr, c->batch_i);
+  c->hashmap->batch_op_drain_helper(
+      c->is_set_arr, c->keyhash_arr, const_cast<const Key **>(c->key_ptr_arr),
+      c->val_ptr_arr, success_arr, c->num_reqs_in_batch);
 
-  for (size_t i = 0; i < c->batch_i; i++) {
+  for (size_t i = 0; i < c->num_reqs_in_batch; i++) {
     erpc::ReqHandle *req_handle = c->req_handle_arr[i];
     req_handle->prealloc_used = true;
     erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
@@ -135,8 +142,10 @@ inline void process_batch(ServerContext *c) {
     }
 
     c->rpc->enqueue_response(req_handle);
-    c->num_resps++;
   }
+
+  c->stats.num_resps_tot += c->num_reqs_in_batch;
+  c->num_reqs_in_batch = 0;
 }
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
@@ -149,7 +158,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp, sizeof(Value));  // sizeof(Result) is smaller
 
-  const size_t batch_i = c->batch_i;
+  const size_t batch_i = c->num_reqs_in_batch;
 
   // Common for both GETs and SETs
   Key *key = reinterpret_cast<Key *>(req->buf);
@@ -176,12 +185,9 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   }
 
   // Tracking
-  c->num_reqs++;
-  c->batch_i++;
-  if (c->batch_i == kAppMaxServerBatch) {
-    process_batch(c);
-    c->batch_i = 0;
-  }
+  c->num_reqs_tot++;
+  c->num_reqs_in_batch++;
+  if (c->num_reqs_in_batch == kAppMaxServerBatch) drain_batch(c);
 }
 
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
@@ -199,26 +205,28 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   c.rpc = &rpc;
 
   while (true) {
-    c.num_resps = 0;
+    c.stats.num_resps_tot = 0;
     struct timespec start;
     clock_gettime(CLOCK_REALTIME, &start);
 
     for (size_t i = 0; i < MB(1); i++) {
-      size_t num_reqs_start = c.num_reqs;
+      size_t num_reqs_tot_start = c.num_reqs_tot;
       rpc.run_event_loop_once();
 
       // If no new requests were received in this iteration of the event loop,
       // and we have responses to send, send them now.
-      if (c.num_reqs == num_reqs_start && c.batch_i > 0) process_batch(&c);
+      if (c.num_reqs_tot == num_reqs_tot_start && c.num_reqs_in_batch > 0) {
+        drain_batch(&c);
+      }
     }
 
     double seconds = erpc::sec_since(start);
     printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,
-           c.num_resps / (seconds * Mi(1)), c.rpc->get_avg_rx_batch(),
+           c.stats.num_resps_tot / (seconds * Mi(1)), c.rpc->get_avg_rx_batch(),
            c.rpc->get_avg_tx_batch());
 
     c.rpc->reset_dpath_stats();
-    c.num_resps = 0;
+    c.stats.num_resps_tot = 0;
 
     if (ctrl_c_pressed == 1) break;
   }
