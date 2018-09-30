@@ -15,7 +15,7 @@ static constexpr bool kAppVerbose = false;       // Print debug info on datapath
 static constexpr double kAppLatFac = 10.0;       // Precision factor for latency
 static constexpr size_t kAppReqType = 1;         // eRPC request type
 static constexpr size_t kAppMaxWindowSize = 32;  // Max pending reqs per client
-static constexpr double kAppMicaOverhead = 0.2;  // Extra bucket fraction
+static constexpr double kAppMicaOverhead = 0.42;  // Extra bucket fraction
 
 // Maximum requests processed by server before issuing a response
 static constexpr size_t kAppMaxServerBatch = 16;
@@ -79,7 +79,8 @@ class ServerContext : public BasicAppContext {
   size_t keyhash_arr[kAppMaxServerBatch];
 
   struct {
-    size_t num_resps_tot = 0;  // Total responses sent
+    size_t num_resps_tot = 0;    // Total responses sent
+    size_t num_drain_batch = 0;  // Number of calls to drain_batch()
   } stats;
 
   void reset_stats() { memset(&stats, 0, sizeof(stats)); }
@@ -149,6 +150,8 @@ inline void drain_batch(ServerContext *c) {
   }
 
   c->stats.num_resps_tot += c->num_reqs_in_batch;
+  c->stats.num_drain_batch++;
+
   c->num_reqs_in_batch = 0;
 }
 
@@ -281,12 +284,11 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
     }
 
     const double seconds = erpc::to_sec(erpc::rdtsc() - start_tsc, freq_ghz);
-    printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,
-           c.stats.num_resps_tot / (seconds * Mi(1)), c.rpc->get_avg_rx_batch(),
-           c.rpc->get_avg_tx_batch());
+    printf("thread %zu: %.2f M/s. avg batch = %.2f\n", thread_id,
+           c.stats.num_resps_tot / (seconds * Mi(1)),
+           c.stats.num_resps_tot * 1.0 / c.stats.num_drain_batch);
 
-    c.rpc->reset_dpath_stats();
-    c.stats.num_resps_tot = 0;
+    c.reset_stats();
 
     if (ctrl_c_pressed == 1) break;
   }
