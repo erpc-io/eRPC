@@ -14,7 +14,7 @@
 
 namespace pmica {
 
-static constexpr size_t kSlotsPerBucket = 8;
+static constexpr size_t kSlotsPerBucket = 5;
 static constexpr size_t kMaxBatchSize = 16;
 static constexpr size_t kNumRedoLogEntries = kMaxBatchSize * 8;
 static constexpr bool kPMicaVerbose = false;
@@ -64,6 +64,7 @@ class HashMap {
   };
 
   struct Bucket {
+    size_t unused[1];
     size_t next_extra_bucket_idx;  // 1-base; 0 = no extra bucket
     Slot slot_arr[kSlotsPerBucket];
   };
@@ -131,8 +132,9 @@ class HashMap {
     rt_assert(num_requested_keys >= kSlotsPerBucket, ">=1 buckets needed");
     rt_assert(file_offset % 256 == 0, "Unaligned file offset");
 
-    printf("Space required = %.4f GB, key capacity = %.4f M\n",
-           reqd_space * 1.0 / (1ull << 30), get_key_capacity() / 1000000.0);
+    printf("Space required = %.4f GB, key capacity = %.4f M. Bkt size = %zu\n",
+           reqd_space * 1.0 / (1ull << 30), get_key_capacity() / 1000000.0,
+           sizeof(Bucket));
 
     pbuf = map_pbuf(mapped_len);
 

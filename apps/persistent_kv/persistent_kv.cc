@@ -13,15 +13,20 @@
 static constexpr size_t kAppEvLoopMs = 1000;     // Duration of event loop
 static constexpr bool kAppVerbose = false;       // Print debug info on datapath
 static constexpr double kAppLatFac = 10.0;       // Precision factor for latency
-static constexpr size_t kAppReqType = 1;         // eRPC request type
 static constexpr size_t kAppMaxWindowSize = 32;  // Max pending reqs per client
-static constexpr double kAppMicaOverhead = 0.42;  // Extra bucket fraction
+static constexpr double kAppMicaOverhead = 0.05;  // Extra bucket fraction
+
+// RPC for KV datapath operations
+static constexpr size_t kAppKvReqType = 1;
+
+// RPC to get the maximum key in the server's table
+static constexpr size_t kAppMaxKeyReqType = 2;
 
 // Maximum requests processed by server before issuing a response
 static constexpr size_t kAppMaxServerBatch = 16;
 
 DEFINE_string(pmem_file, "/dev/dax12.0", "Persistent memory file path");
-DEFINE_uint64(total_keys_mi, 1, "Total keys hosted by the server, in millions");
+DEFINE_double(total_keys_mi, 1.0, "Total keys at server, in millions");
 DEFINE_uint64(num_server_threads, 1, "Number of threads at the server machine");
 DEFINE_uint64(num_client_threads, 1, "Number of threads per client machine");
 DEFINE_uint64(window_size, 1, "Outstanding requests per client");
@@ -67,7 +72,13 @@ class ServerContext : public BasicAppContext {
  public:
   size_t thread_id;
   size_t num_reqs_tot = 0;  // Reqs for which the handler has been called
-  size_t keys_per_partition;
+
+  // The hash table is provisioned for key_cap_per_partition (+ overhead) keys
+  size_t key_cap_per_partition;
+
+  // We were able to successfully insert keys up to max_key in the partition
+  size_t max_key;
+
   HashMap *hashmap;
 
   // Batch info
@@ -91,7 +102,11 @@ class ClientContext : public BasicAppContext {
   size_t num_resps = 0;
   size_t thread_id;
   Workload workload;
-  size_t keys_per_partition;
+
+  // Largest key in the servers' partitions. This is determined using the
+  // max_key RPC.
+  size_t max_key;
+
   pcg64_fast pcg;
 
   size_t start_tsc[kAppMaxWindowSize];
@@ -155,7 +170,18 @@ inline void drain_batch(ServerContext *c) {
   c->num_reqs_in_batch = 0;
 }
 
-void req_handler(erpc::ReqHandle *req_handle, void *_context) {
+void max_key_req_handler(erpc::ReqHandle *req_handle, void *_context) {
+  auto *c = static_cast<ServerContext *>(_context);
+
+  req_handle->prealloc_used = true;
+  erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
+  c->rpc->resize_msg_buffer(&resp, sizeof(size_t));
+  *reinterpret_cast<size_t *>(resp.buf) = c->max_key;
+
+  c->rpc->enqueue_response(req_handle);
+}
+
+void kv_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
 
   const erpc::MsgBuffer *req = req_handle->get_req_msgbuf();
@@ -197,8 +223,8 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   if (c->num_reqs_in_batch == kAppMaxServerBatch) drain_batch(c);
 }
 
-// Populate the partition for this server
-size_t populate(ServerContext &c) {
+// Populate the partition for this server and set c.max_key
+void populate(ServerContext &c) {
   bool is_set_arr[pmica::kMaxBatchSize];
   Key key_arr[pmica::kMaxBatchSize];
   Value val_arr[pmica::kMaxBatchSize];
@@ -214,7 +240,7 @@ size_t populate(ServerContext &c) {
   }
 
   const size_t num_keys_to_insert =
-      erpc::round_up<pmica::kMaxBatchSize>(c.keys_per_partition);
+      erpc::round_up<pmica::kMaxBatchSize>(c.key_cap_per_partition);
   size_t progress_console_lim = num_keys_to_insert / 10;
 
   for (size_t i = 1; i <= num_keys_to_insert; i += pmica::kMaxBatchSize) {
@@ -238,12 +264,13 @@ size_t populate(ServerContext &c) {
       if (!success_arr[j]) {
         printf("thread %zu: populate() failed at key %zu of %zu keys\n",
                c.thread_id, i + j, num_keys_to_insert);
-        return num_success;
+        c.max_key = num_success;
+        return;
       }
     }
   }
 
-  return num_keys_to_insert;  // All keys were added
+  c.max_key = num_keys_to_insert;  // All keys were added
 }
 
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
@@ -251,16 +278,17 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
 
   ServerContext c;
   c.thread_id = thread_id;
-  c.keys_per_partition = FLAGS_total_keys_mi * MB(1) / FLAGS_num_server_threads;
+  c.key_cap_per_partition =
+      FLAGS_total_keys_mi * MB(1) / FLAGS_num_server_threads;
 
   const size_t bytes_per_parition =
-      HashMap::get_required_bytes(c.keys_per_partition, kAppMicaOverhead);
+      HashMap::get_required_bytes(c.key_cap_per_partition, kAppMicaOverhead);
   c.hashmap = new HashMap(FLAGS_pmem_file, thread_id * bytes_per_parition,
-                          c.keys_per_partition, kAppMicaOverhead);
+                          c.key_cap_per_partition, kAppMicaOverhead);
 
-  const size_t num_keys_inserted = populate(c);
-  printf("thread %zu: populate() inserted %.2f fraction of keys\n", thread_id,
-         num_keys_inserted * 1.0 / c.keys_per_partition);
+  populate(c);
+  printf("thread %zu: populate() inserted %zu keys. occupancy = %.2f\n",
+         thread_id, c.max_key, c.max_key * 1.0 / c.hashmap->get_key_capacity());
 
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, port_vec.at(0));
@@ -296,8 +324,9 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   delete c.hashmap;
 }
 
-void app_cont_func(erpc::RespHandle *, void *, size_t);
-inline void send_req(ClientContext &c, size_t ws_i) {
+// Key-value RPC client code
+void kv_cont_func(erpc::RespHandle *, void *, size_t);
+inline void kv_send_req(ClientContext &c, size_t ws_i) {
   c.start_tsc[ws_i] = erpc::rdtsc();
 
   erpc::MsgBuffer &req = c.req_msgbuf[ws_i];
@@ -318,7 +347,7 @@ inline void send_req(ClientContext &c, size_t ws_i) {
 
   // Choose a random key in a partition. The partition is chosen later when
   // we randomly select a session.
-  key->key_frag[0] = 1 + fastrange64(c.pcg(), c.keys_per_partition);
+  key->key_frag[0] = 1 + fastrange64(c.pcg(), c.max_key - 1);
   value->val_frag[0] = key->key_frag[0];
   c.key_arr[ws_i] = *key;
 
@@ -326,12 +355,12 @@ inline void send_req(ClientContext &c, size_t ws_i) {
   c.rpc->resize_msg_buffer(&req, req_size);
 
   // Send request to a random server
-  c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppReqType,
+  c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppKvReqType,
                          &c.req_msgbuf[ws_i], &c.resp_msgbuf[ws_i],
-                         app_cont_func, ws_i);
+                         kv_cont_func, ws_i);
 }
 
-void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
+void kv_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
   const erpc::MsgBuffer *resp = resp_handle->get_resp_msgbuf();
   _unused(resp);
 
@@ -365,7 +394,7 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
   c->latency.update(static_cast<size_t>(req_lat_us * kAppLatFac));
   c->num_resps++;
 
-  send_req(*c, ws_i);  // Clock the used window slot
+  kv_send_req(*c, ws_i);  // Clock the used window slot
 }
 
 // Connect this client thread to all server threads
@@ -388,6 +417,31 @@ void create_sessions(ClientContext &c) {
   }
 }
 
+// max_key client RPC code
+void max_key_cont_func(erpc::RespHandle *, void *, size_t);
+inline void max_key_send_req(ClientContext &c) {
+  // Use window slot 0
+  erpc::MsgBuffer &req = c.req_msgbuf[0];
+  c.rpc->resize_msg_buffer(&req, sizeof(size_t));
+
+  // All partitions are the same, so send to anyone
+  c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppMaxKeyReqType,
+                         &c.req_msgbuf[0], &c.resp_msgbuf[0], max_key_cont_func,
+                         0);
+}
+
+void max_key_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t) {
+  auto *c = static_cast<ClientContext *>(_context);
+  const erpc::MsgBuffer *resp = resp_handle->get_resp_msgbuf();
+  size_t max_key = *reinterpret_cast<size_t *>(resp->buf);
+
+  printf("thread %zu: max_key = %zu\n", c->thread_id, max_key);
+  c->max_key = max_key;
+
+  // Now we can send datapath requests
+  for (size_t i = 0; i < FLAGS_window_size; i++) kv_send_req(*c, i);
+}
+
 void client_func(erpc::Nexus *nexus, size_t thread_id) {
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   uint8_t phy_port = port_vec.at(0);
@@ -398,7 +452,6 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   if (FLAGS_workload == "set") c.workload = Workload::kSets;
   if (FLAGS_workload == "get") c.workload = Workload::kGets;
   if (FLAGS_workload == "5050") c.workload = Workload::k5050;
-  c.keys_per_partition = FLAGS_total_keys_mi * MB(1) / FLAGS_num_server_threads;
   c.pcg = pcg64_fast(pcg_extras::seed_seq_from<std::random_device>{});
 
   rpc.retry_connect_on_invalid_rpc_id = true;
@@ -416,8 +469,9 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   for (size_t i = 0; i < FLAGS_window_size; i++) {
     c.req_msgbuf[i] = rpc.alloc_msg_buffer_or_die(sizeof(Key) + sizeof(Value));
     c.resp_msgbuf[i] = rpc.alloc_msg_buffer_or_die(sizeof(Key) + sizeof(Value));
-    send_req(c, i);
   }
+
+  max_key_send_req(c);
 
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     struct timespec start;
@@ -449,7 +503,8 @@ int main(int argc, char **argv) {
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
-  nexus.register_req_func(kAppReqType, req_handler);
+  nexus.register_req_func(kAppKvReqType, kv_req_handler);
+  nexus.register_req_func(kAppMaxKeyReqType, max_key_req_handler);
 
   size_t num_threads = FLAGS_process_id == 0 ? FLAGS_num_server_threads
                                              : FLAGS_num_client_threads;
