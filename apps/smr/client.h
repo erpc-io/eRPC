@@ -151,12 +151,11 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
   send_req_one(c);
 }
 
-void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
-  c->client.thread_id = thread_id;
+void client_func(erpc::Nexus *nexus, AppContext *c) {
   c->client.leader_idx = 0;  // Start with leader = 0
 
-  c->rpc = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(c),
-                                           thread_id, sm_handler, kAppPhyPort);
+  c->rpc = new erpc::Rpc<erpc::CTransport>(
+      nexus, static_cast<void *>(c), kAppClientRpcId, sm_handler, kAppPhyPort);
   c->rpc->retry_connect_on_invalid_rpc_id = true;
 
   // Pre-allocate MsgBuffers
@@ -167,11 +166,10 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
   // Raft client: Create session to each Raft server
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     std::string uri = erpc::get_uri_for_process(i);
-    printf("smr: Client %zu creating session to %s, index = %zu.\n", thread_id,
-           uri.c_str(), i);
+    printf("smr: Creating session to %s, index = %zu.\n", uri.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num = c->rpc->create_session(uri, 0);
+    c->conn_vec[i].session_num = c->rpc->create_session(uri, kAppServerRpcId);
     assert(c->conn_vec[i].session_num >= 0);
   }
 
@@ -183,7 +181,7 @@ void client_func(size_t thread_id, erpc::Nexus *nexus, AppContext *c) {
     }
   }
 
-  printf("smr: Client %zu connected to all. Sending reqs.\n", thread_id);
+  printf("smr: Client connected to all. Sending reqs.\n");
 
   send_req_one(c);
   while (ctrl_c_pressed == 0) c->rpc->run_event_loop(200);

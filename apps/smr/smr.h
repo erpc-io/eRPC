@@ -28,6 +28,10 @@ extern "C" {
 
 static constexpr bool kUsePmem = true;
 
+// We sometimes run a server and client on the same server
+static constexpr size_t kAppServerRpcId = 2;  // Rpc ID of all Raft servers
+static constexpr size_t kAppClientRpcId = 3;  // Rpc ID of the Raft client
+
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
 static_assert(erpc::is_power_of_two(kAppNumKeys), "");
@@ -183,7 +187,6 @@ class AppContext {
 
   // SMR client members
   struct {
-    size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
     size_t num_resps = 0;
     erpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf

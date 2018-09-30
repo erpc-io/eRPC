@@ -18,7 +18,7 @@ template <class T>
 class PmemLog {
  private:
   // The machines are under different DAX configs, so use the one that works
-  static constexpr const char *kPmemLogFileA = "/dev/dax0.0";
+  static constexpr const char *kPmemLogFileA = "/dev/dax12.0";
   static constexpr const char *kPmemLogFileB = "/mnt/pmem12/raft_log";
 
   const double freq_ghz;

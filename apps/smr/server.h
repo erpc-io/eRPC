@@ -163,9 +163,8 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   nexus->register_req_func(static_cast<uint8_t>(ReqType::kClientReq),
                            client_req_handler);
 
-  // Thread ID = 0
-  c->rpc = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(c), 0,
-                                           sm_handler, kAppPhyPort);
+  c->rpc = new erpc::Rpc<erpc::CTransport>(
+      nexus, static_cast<void *>(c), kAppServerRpcId, sm_handler, kAppPhyPort);
 
   c->rpc->retry_connect_on_invalid_rpc_id = true;
 
@@ -176,7 +175,7 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
     printf("smr: Creating session to %s, index = %zu.\n", uri.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num = c->rpc->create_session(uri, 0);
+    c->conn_vec[i].session_num = c->rpc->create_session(uri, kAppServerRpcId);
     assert(c->conn_vec[i].session_num >= 0);
   }
 
@@ -215,7 +214,7 @@ inline void call_raft_periodic(AppContext *c) {
   }
 }
 
-void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
+void server_func(erpc::Nexus *nexus, AppContext *c) {
   // The Raft server must be initialized before running the eRPC event loop,
   // including running it for eRPC session management.
   init_raft(c);
