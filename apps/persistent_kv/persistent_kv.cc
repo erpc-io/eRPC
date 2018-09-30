@@ -463,7 +463,7 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   printf("Process %zu, thread %zu: Connected. Starting work.\n",
          FLAGS_process_id, thread_id);
   if (thread_id == 0) {
-    printf("thread_id: median_us 5th_us 99th_us 999th_us Mops. Stats.\n");
+    printf("thread_id: median_us 99th_us 999th_us Mops. Stats.\n");
   }
 
   for (size_t i = 0; i < FLAGS_window_size; i++) {
@@ -481,10 +481,10 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
     if (ctrl_c_pressed == 1) break;
 
     double seconds = erpc::sec_since(start);
-    printf("%zu: %.1f %.1f %.1f %.1f %.2f. %s\n", thread_id,
-           c.latency.perc(.5) / kAppLatFac, c.latency.perc(.05) / kAppLatFac,
-           c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac,
-           c.num_resps / (seconds * Mi(1)), c.get_stats_string().c_str());
+    printf("%zu: %.1f %.1f %.1f %.2f. %s\n", thread_id,
+           c.latency.perc(.5) / kAppLatFac, c.latency.perc(.99) / kAppLatFac,
+           c.latency.perc(.999) / kAppLatFac, c.num_resps / (seconds * Mi(1)),
+           c.get_stats_string().c_str());
 
     c.num_resps = 0;
     c.latency.reset();
