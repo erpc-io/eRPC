@@ -7,7 +7,7 @@
  * a workaround.
  */
 
-#ifndef DPDK
+#ifdef RAW
 
 #include <gtest/gtest.h>
 

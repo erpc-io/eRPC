@@ -180,7 +180,7 @@ static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
   udp_hdr->check = 0;
 }
 
-/// Return the IPv4 address of a kernel-visible interface in network-byte order
+/// Return the IPv4 address of a kernel-visible interface in host-byte order
 static uint32_t get_interface_ipv4_addr(std::string interface) {
   struct ifaddrs *ifaddr, *ifa;
   rt_assert(getifaddrs(&ifaddr) == 0);
@@ -191,7 +191,7 @@ static uint32_t get_interface_ipv4_addr(std::string interface) {
     if (strcmp(ifa->ifa_name, interface.c_str()) != 0) continue;
 
     auto sin_addr = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
-    ipv4_addr = *reinterpret_cast<uint32_t*>(&sin_addr->sin_addr);
+    ipv4_addr = ntohl(*reinterpret_cast<uint32_t*>(&sin_addr->sin_addr));
   }
 
   freeifaddrs(ifaddr);

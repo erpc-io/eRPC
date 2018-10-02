@@ -159,6 +159,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
     if (retry_connect_on_invalid_rpc_id) {
       LOG_INFO("%s: Invalid remote Rpc ID. Dropping. Scan will retry later.\n",
                issue_msg);
+      sm_pending_reqs.insert(session->local_session_num);  // Duplicates fine
       return;
     }
   }

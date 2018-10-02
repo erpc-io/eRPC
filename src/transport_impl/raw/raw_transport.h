@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifndef DPDK
+#ifdef RAW
 
 #include "mlx5_defs.h"
 #include "transport.h"
@@ -58,7 +58,6 @@ class RawTransport : public Transport {
   static_assert(is_power_of_two(kRecvCQDepth), "");
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");  // Queue capacity check
   static_assert(kPostlist <= kUnsigBatch, "");     // Postlist check
-  // static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
 
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
@@ -188,7 +187,7 @@ class RawTransport : public Transport {
    public:
     std::string ibdev_name;   ///< Verbs device name (e.g., mlx5_0)
     std::string netdev_name;  ///< Verbs device name (e.g., enp4s0f0, ib0 etc)
-    uint32_t ipv4_addr;       ///< The port's IPv4 address
+    uint32_t ipv4_addr;       ///< The port's IPv4 address in host-byte order
     uint8_t mac_addr[6];      ///< The port's MAC address
   } resolve;
 

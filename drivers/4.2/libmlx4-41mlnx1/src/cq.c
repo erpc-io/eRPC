@@ -223,12 +223,6 @@ static void mlx4_handle_error_cqe(struct mlx4_err_cqe *cqe, struct ibv_wc *wc)
 	wc->vendor_err = cqe->vendor_err;
 }
 
-// Changes:
-// * Only 2-sided SEND/RECV supported
-// * Only wc status is marked
-// * CQE size assumed 64 bytes
-// * XRC/SRQ not supported
-// * Inline RECV not supported
 static int mlx4_poll_one(struct mlx4_cq *cq,
 			 struct mlx4_qp **cur_qp,
 			 struct ibv_exp_wc *wc,
@@ -236,16 +230,28 @@ static int mlx4_poll_one(struct mlx4_cq *cq,
 {
 	struct mlx4_wq *wq;
 	struct mlx4_cqe *cqe;
+	struct mlx4_srq *srq;
 	uint32_t qpn;
+	uint32_t g_mlpath_rqpn;
 	uint16_t wqe_index;
 	int is_error;
 	int is_send;
+	int size;
+	int left;
+	int list_len;
+	int i;
+	struct mlx4_inlr_rbuff *rbuffs;
+	uint8_t *sbuff;
+	int timestamp_en = 0;
+	uint64_t exp_wc_flags = 0;
+	uint64_t wc_flags = 0;
 	cqe = next_cqe_sw(cq);
 	if (!cqe)
 		return CQ_EMPTY;
 
 	++cqe;
 	++cq->cons_index;
+
 	VALGRIND_MAKE_MEM_DEFINED(cqe, sizeof *cqe);
 
 	/*
@@ -264,12 +270,48 @@ static int mlx4_poll_one(struct mlx4_cq *cq,
 		MLX4_CQE_OPCODE_ERROR && (cqe->checksum & 0xff);
 
 	*cur_qp = mlx4_find_qp(to_mctx(cq->ibv_cq.context), qpn);
+	if (0) {
+		/*
+		 * We do not have to take the XSRQ table lock here,
+		 * because CQs will be locked while SRQs are removed
+		 * from the table.
+		 */
+		*cur_qp = NULL;
+		srq = mlx4_find_xsrq(&to_mctx(cq->ibv_cq.context)->xsrq_table,
+				     ntohl(cqe->g_mlpath_rqpn) & MLX4_CQE_QPN_MASK);
+		if (!srq)
+			return CQ_POLL_ERR;
+	} else if (0) {
+		if (unlikely(!*cur_qp || (qpn != (*cur_qp)->verbs_qp.qp.qp_num))) {
+			/*
+			 * We do not have to take the QP table lock here,
+			 * because CQs will be locked while QPs are removed
+			 * from the table.
+			 */
+			*cur_qp = mlx4_find_qp(to_mctx(cq->ibv_cq.context), qpn);
+			if (unlikely(!*cur_qp))
+				return CQ_POLL_ERR;
+		}
+		if (is_exp) {
+			wc->qp = &((*cur_qp)->verbs_qp.qp);
+			exp_wc_flags |= IBV_EXP_WC_QP;
+		}
+		srq = ((*cur_qp)->verbs_qp.qp.srq) ? to_msrq((*cur_qp)->verbs_qp.qp.srq) : NULL;
+	}
 
 	if (is_send) {
 		wq = &(*cur_qp)->sq;
 		wqe_index = ntohs(cqe->wqe_index);
 		wq->tail += (uint16_t) (wqe_index - (uint16_t) wq->tail);
 		++wq->tail;
+	} else if (0) {
+		wqe_index = htons(cqe->wqe_index);
+		wc->wr_id = srq->wrid[wqe_index];
+		mlx4_free_srq_wqe(srq, wqe_index);
+		if (is_exp) {
+			wc->srq = &(srq->verbs_srq.srq);
+			exp_wc_flags |= IBV_EXP_WC_SRQ;
+		}
 	} else {
 		wq = &(*cur_qp)->rq;
     // The NIC just DMA-ed to this address, so this line is evicted from L1
@@ -285,6 +327,173 @@ static int mlx4_poll_one(struct mlx4_cq *cq,
 	}
 
 	wc->status = IBV_WC_SUCCESS;
+
+	if (0 && offsetof(struct ibv_exp_wc, timestamp) < wc_size)  {
+		/* currently, only CQ_CREATE_WITH_TIMESTAMPING_RAW is
+		 * supported. CQ_CREATE_WITH_TIMESTAMPING_SYS isn't
+		 * supported */
+		if (cq->creation_flags &
+		    IBV_EXP_CQ_TIMESTAMP_TO_SYS_TIME)
+			wc->timestamp = 0;
+		else {
+			wc->timestamp =
+				(uint64_t)(ntohl(cqe->timestamp_16_47) +
+					   !cqe->timestamp_0_15) << 16
+				| (uint64_t)ntohs(cqe->timestamp_0_15);
+			exp_wc_flags |= IBV_EXP_WC_WITH_TIMESTAMP;
+		}
+	}
+
+	if (0) {
+		switch (cqe->owner_sr_opcode & MLX4_CQE_OPCODE_MASK) {
+		case MLX4_OPCODE_CALC_RDMA_WRITE_IMM:
+		case MLX4_OPCODE_RDMA_WRITE_IMM:
+			wc_flags |= IBV_WC_WITH_IMM;
+		case MLX4_OPCODE_RDMA_WRITE:
+			wc->exp_opcode    = IBV_EXP_WC_RDMA_WRITE;
+			break;
+		case MLX4_OPCODE_SEND_IMM:
+			wc_flags |= IBV_WC_WITH_IMM;
+		case MLX4_OPCODE_SEND:
+			wc->exp_opcode    = IBV_EXP_WC_SEND;
+			break;
+		case MLX4_OPCODE_RDMA_READ:
+			wc->exp_opcode    = IBV_EXP_WC_RDMA_READ;
+			wc->byte_len  = ntohl(cqe->byte_cnt);
+			break;
+		case MLX4_OPCODE_ATOMIC_CS:
+			wc->exp_opcode    = IBV_EXP_WC_COMP_SWAP;
+			wc->byte_len  = 8;
+			break;
+		case MLX4_OPCODE_ATOMIC_FA:
+			wc->exp_opcode    = IBV_EXP_WC_FETCH_ADD;
+			wc->byte_len  = 8;
+			break;
+		case MLX4_OPCODE_ATOMIC_MASK_CS:
+			wc->exp_opcode    = IBV_EXP_WC_MASKED_COMP_SWAP;
+			break;
+		case MLX4_OPCODE_ATOMIC_MASK_FA:
+			wc->exp_opcode    = IBV_EXP_WC_MASKED_FETCH_ADD;
+			break;
+		case MLX4_OPCODE_LOCAL_INVAL:
+			((struct ibv_wc *)wc)->opcode    = IBV_WC_LOCAL_INV;
+			break;
+		case MLX4_OPCODE_BIND_MW:
+			wc->exp_opcode    = IBV_EXP_WC_BIND_MW;
+			break;
+		case MLX4_OPCODE_SEND_INVAL:
+			((struct ibv_wc *)wc)->opcode    = IBV_WC_SEND;
+			break;
+		default:
+			/* assume it's a send completion */
+			wc->exp_opcode    = IBV_EXP_WC_SEND;
+			break;
+		}
+	} else if (0) {
+		wc->byte_len = ntohl(cqe->byte_cnt);
+		if ((*cur_qp) && (*cur_qp)->max_inlr_sg &&
+		    (cqe->owner_sr_opcode & MLX4_CQE_INL_SCATTER_MASK)) {
+			rbuffs = (*cur_qp)->inlr_buff.buff[wqe_index].sg_list;
+			list_len = (*cur_qp)->inlr_buff.buff[wqe_index].list_len;
+			sbuff = mlx4_get_recv_wqe((*cur_qp), wqe_index);
+			left = wc->byte_len;
+			for (i = 0; (i < list_len) && left; i++) {
+				size = min(rbuffs->rlen, left);
+				memcpy(rbuffs->rbuff, sbuff, size);
+				left -= size;
+				rbuffs++;
+				sbuff += size;
+			}
+			if (left) {
+				wc->status = IBV_WC_LOC_LEN_ERR;
+				return CQ_OK;
+			}
+		}
+
+		switch (cqe->owner_sr_opcode & MLX4_CQE_OPCODE_MASK) {
+		case MLX4_RECV_OPCODE_RDMA_WRITE_IMM:
+			wc->exp_opcode   = IBV_EXP_WC_RECV_RDMA_WITH_IMM;
+			wc_flags = IBV_WC_WITH_IMM;
+			wc->imm_data = cqe->immed_rss_invalid;
+			break;
+		case MLX4_RECV_OPCODE_SEND_INVAL:
+			((struct ibv_wc *)wc)->opcode   = IBV_WC_RECV;
+			((struct ibv_wc *)wc)->wc_flags |= IBV_WC_WITH_INV;
+			wc->imm_data = ntohl(cqe->immed_rss_invalid);
+			break;
+		case MLX4_RECV_OPCODE_SEND:
+			wc->exp_opcode   = IBV_EXP_WC_RECV;
+			wc_flags = 0;
+			break;
+		case MLX4_RECV_OPCODE_SEND_IMM:
+			wc->exp_opcode   = IBV_EXP_WC_RECV;
+			wc_flags = IBV_WC_WITH_IMM;
+			wc->imm_data = cqe->immed_rss_invalid;
+			break;
+		}
+
+		if (!timestamp_en) {
+			exp_wc_flags |= IBV_EXP_WC_WITH_SLID;
+			wc->slid = ntohs(cqe->rlid);
+		}
+		g_mlpath_rqpn	   = ntohl(cqe->g_mlpath_rqpn);
+		wc->src_qp	   = g_mlpath_rqpn & 0xffffff;
+		wc->dlid_path_bits = (g_mlpath_rqpn >> 24) & 0x7f;
+		wc_flags	  |= g_mlpath_rqpn & 0x80000000 ? IBV_WC_GRH : 0;
+		wc->pkey_index     = ntohl(cqe->immed_rss_invalid) & 0x7f;
+		/* When working with xrc srqs, don't have qp to check link layer.
+		  * Using IB SL, should consider Roce. (TBD)
+		*/
+		/* sl is invalid when timestamp is used */
+		if (!timestamp_en) {
+			if ((*cur_qp) && (*cur_qp)->link_layer ==
+			    IBV_LINK_LAYER_ETHERNET)
+				wc->sl = ntohs(cqe->sl_vid) >> 13;
+			else
+				wc->sl = ntohs(cqe->sl_vid) >> 12;
+			exp_wc_flags |= IBV_EXP_WC_WITH_SL;
+		}
+		if (is_exp && *cur_qp) {
+			if ((*cur_qp)->qp_cap_cache & MLX4_RX_CSUM_MODE_IP_OK_IP_NON_TCP_UDP)
+			/* Only ConnectX-3 Pro reports checksum for now) */
+				exp_wc_flags |=
+				MLX4_TRANSPOSE(cqe->badfcs_enc,
+					MLX4_CQE_STATUS_L4_CSUM,
+					(uint64_t)IBV_EXP_WC_RX_TCP_UDP_CSUM_OK) |
+				mlx4_transpose_uint16_t(cqe->status,
+					htons(MLX4_CQE_STATUS_IPOK),
+					(uint64_t)IBV_EXP_WC_RX_IP_CSUM_OK) |
+				mlx4_transpose_uint16_t(cqe->status,
+					htons(MLX4_CQE_STATUS_IPV4),
+					(uint64_t)IBV_EXP_WC_RX_IPV4_PACKET) |
+				mlx4_transpose_uint16_t(cqe->status,
+					htons(MLX4_CQE_STATUS_IPV6),
+					(uint64_t)IBV_EXP_WC_RX_IPV6_PACKET);
+			if ((*cur_qp)->qp_cap_cache & MLX4_RX_VXLAN) {
+				exp_wc_flags |=
+				mlx4_transpose_uint32_t(cqe->vlan_my_qpn,
+				htonl(MLX4_CQE_L2_TUNNEL),
+				(uint64_t)IBV_EXP_WC_RX_TUNNEL_PACKET) |
+				mlx4_transpose_uint32_t(cqe->vlan_my_qpn,
+					htonl(MLX4_CQE_L2_TUNNEL_IPOK),
+					(uint64_t)IBV_EXP_WC_RX_OUTER_IP_CSUM_OK) |
+				mlx4_transpose_uint32_t(cqe->vlan_my_qpn,
+					htonl(MLX4_CQE_L2_TUNNEL_L4_CSUM),
+					(uint64_t)IBV_EXP_WC_RX_OUTER_TCP_UDP_CSUM_OK) |
+				mlx4_transpose_uint32_t(cqe->vlan_my_qpn,
+					htonl(MLX4_CQE_L2_TUNNEL_IPV4),
+					(uint64_t)IBV_EXP_WC_RX_OUTER_IPV4_PACKET);
+				exp_wc_flags |=
+				MLX4_TRANSPOSE(~exp_wc_flags,
+						IBV_EXP_WC_RX_OUTER_IPV4_PACKET,
+						IBV_EXP_WC_RX_OUTER_IPV6_PACKET);
+			}
+		}
+	}
+
+	if (0)
+		wc->exp_wc_flags = exp_wc_flags | (uint64_t)wc_flags;
+
 	return CQ_OK;
 }
 
@@ -305,6 +514,14 @@ static inline unsigned long get_cycles()
 }
 #endif
 
+static void mlx4_stall_poll_cq()
+{
+	int i;
+
+	for (i = 0; i < mlx4_stall_num_loop; i++)
+		(void)get_cycles();
+}
+
 int mlx4_poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 		 uint32_t wc_size, int is_exp)
 {
@@ -313,6 +530,10 @@ int mlx4_poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 	int npolled;
 	int err = CQ_OK;
 
+	if (0) {
+		cq->stall_next_poll = 0;
+		mlx4_stall_poll_cq();
+	}
 	for (npolled = 0; npolled < ne; ++npolled) {
 		err = mlx4_poll_one(cq, &qp, ((void *)wc) + npolled * wc_size,
 				    wc_size, is_exp);
@@ -323,6 +544,7 @@ int mlx4_poll_cq(struct ibv_cq *ibcq, int ne, struct ibv_exp_wc *wc,
 	if (likely(npolled || err == CQ_POLL_ERR))
 		mlx4_update_cons_index(cq);
 
+	
 	return err == CQ_POLL_ERR ? err : npolled;
 }
 

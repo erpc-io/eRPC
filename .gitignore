@@ -65,3 +65,4 @@ scripts/autorun_app_file
 gdb_history
 *.swp
 src/config.h
+.ycm_extra_conf.py

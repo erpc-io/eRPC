@@ -20,7 +20,7 @@ app_args=`cat $app_config | tr '\n' ' '`
 # modded_drivers_cmd="\
 #   sudo ./drivers/4.4/libmlx5-41mlnx1/update-driver.sh; \
 #   sudo ./drivers/4.2/libmlx4-41mlnx1/update-driver.sh;"
-modded_drivers_cmd=""
+modded_drivers_cmd=":"
 
 for ((i = 0; i < $autorun_num_processes; i++)); do
   name=${autorun_name_list[$i]}

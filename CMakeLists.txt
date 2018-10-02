@@ -1,26 +1,20 @@
 cmake_minimum_required(VERSION 2.8)
 project(eRPC)
 
+include(CMakeDependentOption)
+
 # Pick a compiler
 #set(CMAKE_CXX_COMPILER clang++-6.0)
 #set(CMAKE_CXX_COMPILER g++-8)
 set(CMAKE_CXX_COMPILER g++)
 
-add_definitions(-std=c++11)
-
-add_definitions(-Wall -Wextra -Werror -pedantic)
-add_definitions(-Wsign-conversion)
-add_definitions(-Wold-style-cast)
-
-add_definitions(-Wno-unused-function)
-add_definitions(-Wno-nested-anon-types)
-add_definitions(-Wno-keyword-macro)
-add_definitions(-march=native)
-add_definitions(-g)
+add_definitions(-std=c++11 -march=native -g)
+add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
+add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
-# Testing
+# Unit tests
 enable_testing()
 find_package(GTest REQUIRED)
 
@@ -31,7 +25,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
-# Compile the ERPC library unless we cannot (profile-guided optimization or LTO)
+# liberpc will be compiled unless profile-guided optimization or LTO is enabled
 set(COMPILE_ERPC_LIB ON)
 
 # Options exposed to the user
@@ -39,17 +33,16 @@ set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(PERF "Compile for performance" OFF)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
+cmake_dependent_option(LTO "Use link time optimization" ON "PERF" OFF)
 
 # Parse the user-exposed options
 if(PERF)
   MESSAGE(STATUS "Compilation optimized for performance.")
   SET(DEBUG OFF)
-  SET(LTO ON)
   SET(TESTING OFF)
 else(PERF)
   MESSAGE(STATUS "Compilation not optimized for performance.")
   SET(DEBUG ON)
-  SET(LTO OFF)
   SET(TESTING ON)
 endif(PERF)
 
@@ -97,7 +90,6 @@ endif()
 # Debug mode
 if(DEBUG)
   MESSAGE(STATUS "Debugging is enabled. Perf will be low.")
-  add_definitions(-g)
 else(DEBUG)
   MESSAGE(STATUS "Debugging is disabled.")
   add_definitions(-DNDEBUG)
@@ -115,7 +107,7 @@ endif(TESTING)
 
 # Link-time optimization
 if(LTO)
-  MESSAGE(STATUS "LTO is enabled. Tests won't be compiled.")
+  MESSAGE(STATUS "LTO is enabled. eRPC library won't be compiled.")
   SET(COMPILE_ERPC_LIB OFF)
   add_definitions(-flto)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
@@ -144,11 +136,21 @@ set(SOURCES
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
   src/transport_impl/transport.cc
-  src/util/cityhash/city_mod.cc
+  src/transport_impl/dpdk/dpdk_transport.cc
+  src/transport_impl/dpdk/dpdk_transport_datapath.cc
+  src/transport_impl/infiniband/ib_transport.cc
+  src/transport_impl/infiniband/ib_transport_datapath.cc
+  src/transport_impl/raw/raw_transport.cc
+  src/transport_impl/raw/raw_transport_datapath.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
-# Transport-specific. DPDK does not play well with Mellanox OFED.
+# Transport-specific. Mellanox OFED drivers are the best choice for raw and
+# infiniband, but they do not play well with DPDK. So we compile only one
+# transport. Other transports are exluded using preprocessor macros.
+string(TOUPPER ${TRANSPORT} DEFINE_TRANSPORT)
+add_definitions(-D${DEFINE_TRANSPORT}=true)
+
 MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
 if(TRANSPORT STREQUAL "dpdk")
   find_library(DPDK_LIB dpdk)
@@ -156,11 +158,7 @@ if(TRANSPORT STREQUAL "dpdk")
     message(FATAL_ERROR "dpdk library not found")
   endif()
 
-  add_definitions(-DDPDK=true)
   set(LIBRARIES ${LIBRARIES} dpdk dl)
-  set(SOURCES ${SOURCES}
-    src/transport_impl/dpdk/dpdk_transport.cc
-    src/transport_impl/dpdk/dpdk_transport_datapath.cc)
   SET(CONFIG_TRANSPORT "DpdkTransport")
   SET(CONFIG_HEADROOM 40)
 
@@ -181,11 +179,6 @@ else()
   endif()
 
   set(LIBRARIES ${LIBRARIES} ibverbs)
-  set(SOURCES ${SOURCES}
-    src/transport_impl/infiniband/ib_transport.cc
-    src/transport_impl/infiniband/ib_transport_datapath.cc
-    src/transport_impl/raw/raw_transport.cc
-    src/transport_impl/raw/raw_transport_datapath.cc)
   if(TRANSPORT STREQUAL "raw")
     SET(CONFIG_TRANSPORT "RawTransport")
     SET(CONFIG_HEADROOM 40)
@@ -236,11 +229,14 @@ set(UTIL_TESTS
   timely_test
   numautil_test)
 
-# Compile the tests
+# Compile the library
 if(COMPILE_ERPC_LIB)
   MESSAGE(STATUS "Compiling eRPC as a library")
   add_library(erpc ${SOURCES})
+endif()
 
+# Compile the tests
+if(TESTING)
   foreach(test_name IN LISTS CLIENT_TESTS)
     add_executable(${test_name} tests/client_tests/${test_name}.cc)
     target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
@@ -279,7 +275,6 @@ message(STATUS "Compiling app = " ${APP})
 if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
   set(LIBRARIES ${LIBRARIES} raft pmem)
-  set(APP_ADDITIONAL_SOURCES third_party/cityhash/city_mod.cc)
   # MICA
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
@@ -289,12 +284,13 @@ elseif(APP STREQUAL "masstree_analytics")
   include_directories(SYSTEM $ENV{HOME}/masstree-beta)
   add_definitions(-include $ENV{HOME}/masstree-beta/config.h)
   set(APP_ADDITIONAL_SOURCES
-    third_party/cityhash/city_mod.cc
     apps/masstree_analytics/mt_index_api.cc)
   set(LIBRARIES ${LIBRARIES} masstree)
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
+elseif(APP STREQUAL "latency" OR APP STREQUAL "persistent_kv")
+  set(LIBRARIES ${LIBRARIES} pmem cityhash)
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO

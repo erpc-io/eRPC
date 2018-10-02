@@ -21,7 +21,7 @@ sudo dnf -y upgrade vim-minimal
 sudo dnf -y install vim-enhanced
 
 # General packages not specific to eRPC
-sudo dnf -y install ripgrep htop memcached memcached-devel git-clang-format \
+sudo dnf -y install ripgrep htop memcached libmemcached-devel git-clang-format \
   ctags-etags the_silver_searcher sloccount calc
 
 # Fuzzy find configuration

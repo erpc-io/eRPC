@@ -1,4 +1,4 @@
-#ifndef DPDK
+#ifdef RAW
 
 #include "raw_transport.h"
 #include "util/huge_alloc.h"
@@ -75,14 +75,12 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(udp_hdr->check == 0);
     udp_hdr->len = htons(pkt_size - sizeof(eth_hdr_t) - sizeof(ipv4_hdr_t));
 
-    /*
     LOG_TRACE(
         "eRPC RawTransport: Sending packet (idx = %zu, drop = %u). SGE #1 %uB, "
         " SGE #2 = %uB. pkthdr = %s. Frame header = %s.\n",
         i, item.drop, sgl[0].length, (wr.num_sge == 2 ? sgl[1].length : 0),
         pkthdr->to_string().c_str(),
         frame_header_to_string(&pkthdr->headroom[0]).c_str());
-    */
   }
 
   send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains, Khaleesi of grass
@@ -174,12 +172,10 @@ size_t RawTransport::rx_burst() {
           reinterpret_cast<pkthdr_t*>(&ring_extent.buf[recv_head * kRecvSize]);
       __builtin_prefetch(pkthdr, 0, 3);
 
-      /*
       LOG_TRACE(
           "eRPC RawTransport: Received pkt. pkthdr = %s. Frame header = %s.\n",
           pkthdr->to_string().c_str(),
           frame_header_to_string(&pkthdr->headroom[0]).c_str());
-      */
 
       recv_head = (recv_head + 1) % kNumRxRingEntries;
     }

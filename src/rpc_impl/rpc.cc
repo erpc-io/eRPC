@@ -81,12 +81,12 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
 
   LOG_INFO("Rpc %u created. eRPC TID = %zu.\n", rpc_id, creator_etid);
 
-  root_sentinel.client_info.next = &tail_sentinel;
-  root_sentinel.client_info.prev = nullptr;
-  tail_sentinel.client_info.next = nullptr;
-  tail_sentinel.client_info.prev = &root_sentinel;
+  active_rpcs_root_sentinel.client_info.next = &active_rpcs_tail_sentinel;
+  active_rpcs_root_sentinel.client_info.prev = nullptr;
+  active_rpcs_tail_sentinel.client_info.next = nullptr;
+  active_rpcs_tail_sentinel.client_info.prev = &active_rpcs_root_sentinel;
 
-  // Steps that must be done as late as possible
+  // Steps that should be done as late as possible
   pkt_loss_scan_tsc = rdtsc();  // Assign epoch timestamp as late as possible
   if (kCcPacing) wheel->catchup();  // Wheel could be lagging, so catch up
 }

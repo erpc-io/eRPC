@@ -38,42 +38,20 @@ void set_raft_callbacks(AppContext *c) {
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
 }
 
-void map_pmem_log(AppContext *c) {
-  int is_pmem;
-  c->server.pmem.p_buf = reinterpret_cast<uint8_t *>(
-      pmem_map_file("/mnt/pmem12/raft_log", 0 /* length */, 0 /* flags */, 0666,
-                    &c->server.pmem.mapped_len, &is_pmem));
-
-  erpc::rt_assert(c->server.pmem.p_buf != nullptr,
-                  "pmem_map_file() failed. " + std::string(strerror(errno)));
-  erpc::rt_assert(c->server.pmem.mapped_len >= GB(32), "Raft log too short");
-  erpc::rt_assert(is_pmem == 1, "Raft log file is not pmem");
-
-  c->server.pmem.v_num_entries = 0;
-
-  // Initialize persistent metadata pointers and reset them to zero
-  uint8_t *cur = c->server.pmem.p_buf;
-  c->server.pmem.p_voted_for = reinterpret_cast<raft_node_id_t *>(cur);
-  cur += sizeof(raft_node_id_t);
-  c->server.pmem.p_term = reinterpret_cast<raft_term_t *>(cur);
-  cur += sizeof(raft_term_t);
-  c->server.pmem.p_num_entries = reinterpret_cast<size_t *>(cur);
-  cur += sizeof(size_t);
-  pmem_memset_persist(c->server.pmem.p_buf, 0,
-                      static_cast<size_t>(cur - c->server.pmem.p_buf));
-
-  c->server.pmem.p_log_base = cur;
-}
-
 void init_raft(AppContext *c) {
   c->server.raft = raft_new();
+  raft_set_election_timeout(c->server.raft, kAppRaftElectionTimeoutMsec);
+
   erpc::rt_assert(c->server.raft != nullptr);
 
   c->server.node_id = get_raft_node_id_for_process(FLAGS_process_id);
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
 
   set_raft_callbacks(c);
-  if (kUsePmem) map_pmem_log(c);
+  if (kUsePmem) {
+    c->server.pmem_log =
+        new PmemLog<pmem_ser_logentry_t>(erpc::measure_rdtsc_freq());
+  }
 
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {
     int raft_node_id = get_raft_node_id_for_process(i);
@@ -89,6 +67,7 @@ void init_raft(AppContext *c) {
   }
 
   if (kAppTimeEnt) c->server.time_ents.reserve(1000000);
+  c->server.cycles_per_msec = erpc::ms_to_cycles(1, erpc::measure_rdtsc_freq());
   c->server.raft_periodic_tsc = erpc::rdtsc();
 }
 
@@ -161,13 +140,13 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   leader_sav.req_handle = req_handle;
 
   // Receive a log entry. msg_entry can be stack-resident, but not its buf.
-  client_req_t *rsm_cmd_buf = c->server.log_entry_pool.alloc();
-  *rsm_cmd_buf = *client_req;
+  client_req_t *log_entry_appdata = c->server.log_entry_appdata_pool.alloc();
+  *log_entry_appdata = *client_req;
 
   msg_entry_t ent;
   ent.type = RAFT_LOGTYPE_NORMAL;
   ent.id = FLAGS_process_id;
-  ent.data.buf = static_cast<void *>(rsm_cmd_buf);
+  ent.data.buf = log_entry_appdata;
   ent.data.len = sizeof(client_req_t);
 
   int e = raft_recv_entry(c->server.raft, &ent, &leader_sav.msg_entry_response);
@@ -184,9 +163,8 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   nexus->register_req_func(static_cast<uint8_t>(ReqType::kClientReq),
                            client_req_handler);
 
-  // Thread ID = 0
-  c->rpc = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(c), 0,
-                                           sm_handler, kAppPhyPort);
+  c->rpc = new erpc::Rpc<erpc::CTransport>(
+      nexus, static_cast<void *>(c), kAppServerRpcId, sm_handler, kAppPhyPort);
 
   c->rpc->retry_connect_on_invalid_rpc_id = true;
 
@@ -197,7 +175,7 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
     printf("smr: Creating session to %s, index = %zu.\n", uri.c_str(), i);
 
     c->conn_vec[i].session_idx = i;
-    c->conn_vec[i].session_num = c->rpc->create_session(uri, 0);
+    c->conn_vec[i].session_num = c->rpc->create_session(uri, kAppServerRpcId);
     assert(c->conn_vec[i].session_num >= 0);
   }
 
@@ -208,6 +186,8 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
       exit(0);
     }
   }
+
+  printf("smr: All sessions connected\n");
 }
 
 void init_mica(AppContext *c) {
@@ -216,7 +196,25 @@ void init_mica(AppContext *c) {
                                    c->rpc->get_huge_alloc());
 }
 
-void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
+inline void call_raft_periodic(AppContext *c) {
+  // raft_periodic() uses msec_elapsed for only request and election timeouts.
+  // msec_elapsed is in integer milliseconds which does not work for us because
+  // we invoke raft_periodic() much work frequently. Instead, we accumulate
+  // cycles over calls to raft_periodic().
+
+  size_t cur_tsc = erpc::rdtsc();
+  size_t msec_elapsed =
+      (cur_tsc - c->server.raft_periodic_tsc) / c->server.cycles_per_msec;
+
+  if (msec_elapsed > 0) {
+    c->server.raft_periodic_tsc = cur_tsc;
+    raft_periodic(c->server.raft, msec_elapsed);
+  } else {
+    raft_periodic(c->server.raft, 0);
+  }
+}
+
+void server_func(erpc::Nexus *nexus, AppContext *c) {
   // The Raft server must be initialized before running the eRPC event loop,
   // including running it for eRPC session management.
   init_raft(c);
@@ -229,12 +227,13 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
   while (ctrl_c_pressed == 0) {
     if (erpc::rdtsc() - loop_tsc > 3000000000ull) {
       erpc::Latency &commit_latency = c->server.commit_latency;
+
       printf(
           "smr: Leader commit latency (us) = "
           "{%.2f median, %.2f 99%%}. Number of log entries = %zu.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
-          c->server.get_num_log_entries());
+          raft_get_log_count(c->server.raft));
 
       loop_tsc = erpc::rdtsc();
       commit_latency.reset();
@@ -244,7 +243,11 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
     c->rpc->run_event_loop_once();
 
     leader_saveinfo_t &leader_sav = c->server.leader_saveinfo;
-    if (!leader_sav.in_use) continue;  // We didn't get a client request
+    if (!leader_sav.in_use) {
+      // Either we are the leader and don't have an active request, or we
+      // are a follower
+      continue;
+    }
 
     int commit_status = raft_msg_entry_response_committed(
         c->server.raft, &leader_sav.msg_entry_response);
@@ -289,6 +292,6 @@ void server_func(size_t, erpc::Nexus *nexus, AppContext *c) {
   }
 
   printf("smr: Final log size (including uncommitted entries) = %zu.\n",
-         c->server.get_num_log_entries());
+         raft_get_log_count(c->server.raft));
   delete c->rpc;
 }

@@ -17,15 +17,20 @@ extern "C" {
 #include <set>
 
 #include "../apps_common.h"
-#include "cityhash/city.h"
+#include "mica/util/cityhash/city.h"
 #include "time_entry.h"
 
 #include "mica/table/fixedtable.h"
 #include "mica/util/hash.h"
 
+#include "pmem_log.h"
 #include "util/autorun_helpers.h"
 
 static constexpr bool kUsePmem = true;
+
+// We sometimes run a server and client on the same server
+static constexpr size_t kAppServerRpcId = 2;  // Rpc ID of all Raft servers
+static constexpr size_t kAppClientRpcId = 3;  // Rpc ID of the Raft client
 
 // Key-value configuration
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
@@ -44,6 +49,9 @@ static constexpr bool kAppTimeEnt = false;
 static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
 static constexpr bool kAppVerbose = false;
 static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
+
+// willemt/raft uses a very large 1000 ms election timeout
+static constexpr size_t kAppRaftElectionTimeoutMsec = 1000;
 
 // eRPC defines
 static constexpr size_t kAppPhyPort = 0;
@@ -127,6 +135,16 @@ struct leader_saveinfo_t {
   msg_entry_response_t msg_entry_response;  // Used to check commit status
 };
 
+// A log entry serialized into persistent memory
+struct pmem_ser_logentry_t {
+  raft_entry_t raft_entry;
+  client_req_t client_req;
+
+  pmem_ser_logentry_t() {}
+  pmem_ser_logentry_t(raft_entry_t r, client_req_t c)
+      : raft_entry(r), client_req(c) {}
+};
+
 // Context for both servers and clients
 class AppContext {
  public:
@@ -134,36 +152,26 @@ class AppContext {
   struct {
     int node_id = -1;  // This server's Raft node ID
     raft_server_t *raft = nullptr;
-    size_t raft_periodic_tsc;           // rdtsc timestamp
+
+    // Time since last invocation of raft_periodic() with a non-zero
+    // msec_elapsed argument
+    size_t raft_periodic_tsc;
+    size_t cycles_per_msec;  // rdtsc cycles in one millisecond
+
     leader_saveinfo_t leader_saveinfo;  // Info for the ongoing commit request
     std::vector<TimeEnt> time_ents;
 
-    // An in-memory pool for Raft entry data. In non-persistent mode, the Raft
-    // log contains pointers to buffers allocated from this pool. In persistent
-    // mode, these entries are copied to the DAX file.
-    AppMemPool<client_req_t> log_entry_pool;
+    // An in-memory pool for application data for Raft log records. In DRAM
+    // mode, the Raft log contains pointers to buffers allocated from this pool.
+    // In persistent mode, these entries are copied to the DAX file.
+    AppMemPool<client_req_t> log_entry_appdata_pool;
 
-    // The presistent memory Raft log, used only if persistent memory is
-    // enabled. This is a linear memory chunk that starts with persistent
-    // metadata records.
-    struct {
-      uint8_t *p_buf;        // The start of the mapped file
-      size_t mapped_len;     // Length of the mapped log file
-      size_t v_num_entries;  // Volatile record for number of entries
-
-      // Persistent metadata records
-      raft_node_id_t *p_voted_for;  // Persistent record for persist-vote
-      raft_term_t *p_term;          // Persistent record for perist-term
-      size_t *p_num_entries;  // Persistent record for number of log entries
-
-      // The persistent log
-      uint8_t *p_log_base;
-    } pmem;
-
-    // The volatile in-memory Raft log, used only if persistent memory is
-    // enabled. This is a vector of raft_entry_t entries. Each such entry has a
-    // pointer to volatile log entries allocated from log_entry_pool.
-    std::vector<raft_entry_t> dram_raft_log;
+    // The presistent memory Raft log, used only if pmem is enabled.
+    //
+    // In DRAM mode, the user need not provide a log because willemt/raft
+    // internally maintains a log. This log contains pointers to volatile bufs
+    // allocated from log_entry_appdata_pool.
+    PmemLog<pmem_ser_logentry_t> *pmem_log;
 
     // Request tags used for RPCs exchanged among Raft servers
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
@@ -175,16 +183,10 @@ class AppContext {
     erpc::Latency commit_latency;            // Amplification factor = 10
     size_t stat_requestvote_enq_fail = 0;    // Failed to send requestvote req
     size_t stat_appendentries_enq_fail = 0;  // Failed to send appendentries req
-
-    size_t get_num_log_entries() const {
-      if (kUsePmem) return pmem.v_num_entries;
-      return dram_raft_log.size();
-    }
   } server;
 
   // SMR client members
   struct {
-    size_t thread_id;
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
     size_t num_resps = 0;
     erpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
@@ -246,19 +248,3 @@ std::unordered_map<int, std::string> node_id_to_name_map;
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
-
-inline void call_raft_periodic(AppContext *c) {
-  // raft_periodic() takes the number of msec elapsed since the last call. This
-  // is done for ~100 msec timeouts, so this approximation is fine.
-  size_t cur_tsc = erpc::rdtsc();
-
-  // Assume TSC freqency is around 2.8 GHz. 1 ms = 2.8 * 100,000 ticks.
-  bool msec_elapsed = (erpc::rdtsc() - c->server.raft_periodic_tsc > 2800000);
-
-  if (msec_elapsed) {
-    c->server.raft_periodic_tsc = cur_tsc;
-    raft_periodic(c->server.raft, 1);
-  } else {
-    raft_periodic(c->server.raft, 0);
-  }
-}

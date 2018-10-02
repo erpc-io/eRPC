@@ -12,19 +12,21 @@ TEST_F(RpcTest, rpc_list_test) {
   rpc->delete_from_active_rpc_list(d);
   rpc->delete_from_active_rpc_list(b);
 
-  ASSERT_EQ(rpc->root_sentinel.client_info.next, &a);
-  ASSERT_EQ(rpc->tail_sentinel.client_info.prev, &c);
+  ASSERT_EQ(rpc->active_rpcs_root_sentinel.client_info.next, &a);
+  ASSERT_EQ(rpc->active_rpcs_tail_sentinel.client_info.prev, &c);
 
   ASSERT_EQ(a.client_info.next, &c);
-  ASSERT_EQ(a.client_info.prev, &rpc->root_sentinel);
+  ASSERT_EQ(a.client_info.prev, &rpc->active_rpcs_root_sentinel);
 
   ASSERT_EQ(c.client_info.prev, &a);
-  ASSERT_EQ(c.client_info.next, &rpc->tail_sentinel);
+  ASSERT_EQ(c.client_info.next, &rpc->active_rpcs_tail_sentinel);
 
   rpc->delete_from_active_rpc_list(a);
   rpc->delete_from_active_rpc_list(c);
-  ASSERT_EQ(rpc->root_sentinel.client_info.next, &rpc->tail_sentinel);
-  ASSERT_EQ(rpc->tail_sentinel.client_info.prev, &rpc->root_sentinel);
+  ASSERT_EQ(rpc->active_rpcs_root_sentinel.client_info.next,
+            &rpc->active_rpcs_tail_sentinel);
+  ASSERT_EQ(rpc->active_rpcs_tail_sentinel.client_info.prev,
+            &rpc->active_rpcs_root_sentinel);
 }
 
 }  // namespace erpc

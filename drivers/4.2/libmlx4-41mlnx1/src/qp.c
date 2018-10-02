@@ -344,6 +344,29 @@ static inline void set_local_inv_seg(struct mlx4_wqe_local_inval_seg *iseg,
 	iseg->reserved3[1] = 0;
 }
 
+static void set_bind_seg(struct mlx4_wqe_bind_seg *bseg, struct ibv_send_wr *wr)
+{
+	int acc = wr->bind_mw.bind_info.mw_access_flags;
+	bseg->flags1 = 0;
+	if (acc & IBV_ACCESS_REMOTE_ATOMIC)
+		bseg->flags1 |= htonl(MLX4_WQE_MW_ATOMIC);
+	if (acc & IBV_ACCESS_REMOTE_WRITE)
+		bseg->flags1 |= htonl(MLX4_WQE_MW_REMOTE_WRITE);
+	if (acc & IBV_ACCESS_REMOTE_READ)
+		bseg->flags1 |= htonl(MLX4_WQE_MW_REMOTE_READ);
+
+	bseg->flags2 = 0;
+	if (((struct ibv_mw *)(wr->bind_mw.mw))->type == IBV_MW_TYPE_2)
+		bseg->flags2 |= htonl(MLX4_WQE_BIND_TYPE_2);
+	if (acc & IBV_ACCESS_ZERO_BASED)
+		bseg->flags2 |= htonl(MLX4_WQE_BIND_ZERO_BASED);
+
+	bseg->new_rkey = htonl(wr->bind_mw.rkey);
+	bseg->lkey = htonl(wr->bind_mw.bind_info.mr->lkey);
+	bseg->addr = htobe64((uint64_t) wr->bind_mw.bind_info.addr);
+	bseg->length = htobe64(wr->bind_mw.bind_info.length);
+}
+
 static inline void set_raddr_seg(struct mlx4_wqe_raddr_seg *rseg,
 				 uint64_t remote_addr, uint32_t rkey) __attribute__((always_inline));
 static inline void set_raddr_seg(struct mlx4_wqe_raddr_seg *rseg,
@@ -386,26 +409,11 @@ static void set_masked_atomic_seg(struct mlx4_wqe_masked_atomic_seg *aseg,
 static void set_datagram_seg(struct mlx4_wqe_datagram_seg *dseg,
 			     struct ibv_send_wr *wr)
 {
-  // Copy address vector
-  size_t *dst_av = (size_t *)dseg->av;
-  size_t *src_av = (size_t *)&to_mah(wr->wr.ud.ah)->av;
-  dst_av[0] = src_av[0];
-  dst_av[1] = src_av[1];
-  dst_av[2] = src_av[2];
-  dst_av[3] = src_av[3];
-
+	memcpy(dseg->av, &to_mah(wr->wr.ud.ah)->av, sizeof (struct mlx4_av));
 	dseg->dqpn = htonl(wr->wr.ud.remote_qpn);
 	dseg->qkey = htonl(wr->wr.ud.remote_qkey);
 	dseg->vlan = htons(to_mah(wr->wr.ud.ah)->vlan);
-
-  uint8_t *dst_mac = dseg->mac;
-  uint8_t *src_mac = to_mah(wr->wr.ud.ah)->mac;
-  dst_mac[0] = src_mac[0];
-  dst_mac[1] = src_mac[1];
-  dst_mac[2] = src_mac[2];
-  dst_mac[3] = src_mac[3];
-  dst_mac[4] = src_mac[4];
-  dst_mac[5] = src_mac[5];
+	memcpy(dseg->mac, to_mah(wr->wr.ud.ah)->mac, 6);
 }
 
 static  inline void __set_data_seg(struct mlx4_wqe_data_seg *dseg, struct ibv_sge *sg) __attribute__((always_inline));
@@ -611,7 +619,8 @@ static void set_ctrl_seg(struct mlx4_wqe_ctrl_seg *ctrl, struct ibv_send_wr *wr,
 
 //
 // Modifications:
-// 1. Works only for num_sge = 1 (it cannot be 0!)
+// 1. Works only for num_sge = 1 (it cannot be 0!). So eRPC must never request
+//    inlining for dual-sge requests.
 // 2. The data in the SGE must fit in max_inline_data. No error is reported if
 //    this is violated.
 //
@@ -924,6 +933,30 @@ static inline int post_send_connected(struct ibv_send_wr *wr,
 
 		break;
 
+	case IBV_WR_LOCAL_INV:
+		srcrb_flags |=
+			htonl(MLX4_WQE_CTRL_STRONG_ORDER);
+		set_local_inv_seg(wqe, wr->imm_data);
+		wqe  += sizeof
+			(struct mlx4_wqe_local_inval_seg);
+		size += sizeof
+			(struct mlx4_wqe_local_inval_seg) / 16;
+		break;
+
+	case IBV_WR_BIND_MW:
+		srcrb_flags |=
+			htonl(MLX4_WQE_CTRL_STRONG_ORDER);
+		set_bind_seg(wqe, wr);
+		wqe  += sizeof
+			(struct mlx4_wqe_bind_seg);
+		size += sizeof
+			(struct mlx4_wqe_bind_seg) / 16;
+		break;
+
+	case IBV_WR_SEND_WITH_INV:
+		imm = htonl(wr->imm_data);
+		break;
+
 	case IBV_WR_SEND:
 		break;
 
@@ -998,6 +1031,29 @@ int mlx4_post_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 	ind = qp->sq.head;
 
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
+		/* to be considered whether can throw first check, create_qp_exp with post_send */
+		if (0)
+			if (unlikely(wq_overflow(&qp->sq, nreq, qp))) {
+				ret = ENOMEM;
+				errno = ret;
+				*bad_wr = wr;
+				goto out;
+			}
+
+		if (0) {
+			ret = ENOMEM;
+			errno = ret;
+			*bad_wr = wr;
+			goto out;
+		}
+
+		if (0) {
+			ret = EINVAL;
+			errno = ret;
+			*bad_wr = wr;
+			goto out;
+		}
+
 		ctrl = get_send_wqe(qp, ind & (qp->sq.wqe_cnt - 1));
 		qp->sq.wrid[ind & (qp->sq.wqe_cnt - 1)] = wr->wr_id;
 

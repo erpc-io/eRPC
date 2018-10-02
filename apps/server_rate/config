@@ -1,0 +1,10 @@
+--test_ms 200000
+--sm_verbose 0
+--num_server_threads 4
+--num_client_threads 16
+--window_size 8
+--req_size 32
+--resp_size 32
+--num_processes 2
+--numa_0_ports 0
+--numa_1_ports 1,3

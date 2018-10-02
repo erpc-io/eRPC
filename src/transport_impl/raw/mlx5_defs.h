@@ -7,9 +7,10 @@
 
 #ifndef DPDK
 
-#include <infiniband/verbs_exp.h>
+#include <infiniband/verbs.h>
 #include <inttypes.h>
 #include <linux/types.h>
+#include <pthread.h>
 #include <stdint.h>
 
 namespace erpc {

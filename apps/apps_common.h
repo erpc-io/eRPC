@@ -2,14 +2,17 @@
  * @file apps_common.h
  * @brief Common code for apps
  */
-#ifndef APPS_COMMON_H
-#define APPS_COMMON_H
+#pragma once
 
 #include <gflags/gflags.h>
 #include <boost/algorithm/string.hpp>
 #include <set>
 #include "rpc.h"
 #include "util/latency.h"
+
+#define Ki(x) (static_cast<size_t>(x) * 1000)
+#define Mi(x) (static_cast<size_t>(x) * 1000 * 1000)
+#define Gi(x) (static_cast<size_t>(x) * 1000 * 1000 * 1000)
 
 //
 // Gflags
@@ -136,6 +139,13 @@ class BasicAppContext {
   ~BasicAppContext() {
     if (tmp_stat != nullptr) delete tmp_stat;
   }
+
+  // Use Lemire's trick to get a random session number from session_num_vec
+  inline int fast_get_rand_session_num() {
+    uint32_t x = fastrand.next_u32();
+    size_t rand_index = (static_cast<size_t>(x) * session_num_vec.size()) >> 32;
+    return session_num_vec[rand_index];
+  }
 };
 
 // A basic session management handler that expects successful responses
@@ -228,5 +238,3 @@ void ping_all_blocking(BasicAppContext &c) {
     }
   }
 }
-
-#endif  // APPS_COMMON_H

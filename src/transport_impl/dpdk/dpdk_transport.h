@@ -184,7 +184,7 @@ class DpdkTransport : public Transport {
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
-    uint32_t ipv4_addr;    ///< The port's IPv4 address
+    uint32_t ipv4_addr;    ///< The port's IPv4 address in host-byte order
     uint8_t mac_addr[6];   ///< The port's MAC address
     size_t bandwidth = 0;  ///< Link bandwidth in bytes per second
   } resolve;

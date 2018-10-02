@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifndef DPDK
+#ifdef INFINIBAND
 
 #include "transport.h"
 #include "transport_impl/verbs_common.h"
@@ -27,9 +27,8 @@ class IBTransport : public Transport {
   static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
   static constexpr size_t kGRHBytes = 40;
 
-  static_assert(kSQDepth >= 2 * kUnsigBatch, "");     // Queue capacity check
-  static_assert(kPostlist <= kUnsigBatch, "");        // Postlist check
-  static_assert(kMaxInline >= sizeof(pkthdr_t), "");  // Inline control msgs
+  static_assert(kSQDepth >= 2 * kUnsigBatch, "");  // Queue capacity check
+  static_assert(kPostlist <= kUnsigBatch, "");     // Postlist check
 
   // Derived constants
 
@@ -95,7 +94,7 @@ class IBTransport : public Transport {
   void post_recvs(size_t num_recvs);
 
   /// Get the current SEND signaling flag, and poll the send CQ if we need to
-  inline int get_signaled_flag() {
+  inline uint32_t get_signaled_flag() {
     // If kUnsigBatch is 4, the sequence of signaling and polling looks like so:
     // * nb_tx = 0: no poll, signaled
     // * nb_tx = 1: no poll, unsignaled
@@ -104,7 +103,7 @@ class IBTransport : public Transport {
     // * nb_tx = 4: poll, signaled
     static_assert(is_power_of_two(kUnsigBatch), "");
 
-    int flag;
+    uint32_t flag;
     if ((nb_tx & (kUnsigBatch - 1)) == 0) {
       flag = IBV_SEND_SIGNALED;
       if (likely(nb_tx != 0)) poll_cq_one_helper(send_cq);

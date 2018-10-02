@@ -62,7 +62,8 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
     return true;
   } else {
     LOG_WARN(
-        "Rpc %u, lsn %u: Cannot reset client session. %zu conts pending.\n",
+        "Rpc %u, lsn %u: Cannot destroy client session. "
+        "(%zu pending continuations). \n",
         rpc_id, session->local_session_num, pending_conts);
     return false;
   }

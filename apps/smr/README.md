@@ -2,8 +2,7 @@
 
 ## Implementation notes
  * `willemt/raft` must be installed at the system-level for this application.
-   The upstream `willemt/raft` does not provide a installation script; for now,
-   use the `install.sh` script from `anujkaliaiitd/raft` instead.
+   See the helper scripts `raft-make.sh` and `raft-install.sh`.
  * A replicated key-value store is implemented with the following constraints:
    * Only PUTs are supported
    * Only one client is allowed

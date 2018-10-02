@@ -39,7 +39,7 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
-    '-DDPDK=true',
+    '-DINFINIBAND=true',
     '-I' + str(home_dir) + '/eRPC/src',
     '-I' + str(home_dir) + '/eRPC/third_party',
     '-I' + str(home_dir) + '/eRPC/mica/src',

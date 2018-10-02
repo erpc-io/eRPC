@@ -13,7 +13,7 @@ class SSlot;
 class ReqHandle;
 class RespHandle;
 
-/// The application-defined request handler
+/// The request handler
 typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
 
 /// The continuation function

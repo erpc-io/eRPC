@@ -13,10 +13,19 @@ void Rpc<TTr>::handle_sm_rx_st() {
 
   while (queue.size > 0) {
     const SmPkt sm_pkt = queue.unlocked_pop();  // Lock is held only briefly
+
+    if (sm_pkt.is_resp() &&
+        sm_pending_reqs.count(sm_pkt.client.session_num) > 0) {
+      sm_pending_reqs.erase(sm_pending_reqs.find(sm_pkt.client.session_num));
+    }
+
     switch (sm_pkt.pkt_type) {
       case SmPktType::kConnectReq: handle_connect_req_st(sm_pkt); break;
-      case SmPktType::kConnectResp: handle_connect_resp_st(sm_pkt); break;
       case SmPktType::kDisconnectReq: handle_disconnect_req_st(sm_pkt); break;
+      case SmPktType::kConnectResp: {
+        handle_connect_resp_st(sm_pkt);
+        break;
+      }
       case SmPktType::kDisconnectResp: handle_disconnect_resp_st(sm_pkt); break;
       default: throw std::runtime_error("Invalid packet type");
     }
@@ -55,9 +64,9 @@ void Rpc<TTr>::sm_pkt_udp_tx_st(const SmPkt &sm_pkt) {
 
 template <class TTr>
 void Rpc<TTr>::send_sm_req_st(Session *session) {
-  assert(in_dispatch() && session->is_client());
-  assert(session->state == SessionState::kConnectInProgress ||
-         session->state == SessionState::kDisconnectInProgress);
+  assert(in_dispatch());
+
+  sm_pending_reqs.insert(session->local_session_num);  // Duplicates are fine
   session->client_info.sm_req_ts = rdtsc();
 
   SmPkt sm_pkt;

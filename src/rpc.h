@@ -1,5 +1,6 @@
 #pragma once
 
+#include <set>
 #include "cc/timing_wheel.h"
 #include "common.h"
 #include "msg_buffer.h"
@@ -281,9 +282,9 @@ class Rpc {
   /// determined using the packet's type.
   void sm_pkt_udp_tx_st(const SmPkt &);
 
-  /// Send a session management request for this session and set the SM request
-  /// timestamp.
-  /// The SM request type is computed using the session state
+  /// Send a session management request for a client session. This includes
+  /// saving retransmission information for the request. The SM request type is
+  /// computed using the session state
   void send_sm_req_st(Session *);
 
   //
@@ -368,7 +369,7 @@ class Rpc {
     return sslot->client_info.num_tx < sslot->tx_msgbuf->num_pkts;
   }
 
-  /// Return true iff it's currently OK to bypass the wheel for this session
+  /// Return true iff it's currently OK to bypass the wheel for this request
   inline bool can_bypass_wheel(SSlot *sslot) const {
     if (!kCcPacing) return true;
     if (kTesting) return faults.hard_wheel_bypass;
@@ -388,13 +389,13 @@ class Rpc {
 
   /// Add an RPC slot to the list of active RPCs
   inline void add_to_active_rpc_list(SSlot &sslot) {
-    SSlot *prev_tail = tail_sentinel.client_info.prev;
+    SSlot *prev_tail = active_rpcs_tail_sentinel.client_info.prev;
 
     prev_tail->client_info.next = &sslot;
     sslot.client_info.prev = prev_tail;
 
-    sslot.client_info.next = &tail_sentinel;
-    tail_sentinel.client_info.prev = &sslot;
+    sslot.client_info.next = &active_rpcs_tail_sentinel;
+    active_rpcs_tail_sentinel.client_info.prev = &sslot;
   }
 
   /// Delete an active RPC slot from the list of active RPCs
@@ -795,6 +796,21 @@ class Rpc {
     return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
   }
 
+  /// Return the average number of packets received in a call to rx_burst
+  double get_avg_rx_batch() {
+    if (!kDatapathStats || dpath_stats.rx_burst_calls == 0) return -1.0;
+    return dpath_stats.pkts_rx * 1.0 / dpath_stats.rx_burst_calls;
+  }
+
+  /// Return the average number of packets sent in a call to tx_burst
+  double get_avg_tx_batch() {
+    if (!kDatapathStats || dpath_stats.tx_burst_calls == 0) return -1.0;
+    return dpath_stats.pkts_tx * 1.0 / dpath_stats.tx_burst_calls;
+  }
+
+  /// Reset all datapath stats to zero
+  void reset_dpath_stats() { memset(&dpath_stats, 0, sizeof(dpath_stats)); }
+
   //
   // Misc private functions
   //
@@ -933,7 +949,9 @@ class Rpc {
   /// The doubly-linked list of active RPCs. An RPC slot is added to this list
   /// when the request is enqueued. The slot is deleted from this list when its
   /// continuation is invoked or queued to a background thread.
-  SSlot root_sentinel, tail_sentinel;
+  /// Having permanent root and tail sentinels allows adding and deleting slots
+  /// from the list without conditional statements.
+  SSlot active_rpcs_root_sentinel, active_rpcs_tail_sentinel;
 
   // Allocator
   HugeAlloc *huge_alloc = nullptr;  ///< This thread's hugepage allocator
@@ -962,11 +980,14 @@ class Rpc {
   Nexus::Hook nexus_hook;       ///< A hook shared with the Nexus
 
   /// To avoid allocating a new session on receiving a duplicate session
-  /// connect request, the server remembers all (! XXX) the unique connect
+  /// connect request, the server remembers all (XXX) the unique connect
   /// requests it has received. To accomplish this, the client generates a
-  /// globally-unique (! XXX) token for the first copy of its connect request.
+  /// globally-unique (XXX) token for the first copy of its connect request.
   /// The server saves maps this token to the index of the allocated session.
   std::map<conn_req_uniq_token_t, uint16_t> conn_req_token_map;
+
+  /// Sessions for which a session management request is outstanding
+  std::set<uint16_t> sm_pending_reqs;
 
   /// All the faults that can be injected into eRPC for testing
   struct {
@@ -1007,12 +1028,5 @@ class Rpc {
 };
 
 // This goes at the end of every Rpc implementation file to force compilation
-#ifdef DPDK
-#define FORCE_COMPILE_TRANSPORTS template class Rpc<DpdkTransport>;
-#else
-#define FORCE_COMPILE_TRANSPORTS   \
-  template class Rpc<IBTransport>; \
-  template class Rpc<RawTransport>;
-#endif
-
+#define FORCE_COMPILE_TRANSPORTS template class Rpc<CTransport>;
 }  // namespace erpc
