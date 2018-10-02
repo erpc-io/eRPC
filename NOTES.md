@@ -99,7 +99,6 @@
    * Set transport max inline size to 120 bytes for ConnectX-3.
 
 ## Short-term TODOs
- * Session management timeouts should not scan all sessions.
  * Session reset and machine failure detection broke when I changed session
    management to use UDP instead of ENet.
  * In `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
