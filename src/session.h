@@ -16,8 +16,10 @@
 
 namespace erpc {
 
+// Forward declaration for friendship
 template <typename T>
 class Rpc;
+
 /// A one-to-one session class for all transports
 class Session {
   friend class Rpc<CTransport>;

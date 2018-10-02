@@ -11,12 +11,43 @@
 
 namespace erpc {
 
+// Forward declaration for friendship
+template <typename T>
+class Rpc;
+
 /**
  * @brief A per-process object that manages the background threads, the session
  * management thread, and request handler registration.
  */
 class Nexus {
+  friend class Rpc<CTransport>;
+
+  /**
+   * @brief Create the one-per-process Nexus object.
+   *
+   * @param local_uri A URI for this process formatted as hostname:udp_port.
+   * @param numa_node NUMA node used by eRPC for this process. Only one eRPC
+   * process may run per NUMA node.
+   * @param num_bg_threads The number of background RPC request processing
+   * threads to launch.
+   *
+   * @throw runtime_error if Nexus creation fails.
+   */
  public:
+  Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads);
+
+  ~Nexus();
+
+  /**
+   * @brief Register application-defined request handler function. This
+   * must be done before any Rpc registers a hook with the Nexus.
+   *
+   * @return 0 on success, negative errno on failure.
+   */
+  int register_req_func(uint8_t req_type, erpc_req_func_t req_func,
+                        ReqFuncType req_func_type = ReqFuncType::kForeground);
+
+ private:
   enum class BgWorkItemType : bool { kReq, kResp };
 
   /// A work item submitted to a background thread
@@ -47,21 +78,6 @@ class Nexus {
     MtQueue<SmPkt> sm_rx_queue;
   };
 
-  /**
-   * @brief Create the one-per-process Nexus object.
-   *
-   * @param hostname The local URI formatted as hostname:udp_port
-   * @param numa_node NUMA node for this eRPC process. Only one eRPC process
-   * may run per NUMA node.
-   * @param num_bg_threads The number of background RPC request processing
-   * threads to launch.
-   *
-   * @throw runtime_error if Nexus creation fails.
-   */
-  Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads);
-
-  ~Nexus();
-
   /// Check if a hook with for rpc_id exists in this Nexus. The caller must not
   /// hold the Nexus lock before calling this.
   bool rpc_id_exists(uint8_t rpc_id);
@@ -72,16 +88,6 @@ class Nexus {
   /// Unregister a previously registered session management hook
   void unregister_hook(Hook *hook);
 
-  /**
-   * @brief Register application-defined request handler function. This
-   * must be done before any Rpc registers a hook with the Nexus.
-   *
-   * @return 0 on success, negative errno on failure.
-   */
-  int register_req_func(uint8_t req_type, erpc_req_func_t req_func,
-                        ReqFuncType req_func_type = ReqFuncType::kForeground);
-
- private:
   /// Background thread context
   class BgThreadCtx {
    public:
@@ -115,7 +121,6 @@ class Nexus {
   /// The session management thread
   static void sm_thread_func(SmThreadCtx ctx);
 
- public:
   /// Read-mostly members exposed to Rpc threads
   const double freq_ghz;        ///< TSC frequncy
   const std::string hostname;   ///< The local host
@@ -128,7 +133,6 @@ class Nexus {
   std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
   const uint8_t pad[64] = {0};  ///< Separate read-write members from read-only
 
- private:
   /// Request function registration is disallowed after any Rpc registers with
   /// the Nexus and gets a copy of req_func_arr
   bool req_func_registration_allowed = true;
