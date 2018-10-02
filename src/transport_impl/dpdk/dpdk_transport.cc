@@ -84,14 +84,15 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
 }
 
 void DpdkTransport::setup_phy_port() {
-#if RTE_VER_YEAR < 18
-  uint16_t num_ports = rte_eth_dev_count();
-#else
+#if RTE_VER_YEAR >= 18 && RTE_VER_MONTH >= 5
+  // rte_eth_dev_count() was deprecated in DPDK 18.05
   uint16_t num_ports = rte_eth_dev_count_avail();
+#else
+  uint16_t num_ports = rte_eth_dev_count();
 #endif
 
-  // Hint: If dpdk-devbind shows available ports, this can sometimes happen
-  // if we numactl-membind the process to a different NUMA node than the NIC's.
+  // If dpdk-devbind shows available ports, this can sometimes happen if we
+  // numactl-membind the process to a different NUMA node than the NIC's.
   if (phy_port >= num_ports) {
     fprintf(stderr,
             "Port %u (0-based) requested, but only %u DPDK ports available. If "
