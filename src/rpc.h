@@ -129,10 +129,6 @@ class Rpc {
     return m;
   }
 
-  /// . This does not modify the MsgBuffer's packet headers. This is
-  /// useful when an application creates a large MsgBuffer and then resizes
-  /// it
-
   /**
    * @brief Resize a MsgBuffer to fit a request or response
    *
@@ -802,7 +798,8 @@ class Rpc {
     return Transport::kNumRxRingEntries / kSessionCredits;
   }
 
-  /// Return the maximum message *data* size that can be sent
+  /// Return the maximum application data size that can be sent in one request
+  /// or response
   static inline size_t get_max_msg_size() { return kMaxMsgSize; }
 
   /// Return the ID of this Rpc object

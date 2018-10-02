@@ -1,7 +1,4 @@
 PROJECT_NAME = eRPC
-EXTRACT_ALL = YES
-#EXTRACT_PRIVATE = YES
-EXTRACT_STATIC = YES
 
 INPUT = src/nexus.h src/rpc.h src/msg_buffer.h
 
