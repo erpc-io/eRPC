@@ -16,20 +16,11 @@
 
 namespace erpc {
 
-// Forward declarations for friendship. Prevent Nexus's background threads
-// from accessing session members.
-class IBTransport;
-class RawTransport;
-class DpdkTransport;
-
 template <typename T>
 class Rpc;
-
 /// A one-to-one session class for all transports
 class Session {
-  friend class Rpc<IBTransport>;
-  friend class Rpc<RawTransport>;
-  friend class Rpc<DpdkTransport>;
+  friend class Rpc<CTransport>;
 
  public:
   enum class Role : int { kServer, kClient };

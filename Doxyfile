@@ -3,8 +3,6 @@ EXTRACT_ALL = YES
 #EXTRACT_PRIVATE = YES
 EXTRACT_STATIC = YES
 
-INPUT = src
-RECURSIVE = YES
-EXCLUDE = src/transport_impl/raw/mlx5_defs.h
+INPUT = src/nexus.h src/rpc.h src/msg_buffer.h
 
 DISTRIBUTE_GROUP_DOC = YES

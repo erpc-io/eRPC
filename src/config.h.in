@@ -8,6 +8,6 @@ class IBTransport;
 class RawTransport;
 class DpdkTransport;
 
-typedef ${CONFIG_TRANSPORT} CTransport;
+#define CTransport ${CONFIG_TRANSPORT}
 static constexpr size_t kHeadroom = ${CONFIG_HEADROOM};
 }

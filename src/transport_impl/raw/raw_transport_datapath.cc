@@ -20,8 +20,8 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     assert(wr.opcode == IBV_WR_SEND);
     assert(wr.sg_list == sgl);
 
-    // Set signaling flag. The work request is non-inline by default.
-    wr.send_flags = get_signaled_flag();
+    // Set signaling + poll SEND CQ if needed. The wr is non-inline by default.
+    wr.send_flags = get_signaled_flag() ? IBV_SEND_SIGNALED : 0;
 
     size_t pkt_size;
     pkthdr_t* pkthdr;

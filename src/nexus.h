@@ -11,8 +11,10 @@
 
 namespace erpc {
 
-/// A per-process object that manages the background threads, the session
-/// management thread, and request handler registration.
+/**
+ * @brief A per-process object that manages the background threads, the session
+ * management thread, and request handler registration.
+ */
 class Nexus {
  public:
   enum class BgWorkItemType : bool { kReq, kResp };

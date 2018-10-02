@@ -7,9 +7,6 @@
 namespace erpc {
 
 // Forward declarations for friendship
-class IBTransport;
-class RawTransport;
-class DpdkTransport;
 class Session;
 class Nexus;
 
@@ -20,9 +17,7 @@ class Rpc;
 class SSlot {
   friend class Session;
   friend class Nexus;
-  friend class Rpc<IBTransport>;
-  friend class Rpc<RawTransport>;
-  friend class Rpc<DpdkTransport>;
+  friend class Rpc<CTransport>;
   friend class ReqHandle;
   friend class RespHandle;
 

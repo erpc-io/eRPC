@@ -134,7 +134,7 @@ class RawTransport : public Transport {
   void post_recvs(size_t num_recvs);
 
   /// Get the current SEND signaling flag, and poll the send CQ if we need to
-  inline int get_signaled_flag() {
+  inline bool get_signaled_flag() {
     // If kUnsigBatch is 4, the sequence of signaling and polling looks like so:
     // * nb_tx = 0: no poll, signaled
     // * nb_tx = 1: no poll, unsignaled
@@ -142,16 +142,16 @@ class RawTransport : public Transport {
     // * nb_tx = 3: no poll, unsignaled
     // * nb_tx = 4: poll, signaled
 
-    int flag;
+    bool signaled;
     if (nb_tx % kUnsigBatch == 0) {
-      flag = IBV_SEND_SIGNALED;
+      signaled = true;
       if (likely(nb_tx != 0)) poll_cq_one_helper(send_cq);
     } else {
-      flag = 0;
+      signaled = false;
     }
 
     nb_tx++;
-    return flag;
+    return signaled;
   }
 
  private:
