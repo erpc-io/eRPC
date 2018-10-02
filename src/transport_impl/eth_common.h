@@ -186,13 +186,20 @@ static uint32_t get_interface_ipv4_addr(std::string interface) {
   rt_assert(getifaddrs(&ifaddr) == 0);
   uint32_t ipv4_addr = 0;
 
-  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr->sa_family != AF_INET) continue;  // IP address
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
     if (strcmp(ifa->ifa_name, interface.c_str()) != 0) continue;
+
+    // We might get the same interface multiple times with different sa_family
+    if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET) {
+      continue;
+    }
 
     auto sin_addr = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
     ipv4_addr = ntohl(*reinterpret_cast<uint32_t*>(&sin_addr->sin_addr));
   }
+
+  rt_assert(ipv4_addr != 0,
+            std::string("Failed to find interface ") + interface);
 
   freeifaddrs(ifaddr);
   return ipv4_addr;

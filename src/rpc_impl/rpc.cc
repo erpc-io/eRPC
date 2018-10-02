@@ -97,9 +97,7 @@ Rpc<TTr>::~Rpc() {
 
   // XXX: Check if all sessions are disconnected
   for (Session *session : session_vec) {
-    if (session != nullptr) {
-      _unused(session);
-    }
+    if (session != nullptr) delete session;
   }
 
   LOG_INFO("Destroying Rpc %u.\n", rpc_id);
