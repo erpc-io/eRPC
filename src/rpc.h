@@ -26,7 +26,7 @@ namespace erpc {
  * @brief An Rpc object is the main communication end point in eRPC.
  * Applications use it to create sessions with remote Rpc objects, send and
  * receive requests and responses, and run the event loop.
- * 
+ *
  * None of the functions are thread safe. eRPC's worker (background) threads
  * have restricted concurrent access to Rpc objects.
  *
@@ -59,14 +59,14 @@ class Rpc {
    * @brief Construct the Rpc object
    * @param nexus The Nexus object created by this process
    * @param context The context passed by the event loop to user callbacks
-   * 
+   *
    * @param rpc_id Each Rpc object created by threads of one process must
    * have a unique ID. Users create connections to remote Rpc objects by
    * specifying the URI of the remote process, and the remote Rpc's ID.
-   * 
+   *
    * \param sm_handler The session management callback that is invoked when
    * sessions are successfully created or destroyed.
-   * 
+   *
    * @param phy_port An Rpc object uses one physical port. This is the
    * zero-based index of that port among active ports.
    * @throw runtime_error if construction fails
@@ -83,7 +83,7 @@ class Rpc {
 
   /**
    * @brief Create a hugepage-backed message buffer for the eRPC user.
-   * 
+   *
    * @param max_data_size If this call is successful, the returned MsgBuffer
    * contains space for this many application data bytes. The MsgBuffer should
    * be resized with resize_msg_buffer() when used for smaller requests or
@@ -95,7 +95,7 @@ class Rpc {
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
    * if allocation fails simply because we ran out of memory.
-   * 
+   *
    * \note The returned MsgBuffer's \p buf is surrounded by packet headers for
    * internal use by eRPC. This function does not fill in packet headers,
    * although it sets the magic field in the zeroth header.
@@ -133,11 +133,11 @@ class Rpc {
    * @brief Resize a MsgBuffer to fit a request or response
    *
    * @param msg_buffer The MsgBuffer to resize
-   * 
+   *
    * @param new_data_size The new size in bytes of the application data that
    * this MsgBuffer should contain. This must be smaller than the size used
    * to create the MsgBuffer in alloc_msg_buffer().
-   * 
+   *
    * \p note This does not modify the MsgBuffer's packet headers
    */
   static inline void resize_msg_buffer(MsgBuffer *msg_buffer,
@@ -235,7 +235,7 @@ class Rpc {
   /**
    * @brief Disconnect and destroy a session. The application must not use this
    * session number after this function is called.
-   * 
+   *
    * @param session_num A session number returned from a successful
    * create_session()
    *
@@ -446,22 +446,22 @@ class Rpc {
    *
    * @param session_num The session number to send the request on. This session
    * must be connected.
-   * 
+   *
    * @param req_type The type of the request. The server for this remote
    * procedure call must have a registered handler for this request type.
-   * 
+   *
    * @param req_msgbuf The MsgBuffer containing the request data,
-   * 
+   *
    * @param resp_msgbuf The MsgBuffer that will contain the response data when
    * the continuation is invoked. This must be large enough to accomodate any
    * response for this request.
    *
    * @param cont_func The continuation that will be invoked when this request
    * completes
-   * 
+   *
    * @param tag A tag for this request that will be passed to the application
    * in the continuation callback
-   * 
+   *
    * @param cont_etid The eRPC thread ID of the background thread to run the
    * continuation on. The default value of \p kInvalidBgETid means that the
    * continuation runs in the foreground. This argument is meant only for
@@ -481,12 +481,11 @@ class Rpc {
 
   // rpc_resp.cc
  public:
-
   /**
    * @brief Enqueue a response for transmission at the server. See ReqHandle
    * for details about creating the response. On calling this, the application
    * loses ownership of the request and response MsgBuffer.
-   * 
+   *
    * This can be called outside the request handler.
    *
    * @param req_handle The handle passed to the request handler by eRPC
@@ -830,7 +829,7 @@ class Rpc {
 
   /// Return the number of seconds elapsed since this Rpc was created
   double sec_since_creation() {
-    return to_sec(rdtsc() - creation_tsc, nexus->freq_ghz);
+    return to_sec(rdtsc() - creation_tsc, freq_ghz);
   }
 
   /// Return the average number of packets received in a call to rx_burst

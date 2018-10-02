@@ -123,7 +123,7 @@ void generic_test_func(Nexus *nexus, size_t) {
     // The default timeout for tests is 20 seconds. This test takes more time
     // because of packet drops.
     for (size_t i = 0; i < 5; i++) {
-      wait_for_rpc_resps_or_timeout(context, config_num_rpcs, nexus->freq_ghz);
+      wait_for_rpc_resps_or_timeout(context, config_num_rpcs);
       if (context.num_rpc_resps == config_num_rpcs) break;
     }
     assert(context.num_rpc_resps == config_num_rpcs);

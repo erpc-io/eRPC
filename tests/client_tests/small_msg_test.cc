@@ -104,7 +104,7 @@ void generic_test_func(Nexus *nexus, size_t) {
       }
     }
 
-    wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter, nexus->freq_ghz);
+    wait_for_rpc_resps_or_timeout(context, tot_reqs_per_iter);
     assert(context.num_rpc_resps == tot_reqs_per_iter);
   }
 

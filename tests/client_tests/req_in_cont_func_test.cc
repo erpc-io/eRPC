@@ -114,7 +114,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
     enqueue_request_helper(&c, i);
   }
 
-  wait_for_rpc_resps_or_timeout(c, kTestNumReqs, nexus->freq_ghz);
+  wait_for_rpc_resps_or_timeout(c, kTestNumReqs);
   assert(c.num_rpc_resps == kTestNumReqs);
 
   for (size_t i = 0; i < kSessionReqWindow; i++) {
@@ -126,7 +126,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   for (size_t i = 0; i < num_sessions; i++) {
     rpc->destroy_session(c.session_num_arr[0]);
   }
-  wait_for_sm_resps_or_timeout(c, num_sessions, nexus->freq_ghz);
+  wait_for_sm_resps_or_timeout(c, num_sessions);
 
   // Free resources
   delete rpc;

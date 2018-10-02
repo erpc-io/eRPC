@@ -87,8 +87,7 @@ size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
 }
 
 // Forward declaration
-void wait_for_sm_resps_or_timeout(BasicAppContext &, const size_t,
-                                  const double);
+void wait_for_sm_resps_or_timeout(BasicAppContext &, const size_t);
 
 /// A basic session management handler that expects successful responses
 void basic_sm_handler(int session_num, SmEventType sm_event_type,
@@ -163,7 +162,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
     }
 
     // Wait for the sessions to connect
-    wait_for_sm_resps_or_timeout(context, num_srv_threads - 1, nexus->freq_ghz);
+    wait_for_sm_resps_or_timeout(context, num_srv_threads - 1);
   } else {
     test_printf("Server %u: not connecting to other server threads.\n", rpc_id);
   }
@@ -309,14 +308,14 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
  * @param freq_ghz rdtsc frequency in GHz
  */
 void wait_for_sm_resps_or_timeout(BasicAppContext &context,
-                                  const size_t num_resps,
-                                  const double freq_ghz) {
+                                  const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
-  uint64_t cycles_start = rdtsc();
+  struct timespec start;
+  clock_gettime(CLOCK_REALTIME, &start);
   while (context.num_sm_resps < num_resps) {
     context.rpc->run_event_loop(kTestEventLoopMs);
 
-    double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
+    double ms_elapsed = sec_since(start) * 1000;
     if (ms_elapsed > kTestMaxEventLoopMs) break;
   }
 }
@@ -330,14 +329,14 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &context,
  * @param freq_ghz rdtsc frequency in GHz
  */
 void wait_for_rpc_resps_or_timeout(BasicAppContext &context,
-                                   const size_t num_resps,
-                                   const double freq_ghz) {
+                                   const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
-  uint64_t cycles_start = rdtsc();
+  struct timespec start;
+  clock_gettime(CLOCK_REALTIME, &start);
   while (context.num_rpc_resps < num_resps) {
     context.rpc->run_event_loop(kTestEventLoopMs);
 
-    double ms_elapsed = to_msec(rdtsc() - cycles_start, freq_ghz);
+    double ms_elapsed = sec_since(start) * 1000;
     if (ms_elapsed > kTestMaxEventLoopMs) break;
   }
 }

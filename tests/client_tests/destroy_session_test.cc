@@ -50,13 +50,13 @@ void simple_disconnect(Nexus *nexus, size_t) {
 
   // Connect the session
   context.arm(SmEventType::kConnected, SmErrType::kNoError);
-  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
+  wait_for_sm_resps_or_timeout(context, 1);
   ASSERT_EQ(context.num_sm_resps, 1);  // The connect event
 
   // Disconnect the session
   context.arm(SmEventType::kDisconnected, SmErrType::kNoError);
   rpc->destroy_session(session_num);
-  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
+  wait_for_sm_resps_or_timeout(context, 1);
   ASSERT_EQ(context.num_sm_resps, 1);  // The disconnect event
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
@@ -107,7 +107,7 @@ void disconnect_multi(Nexus *nexus, size_t) {
 
     // Connect the sessions
     context.arm(SmEventType::kConnected, SmErrType::kNoError);
-    wait_for_sm_resps_or_timeout(context, num_sessions, nexus->freq_ghz);
+    wait_for_sm_resps_or_timeout(context, num_sessions);
     ASSERT_EQ(context.num_sm_resps, num_sessions);  // The connect events
 
     // Disconnect the sessions
@@ -117,7 +117,7 @@ void disconnect_multi(Nexus *nexus, size_t) {
       rpc->destroy_session(context.session_num_arr[i]);
     }
 
-    wait_for_sm_resps_or_timeout(context, num_sessions, nexus->freq_ghz);
+    wait_for_sm_resps_or_timeout(context, num_sessions);
     ASSERT_EQ(context.num_sm_resps, num_sessions);  // The disconnect events
 
     ASSERT_EQ(rpc->num_active_sessions(), 0);
@@ -148,7 +148,7 @@ void disconnect_remote_error(Nexus *nexus, size_t) {
       rpc->create_session("localhost:31850", kTestServerRpcId + 1);
   ASSERT_GE(session_num, 0);
   context.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemoteRpcId);
-  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
+  wait_for_sm_resps_or_timeout(context, 1);
   ASSERT_EQ(context.num_sm_resps, 1);  // The connect failed event
 
   // After invoking the kConnectFailed callback, the Rpc event loop immediately
@@ -183,7 +183,7 @@ void disconnect_local_error(Nexus *nexus, size_t) {
   ASSERT_GE(session_num, 0);
 
   context.arm(SmEventType::kDisconnected, SmErrType::kNoError);
-  wait_for_sm_resps_or_timeout(context, 1, nexus->freq_ghz);
+  wait_for_sm_resps_or_timeout(context, 1);
   ASSERT_EQ(context.num_sm_resps, 1);  // The connect failed event
 
   // After invoking the kConnectFailed callback, the Rpc event loop tries to

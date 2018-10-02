@@ -36,7 +36,7 @@ void Rpc<TTr>::pkt_loss_scan_st() {
       case SessionState::kDisconnectInProgress: {
         // Session management packet loss detection
         const size_t ms_elapsed =
-            to_msec(rdtsc() - session->client_info.sm_req_ts, nexus->freq_ghz);
+            to_msec(rdtsc() - session->client_info.sm_req_ts, freq_ghz);
         if (ms_elapsed > kSMTimeoutMs) send_sm_req_st(session);
         break;
       }
