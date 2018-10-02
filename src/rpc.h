@@ -23,11 +23,12 @@
 namespace erpc {
 
 /**
- * @brief Rpc object created by foreground threads, and possibly shared with
- * background threads.
- *
- * Non-const functions that are not thread-safe should be marked in the
- * documentation.
+ * @brief An Rpc object is the main communication end point in eRPC.
+ * Applications use it to create sessions with remote Rpc objects, send and
+ * receive requests and responses, and run the event loop.
+ * 
+ * None of the functions are thread safe. eRPC's worker (background) threads
+ * have restricted concurrent access to Rpc objects.
  *
  * @tparam TTr The unreliable transport
  */
@@ -35,29 +36,39 @@ template <class TTr>
 class Rpc {
   friend class RpcTest;
 
- public:
-  /// Max request or response *data* size, i.e., excluding packet headers
-  static constexpr size_t kMaxMsgSize =
-      HugeAlloc::kMaxClassSize -
-      ((HugeAlloc::kMaxClassSize / TTr::kMaxDataPerPkt) * sizeof(pkthdr_t));
-  static_assert((1ull << kMsgSizeBits) >= kMaxMsgSize, "");
-
-  static_assert((1ull << kPktNumBits) * TTr::kMaxDataPerPkt > 2 * kMaxMsgSize,
-                "");
-
+ private:
   /// Initial capacity of the hugepage allocator
   static constexpr size_t kInitialHugeAllocSize = (8 * MB(1));
 
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 10 : 100;
 
+ public:
+  /// Max request or response *data* size, i.e., excluding packet headers
+  static constexpr size_t kMaxMsgSize =
+      HugeAlloc::kMaxClassSize -
+      ((HugeAlloc::kMaxClassSize / TTr::kMaxDataPerPkt) * sizeof(pkthdr_t));
+  static_assert((1 << kMsgSizeBits) >= kMaxMsgSize, "");
+  static_assert((1 << kPktNumBits) * TTr::kMaxDataPerPkt > 2 * kMaxMsgSize, "");
+
   //
   // Constructor/destructor (rpc.cc)
   //
 
   /**
-   * @brief Construct the Rpc object from a foreground thread
-   * @param phy_port Zero-based index among active fabric ports
+   * @brief Construct the Rpc object
+   * @param nexus The Nexus object created by this process
+   * @param context The context passed by the event loop to user callbacks
+   * 
+   * @param rpc_id Each Rpc object created by threads of one process must
+   * have a unique ID. Users create connections to remote Rpc objects by
+   * specifying the URI of the remote process, and the remote Rpc's ID.
+   * 
+   * \param sm_handler The session management callback that is invoked when
+   * sessions are successfully created or destroyed.
+   * 
+   * @param phy_port An Rpc object uses one physical port. This is the
+   * zero-based index of that port among active ports.
    * @throw runtime_error if construction fails
    */
   Rpc(Nexus *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,
@@ -71,13 +82,12 @@ class Rpc {
   //
 
   /**
-   * @brief Create a hugepage-backed MsgBuffer for the eRPC user.
-   *
-   * The returned MsgBuffer's \p buf is surrounded by packet headers that the
-   * user must not modify. This function does not fill in these message headers,
-   * though it sets the magic field in the zeroth header.
-   *
-   * @param max_data_size Maximum non-header bytes in the returned MsgBuffer
+   * @brief Create a hugepage-backed message buffer for the eRPC user.
+   * 
+   * @param max_data_size If this call is successful, the returned MsgBuffer
+   * contains space for this many application data bytes. The MsgBuffer should
+   * be resized with resize_msg_buffer() when used for smaller requests or
+   * responses.
    *
    * @return \p The allocated MsgBuffer. The MsgBuffer is invalid (i.e., its
    * \p buf is null) if we ran out of memory.
@@ -85,6 +95,10 @@ class Rpc {
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
    * if allocation fails simply because we ran out of memory.
+   * 
+   * \note The returned MsgBuffer's \p buf is surrounded by packet headers for
+   * internal use by eRPC. This function does not fill in packet headers,
+   * although it sets the magic field in the zeroth header.
    */
   inline MsgBuffer alloc_msg_buffer(size_t max_data_size) {
     assert(max_data_size > 0);  // Doesn't work for max_data_size = 0
@@ -107,15 +121,29 @@ class Rpc {
     return msg_buffer;
   }
 
-  /// Identical to alloc_msg_buffer, but dies on failure
+  /// Identical to alloc_msg_buffer(), but throws an exception if the allocation
+  /// fails.
   inline MsgBuffer alloc_msg_buffer_or_die(size_t max_data_size) {
     MsgBuffer m = alloc_msg_buffer(max_data_size);
     rt_assert(m.buf != nullptr);
     return m;
   }
 
-  /// Resize a MsgBuffer to a smaller size than its max allocation, including
-  /// zero size. This does not modify the MsgBuffer's packet headers.
+  /// . This does not modify the MsgBuffer's packet headers. This is
+  /// useful when an application creates a large MsgBuffer and then resizes
+  /// it
+
+  /**
+   * @brief Resize a MsgBuffer to fit a request or response
+   *
+   * @param msg_buffer The MsgBuffer to resize
+   * 
+   * @param new_data_size The new size in bytes of the application data that
+   * this MsgBuffer should contain. This must be smaller than the size used
+   * to create the MsgBuffer in alloc_msg_buffer().
+   * 
+   * \p note This does not modify the MsgBuffer's packet headers
+   */
   static inline void resize_msg_buffer(MsgBuffer *msg_buffer,
                                        size_t new_data_size) {
     assert(msg_buffer->is_valid());  // Can be fake
@@ -133,7 +161,7 @@ class Rpc {
     unlock_cond(&huge_alloc_lock);
   }
 
-  /// Return the total amount of memory allocated to the user
+  /// Return the total amount of huge page memory allocated to the user
   inline size_t get_stat_user_alloc_tot() {
     lock_cond(&huge_alloc_lock);
     size_t ret = huge_alloc->get_stat_user_alloc_tot();
@@ -194,30 +222,28 @@ class Rpc {
 
  public:
   /**
-   * @brief Create a session and initiate session connection. This function
-   * can only be called from the creator thread.
+   * @brief Create a session to a remote Rpc object and initiate session
+   * connection. A session management callback of type \p kConnected or
+   * \p kConnectFailed will be invoked if this call is successful.
    *
-   * @return The local session number (>= 0) of the session if creation succeeds
-   * and the connect request is sent, negative errno otherwise.
-   *
-   * A callback of type \p kConnected or \p kConnectFailed will be invoked if
-   * this call is successful.
+   * @return The local session number (>= 0) of the session if the session
+   * is successfully created, negative errno otherwise.
    *
    * @param remote_uri The remote Nexus's URI, formatted as hostname:udp_port
+   * @param rem_rpc_id The ID of the remote Rpc object
    */
   int create_session(std::string remote_uri, uint8_t rem_rpc_id) {
     return create_session_st(remote_uri, rem_rpc_id);
   }
 
   /**
-   * @brief Disconnect and destroy a client session. The session should not
-   * be used by the application after this function is called. This functio
-   * can only be called from the creator thread.
-   *
+   * @brief Disconnect and destroy a session. The application must not use this
+   * session number after this function is called.
+   * 
    * @param session_num A session number returned from a successful
    * create_session()
    *
-   * @return 0 if (a) the session disconnect packet was sent, and the disconnect
+   * @return 0 if the session disconnect packet was sent, and the disconnect
    * callback will be invoked later. Negative errno if the session cannot be
    * disconnected.
    */
