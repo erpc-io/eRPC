@@ -441,25 +441,31 @@ class Rpc {
   // rpc_req.cc
  public:
   /**
-   * @brief Try to enqueue a request for transmission.
+   * @brief Enqueue a request for transmission. This always succeeds. eRPC owns
+   * \p msg_buffer until it invokves the continuation callback.
    *
-   * If a session slot is available for this session, the request will be
-   * enqueued. If this call succeeds, eRPC owns \p msg_buffer until the request
-   * completes (i.e., the continuation is invoked).
+   * @param session_num The session number to send the request on. This session
+   * must be connected.
+   * 
+   * @param req_type The type of the request. The server for this remote
+   * procedure call must have a registered handler for this request type.
+   * 
+   * @param req_msgbuf The MsgBuffer containing the request data,
+   * 
+   * @param resp_msgbuf The MsgBuffer that will contain the response data when
+   * the continuation is invoked. This must be large enough to accomodate any
+   * response for this request.
    *
-   * @param session_num The session number to send the request on
-   * @param req_type The type of the request
-   * @param req_msgbuf The user-created MsgBuffer containing the request payload
-   * but not packet headers
-   *
-   * @param cont_func The continuation function for this request
-   * @tag The tag for this request
-   * @cont_etid The eRPC thread ID of the background thread to run the
+   * @param cont_func The continuation that will be invoked when this request
+   * completes
+   * 
+   * @param tag A tag for this request that will be passed to the application
+   * in the continuation callback
+   * 
+   * @param cont_etid The eRPC thread ID of the background thread to run the
    * continuation on. The default value of \p kInvalidBgETid means that the
    * continuation runs in the foreground. This argument is meant only for
    * internal use by eRPC (i.e., user calls must ignore it).
-   *
-   * @return Currently this function always returns 0
    */
   void enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
                        MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
@@ -475,11 +481,19 @@ class Rpc {
 
   // rpc_resp.cc
  public:
-  /// Enqueue a response for transmission at the server
+
+  /**
+   * @brief Enqueue a response for transmission at the server. See ReqHandle
+   * for details about creating the response. On calling this, the application
+   * loses ownership of the request and response MsgBuffer.
+   * 
+   * This can be called outside the request handler.
+   *
+   * @param req_handle The handle passed to the request handler by eRPC
+   */
   void enqueue_response(ReqHandle *req_handle);
 
-  /// From a continuation, release ownership of a response handle. The response
-  /// MsgBuffer is owned by the app and shouldn't be freed.
+  /// From a continuation, release ownership of a response handle.
   inline void release_response(RespHandle *resp_handle) {
     // When called from a background thread, enqueue to the foreground thread
     if (unlikely(!in_dispatch())) {
