@@ -16,18 +16,19 @@ template <typename T>
 class Rpc;
 
 /**
- * @brief A per-process object that manages the background threads, the session
- * management thread, and request handler registration.
+ * @brief A per-process library object used for initializing eRPC
  */
 class Nexus {
   friend class Rpc<CTransport>;
 
   /**
-   * @brief Create the one-per-process Nexus object.
+   * @brief Initialize eRPC for this process
    *
    * @param local_uri A URI for this process formatted as hostname:udp_port.
-   * @param numa_node NUMA node used by eRPC for this process. Only one eRPC
+   * 
+   * @param numa_node The NUMA node used by eRPC for this process. Only one eRPC
    * process may run per NUMA node.
+   * 
    * @param num_bg_threads The number of background RPC request processing
    * threads to launch.
    *
