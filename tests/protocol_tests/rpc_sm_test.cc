@@ -176,7 +176,7 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
   // Process response with error. Session is destroyed and ring buffers released
   rpc->handle_connect_resp_st(conn_resp);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
-  ASSERT_EQ(rpc->ring_entries_available, rpc->get_num_rx_ring_entries());
+  ASSERT_TRUE(rpc->ring_entries_available == rpc->transport->kNumRxRingEntries);
   // No more tests here because session is destroyed
 }
 
@@ -199,7 +199,7 @@ TEST_F(RpcSmTest, handle_disconnect_req_st) {
   common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
   ASSERT_LT(rpc->huge_alloc->get_stat_user_alloc_tot(), initial_alloc);
-  ASSERT_EQ(rpc->ring_entries_available, rpc->get_num_rx_ring_entries());
+  ASSERT_TRUE(rpc->ring_entries_available == rpc->transport->kNumRxRingEntries);
 
   // Process disconnect request again. Response is re-sent.
   rpc->handle_disconnect_req_st(disc_req);
@@ -223,7 +223,7 @@ TEST_F(RpcSmTest, handle_disconnect_resp_st) {
   // Process first disconnect response
   rpc->handle_disconnect_resp_st(disc_resp);
   ASSERT_EQ(rpc->session_vec[0], nullptr);
-  ASSERT_EQ(rpc->ring_entries_available, rpc->get_num_rx_ring_entries());
+  ASSERT_TRUE(rpc->ring_entries_available == rpc->transport->kNumRxRingEntries);
 
   // Process disconnect request again. This gets ignored.
   rpc->handle_disconnect_resp_st(disc_resp);

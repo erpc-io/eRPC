@@ -39,17 +39,19 @@ namespace erpc {
  *    - Create an Rpc end point using the Nexus
  *    - Run the event loop with Rpc::run_event_loop. The request handler will
  *      be invoked when requests are received from clients.
- *    - In the request handler callback:
+ *    - Create the response in the request handle supplied to the handler.
+ *      Use Rpc::enqueue_response to send the reply.
  * -# For an RPC client thread:
  *    - Create an Rpc endpoint using the Nexus
- *    - Create sessions with Rpc::create_session to remote endpoints
- *    - Create message buffers with Rpc::alloc_msg_buffer for the request and
- *      response messages
- *    - Enqueue a request with Rpc::enqueue_request, specifying a continuation
+ *    - Connect to remote endpoints with Rpc::create_session
+ *    - Create buffers to store request and response messages with
+ *      Rpc::alloc_msg_buffer
+ *    - Send a request with Rpc::enqueue_request, specifying a continuation
  *      callback
- *    - Run the event loop
- *    - The continuation callback will be called when the response is received
- *      or if the request times out
+ *    - Run eRPC's event loop with Rpc::run_event_loop
+ *    - The continuation will run when the response is received, or when the
+ *      request times out
+ *    - Release the reponse using Rpc::release_response
  */
 
 /**
@@ -112,7 +114,8 @@ class Rpc {
   //
 
   /**
-   * @brief Create a hugepage-backed message buffer for the eRPC user.
+   * @brief Create a hugepage-backed buffer for storing request or response
+   * messages.
    *
    * @param max_data_size If this call is successful, the returned MsgBuffer
    * contains space for this many application data bytes. The MsgBuffer should
@@ -407,6 +410,17 @@ class Rpc {
     }
 
     return true;
+  }
+
+  /**
+   * @brief Return the number of packets required for \p data_size data bytes.
+   *
+   * This should avoid division if \p data_size fits in one packet.
+   * For \p data_size = 0, the return value need not be 0, i.e., it can be 1.
+   */
+  static size_t data_size_to_num_pkts(size_t data_size) {
+    if (data_size <= TTr::kMaxDataPerPkt) return 1;
+    return (data_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
   }
 
   /// Return the total number of packets sent on the wire by one RPC endpoint.
@@ -810,25 +824,9 @@ class Rpc {
     return huge_alloc;
   }
 
-  /**
-   * @brief Return the number of packets required for \p data_size data bytes.
-   *
-   * This should avoid division if \p data_size fits in one packet.
-   * For \p data_size = 0, the return value need not be 0, i.e., it can be 1.
-   */
-  static size_t data_size_to_num_pkts(size_t data_size) {
-    if (data_size <= TTr::kMaxDataPerPkt) return 1;
-    return (data_size + TTr::kMaxDataPerPkt - 1) / TTr::kMaxDataPerPkt;
-  }
-
   /// Return the maximum *data* size in one packet for the (private) transport
   static inline constexpr size_t get_max_data_per_pkt() {
     return TTr::kMaxDataPerPkt;
-  }
-
-  /// Return the (private) transport's RX ring size
-  static inline constexpr size_t get_num_rx_ring_entries() {
-    return TTr::kNumRxRingEntries;
   }
 
   /// Return the hostname of the remote endpoint for a connected session
@@ -841,8 +839,7 @@ class Rpc {
     return Transport::kNumRxRingEntries / kSessionCredits;
   }
 
-  /// Return the maximum application data size that can be sent in one request
-  /// or response
+  /// Return the data size in bytes that can be sent in one request or response
   static inline size_t get_max_msg_size() { return kMaxMsgSize; }
 
   /// Return the ID of this Rpc object
