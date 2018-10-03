@@ -16,7 +16,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
     assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
     auto req_args = enq_req_args_t(session_num, req_type, req_msgbuf,
                                    resp_msgbuf, cont_func, tag, get_etid());
-    bg_queues.enqueue_request.unlocked_push(req_args);
+    bg_queues._enqueue_request.unlocked_push(req_args);
     return;
   }
 

@@ -23,6 +23,36 @@
 namespace erpc {
 
 /**
+ * \mainpage
+ *
+ * eRPC is a high-performance remote procedure call system for datacenters.
+ * The <a href="https://github.com/efficient/eRPC">source code</a> is maintained
+ * on GitHub. A <a href="https://arxiv.org/pdf/1806.00680.pdf">preprint</a>
+ * describing the system is available.
+ *
+ * See the API documentation tab for details on how to use eRPC. Using eRPC
+ * requires the following steps:
+ *
+ * -# Create a Nexus to initialize the eRPC library
+ * -# Register request handlers using Nexus::register_req_func
+ * -# For an RPC server thread:
+ *    - Create an Rpc end point using the Nexus
+ *    - Run the event loop with Rpc::run_event_loop. The request handler will
+ *      be invoked when requests are received from clients.
+ *    - In the request handler callback:
+ * -# For an RPC client thread:
+ *    - Create an Rpc endpoint using the Nexus
+ *    - Create sessions with Rpc::create_session to remote endpoints
+ *    - Create message buffers with Rpc::alloc_msg_buffer for the request and
+ *      response messages
+ *    - Enqueue a request with Rpc::enqueue_request, specifying a continuation
+ *      callback
+ *    - Run the event loop
+ *    - The continuation callback will be called when the response is received
+ *      or if the request times out
+ */
+
+/**
  * @brief An Rpc object is the main communication end point in eRPC.
  * Applications use it to create sessions with remote Rpc objects, send and
  * receive requests and responses, and run the event loop.
@@ -442,7 +472,7 @@ class Rpc {
  public:
   /**
    * @brief Enqueue a request for transmission. This always succeeds. eRPC owns
-   * \p msg_buffer until it invokves the continuation callback.
+   * \p msg_buffer until it invokes the continuation callback.
    *
    * @param session_num The session number to send the request on. This session
    * must be connected.
@@ -496,7 +526,7 @@ class Rpc {
   inline void release_response(RespHandle *resp_handle) {
     // When called from a background thread, enqueue to the foreground thread
     if (unlikely(!in_dispatch())) {
-      bg_queues.release_response.unlocked_push(resp_handle);
+      bg_queues._release_response.unlocked_push(resp_handle);
       return;
     }
 
@@ -1005,9 +1035,9 @@ class Rpc {
 
   /// Queues for datapath API requests from background threads
   struct {
-    MtQueue<enq_req_args_t> enqueue_request;
-    MtQueue<ReqHandle *> enqueue_response;
-    MtQueue<RespHandle *> release_response;
+    MtQueue<enq_req_args_t> _enqueue_request;
+    MtQueue<ReqHandle *> _enqueue_response;
+    MtQueue<RespHandle *> _release_response;
   } bg_queues;
 
   // Misc

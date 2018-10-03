@@ -3,7 +3,7 @@
   <!-- Navigation index tabs for HTML output -->
   <navindex>
     <tab type="mainpage" visible="yes" title=""/>
-    <tab type="classes" visible="yes" title=""/>
+    <tab type="classlist" visible="yes" title="API documentation"/>
   </navindex>
 
   <!-- Layout definition for a class page -->

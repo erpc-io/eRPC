@@ -55,7 +55,7 @@ void Rpc<TTr>::process_wheel_st() {
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
   assert(in_dispatch());
-  auto &queue = bg_queues.enqueue_request;
+  auto &queue = bg_queues._enqueue_request;
   const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
 
   for (size_t i = 0; i < cmds_to_process; i++) {
@@ -68,7 +68,7 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
   assert(in_dispatch());
-  auto &queue = bg_queues.enqueue_response;
+  auto &queue = bg_queues._enqueue_response;
   const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
 
   for (size_t i = 0; i < cmds_to_process; i++) {
@@ -80,7 +80,7 @@ void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
 template <class TTr>
 void Rpc<TTr>::process_bg_queues_release_response_st() {
   assert(in_dispatch());
-  auto &queue = bg_queues.release_response;
+  auto &queue = bg_queues._release_response;
   const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
 
   for (size_t i = 0; i < cmds_to_process; i++) {
