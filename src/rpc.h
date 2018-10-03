@@ -83,10 +83,6 @@ class Rpc {
   static_assert((1 << kMsgSizeBits) >= kMaxMsgSize, "");
   static_assert((1 << kPktNumBits) * TTr::kMaxDataPerPkt > 2 * kMaxMsgSize, "");
 
-  //
-  // Constructor/destructor (rpc.cc)
-  //
-
   /**
    * @brief Construct the Rpc object
    * @param nexus The Nexus object created by this process
@@ -108,10 +104,6 @@ class Rpc {
 
   /// Destroy the Rpc from a foreground thread
   ~Rpc();
-
-  //
-  // MsgBuffer management
-  //
 
   /**
    * @brief Create a hugepage-backed buffer for storing request or response
@@ -154,14 +146,6 @@ class Rpc {
     return msg_buffer;
   }
 
-  /// Identical to alloc_msg_buffer(), but throws an exception if the allocation
-  /// fails.
-  inline MsgBuffer alloc_msg_buffer_or_die(size_t max_data_size) {
-    MsgBuffer m = alloc_msg_buffer(max_data_size);
-    rt_assert(m.buf != nullptr);
-    return m;
-  }
-
   /**
    * @brief Resize a MsgBuffer to fit a request or response
    *
@@ -183,11 +167,150 @@ class Rpc {
     msg_buffer->resize(new_data_size, new_num_pkts);
   }
 
-  /// Free a MsgBuffer created by \p alloc_msg_buffer()
+  /// Free a MsgBuffer created by alloc_msg_buffer()
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     lock_cond(&huge_alloc_lock);
     huge_alloc->free_buf(msg_buffer.buffer);
     unlock_cond(&huge_alloc_lock);
+  }
+
+  /**
+   * @brief Create a session to a remote Rpc object and initiate session
+   * connection. A session management callback of type \p kConnected or
+   * \p kConnectFailed will be invoked if this call is successful.
+   *
+   * @return The local session number (>= 0) of the session if the session
+   * is successfully created, negative errno otherwise.
+   *
+   * @param remote_uri The remote Nexus's URI, formatted as hostname:udp_port
+   * @param rem_rpc_id The ID of the remote Rpc object
+   */
+  int create_session(std::string remote_uri, uint8_t rem_rpc_id) {
+    return create_session_st(remote_uri, rem_rpc_id);
+  }
+
+  /**
+   * @brief Disconnect and destroy a session. The application must not use this
+   * session number after this function is called.
+   *
+   * @param session_num A session number returned from a successful
+   * create_session()
+   *
+   * @return 0 if the session disconnect packet was sent, and the disconnect
+   * callback will be invoked later. Negative errno if the session cannot be
+   * disconnected.
+   */
+  int destroy_session(int session_num) {
+    return destroy_session_st(session_num);
+  }
+
+  /**
+   * @brief Enqueue a request for transmission. This always succeeds. eRPC owns
+   * \p msg_buffer until it invokes the continuation callback.
+   *
+   * @param session_num The session number to send the request on. This session
+   * must be connected.
+   *
+   * @param req_type The type of the request. The server for this remote
+   * procedure call must have a registered handler for this request type.
+   *
+   * @param req_msgbuf The MsgBuffer containing the request data,
+   *
+   * @param resp_msgbuf The MsgBuffer that will contain the response data when
+   * the continuation is invoked. This must be large enough to accomodate any
+   * response for this request.
+   *
+   * @param cont_func The continuation that will be invoked when this request
+   * completes. See erpc_req_func_t.
+   *
+   * @param tag A tag for this request that will be passed to the application
+   * in the continuation callback
+   *
+   * @param cont_etid The eRPC thread ID of the background thread to run the
+   * continuation on. The default value of \p kInvalidBgETid means that the
+   * continuation runs in the foreground. This argument is meant only for
+   * internal use by eRPC (i.e., user calls must ignore it).
+   */
+  void enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
+                       MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
+                       size_t tag, size_t cont_etid = kInvalidBgETid);
+
+  /**
+   * @brief Enqueue a response for transmission at the server. See ReqHandle
+   * for details about creating the response. On calling this, the application
+   * loses ownership of the request and response MsgBuffer.
+   *
+   * This can be called outside the request handler.
+   *
+   * @param req_handle The handle passed to the request handler by eRPC
+   */
+  void enqueue_response(ReqHandle *req_handle);
+
+  /// From a continuation, release ownership of a response handle.
+  inline void release_response(RespHandle *resp_handle) {
+    // When called from a background thread, enqueue to the foreground thread
+    if (unlikely(!in_dispatch())) {
+      bg_queues._release_response.unlocked_push(resp_handle);
+      return;
+    }
+
+    // If we're here, we're in the dispatch thread
+    SSlot *sslot = static_cast<SSlot *>(resp_handle);
+    assert(sslot->tx_msgbuf == nullptr);  // Response was received previously
+
+    Session *session = sslot->session;
+    assert(session != nullptr && session->is_client());
+    session->client_info.sslot_free_vec.push_back(sslot->index);
+
+    if (!session->client_info.enq_req_backlog.empty()) {
+      // We just got a new sslot, and we should have no more if there's backlog
+      assert(session->client_info.sslot_free_vec.size() == 1);
+      enq_req_args_t &args = session->client_info.enq_req_backlog.front();
+      enqueue_request(args.session_num, args.req_type, args.req_msgbuf,
+                      args.resp_msgbuf, args.cont_func, args.tag,
+                      args.cont_etid);
+      session->client_info.enq_req_backlog.pop();
+    }
+  }
+
+  /// Run the event loop for some milliseconds
+  inline void run_event_loop(size_t timeout_ms) {
+    run_event_loop_timeout_st(timeout_ms);
+  }
+
+  /// Run the event loop once
+  inline void run_event_loop_once() { run_event_loop_do_one_st(); }
+
+  /// Identical to alloc_msg_buffer(), but throws an exception on failure
+  inline MsgBuffer alloc_msg_buffer_or_die(size_t max_data_size) {
+    MsgBuffer m = alloc_msg_buffer(max_data_size);
+    rt_assert(m.buf != nullptr);
+    return m;
+  }
+
+  /// Return the number of active server or client sessions. This function
+  /// can be called only from the creator thread.
+  size_t num_active_sessions() { return num_active_sessions_st(); }
+
+  /// Return true iff this session is connected. The session must not have
+  /// been disconnected.
+  bool is_connected(int session_num) const {
+    return session_vec[static_cast<size_t>(session_num)]->is_connected();
+  }
+
+  /// Return the physical link bandwidth (bytes per second)
+  size_t get_bandwidth() const { return transport->get_bandwidth(); }
+
+  /// Return the number of retransmissions for a connected session
+  size_t get_num_re_tx(int session_num) const {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    return session->client_info.num_re_tx;
+  }
+
+  /// Reset the number of retransmissions for a connected session
+  void reset_num_re_tx(int session_num) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    session->client_info.num_re_tx = 0;
   }
 
   /// Return the total amount of huge page memory allocated to the user
@@ -198,10 +321,138 @@ class Rpc {
     return ret;
   }
 
+  /// Return the Timely instance for a connected session. Expert use only.
+  Timely *get_timely(int session_num) {
+    Session *session = session_vec[static_cast<size_t>(session_num)];
+    return &session->client_info.cc.timely;
+  }
+
+  /// Return the Timing Wheel for this Rpc. Expert use only.
+  TimingWheel *get_wheel() { return wheel; }
+
+  /// Set this Rpc's context
+  inline void set_context(void *_context) {
+    rt_assert(context == nullptr, "Cannot reset non-null Rpc context");
+    context = _context;
+  }
+
+  /// Retrieve this Rpc's hugepage allocator. For expert use only.
+  inline HugeAlloc *get_huge_alloc() const {
+    rt_assert(nexus->num_bg_threads == 0,
+              "Cannot extract allocator because background threads exist.");
+    return huge_alloc;
+  }
+
+  /// Return the maximum *data* size in one packet for the (private) transport
+  static inline constexpr size_t get_max_data_per_pkt() {
+    return TTr::kMaxDataPerPkt;
+  }
+
+  /// Return the hostname of the remote endpoint for a connected session
+  std::string get_remote_hostname(int session_num) const {
+    return session_vec[static_cast<size_t>(session_num)]->get_remote_hostname();
+  }
+
+  /// Return the maximum number of sessions supported
+  static inline constexpr size_t get_max_num_sessions() {
+    return Transport::kNumRxRingEntries / kSessionCredits;
+  }
+
+  /// Return the data size in bytes that can be sent in one request or response
+  static inline size_t get_max_msg_size() { return kMaxMsgSize; }
+
+  /// Return the ID of this Rpc object
+  inline uint8_t get_rpc_id() const { return rpc_id; }
+
+  /// Return true iff the caller is running in a background thread
+  inline bool in_background() const { return !in_dispatch(); }
+
+  /// Return the eRPC thread ID of the caller
+  inline size_t get_etid() const { return tls_registry->get_etid(); }
+
+  /// Return RDTSC frequency in GHz
+  inline double get_freq_ghz() const { return freq_ghz; }
+
+  /// Return the number of seconds elapsed since this Rpc was created
+  double sec_since_creation() {
+    return to_sec(rdtsc() - creation_tsc, freq_ghz);
+  }
+
+  /// Return the average number of packets received in a call to rx_burst
+  double get_avg_rx_batch() {
+    if (!kDatapathStats || dpath_stats.rx_burst_calls == 0) return -1.0;
+    return dpath_stats.pkts_rx * 1.0 / dpath_stats.rx_burst_calls;
+  }
+
+  /// Return the average number of packets sent in a call to tx_burst
+  double get_avg_tx_batch() {
+    if (!kDatapathStats || dpath_stats.tx_burst_calls == 0) return -1.0;
+    return dpath_stats.pkts_tx * 1.0 / dpath_stats.tx_burst_calls;
+  }
+
+  /// Reset all datapath stats to zero
+  void reset_dpath_stats() { memset(&dpath_stats, 0, sizeof(dpath_stats)); }
+
+  /**
+   * @brief Inject a fault that always fails all routing info resolution
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_fail_resolve_rinfo_st();
+
+  /**
+   * @brief Set the TX packet drop probability for this Rpc
+   * @throw runtime_error if the caller cannot inject faults
+   */
+  void fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob);
+
  private:
+  int create_session_st(std::string remote_uri, uint8_t rem_rpc_id);
+  int destroy_session_st(int session_num);
+  size_t num_active_sessions_st();
+
+  //
+  // Session management helper functions
+  //
+
+  /// Process all session management packets in the hook's RX list
+  void handle_sm_rx_st();
+
+  /// Free a session's resources and mark it as null in the session vector.
+  /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
+  /// responsible for freeing user-allocated MsgBuffers.
+  void bury_session_st(Session *);
+
+  /// Send an SM packet. The packet's destination (i.e., client or server) is
+  /// determined using the packet's type.
+  void sm_pkt_udp_tx_st(const SmPkt &);
+
+  /// Send a session management request for a client session. This includes
+  /// saving retransmission information for the request. The SM request type is
+  /// computed using the session state
+  void send_sm_req_st(Session *);
+
+  //
+  // Session management packet handlers
+  //
+  void handle_connect_req_st(const SmPkt &);
+  void handle_connect_resp_st(const SmPkt &);
+
+  void handle_disconnect_req_st(const SmPkt &);
+  void handle_disconnect_resp_st(const SmPkt &);
+
+  /// Try to reset a client session. If this is not currently possible, the
+  /// session state must be set to reset-in-progress.
+  bool handle_reset_client_st(Session *session);
+
+  /// Try to reset a server session. If this is not currently possible, the
+  /// session state must be set to reset-in-progress.
+  bool handle_reset_server_st(Session *session);
+
+  //
   // Methods to bury server-side request and response MsgBuffers. Client-side
   // request and response MsgBuffers are owned by user apps, so eRPC doesn't
   // free their backing memory.
+  //
 
   /**
    * @brief Bury a server sslot's response MsgBuffer (i.e., sslot->tx_msgbuf).
@@ -244,121 +495,6 @@ class Rpc {
 
     req_msgbuf.buf = nullptr;
   }
-
-  //
-  // Session management API (rpc_sm_api.cc)
-  //
-
- public:
-  /**
-   * @brief Create a session to a remote Rpc object and initiate session
-   * connection. A session management callback of type \p kConnected or
-   * \p kConnectFailed will be invoked if this call is successful.
-   *
-   * @return The local session number (>= 0) of the session if the session
-   * is successfully created, negative errno otherwise.
-   *
-   * @param remote_uri The remote Nexus's URI, formatted as hostname:udp_port
-   * @param rem_rpc_id The ID of the remote Rpc object
-   */
-  int create_session(std::string remote_uri, uint8_t rem_rpc_id) {
-    return create_session_st(remote_uri, rem_rpc_id);
-  }
-
-  /**
-   * @brief Disconnect and destroy a session. The application must not use this
-   * session number after this function is called.
-   *
-   * @param session_num A session number returned from a successful
-   * create_session()
-   *
-   * @return 0 if the session disconnect packet was sent, and the disconnect
-   * callback will be invoked later. Negative errno if the session cannot be
-   * disconnected.
-   */
-  int destroy_session(int session_num) {
-    return destroy_session_st(session_num);
-  }
-
-  /// Return the number of active server or client sessions. This function
-  /// can be called only from the creator thread.
-  size_t num_active_sessions() { return num_active_sessions_st(); }
-
-  /// Return true iff this session is connected. The session must not have
-  /// been disconnected.
-  bool is_connected(int session_num) const {
-    return session_vec[static_cast<size_t>(session_num)]->is_connected();
-  }
-
-  /// Return the Timely instance for a connected session. Expert use only.
-  Timely *get_timely(int session_num) {
-    Session *session = session_vec[static_cast<size_t>(session_num)];
-    return &session->client_info.cc.timely;
-  }
-
-  /// Return the physical link bandwidth (bytes per second)
-  size_t get_bandwidth() const { return transport->get_bandwidth(); }
-
-  /// Return the number of retransmissions for a connected session
-  size_t get_num_re_tx(int session_num) const {
-    Session *session = session_vec[static_cast<size_t>(session_num)];
-    return session->client_info.num_re_tx;
-  }
-
-  /// Reset the number of retransmissions for a connected session
-  void reset_num_re_tx(int session_num) {
-    Session *session = session_vec[static_cast<size_t>(session_num)];
-    session->client_info.num_re_tx = 0;
-  }
-
-  /// Return the Timing Wheel for this Rpc. Expert use only.
-  TimingWheel *get_wheel() { return wheel; }
-
- private:
-  int create_session_st(std::string remote_uri, uint8_t rem_rpc_id);
-  int destroy_session_st(int session_num);
-  size_t num_active_sessions_st();
-
-  //
-  // Session management helper functions
-  //
- private:
-  // rpc_sm_helpers.cc
-
-  /// Process all session management packets in the hook's RX list
-  void handle_sm_rx_st();
-
-  /// Free a session's resources and mark it as null in the session vector.
-  /// Only the MsgBuffers allocated by the Rpc layer are freed. The user is
-  /// responsible for freeing user-allocated MsgBuffers.
-  void bury_session_st(Session *);
-
-  /// Send an SM packet. The packet's destination (i.e., client or server) is
-  /// determined using the packet's type.
-  void sm_pkt_udp_tx_st(const SmPkt &);
-
-  /// Send a session management request for a client session. This includes
-  /// saving retransmission information for the request. The SM request type is
-  /// computed using the session state
-  void send_sm_req_st(Session *);
-
-  //
-  // Session management packet handlers (rpc_connect_handlers.cc,
-  // rpc_disconnect_handlers.cc, rpc_reset_handlers.cc)
-  //
-  void handle_connect_req_st(const SmPkt &);
-  void handle_connect_resp_st(const SmPkt &);
-
-  void handle_disconnect_req_st(const SmPkt &);
-  void handle_disconnect_resp_st(const SmPkt &);
-
-  /// Try to reset a client session. If this is not currently possible, the
-  /// session state must be set to reset-in-progress.
-  bool handle_reset_client_st(Session *session);
-
-  /// Try to reset a server session. If this is not currently possible, the
-  /// session state must be set to reset-in-progress.
-  bool handle_reset_server_st(Session *session);
 
   //
   // Handle available ring entries
@@ -470,7 +606,9 @@ class Rpc {
     sslot.client_info.next->client_info.prev = sslot.client_info.prev;
   }
 
-  // rpc_kick.cc
+  //
+  // Datapath processing
+  //
 
   /// Enqueue client packets for a sslot that has at least one credit and
   /// request packets to send. Packets may be added to the timing wheel or the
@@ -482,40 +620,6 @@ class Rpc {
   /// TX burst; credits are used in both cases.
   void kick_rfr_st(SSlot *);
 
-  // rpc_req.cc
- public:
-  /**
-   * @brief Enqueue a request for transmission. This always succeeds. eRPC owns
-   * \p msg_buffer until it invokes the continuation callback.
-   *
-   * @param session_num The session number to send the request on. This session
-   * must be connected.
-   *
-   * @param req_type The type of the request. The server for this remote
-   * procedure call must have a registered handler for this request type.
-   *
-   * @param req_msgbuf The MsgBuffer containing the request data,
-   *
-   * @param resp_msgbuf The MsgBuffer that will contain the response data when
-   * the continuation is invoked. This must be large enough to accomodate any
-   * response for this request.
-   *
-   * @param cont_func The continuation that will be invoked when this request
-   * completes. See erpc_req_func_t.
-   *
-   * @param tag A tag for this request that will be passed to the application
-   * in the continuation callback
-   *
-   * @param cont_etid The eRPC thread ID of the background thread to run the
-   * continuation on. The default value of \p kInvalidBgETid means that the
-   * continuation runs in the foreground. This argument is meant only for
-   * internal use by eRPC (i.e., user calls must ignore it).
-   */
-  void enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
-                       MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
-                       size_t tag, size_t cont_etid = kInvalidBgETid);
-
- private:
   /// Process a single-packet request message. Using (const pkthdr_t *) instead
   /// of (pkthdr_t *) is messy because of fake MsgBuffer constructor.
   void process_small_req_st(SSlot *, pkthdr_t *);
@@ -523,47 +627,6 @@ class Rpc {
   /// Process a packet for a multi-packet request
   void process_large_req_one_st(SSlot *, const pkthdr_t *);
 
-  // rpc_resp.cc
- public:
-  /**
-   * @brief Enqueue a response for transmission at the server. See ReqHandle
-   * for details about creating the response. On calling this, the application
-   * loses ownership of the request and response MsgBuffer.
-   *
-   * This can be called outside the request handler.
-   *
-   * @param req_handle The handle passed to the request handler by eRPC
-   */
-  void enqueue_response(ReqHandle *req_handle);
-
-  /// From a continuation, release ownership of a response handle.
-  inline void release_response(RespHandle *resp_handle) {
-    // When called from a background thread, enqueue to the foreground thread
-    if (unlikely(!in_dispatch())) {
-      bg_queues._release_response.unlocked_push(resp_handle);
-      return;
-    }
-
-    // If we're here, we're in the dispatch thread
-    SSlot *sslot = static_cast<SSlot *>(resp_handle);
-    assert(sslot->tx_msgbuf == nullptr);  // Response was received previously
-
-    Session *session = sslot->session;
-    assert(session != nullptr && session->is_client());
-    session->client_info.sslot_free_vec.push_back(sslot->index);
-
-    if (!session->client_info.enq_req_backlog.empty()) {
-      // We just got a new sslot, and we should have no more if there's backlog
-      assert(session->client_info.sslot_free_vec.size() == 1);
-      enq_req_args_t &args = session->client_info.enq_req_backlog.front();
-      enqueue_request(args.session_num, args.req_type, args.req_msgbuf,
-                      args.resp_msgbuf, args.cont_func, args.tag,
-                      args.cont_etid);
-      session->client_info.enq_req_backlog.pop();
-    }
-  }
-
- private:
   /**
    * @brief Process a single-packet response
    * @param rx_tsc The timestamp at which this packet was received
@@ -574,23 +637,12 @@ class Rpc {
   // Event loop
   //
 
- public:
-  /// Run the event loop for \p timeout_ms milliseconds
-  inline void run_event_loop(size_t timeout_ms) {
-    run_event_loop_timeout_st(timeout_ms);
-  }
-
-  /// Run the event loop once
-  inline void run_event_loop_once() { run_event_loop_do_one_st(); }
-
- private:
   /// Implementation of the run_event_loop(timeout) API function
   void run_event_loop_timeout_st(size_t timeout_ms);
 
   /// Actually run one iteration of the event loop
   void run_event_loop_do_one_st();
 
- private:
   /// Return true iff a packet should be dropped
   inline bool roll_pkt_drop() {
     static constexpr uint32_t billion = 1000000000;
@@ -713,11 +765,6 @@ class Rpc {
     tx_batch_i = 0;
   }
 
-  //
-  // rpc_rx.cc
-  //
-
- private:
   /// Return a credit to this session
   inline void bump_credits(Session *session) {
     assert(session->is_client());
@@ -755,9 +802,9 @@ class Rpc {
                             size_t bg_etid = kMaxBgThreads);
 
   //
-  // Queue handlers (rpc_queues.cc)
+  // Queue handlers
   //
- private:
+
   /// Try to transmit request packets from sslots that are stalled for credits.
   void process_credit_stall_queue_st();
 
@@ -773,23 +820,6 @@ class Rpc {
   /// Process the responses freed by background threads
   void process_bg_queues_release_response_st();
 
-  //
-  // Fault injection
-  //
- public:
-  /**
-   * @brief Inject a fault that always fails all routing info resolution
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_fail_resolve_rinfo_st();
-
-  /**
-   * @brief Set the TX packet drop probability for this Rpc
-   * @throw runtime_error if the caller cannot inject faults
-   */
-  void fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob);
-
- private:
   /**
    * @brief Check if the caller can inject faults
    * @throw runtime_error if the caller cannot inject faults
@@ -797,7 +827,7 @@ class Rpc {
   void fault_inject_check_ok() const;
 
   //
-  // Packet loss handling (rpc_pkt_loss.cc)
+  // Packet loss handling
   //
 
   /// Scan sessions and requests for session management and datapath packet loss
@@ -807,78 +837,9 @@ class Rpc {
   void pkt_loss_retransmit_st(SSlot *sslot);
 
   //
-  // Misc public functions
-  //
-
- public:
-  /// Set this Rpc's context
-  inline void set_context(void *_context) {
-    rt_assert(context == nullptr, "Cannot reset non-null Rpc context");
-    context = _context;
-  }
-
-  /// Retrieve this Rpc's hugepage allocator. For expert use only.
-  inline HugeAlloc *get_huge_alloc() const {
-    rt_assert(nexus->num_bg_threads == 0,
-              "Cannot extract allocator because background threads exist.");
-    return huge_alloc;
-  }
-
-  /// Return the maximum *data* size in one packet for the (private) transport
-  static inline constexpr size_t get_max_data_per_pkt() {
-    return TTr::kMaxDataPerPkt;
-  }
-
-  /// Return the hostname of the remote endpoint for a connected session
-  std::string get_remote_hostname(int session_num) const {
-    return session_vec[static_cast<size_t>(session_num)]->get_remote_hostname();
-  }
-
-  /// Return the maximum number of sessions supported
-  static inline constexpr size_t get_max_num_sessions() {
-    return Transport::kNumRxRingEntries / kSessionCredits;
-  }
-
-  /// Return the data size in bytes that can be sent in one request or response
-  static inline size_t get_max_msg_size() { return kMaxMsgSize; }
-
-  /// Return the ID of this Rpc object
-  inline uint8_t get_rpc_id() const { return rpc_id; }
-
-  /// Return true iff the caller is running in a background thread
-  inline bool in_background() const { return !in_dispatch(); }
-
-  /// Return the eRPC thread ID of the caller
-  inline size_t get_etid() const { return tls_registry->get_etid(); }
-
-  /// Return RDTSC frequency in GHz
-  inline double get_freq_ghz() const { return freq_ghz; }
-
-  /// Return the number of seconds elapsed since this Rpc was created
-  double sec_since_creation() {
-    return to_sec(rdtsc() - creation_tsc, freq_ghz);
-  }
-
-  /// Return the average number of packets received in a call to rx_burst
-  double get_avg_rx_batch() {
-    if (!kDatapathStats || dpath_stats.rx_burst_calls == 0) return -1.0;
-    return dpath_stats.pkts_rx * 1.0 / dpath_stats.rx_burst_calls;
-  }
-
-  /// Return the average number of packets sent in a call to tx_burst
-  double get_avg_tx_batch() {
-    if (!kDatapathStats || dpath_stats.tx_burst_calls == 0) return -1.0;
-    return dpath_stats.pkts_tx * 1.0 / dpath_stats.tx_burst_calls;
-  }
-
-  /// Reset all datapath stats to zero
-  void reset_dpath_stats() { memset(&dpath_stats, 0, sizeof(dpath_stats)); }
-
-  //
   // Misc private functions
   //
 
- private:
   /// Return true iff we're currently running in this Rpc's creator thread
   inline bool in_dispatch() const { return get_etid() == creator_etid; }
 
@@ -914,8 +875,6 @@ class Rpc {
     sslot->session->client_info.cc.timely.update_rate(rx_tsc, rtt_tsc);
   }
 
-  // rpc_cr.cc
-
   /**
    * @brief Enqueue an explicit credit return
    *
@@ -930,8 +889,6 @@ class Rpc {
    * @param rx_tsc Timestamp at which the packet was received
    */
   void process_expl_cr_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
-
-  // rpc_rfr.cc
 
   /**
    * @brief Enqueue a request-for-response. This doesn't modify credits or

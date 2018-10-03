@@ -42,7 +42,7 @@ typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
  * The application must call Rpc::release_response to allow eRPC to send more
  * requests on the connection.
  *
- * @param ReqHandle A handle to the received request
+ * @param ReqHandle A handle to the received reply
  * @param context The context that was used while creating the Rpc object
  */
 typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
