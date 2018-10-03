@@ -56,11 +56,14 @@ typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
  */
 enum class ReqFuncType : uint8_t { kForeground, kBackground };
 
-/// The application-specified eRPC request handler
+/**
+ * @relates Rpc
+ * @brief The request handler registered by applications
+ */
 class ReqFunc {
  public:
-  erpc_req_func_t req_func;
-  ReqFuncType req_func_type;
+  erpc_req_func_t req_func;   ///< The handler function
+  ReqFuncType req_func_type;  ///< The handlers's mode (foreground/background)
 
   inline bool is_background() const {
     return req_func_type == ReqFuncType::kBackground;
