@@ -16,6 +16,29 @@
 
 namespace erpc {
 
+/// The arguments to enqueue_request()
+struct enq_req_args_t {
+  int session_num;
+  uint8_t req_type;
+  MsgBuffer *req_msgbuf;
+  MsgBuffer *resp_msgbuf;
+  erpc_cont_func_t cont_func;
+  size_t tag;
+  size_t cont_etid;
+
+  enq_req_args_t() {}
+  enq_req_args_t(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
+                 MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func, size_t tag,
+                 size_t cont_etid)
+      : session_num(session_num),
+        req_type(req_type),
+        req_msgbuf(req_msgbuf),
+        resp_msgbuf(resp_msgbuf),
+        cont_func(cont_func),
+        tag(tag),
+        cont_etid(cont_etid) {}
+};
+
 // Forward declaration for friendship
 template <typename T>
 class Rpc;

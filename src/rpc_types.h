@@ -19,11 +19,11 @@ class RespHandle;
 
 /**
  * @relates Rpc
- * 
+ *
  * @brief The type of the request handler function invoked at the server when a
  * request is received. The application owns the request handle (and therefore
  * the request message buffer) until it calls Rpc::enqueue_response.
- * 
+ *
  * The application need not enqueue the response in the body of the request
  * handler. This is true even if the request handler is foreground-mode.
  *
@@ -34,11 +34,11 @@ typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
 
 /**
  * @relates Rpc
- * 
+ *
  * @brief The type of the continuation callback invoked at the client. This
  * returns ownership of the request and response message buffers that the
  * application supplied in Rpc::enqueue_request back to the application.
- * 
+ *
  * The application must call Rpc::release_response to allow eRPC to send more
  * requests on the connection.
  *
@@ -75,28 +75,5 @@ class ReqFunc {
 
   /// Check if this request handler is registered
   inline bool is_registered() const { return req_func != nullptr; }
-};
-
-/// The arguments to enqueue_request()
-struct enq_req_args_t {
-  int session_num;
-  uint8_t req_type;
-  MsgBuffer *req_msgbuf;
-  MsgBuffer *resp_msgbuf;
-  erpc_cont_func_t cont_func;
-  size_t tag;
-  size_t cont_etid;
-
-  enq_req_args_t() {}
-  enq_req_args_t(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
-                 MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func, size_t tag,
-                 size_t cont_etid)
-      : session_num(session_num),
-        req_type(req_type),
-        req_msgbuf(req_msgbuf),
-        resp_msgbuf(resp_msgbuf),
-        cont_func(cont_func),
-        tag(tag),
-        cont_etid(cont_etid) {}
 };
 }  // namespace erpc
