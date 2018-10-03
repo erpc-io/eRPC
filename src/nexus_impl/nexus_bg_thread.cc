@@ -1,6 +1,6 @@
-#include "common.h"
 #include "nexus.h"
-#include "ops.h"
+#include "common.h"
+#include "rpc_types.h"
 #include "session.h"
 #include "util/mt_queue.h"
 

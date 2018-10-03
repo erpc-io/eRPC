@@ -8,7 +8,7 @@
 #include "cc/timing_wheel.h"
 #include "common.h"
 #include "msg_buffer.h"
-#include "ops.h"
+#include "rpc_types.h"
 #include "sm_types.h"
 #include "sslot.h"
 #include "util/buffer.h"

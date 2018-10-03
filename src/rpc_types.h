@@ -1,15 +1,18 @@
 /**
- * @file ops.h
- * @brief User-defined eRPC request handler and continuation types
+ * @file rpc_types.h
+ * @brief Types exposed to the eRPC user
  */
 #pragma once
 
-#include "msg_buffer.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include "common.h"
 
 namespace erpc {
 
 // Forward declarations
 class SSlot;
+class MsgBuffer;
 class ReqHandle;
 class RespHandle;
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "msg_buffer.h"
-#include "ops.h"
+#include "rpc_types.h"
 #include "sm_types.h"
 
 namespace erpc {
