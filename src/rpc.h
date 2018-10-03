@@ -122,8 +122,8 @@ class Rpc {
    * be resized with resize_msg_buffer() when used for smaller requests or
    * responses.
    *
-   * @return \p The allocated MsgBuffer. The MsgBuffer is invalid (i.e., its
-   * \p buf is null) if we ran out of memory.
+   * @return The allocated message buffer. The returned message buffer is
+   * invalid (i.e., its MsgBuffer.buf is null) if we ran out of hugepage memory.
    *
    * @throw runtime_error if \p size is too large for the allocator, or if
    * hugepage reservation failure is catastrophic. An exception is *not* thrown
