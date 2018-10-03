@@ -53,7 +53,8 @@ Some highlights:
    instructions below are for this suite of applications. eRPC can also be
    simply linked as a library instead (see `hello_world/` for an example).
  * To build an application, create `scripts/autorun_app_file` and change its
-   contents to one of the available directory names in `apps/`. Then generate a
+   contents to one of the available directory names in `apps/`. See
+   `scripts/example_autorun_app_file` for an example. Then generate a
    Makefile using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
  * Each application directory in `apps/` contains a config file
    that must specify all flags defined in `apps/apps_common.h`. For example,
