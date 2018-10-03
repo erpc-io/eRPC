@@ -52,9 +52,9 @@ Some highlights:
  * The `apps` directory contains a suite of benchmarks and examples. The
    instructions below are for this suite of applications. eRPC can also be
    simply linked as a library instead (see `hello_world/` for an example).
- * To build an application, change the contents of `scripts/autorun_app_file`
-   to one of the available directory names in `apps/`. Then generate a Makefile
-   using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
+ * To build an application, create `scripts/autorun_app_file` and change its
+   contents to one of the available directory names in `apps/`. Then generate a
+   Makefile using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
  * Each application directory in `apps/` contains a config file
    that must specify all flags defined in `apps/apps_common.h`. For example,
    `num_processes` specifies the total number of eRPC processes in the cluster.
