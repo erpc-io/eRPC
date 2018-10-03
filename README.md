@@ -1,6 +1,6 @@
 eRPC is a fast and general-purpose RPC library for datacenter networks.
 We have a [preprint](https://arxiv.org/pdf/1806.00680.pdf) that describes the
-system. [Documentation](http://www.cs.cmu.edu/~akalia/erpc-doc) is available
+system. [Documentation](http://www.cs.cmu.edu/~akalia/erpc_doc) is available
 online.
 
 Some highlights:
