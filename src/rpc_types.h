@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <type_traits>
 #include "common.h"
 
 namespace erpc {
@@ -16,18 +17,44 @@ class MsgBuffer;
 class ReqHandle;
 class RespHandle;
 
-/// The request handler
+/**
+ * @relates Rpc
+ * 
+ * @brief The type of the request handler function invoked at the server when a
+ * request is received. The application owns the request handle (and therefore
+ * the request message buffer) until it calls Rpc::enqueue_response.
+ * 
+ * The application need not enqueue the response in the body of the request
+ * handler. This is true even if the request handler is foreground-mode.
+ *
+ * @param ReqHandle A handle to the received request
+ * @param context The context that was used while creating the Rpc object
+ */
 typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
 
-/// The continuation function
+/**
+ * @relates Rpc
+ * 
+ * @brief The type of the continuation callback invoked at the client. This
+ * returns ownership of the request and response message buffers that the
+ * application supplied in Rpc::enqueue_request back to the application.
+ * 
+ * The application must call Rpc::release_response to allow eRPC to send more
+ * requests on the connection.
+ *
+ * @param ReqHandle A handle to the received request
+ * @param context The context that was used while creating the Rpc object
+ */
 typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
                                  size_t tag);
 
-/// The request handler types
-enum class ReqFuncType : uint8_t {
-  kForeground,  ///< Request handler runs in foreground (network I/O) thread
-  kBackground   ///< Request handler runs in a background thread
-};
+/**
+ * @relates Rpc
+ * @brief The possible kinds of request handlers. Foreground-mode handlers run
+ * in the thread that calls the event loop. Background-mode handlers run in
+ * background threads spawned by eRPC.
+ */
+enum class ReqFuncType : uint8_t { kForeground, kBackground };
 
 /// The application-specified eRPC request handler
 class ReqFunc {

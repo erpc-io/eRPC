@@ -501,7 +501,7 @@ class Rpc {
    * response for this request.
    *
    * @param cont_func The continuation that will be invoked when this request
-   * completes
+   * completes. See erpc_req_func_t.
    *
    * @param tag A tag for this request that will be passed to the application
    * in the continuation callback
