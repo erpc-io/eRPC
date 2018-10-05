@@ -5,9 +5,10 @@ online.
 
 Some highlights:
  * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
- * Performance for small RPCs: ~10 million 32-byte RPCs/second per CPU core
  * Low latency: 2.3 microseconds round-trip RPC latency with UDP over Ethernet
- * High bandwidth for large RPC: 40 Gbps per CPU core for 8 MB RPCs
+ * Performance for small RPCs: ~10 million 32-byte RPCs/second per CPU core
+ * Bandwidth for large RPC: 75 Gbps on one connection (one CPU core at server
+   and client) for 8 MB RPCs
  * Scalability: 20000 RPC sessions per server
  * End-to-end congestion control that tolerates 100-way incasts
  * Nested RPCs, and long-running background RPCs
