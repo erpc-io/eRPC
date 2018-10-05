@@ -99,7 +99,10 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
     erpc::rt_assert(match, "Invalid resp data");
   } else {
-    erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte, "Invalid resp data");
+    if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
+      fprintf(stderr, "Invalid response data\n");
+      exit(-1);
+    }
   }
 
   c->stat_rx_bytes_tot += FLAGS_resp_size;
