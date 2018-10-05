@@ -1,6 +1,5 @@
 #include "util/latency.h"
 #include <gflags/gflags.h>
-#include <libpmem.h>
 #include <signal.h>
 #include <cstring>
 #include "../apps_common.h"
@@ -8,6 +7,12 @@
 #include "util/autorun_helpers.h"
 #include "util/numautils.h"
 #include "util/pmem.h"
+
+#define USE_PMEM false
+
+#if USE_PMEM == true
+#include <libpmem.h>
+#endif
 
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
@@ -42,16 +47,16 @@ class ClientContext : public BasicAppContext {
 };
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
-  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   auto *c = static_cast<ServerContext *>(_context);
 
-  if (kAppUsePmem) {
-    const size_t copy_size = req_msgbuf->get_data_size();
-    if (c->file_offset + copy_size >= kAppPmemFileSize) c->file_offset = 0;
-    pmem_memcpy_persist(&c->pbuf[c->file_offset], req_msgbuf->buf, copy_size);
+#if USE_PMEM == true
+  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
+  const size_t copy_size = req_msgbuf->get_data_size();
+  if (c->file_offset + copy_size >= kAppPmemFileSize) c->file_offset = 0;
+  pmem_memcpy_persist(&c->pbuf[c->file_offset], req_msgbuf->buf, copy_size);
 
-    c->file_offset += copy_size;
-  }
+  c->file_offset += copy_size;
+#endif
 
   req_handle->prealloc_used = true;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
@@ -68,12 +73,12 @@ void server_func(erpc::Nexus *nexus) {
                                   basic_sm_handler, phy_port);
   c.rpc = &rpc;
 
-  if (kAppUsePmem) {
-    printf("Mapping pmem file...");
-    c.pbuf = erpc::map_devdax_file(kAppPmemFile, kAppPmemFileSize);
-    pmem_memset_persist(c.pbuf, 0, kAppPmemFileSize);
-    printf("done.\n");
-  }
+#if USE_PMEM == true
+  printf("Mapping pmem file...");
+  c.pbuf = erpc::map_devdax_file(kAppPmemFile, kAppPmemFileSize);
+  pmem_memset_persist(c.pbuf, 0, kAppPmemFileSize);
+  printf("done.\n");
+#endif
 
   while (true) {
     rpc.run_event_loop(1000);

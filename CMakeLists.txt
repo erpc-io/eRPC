@@ -272,9 +272,20 @@ endif()
 message(STATUS "Compiling app = " ${APP})
 
 # Add app-specific defines now, isolating them from the tests
+
+# libpmem is installable from package managers in only recent distros. If it's
+# not present, don't link it in.
+find_library(PMEM_LIB pmem)
+if(NOT PMEM_LIB)
+  message(STATUS "pmem library not found")
+  SET(PMEM "")
+else()
+  SET(PMEM "pmem")
+endif()
+
 if(APP STREQUAL "smr")
   # Raft library from willemt/raft, installed at system-level
-  set(LIBRARIES ${LIBRARIES} raft pmem)
+  set(LIBRARIES ${LIBRARIES} raft ${PMEM})
   # MICA
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
@@ -289,8 +300,10 @@ elseif(APP STREQUAL "masstree_analytics")
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
-elseif(APP STREQUAL "latency" OR APP STREQUAL "persistent_kv")
-  set(LIBRARIES ${LIBRARIES} pmem cityhash)
+elseif(APP STREQUAL "latency")
+  set(LIBRARIES ${LIBRARIES} ${PMEM})
+elseif(APP STREQUAL "persistent_kv")
+  set(LIBRARIES ${LIBRARIES} ${PMEM} cityhash)
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO
