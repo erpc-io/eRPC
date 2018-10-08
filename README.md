@@ -41,13 +41,15 @@ Some highlights:
 ## Supported NICs:
  * UDP over Ethernet mode:
    * ConnectX-4 or newer Mellanox Ethernet NICs: Use `DTRANSPORT=raw`
-   * Any DPDK-compatible NICs: Use `DTRANSPORT=dpdk`. `raw` transport is faster
-     for Mellanox NICs, which also support DPDK.
-   * ConnectX-3 and older Mellanox NICs are supported in eRPC's RoCE mode
- * InfiniBand mode (`DTRANSPORT=infiniband`): Any InfiniBand-compliant NICs
- * RoCE mode: Any RoCE-compilant NICs
- * Mellanox drivers specially optimized for eRPC are available in the `drivers`
-   directory.
+   * DPDK-compatible NICs that support flow-director: Use `DTRANSPORT=dpdk`
+     * Intel 82599 and Intel X710 NICs have been tested
+     * Virtual NICs have not been tested
+     * `raw` transport is faster for Mellanox NICs, which also support DPDK
+   * ConnectX-3 Ethernet NICs are supported in eRPC's RoCE mode
+ * Any InfiniBand-compliant NICs: Use `DTRANSPORT=infiniband`
+ * Any RoCE-compilant NICs: Coming soon.
+ * Mellanox drivers optimized specially for eRPC are available in the `drivers`
+   directory
 
 ## Configuring and running the provided applications
  * The `apps` directory contains a suite of benchmarks and examples. The
