@@ -16,7 +16,7 @@ constexpr size_t RawTransport::kMaxDataPerPkt;
 RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
                            FILE *trace_file)
     : Transport(TransportType::kRaw, rpc_id, phy_port, numa_node, trace_file),
-      rx_flow_udp_port(kBaseEthUDPPort + (256u * numa_node) + rpc_id) {
+      rx_flow_udp_port(kBaseEthUDPPort + (kMaxRpcId * numa_node) + rpc_id) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
@@ -28,7 +28,7 @@ RawTransport::RawTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
 
   LOG_WARN(
       "RawTransport created for Rpc ID %u. Device %s/%s, port %d. "
-      "IPv4 %s, MAC %s. RX UDP port %u.\n",
+      "IPv4 %s, MAC %s. Datapath UDP port %u.\n",
       rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
       resolve.dev_port_id, ipv4_to_string(htonl(resolve.ipv4_addr)).c_str(),
       mac_to_string(resolve.mac_addr).c_str(), rx_flow_udp_port);

@@ -79,7 +79,8 @@ DpdkTransport::DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   resolve_phy_port();
   init_mem_reg_funcs();
 
-  LOG_WARN("DpdkTransport created for Rpc ID %u, queue %zu, udp port = %u\n",
+  LOG_WARN("DpdkTransport created for Rpc ID %u, queue %zu, "
+           "datapath udp port = %u\n",
            rpc_id, qp_id, rx_flow_udp_port);
 }
 
