@@ -46,10 +46,22 @@ struct wheel_ent_t {
 };
 static_assert(sizeof(wheel_ent_t) == 8, "");
 
+// Handle the fact that we're not using all 64 TSC bits
 static constexpr size_t kWheelBucketCap = 5;  ///< Wheel entries per bucket
+static constexpr size_t kNumBktEntriesBits = 3;
+static_assert((1ull << kNumBktEntriesBits) > kWheelBucketCap, "");
+
+// TSC ticks per day = ~3 billion per second * 86400 seconds per day
+// Require that rollback happens only after server lifetime
+static constexpr size_t _kTscTicks = 1ull << (64 - kNumBktEntriesBits);
+static_assert(_kTscTicks / (3000000000ull * 86400) > 2000, "");
+
 struct wheel_bkt_t {
-  size_t num_entries : 8;  ///< Number of valid entries in this bucket
-  size_t tx_tsc : 56;      ///< Timestamp at which it is safe to transmit
+  size_t num_entries : kNumBktEntriesBits;  ///< Valid entries in this bucket
+
+  /// Timestamp at which it is safe to transmit packets in this bucket's chain
+  size_t tx_tsc : 64 - kNumBktEntriesBits;
+
   wheel_bkt_t *last;  ///< Last bucket in chain. Used only at the first bucket.
   wheel_bkt_t *next;  ///< Next bucket in chain
   wheel_ent_t entry[kWheelBucketCap];  ///< Space for wheel entries
