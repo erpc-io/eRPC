@@ -1,8 +1,8 @@
 #include "nexus.h"
 #include <algorithm>
 #include "common.h"
-#include "transport_impl/eth_common.h"
 #include "rpc.h"
+#include "transport_impl/eth_common.h"
 #include "util/autorun_helpers.h"
 #include "util/barrier.h"
 #include "util/numautils.h"
@@ -70,9 +70,10 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
   sm_thread = std::thread(sm_thread_func, sm_thread_ctx);
   bind_to_core(sm_thread, numa_node, sm_thread_lcore_index);
 
-  LOG_INFO("eRPC Nexus: Created with management UDP port %u, "
-           "hostname %s.\n", sm_udp_port,
-           hostname.c_str());
+  LOG_INFO(
+      "eRPC Nexus: Created with management UDP port %u, "
+      "hostname %s.\n",
+      sm_udp_port, hostname.c_str());
 }
 
 Nexus::~Nexus() {
