@@ -15,13 +15,16 @@ Some highlights:
  * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
    replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
-## Software requirements
+## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+
  * Install _exactly one_ of the following, mutually-incompatible packages:
    * Mellanox OFED for Mellanox NICs
    * System-wide DPDK for other, DPDK-compatible NICs
- * See `scripts/packages/` for required software packages for your distro.
- * At least 512 huge pages on every NUMA node, and unlimited SHM limits.
+ * See `scripts/packages/` for required software packages for your distro
+ * At least 512 huge pages on every NUMA node, and unlimited SHM limits
+ * UDP ports 31850 and 31851 should be open on the management network.
+   `scripts/firewalld/erpc_firewall.sh` opens them on systems running
+   `firewalld`.
 
 ## eRPC quickstart
  * Build and run the test suite:
