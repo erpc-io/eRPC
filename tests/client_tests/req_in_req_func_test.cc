@@ -76,12 +76,11 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
   const MsgBuffer *req_msgbuf_cp = req_handle_cp->get_req_msgbuf();
   size_t req_size_cp = req_msgbuf_cp->get_data_size();
 
-  test_printf("Primary [Rpc %u]: Received request of length %zu. etid %zu\n",
-              context->rpc->get_rpc_id(), req_size_cp,
-              context->rpc->get_etid());
+  test_printf("Primary [Rpc %u]: Received request of length %zu\n",
+              context->rpc->get_rpc_id(), req_size_cp);
 
   // Record info for the request that we are now sending to the backup
-  PrimaryReqInfo *srv_req_info =
+  auto *srv_req_info =
       new PrimaryReqInfo(req_size_cp, req_handle_cp, context->rpc->get_etid());
 
   // Allocate request and response MsgBuffers for the request to the backup
@@ -136,9 +135,8 @@ void primary_cont_func(void *_context, size_t _tag) {
   auto *srv_req_info = reinterpret_cast<PrimaryReqInfo *>(_tag);
 
   const MsgBuffer &resp_msgbuf_pb = srv_req_info->resp_msgbuf_pb;
-  test_printf("Primary [Rpc %u]: Received response of length %zu. etid %zu.\n",
-              context->rpc->get_rpc_id(), resp_msgbuf_pb.get_data_size(),
-              context->rpc->get_etid());
+  test_printf("Primary [Rpc %u]: Received response of length %zu\n",
+              context->rpc->get_rpc_id(), resp_msgbuf_pb.get_data_size());
 
   // Check that we're still running in the same thread as for the
   // client-to-primary request
