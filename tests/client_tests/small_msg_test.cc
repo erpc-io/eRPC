@@ -41,19 +41,16 @@ void req_handler(ReqHandle *req_handle, void *_context) {
 /// The common continuation function for all subtests. This checks that the
 /// request buffer is identical to the response buffer, and increments the
 /// number of responses in the context.
-void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
-  const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  ASSERT_EQ(resp_msgbuf->get_data_size(), config_msg_size);
+void cont_func(void *_context, size_t tag) {
+  auto *context = static_cast<AppContext *>(_context);
+  ASSERT_EQ(context->resp_msgbufs[tag].get_data_size(), config_msg_size);
 
   for (size_t i = 0; i < config_msg_size; i++) {
-    ASSERT_EQ(resp_msgbuf->buf[i], static_cast<uint8_t>(tag));
+    ASSERT_EQ(context->resp_msgbufs[tag].buf[i], static_cast<uint8_t>(tag));
   }
 
-  auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
   context->num_rpc_resps++;
-
-  context->rpc->release_response(resp_handle);
 }
 
 /// The generic test function that issues \p config_rpcs_per_session Rpcs
@@ -72,11 +69,13 @@ void generic_test_func(Nexus *nexus, size_t) {
 
   // Pre-create MsgBuffers so we can test reuse and resizing
   size_t tot_reqs_per_iter = config_num_sessions * config_rpcs_per_session;
-  std::vector<MsgBuffer> req_msgbufs(tot_reqs_per_iter);
-  std::vector<MsgBuffer> resp_msgbufs(tot_reqs_per_iter);
+  context.req_msgbufs.resize(tot_reqs_per_iter);
+  context.resp_msgbufs.resize(tot_reqs_per_iter);
   for (size_t i = 0; i < tot_reqs_per_iter; i++) {
-    req_msgbufs[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_data_per_pkt());
-    resp_msgbufs[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_data_per_pkt());
+    context.req_msgbufs[i] =
+        rpc->alloc_msg_buffer_or_die(rpc->get_max_data_per_pkt());
+    context.resp_msgbufs[i] =
+        rpc->alloc_msg_buffer_or_die(rpc->get_max_data_per_pkt());
   }
 
   // The main request-issuing loop
@@ -89,7 +88,7 @@ void generic_test_func(Nexus *nexus, size_t) {
     for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {
       for (size_t w_i = 0; w_i < config_rpcs_per_session; w_i++) {
         assert(iter_req_i < tot_reqs_per_iter);
-        MsgBuffer &cur_req_msgbuf = req_msgbufs[iter_req_i];
+        MsgBuffer &cur_req_msgbuf = context.req_msgbufs[iter_req_i];
 
         rpc->resize_msg_buffer(&cur_req_msgbuf, config_msg_size);
         for (size_t i = 0; i < config_msg_size; i++) {
@@ -97,7 +96,7 @@ void generic_test_func(Nexus *nexus, size_t) {
         }
 
         rpc->enqueue_request(session_num_arr[sess_i], kTestReqType,
-                             &cur_req_msgbuf, &resp_msgbufs[iter_req_i],
+                             &cur_req_msgbuf, &context.resp_msgbufs[iter_req_i],
                              cont_func, iter_req_i);
 
         iter_req_i++;
@@ -109,8 +108,8 @@ void generic_test_func(Nexus *nexus, size_t) {
   }
 
   // Free the MsgBuffers
-  for (auto req_msgbuf : req_msgbufs) rpc->free_msg_buffer(req_msgbuf);
-  for (auto resp_msgbuf : resp_msgbufs) rpc->free_msg_buffer(resp_msgbuf);
+  for (auto &mb : context.req_msgbufs) rpc->free_msg_buffer(mb);
+  for (auto &mb : context.resp_msgbufs) rpc->free_msg_buffer(mb);
 
   // Disconnect the sessions
   for (size_t sess_i = 0; sess_i < config_num_sessions; sess_i++) {

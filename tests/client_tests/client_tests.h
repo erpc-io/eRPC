@@ -43,6 +43,9 @@ class BasicAppContext {
 
   size_t num_sm_resps = 0;   ///< Number of SM responses
   size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+
+  std::vector<MsgBuffer> req_msgbufs;
+  std::vector<MsgBuffer> resp_msgbufs;
 };
 
 /// Info required to register a request handler function

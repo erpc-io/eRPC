@@ -69,8 +69,6 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t tag) {
   auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
   context->num_rpc_resps++;
-
-  context->rpc->release_response(resp_handle);
 }
 
 /// The generic test function that issues \p config_num_rpcs Rpcs

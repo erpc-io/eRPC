@@ -78,8 +78,9 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_context) {
   const MsgBuffer *req_msgbuf_cp = req_handle_cp->get_req_msgbuf();
   size_t req_size_cp = req_msgbuf_cp->get_data_size();
 
-  test_printf("Primary [Rpc %u]: Received request of length %zu.\n",
-              context->rpc->get_rpc_id(), req_size_cp);
+  test_printf("Primary [Rpc %u]: Received request of length %zu. etid %zu\n",
+              context->rpc->get_rpc_id(), req_size_cp,
+              context->rpc->get_etid());
 
   // Record info for the request that we are now sending to the backup
   PrimaryReqInfo *srv_req_info =
@@ -136,8 +137,9 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
   ASSERT_EQ(context->rpc->in_background(), primary_bg);
 
   const MsgBuffer *resp_msgbuf_pb = resp_handle_pb->get_resp_msgbuf();
-  test_printf("Primary [Rpc %u]: Received response of length %zu.\n",
-              context->rpc->get_rpc_id(), resp_msgbuf_pb->get_data_size());
+  test_printf("Primary [Rpc %u]: Received response of length %zu. etid %zu.\n",
+              context->rpc->get_rpc_id(), resp_msgbuf_pb->get_data_size(),
+              context->rpc->get_etid());
 
   // Check that we're still running in the same thread as for the
   // client-to-primary request
@@ -167,9 +169,6 @@ void primary_cont_func(RespHandle *resp_handle_pb, void *_context,
   context->rpc->free_msg_buffer(srv_req_info->req_msgbuf_pb);
   context->rpc->free_msg_buffer(srv_req_info->resp_msgbuf_pb);
   delete srv_req_info;
-
-  // Release the server-server response
-  context->rpc->release_response(resp_handle_pb);
 
   // Send response to the client
   req_handle_cp->prealloc_used = false;
@@ -232,7 +231,6 @@ void client_cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   }
 
   context->num_rpc_resps++;
-  context->rpc->release_response(resp_handle);
 
   if (context->num_reqs_sent < kTestNumReqs) {
     client_request_helper(context, msgbuf_i);
@@ -247,7 +245,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   Rpc<CTransport> *rpc = context.rpc;
 
   // Start by filling the request window
-  for (size_t i = 0; i < kSessionReqWindow; i++) {
+  for (size_t i = 0; i < erpc::kSessionReqWindow; i++) {
     context.req_msgbuf[i] =
         rpc->alloc_msg_buffer_or_die(Rpc<CTransport>::kMaxMsgSize);
 
@@ -260,7 +258,7 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   wait_for_rpc_resps_or_timeout(context, kTestNumReqs);
   assert(context.num_rpc_resps == kTestNumReqs);
 
-  for (size_t i = 0; i < kSessionReqWindow; i++) {
+  for (size_t i = 0; i < erpc::kSessionReqWindow; i++) {
     rpc->free_msg_buffer(context.req_msgbuf[i]);
   }
 
@@ -300,8 +298,8 @@ TEST(Base, PrimaryInBackground) {
       ReqFuncRegInfo(kTestReqTypeCP, req_handler_cp, ReqFuncType::kBackground),
       ReqFuncRegInfo(kTestReqTypePB, req_handler_pb, ReqFuncType::kForeground)};
 
-  // 2 client sessions (=> 2 server threads), 3 background threads
-  launch_server_client_threads(2, 1, client_thread, reg_info_vec,
+  // 2 client sessions (=> 2 server threads), 1 background threads
+  launch_server_client_threads(2, 8, client_thread, reg_info_vec,
                                ConnectServers::kTrue, 0.0);
 }
 

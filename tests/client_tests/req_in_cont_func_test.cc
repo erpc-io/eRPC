@@ -93,7 +93,6 @@ void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
   ASSERT_EQ(resp_msgbuf->get_data_size(), static_cast<tag_t>(tag).s.req_size);
 
   context->num_rpc_resps++;
-  context->rpc->release_response(resp_handle);
 
   if (context->num_reqs_sent < kTestNumReqs) {
     enqueue_request_helper(context, static_cast<tag_t>(tag).s.msgbuf_i);
