@@ -181,7 +181,7 @@ static void req_handler(ReqHandle *req_handle, void *_context) {
 }
 
 /// The common continuation for subtests.
-static void cont_func(RespHandle *, void *_context, size_t) {
+static void cont_func(void *_context, size_t) {
   auto *context = static_cast<RpcTest *>(_context);
   context->num_cont_func_calls++;
 }
