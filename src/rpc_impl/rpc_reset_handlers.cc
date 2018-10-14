@@ -34,8 +34,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
         // sslot contains a valid request
         MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
         resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
-        sslot.client_info.cont_func(static_cast<RespHandle *>(&sslot), context,
-                                    sslot.client_info.tag);
+        sslot.client_info.cont_func(context, sslot.client_info.tag);
       }
     }
   }

@@ -77,18 +77,6 @@ void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
   }
 }
 
-template <class TTr>
-void Rpc<TTr>::process_bg_queues_release_response_st() {
-  assert(in_dispatch());
-  auto &queue = bg_queues._release_response;
-  const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
-
-  for (size_t i = 0; i < cmds_to_process; i++) {
-    RespHandle *resp_handle = queue.unlocked_pop();
-    release_response(resp_handle);
-  }
-}
-
 FORCE_COMPILE_TRANSPORTS
 
 }  // namespace erpc

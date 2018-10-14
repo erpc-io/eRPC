@@ -25,7 +25,6 @@ void Rpc<TTr>::run_event_loop_do_one_st() {
     // Process the background queues
     process_bg_queues_enqueue_request_st();
     process_bg_queues_enqueue_response_st();
-    process_bg_queues_release_response_st();
   }
 
   // Check for packet loss if we're in a new epoch. ev_loop_tsc is stale by

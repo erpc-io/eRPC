@@ -1,5 +1,5 @@
-#include "nexus.h"
 #include "common.h"
+#include "nexus.h"
 #include "rpc_types.h"
 #include "session.h"
 #include "util/mt_queue.h"
@@ -30,8 +30,7 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
         const ReqFunc &req_func = ctx.req_func_arr->at(req_type);
         req_func.req_func(static_cast<ReqHandle *>(s), wi.context);
       } else {
-        wi.sslot->client_info.cont_func(static_cast<RespHandle *>(s),
-                                        wi.context, s->client_info.tag);
+        wi.sslot->client_info.cont_func(wi.context, s->client_info.tag);
       }
     }
   }

@@ -13,7 +13,6 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                                size_t cont_etid) {
   // When called from a background thread, enqueue to the foreground thread
   if (unlikely(!in_dispatch())) {
-    assert(cont_etid == kInvalidBgETid);  // User does not specify cont TID
     auto req_args = enq_req_args_t(session_num, req_type, req_msgbuf,
                                    resp_msgbuf, cont_func, tag, get_etid());
     bg_queues._enqueue_request.unlocked_push(req_args);
@@ -26,9 +25,9 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   // If a free sslot is unavailable, save to session backlog
   if (unlikely(session->client_info.sslot_free_vec.size() == 0)) {
-    session->client_info.enq_req_backlog.emplace(
-        session_num, req_type, req_msgbuf, resp_msgbuf, cont_func, tag,
-        kInvalidBgETid);
+    session->client_info.enq_req_backlog.emplace(session_num, req_type,
+                                                 req_msgbuf, resp_msgbuf,
+                                                 cont_func, tag, cont_etid);
     return;
   }
 
@@ -48,7 +47,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   ci.num_rx = 0;
   ci.num_tx = 0;
-  if (unlikely(cont_etid != kInvalidBgETid)) ci.cont_etid = cont_etid;
+  ci.cont_etid = cont_etid;
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();

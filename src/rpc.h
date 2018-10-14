@@ -51,7 +51,6 @@ namespace erpc {
  *    - Run eRPC's event loop with Rpc::run_event_loop
  *    - The continuation will run when the response is received, or when the
  *      request times out
- *    - Release the reponse using Rpc::release_response
  */
 
 /**
@@ -245,33 +244,6 @@ class Rpc {
    * @param req_handle The handle passed to the request handler by eRPC
    */
   void enqueue_response(ReqHandle *req_handle);
-
-  /// From a continuation, release ownership of a response handle.
-  inline void release_response(RespHandle *resp_handle) {
-    // When called from a background thread, enqueue to the foreground thread
-    if (unlikely(!in_dispatch())) {
-      bg_queues._release_response.unlocked_push(resp_handle);
-      return;
-    }
-
-    // If we're here, we're in the dispatch thread
-    SSlot *sslot = static_cast<SSlot *>(resp_handle);
-    assert(sslot->tx_msgbuf == nullptr);  // Response was received previously
-
-    Session *session = sslot->session;
-    assert(session != nullptr && session->is_client());
-    session->client_info.sslot_free_vec.push_back(sslot->index);
-
-    if (!session->client_info.enq_req_backlog.empty()) {
-      // We just got a new sslot, and we should have no more if there's backlog
-      assert(session->client_info.sslot_free_vec.size() == 1);
-      enq_req_args_t &args = session->client_info.enq_req_backlog.front();
-      enqueue_request(args.session_num, args.req_type, args.req_msgbuf,
-                      args.resp_msgbuf, args.cont_func, args.tag,
-                      args.cont_etid);
-      session->client_info.enq_req_backlog.pop();
-    }
-  }
 
   /// Run the event loop for some milliseconds
   inline void run_event_loop(size_t timeout_ms) {
@@ -817,9 +789,6 @@ class Rpc {
   /// Process the responses enqueued by background threads
   void process_bg_queues_enqueue_response_st();
 
-  /// Process the responses freed by background threads
-  void process_bg_queues_release_response_st();
-
   /**
    * @brief Check if the caller can inject faults
    * @throw runtime_error if the caller cannot inject faults
@@ -991,7 +960,6 @@ class Rpc {
   struct {
     MtQueue<enq_req_args_t> _enqueue_request;
     MtQueue<ReqHandle *> _enqueue_response;
-    MtQueue<RespHandle *> _release_response;
   } bg_queues;
 
   // Misc

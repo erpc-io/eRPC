@@ -19,7 +19,6 @@ class SSlot {
   friend class Nexus;
   friend class Rpc<CTransport>;
   friend class ReqHandle;
-  friend class RespHandle;
 
  public:
   SSlot() {}
@@ -122,13 +121,6 @@ class ReqHandle : public SSlot {
  public:
   inline const MsgBuffer *get_req_msgbuf() const {
     return &server_info.req_msgbuf;
-  }
-};
-
-class RespHandle : public SSlot {
- public:
-  inline const MsgBuffer *get_resp_msgbuf() const {
-    return client_info.resp_msgbuf;
   }
 };
 }  // namespace erpc

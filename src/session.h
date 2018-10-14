@@ -79,7 +79,6 @@ class Session {
 
       if (is_client()) {
         for (auto &x : sslot.client_info.in_wheel) x = false;
-        sslot.client_info.cont_etid = kInvalidBgETid;  // Continuations in fg
       } else {
         sslot.server_info.req_type = kInvalidReqType;
       }

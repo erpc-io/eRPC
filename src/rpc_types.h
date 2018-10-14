@@ -15,7 +15,6 @@ namespace erpc {
 class SSlot;
 class MsgBuffer;
 class ReqHandle;
-class RespHandle;
 
 /**
  * @relates Rpc
@@ -39,14 +38,10 @@ typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
  * returns ownership of the request and response message buffers that the
  * application supplied in Rpc::enqueue_request back to the application.
  *
- * The application must call Rpc::release_response to allow eRPC to send more
- * requests on the connection.
- *
- * @param ReqHandle A handle to the received reply
  * @param context The context that was used while creating the Rpc object
+ * @param tag The tag used by the application for this request
  */
-typedef void (*erpc_cont_func_t)(RespHandle *resp_handle, void *context,
-                                 size_t tag);
+typedef void (*erpc_cont_func_t)(void *context, size_t tag);
 
 /**
  * @relates Rpc

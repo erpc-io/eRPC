@@ -133,13 +133,26 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // 2. The wheel cannot contain a reference because we (a) wait for sslot to
   //    drain from the wheel before retransmitting, and (b) discard spurious
   //    corresponding packets received for packets in the wheel.
-  assert(sslot->client_info.wheel_count == 0);
+  assert(ci.wheel_count == 0);
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
   delete_from_active_rpc_list(*sslot);
 
-  if (ci.cont_etid == kInvalidBgETid) {
-    ci.cont_func(static_cast<RespHandle *>(sslot), context, ci.tag);
+  // Free-up this sslot, and clear up one request from the backlog if needed.
+  Session *session = sslot->session;
+  session->client_info.sslot_free_vec.push_back(sslot->index);
+
+  if (!session->client_info.enq_req_backlog.empty()) {
+    // We just got a new sslot, and we should have no more if there's backlog
+    assert(session->client_info.sslot_free_vec.size() == 1);
+    enq_req_args_t &args = session->client_info.enq_req_backlog.front();
+    enqueue_request(args.session_num, args.req_type, args.req_msgbuf,
+                    args.resp_msgbuf, args.cont_func, args.tag, args.cont_etid);
+    session->client_info.enq_req_backlog.pop();
+  }
+
+  if (likely(ci.cont_etid == kInvalidBgETid)) {
+    ci.cont_func(context, ci.tag);
   } else {
     submit_background_st(sslot, Nexus::BgWorkItemType::kResp, ci.cont_etid);
   }
