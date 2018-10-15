@@ -86,8 +86,8 @@ class AppContext : public BasicAppContext {
 // Allocate request and response MsgBuffers
 void alloc_req_resp_msg_buffers(AppContext* c) {
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    c->resp_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_resp_size);
     c->req_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_req_size);
+    c->resp_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_resp_size);
 
     // Fill the request regardless of kAppMemset. This is a one-time thing.
     memset(c->req_msgbuf[i].buf, kAppDataByte, FLAGS_req_size);

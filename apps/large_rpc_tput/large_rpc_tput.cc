@@ -31,7 +31,7 @@ static constexpr bool kAppClientCheckResp = false;   // Check entire response
 // Profile-specifc session connection function
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
-void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
+void app_cont_func(void *, size_t);  // Forward declaration
 
 // Send a request using this MsgBuffer
 void send_req(AppContext *c, size_t msgbuf_idx) {
@@ -74,36 +74,35 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
-  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
+void app_cont_func(void *_context, size_t _tag) {
+  auto *c = static_cast<AppContext *>(_context);
   size_t msgbuf_idx = _tag;
+  const erpc::MsgBuffer &resp_msgbuf = c->resp_msgbuf[msgbuf_idx];
   if (kAppVerbose) {
     printf("large_rpc_tput: Received response for msgbuf %zu.\n", msgbuf_idx);
   }
 
   // Measure latency. 1 us granularity is sufficient for large RPC latency.
-  auto *c = static_cast<AppContext *>(_context);
   double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
   c->lat_vec.push_back(usec);
 
   // Check the response
-  erpc::rt_assert(resp_msgbuf->get_data_size() == FLAGS_resp_size,
+  erpc::rt_assert(resp_msgbuf.get_data_size() == FLAGS_resp_size,
                   "Invalid response size");
 
   if (kAppClientCheckResp) {
     bool match = true;
     // Check all response cachelines (checking every byte is slow)
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
-      if (resp_msgbuf->buf[i] != kAppDataByte) match = false;
+      if (resp_msgbuf.buf[i] != kAppDataByte) match = false;
     }
     erpc::rt_assert(match, "Invalid resp data");
   } else {
-    erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte, "Invalid resp data");
+    erpc::rt_assert(resp_msgbuf.buf[0] == kAppDataByte, "Invalid resp data");
   }
 
   c->stat_rx_bytes_tot += FLAGS_resp_size;
-  c->rpc->release_response(resp_handle);
 
   // Create a new request clocking this response, and put in request queue
   if (kAppClientMemsetReq) {
