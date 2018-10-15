@@ -30,8 +30,6 @@ static_assert(sizeof(tag_t) == sizeof(size_t), "");
 class AppContext : public BasicAppContext {
  public:
   FastRand fast_rand;
-  MsgBuffer req_msgbuf[kSessionReqWindow];
-  MsgBuffer resp_msgbuf[kSessionReqWindow];
   size_t num_reqs_sent = 0;
 };
 
@@ -57,7 +55,7 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   context->rpc->enqueue_response(req_handle);
 }
 
-void cont_func(RespHandle *, void *, size_t);  // Forward declaration
+void cont_func(void *, size_t);  // Forward declaration
 
 /// Enqueue a request using the request MsgBuffer with index = msgbuf_i
 void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
@@ -66,7 +64,7 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
   size_t req_size =
       get_rand_msg_size(&c->fast_rand, c->rpc->get_max_data_per_pkt(),
                         c->rpc->get_max_msg_size());
-  c->rpc->resize_msg_buffer(&c->req_msgbuf[msgbuf_i], req_size);
+  c->rpc->resize_msg_buffer(&c->req_msgbufs[msgbuf_i], req_size);
 
   tag_t tag(static_cast<uint16_t>(c->num_reqs_sent),
             static_cast<uint16_t>(msgbuf_i), static_cast<uint32_t>(req_size));
@@ -75,23 +73,22 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
               req_size);
 
   c->rpc->enqueue_request(c->session_num_arr[0], kTestReqType,
-                          &c->req_msgbuf[msgbuf_i], &c->resp_msgbuf[msgbuf_i],
+                          &c->req_msgbufs[msgbuf_i], &c->resp_msgbufs[msgbuf_i],
                           cont_func, tag._tag);
 
   c->num_reqs_sent++;
 }
 
-void cont_func(RespHandle *resp_handle, void *_context, size_t _tag) {
+void cont_func(void *_context, size_t _tag) {
   auto *context = static_cast<AppContext *>(_context);
   assert(context->is_client);
-  const MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
   auto tag = *reinterpret_cast<tag_t *>(&_tag);
 
+  const MsgBuffer &resp_msgbuf = context->resp_msgbufs[tag.s.msgbuf_i];
   test_printf("Client: Received response for req %u, length = %zu.\n",
-              tag.s.req_i, resp_msgbuf->get_data_size());
+              tag.s.req_i, resp_msgbuf.get_data_size());
 
-  ASSERT_EQ(resp_msgbuf->get_data_size(), static_cast<tag_t>(tag).s.req_size);
-
+  ASSERT_EQ(resp_msgbuf.get_data_size(), static_cast<tag_t>(tag).s.req_size);
   context->num_rpc_resps++;
 
   if (context->num_reqs_sent < kTestNumReqs) {
@@ -107,18 +104,20 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   Rpc<CTransport> *rpc = c.rpc;
 
   // Start by filling the request window
+  c.req_msgbufs.resize(kSessionReqWindow);
+  c.resp_msgbufs.resize(kSessionReqWindow);
   for (size_t i = 0; i < kSessionReqWindow; i++) {
-    c.req_msgbuf[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
-    c.resp_msgbuf[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
+    const size_t max_msg_sz = rpc->get_max_msg_size();
+    c.req_msgbufs[i] = rpc->alloc_msg_buffer_or_die(max_msg_sz);
+    c.resp_msgbufs[i] = rpc->alloc_msg_buffer_or_die(max_msg_sz);
     enqueue_request_helper(&c, i);
   }
 
   wait_for_rpc_resps_or_timeout(c, kTestNumReqs);
   assert(c.num_rpc_resps == kTestNumReqs);
 
-  for (size_t i = 0; i < kSessionReqWindow; i++) {
-    rpc->free_msg_buffer(c.req_msgbuf[i]);
-  }
+  for (auto &mb : c.req_msgbufs) rpc->free_msg_buffer(mb);
+  for (auto &mb : c.resp_msgbufs) rpc->free_msg_buffer(mb);
 
   // Disconnect the sessions
   c.num_sm_resps = 0;
