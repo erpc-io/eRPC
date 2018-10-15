@@ -70,7 +70,7 @@ class IBTransport : public Transport {
   struct ibv_ah *create_ah(const ib_routing_info_t *) const;
 
   void fill_local_routing_info(RoutingInfo *routing_info) const;
-  bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
+  bool resolve_remote_routing_info(RoutingInfo *routing_info);
   size_t get_bandwidth() const { return resolve.bandwidth; }
 
   static std::string routing_info_str(RoutingInfo *routing_info) {
@@ -172,6 +172,9 @@ class IBTransport : public Transport {
 
   // Once post_recvs_fast() is used, regular post_recv() must not be used
   bool fast_recv_used = false;
+
+  /// Address handles that we must free in the destructor
+  std::vector<ibv_ah *> ah_to_free_vec;
 };
 
 }  // namespace erpc

@@ -57,28 +57,26 @@ static std::string link_layer_str(uint8_t link_layer) {
 static Transport::MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
                                                 size_t size) {
   struct ibv_mr *mr = ibv_reg_mr(pd, buf, size, IBV_ACCESS_LOCAL_WRITE);
-  rt_assert(mr != nullptr, "eRPC Verbs: Failed to register mr.");
+  rt_assert(mr != nullptr, "Failed to register mr.");
 
-  LOG_INFO("eRPC Verbs: Registered %zu MB (lkey = %u)\n", size / MB(1),
-           mr->lkey);
+  LOG_INFO("Registered %zu MB (lkey = %u)\n", size / MB(1), mr->lkey);
   return Transport::MemRegInfo(mr, mr->lkey);
 }
 
 /// A function wrapper used to generate a verbs transport's memory
 /// deregistration function
 static void ibv_dereg_mr_wrapper(Transport::MemRegInfo mr) {
-  struct ibv_mr *ib_mr = reinterpret_cast<struct ibv_mr *>(mr.transport_mr);
+  auto *ib_mr = reinterpret_cast<struct ibv_mr *>(mr.transport_mr);
   size_t size = ib_mr->length;
   uint32_t lkey = ib_mr->lkey;
 
   int ret = ibv_dereg_mr(ib_mr);
-
   if (ret != 0) {
-    LOG_ERROR("eRPC Verbs: Memory degistration failed. size %zu B, lkey %u\n",
-              size / MB(1), lkey);
+    LOG_ERROR("Memory degistration failed. size %zu B, lkey %u\n", size / MB(1),
+              lkey);
   }
 
-  LOG_INFO("eRPC Verbs: Deregistered %zu B, lkey = %u\n", size, lkey);
+  LOG_INFO("Deregistered %zu MB (lkey = %u)\n", size / MB(1), lkey);
 }
 
 /// Polls a CQ for one completion. In verbose mode only, prints a warning

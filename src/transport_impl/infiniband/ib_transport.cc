@@ -17,7 +17,11 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
                          FILE *trace_file)
     : Transport(TransportType::kInfiniBand, rpc_id, phy_port, numa_node,
                 trace_file) {
-  rt_assert(kHeadroom == 0, "Invalid packet header headroom for InfiniBand");
+  if (!is_roce()) {
+    rt_assert(kHeadroom == 0, "Invalid packet header headroom for InfiniBand");
+  } else {
+    rt_assert(kHeadroom == 40, "Invalid packet header headroom for RoCE");
+  }
 
   common_resolve_phy_port(phy_port, kMTU, kTransportType, resolve);
   ib_resolve_phy_port();
@@ -25,7 +29,7 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
   init_verbs_structs();
   init_mem_reg_funcs();
 
-  LOG_INFO("Created for ID %u. Device %s, port %d.\n", rpc_id,
+  LOG_INFO("IBTransport created for ID %u. Device %s, port %d.\n", rpc_id,
            resolve.ib_ctx->device->name, resolve.dev_port_id);
 }
 
@@ -45,10 +49,14 @@ IBTransport::~IBTransport() {
   LOG_INFO("Destroying transport for ID %u\n", rpc_id);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
-  exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy SEND QP");
+  exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy send QP");
   exit_assert(ibv_destroy_cq(send_cq) == 0, "Failed to destroy send CQ");
-  exit_assert(ibv_destroy_cq(recv_cq) == 0, "Failed to destroy RECV CQ");
+  exit_assert(ibv_destroy_cq(recv_cq) == 0, "Failed to destroy recv CQ");
+
   exit_assert(ibv_destroy_ah(self_ah) == 0, "Failed to destroy self AH");
+  for (auto *_ah : ah_to_free_vec) {
+    exit_assert(ibv_destroy_ah(_ah) == 0, "Failed to destroy AH");
+  }
 
   // Destroy protection domain and device context
   exit_assert(ibv_dealloc_pd(pd) == 0, "Failed to destroy PD. Leaked MRs?");
@@ -82,9 +90,10 @@ void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   if (is_roce()) ib_routing_info->gid = resolve.gid;
 }
 
-bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) const {
+bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) {
   auto *ib_rinfo = reinterpret_cast<ib_routing_info_t *>(routing_info);
   ib_rinfo->ah = create_ah(ib_rinfo);
+  ah_to_free_vec.push_back(ib_rinfo->ah);
   return (ib_rinfo->ah != nullptr);
 }
 
