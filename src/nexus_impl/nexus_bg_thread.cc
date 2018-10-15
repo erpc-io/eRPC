@@ -23,14 +23,15 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
 
     while (ctx.bg_req_queue->size > 0) {
       BgWorkItem wi = ctx.bg_req_queue->unlocked_pop();
-      SSlot *s = wi.sslot;
 
       if (wi.is_req()) {
+        SSlot *s = wi.sslot;  // For requests, we have a valid sslot
         uint8_t req_type = s->server_info.req_msgbuf.get_req_type();
         const ReqFunc &req_func = ctx.req_func_arr->at(req_type);
         req_func.req_func(static_cast<ReqHandle *>(s), wi.context);
       } else {
-        wi.sslot->client_info.cont_func(wi.context, s->client_info.tag);
+        // For responses, we don't have a valid sslot
+        wi.cont_func(wi.context, wi.tag);
       }
     }
   }

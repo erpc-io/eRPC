@@ -143,7 +143,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
     assert(req_msgbuf.buf != nullptr);
     memcpy(req_msgbuf.get_pkthdr_0(), pkthdr,
            pkthdr->msg_size + sizeof(pkthdr_t));
-    submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
+    submit_bg_req_st(sslot);
     return;
   }
 }
@@ -244,7 +244,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   if (likely(!req_func.is_background())) {
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
   } else {
-    submit_background_st(sslot, Nexus::BgWorkItemType::kReq);
+    submit_bg_req_st(sslot);
   }
 }
 

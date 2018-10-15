@@ -25,10 +25,10 @@ class Nexus {
    * @brief Initialize eRPC for this process
    *
    * @param local_uri A URI for this process formatted as hostname:udp_port.
-   * 
+   *
    * @param numa_node The NUMA node used by eRPC for this process. Only one eRPC
    * process may run per NUMA node.
-   * 
+   *
    * @param num_bg_threads The number of background RPC request processing
    * threads to launch.
    *
@@ -54,14 +54,38 @@ class Nexus {
   /// A work item submitted to a background thread
   class BgWorkItem {
    public:
-    BgWorkItem(BgWorkItemType wi_type, uint8_t rpc_id, void *context,
-               SSlot *sslot)
-        : wi_type(wi_type), rpc_id(rpc_id), context(context), sslot(sslot) {}
+    BgWorkItem() {}
 
-    const BgWorkItemType wi_type;
-    const uint8_t rpc_id;  ///< The Rpc ID that submitted this work item
-    void *context;         ///< The context to use for request handler
+    static inline BgWorkItem make_req_item(void *context, SSlot *sslot) {
+      BgWorkItem ret;
+      ret.wi_type = BgWorkItemType::kReq;
+      ret.context = context;
+      ret.sslot = sslot;
+      return ret;
+    }
+
+    static inline BgWorkItem make_resp_item(void *context,
+                                            erpc_cont_func_t cont_func,
+                                            size_t tag) {
+      BgWorkItem ret;
+      ret.wi_type = BgWorkItemType::kResp;
+      ret.context = context;
+      ret.cont_func = cont_func;
+      ret.tag = tag;
+      return ret;
+    }
+
+    BgWorkItemType wi_type;
+    void *context;  ///< The Rpc's context
+
+    // Fields for request handlers. For request handlers, we still have
+    // ownership of the request slot, so we can hold it until enqueue_response.
     SSlot *sslot;
+
+    // Fields for continuations. For continuations, we have lost ownership of
+    // the request slot, so the work item contains all needed info by value.
+    erpc_cont_func_t cont_func;
+    size_t tag;
 
     bool is_req() const { return wi_type == BgWorkItemType::kReq; }
   };

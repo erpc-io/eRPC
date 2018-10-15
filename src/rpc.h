@@ -764,14 +764,25 @@ class Rpc {
   void process_comps_st();
 
   /**
-   * @brief Submit a work item to a background thread
+   * @brief Submit a request work item to a random background thread
    *
-   * @param sslot Session sslot with a complete request or response MsgBuffer
-   * @param wi_type Work item type (request or response)
+   * @param sslot Session sslot with a complete request. Used only for request
+   * work item types.
+   */
+  void submit_bg_req_st(SSlot *sslot);
+
+  /**
+   * @brief Submit a response work item to a specific background thread
+   *
+   * @param cont_func The continuation to invoke
+   *
+   * @param tag The tag of the completed request. Used only for response work
+   * item types.
+   *
    * @param bg_etid eRPC thread ID of the background thread to submit to
    */
-  void submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
-                            size_t bg_etid = kMaxBgThreads);
+  void submit_bg_resp_st(erpc_cont_func_t cont_func, size_t tag,
+                         size_t bg_etid);
 
   //
   // Queue handlers

@@ -86,14 +86,13 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     return;
   }
 
-  auto &ci = sslot->client_info;
-  MsgBuffer *resp_msgbuf = ci.resp_msgbuf;
+  MsgBuffer *resp_msgbuf = sslot->client_info.resp_msgbuf;
 
   // Update client tracking metadata
   if (kCcRateComp) update_timely_rate(sslot, pkthdr->pkt_num, rx_tsc);
   bump_credits(sslot->session);
-  ci.num_rx++;
-  ci.progress_tsc = ev_loop_tsc;
+  sslot->client_info.num_rx++;
+  sslot->client_info.progress_tsc = ev_loop_tsc;
 
   // Special handling for single-packet responses
   if (likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
@@ -116,13 +115,15 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     }
 
     // Transmit remaining RFRs before response memcpy. We have credits.
-    if (ci.num_tx != wire_pkts(req_msgbuf, resp_msgbuf)) kick_rfr_st(sslot);
+    if (sslot->client_info.num_tx != wire_pkts(req_msgbuf, resp_msgbuf)) {
+      kick_rfr_st(sslot);
+    }
 
     // Hdr 0 was copied earlier, other headers are unneeded, so copy just data.
     const size_t pkt_idx = resp_ntoi(pkthdr->pkt_num, resp_msgbuf->num_pkts);
     copy_data_to_msgbuf(resp_msgbuf, pkt_idx, pkthdr);
 
-    if (ci.num_rx != wire_pkts(req_msgbuf, resp_msgbuf)) return;
+    if (sslot->client_info.num_rx != wire_pkts(req_msgbuf, resp_msgbuf)) return;
     // Else fall through to invoke continuation
   }
 
@@ -133,12 +134,17 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // 2. The wheel cannot contain a reference because we (a) wait for sslot to
   //    drain from the wheel before retransmitting, and (b) discard spurious
   //    corresponding packets received for packets in the wheel.
-  assert(ci.wheel_count == 0);
+  assert(sslot->client_info.wheel_count == 0);
 
   sslot->tx_msgbuf = nullptr;  // Mark response as received
   delete_from_active_rpc_list(*sslot);
 
   // Free-up this sslot, and clear up one request from the backlog if needed.
+
+  // Slot ownership beyond this point works as follows: We can't let a reference
+  // to sslot live beyond the end of this function since other requests may use
+  // it in the future. Inside this function, however, it's OK to use sslot's
+  // members as only the event loop may modify sslot. So we don't need copies.
   Session *session = sslot->session;
   session->client_info.sslot_free_vec.push_back(sslot->index);
 
@@ -151,10 +157,11 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     session->client_info.enq_req_backlog.pop();
   }
 
-  if (likely(ci.cont_etid == kInvalidBgETid)) {
-    ci.cont_func(context, ci.tag);
+  if (likely(sslot->client_info.cont_etid == kInvalidBgETid)) {
+    sslot->client_info.cont_func(context, sslot->client_info.tag);
   } else {
-    submit_background_st(sslot, Nexus::BgWorkItemType::kResp, ci.cont_etid);
+    submit_bg_resp_st(sslot->client_info.cont_func, sslot->client_info.tag,
+                      sslot->client_info.cont_etid);
   }
   return;
 }

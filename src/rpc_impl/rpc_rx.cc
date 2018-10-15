@@ -71,19 +71,26 @@ void Rpc<TTr>::process_comps_st() {
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_background_st(SSlot *sslot, Nexus::BgWorkItemType wi_type,
-                                    size_t bg_etid) {
+void Rpc<TTr>::submit_bg_req_st(SSlot *sslot) {
   assert(in_dispatch());
-  assert(bg_etid < nexus->num_bg_threads || bg_etid == kInvalidBgETid);
   assert(nexus->num_bg_threads > 0);
 
-  if (bg_etid == kInvalidBgETid) {
-    // Background thread was not specified, so choose one at random
-    bg_etid = fast_rand.next_u32() % nexus->num_bg_threads;
-  }
+  const size_t bg_etid = fast_rand.next_u32() % nexus->num_bg_threads;
+  auto *req_queue = nexus_hook.bg_req_queue_arr[bg_etid];
+
+  req_queue->unlocked_push(Nexus::BgWorkItem::make_req_item(context, sslot));
+}
+
+template <class TTr>
+void Rpc<TTr>::submit_bg_resp_st(erpc_cont_func_t cont_func, size_t tag,
+                                 size_t bg_etid) {
+  assert(in_dispatch());
+  assert(nexus->num_bg_threads > 0);
+  assert(bg_etid < nexus->num_bg_threads);
 
   auto *req_queue = nexus_hook.bg_req_queue_arr[bg_etid];
-  req_queue->unlocked_push(Nexus::BgWorkItem(wi_type, rpc_id, context, sslot));
+  req_queue->unlocked_push(
+      Nexus::BgWorkItem::make_resp_item(context, cont_func, tag));
 }
 
 FORCE_COMPILE_TRANSPORTS
