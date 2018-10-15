@@ -91,7 +91,7 @@ class SSlot {
       uint8_t req_type;
       ReqFuncType req_func_type;  ///< The req handler type (e.g., background)
 
-      /// Number of pkts received. Pkts up to (num_tx - 1) have been received.
+      /// Number of pkts received. Pkts up to (num_rx - 1) have been received.
       size_t num_rx;
 
       /// The server remembers the number of packets in the request after
@@ -108,7 +108,7 @@ class SSlot {
       ret << "[num_tx " << client_info.num_tx << ", num_rx "
           << client_info.num_rx << "]";
     } else {
-      ret << "[num_rx " << client_info.num_rx << "]";
+      ret << "[num_rx " << server_info.num_rx << "]";
     }
     return ret.str();
   }
