@@ -201,7 +201,7 @@ void ping_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void ping_cont_func(erpc::RespHandle *, void *_context, size_t) {
+void ping_cont_func(void *_context, size_t) {
   auto *c = static_cast<BasicAppContext *>(_context);
   c->ping_pending = false;  // Mark ping as completed
 }
@@ -211,6 +211,7 @@ void ping_all_blocking(BasicAppContext &c) {
   std::set<std::string> hostname_set;
   erpc::MsgBuffer ping_req, ping_resp;
 
+  // These buffers stay valid for the lifetime of the ping RPC
   ping_req = c.rpc->alloc_msg_buffer_or_die(kPingMsgSize);
   ping_resp = c.rpc->alloc_msg_buffer_or_die(kPingMsgSize);
 

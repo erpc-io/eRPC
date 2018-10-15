@@ -119,7 +119,7 @@ class AppContext : public BasicAppContext {
   ~AppContext() {}
 };
 
-void app_cont_func(erpc::RespHandle *, void *, size_t);  // Forward declaration
+void app_cont_func(void *, size_t);  // Forward declaration
 
 // Send all requests for a batch
 void send_reqs(AppContext *c, size_t batch_i) {
@@ -193,22 +193,24 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle);
 }
 
-void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
-  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf->get_data_size() == FLAGS_msg_size);
-
+void app_cont_func(void *_context, size_t _tag) {
   auto *c = static_cast<AppContext *>(_context);
+  auto tag = static_cast<tag_t>(_tag);
+
+  BatchContext &bc = c->batch_arr[tag.s.batch_i];
+  const erpc::MsgBuffer &resp_msgbuf = bc.resp_msgbuf[tag.s.msgbuf_i];
+  assert(resp_msgbuf.get_data_size() == FLAGS_msg_size);
 
   if (!kAppPayloadCheck) {
     // Do a cheap check, but touch the response MsgBuffer
-    if (unlikely(resp_msgbuf->buf[0] != kAppDataByte)) {
+    if (unlikely(resp_msgbuf.buf[0] != kAppDataByte)) {
       fprintf(stderr, "Invalid response.\n");
       exit(-1);
     }
   } else {
     // Check the full response MsgBuffer
     for (size_t i = 0; i < FLAGS_msg_size; i++) {
-      const uint8_t *buf = resp_msgbuf->buf;
+      const uint8_t *buf = resp_msgbuf.buf;
       if (unlikely(buf[i] != static_cast<uint8_t>(buf[0] + i))) {
         fprintf(stderr, "Invalid resp at %zu (%u, %u)\n", i, buf[0], buf[i]);
         exit(-1);
@@ -216,15 +218,11 @@ void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
     }
   }
 
-  c->rpc->release_response(resp_handle);
-
-  auto tag = static_cast<tag_t>(_tag);
   if (kAppVerbose) {
     printf("Received response for batch %zu, msgbuf %zu.\n", tag.s.batch_i,
            tag.s.msgbuf_i);
   }
 
-  BatchContext &bc = c->batch_arr[tag.s.batch_i];
   bc.num_resps_rcvd++;
 
   if (kAppMeasureLatency) {
