@@ -33,9 +33,9 @@ class AppContext : public BasicAppContext {
   size_t num_reqs_sent = 0;
 };
 
-void req_handler(ReqHandle *req_handle, void *_context) {
-  auto *context = static_cast<AppContext *>(_context);
-  assert(!context->is_client);
+void req_handler(ReqHandle *req_handle, void *_c) {
+  auto *c = static_cast<AppContext *>(_c);
+  assert(!c->is_client);
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf->get_data_size();
@@ -43,16 +43,16 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   req_handle->prealloc_used = false;
 
   // eRPC will free the MsgBuffer
-  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer_or_die(req_size);
+  req_handle->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(req_size);
   memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, req_size);
 
-  size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
+  size_t user_alloc_tot = c->rpc->get_stat_user_alloc_tot();
   test_printf(
       "Server: Received request of length %zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
       req_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
 
-  context->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle);
 }
 
 void cont_func(void *, size_t);  // Forward declaration
@@ -79,20 +79,20 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
   c->num_reqs_sent++;
 }
 
-void cont_func(void *_context, size_t _tag) {
-  auto *context = static_cast<AppContext *>(_context);
-  assert(context->is_client);
+void cont_func(void *_c, size_t _tag) {
+  auto *c = static_cast<AppContext *>(_c);
+  assert(c->is_client);
   auto tag = *reinterpret_cast<tag_t *>(&_tag);
 
-  const MsgBuffer &resp_msgbuf = context->resp_msgbufs[tag.s.msgbuf_i];
+  const MsgBuffer &resp_msgbuf = c->resp_msgbufs[tag.s.msgbuf_i];
   test_printf("Client: Received response for req %u, length = %zu.\n",
               tag.s.req_i, resp_msgbuf.get_data_size());
 
   ASSERT_EQ(resp_msgbuf.get_data_size(), static_cast<tag_t>(tag).s.req_size);
-  context->num_rpc_resps++;
+  c->num_rpc_resps++;
 
-  if (context->num_reqs_sent < kTestNumReqs) {
-    enqueue_request_helper(context, static_cast<tag_t>(tag).s.msgbuf_i);
+  if (c->num_reqs_sent < kTestNumReqs) {
+    enqueue_request_helper(c, static_cast<tag_t>(tag).s.msgbuf_i);
   }
 }
 

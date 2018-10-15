@@ -8,13 +8,13 @@ class AppContext : public BasicAppContext {
 
 // Only invoked for clients
 void test_sm_handler(int session_num, SmEventType sm_event_type,
-                     SmErrType sm_err_type, void *_context) {
-  AppContext *context = static_cast<AppContext *>(_context);
-  context->num_sm_resps++;
+                     SmErrType sm_err_type, void *_c) {
+  AppContext *c = static_cast<AppContext *>(_c);
+  c->num_sm_resps++;
 
   // Check that the error type matches the expected value
-  ASSERT_EQ(sm_err_type, context->exp_err);
-  ASSERT_EQ(session_num, context->session_num);
+  ASSERT_EQ(sm_err_type, c->exp_err);
+  ASSERT_EQ(session_num, c->session_num);
 
   // If the error type is really an error, the event should be connect failed
   if (sm_err_type == SmErrType::kNoError) {
@@ -29,22 +29,20 @@ void test_sm_handler(int session_num, SmEventType sm_event_type,
 //
 void simple_connect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
-  AppContext context;
-  context.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                                    kTestClientRpcId, &test_sm_handler,
-                                    kTestClientPhyPort);
+  AppContext c;
+  c.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
+                              &test_sm_handler, kTestClientPhyPort);
 
   // Connect the session
-  context.exp_err = SmErrType::kNoError;
-  context.session_num =
-      context.rpc->create_session("localhost:31850", kTestServerRpcId);
-  ASSERT_GE(context.session_num, 0);
+  c.exp_err = SmErrType::kNoError;
+  c.session_num = c.rpc->create_session("localhost:31850", kTestServerRpcId);
+  ASSERT_GE(c.session_num, 0);
 
-  context.rpc->run_event_loop(kTestEventLoopMs);
-  ASSERT_EQ(context.num_sm_resps, 1);
+  c.rpc->run_event_loop(kTestEventLoopMs);
+  ASSERT_EQ(c.num_sm_resps, 1);
 
   // Free resources
-  delete context.rpc;
+  delete c.rpc;
   client_done = true;
 }
 

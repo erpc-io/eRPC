@@ -94,14 +94,14 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &, const size_t);
 
 /// A basic session management handler that expects successful responses
 void basic_sm_handler(int session_num, SmEventType sm_event_type,
-                      SmErrType sm_err_type, void *_context) {
+                      SmErrType sm_err_type, void *_c) {
   _unused(session_num);
   _unused(sm_event_type);
   _unused(sm_err_type);
-  _unused(_context);
+  _unused(_c);
 
-  auto *context = static_cast<BasicAppContext *>(_context);
-  context->num_sm_resps++;
+  auto *c = static_cast<BasicAppContext *>(_c);
+  c->num_sm_resps++;
 
   assert(sm_err_type == SmErrType::kNoError);
   assert(sm_event_type == SmEventType::kConnected ||
@@ -131,14 +131,14 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
                               sm_handler_t sm_handler, size_t num_srv_threads,
                               ConnectServers connect_servers,
                               double pkt_loss_prob) {
-  BasicAppContext context;
-  context.is_client = false;
+  BasicAppContext c;
+  c.is_client = false;
 
-  Rpc<CTransport> rpc(nexus, static_cast<void *>(&context), rpc_id, sm_handler,
+  Rpc<CTransport> rpc(nexus, static_cast<void *>(&c), rpc_id, sm_handler,
                       kTestServerPhyPort);
   if (kTesting) rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
 
-  context.rpc = &rpc;
+  c.rpc = &rpc;
   num_servers_up++;
 
   // Wait for all servers to come up
@@ -152,20 +152,20 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
                 rpc_id, num_srv_threads - 1);
 
     // Session number for server (kTestServerRpcId + x) is session_num_arr[x]
-    context.session_num_arr = new int[num_srv_threads];
+    c.session_num_arr = new int[num_srv_threads];
 
     // Create the sessions
     for (size_t i = 0; i < num_srv_threads; i++) {
       uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
       if (other_rpc_id == rpc_id) continue;
 
-      context.session_num_arr[i] = context.rpc->create_session(
+      c.session_num_arr[i] = c.rpc->create_session(
           "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
-      assert(context.session_num_arr[i] >= 0);
+      assert(c.session_num_arr[i] >= 0);
     }
 
     // Wait for the sessions to connect
-    wait_for_sm_resps_or_timeout(context, num_srv_threads - 1);
+    wait_for_sm_resps_or_timeout(c, num_srv_threads - 1);
   } else {
     test_printf("Server %u: not connecting to other server threads.\n", rpc_id);
   }
@@ -185,18 +185,18 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
       uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
       if (other_rpc_id == rpc_id) continue;
 
-      context.rpc->destroy_session(context.session_num_arr[i]);
+      c.rpc->destroy_session(c.session_num_arr[i]);
     }
 
     // We cannot stop running the event loop after receiving the disconnect
     // responses required by this thread. We need to keep the event loop running
     // to send disconnect responses to other server threads.
-    context.num_sm_resps = 0;
+    c.num_sm_resps = 0;
     while (num_servers_up > 0) {
       rpc.run_event_loop(kTestEventLoopMs);
-      if (context.num_sm_resps == num_srv_threads - 1) {
+      if (c.num_sm_resps == num_srv_threads - 1) {
         num_servers_up--;  // Mark this server as down
-        context.num_sm_resps = 0;
+        c.num_sm_resps = 0;
       }
     }
   }
@@ -269,54 +269,52 @@ void launch_server_client_threads(
  * on localhost
  *
  * @param nexus The process's Nexus
- * @param context The uninitialized client context
+ * @param c The uninitialized client context
  * @param num_sessions The number of sessions to create for the client. Session
  * \p i is created to Rpc \p {kTestServerRpcId + i} at localhost
  * @param sm_handler The client's sm handler
  */
-void client_connect_sessions(Nexus *nexus, BasicAppContext &context,
+void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
                              size_t num_sessions, sm_handler_t sm_handler) {
   assert(num_sessions >= 1);
 
   // Wait for all server threads to start
   while (!all_servers_ready) usleep(1);
 
-  context.is_client = true;
-  context.rpc =
-      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, sm_handler, kTestClientPhyPort);
+  c.is_client = true;
+  c.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
+                              sm_handler, kTestClientPhyPort);
 
   // Connect the sessions
-  context.session_num_arr = new int[num_sessions];
+  c.session_num_arr = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
-    context.session_num_arr[i] = context.rpc->create_session(
+    c.session_num_arr[i] = c.rpc->create_session(
         "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
   }
 
-  while (context.num_sm_resps < num_sessions) {
-    context.rpc->run_event_loop(kTestEventLoopMs);
+  while (c.num_sm_resps < num_sessions) {
+    c.rpc->run_event_loop(kTestEventLoopMs);
   }
 
   // basic_sm_handler checks that the callbacks have no errors
-  assert(context.num_sm_resps == num_sessions);
+  assert(c.num_sm_resps == num_sessions);
 }
 
 /**
- * @brief Run the event loop on \p context's Rpc until we get at least
+ * @brief Run the event loop on the context's Rpc until we get at least
  * \p num_resps session management responses, or until \p kTestMaxEventLoopMs
  * are elapsed
  *
- * @param context The server or client context containing the Rpc
+ * @param c The server or client context containing the Rpc
  * @param num_resps The number of SM responses to wait for
  * @param freq_ghz rdtsc frequency in GHz
  */
-void wait_for_sm_resps_or_timeout(BasicAppContext &context,
-                                  const size_t num_resps) {
+void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
   struct timespec start;
   clock_gettime(CLOCK_REALTIME, &start);
-  while (context.num_sm_resps < num_resps) {
-    context.rpc->run_event_loop(kTestEventLoopMs);
+  while (c.num_sm_resps < num_resps) {
+    c.rpc->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = sec_since(start) * 1000;
     if (ms_elapsed > kTestMaxEventLoopMs) break;
@@ -324,20 +322,19 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &context,
 }
 
 /**
- * @brief Run the event loop on \p context's Rpc until we get at least
+ * @brief Run the event loop on the context's Rpc until we get at least
  * \p num_resps RPC responses, or until \p kTestMaxEventLoopMs are elapsed
  *
- * @param context The server or client context containing the Rpc
+ * @param c The server or client context containing the Rpc
  * @param num_resps The number of RPC responses to wait for
  * @param freq_ghz rdtsc frequency in GHz
  */
-void wait_for_rpc_resps_or_timeout(BasicAppContext &context,
-                                   const size_t num_resps) {
+void wait_for_rpc_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
   struct timespec start;
   clock_gettime(CLOCK_REALTIME, &start);
-  while (context.num_rpc_resps < num_resps) {
-    context.rpc->run_event_loop(kTestEventLoopMs);
+  while (c.num_rpc_resps < num_resps) {
+    c.rpc->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = sec_since(start) * 1000;
     if (ms_elapsed > kTestMaxEventLoopMs) break;

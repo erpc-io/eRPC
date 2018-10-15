@@ -20,16 +20,16 @@ class AppContext : public BasicAppContext {
 
 /// The common session management handler for all subtests
 void sm_handler(int session_num, SmEventType sm_event_type,
-                SmErrType sm_err_type, void *_context) {
+                SmErrType sm_err_type, void *_c) {
   _unused(session_num);
 
-  AppContext *context = static_cast<AppContext *>(_context);
-  context->num_sm_resps++;
-  printf("sm_handler: num_sm_resps = %zu\n", context->num_sm_resps);
+  AppContext *c = static_cast<AppContext *>(_c);
+  c->num_sm_resps++;
+  printf("sm_handler: num_sm_resps = %zu\n", c->num_sm_resps);
 
   // Check that the event and error types matche their expected values
-  ASSERT_EQ(sm_event_type, context->exp_event);
-  ASSERT_EQ(sm_err_type, context->exp_err);
+  ASSERT_EQ(sm_event_type, c->exp_event);
+  ASSERT_EQ(sm_err_type, c->exp_err);
 }
 
 ///
@@ -37,11 +37,10 @@ void sm_handler(int session_num, SmEventType sm_event_type,
 ///
 void simple_disconnect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
-  AppContext context;
-  context.rpc =
-      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
-  auto *rpc = context.rpc;
+  AppContext c;
+  c.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
+                              &sm_handler, kTestClientPhyPort);
+  auto *rpc = c.rpc;
 
   // Create the session
   int session_num = rpc->create_session("localhost:31850", kTestServerRpcId);
@@ -49,15 +48,15 @@ void simple_disconnect(Nexus *nexus, size_t) {
   ASSERT_NE(rpc->destroy_session(session_num), 0);  // Try early disconnect
 
   // Connect the session
-  context.arm(SmEventType::kConnected, SmErrType::kNoError);
-  wait_for_sm_resps_or_timeout(context, 1);
-  ASSERT_EQ(context.num_sm_resps, 1);  // The connect event
+  c.arm(SmEventType::kConnected, SmErrType::kNoError);
+  wait_for_sm_resps_or_timeout(c, 1);
+  ASSERT_EQ(c.num_sm_resps, 1);  // The connect event
 
   // Disconnect the session
-  context.arm(SmEventType::kDisconnected, SmErrType::kNoError);
+  c.arm(SmEventType::kDisconnected, SmErrType::kNoError);
   rpc->destroy_session(session_num);
-  wait_for_sm_resps_or_timeout(context, 1);
-  ASSERT_EQ(context.num_sm_resps, 1);  // The disconnect event
+  wait_for_sm_resps_or_timeout(c, 1);
+  ASSERT_EQ(c.num_sm_resps, 1);  // The disconnect event
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
   // Other simple tests
@@ -68,7 +67,7 @@ void simple_disconnect(Nexus *nexus, size_t) {
   // Try to disconnect an invalid session number. This should fail.
   ASSERT_NE(rpc->destroy_session(-1), 0);
 
-  delete context.rpc;
+  delete c.rpc;
   client_done = true;
 }
 
@@ -83,22 +82,21 @@ TEST(Base, SimpleDisconnect) {
 ///
 void disconnect_multi(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions()
-  AppContext context;
-  context.rpc =
-      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
-  auto *rpc = context.rpc;
+  AppContext c;
+  c.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
+                              &sm_handler, kTestClientPhyPort);
+  auto *rpc = c.rpc;
 
   // The number of sessions we can create before running out of ring buffers
   size_t num_sessions = Transport::kNumRxRingEntries / kSessionCredits;
-  context.session_num_arr = new int[num_sessions];
+  c.session_num_arr = new int[num_sessions];
 
   for (size_t iter = 0; iter < 3; iter++) {
     for (size_t i = 0; i < num_sessions; i++) {
       int session_num =
           rpc->create_session("localhost:31850", kTestServerRpcId);
       ASSERT_GE(session_num, 0);
-      context.session_num_arr[i] = session_num;
+      c.session_num_arr[i] = session_num;
     }
 
     // Try to create one more session. This should fail.
@@ -106,24 +104,24 @@ void disconnect_multi(Nexus *nexus, size_t) {
     ASSERT_LT(session_num, 0);
 
     // Connect the sessions
-    context.arm(SmEventType::kConnected, SmErrType::kNoError);
-    wait_for_sm_resps_or_timeout(context, num_sessions);
-    ASSERT_EQ(context.num_sm_resps, num_sessions);  // The connect events
+    c.arm(SmEventType::kConnected, SmErrType::kNoError);
+    wait_for_sm_resps_or_timeout(c, num_sessions);
+    ASSERT_EQ(c.num_sm_resps, num_sessions);  // The connect events
 
     // Disconnect the sessions
-    context.arm(SmEventType::kDisconnected, SmErrType::kNoError);
+    c.arm(SmEventType::kDisconnected, SmErrType::kNoError);
 
     for (size_t i = 0; i < num_sessions; i++) {
-      rpc->destroy_session(context.session_num_arr[i]);
+      rpc->destroy_session(c.session_num_arr[i]);
     }
 
-    wait_for_sm_resps_or_timeout(context, num_sessions);
-    ASSERT_EQ(context.num_sm_resps, num_sessions);  // The disconnect events
+    wait_for_sm_resps_or_timeout(c, num_sessions);
+    ASSERT_EQ(c.num_sm_resps, num_sessions);  // The disconnect events
 
     ASSERT_EQ(rpc->num_active_sessions(), 0);
   }
 
-  delete context.rpc;
+  delete c.rpc;
   client_done = true;
 }
 
@@ -137,25 +135,24 @@ TEST(Base, DisconnectMulti) {
 ///
 void disconnect_remote_error(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
-  AppContext context;
-  context.rpc =
-      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
-  auto *rpc = context.rpc;
+  AppContext c;
+  c.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
+                              &sm_handler, kTestClientPhyPort);
+  auto *rpc = c.rpc;
 
   // Create a session that uses an invalid remote port
   int session_num =
       rpc->create_session("localhost:31850", kTestServerRpcId + 1);
   ASSERT_GE(session_num, 0);
-  context.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemoteRpcId);
-  wait_for_sm_resps_or_timeout(context, 1);
-  ASSERT_EQ(context.num_sm_resps, 1);  // The connect failed event
+  c.arm(SmEventType::kConnectFailed, SmErrType::kInvalidRemoteRpcId);
+  wait_for_sm_resps_or_timeout(c, 1);
+  ASSERT_EQ(c.num_sm_resps, 1);  // The connect failed event
 
   // After invoking the kConnectFailed callback, the Rpc event loop immediately
   // buries the session since there are no server resources to free.
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
-  delete context.rpc;
+  delete c.rpc;
   client_done = true;
 }
 
@@ -170,11 +167,10 @@ TEST(Base, DisconnectRemoteError) {
 ///
 void disconnect_local_error(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
-  AppContext context;
-  context.rpc =
-      new Rpc<CTransport>(nexus, static_cast<void *>(&context),
-                          kTestClientRpcId, &sm_handler, kTestClientPhyPort);
-  auto *rpc = context.rpc;
+  AppContext c;
+  c.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
+                              &sm_handler, kTestClientPhyPort);
+  auto *rpc = c.rpc;
 
   // Force Rpc to fail remote routing info resolution at client
   rpc->fault_inject_fail_resolve_rinfo_st();
@@ -182,9 +178,9 @@ void disconnect_local_error(Nexus *nexus, size_t) {
   int session_num = rpc->create_session("localhost:31850", kTestServerRpcId);
   ASSERT_GE(session_num, 0);
 
-  context.arm(SmEventType::kDisconnected, SmErrType::kNoError);
-  wait_for_sm_resps_or_timeout(context, 1);
-  ASSERT_EQ(context.num_sm_resps, 1);  // The connect failed event
+  c.arm(SmEventType::kDisconnected, SmErrType::kNoError);
+  wait_for_sm_resps_or_timeout(c, 1);
+  ASSERT_EQ(c.num_sm_resps, 1);  // The connect failed event
 
   // After invoking the kConnectFailed callback, the Rpc event loop tries to
   // free session resources at the server. This does not invoke a callback on
@@ -192,7 +188,7 @@ void disconnect_local_error(Nexus *nexus, size_t) {
   rpc->run_event_loop(kTestEventLoopMs);
   ASSERT_EQ(rpc->num_active_sessions(), 0);
 
-  delete context.rpc;
+  delete c.rpc;
   client_done = true;
 }
 

@@ -30,17 +30,16 @@ size_t config_num_bg_threads;  ///< Number of background threads
 
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
-void req_handler(ReqHandle *req_handle, void *_context) {
-  auto *context = static_cast<AppContext *>(_context);
-  if (config_num_bg_threads > 0) assert(context->rpc->in_background());
+void req_handler(ReqHandle *req_handle, void *_c) {
+  auto *c = static_cast<AppContext *>(_c);
+  if (config_num_bg_threads > 0) assert(c->rpc->in_background());
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
 
   // MsgBuffer allocation is thread safe
-  req_handle->dyn_resp_msgbuf =
-      context->rpc->alloc_msg_buffer_or_die(resp_size);
-  size_t user_alloc_tot = context->rpc->get_stat_user_alloc_tot();
+  req_handle->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(resp_size);
+  size_t user_alloc_tot = c->rpc->get_stat_user_alloc_tot();
 
   memcpy(reinterpret_cast<char *>(req_handle->dyn_resp_msgbuf.buf),
          reinterpret_cast<char *>(req_msgbuf->buf), resp_size);
@@ -51,15 +50,15 @@ void req_handler(ReqHandle *req_handle, void *_context) {
       "Rpc memory used = %zu bytes (%.3f MB)\n",
       resp_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
 
-  context->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle);
 }
 
 /// The common continuation function for all subtests. This checks that the
 /// request buffer is identical to the response buffer, and increments the
-/// number of responses in the context.
-void cont_func(void *_context, size_t tag) {
-  auto *context = static_cast<AppContext *>(_context);
-  const MsgBuffer &resp_msgbuf = context->resp_msgbufs[tag];
+/// number of responses in the context
+void cont_func(void *_c, size_t tag) {
+  auto *c = static_cast<AppContext *>(_c);
+  const MsgBuffer &resp_msgbuf = c->resp_msgbufs[tag];
   test_printf("Client: Received response of length %zu.\n",
               resp_msgbuf.get_data_size());
 
@@ -67,8 +66,8 @@ void cont_func(void *_context, size_t tag) {
     ASSERT_EQ(resp_msgbuf.buf[i], static_cast<uint8_t>(tag));
   }
 
-  assert(context->is_client);
-  context->num_rpc_resps++;
+  assert(c->is_client);
+  c->num_rpc_resps++;
 }
 
 /// The generic test function that issues \p config_num_rpcs Rpcs
@@ -78,44 +77,41 @@ void cont_func(void *_context, size_t tag) {
 /// template in client_tests.h requires it.
 void generic_test_func(Nexus *nexus, size_t) {
   // Create the Rpc and connect the session
-  AppContext context;
-  client_connect_sessions(nexus, context, 1, basic_sm_handler);  // 1 session
+  AppContext c;
+  client_connect_sessions(nexus, c, 1, basic_sm_handler);  // 1 session
 
-  Rpc<CTransport> *rpc = context.rpc;
+  Rpc<CTransport> *rpc = c.rpc;
   rpc->fault_inject_set_pkt_drop_prob_st(kPktDropProb);
 
   // Pre-create MsgBuffers so we can test reuse and resizing
-  context.req_msgbufs.resize(config_num_rpcs);
-  context.resp_msgbufs.resize(config_num_rpcs);
+  c.req_msgbufs.resize(config_num_rpcs);
+  c.resp_msgbufs.resize(config_num_rpcs);
   for (size_t i = 0; i < config_num_rpcs; i++) {
-    context.req_msgbufs[i] =
-        rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
-    context.resp_msgbufs[i] =
-        rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
+    c.req_msgbufs[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
+    c.resp_msgbufs[i] = rpc->alloc_msg_buffer_or_die(rpc->get_max_msg_size());
   }
 
   // The main request-issuing loop
   for (size_t iter = 0; iter < config_num_iters; iter++) {
-    context.num_rpc_resps = 0;
+    c.num_rpc_resps = 0;
 
     test_printf("Client: Iteration %zu.\n", iter);
     size_t iter_req_i = 0;  // Request MsgBuffer index in this iteration
 
     for (size_t w_i = 0; w_i < config_num_rpcs; w_i++) {
       assert(iter_req_i < config_num_rpcs);
-      MsgBuffer &cur_req_msgbuf = context.req_msgbufs[iter_req_i];
+      MsgBuffer &cur_req_msgbuf = c.req_msgbufs[iter_req_i];
 
       // Don't use very large requests because we drop a lot of packets
-      size_t req_pkts = (kSessionCredits * 2) +
-                        (context.fastrand.next_u32() % kSessionCredits);
+      size_t req_pkts =
+          (kSessionCredits * 2) + (c.fastrand.next_u32() % kSessionCredits);
       size_t req_size = req_pkts * rpc->get_max_data_per_pkt();
 
       rpc->resize_msg_buffer(&cur_req_msgbuf, req_size);
       memset(cur_req_msgbuf.buf, iter_req_i, req_size);
 
-      rpc->enqueue_request(context.session_num_arr[0], kTestReqType,
-                           &cur_req_msgbuf, &context.resp_msgbufs[iter_req_i],
-                           cont_func, iter_req_i);
+      rpc->enqueue_request(c.session_num_arr[0], kTestReqType, &cur_req_msgbuf,
+                           &c.resp_msgbufs[iter_req_i], cont_func, iter_req_i);
 
       iter_req_i++;
     }
@@ -123,17 +119,17 @@ void generic_test_func(Nexus *nexus, size_t) {
     // The default timeout for tests is 20 seconds. This test takes more time
     // because of packet drops.
     for (size_t i = 0; i < 5; i++) {
-      wait_for_rpc_resps_or_timeout(context, config_num_rpcs);
-      if (context.num_rpc_resps == config_num_rpcs) break;
+      wait_for_rpc_resps_or_timeout(c, config_num_rpcs);
+      if (c.num_rpc_resps == config_num_rpcs) break;
     }
-    assert(context.num_rpc_resps == config_num_rpcs);
+    assert(c.num_rpc_resps == config_num_rpcs);
   }
 
   // Free the MsgBuffers
-  for (auto &mb : context.req_msgbufs) rpc->free_msg_buffer(mb);
-  for (auto &mb : context.resp_msgbufs) rpc->free_msg_buffer(mb);
+  for (auto &mb : c.req_msgbufs) rpc->free_msg_buffer(mb);
+  for (auto &mb : c.resp_msgbufs) rpc->free_msg_buffer(mb);
 
-  rpc->destroy_session(context.session_num_arr[0]);
+  rpc->destroy_session(c.session_num_arr[0]);
   rpc->run_event_loop(kTestEventLoopMs);
 
   // Free resources

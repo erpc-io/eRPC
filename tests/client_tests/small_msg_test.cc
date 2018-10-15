@@ -21,12 +21,12 @@ size_t config_msg_size;  ///< The size of the request and response messages
 
 /// The common request handler for all subtests. Copies the request message to
 /// the response.
-void req_handler(ReqHandle *req_handle, void *_context) {
-  auto *context = static_cast<AppContext *>(_context);
-  assert(!context->is_client);
+void req_handler(ReqHandle *req_handle, void *_c) {
+  auto *c = static_cast<AppContext *>(_c);
+  assert(!c->is_client);
 
   if (config_num_bg_threads > 0) {
-    assert(context->rpc->in_background());
+    assert(c->rpc->in_background());
   }
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
@@ -35,22 +35,22 @@ void req_handler(ReqHandle *req_handle, void *_context) {
   memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
   req_handle->prealloc_used = true;
 
-  context->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle);
 }
 
 /// The common continuation function for all subtests. This checks that the
 /// request buffer is identical to the response buffer, and increments the
-/// number of responses in the context.
-void cont_func(void *_context, size_t tag) {
-  auto *context = static_cast<AppContext *>(_context);
-  ASSERT_EQ(context->resp_msgbufs[tag].get_data_size(), config_msg_size);
+/// number of responses in the context
+void cont_func(void *_c, size_t tag) {
+  auto *c = static_cast<AppContext *>(_c);
+  ASSERT_EQ(c->resp_msgbufs[tag].get_data_size(), config_msg_size);
 
   for (size_t i = 0; i < config_msg_size; i++) {
-    ASSERT_EQ(context->resp_msgbufs[tag].buf[i], static_cast<uint8_t>(tag));
+    ASSERT_EQ(c->resp_msgbufs[tag].buf[i], static_cast<uint8_t>(tag));
   }
 
-  assert(context->is_client);
-  context->num_rpc_resps++;
+  assert(c->is_client);
+  c->num_rpc_resps++;
 }
 
 /// The generic test function that issues \p config_rpcs_per_session Rpcs
