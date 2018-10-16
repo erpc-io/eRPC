@@ -307,7 +307,6 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
  *
  * @param c The server or client context containing the Rpc
  * @param num_resps The number of SM responses to wait for
- * @param freq_ghz rdtsc frequency in GHz
  */
 void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
@@ -327,7 +326,6 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
  *
  * @param c The server or client context containing the Rpc
  * @param num_resps The number of RPC responses to wait for
- * @param freq_ghz rdtsc frequency in GHz
  */
 void wait_for_rpc_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
