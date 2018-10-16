@@ -98,6 +98,16 @@
    * Set session request window to 1, or implement Rpc flush.
    * Set transport max inline size to 120 bytes for ConnectX-3.
 
+## Immediate TODOs
+ * This list should be empty :)
+ * `large_msg_test` fails when there are only 512 huge pages. This is OK, but
+    the error occurs during memory registration (on InfiniBand). It should occur
+    in `alloc_raw`.
+ * On slow machines, tests might take too long, so `kTestMaxEventLoopMs` might
+   be too short a duration. Ideally we would like to run the test as long as
+   we're steadily getting responses. This can be done cleanly in
+   `wait_for_rpc_resps_or_timeout`.
+
 ## Short-term TODOs
  * Session reset and machine failure detection broke when I changed session
    management to use UDP instead of ENet.

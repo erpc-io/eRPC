@@ -21,7 +21,7 @@ Some highlights:
    * Mellanox OFED for Mellanox NICs
    * System-wide DPDK for other, DPDK-compatible NICs
  * See `scripts/packages/` for required software packages for your distro
- * At least 512 huge pages on every NUMA node, and unlimited SHM limits
+ * At least 1024 huge pages on every NUMA node, and unlimited SHM limits
  * UDP ports 31850 and 31851 should be open on the management network.
    `scripts/firewalld/erpc_firewall.sh` opens them on systems running
    `firewalld`.
