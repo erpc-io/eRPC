@@ -169,9 +169,9 @@ void client_print_stats(AppContext &c) {
   printf(
       "Client %zu. Tput = %.3f Mrps. "
       "Point latency (us) = {%.2f 50, %.2f 99}. "
-      "Range latency (us) = %.2f 99.\n",
+      "Range latency (us) = %zu 99.\n",
       c.thread_id, tput_mrps, stats.lat_us_50, stats.lat_us_99,
-      c.client.range_latency.perc(.99) / 10.0);
+      c.client.range_latency.perc(.99));
 
   if (c.thread_id == 0) {
     app_stats_t accum;
