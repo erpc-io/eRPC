@@ -297,6 +297,7 @@ elseif(APP STREQUAL "masstree_analytics")
   set(APP_ADDITIONAL_SOURCES
     apps/masstree_analytics/mt_index_api.cc)
   set(LIBRARIES ${LIBRARIES} masstree)
+  include_directories(mica/src)
 elseif(APP STREQUAL "mica_test")
   include_directories(mica/src)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})

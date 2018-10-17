@@ -1,7 +1,7 @@
 #include "masstree_analytics.h"
 #include <signal.h>
 #include <cstring>
-#include "cityhash/city.h"
+#include "mica/util/cityhash/city.h"
 #include "util/autorun_helpers.h"
 
 // The keys in the index are 64-bit hashes of keys {0, ..., FLAGS_num_keys}.
