@@ -278,8 +278,8 @@ int main(int argc, char **argv) {
                             erpc::ReqFuncType::kForeground);
 
     auto range_handler_type = FLAGS_num_server_bg_threads > 0
-                                  ? erpc::ReqFuncType::kForeground
-                                  : erpc::ReqFuncType::kBackground;
+                                  ? erpc::ReqFuncType::kBackground
+                                  : erpc::ReqFuncType::kForeground;
     nexus.register_req_func(kAppRangeReqType, range_req_handler,
                             range_handler_type);
 
