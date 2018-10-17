@@ -12,6 +12,7 @@
 static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppPointReqType = 1;
 static constexpr size_t kAppRangeReqType = 2;
+static constexpr size_t kAppEvLoopMs = 500;
 
 // Workload params
 static constexpr bool kBypassMasstree = false;  // Bypass Masstree?
@@ -56,6 +57,31 @@ struct resp_t {
   };
 };
 
+struct app_stats_t {
+  double mrps;       // Point request rate
+  double lat_us_50;  // Point request median latency
+  double lat_us_99;  // Point request 99th percentile latency
+  size_t pad[5];
+
+  app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
+
+  static std::string get_template_str() { return "mrps lat_us_50 lat_us_99"; }
+
+  std::string to_string() {
+    return std::to_string(mrps) + " " + std::to_string(lat_us_50) + " " +
+           std::to_string(lat_us_99);
+  }
+
+  /// Accumulate stats
+  app_stats_t &operator+=(const app_stats_t &rhs) {
+    this->mrps += rhs.mrps;
+    this->lat_us_50 += rhs.lat_us_50;
+    this->lat_us_99 += rhs.lat_us_99;
+    return *this;
+  }
+};
+static_assert(sizeof(app_stats_t) == 64, "");
+
 // Per-thread application context
 class AppContext : public BasicAppContext {
  public:
@@ -65,10 +91,12 @@ class AppContext : public BasicAppContext {
   } server;
 
   struct {
+    struct timespec tput_t0;  // Throughput measurement start
+    app_stats_t *app_stats;   // Common stats array for all threads
+
     erpc::Latency point_latency;  // Latency of point requests (factor = 10)
     erpc::Latency range_latency;  // Latency of point requests (factor = 1)
 
-    struct timespec tput_t0;            // Throughput measurement start
     uint64_t req_ts[kAppMaxReqWindow];  // Per-request timestamps
     erpc::MsgBuffer req_msgbuf[kAppMaxReqWindow];
     erpc::MsgBuffer resp_msgbuf[kAppMaxReqWindow];

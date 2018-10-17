@@ -154,33 +154,49 @@ void app_cont_func(void *_context, size_t _tag) {
     c->client.range_latency.update(static_cast<size_t>(usec));
   }
 
-  constexpr size_t kMeasurement = 200000;
-  if (c->client.num_resps_tot++ == kMeasurement) {
-    double point_us_median = c->client.point_latency.perc(.5) / 10.0;
-    double point_us_99 = c->client.point_latency.perc(.99) / 10.0;
-    double range_us_90 = c->client.range_latency.perc(.99);
-
-    double seconds = erpc::sec_since(c->client.tput_t0);
-    double tput = kMeasurement / (seconds * 1000000);
-
-    printf(
-        "main: Client %zu. Tput = %.3f Mrps. "
-        "Point latency (us) = {%.2f 50, %.2f 99}. "
-        "Range latency (us) = %.2f 90.\n",
-        c->thread_id, tput, point_us_median, point_us_99, range_us_90);
-
-    clock_gettime(CLOCK_REALTIME, &c->client.tput_t0);
-    c->client.num_resps_tot = 0;
-    c->client.point_latency.reset();
-    c->client.range_latency.reset();
-  }
-
+  c->client.num_resps_tot++;
   send_req(c, msgbuf_idx);
 }
 
-void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
+void client_print_stats(AppContext &c) {
+  double seconds = erpc::sec_since(c.client.tput_t0);
+  double tput_mrps = c.client.num_resps_tot / (seconds * 1000000);
+  app_stats_t &stats = c.client.app_stats[c.thread_id];
+  stats.mrps = tput_mrps;
+  stats.lat_us_50 = c.client.point_latency.perc(0.50) / 10.0;
+  stats.lat_us_99 = c.client.point_latency.perc(0.99) / 10.0;
+
+  printf(
+      "Client %zu. Tput = %.3f Mrps. "
+      "Point latency (us) = {%.2f 50, %.2f 99}. "
+      "Range latency (us) = %.2f 99.\n",
+      c.thread_id, tput_mrps, stats.lat_us_50, stats.lat_us_99,
+      c.client.range_latency.perc(.99) / 10.0);
+
+  if (c.thread_id == 0) {
+    app_stats_t accum;
+    for (size_t i = 0; i < fLU64::FLAGS_num_client_threads; i++) {
+      accum += c.client.app_stats[i];
+    }
+    accum.lat_us_50 /= FLAGS_num_client_threads;
+    accum.lat_us_99 /= FLAGS_num_client_threads;
+    c.tmp_stat->write(accum.to_string());
+  }
+
+  c.client.num_resps_tot = 0;
+  c.client.point_latency.reset();
+  c.client.range_latency.reset();
+
+  clock_gettime(CLOCK_REALTIME, &c.client.tput_t0);
+}
+
+void client_thread_func(size_t thread_id, app_stats_t *app_stats,
+                        erpc::Nexus *nexus) {
   AppContext c;
   c.thread_id = thread_id;
+  c.client.app_stats = app_stats;
+
+  if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
@@ -213,7 +229,11 @@ void client_thread_func(size_t thread_id, erpc::Nexus *nexus) {
   clock_gettime(CLOCK_REALTIME, &c.client.tput_t0);
   for (size_t i = 0; i < FLAGS_req_window; i++) send_req(&c, i);
 
-  while (ctrl_c_pressed == 0) c.rpc->run_event_loop(200);
+  for (size_t i = 0; i < FLAGS_test_ms; i += kAppEvLoopMs) {
+    c.rpc->run_event_loop(kAppEvLoopMs);
+    if (ctrl_c_pressed == 1) break;
+    client_print_stats(c);
+  }
 }
 
 void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
@@ -298,8 +318,9 @@ int main(int argc, char **argv) {
                       FLAGS_numa_node, FLAGS_num_server_bg_threads);
 
     std::vector<std::thread> thread_arr(FLAGS_num_client_threads);
+    auto *app_stats = new app_stats_t[FLAGS_num_client_threads];
     for (size_t i = 0; i < FLAGS_num_client_threads; i++) {
-      thread_arr[i] = std::thread(client_thread_func, i, &nexus);
+      thread_arr[i] = std::thread(client_thread_func, i, app_stats, &nexus);
       erpc::bind_to_core(thread_arr[i], FLAGS_numa_node, i);
     }
 
