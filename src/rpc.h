@@ -939,7 +939,7 @@ class Rpc {
   uint8_t *rx_ring[TTr::kNumRxRingEntries];
   size_t rx_ring_head = 0;  ///< Current unused RX ring buffer
 
-  std::vector<SSlot *> stallq;  ///< Req sslots stalled for credits
+  std::vector<SSlot *> stallq;  ///< Request sslots stalled for credits
 
   size_t ev_loop_tsc;  ///< TSC taken at each iteration of the ev loop
 
@@ -1020,7 +1020,7 @@ class Rpc {
   struct {
     size_t num_re_tx = 0;  /// Total retransmissions across all sessions
 
-    /// Number of times we could not retranmsit a request, or we had to drop
+    /// Number of times we could not retransmit a request, or we had to drop
     /// a received packet, because a request reference was still in the wheel.
     size_t still_in_wheel_during_retx = 0;
   } pkt_loss_stats;
