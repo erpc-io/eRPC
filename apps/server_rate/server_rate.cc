@@ -74,7 +74,7 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   }
 }
 
-void app_cont_func(erpc::RespHandle *, void *, size_t);
+void app_cont_func(void *, size_t);
 inline void send_req(ClientContext &c, size_t ws_i) {
   c.start_tsc[ws_i] = erpc::rdtsc();
   c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppReqType,
@@ -82,13 +82,9 @@ inline void send_req(ClientContext &c, size_t ws_i) {
                          app_cont_func, ws_i);
 }
 
-void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
-  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf->get_data_size() == FLAGS_resp_size);
-  _unused(resp_msgbuf);
-
+void app_cont_func(void *_context, size_t ws_i) {
   auto *c = static_cast<ClientContext *>(_context);
-  c->rpc->release_response(resp_handle);
+  assert(c->resp_msgbuf[ws_i].get_data_size() == FLAGS_resp_size);
 
   double req_lat_us =
       erpc::to_usec(erpc::rdtsc() - c->start_tsc[ws_i], c->rpc->get_freq_ghz());
