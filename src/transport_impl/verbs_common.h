@@ -165,7 +165,7 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
       if (ports_to_discover == 0) {
         // Resolution succeeded. Check if the link layer matches.
         const auto expected_link_layer =
-            (transport_type == TransportType::kInfiniBand)
+            (transport_type == TransportType::kInfiniBand && !kIsRoCE)
                 ? IBV_LINK_LAYER_INFINIBAND
                 : IBV_LINK_LAYER_ETHERNET;
         if (port_attr.link_layer != expected_link_layer) {

@@ -17,7 +17,7 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
                          FILE *trace_file)
     : Transport(TransportType::kInfiniBand, rpc_id, phy_port, numa_node,
                 trace_file) {
-  if (kIsRoCE) {
+  if (!kIsRoCE) {
     rt_assert(kHeadroom == 0, "Invalid packet header headroom for InfiniBand");
   } else {
     rt_assert(kHeadroom == 40, "Invalid packet header headroom for RoCE");
