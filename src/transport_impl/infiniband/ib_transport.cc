@@ -9,6 +9,12 @@
 namespace erpc {
 
 constexpr size_t IBTransport::kMaxDataPerPkt;
+
+// GIDs are currently used only for RoCE. This default value works for most
+// clusters, but we need a more robust GID selection method. Some observations:
+//  * On physical clusters, gid_index = 0 always works (in my experience)
+//  * On VM clusters (AWS/KVM), gid_index = 0 does not work, gid_index = 1 works
+//  * Mellanox's `show_gids` script lists all GIDs on all NICs
 static constexpr size_t kDefaultGIDIndex = 1;
 
 // Initialize the protection domain, queue pair, and memory registration and
