@@ -9,6 +9,7 @@
 namespace erpc {
 
 constexpr size_t IBTransport::kMaxDataPerPkt;
+static constexpr size_t kDefaultGIDIndex = 1;
 
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
@@ -75,7 +76,7 @@ struct ibv_ah *IBTransport::create_ah(const ib_routing_info_t *ib_rinfo) const {
   if (kIsRoCE) {
     ah_attr.grh.dgid.global.interface_id = ib_rinfo->gid.global.interface_id;
     ah_attr.grh.dgid.global.subnet_prefix = ib_rinfo->gid.global.subnet_prefix;
-    ah_attr.grh.sgid_index = 0;
+    ah_attr.grh.sgid_index = kDefaultGIDIndex;
     ah_attr.grh.hop_limit = 1;
   }
 
@@ -110,8 +111,8 @@ void IBTransport::ib_resolve_phy_port() {
   resolve.port_lid = port_attr.lid;
 
   if (kIsRoCE) {
-    int ret =
-        ibv_query_gid(resolve.ib_ctx, resolve.dev_port_id, 0, &resolve.gid);
+    int ret = ibv_query_gid(resolve.ib_ctx, resolve.dev_port_id,
+                            kDefaultGIDIndex, &resolve.gid);
     rt_assert(ret == 0, "Failed to query GID");
   }
 }
