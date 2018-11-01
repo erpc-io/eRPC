@@ -17,7 +17,7 @@ IBTransport::IBTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
                          FILE *trace_file)
     : Transport(TransportType::kInfiniBand, rpc_id, phy_port, numa_node,
                 trace_file) {
-  if (!is_roce()) {
+  if (kIsRoCE) {
     rt_assert(kHeadroom == 0, "Invalid packet header headroom for InfiniBand");
   } else {
     rt_assert(kHeadroom == 40, "Invalid packet header headroom for RoCE");
@@ -66,13 +66,13 @@ IBTransport::~IBTransport() {
 struct ibv_ah *IBTransport::create_ah(const ib_routing_info_t *ib_rinfo) const {
   struct ibv_ah_attr ah_attr;
   memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
-  ah_attr.is_global = is_roce() ? 1 : 0;
-  ah_attr.dlid = is_roce() ? 0 : ib_rinfo->port_lid;
+  ah_attr.is_global = kIsRoCE ? 1 : 0;
+  ah_attr.dlid = kIsRoCE ? 0 : ib_rinfo->port_lid;
   ah_attr.sl = 0;
   ah_attr.src_path_bits = 0;
   ah_attr.port_num = resolve.dev_port_id;  // Local port
 
-  if (is_roce()) {
+  if (kIsRoCE) {
     ah_attr.grh.dgid.global.interface_id = ib_rinfo->gid.global.interface_id;
     ah_attr.grh.dgid.global.subnet_prefix = ib_rinfo->gid.global.subnet_prefix;
     ah_attr.grh.sgid_index = 0;
@@ -87,7 +87,7 @@ void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
   ib_routing_info->port_lid = resolve.port_lid;
   ib_routing_info->qpn = qp->qp_num;
-  if (is_roce()) ib_routing_info->gid = resolve.gid;
+  if (kIsRoCE) ib_routing_info->gid = resolve.gid;
 }
 
 bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) {
@@ -109,7 +109,7 @@ void IBTransport::ib_resolve_phy_port() {
 
   resolve.port_lid = port_attr.lid;
 
-  if (is_roce()) {
+  if (kIsRoCE) {
     int ret =
         ibv_query_gid(resolve.ib_ctx, resolve.dev_port_id, 0, &resolve.gid);
     rt_assert(ret == 0, "Failed to query GID");

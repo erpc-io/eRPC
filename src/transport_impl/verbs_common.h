@@ -164,23 +164,13 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
 
       if (ports_to_discover == 0) {
         // Resolution succeeded. Check if the link layer matches.
-        switch (transport_type) {
-          case TransportType::kRaw:
-          case TransportType::kRoCE:
-            if (port_attr.link_layer != IBV_LINK_LAYER_ETHERNET) {
-              throw std::runtime_error(
-                  "Transport type required is raw Ethernet but port L2 is " +
-                  link_layer_str(port_attr.link_layer));
-            }
-            break;
-          case TransportType::kInfiniBand:
-            if (port_attr.link_layer != IBV_LINK_LAYER_INFINIBAND) {
-              throw std::runtime_error(
-                  "Transport type required is InfiniBand but port L2 is " +
-                  link_layer_str(port_attr.link_layer));
-            }
-            break;
-          default: exit_assert(false, "Not a verbs transport");
+        const auto expected_link_layer =
+            (transport_type == TransportType::kInfiniBand)
+                ? IBV_LINK_LAYER_INFINIBAND
+                : IBV_LINK_LAYER_ETHERNET;
+        if (port_attr.link_layer != expected_link_layer) {
+          throw std::runtime_error("Invalid link layer. Port link layer is " +
+                                   link_layer_str(port_attr.link_layer));
         }
 
         // Check the MTU

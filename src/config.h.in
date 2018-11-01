@@ -10,4 +10,5 @@ class DpdkTransport;
 
 #define CTransport ${CONFIG_TRANSPORT}
 static constexpr size_t kHeadroom = ${CONFIG_HEADROOM};
+static constexpr size_t kIsRoCE = ${CONFIG_IS_ROCE};
 }

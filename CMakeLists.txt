@@ -30,6 +30,7 @@ set(COMPILE_ERPC_LIB ON)
 
 # Options exposed to the user
 set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
+option(ROCE "Use RoCE if TRANSPORT is infiniband" OFF)
 option(PERF "Compile for performance" OFF)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
@@ -150,8 +151,9 @@ set(SOURCES
 # transport. Other transports are exluded using preprocessor macros.
 string(TOUPPER ${TRANSPORT} DEFINE_TRANSPORT)
 add_definitions(-D${DEFINE_TRANSPORT}=true)
-
 MESSAGE(STATUS "Selected transport = ${TRANSPORT}.")
+SET(CONFIG_IS_ROCE false)
+
 if(TRANSPORT STREQUAL "dpdk")
   find_library(DPDK_LIB dpdk)
   if(NOT DPDK_LIB)
@@ -184,7 +186,13 @@ else()
     SET(CONFIG_HEADROOM 40)
   elseif(TRANSPORT STREQUAL "infiniband")
     SET(CONFIG_TRANSPORT "IBTransport")
-    SET(CONFIG_HEADROOM 0)
+    if(ROCE)
+      SET(CONFIG_HEADROOM 40)
+      SET(CONFIG_IS_ROCE true)
+    else()
+      SET(CONFIG_HEADROOM 0)
+      SET(CONFIG_IS_ROCE false)
+    endif()
   endif()
 endif()
 

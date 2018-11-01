@@ -16,7 +16,11 @@ class IBTransport : public Transport {
  public:
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kInfiniBand;
-  static constexpr size_t kMTU = 3840;  ///< Make (kRecvSize / 64) prime
+
+  // For IBTransport, we've kept (kRecvSize + 64) non-4096 aligned. Is this
+  // ever beneficial?
+  static constexpr size_t kMTU = kIsRoCE ? 1024 : 3840;
+
   static constexpr size_t kRecvSize = (kMTU + 64);  ///< RECV size (with GRH)
   static constexpr size_t kRQDepth = kNumRxRingEntries;  ///< RECV queue depth
   static constexpr size_t kSQDepth = 128;                ///< Send queue depth
@@ -137,8 +141,6 @@ class IBTransport : public Transport {
   void init_recvs(uint8_t **rx_ring);
 
   void init_sends();  ///< Initialize constant fields of SEND work requests
-
-  static bool is_roce() { return kTransportType == TransportType::kRoCE; }
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   class IBResolve : public VerbsResolve {
