@@ -41,18 +41,26 @@ Some highlights:
    * Run `./server` at the server, and `./client` at the client
  * Generate the documentation: `doxygen`
 
-## Supported NICs:
- * UDP over Ethernet mode:
+## Supported bare-metal NICs:
+ * Ethernet/UDP mode:
    * ConnectX-4 or newer Mellanox Ethernet NICs: Use `DTRANSPORT=raw`
    * DPDK-compatible NICs that support flow-director: Use `DTRANSPORT=dpdk`
      * Intel 82599 and Intel X710 NICs have been tested
      * Virtual NICs have not been tested
      * `raw` transport is faster for Mellanox NICs, which also support DPDK
    * ConnectX-3 Ethernet NICs are supported in eRPC's RoCE mode
- * Any InfiniBand-compliant NICs: Use `DTRANSPORT=infiniband`
- * Any RoCE-compilant NICs: Coming soon.
+ * RDMA (InfiniBand/RoCE) NICs: Use `DTRANSPORT=infiniband`. Add `DROCE=on`
+   if using RoCE.
  * Mellanox drivers optimized specially for eRPC are available in the `drivers`
    directory
+
+## Running eRPC without fast bare-metal NICs:
+ * Follow these instructions to try out eRPC on a machine without fast Mellanox
+   or DPDK-capable NICs (e.g., on your desktop or in a virtual machine). This is
+   for development only: eRPC is not designed to perform well in these settings.
+   eRPC has been tested on KVM virtual machines and in Amazon EC2.
+ * Create an emulated RoCE device with [SoftRoCE](https://community.mellanox.com/community/support/software-drivers/mellanox-ofed/blog/2017/12/22/how-to-configure-soft-roce-with-mellanox-ofed-42)
+ * Compile eRPC with `DTRANSPORT=infiniband -DROCE=on`
 
 ## Configuring and running the provided applications
  * The `apps` directory contains a suite of benchmarks and examples. The
