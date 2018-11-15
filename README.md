@@ -81,7 +81,11 @@ Some highlights:
    statistics generated in a run can be collected using `scripts/proc-out.sh`.
 
 ## Getting help
- * GitHub issues are preferred over email.
+ * GitHub issues are preferred over email. Please include the following
+   information in the issue:
+   * NIC model
+   * Mellanox OFED or DPDK version
+   * Operating system
 
 ## Contact
 Anuj Kalia (akalia@cs.cmu.edu)
