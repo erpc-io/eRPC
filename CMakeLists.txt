@@ -299,9 +299,9 @@ if(APP STREQUAL "smr")
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
 elseif(APP STREQUAL "masstree_analytics")
   # CMake-based Masstree library from anujkaliaiitd/masstree-beta
-  link_directories($ENV{HOME}/masstree-beta)
-  include_directories(SYSTEM $ENV{HOME}/masstree-beta)
-  add_definitions(-include $ENV{HOME}/masstree-beta/config.h)
+  link_directories(${CMAKE_SOURCE_DIR}/third_party/masstree-beta)
+  include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party/masstree-beta)
+  add_definitions(-include ${CMAKE_SOURCE_DIR}/third_party/masstree-beta/config.h)
   set(APP_ADDITIONAL_SOURCES
     apps/masstree_analytics/mt_index_api.cc
     mica/src/mica/util/cityhash/city_mod.cc)

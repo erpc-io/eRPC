@@ -1,0 +1,1395 @@
+% -*- tex-command: "pdflatex" -*-
+\documentclass[11pt]{article}
+\usepackage{times,mathptmx,amsmath,amssymb,graphicx,float}
+\usepackage[tmargin=1in,hmargin=.75in,height=9in,columnsep=2pc,letterpaper]{geometry}
+\usepackage[T1]{fontenc}
+\makeatletter
+\newcommand{\Keyset}{\ensuremath{\mathcal K}}
+\newcommand{\Valueset}{\ensuremath{\mathcal V}}
+\newcommand{\None}{\textsc{None}}
+\newcommand{\NONE}{\textsc{none}}
+\newcommand{\FALSE}{\textsc{false}}
+\newcommand{\TRUE}{\textsc{true}}
+\newcommand{\Bool}{\textsc{Bool}}
+\newcommand{\Nat}{\ensuremath{\mathbb N}}
+\newcommand{\sysGet}{\textit{Get}}
+\newcommand{\sysget}{\textit{get}}
+\newcommand{\sysgets}{\textit{get\/}s}
+\newcommand{\sysPut}{\textit{Put}}
+\newcommand{\sysput}{\textit{put}}
+\newcommand{\sysputs}{\textit{put\/}s}
+\newcommand{\sysScan}{\textit{Scan}}
+\newcommand{\sysscan}{\textit{scan}}
+\newcommand{\Inv}[1]{\ensuremath{\textrm{inv}(#1)}}
+\newcommand{\Res}[1]{\ensuremath{\textrm{res}(#1)}}
+\newcommand{\Precedes}{<}
+\newcommand{\NotPrecedes}{\not <}
+\newcommand{\Overlaps}{\approx}
+\newcommand{\PrecedesK}[1]{\ensuremath{\mathrel{<_{#1}}}}
+\newcommand{\PrecedesEqK}[1]{\ensuremath{\mathrel{\leq_{#1}}}}
+\newcommand{\V}[1]{\textit{#1}}
+\newcommand{\N}[1]{\text{\upshape{#1}}}
+\newcommand{\NIL}{\textsc{nil}}
+\newcommand{\NOTFOUND}{\textsc{notfound}}
+\newcommand{\VALUE}{\textsc{value}}
+\newcommand{\LAYER}{\textsc{layer}}
+\newcommand{\MARK}{\textsc{mark}}
+\newcommand{\INSERTING}{\textsc{inserting}}
+\newcommand{\REMOVING}{\textsc{removing}}
+\newcommand{\readnow}[1]{\ensuremath{{}^\circ#1}}
+\newcommand{\fencebase}{\text{- - - - - - - - -}}
+\newcommand{\rcufencebase}{\text{* * * * * * * * *}}
+\newcommand{\fence}{\ensuremath{\fencebase}}
+%\newcommand{\acquirefence}{\ensuremath{\fencebase_{\textsc{acquire}}}}
+%\newcommand{\releasefence}{\ensuremath{\fencebase_{\textsc{release}}}}
+\let\acquirefence\fence
+\let\releasefence\fence
+\newcommand{\rcufence}{\ensuremath{\rcufencebase_{\textsc{rcu
+        fence}}}}
+\newcommand{\substring}[3]{\ensuremath{#1[#2\mathbin:#3]}}
+\newcommand{\Returns}[1]{\ensuremath{\rightarrow\text{#1}}}
+\newcommand{\Bplus}{B\(^+\)}
+\newcommand{\Blink}{B\(^{\text{link}}\)}
+\newcommand{\LEAFWIDTH}{\ensuremath{W_\text{leaf}}}
+\newcommand{\INTERIORWIDTH}{\ensuremath{W_\text{interior}}}
+\newcommand{\CX}[1]{\small{\textit{// #1}}}
+\newcommand{\C}[1]{\unskip\qquad\CX{#1}}
+\newcommand{\ITEM}[1]{\textsc{#1}}
+\newcommand{\AT}[2]{\ensuremath{#1_{@#2}}}
+\newenvironment{programtabbing}%
+  {\begingroup\parskip\z@\begin{tabbing}\quad\qquad~~\= \quad~~\= \quad~~\= \quad~~\=\kill}%
+  {\unskip\end{tabbing}\endgroup}
+\gdef\programtabskip{\leavevmode\raise1.5ex\hbox{\strut}}
+\gdef\_{\char`\_}
+\frenchspacing
+\makeatother
+\begin{document}
+
+\section{Definitions}
+
+A Masstree maps \emph{keys} to \emph{values}. Keys are variable-length strings. Values are arbitrary.
+Let \Keyset\ be the set of keys and \Valueset\ the set of values.
+
+Masstree's operations are \sysput, \sysget, and \sysscan.
+
+\begin{itemize}
+\item \(\sysput : \Keyset \times \Valueset \mapsto \None\)
+\item \(\sysget : \Keyset \mapsto (\Valueset \cup \None)\)
+\item \(\sysscan : \Keyset \times (\Keyset \times \Valueset \mapsto \Bool) \mapsto \None\)
+\end{itemize}
+
+\noindent%
+\sysPut\
+stores a value at a given key. \sysGet\ returns the value for a given
+key (or \NONE\ if there is no value). \sysScan\ fetches multiple keys
+and values. It takes an initial key $k_0$ and a function object $f$.
+The function object is called for every key $k \geq k_0$ in the
+Masstree, once per key, in increasing order by key. Its arguments are
+a key and the corresponding value. We expect the scan function will
+save copies of the keys and values in the object, or count them, or
+whatever is appropriate, and that scan's caller will extract those
+values once the scan returns. The scan stops when the Masstree
+runs out of values or the function object returns false, whichever
+happens first.
+
+Masstree can support other operations, such as remove and a compare-and-swap-style atomic put, but these three suffice to discuss correctness.
+
+
+\section{Correctness}
+
+Masstree is a concurrent data structure. This means that multiple threads access Masstree simultaneously, complicating notions of correctness. Roughly speaking, Masstree is correct if every \sysget\ returns the most recent \sysput\ for that key, but when \sysgets\ and \sysputs\ overlap this gets a little complicated.
+
+Multiple \emph{threads} submit \emph{invocations} to Masstree and
+receive \emph{responses}. An example invocation is \(\sysput(k,v)\): put
+value $v$ at key $k$. The pair of an invocation and its response is
+called an \emph{action}. An invocation or response is
+called a \emph{half-action}.
+
+We assume a \sysget\ or \sysput\ response contains \emph{the
+relevant \sysput\ action}. For \sysget, this is the \sysput\ action that
+stored the corresponding value (or \NONE\ if there was no previous
+\sysput\ for that key). For \sysput, this is the immediately preceding
+\sysput\ action for that key. This differs from the methods' normal
+signatures, but simplifies the model. The response to a \sysscan\ action
+is a \emph{set} of \sysput\ actions. Here's an example sequence of
+actions:
+
+\begin{flushleft}
+\begin{tabular}{@{}rll}
+& Invocation & Response \\
+$a_1$ & $\sysget(k)$ & \NONE \\
+$a_2$ & $\sysput(k, v_2)$ & \NONE \\
+$a_3$ & $\sysput(k, v_3)$ & $a_2$ \\
+$a_4$ & $\sysget(k)$ & $a_3$ \\
+$a_5$ & $\sysput(k+1, v_5)$ & \NONE \\
+$a_6$ & $\sysscan(k, \dots)$ & $\{a_3,a_5\}$ \\
+\end{tabular}
+\end{flushleft}
+
+We assume that all half-actions are sequenced into a total order, which
+we might call global time. In this time order, every invocation precedes
+its corresponding response---$\Inv{a} < \Res{a}$ for all
+$a$---though other half-actions may intervene between them.
+
+The total order on half-actions imposes a \emph{partial} order on
+actions. Given actions $a_1$ and $a_2$, we say that $a_1$
+\emph{precedes} $a_2$, written $a_1 \Precedes a_2$, if $a_1$'s
+response is before $a_2$'s invocation in the global time order:
+$\Res{a_1} < \Inv{a_2}$. We say that $a_1$ \emph{overlaps} $a_2$,
+written $a_1 \Overlaps a_2$, if $a_1 \NotPrecedes a_2$ and $a_2
+\NotPrecedes a_1$.
+
+Masstree is correct if there exist per-key total orders
+\(\PrecedesK{k}\), where \(\PrecedesK{k}\) for key $k$ contains the set
+of \sysput\ actions on $k$, so that the following properties are
+satisfied.
+
+\begin{enumerate}
+\item Every \sysput\ action on $k$ is in \(\PrecedesK{k}\).
+\item The \(\PrecedesK{k}\) order agrees with the partial order on actions. That is, if $a_1 \Precedes a_2$ and $a_1$ and $a_2$ are \sysput\ actions on $k$, then $a_1 \PrecedesK{k} a_2$.
+\item The \(\PrecedesK{k}\) order agrees with \sysput\ responses. That is, assuming $\mathord{\PrecedesK{k}} = [a_0, a_1, a_2, \dots]$, then $\Res{a_0} = \NONE$, $\Res{a_1} = a_0$, $\Res{a_2} = a_1$, and so forth.
+\item Given \(a\), a \sysget\ action on $k$ with response \NONE, no
+  \(\sysput(k, \cdot)\) actions precede \(a\) in the partial order on actions.
+\item Given \(a\), a \sysget\ action on $k$ with response $b \neq \NONE$, $b$ is a \sysput\ on $k$ that either overlaps with $a$ or immediately precedes $a$ in $\PrecedesK{k}$. That is, $\Res{a} \NotPrecedes \Inv{b}$, and there is no $x$ with $b \PrecedesK{k} x \Precedes a$.
+\item Given \(a_1 \Precedes a_2\), two \sysget\ actions on the same $k$ that originate \emph{from the same thread}, we must have \(\Res{a_1} \PrecedesEqK{k} \Res{a_2}\). That is, no thread sees ``time'' go backwards.
+\item Given \(a\), a \sysscan\ action starting from $k$, a corresponding set of \sysget\ operations, returning the same results as the \sysscan, would also follow these rules. (As an example, if \(b = \sysput(k, \cdot) \in \Res{a}\), then $b$ must be a \sysput\ on $k$ that either overlaps with $a$ or immediately precedes $a$ in $\PrecedesK{k}$. A key $x$ in the scan range with no corresponding response is like a \sysget\ action that returned \NONE: no \(\sysput(x, \cdot)\) actions can precede \(a\).)
+\end{enumerate}
+
+
+\section{Data structures}
+
+Here's a picture of a Masstree layer.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{examples_1}
+\caption{Example Masstree layer.}
+\end{figure}
+
+\noindent
+Leaves are on the bottom row, interior nodes above. The letters are
+keys.
+
+Leaves are connected in a doubly-linked list (dotted arrows); this
+facilitates scans and reverse scans and speeds up some other operations.
+(See \Blink\ trees.) A leaf \(n\) contains \(n.\V{size}\) keys and
+values, where \(0 \leq n.\V{size} \leq \LEAFWIDTH = 15\).
+
+A leaf \(n\) is responsible for all keys \(k\) in the range
+\(\N{lowkey}(n) \leq k < \N{highkey}(n)\). Each leaf stores its lowkey
+explicitly, and that lowkey \emph{never changes}. The highkey is not
+stored in the leaf---it equals the \emph{next} leaf's lowkey---and can
+change over time. If leaf \(n\) splits, then \(\N{highkey}(n)\)
+decreases; if the leaf following \(n\) is deleted, then
+\(\N{highkey}(n)\) increases to cover the deleted leaf's key range. The
+layer's leftmost leaf has lowkey \(-\infty\).
+
+Interior nodes form a B$^+$ tree for fast access to data stored in
+leaves. Interior nodes are \emph{not} linked
+together.\footnote{\Blink\ trees also connect interior nodes in linked
+lists, but in our tests this didn't speed anything up, and it would
+complicate remove.}
+
+An interior node \(n\) contains \(n.\V{size}\) keys, where \(0 \leq
+n.\V{size} \leq \INTERIORWIDTH = 15\). A node with \(n.\V{size}\) keys
+contains exactly \(n.\V{size} + 1\) child pointers. Keys are stored in a
+\(n.\V{kslice}\) array (see \S\ref{s:keys} for more on key slices).
+Values for key \(k\) are found in one of the underlying children:
+%
+\[
+\text{The child containing \(k\)} =
+\begin{cases}
+n.\V{child}[0] & \text{if \(k < n.\V{kslice}[0]\),} \\
+n.\V{child}[1] & \text{if \(n.\V{kslice}[0] \leq k < n.\V{kslice}[1]\),} \\
+\vdots \\
+n.\V{child}[n.\V{size}] & \text{if \(k \geq n.\V{kslice}[n.\V{size}-1]\).}
+\end{cases}
+\]
+%
+If \(n.\V{size} = 0\), then all values are found in \(n.\V{child}[0]\).
+
+Although each interior node is responsible for a range of keys, this
+range (unlike with leaves) is \emph{implicit}, depending on keys higher
+in the tree. For example, in the figure, interior node (1) is
+responsible for the key range \([\textsc{j}, \infty)\), but bounds
+\textsc{j} and \(\infty\) are implicit from context: if the root node
+contained different keys, (1) might be responsible for
+\([\textsc{e},\textsc{q})\) or some other range. This means that we
+can't always tell from local information whether a key belongs in an
+interior node. This has consequences for the remove operation, as we
+will see.
+
+
+\section{Keys}
+\label{s:keys}
+
+Masstree \emph{keys} are variable-length strings ordered
+lexicographically.
+%
+Masstree divides these strings into eight-byte \emph{slices}; the
+B-tree structures that make up a Masstree store these slices as keys.
+Slice comparison produces the same result as lexicographic comparison
+of the underlying keys.
+
+Masstree code uses objects of type ``key.''
+%
+A key is basically a string decomposed into three parts, a prefix, a
+slice, and a suffix.
+%
+The \N{shift\_key} function, which is called when walking from one
+layer of Masstree to the next, shifts the current slice into the
+prefix, and shifts the next eight bytes of the suffix into the slice.
+
+If \(s\) is a string, let \(\substring{s}{a}{b}\) represent the
+substring of \(s\) starting at index \(a\) and ending just before
+index \(b\).
+%
+Thus, \(\substring{s}{0}{s.\V{length}} = s\), and
+\(\substring{s}{i}{i}\) is empty for any \(i\).
+%
+The substring operation constrains \(a\) and \(b\) to the appropriate
+bounds:
+%
+\[ \substring{s}{a}{b} =
+\substring{s}{\max(a,0)}{\min(b,s.\V{length})}. \]
+
+Then the key type's methods are as follows.
+
+\begin{flushleft}
+\begin{tabular}{@{}p{.5\hsize}@{}p{.5\hsize}@{}}
+\begin{programtabbing}
+\textbf{class key}: \\
+\> representation: string \(s\), int \(p\) \\
+\programtabskip
+\> constructor(string \(s\)): \\
+\>\> return \(\N{key}\{s = s, p = 0\}\) \\
+\programtabskip
+\> slice(key \(k\)) \Returns{string}: \\
+\>\> return \(\substring{k.s}{k.p}{k.p+8}\) \\
+\programtabskip
+\> suffix(key \(k\)) \Returns{string}: \\
+\>\> return \(\substring{k.s}{k.p+8}{k.s.\V{length}}\) \\
+\programtabskip
+\> length(key \(k\)) \Returns{int}: \\
+\>\> return \(k.s.\V{length} - k.p\)
+\end{programtabbing}
+&
+\begin{programtabbing}
+\\
+\\
+\programtabskip
+\> prefix(key \(k\)) \Returns{string}: \\
+\>\> return \(\substring{k.s}{0}{k.p}\) \\
+\programtabskip
+\> shift\_key(key \(k\)) \Returns{key}: \\
+\>\> // precondition: \(k.\V{length} > 8\) \\
+\>\> return \(\N{key}\{s = k.s, p = k.p + 8\}\) \\
+\programtabskip
+\> reset\_key(key \(k\)) \Returns{key}: \\
+\>\> // undoes all prior shift\_keys \\
+\>\> return \(\N{key}\{s = k.s, p = 0\}\)
+\end{programtabbing}
+\end{tabular}
+\end{flushleft}
+
+Masstree leaves store key slices, key lengths, and key suffixes. These
+are stored in separate arrays: the key at position \(\pi\) has slice
+\(n.\V{kslice}[\pi]\), length \(n.\V{klength}[\pi]\), and suffix
+\(n.\V{ksuffix}[\pi]\). (It is important to store slices and lengths
+inline, in the node, to allow prefetching. Suffixes, which can have
+arbitrary length, must be stored out of line.) Multiple keys with the
+same slice and \emph{different} suffixes are stored in a new layer.
+
+Interior nodes, unlike leaves, store \emph{only} key slices. (This
+speeds up the code, simplifies suffix memory management, and reduces
+memory usage.) As a consequence, all keys with slice \(k\) \emph{must}
+be stored in the same leaf. This choice constrains split.
+
+
+\section{Memory model}
+
+We write memory fences as rows of dashes\ \fence; on x86 (TSO) machines,
+these fences only affect the compiler's code generation---no machine
+instructions are required.
+
+We assume that, except as constrained by fences, the compiler may
+arbitrarily cache and reorder reads from and writes to node data. For
+example, the following code might read \(n.\V{version}\) once or twice,
+and might write \(n.\V{kslice}[0]\) once or twice:
+
+\begin{programtabbing}
+\(a \gets n.\V{version}\) \\
+\(++n.\V{kslice}[0]\) \\
+\(b \gets n.\V{version}\) \\
+\(n.\V{kslice}[0] \gets 0\)
+\end{programtabbing}
+
+\noindent
+However, this code \emph{must} read \(n.\V{version}\) twice, and write
+\(n.\V{kslice}[0]\) twice:
+
+\begin{programtabbing}
+\(a \gets n.\V{version}\) \\
+\(++n.\V{kslice}[0]\) \\
+\fence \\
+\(b \gets n.\V{version}\) \\
+\(n.\V{kslice}[0] \gets 0\)
+\end{programtabbing}
+
+We occasionally use a superscript O notation, as in
+\(\readnow{n.\V{version}}\), to indicate that a value is
+read from main memory at that point (i.e., no previously cached
+value allowed). Some unmarked reads must also complete from main
+memory, specifically those after fences.
+
+All reads and writes of individual variables are assumed to be atomic.
+We also assume one atomic compare-and-swap operation, cmpxchg, which has
+the following effect (but in one atomic step):
+
+\begin{programtabbing}
+\textbf{cmpxchg}(address \V{value}, value \V{expected}, value
+\V{desired}) \Returns{bool}: \\
+\> if \(\readnow{\V{value}} = \V{expected}\): \\
+\>\> \(\V{value} \gets \V{desired}\);~ return \TRUE \\
+\> else: \\
+\>\> return \FALSE
+\end{programtabbing}
+
+\section{Versions and locking}
+
+Each node has a 32- or 64-bit \emph{version}.\footnote{64-bit versions
+offer greater protection against overflow. A 32-bit version could wrap,
+causing unexpected reader behavior, if a reader blocked mid-computation
+for \(2^{22}\) inserts.} The version is located at the same place in
+leaf and interior nodes---it's the only common aspect of layout between
+node types. Versions can be manipulated with compare-and-swap operations
+and can be assigned atomically. They have the following fields:
+
+\begin{flushleft}
+\begin{tabular}{@{}lll}
+\V{locked} & 1 bit & whether node is locked \\
+\V{inserting} & 1 bit & whether node has been dirtied for insertion \\
+\V{splitting} & 1 bit & whether node has been dirtied for splitting \\
+&& Together, \V{inserting} and \V{splitting} are the \emph{dirty bits}. \\
+\V{vinsert} & 6 or 16 bits & insert version counter \\
+\V{vsplit} & 19 or 33 bits & split version counter \\
+&& \V{vinsert} overflows into \V{vsplit}; \V{vsplit} is a circular
+counter. \\
+\V{deleted} & 1 bit & whether node has been deleted \\
+\V{isroot} & 1 bit & whether node is root of its layer \\
+\V{isleaf} & 1 bit & whether node is a leaf \\
+\end{tabular}
+\end{flushleft}
+
+The dirty bits alert readers of potentially unstable states that require
+retry. Masstree updates generally involve multiple writes that should be
+considered atomic (for example, inserting a new child into an interior
+node, or updating the various parts of a key in a leaf). In some cases
+Masstree can arrange to ``publish'' an update atomically,
+but this is not always possible. Thus,
+before changing a node in a dangerous way, Masstree writers must mark
+the node as dirty by changing its version. Masstree readers execute
+\emph{read transactions} that are \emph{validated} using versions. First
+they snapshot the node's version, then they snapshot the relevant
+portion of its contents, and finally they compare the node's new version
+to its snapshot. If the versions differ in more than the \V{locked}
+bit (that is, if \(v \oplus \readnow{n.\V{version}} > \V{locked}\)),
+then the node changed in some potentially invalidating way during the
+read operation, and the reader must retry the read transaction.
+
+Masstree's lock and unlock functions are as follows. Note that they
+contain fences.
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{lock}(node $n$): \\
+\> $v \gets n.\V{version}$ \\
+\> while $v.\V{locked}$ or $!\text{cmpxchg}(n.\V{version}, v, v + \V{locked})$: \\
+\>\> $v \gets \readnow{n.\V{version}}$ \\
+\> \acquirefence \\
+\programtabskip
+%
+\textbf{unlock}(node $n$): \C{precondition: \(n\) is locked} \\
+\> $v \gets n.\V{version}$ \\
+\> if $v.\V{inserting}$: \\
+\>\> $++v.\V{vinsert}$ \C{may overflow into \V{vsplit}} \\
+\> else if $v.\V{splitting}$: \\
+\>\> $++v.\V{vsplit}$;~ $v.\V{isroot} \gets 0$ \C{the true root has never split} \\
+\> $v.\{\V{locked},\V{inserting},\V{splitting}\} \gets 0$ \\
+\> \releasefence \\
+\> $n.\V{version} \gets v$
+\end{programtabbing}
+\end{figure}
+
+A read transaction must first wait for its node to reach a stable
+state, so read transactions start with \N{stable\_version}, a form of
+``lock'' that doesn't actually involve locking.
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{stable\_version}(node $n$): \\
+\> $v \gets {n.\V{version}}$ \\
+\> while $v.\V{inserting}$ or $v.\V{splitting}$: \\
+\>\> $v \gets \readnow{n.\V{version}}$ \\
+\> \acquirefence \\
+\> return $v$
+\end{programtabbing}
+\end{figure}
+
+Nodes contain \V{parent} pointers for traversing up the tree. The
+\N{locked\_parent} and \N{true\_root} functions traverse these pointers.
+\N{locked\_parent} must retry because a node's parent can spontaneously
+change, even while the node is locked, if its parent interior node
+splits. The \N{true\_root} function traverses parent pointers until it
+finds the root of a tree.
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{locked\_parent}(node $n$): \C{precondition: \(n\) is locked} \\
+retry:~
+\> $p \gets n.\V{parent}$ \\
+\> if $p \neq \NIL$: \\
+\>\> lock($p$) \\
+\>\> if $p \neq \readnow{n.\V{parent}}$: \C{parent changed underneath us} \\
+\>\>\> unlock($p$);~ goto retry \\
+\> return $p$ \\
+\programtabskip
+%
+\textbf{true\_root}(node $n$): \\
+\> \(p \gets n.\V{parent}\) \\
+\> while \(p \neq \NIL\): \\
+\>\> \(n \gets p\);~ \(p \gets n.\V{parent}\) \\
+\> return \(n\)
+\end{programtabbing}
+\end{figure}
+
+
+\section{Invariants}
+
+We write \(\AT{x}{t}\) for the value of \(x\) at time \(t\).
+Times \(t\) and \(t'\) are \emph{RCU-overlapping} if a
+single reader could be active over some interval including both \(t\)
+and \(t'\).
+
+\paragraph{Root reachability}
+
+Assume that at time \(t\), the true root of a layer is node \(n\), and
+\(n\) is unlocked. Let \(x\) be the root of that layer as observed by
+a concurrent reader active at time \(t\). Then either \(x=n\), or
+\(x.\V{isroot} = \FALSE\) and \(n\) is reachable from \(x\) by a chain
+of \V{parent} pointers.
+
+\paragraph{Parent validity}
+
+If \(n\) is reachable, then \(n.\V{parent}\) is either another
+reachable node or \NIL.
+
+\paragraph{Key stability}
+
+Let \(n\) be a reachable leaf, and consider two times \(t<t'\) where
+\(n.\V{version}\) is the same at both times, and not dirty. Consider a
+slot \(\pi\) reachable via \(\AT{n.\V{permutation}}{t}\). Then
+slot \(\pi\) is also reachable via \(\AT{n.\V{permutation}}{t'}\), and
+all key information in slot \(\pi\) is unchanged from the corresponding values at time
+\(t\). (That is, \(\AT{n.\V{kslice}[\pi]}{t} =
+\AT{n.\V{kslice}[\pi]}{t'}\), \(\AT{n.\V{ksuffix}[\pi]}{t} =
+\AT{n.\V{ksuffix}[\pi]}{t'}\),  and \(\AT{n.\V{klength}[\pi]}{t} =
+\AT{n.\V{klength}[\pi]}{t'}\).)
+
+\paragraph{Interior node validity}
+
+Assume that \(n\) is a reachable interior node with
+\(\AT{n.\V{size}}{t} = s\). Let \(t'>t\) be an RCU-overlapping time with
+\(t\), and let \(x = \AT{n.\V{child}[i]}{t'}\) for some \(i\) with \(0
+\leq i \leq s\). Then either \(x = \NIL\), or \(x\) is a pointer to a
+valid (though not necessarily reachable) node.
+
+\paragraph{Cleanliness}
+
+If node \(n\) is dirty at time \(t\), then \(n\) is locked at time \(t\).
+
+\paragraph{Locking discipline}
+
+If a Masstree interface function (such as get, put, or remove) locks a
+node, then it unlocks that node before returning to the user.
+
+Node locks are obtained sequentially \emph{down} from layer to layer, but
+within a layer, they are obtained \emph{up} from leaves toward the root.
+
+\paragraph{Leaf linkage}
+
+At all times, all of a tree's active nodes are reachable from the
+leftmost leaf by \V{next} pointers.
+
+Say that \(n\) and \(n'\) are active nodes in the same tree, with
+\(\N{lowkey}(n) < \N{lowkey}(n')\). Then either \(n\) is reachable from
+\(n'\) by \V{prev} pointers, or \(n\) is dirty (\V{splitting}).
+
+\section{Transaction types}
+
+Leaf values are accessed in read transactions validated by version.
+
+Node modifications use transactions protected by locks.
+
+Internal nodes are accessed during descent using hand-over-hand
+validation by version.
+
+Obtaining a locked pointer to a parent node requires hand-over-hand
+locking with validation.
+
+\section{Get}
+
+Get first descends to the leaf responsible for a key,
+then finds the key in that leaf. This proceeds a layer at a time.
+
+Two related procedures, \N{descend} and \N{advance}, find within a layer
+the leaf node responsible for key $k$. \N{Descend} is more fundamental:
+every lookup involves one or more calls to \N{descend}. \N{Advance} is
+used occasionally to fix lookups that happened concurrently with splits.
+
+Both procedures return a leaf node $n$ and corresponding version $v$.
+The version is never dirty (it was obtained by \N{stable\_version}).
+Either version $v$ of leaf $n$ is responsible for $k$, or
+$v.\V{deleted}$ is true.
+However, neither \N{descend} nor \N{advance} lock nodes or perform any
+writes to shared memory, so $n$ may not \emph{remain} responsible for
+$k$. $n$ could split, moving responsibility for $k$ to the right; or $n$
+could be deleted, moving responsibility for $k$ to the left. Users of
+\N{descend} must detect these situations using read transactions
+validated by a check of $n.\V{version}$. If $n.\V{version}$ indicates a
+split, the user should call \N{advance} to find the leaf truly
+responsible for $k$; if $n.\V{version}$ indicates a deletion, the user
+must call \N{descend} again.
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{descend}(node \V{root}, key $k$) \Returns{\(\langle
+  \N{leaf \V{n}, version \V{v}}\rangle\)}: \\
+\CX{postcondition: either \(v.\V{deleted}\), or version \V{v} of leaf
+\V{n} is responsible for key $k$: \(\N{lowkey}(n) \leq k.\V{slice} <
+\N{highkey}(n_{@v})\)} \\
+retry:
+\> $n \gets \V{root}$;~ $v \gets \text{stable\_version}(n)$ \\
+\> if \(!v.\V{isroot}\): \\
+\>\> \(n \gets \text{true\_root}(n)\);~ goto retry \\
+descend:~
+if $v.\V{isleaf}$: \\
+\>\> return $\langle n, v\rangle$ \\
+\> $n_c \gets \text{child of \(n\) containing \(k\)}$ \\
+\> if $n_c = \NIL$: \C{retry from root if concurrent remove reshaped tree} \\
+\>\> goto retry \\
+\> $v_c \gets \text{stable\_version}(n_c)$ \C{hand-over-hand validation} \\
+\> \fence \\
+\> if $v \oplus \readnow{n.\V{version}} > \V{locked}$: \C{$n$ changed, must retry} \\
+\>\> $\V{oldv} \gets v$;~ $v \gets \text{stable\_version}(n)$ \\
+\>\> if $v.\V{vsplit} \neq \V{oldv}.\V{vsplit}$: \C{retry from root when internal node splits} \\
+\>\>\> goto retry \\
+\> else: \\
+\>\> $n \gets n_c$;~ $v \gets v_c$ \\
+\> goto descend
+\end{programtabbing}
+\label{fig:nlookup}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{advance}(leaf $n$, key $k$) \Returns{\(\langle
+  \N{leaf $n'$, version $v$}\rangle\)}: \\
+\CX{precondition: \(\N{lowkey}(n) \leq k.\V{slice}\)} \\
+\CX{postcondition: either $v.\V{deleted}$ (caller should rerun \N{descend}), or version $v$ of leaf $n'$ is responsible for $k$} \\
+\> $v \gets \text{stable\_version}(n)$;~ $\V{next} \gets n.\V{next}$ \\
+\> while $!v.\V{deleted}$ and $\V{next} \neq \NIL$ and
+	$k \geq \text{lowkey}(\V{next})$: \\
+\>\> $n \gets \V{next}$;~ $v \gets \text{stable\_version}(n)$;~
+	$\V{next} \gets n.\V{next}$ \\
+\> return $\langle n, v \rangle$
+\end{programtabbing}
+\end{figure}
+
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{find\_key}(leaf $n$, key $k$, permutation \V{perm})
+\Returns{\(\langle \N{int \V{i}}, \N{int \(\pi\)} \rangle\)}: \\
+\CX{Returns the insertion index and position of \(k\) in \(n\),
+  considering only key slice and length.} \\
+\CX{postcondition: \(0 \leq i \leq \V{perm}.\V{size}\)} \\
+\CX{postcondition: \(\pi = \NONE\) iff \(k\) is not contained in \(n\)} \\
+\> $i \gets 0$;~ $\V{klength} = \min(k.\V{length}, 9)$ \\
+\> while $i < \V{perm}.\V{size}$: \C{linear search; we use binary search in practice} \\
+\>\> $\pi \gets \V{perm}.\V{pos}[i]$ \\
+\>\> if $n.\V{kslice}[\pi] < k.\V{slice}$ or ($n.\V{kslice}[\pi] =
+k.\V{slice}$ and $n.\V{klength}[\pi] < \V{klength}$): \\
+\>\>\> $++i$ \\
+\>\> else if $n.\V{kslice}[\pi] = k.\V{slice}$ and $n.\V{klength}[\pi] =
+\V{klength}$: \\
+\>\>\> return $\langle i, \pi \rangle$ \\
+\>\> else: \\
+\>\>\> break \\
+\> return $\langle i, \NONE \rangle$
+\end{programtabbing}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{get}(node \V{root}, key $k$): \\
+descend:~
+ $\langle n, v \rangle \gets \text{descend}(\V{root}, k)$ \\
+retry:~
+\> if $v.\V{deleted}$: \\
+\>\> goto descend \\
+\> \(\langle i, \pi \rangle \gets \text{find\_key}(n, k,
+n.\V{permutation})\) \\
+\> if \(\pi \neq \NONE\): \\
+\>\> \(t \gets n.\V{type}[\pi]\);~
+    \(\V{suffix} \gets n.\V{ksuffix}[\pi]\);~
+    \(\V{value} \gets n.\V{value}[\pi]\) \\
+\> \fence \\
+\> if \(v \oplus \readnow{n.\V{version}} > \V{locked}\): \\
+\>\> $\langle n, v \rangle \gets \text{advance}(n, k)$ \\
+\>\> goto retry \\
+\> else if \(\pi \neq \NONE\) and \(t = \LAYER\): \\
+\>\> \(root \gets \V{value}\);~ \(k \gets \N{shift\_key}(k)\) \\
+\>\> goto descend \\
+\> else if \(\pi = \NONE\) or \(\V{suffix} \neq k.\V{suffix}\): \\
+\>\> return \NONE \\
+\> else: \\
+\>\> return \V{value}
+\end{programtabbing}
+\caption{Find the value for a key.}
+\label{fig:nget}
+\end{figure}
+
+
+\section{Put}
+
+Put and remove, unlike get, must lock the leaf containing a key. The
+\N{descend\_and\_lock} function performs a combined traversal and lock.
+Unlike \N{descend}, \N{descend\_and\_lock} descends across multiple
+layers. It returns the unique node that would contain the value for
+\(k\) if \(k\) were in the Masstree.
+
+A natural implementation of \N{descend\_and\_lock} might lock a
+leaf node per layer. When encountering a pointer to a lower layer,
+\N{descend\_and\_lock} would unlock the leaf from the higher layer and
+then recurse into the lower. This, however, would perform far more
+locking operations than required. A goal of Masstree is to perform no
+memory writes for common-case tree traversal. Therefore,
+\N{descend\_and\_lock} includes an optimization that, in the common
+case, recurses into a lower layer without obtaining a lock.
+
+\N{Descend\_and\_lock} also performs a tree cleanup task. Consider a
+full lower-layer tree (linked from a higher layer, which we display
+above the dashed line):
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{insert1_1}
+\end{figure}
+
+\noindent%
+Inserting a new item into this lower layer will cause a split. A new
+leaf node is created,
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{insert1_2}
+\end{figure}
+
+\noindent%
+then a new internal node
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{insert1_3}
+\end{figure}
+
+\noindent%
+and finally a new root.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{insert1_4}
+\end{figure}
+
+\noindent%
+But the higher layer connects to the \emph{old} root, not the new root.
+Correcting this requires more work, since a modification to the higher layer
+requires locking the higher-layer node. We choose to delay that work.
+There's no \emph{correctness} problem with leaving the tree this
+way---thanks to the root reachability invariant, the new root will be
+found by traversing parent pointers from the old. So we leave the tree
+this way until the next put or remove, which will retarget the higher
+layer's pointer.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{insert1_5}
+\end{figure}
+
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{descend\_and\_lock}(node \V{toproot}, key \(k\))
+  \Returns{\(\langle \N{leaf \V{n}}, \N{int \V{i}}, \N{int
+      \(\pi\)}, \N{key \(k'\)}\rangle\)}: \\
+\CX{Find, lock, and return the node into which \(k\) would be inserted.} \\
+\CX{postcondition: \(k' = \N{shift\_key}^m(k)\) for some \(m \geq 0\)}\\
+\CX{postcondition: \(n\) is locked and \(n\) is responsible for \(k'\)}\\
+\CX{postcondition: \(i\) is the insertion index for \(k'\) in \(n\)}\\
+\CX{postcondition: \(\pi = \NONE\) iff \(k'\) is not present in \(n\)}\\
+retrytop:~
+   $\V{root} \gets \V{toproot}$;~ \(k \gets \N{reset\_key}(k)\) \\
+descend:~  $\langle n, v \rangle \gets \text{descend}(\V{root}, k)$ \\
+\> if $k$ has suffix: \C{optimization: avoid some unnecessary traversal locks} \\
+\>\> \(x \gets \text{try\_descend\_layer}(n, v, k)\) \\
+\>\> if \(x \neq \NONE\): \\
+\>\>\> \(\V{root} \gets x\);~ \(k \gets \N{shift\_key}(k)\) \\
+\>\>\> goto descend \\
+%
+retry:~
+\> \(\N{lock}(n)\);~ \(v' \gets n.\V{version}\) \\
+\> if \(v'.\V{deleted}\): \\
+\>\> unlock(\(n\));~ goto descend \\
+\> else if \(n.\V{deletedlayer}\): \C{an entire layer has been
+  deleted, start over}\\
+\>\> unlock(\(n\));~ goto retrytop \\
+\> else if \(v'.\V{vsplit} \neq v.\V{vsplit}\) and \(n.\V{next} \neq
+\NIL\) and \(k \geq \N{lowkey}(n.\V{next})\): \\
+\>\> \(\V{next} \gets n.\V{next}\);~ unlock(\(n\)) \\
+\>\> \(\langle n, v \rangle \gets \N{advance}(\V{next}, k)\) \\
+\>\> goto retry \\
+\> else: \\
+\>\> \(\langle i, \pi \rangle \gets \N{find\_key}(n, k, n.\V{permutation})\)
+\\
+\>\> if \(\pi \neq \NONE\) and \(n.\V{type}[\pi] = \LAYER\): \\
+\>\>\> \(\V{root} \gets n.\V{value}[\pi]\);~ \(k \gets \N{shift\_key}(k)\) \\
+\>\>\> if \(!\V{root}.\V{isroot}\): \\
+\>\>\>\> \(\V{root} \gets n.\V{value}[\pi] \gets \N{true\_root}(\V{root})\) \\
+\>\>\> unlock(\(n\));~ goto descend \\
+\>\> else: \\
+\>\>\> return \(\langle n, i, \pi, k \rangle\) \\
+\programtabskip
+%
+\textbf{try\_descend\_layer}(node \(n\), version \(v\), key \(k\)): \\
+\> \(\langle i, \pi \rangle \gets \text{find\_key}(n, k, n.\V{permutation})\) \\
+\> if \(\pi \neq \NONE\): \\
+\>\> \(t \gets n.\V{type}[\pi]\) \\
+\>\> \fence \\
+\>\> \(\V{value} \gets n.\V{value}[\pi]\) \\
+\>\> \fence \\
+\>\> if \(!v.\V{deleted}\) and \(t = \LAYER\) and \(v \oplus \readnow{n.\V{version}} \leq \V{locked}\)
+and \(\V{value}.\V{isroot}\): \\
+\>\>\> return \V{value} \\
+\> return \NONE
+\end{programtabbing}
+\caption{Lock and return the leaf that would contain a key.}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{put}(node \V{root}, key \(k\), value \(\V{value}\)): \\
+\> \(\langle n, i, \pi, k \rangle \gets \N{descend\_and\_lock}(\V{toproot}, k)\) \\
+retry:~
+\> if \(\pi \neq \NONE\) and \(n.\V{ksuffix}[\pi] = k.\V{suffix}\): \\
+\>\> fork \(\N{free\_value}(n.\V{value}[\pi])\) \\
+\>\> \(n.\V{value}[\pi] \gets \V{value}\) \\
+\>\> unlock(\(n\));~ return \\
+\> else if \(\pi \neq \NONE\): \\
+\>\> \(n \gets \N{new\_layer}(n, \pi)\);~ \(k \gets \N{shift\_key}(k)\) \\
+\>\> \(\langle i, \pi \rangle \gets \N{find\_key}(n, k,
+n.\V{permutation})\) \\
+\>\> goto retry \\
+\> if \(n.\V{modstate} \neq \INSERTING\): \\
+\>\> \(n.\V{modstate} \gets \INSERTING\) \\
+\>\> \(n.\V{version}.\V{inserting} \gets 1\) \\
+\>\> \fence \\
+\> if \(n.\V{size} < \LEAFWIDTH\): \\
+\>\> \(\pi \gets \text{an unused position from \(n.\V{permutation}\)}\) \\
+\>\> \(n.\V{kslice}[\pi] \gets k.\V{slice}\) \\
+\>\> \(n.\V{ksuffix}[\pi] \gets k.\V{suffix}\) \\
+\>\> \(n.\V{klength}[\pi] \gets \min(k.\V{length}, 9)\) \\
+\>\> \(n.\V{type}[\pi] \gets \VALUE\) \\
+\>\> \(n.\V{value}[\pi] \gets \V{value}\) \\
+\>\> \fence \\
+\>\> \(n.\V{permutation} \gets \text{modified permutation with \(\pi\) at
+  position \(i\)}\) \\
+\>\> unlock(\(n\));~ return \\
+\> \(\N{split}(n, k, \V{value})\) \\
+\programtabskip
+%
+\textbf{new\_layer}(leaf \(n\), int \(\pi\)): \\
+\> \(\V{suffix} = n.\V{ksuffix}[\pi]\);~ \(\V{value} \gets
+n.\V{value}[\pi]\) \\
+\> \(n' \gets \text{new locked leaf containing only \V{suffix} and
+  \V{value}}\) \\
+\> \(n.\V{version}.\V{inserting} \gets 1\) \\
+\> \fence \\
+\> \(n.\V{value}[\pi] \gets n'\) \\
+\> \(n.\V{ksuffix}[\pi] \gets \text{empty string}\) \\
+%\> \fence \\
+\> \(n.\V{type}[\pi] \gets \LAYER\) \\
+\> unlock(\(n\)) \\
+\> return \(n'\)
+\end{programtabbing}
+\caption{Put implementation (except for split).}
+\end{figure}
+
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{split}(node $n$, key $k$, value \V{value}): \C{precondition: $n$ locked} \\
+\> $n' \gets \text{new empty leaf}$ \\
+\> \(n'.\V{version} \gets n.\V{version}\) \C{\(n'\) is initially locked} \\
+\> \(n'.\V{version}.\V{splitting} \gets 1\) \\
+\> copy the larger keys and values from \(n\) to \(n'\) \\
+\> assign \(n'.\V{permutation}\) appropriately \\
+\> \fence \\
+\> \(\N{link\_split\_leaf}(n, n')\) \\
+\> \(n.\V{version}.\V{splitting} \gets 1\) \\
+\> \fence \\
+\> assign \(n.\V{permutation}\) to contain only those keys not copied to
+\(n'\) \\
+\> insert \(k\) and \V{value} into \(n\) or \(n'\) as appropriate \\
+ascend:~
+\> $p \gets \text{locked\_parent}(n)$ \C{hand-over-hand locking} \\
+\> if $p = \NIL$: \C{$n$ was old root} \\
+\>\> \(p \gets \text{new interior node}\) \\
+\>\> insert \(n\), \(n'\) into \(p\) \\
+\>\> \(p.\V{isroot} \gets 1\);~ \(p.\V{parent} \gets \NIL\) \\
+\>\> \(n'.\V{parent} \gets p\) \\
+\>\> \fence \\
+\>\> \(n.\V{parent} \gets p\) \\
+\>\> unlock($n$);~ unlock($n'$);~ return \\
+\> else if $p$ is not full: \\
+\>\> $p.\V{version}.\V{inserting} \gets 1$ \\
+\>\> \fence \\
+\>\> \(\N{unlock}(n)\) \\
+\>\> shift $p$ keys and children to include $n'$ \\
+\>\> \(n'.\V{parent} \gets p\) \\
+\>\> \fence \\
+\>\> \(++p.\V{size}\) \\
+\>\> unlock($n$);~ unlock($n'$);~ unlock($p$);~ return \\
+\> else: \\
+\>\> \(p.\V{version}.\V{splitting} \gets 1\) \\
+\>\> \fence \\
+\>\> \(\N{unlock}(n)\) \\
+\>\> \(p' \gets \text{new interior node}\) \\
+\>\> \(p'.\V{version} \gets p.\V{version}\) \\
+\>\> \fence \\
+\>\> move larger keys from \(p\) into \(p'\), inserting \(n'\) where it belongs  (and setting \(n'.\V{parent}\)) \\
+\>\> for all \(c \in \text{children of \(p'\)}\): \\
+\>\>\> \(c.\V{parent} \gets p'\) \\
+\>\> unlock($n'$);~ $n \gets p$;~ $n' \gets p'$;~ goto ascend
+\end{programtabbing}
+\caption{Split a leaf and insert a key.}
+\label{fig:nsplit}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{link\_split\_leaf}(leaf \(n\), leaf \(n'\)): \\
+\> \(n'.\V{prev} \gets n\) \\
+\> \(\V{next} \gets n.\V{next}\) \\
+\> while \(\V{next} \neq \NIL\) and
+(\V{next} has a \MARK\ or \(!cmpxchg(n.\V{next}, \V{next},
+\V{next} + \MARK)\)): \\
+\>\> \(\V{next} \gets \readnow{n.\V{next}}\) \\
+\> \(n'.\V{next} \gets \V{next}\) \\
+\> if \(\V{next} \neq \NIL\): \\
+\>\> \(\V{next}.\V{prev} \gets n'\) \\
+\> \fence \\
+\> \(n.\V{next} \gets n'\)
+\end{programtabbing}
+\end{figure}
+
+\section{Remove}
+
+The most complex Masstree operation is remove. It's complex because of
+the wide range of tree changes it can cause.
+
+\subsection{Removing an item}
+
+We start with a simple example tree.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_1}
+\end{figure}
+
+Removing a single item---say, \ITEM{e}---is relatively simple: all code
+is in two short functions, \N{remove} and \N{remove\_item}. We first use
+\N{descend\_and\_lock} to locate and lock the leaf containing the item, then pop
+the item out of the relevant leaf's permutation.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_2}
+\end{figure}
+
+\noindent
+The heavy circle on the leaf's upper left indicates a lock. The item's
+value is reclaimed by \N{free\_value}, but only after concurrent readers
+have completed.
+
+Note that \N{remove} does not actually modify the leaf's state for the
+item, namely \(n.\V{kslice}[\pi]\), \(n.\V{klength}[\pi]\),
+\(n.\V{ksuffix}[\pi]\), \(n.\V{type}[\pi]\), and \(n.\V{value}[\pi]\)!
+This allows concurrent readers who saw the \emph{old} permutation to
+extract a correct value for the item, namely the old value. This is
+correct---an overlapping reader can return the old value. Alternatively,
+\N{remove} could dirty the node, but this would force readers to retry,
+something we aim to avoid.
+
+However, there is a wrinkle. We must ensure that a change in the node's keys
+can be detected by examining the node's version---specifically, by examining
+the version and the current node size. Thus, the sequence of operations
+``insert(\textsc{x}); remove(\textsc{x})'' should change the node's version
+number. To this end, we keep track of a per-node modification state, called
+\(n.\V{modstate}\). This is either \INSERTING, if we are currently in the
+midst of inserting keys into the node, or \REMOVING, if we're currently
+removing keys from the node. Switching between modification states requires an
+explicit change to the node's version number.
+
+\subsection{Removing a leaf}
+
+A series of removes can empty out a leaf entirely. Empty nodes would
+waste memory and slow down lookup, so they are removed from the tree.
+
+The set of leaves in a Masstree are collectively responsible for a full
+range of keys. When a leaf is removed, responsibility for its key range
+shifts to another leaf. Since \N{lowkey} values never change,
+responsibility always passes to the left, to the node's predecessor in
+the doubly linked list. Remove must ensure that concurrent operations
+reach this predecessor. This requires remove to update both the leaf
+linked list, which is used during scans and some puts, and the
+\Bplus\ tree structure.
+
+As an exception, \N{remove} always preserves the leftmost leaf in a
+tree. This simplifies many operations and is logically required by our
+invariants: \N{lowkey} values never change, but deleting the leftmost
+node would effectively require setting its successor's \N{lowkey} to
+$-\infty$. The leftmost leaf can be deleted, but only when the entire
+subtree is empty.
+
+We demonstrate by removing all the elements in \ITEM{def}.
+
+Masstree first marks the node's version as \V{deleted}, which we show
+with a white X. Any operation that reaches a \V{deleted} node will retry
+from the root. This is important because the next steps will unlink the
+deleted node from the tree, and unlinked nodes no longer receive updates
+about other changes to the tree's structure. This means there is no
+reliable way to get back on track from a deleted node. Other operations
+will retry in a loop until the deleted leaf is fully unlinked. Also, a
+callback is registered to free the leaf's memory once concurrent readers
+have completed.
+
+We next remove the node from the leaf linked list. Logical ``locks''
+protect against neighbors' concurrent removes and splits, but to prevent
+deadlock, these per-node locks are different from the main per-node
+locks. The lock is a mark bit stolen from node \V{next} pointers. The mark
+bit in \(n.\V{next}\) protects the setting of \(n.\V{next}\), and the
+setting of \(n.\V{next}.\V{prev}\).
+
+The \N{unlink\_leaf} function contains the code. (The code for inserting
+new leaves during split is in \N{link\_split\_leaf}.) First, the
+\(\ITEM{def}.\V{next}\) pointer is locked with a mark, shown in black
+below. This lock protects both \(\ITEM{def}.\V{next}\) and
+\(\ITEM{ghi}.\V{prev}\), so \ITEM{ghi} now cannot remove itself from the
+list until \ITEM{def} is unlinked.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_3}
+\end{figure}
+
+\noindent%
+But removing \ITEM{def} requires modifying, and therefore locking,
+\(\ITEM{def}.\V{prev}.\V{next} = \ITEM{abc}.\V{next}\) as well. This
+modification requires a retry loop, in case \ITEM{abc} splits or is
+removed during the operation.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_31}
+\end{figure}
+
+\noindent%
+With \(\ITEM{def}.\V{prev}.\V{next}\) and \(\ITEM{def}.\V{next}\) both
+locked, the unlink is easy. First, \(\ITEM{ghi}.\V{prev}\) is modified,
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_4}
+\end{figure}
+
+\noindent%
+and then, after a fence, \(\ITEM{abc}.\V{next}\). A single assignment
+both unlocks and changes the pointer.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_5}
+\end{figure}
+
+\noindent%
+This algorithm resembles some algorithms for lock-free
+doubly-linked-list insertion and removal, but it is a bit simpler. This
+is because Masstree leaf insertion is constrained---it only happens
+during split. As a result, insertion immediately after \(n\) cannot
+proceed concurrently with removal of \(n\).
+
+The leaf linked list is correct, but the \Bplus\ tree index is not.
+Masstree traverses to and locks the leaf's parent, then releases the
+lock on the leaf. It dirties the interior node, searches for the deleted
+leaf's \N{lowkey} (here, \(\N{lowkey}(\ITEM{def}) = \ITEM{d}\)), and removes
+the corresponding key and child pointer, creating this state.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_6}
+\end{figure}
+
+And this completes the removal of \ITEM{def}.
+
+\subsection{Collapsing trivial interior nodes}
+
+Now say \ITEM{ghi} is deleted. This process starts out as before.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_7}
+\end{figure}
+
+\noindent%
+But when \(\N{lowkey}(\ITEM{ghi}) = \ITEM{g}\) is removed from its
+parent interior node, that interior node becomes \emph{trivial}: it has
+no keys and only one child. Trivial interior nodes are redundant,
+wasting space and traversal time.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_8}
+\end{figure}
+
+Masstree detects trivial nodes and deletes them in the \N{collapse}
+function. \N{Collapse} marks trivial nodes' versions as \V{deleted} and
+frees them after the usual reader delay. It also walks up the tree, with
+hand-over-hand locking, and adjusts parent nodes' pointers to hop over
+the deleted trivial node.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove1_9}
+\end{figure}
+
+\noindent%
+This deletion procedure leaves the tree funnily shaped: leaves are at
+different heights. It's this property that prevents us from storing
+links on interior nodes.
+
+The \N{collapse} function won't ever delete the root node. A trivial
+root requires more work to fix, as we'll see.
+
+\subsection{Reshaping the tree}
+
+We return to the original example and, this time, remove leaf \ITEM{jkl}.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_1}
+\end{figure}
+
+Now, \ITEM{jkl} is the \emph{first} child of its parent. This requires
+special handling. To see why, note that
+the usual removal procedure would create this state:
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_2}
+\end{figure}
+
+\noindent%
+Now consider a \N{put} operation on key \ITEM{j}. This \N{put} should
+reach leaf \ITEM{ghi}, which has inherited responsibility for
+the \ITEM{jkl} range. But the \Bplus\ tree structure will direct the
+\N{put} to leaf \ITEM{mno}!
+
+Although such mistakes might be detectable at the leaves
+using \N{lowkey} comparisons, we prefer to avoid the problem
+in a different way. When
+a subtree's leftmost leaf is deleted, Masstree detects the issue and
+switches to a special \N{reshape} procedure. This procedure first sets
+the subtree's leftmost child pointer to \(\NIL\), causing concurrent
+gets and puts that would hit that node to retry from the root.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_3}
+\end{figure}
+
+The procedure then works up the tree using hand-over-hand locking. At
+each step it replaces the deleted lowkey, here \ITEM{j}, with its
+logical successor, here \ITEM{m}. In this tree, that takes one step, but
+more complicated trees might require multiple replacements.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_4}
+\end{figure}
+
+This tree is valid and sends no puts down the wrong path. Although an
+interior node has a redundant key---the right-hand interior node
+contains key \ITEM{m}, although it is responsible for no keys less
+than \ITEM{m}---we don't bother to clean it up yet.
+
+\subsection{Root trimming}
+
+When the \ITEM{mno} leaf is deleted,
+the entire right-hand subtree becomes redundant.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_5}
+\end{figure}
+
+After removing the \ITEM{mno} reference, \N{remove\_leaf} can tell that
+the right-hand interior node is redundant: its single child pointer is
+\NIL. The interior node can therefore be deleted
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_6}
+\end{figure}
+
+\noindent%
+and this continues
+up the tree.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_7}
+\end{figure}
+
+\noindent%
+But now the \emph{root} node is trivial, having only a single child. How
+can we fix this? The root node may be referenced by
+a leaf node in a higher \emph{tree layer}, as shown here:
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_8}
+\end{figure}
+
+\noindent%
+(Everything above the dashed line is in the next-higher layer.) We
+cannot delete the root node until this pointer is switched to its child.
+And any change to that higher layer's values requires locking the
+corresponding leaf.
+
+We solve this problem by registering a callback to trim the layer,
+called \N{gclayer}. This function locks the
+relevant leaf in the higher layer
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_9}
+\end{figure}
+
+\noindent%
+locks the lower layer's root
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_11}
+\end{figure}
+
+\noindent%
+and then marks its single child as the new root, switching the higher
+layer's value pointer to it.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_12}
+\end{figure}
+
+The original root is now garbage and can be reclaimed.
+
+But what about concurrent readers? The root reachability invariant
+requires that the true root of a layer always be reachable from any
+prior root. We therefore set the \emph{old} root's parent pointer to
+point to the \emph{new} root. This can cause an apparent anomaly: an
+internal node can have a leaf as its parent!
+
+\subsection{Deleting a layer}
+
+After the last item in a layer is removed, Masstree can remove the
+entire layer. This starts out like any gclayer call: the relevant leaf
+in the higher layer is locked
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_15}
+\end{figure}
+
+\noindent
+and so is the empty root in the lower layer.
+
+\begin{figure}[H]
+\includegraphics[scale=.8]{remove2_16}
+\end{figure}
+
+\noindent%
+But the empty root is not deleted in the conventional way. We mark it
+not as deleted, but as a \emph{deleted layer}, using
+a flag that's checked only by concurrent \emph{writers}. Why?
+Normally, a lookup encountering a deleted node retries from the root of
+the current layer. Marking a layer's only node as deleted would cause a
+retry loop! Instead, concurrent readers that reach a deleted layer see a
+normal empty leaf and return ``not found.'' (This is correct: the
+deleted layer contains no keys.) Concurrent writers, however, must not
+write into a deleted layer, lest their updates be lost. On encountering
+a deleted layer, writers retry from the layer-0 root.
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{remove}(node \V{toproot}, key \(k\)): \\
+\> \(\langle n, i, \pi, k \rangle \gets \N{descend\_and\_lock}(\V{toproot}, k)\) \\
+\> if \(\pi = \NONE\) or \(n.\V{ksuffix}[\pi] \neq k.\V{suffix}\): \\
+\>\> return \FALSE \\
+\> \(\N{remove\_item}(n, i, \pi, k, \V{toproot})\) \\
+\> return \TRUE
+\end{programtabbing}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{remove\_item}(leaf \(n\), int \(i\), int \(\pi\), key \(k\), node
+\V{toproot}): \\
+\> if \(n.\V{modstate} = \INSERTING\): \\
+\>\> \(n.\V{modstate} \gets \REMOVING\) \\
+\>\> \(n.\V{version}.\V{inserting} \gets 1 \) \\
+\>\> \fence \\
+\> \(n.\V{permutation} \gets \N{permremove}(n.\V{permutation}, i)\) \\
+\> fork \(\N{free\_value}(n.\V{value}[\pi])\) \\
+\> if \(n.\V{size} \neq 0\): \\
+\>\> \(\N{unlock}(n)\);~ return \\
+\> \(\N{remove\_leaf}(n, \V{toproot}, k.\V{layerprefix})\)
+\end{programtabbing}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{remove\_leaf}(leaf \V{n}, node \V{toproot}, key \V{layerkey}): \\
+\> if \(n.\V{prev} = \NIL\): \\
+\>\> if \(n.\V{next} = \NIL\) and \(\V{layerkey}\) is not empty: \\
+\>\>\> fork \(\N{gclayer}(\V{toproot}, \V{layerkey})\) \\
+\>\> unlock(\(n\)) \\
+\>\> return \\
+\> \(n.\V{version}.\V{deleted} \gets 1\);~ fork \(\N{free\_node}(n)\) \\
+\> \(\N{unlink\_leaf}(n)\) \\
+\> \(k \gets \N{lowkey}(n)\) \\
+ascend:~
+\> \(p \gets \N{locked\_parent}(n)\);~ \(\N{unlock}(n)\) \\
+\> \(i \gets \text{position of \V{k} in \V{p}}\) \\
+\> if \(i \neq 0\): \\
+\>\> \(p.\V{version}.\V{inserting} \gets 1\) \\
+\>\> \fence \\
+\>\> remove the element at index \(i - 1\), shifting others down \\
+\>\> if \(i \neq 1\) or \(p.\V{child}[0] \neq \NIL\): \\
+\>\>\> \(\N{collapse}(p, k, \V{toproot}, \V{layerkey})\) \\
+\>\>\> return \\
+\> if \(p.\V{size} = 0\): \\
+\>\> \(p.\V{version}.\V{deleted} \gets 1\);~ fork \(\N{free\_node}(p)\) \\
+\> else: \\
+\>\> \(\N{reshape}(p, k, \V{toproot}, \V{layerkey})\) \\
+\>\> return \\
+\> \(n \gets p\);~ goto ascend
+\end{programtabbing}
+\caption{Remove a node.}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{unlink\_leaf}(leaf \(n\)): \\
+\> \(\V{next} \gets n.\V{next}\) \\
+\> while \(\V{next} \neq \NIL\) and \(!\N{cmpxchg}(n.\V{next}, \V{next},
+		\V{next} + \MARK)\): \\
+\>\> \(\V{next} \gets \readnow{n.\V{next}}\) \\
+\> \(\V{prev} \gets n.\V{prev}\) \\
+\> while \(!\N{cmpxchg}(\V{prev}.\V{next}, n, n + \MARK)\): \\
+\>\> \(\V{prev} \gets \readnow{n.\V{prev}}\) \\
+\> if \(\V{next} \neq \NIL\): \\
+\>\> \(\V{next}.\V{prev} \gets \V{prev}\) \\
+\> \fence \\
+\> \(\V{prev}.\V{next} \gets \V{next}\)
+\end{programtabbing}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{reshape}(interiornode \(n\), key \V{k}, node \V{toproot}, key \V{layerkey}): \\
+\> \(n.\V{child}[0] \gets \NIL\) \\
+\> \(\V{patchkey} \gets n.\V{kslice}[0]\) \\
+ ascend:~
+\> \(p \gets \N{locked\_parent}(n)\);~ \(\N{unlock}(n)\) \\
+\> \(i \gets \text{position of \V{k} in \V{p}}\) \\
+\> if \(i \neq 0\): \\
+\>\> \(p.\V{version}.\V{inserting} \gets 1\) \\
+\>\> \fence \\
+\>\> \(p.\V{kslice}[i - 1] \gets \V{patchkey}\) \\
+\>\> if \(i \neq 1\) or \(p.\V{child}[0] \neq \NIL\): \\
+\>\>\> \(\N{collapse}(p, k, \V{toproot}, \V{layerkey})\) \\
+\>\>\> return \\
+\> \(n \gets p\);~ goto ascend
+\end{programtabbing}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{collapse}(interiornode \(n\), key \(k\), node \V{toproot},
+key \V{layerkey}): \\
+ascend:~
+\> if \(n.\V{size} \neq 0\): \\
+\>\> \(\N{unlock}(n)\);~ return \\
+\> \(p \gets \N{locked\_parent}(n)\) \\
+\> if \(p = \NIL\): \\
+\>\> if \V{layerkey} is not empty: \\
+\>\>\> fork gclayer(\V{toproot}, \V{layerkey}) \\
+\>\> \(\N{unlock}(n)\);~ return \\
+\> \(i \gets \text{position of \(k\) in \(p\)}\) \\
+\> \(p.\V{child}[i] \gets n.\V{child}[0]\) \\
+\> \(n.\V{child}[0].\V{parent} \gets p\) \\
+\> \(n.\V{version}.\V{deleted} \gets 1\);~ fork \(\N{free\_node}(n)\) \\
+\> \(\N{unlock}(n)\);~ \(n \gets p\);~ goto ascend
+\end{programtabbing}
+\end{figure}
+
+\begin{figure}[H]
+\begin{programtabbing}
+\textbf{gclayer}(node \V{toproot}, key \V{layerkey}): \\
+\> \rcufence \\
+\> \(\langle n, i, \pi, \N{\_} \rangle \gets \N{descend\_and\_lock}(\V{toproot}, \V{layerkey})\) \\
+\> if \(\pi = \NONE\) or \(n.\V{type}[\pi] \neq \LAYER\): \\
+\>\> \(\N{unlock}(n)\);~ return \\
+retry:~
+\> \(\V{layer} \gets n.\V{value}[\pi]\) \\
+\> if \(!\V{layer}.\V{isroot}\): \\
+\>\> \(\V{layer} \gets n.\V{value}[\pi] \gets \N{true\_root}(\V{layer})\) \\
+\> if \(\V{layer}.\V{size} > 0\): \\
+\>\> \(\N{unlock}(n)\);~ return \\
+\> \(\N{lock}(\V{layer})\) \\
+\> if \(\V{layer}.\V{size} > 0\) or \(!\V{layer}.\V{isroot}\): \\
+\>\> \(\N{unlock}(\V{layer})\);~ \(\N{unlock}(\V{n})\);~ return \\
+\> if \(\V{layer}.\V{isleaf}\): \\
+\>\> \(\V{layer}.\V{deletedlayer} \gets 1\) \\
+\>\> \(\N{unlock}(\V{layer})\) \\
+\>\> \(\N{remove\_item}(n, i, \pi, \V{layerkey}, \V{toproot})\) \\
+\>\> fork \(\N{free\_node}(\V{layer})\) \\
+\>\> return \\
+\> else: \\
+\>\> \(\V{child} \gets \V{layer}.\V{child}[0]\) \\
+\>\> \(\V{child}.\V{isroot} \gets 1\) \\
+\>\> \(\V{child}.\V{parent} \gets \NIL\) \\
+\>\> \(n.\V{value}[\pi] \gets \V{child}\) \\
+\>\> \(\V{layer}.\V{isroot} \gets 0\) \\
+\>\> \(\V{layer}.\V{parent} \gets \V{child}\) \\
+\>\> \(\N{unlock}(\V{layer})\) \\
+\>\> fork \(\N{free\_node}(\V{layer})\) \\
+\>\> goto retry
+\end{programtabbing}
+\caption{Remove a twig.}
+\end{figure}
+
+\section{Other optimizations and left-off properties}
+
+In the implementation, \(\N{lowkey}(n)\) is stored in
+\(n.\V{kslice}[0]\).
+%
+Thus, the code must ensure that any values stored in position 0
+have this slice.
+%
+This isn't a problem unless the value in position 0 is removed.
+%
+To guard against inappropriate reuse, the \N{insert} procedure
+ensures that position 0 is only reused by a key with the right slice.
+
+In the implementation, \(n.\V{type}\) is stored implicitly; its values
+are inferred from \(n.\V{klength}\).
+
+
+node\_ts
+
+\end{document}
