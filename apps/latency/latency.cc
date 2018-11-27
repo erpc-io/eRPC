@@ -103,20 +103,16 @@ void connect_session(ClientContext &c) {
   }
 }
 
-void app_cont_func(erpc::RespHandle *, void *, size_t);
+void app_cont_func(void *, size_t);
 inline void send_req(ClientContext &c) {
   c.start_tsc = erpc::rdtsc();
   c.rpc->enqueue_request(c.session_num_vec[0], kAppReqType, &c.req_msgbuf,
                          &c.resp_msgbuf, app_cont_func, 0);
 }
 
-void app_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t) {
-  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  assert(resp_msgbuf->get_data_size() == kAppRespSize);
-  _unused(resp_msgbuf);
-
+void app_cont_func(void *_context, size_t) {
   auto *c = static_cast<ClientContext *>(_context);
-  c->rpc->release_response(resp_handle);
+  assert(c->resp_msgbuf.get_data_size() == kAppRespSize);
 
   double req_lat_us =
       erpc::to_usec(erpc::rdtsc() - c->start_tsc, c->rpc->get_freq_ghz());
