@@ -5,9 +5,6 @@
 
 namespace erpc {
 
-// Print the pkthdr's hash code instead of the complete frame in trace log
-static constexpr bool kTraceHashCode = false;
-
 static void format_pkthdr(pkthdr_t *pkthdr,
                           const Transport::tx_burst_item_t &item,
                           const size_t pkt_size) {
@@ -78,8 +75,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
     LOG_TRACE(
         "  Transport: TX (idx = %zu, drop = %u). pkthdr = %s. Frame  = %s.\n",
         i, item.drop, pkthdr->to_string().c_str(),
-        kTraceHashCode ? std::to_string(pkthdr->hashcode()).c_str()
-                       : frame_header_to_string(&pkthdr->headroom[0]).c_str());
+        frame_header_to_string(&pkthdr->headroom[0]).c_str());
   }
 
   size_t nb_tx_new = rte_eth_tx_burst(phy_port, qp_id, tx_mbufs, num_pkts);
@@ -115,9 +111,7 @@ size_t DpdkTransport::rx_burst() {
     _unused(pkthdr);
     LOG_TRACE("  Transport: RX pkthdr = %s. Frame = %s.\n",
               pkthdr->to_string().c_str(),
-              kTraceHashCode
-                  ? std::to_string(pkthdr->hashcode()).c_str()
-                  : frame_header_to_string(&pkthdr->headroom[0]).c_str());
+              frame_header_to_string(&pkthdr->headroom[0]).c_str());
 
 #if DEBUG
     if (unlikely(ntohl(pkthdr->get_ipv4_hdr()->dst_ip) != resolve.ipv4_addr ||
