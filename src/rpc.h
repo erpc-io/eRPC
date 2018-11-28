@@ -363,7 +363,9 @@ class Rpc {
   }
 
   /// Reset all datapath stats to zero
-  void reset_dpath_stats() { memset(&dpath_stats, 0, sizeof(dpath_stats)); }
+  void reset_dpath_stats() {
+    memset(reinterpret_cast<void *>(&dpath_stats), 0, sizeof(dpath_stats));
+  }
 
   /**
    * @brief Inject a fault that always fails all routing info resolution

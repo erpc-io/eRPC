@@ -1,0 +1,11 @@
+*.aux
+*.bbl
+*.blg
+*.dvi
+*.log
+*.mpx
+*_[0-9]*.eps
+*_[0-9]*.pdf
+!GNUmakefile
+mpxerr.tex
+spec.pdf

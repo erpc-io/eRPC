@@ -1,0 +1,88 @@
+% elemfig.sty -- LaTeX macros for Click configuration graphs in MetaPost
+% Eddie Kohler
+%
+% Copyright (c) 1999-2001 Massachusetts Institute of Technology
+% Copyright (c) 2001-2003 International Computer Science Institute
+%
+% Permission is hereby granted, free of charge, to any person obtaining a
+% copy of this software and associated documentation files (the "Software"),
+% to deal in the Software without restriction, subject to the conditions
+% listed in the Click LICENSE file. These conditions include: you must
+% preserve this copyright notice, and you cannot mention the copyright
+% holders in advertising related to the Software without their permission.
+% The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+% notice is a summary of the Click LICENSE file; the license in that file is
+% legally binding.
+
+\makeatletter
+\usepackage{times,mathptmx}
+\usepackage[T1]{fontenc}
+%\input{../notation}
+
+\IfFileExists{./pfonts.sty}{\input{./pfonts.sty}}{%
+  \IfFileExists{../pfonts.sty}{\input{../pfonts.sty}}{%
+    \input{times.sty}%
+  }%
+}%
+\@ifundefined{elementdefault}{}{\long\global\edef\rmdefault{\elementdefault}}
+
+% for MetaPost
+
+\renewcommand{\v}[1]{\ifmmode\mathit{#1\strut}\else\textit{#1}\fi}
+
+\let\elementshape\itshape
+\newdimen\@elementQdp\setbox0\hbox{\elementshape Q}\@elementQdp=\dp0
+\def\element#1{{\setbox0\hbox{\elementshape #1\vphantom{Q}}%
+	\dimen0=\dp0\advance\dimen0 by-0.5\@elementQdp\dp0=\dimen0\box0}}%
+\def\belement#1{\textbf{\element{#1}}}%
+\newcommand{\elementlabel}[1]{\element{#1}}
+
+\newcommand{\melementlabel}[1]{{%
+  \elementshape
+  \begin{tabular}{@{}c@{}}%
+  #1
+  \end{tabular}%
+}}%
+\newcommand{\lmelementlabel}[1]{{%
+  \elementshape
+  \begin{tabular}{@{}l@{}}%
+  #1
+  \end{tabular}%
+}}%
+\newcommand{\rmelementlabel}[1]{{%
+  \elementshape
+  \begin{tabular}{@{}r@{}}%
+  #1
+  \end{tabular}%
+}}%
+\let\lelementlabel\lmelementlabel
+\let\relementlabel\rmelementlabel
+\newcommand{\mlabel}[1]{{%
+  \begin{tabular}{@{}c@{}}%
+  #1
+  \end{tabular}%
+}}%
+\newcommand{\lmlabel}[1]{{%
+  \begin{tabular}{@{}l@{}}%
+  #1
+  \end{tabular}%
+}}%
+\newcommand{\rmlabel}[1]{{%
+  \begin{tabular}{@{}r@{}}%
+  #1
+  \end{tabular}%
+}}%
+\let\llabel\lmlabel
+\let\rlabel\rmlabel
+\newcommand{\portlabel}[1]{\hbox{%
+  \tiny\sffamily\baselineskip6pt\begin{tabular}{@{}c@{}}#1\end{tabular}%
+}}%
+\newcommand{\lportlabel}[1]{\hbox{%
+  \tiny\sffamily\baselineskip6pt\begin{tabular}{@{}l@{}}#1\end{tabular}%
+}}%
+\newcommand{\rportlabel}[1]{\hbox{%
+  \tiny\sffamily\baselineskip6pt\begin{tabular}{@{}r@{}}#1\end{tabular}%
+}}%
+
+\makeatother
+\endinput
