@@ -53,7 +53,6 @@ static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
     (240 + kMaxHostnameLen * 2);           // Three lines and two hostnames
 
 // Invalid values
-static constexpr uint8_t kInvalidNUMANode = 2;  ///< 0/1 only for now
 static constexpr uint8_t kInvalidRpcId = kMaxRpcId + 1;
 static constexpr uint8_t kInvalidReqType = kReqTypeArraySize - 1;
 static constexpr uint8_t kInvalidPhyPort = kMaxPhyPorts + 1;
