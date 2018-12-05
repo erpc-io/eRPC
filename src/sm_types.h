@@ -170,7 +170,7 @@ class SessionEndpoint {
 
   SessionEndpoint() {
     memset(static_cast<void *>(hostname), 0, sizeof(hostname));
-    sm_udp_port = kInvalidSmUdpPort;
+    sm_udp_port = 0;  // UDP port 0 is naturally invalid
     rpc_id = kInvalidRpcId;
     session_num = kInvalidSessionNum;
     memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));

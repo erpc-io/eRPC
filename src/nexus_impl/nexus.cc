@@ -70,10 +70,8 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
   sm_thread = std::thread(sm_thread_func, sm_thread_ctx);
   bind_to_core(sm_thread, numa_node, sm_thread_lcore_index);
 
-  LOG_INFO(
-      "eRPC Nexus: Created with management UDP port %u, "
-      "hostname %s.\n",
-      sm_udp_port, hostname.c_str());
+  LOG_INFO("eRPC Nexus: Created with management UDP port %u, hostname %s.\n",
+           sm_udp_port, hostname.c_str());
 }
 
 Nexus::~Nexus() {
