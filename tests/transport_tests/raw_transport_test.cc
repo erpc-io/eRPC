@@ -17,6 +17,7 @@
 #include "util/timer.h"
 
 namespace erpc {
+static constexpr size_t kTestSmUdpPort = kBaseSmUdpPort;
 static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kTestRpcIdClient = 100;
 static constexpr size_t kTestRpcIdServer = 200;
@@ -43,8 +44,9 @@ class RawTransportTest : public ::testing::Test {
     assert(trace_file != nullptr);
 
     // Initalize client transport
-    clt_ttr.transport = new RawTransport(kTestRpcIdClient, kTestPhyPort,
-                                         kTestNumaNode, trace_file);
+    clt_ttr.transport =
+        new RawTransport(kTestSmUdpPort, kTestRpcIdClient, kTestPhyPort,
+                         kTestNumaNode, trace_file);
     clt_ttr.huge_alloc =
         new HugeAlloc(MB(32), kTestNumaNode, clt_ttr.transport->reg_mr_func,
                       clt_ttr.transport->dereg_mr_func);
@@ -52,8 +54,9 @@ class RawTransportTest : public ::testing::Test {
                                                 clt_ttr.rx_ring);
 
     // Initialize server transport
-    srv_ttr.transport = new RawTransport(kTestRpcIdServer, kTestPhyPort,
-                                         kTestNumaNode, trace_file);
+    srv_ttr.transport =
+        new RawTransport(kTestSmUdpPort, kTestRpcIdServer, kTestPhyPort,
+                         kTestNumaNode, trace_file);
     srv_ttr.huge_alloc =
         new HugeAlloc(MB(32), kTestNumaNode, srv_ttr.transport->reg_mr_func,
                       srv_ttr.transport->dereg_mr_func);

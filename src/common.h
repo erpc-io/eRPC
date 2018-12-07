@@ -39,9 +39,6 @@ static constexpr bool kTesting = TESTING;
 
 // General constants
 
-/// The max Rpc ID. 256 threads per machine is enough.
-static constexpr size_t kMaxRpcId = UINT8_MAX - 1;
-
 /// Array size to hold registered request handler functions
 static constexpr size_t kReqTypeArraySize = 1ull + UINT8_MAX;
 

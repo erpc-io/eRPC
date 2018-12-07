@@ -159,7 +159,7 @@ class Transport {
   const TransportType transport_type;
   const uint8_t rpc_id;    ///< The parent Rpc's ID
   const uint8_t phy_port;  ///< 0-based index among active fabric ports
-  const size_t numa_node;  ///< Derived from \p huge_alloc
+  const size_t numa_node;  ///< The NUMA node of the parent Nexus
 
   // Other members
   reg_mr_func_t reg_mr_func;      ///< The memory registration function

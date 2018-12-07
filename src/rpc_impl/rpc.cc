@@ -47,7 +47,8 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for
   // the hugepage allocator.
-  transport = new TTr(rpc_id, phy_port, numa_node, trace_file);
+  transport =
+      new TTr(nexus->sm_udp_port, rpc_id, phy_port, numa_node, trace_file);
 
   huge_alloc = new HugeAlloc(kInitialHugeAllocSize, numa_node,
                              transport->reg_mr_func, transport->dereg_mr_func);

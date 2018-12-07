@@ -19,18 +19,9 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
     LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   }
 
-  // Ensure that the management UDP port cannot conflict with the datapath UDP
-  // port. Otherwise the datapath might end up processing management packets.
-  const uint16_t max_rx_flow_udp_port =
-      kBaseEthUDPPort + (kMaxNumaNodes * kMaxRpcId);
-  if (sm_udp_port >= kBaseEthUDPPort && sm_udp_port <= max_rx_flow_udp_port) {
-    LOG_ERROR(
-        "Management UDP port cannot be between %u and %u. These ports "
-        "are reserved for eRPC's datapath.\n",
-        kBaseEthUDPPort, max_rx_flow_udp_port);
-    exit(-1);
-  }
-
+  rt_assert(sm_udp_port >= kBaseSmUdpPort &&
+                sm_udp_port < (kBaseSmUdpPort + kMaxNumERpcProcesses),
+            "Invalid management UDP port");
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
   rt_assert(numa_node < kMaxNumaNodes, "Invalid NUMA node");
 
