@@ -273,7 +273,7 @@ void RawTransport::install_flow_rule() {
       sizeof(ibv_exp_flow_attr) + sizeof(ibv_exp_flow_spec_eth) +
       sizeof(ibv_exp_flow_spec_ipv4_ext) + sizeof(ibv_exp_flow_spec_tcp_udp);
 
-  uint8_t *flow_rule = new uint8_t[rule_sz];
+  uint8_t flow_rule[rule_sz];
   memset(flow_rule, 0, rule_sz);
   uint8_t *buf = flow_rule;
 

@@ -37,4 +37,4 @@ static constexpr size_t kMaxBgThreads = 8;
  * @brief Maximum number of datapath device ports
  */
 static constexpr size_t kMaxPhyPorts = 16;
-};
+}  // namespace erpc
