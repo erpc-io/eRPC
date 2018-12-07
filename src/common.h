@@ -18,6 +18,7 @@
 #include <thread>
 #include <vector>
 #include "config.h"
+#include "rpc_constants.h"
 #include "tweakme.h"
 
 namespace erpc {
@@ -44,9 +45,6 @@ static constexpr size_t kMaxRpcId = UINT8_MAX - 1;
 /// Array size to hold registered request handler functions
 static constexpr size_t kReqTypeArraySize = 1ull + UINT8_MAX;
 
-static constexpr size_t kMaxPhyPorts = 16;  ///< Max fabric device ports
-static constexpr size_t kMaxBgThreads = 8;  ///< Max Nexus background threads
-static constexpr size_t kMaxNumaNodes = 8;  ///< Maximum number of NUMA nodes
 static constexpr size_t kHugepageSize = (2 * 1024 * 1024);  ///< Hugepage size
 static constexpr size_t kMaxHostnameLen = 128;  ///< Max hostname length
 static constexpr size_t kMaxIssueMsgLen =  ///< Max debug issue message length
