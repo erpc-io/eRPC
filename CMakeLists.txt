@@ -211,7 +211,8 @@ set(CLIENT_TESTS
   large_msg_test
   req_in_cont_func_test
   req_in_req_func_test
-  packet_loss_test)
+  packet_loss_test
+  multi_process_test)
 
 set(PROTOCOL_TESTS
   rpc_sm_test
