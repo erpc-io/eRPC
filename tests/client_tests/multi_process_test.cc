@@ -26,6 +26,12 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
   Rpc<CTransport> rpc(&nexus, &c, 0, basic_sm_handler);
   c.rpc = &rpc;
 
+  // Barrier
+  num_processes_ready++;
+  while (num_processes_ready != num_processes_ready) {
+    // Wait for Rpc objects to be registered with their Nexus
+  }
+
   c.session_num_arr = new int[num_processes];
   c.req_msgbufs.resize(num_processes);
   c.resp_msgbufs.resize(num_processes);
@@ -37,12 +43,6 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
 
     c.req_msgbufs[i] = c.rpc->alloc_msg_buffer_or_die(sizeof(size_t));
     c.resp_msgbufs[i] = c.rpc->alloc_msg_buffer_or_die(sizeof(size_t));
-  }
-
-  // Barrier
-  num_processes_ready++;
-  while (num_processes_ready != num_processes_ready) {
-    // Wait for all connections
   }
 
   wait_for_sm_resps_or_timeout(c, num_processes - 1);
@@ -62,11 +62,27 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
 
 TEST(MultiProcessTest, TwoProcesses) {
   num_processes_ready = 0;
-  std::thread process_1_thread(process_proxy_thread_func, 0, 2);
-  std::thread process_2_thread(process_proxy_thread_func, 1, 2);
+  std::thread process_proxy_thread_thread_1(process_proxy_thread_func, 0, 2);
+  std::thread process_proxy_thread_thread_2(process_proxy_thread_func, 1, 2);
 
-  process_1_thread.join();
-  process_2_thread.join();
+  process_proxy_thread_thread_1.join();
+  process_proxy_thread_thread_2.join();
+}
+
+TEST(MultiProcessTest, MaxProcesses) {
+  num_processes_ready = 0;
+  const size_t num_processes = 4;
+
+  std::vector<std::thread> process_proxy_thread_vec(num_processes);
+
+  for (size_t i = 0; i < num_processes; i++) {
+    process_proxy_thread_vec[i] =
+        std::thread(process_proxy_thread_func, i, num_processes);
+  }
+
+  for (size_t i = 0; i < num_processes; i++) {
+    process_proxy_thread_vec[i].join();
+  }
 }
 
 int main(int argc, char **argv) {
