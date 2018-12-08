@@ -75,9 +75,8 @@ Some highlights:
    `num_processes` specifies the total number of eRPC processes in the cluster.
  * The URIs of eRPC processes in the cluster are specified in
    `scripts/autorun_process_file`. Each line in this file must be
-   `<hostname> <management udp port> <numa_node>`. One eRPC process is allowed
-   per NUMA node. See `scripts/gen_autorun_process_file.sh` for how to generate
-   this file.
+   `<hostname> <management udp port> <numa_node>`. See
+   `scripts/gen_autorun_process_file.sh` for how to generate this file.
  * Run `scripts/do.sh` for each process:
    * With single-CPU machines: `num_processes` machines are needed.
      Run `scripts/do.sh <i> 0` on machine `i` in `{0, ..., num_processes - 1}`.

@@ -23,7 +23,7 @@ static constexpr size_t kMaxRpcId = UINT8_MAX - 1;
 /**
  * @relates Rpc
  * @brief The management port for an eRPC processes must be between
- * \p kBaseSmUdpPort and (\p kBaseSmUdpPort + \p kMaxNumERpcProcesses)
+ * kBaseSmUdpPort and (kBaseSmUdpPort + kMaxNumERpcProcesses)
  */
 static constexpr uint16_t kBaseSmUdpPort = 31850;
 
