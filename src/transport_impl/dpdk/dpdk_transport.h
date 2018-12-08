@@ -54,8 +54,8 @@ class DpdkTransport : public Transport {
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
 
-  DpdkTransport(uint8_t rpc_id, uint8_t phy_port, size_t numa_node,
-                FILE *trace_file);
+  DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id, uint8_t phy_port,
+                size_t numa_node, FILE *trace_file);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
 
   ~DpdkTransport();
