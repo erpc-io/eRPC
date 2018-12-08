@@ -28,7 +28,7 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
 
   // Barrier
   num_processes_ready++;
-  while (num_processes_ready != num_processes_ready) {
+  while (num_processes_ready != num_processes) {
     // Wait for Rpc objects to be registered with their Nexus
   }
 
@@ -71,7 +71,7 @@ TEST(MultiProcessTest, TwoProcesses) {
 
 TEST(MultiProcessTest, MaxProcesses) {
   num_processes_ready = 0;
-  const size_t num_processes = 4;
+  const size_t num_processes = kMaxNumERpcProcesses;
 
   std::vector<std::thread> process_proxy_thread_vec(num_processes);
 
