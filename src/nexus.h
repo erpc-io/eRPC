@@ -26,7 +26,7 @@ class Nexus {
    *
    * @param local_uri A URI for this process formatted as hostname:udp_port.
    * This UDP port is used for listening to management packets, and it must
-   * be in [kBaseSmUdpPort, kBaseSmUdpPort + kMaxNumERpcProcesses).
+   * be in [#kBaseSmUdpPort, #kBaseSmUdpPort + #kMaxNumERpcProcesses).
    *
    * @param numa_node The NUMA node used by eRPC for this process. Only one eRPC
    * process may run per NUMA node.
