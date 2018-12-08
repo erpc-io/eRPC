@@ -16,17 +16,14 @@ void cont_func(void *_c, size_t) {
   c->num_rpc_resps++;
 }
 
-void sm_handler(int, erpc::SmEventType, erpc::SmErrType, void *) {}
-
 // This threads acts as a process with a Nexus
 void process_proxy_thread_func(size_t process_id, size_t num_processes) {
-  auto uri =
-      std::string("localhost:") + std::to_string(kBaseSmUdpPort + process_id);
+  auto uri = "localhost:" + std::to_string(kBaseSmUdpPort + process_id);
   Nexus nexus(uri, 0, 0);
   nexus.register_req_func(kTestReqType, req_handler);
 
   BasicAppContext c;
-  Rpc<CTransport> rpc(&nexus, &c, 0, sm_handler);
+  Rpc<CTransport> rpc(&nexus, &c, 0, basic_sm_handler);
   c.rpc = &rpc;
 
   c.session_num_arr = new int[num_processes];
@@ -35,8 +32,7 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
   for (size_t i = 0; i < num_processes; i++) {
     if (i == process_id) continue;
 
-    auto remote_uri =
-        std::string("localhost:") + std::to_string(kBaseSmUdpPort + i);
+    auto remote_uri = "localhost:" + std::to_string(kBaseSmUdpPort + i);
     c.session_num_arr[i] = c.rpc->create_session(remote_uri, 0);
 
     c.req_msgbufs[i] = c.rpc->alloc_msg_buffer_or_die(sizeof(size_t));
@@ -46,10 +42,12 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
   // Barrier
   num_processes_ready++;
   while (num_processes_ready != num_processes_ready) {
+    // Wait for all connections
   }
 
-  c.rpc->run_event_loop(kTestEventLoopMs);
+  wait_for_sm_resps_or_timeout(c, num_processes - 1);
   assert(c.num_sm_resps == num_processes - 1);
+  printf("Process %zu: All sessions connected\n", process_id);
 
   for (size_t i = 0; i < num_processes; i++) {
     if (i == process_id) continue;
@@ -57,7 +55,8 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
     c.rpc->enqueue_request(c.session_num_arr[i], kTestReqType,
                            &c.req_msgbufs[i], &c.resp_msgbufs[i], cont_func, 0);
   }
-  c.rpc->run_event_loop(kTestEventLoopMs);
+
+  wait_for_rpc_resps_or_timeout(c, num_processes - 1);
   assert(c.num_rpc_resps == num_processes - 1);
 }
 
