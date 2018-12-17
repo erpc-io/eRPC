@@ -901,9 +901,9 @@ class Rpc {
   const sm_handler_t sm_handler;
   const uint8_t phy_port;  ///< Zero-based physical port specified by app
   const size_t numa_node;
-  const size_t creation_tsc;  ///< Timestamp of creation of this Rpc endpoint
 
   // Derived
+  const size_t creation_tsc;    ///< Timestamp of creation of this Rpc endpoint
   const bool multi_threaded;    ///< True iff there are background threads
   const double freq_ghz;        ///< RDTSC frequency, derived from Nexus
   const size_t rpc_rto_cycles;  ///< RPC RTO in cycles
@@ -951,7 +951,7 @@ class Rpc {
   /// The doubly-linked list of active RPCs. An RPC slot is added to this list
   /// when the request is enqueued. The slot is deleted from this list when its
   /// continuation is invoked or queued to a background thread. Notes:
-  /// 
+  ///
   /// This should not be a vector because we need random deletes. Having
   /// permanent root and tail sentinels allows adding and deleting slots from
   /// the list without conditionals.
