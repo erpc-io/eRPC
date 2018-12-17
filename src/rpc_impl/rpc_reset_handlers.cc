@@ -17,8 +17,8 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
-  // The session can be in any state (except the temporary disconnected state).
-  // In the connected state, the session may have outstanding requests.
+  // The session can be in any state. In the connected state, the session may
+  // have outstanding requests.
   if (session->is_connected()) {
     // Erase session slots from credit stall queue
     for (const SSlot &sslot : session->sslot_arr) {
