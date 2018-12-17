@@ -13,25 +13,23 @@ void Rpc<TTr>::pkt_loss_scan_st() {
   assert(in_dispatch());
 
   // Datapath packet loss
-  SSlot *cur = active_rpcs_root_sentinel.client_info.next;
-  while (cur != &active_rpcs_tail_sentinel) {
-    // Don't re-tx or check for server failure if we're just stalled on credits
-    if (cur->client_info.num_tx == cur->client_info.num_rx) {
-      cur = cur->client_info.next;
-      continue;
-    }
+  SSlot *it = active_rpcs_root_sentinel.client_info.next;  // The iterator
+  while (it != &active_rpcs_tail_sentinel) {
+    // We might destroy *it below, so move the iterator first
+    SSlot *sslot = it;
+    it = it->client_info.next;
 
-    size_t cycles_elapsed = ev_loop_tsc - cur->client_info.progress_tsc;
+    // Don't re-tx or check for server failure if we're just stalled on credits
+    if (sslot->client_info.num_tx == sslot->client_info.num_rx) continue;
+
+    size_t cycles_elapsed = ev_loop_tsc - sslot->client_info.progress_tsc;
 
     if (to_msec(cycles_elapsed, freq_ghz) > kServerFailureTimeoutMs) {
-      // Handle server failure
-
+      handle_reset_client_st(sslot->session);
     } else if (cycles_elapsed > rpc_rto_cycles) {
       // Don't retransmit if we initiated session reset
-      pkt_loss_retransmit_st(cur);
+      pkt_loss_retransmit_st(sslot);
     }
-
-    cur = cur->client_info.next;
   }
 
   // Management packet loss
