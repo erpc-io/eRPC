@@ -6,7 +6,8 @@
 
 namespace erpc {
 
-// This handles both datapath and management packet loss
+// This handles both datapath and management packet loss. This is called
+// rarely, so no need to optimize heavily.
 template <class TTr>
 void Rpc<TTr>::pkt_loss_scan_st() {
   assert(in_dispatch());
@@ -14,14 +15,21 @@ void Rpc<TTr>::pkt_loss_scan_st() {
   // Datapath packet loss
   SSlot *cur = active_rpcs_root_sentinel.client_info.next;
   while (cur != &active_rpcs_tail_sentinel) {
-    // Don't retransmit if we're just stalled on credits
+    // Don't re-tx or check for server failure if we're just stalled on credits
     if (cur->client_info.num_tx == cur->client_info.num_rx) {
       cur = cur->client_info.next;
       continue;
     }
 
     size_t cycles_elapsed = ev_loop_tsc - cur->client_info.progress_tsc;
-    if (cycles_elapsed > rpc_rto_cycles) pkt_loss_retransmit_st(cur);
+
+    if (to_msec(cycles_elapsed, freq_ghz) > kServerFailureTimeoutMs) {
+      // Handle server failure
+
+    } else if (cycles_elapsed > rpc_rto_cycles) {
+      // Don't retransmit if we initiated session reset
+      pkt_loss_retransmit_st(cur);
+    }
 
     cur = cur->client_info.next;
   }

@@ -69,10 +69,14 @@ class Rpc {
 
  private:
   /// Initial capacity of the hugepage allocator
-  static constexpr size_t kInitialHugeAllocSize = (8 * MB(1));
+  static constexpr size_t kInitialHugeAllocSize = MB(8);
 
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 10 : 100;
+
+  /// If any request does not make progress for kServerFailureTimeoutMs, we
+  /// assume that the request's server has failed.
+  static constexpr size_t kServerFailureTimeoutMs = 500;
 
  public:
   /// Max request or response *data* size, i.e., excluding packet headers
