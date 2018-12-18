@@ -956,7 +956,7 @@ class Rpc {
 
   /// The doubly-linked list of active RPCs. An RPC slot is added to this list
   /// when the request is enqueued. The slot is deleted from this list when its
-  /// continuation is invoked or queued to a background thread. Notes:
+  /// continuation is invoked or queued to a background thread.
   ///
   /// This should not be a vector because we need random deletes. Having
   /// permanent root and tail sentinels allows adding and deleting slots from
