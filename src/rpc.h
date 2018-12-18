@@ -554,6 +554,8 @@ class Rpc {
     if (!kCcPacing) return true;
     if (kTesting) return faults.hard_wheel_bypass;
     if (kCcOptWheelBypass) {
+      // To prevent reordering, do not bypass the wheel if it contains packets
+      // for this session.
       return sslot->client_info.wheel_count == 0 &&
              sslot->session->is_uncongested();
     }
