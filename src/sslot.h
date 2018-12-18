@@ -58,7 +58,12 @@ class SSlot {
       /// Number of pkts received. Pkts up to (num_tx - 1) have been received.
       size_t num_rx;
 
-      size_t progress_tsc;  ///< TSC at which this request last made progress
+      /// TSC at which we last sent or received a packet for this request
+      size_t progress_tsc;
+
+      /// TSC at which this request was enqueued
+      size_t enqueue_request_tsc;
+
       size_t cont_etid;     ///< eRPC thread ID to run the continuation on
 
       /// Pointers for the intrusive doubly-linked list of active RPCs
