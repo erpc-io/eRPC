@@ -13,23 +13,47 @@ void Rpc<TTr>::pkt_loss_scan_st() {
   assert(in_dispatch());
 
   // Datapath packet loss
-  SSlot *it = active_rpcs_root_sentinel.client_info.next;  // The iterator
-  while (it != &active_rpcs_tail_sentinel) {
-    // We might destroy *it below, so move the iterator first
-    SSlot *sslot = it;
-    it = it->client_info.next;
-
+  SSlot *cur = active_rpcs_root_sentinel.client_info.next;  // The iterator
+  while (cur != &active_rpcs_tail_sentinel) {
     // Don't re-tx or check for server failure if we're just stalled on credits
-    if (sslot->client_info.num_tx == sslot->client_info.num_rx) continue;
+    if (cur->client_info.num_tx == cur->client_info.num_rx) continue;
 
-    size_t cycles_elapsed = ev_loop_tsc - sslot->client_info.progress_tsc;
+    // Check if the server has failed
+    if (to_msec(ev_loop_tsc - cur->client_info.enqueue_request_tsc, freq_ghz) >
+        kServerFailureTimeoutMs) {
+      // We cannot destroy this session while it still has packets in the
+      // wheel. We will try again in the next epoch.
+      bool session_pkts_in_wheel = false;
+      for (const SSlot &s : cur->session->sslot_arr) {
+        session_pkts_in_wheel |= (s.client_info.wheel_count > 0);
+      }
 
-    if (to_msec(cycles_elapsed, freq_ghz) > kServerFailureTimeoutMs) {
-      handle_reset_client_st(sslot->session);
-    } else if (cycles_elapsed > rpc_rto_cycles) {
-      // Don't retransmit if we initiated session reset
-      pkt_loss_retransmit_st(sslot);
+      if (session_pkts_in_wheel) {
+        pkt_loss_stats.still_in_wheel_during_retx++;
+
+        LOG_REORDER(
+            "Rpc %u, lsn %u: Could not reset because packets still in wheel.\n",
+            rpc_id, cur->session->local_session_num);
+        continue;
+      }
+
+      // If we are here, we will destroy th session
+      drain_tx_batch_and_dma_queue();
+
+      // In this case, we will delete sslots from the active RPC list, including
+      // the current slot. Re-start the scan to handle this.
+      handle_reset_client_st(cur->session);
+      cur = active_rpcs_root_sentinel.client_info.next;
+      continue;
     }
+
+    // If the server hasn't failed, check for packet loss
+    if (ev_loop_tsc - cur->client_info.progress_tsc > rpc_rto_cycles) {
+      pkt_loss_retransmit_st(cur);
+      drain_tx_batch_and_dma_queue();
+    }
+
+    cur = cur->client_info.next;
   }
 
   // Management packet loss
@@ -78,7 +102,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // We have num_tx > num_rx, so stallq cannot contain sslot
   assert(std::find(stallq.begin(), stallq.end(), sslot) == stallq.end());
 
-  // Deleting from the rate limiter is too complex
+  // Do not roll back if this request still has packets in the wheel. Deleting
+  // from the wheel is too complex.
   if (unlikely(sslot->client_info.wheel_count > 0)) {
     pkt_loss_stats.still_in_wheel_during_retx++;
     LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
@@ -96,7 +121,6 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   ci.progress_tsc = ev_loop_tsc;
 
   req_pkts_pending(sslot) ? kick_req_st(sslot) : kick_rfr_st(sslot);
-  drain_tx_batch_and_dma_queue();
 }
 
 FORCE_COMPILE_TRANSPORTS

@@ -9,7 +9,6 @@ namespace erpc {
 template <class TTr>
 bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   assert(in_dispatch());
-  assert(session->is_client());
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
@@ -17,55 +16,37 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
           rpc_id, session->local_session_num,
           session_state_str(session->state).c_str());
 
-  // The session can be in any state. In the connected state, the session may
-  // have outstanding requests.
-  if (session->is_connected()) {
-    // Erase session slots from credit stall queue
-    for (const SSlot &sslot : session->sslot_arr) {
-      stallq.erase(std::remove(stallq.begin(), stallq.end(), &sslot),
-                   stallq.end());
-    }
+  // Erase session slots from credit stall queue
+  for (const SSlot &sslot : session->sslot_arr) {
+    stallq.erase(std::remove(stallq.begin(), stallq.end(), &sslot),
+                 stallq.end());
+  }
 
-    // Invoke continuation-with-failure for sslots without complete response
-    for (SSlot &sslot : session->sslot_arr) {
-      if (sslot.tx_msgbuf != nullptr) {
-        sslot.tx_msgbuf = nullptr;  // Invoke failure continuation only once
+  // Invoke continuation-with-failure for all active requests
+  for (SSlot &sslot : session->sslot_arr) {
+    if (sslot.tx_msgbuf == nullptr) {
+      sslot.tx_msgbuf = nullptr;
+      delete_from_active_rpc_list(sslot);
+      session->client_info.sslot_free_vec.push_back(sslot.index);
 
-        // sslot contains a valid request
-        MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
-        resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
-        sslot.client_info.cont_func(context, sslot.client_info.tag);
-      }
+      MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
+      resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
+      sslot.client_info.cont_func(context, sslot.client_info.tag);
     }
   }
 
-  // We can free the session after all continutions call enqueue_response()
-  size_t pending_conts =
-      kSessionReqWindow - session->client_info.sslot_free_vec.size();
-
-  if (session->state == SessionState::kConnectInProgress ||
-      session->state == SessionState::kDisconnectInProgress) {
-    assert(pending_conts == 0);
-  }
+  assert(session->client_info.sslot_free_vec.size() == kSessionReqWindow);
 
   // Change state before failure continuations
   session->state = SessionState::kDisconnectInProgress;
 
-  if (pending_conts == 0) {
-    // Act similar to handling a disconnect response
-    LOG_INFO("%s: None. Session resetted.\n", issue_msg);
-    free_ring_entries();  // Free before callback to allow creating new session
-    sm_handler(session->local_session_num, SmEventType::kDisconnected,
-               SmErrType::kSrvDisconnected, context);
-    bury_session_st(session);
-    return true;
-  } else {
-    LOG_WARN(
-        "Rpc %u, lsn %u: Cannot destroy client session. "
-        "(%zu pending continuations). \n",
-        rpc_id, session->local_session_num, pending_conts);
-    return false;
-  }
+  // Act similar to handling a disconnect response
+  LOG_INFO("%s: None. Session resetted.\n", issue_msg);
+  free_ring_entries();  // Free before callback to allow creating new session
+  sm_handler(session->local_session_num, SmEventType::kDisconnected,
+             SmErrType::kSrvDisconnected, context);
+  bury_session_st(session);
+  return true;
 }
 
 template <class TTr>
