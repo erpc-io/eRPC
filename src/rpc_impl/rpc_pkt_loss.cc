@@ -16,7 +16,10 @@ void Rpc<TTr>::pkt_loss_scan_st() {
   SSlot *cur = active_rpcs_root_sentinel.client_info.next;  // The iterator
   while (cur != &active_rpcs_tail_sentinel) {
     // Don't re-tx or check for server failure if we're just stalled on credits
-    if (cur->client_info.num_tx == cur->client_info.num_rx) continue;
+    if (cur->client_info.num_tx == cur->client_info.num_rx) {
+      cur = cur->client_info.next;
+      continue;
+    }
 
     // Check if the server has failed
     if (to_msec(ev_loop_tsc - cur->client_info.enqueue_request_tsc, freq_ghz) >
@@ -42,8 +45,8 @@ void Rpc<TTr>::pkt_loss_scan_st() {
                rpc_id, cur->session->local_session_num);
       drain_tx_batch_and_dma_queue();
 
-      // In this case, we will delete sslots from the active RPC list, including
-      // the current slot. Re-start the scan to handle this.
+      // In this case, we will delete sslots of this session from the active RPC
+      // list, including the current slot. Re-start the scan to handle this.
       handle_reset_client_st(cur->session);
       cur = active_rpcs_root_sentinel.client_info.next;
       continue;
