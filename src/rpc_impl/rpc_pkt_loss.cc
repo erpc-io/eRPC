@@ -37,7 +37,9 @@ void Rpc<TTr>::pkt_loss_scan_st() {
         continue;
       }
 
-      // If we are here, we will destroy th session
+      // If we are here, we will destroy the session
+      LOG_INFO("Rpc %u, lsn %u: Server disconnected. Destroying session.\n",
+               rpc_id, cur->session->local_session_num);
       drain_tx_batch_and_dma_queue();
 
       // In this case, we will delete sslots from the active RPC list, including
