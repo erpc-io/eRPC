@@ -33,6 +33,13 @@ namespace erpc {
 
 #define LOG_DEFAULT_STREAM stdout
 
+// Log messages with "reorder" or higher verbosity get written to
+// trace_file_or_default_stream. This can be stdout for basic debugging, or
+// eRPC's trace file for more involved debugging.
+
+#define trace_file_or_default_stream trace_file
+//#define trace_file_or_default_stream LOG_DEFAULT_STREAM
+
 // If LOG_LEVEL is not defined, default to the highest level for YouCompleteMe
 #ifndef LOG_LEVEL
 #define LOG_LEVEL LOG_LEVEL_CC
@@ -68,28 +75,28 @@ static void output_log_header(int level);
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_REORDER
-#define LOG_REORDER(...)                            \
-  output_log_header(trace_file, LOG_LEVEL_REORDER); \
-  fprintf(trace_file, __VA_ARGS__);                 \
-  fflush(trace_file)
+#define LOG_REORDER(...)                                              \
+  output_log_header(trace_file_or_default_stream, LOG_LEVEL_REORDER); \
+  fprintf(trace_file_or_default_stream, __VA_ARGS__);                 \
+  fflush(trace_file_or_default_stream)
 #else
 #define LOG_REORDER(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_TRACE
-#define LOG_TRACE(...)                            \
-  output_log_header(trace_file, LOG_LEVEL_TRACE); \
-  fprintf(trace_file, __VA_ARGS__);               \
-  fflush(trace_file)
+#define LOG_TRACE(...)                                              \
+  output_log_header(trace_file_or_default_stream, LOG_LEVEL_TRACE); \
+  fprintf(trace_file_or_default_stream, __VA_ARGS__);               \
+  fflush(trace_file_or_default_stream)
 #else
 #define LOG_TRACE(...) ((void)0)
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_CC
-#define LOG_CC(...)                            \
-  output_log_header(trace_file, LOG_LEVEL_CC); \
-  fprintf(trace_file, __VA_ARGS__);            \
-  fflush(trace_file)
+#define LOG_CC(...)                                              \
+  output_log_header(trace_file_or_default_stream, LOG_LEVEL_CC); \
+  fprintf(trace_file_or_default_stream, __VA_ARGS__);            \
+  fflush(trace_file_or_default_stream)
 #else
 #define LOG_CC(...) ((void)0)
 #endif
