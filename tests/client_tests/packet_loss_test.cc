@@ -1,7 +1,6 @@
 /**
- * @file test_packet_loss.cc
- * @brief Test packet losses. Most of the code here is derived from
- * `test_large_msg.cc`.
+ * @file packet_loss_test.cc
+ * @brief Test packet loss handling
  */
 #include "client_tests.h"
 
@@ -53,9 +52,7 @@ void req_handler(ReqHandle *req_handle, void *_c) {
   c->rpc->enqueue_response(req_handle);
 }
 
-/// The common continuation function for all subtests. This checks that the
-/// request buffer is identical to the response buffer, and increments the
-/// number of responses in the context
+/// The common continuation function for all subtests
 void cont_func(void *_c, size_t tag) {
   auto *c = static_cast<AppContext *>(_c);
   const MsgBuffer &resp_msgbuf = c->resp_msgbufs[tag];
