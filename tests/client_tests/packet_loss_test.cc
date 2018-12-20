@@ -27,8 +27,7 @@ size_t config_num_iters;       ///< The number of iterations
 size_t config_num_rpcs;        ///< Number of Rpcs per iteration
 size_t config_num_bg_threads;  ///< Number of background threads
 
-/// The common request handler for all subtests. Copies the request message to
-/// the response.
+/// The common request handler for all subtests
 void req_handler(ReqHandle *req_handle, void *_c) {
   auto *c = static_cast<AppContext *>(_c);
   if (config_num_bg_threads > 0) assert(c->rpc->in_background());
@@ -36,7 +35,6 @@ void req_handler(ReqHandle *req_handle, void *_c) {
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t resp_size = req_msgbuf->get_data_size();
 
-  // MsgBuffer allocation is thread safe
   req_handle->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(resp_size);
   size_t user_alloc_tot = c->rpc->get_stat_user_alloc_tot();
 
