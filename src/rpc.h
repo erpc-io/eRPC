@@ -74,11 +74,11 @@ class Rpc {
   /// Timeout for a session management request in milliseconds
   static constexpr size_t kSMTimeoutMs = kTesting ? 10 : 100;
 
+ public:
   /// If any request does not make progress for kServerFailureTimeoutMs, we
   /// assume that the request's server has failed.
   static constexpr size_t kServerFailureTimeoutMs = 500;
 
- public:
   /// Max request or response *data* size, i.e., excluding packet headers
   static constexpr size_t kMaxMsgSize =
       HugeAlloc::kMaxClassSize -
