@@ -220,9 +220,6 @@ class HugeAlloc {
    */
   bool reserve_hugepages(size_t size);
 
-  /// Delete the SHM region specified by \p shm_key and \p shm_buf
-  void delete_shm(int shm_key, const uint8_t *shm_buf);
-
   std::vector<shm_region_t> shm_list;  /// SHM regions by increasing alloc size
   std::vector<Buffer> freelist[kNumClasses];  /// Per-class freelist
 

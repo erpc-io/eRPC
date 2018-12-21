@@ -17,10 +17,14 @@ HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
 }
 
 HugeAlloc::~HugeAlloc() {
-  // Deregister and delete the created SHM regions
+  // Deregister and detach the created SHM regions
   for (shm_region_t &shm_region : shm_list) {
     if (shm_region.registered) dereg_mr_func(shm_region.mem_reg_info);
-    delete_shm(shm_region.shm_key, shm_region.buf);
+    int ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_region.buf)));
+    if (ret != 0) {
+      fprintf(stderr, "HugeAlloc: Error freeing SHM buf for key %d.\n", shm_region.shm_key);
+      exit(-1);
+    }
   }
 }
 
@@ -106,6 +110,9 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   rt_assert(shm_buf != nullptr,
             "eRPC HugeAlloc: shmat() failed. Key = " + std::to_string(shm_key));
 
+  // Mark the SHM region for deletion when this process exits
+  shmctl(shm_id, IPC_RMID, nullptr);
+
   // Bind the buffer to the NUMA node
   const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node));
   long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
@@ -190,39 +197,4 @@ bool HugeAlloc::reserve_hugepages(size_t size) {
   return true;
 }
 
-void HugeAlloc::delete_shm(int shm_key, const uint8_t *shm_buf) {
-  int shmid = shmget(shm_key, 0, 0);
-  if (shmid == -1) {
-    switch (errno) {
-      case EACCES:
-        fprintf(stderr,
-                "eRPC HugeAlloc: SHM free error for key %d. Permission denied.",
-                shm_key);
-        break;
-      case ENOENT:
-        fprintf(stderr, "eRPC HugeAlloc: SHM free error: No such SHM key %d.\n",
-                shm_key);
-        break;
-      default:
-        fprintf(stderr,
-                "eRPC HugeAlloc: SHM free error: A wild SHM error: %s\n",
-                strerror(errno));
-        break;
-    }
-
-    exit(-1);
-  }
-
-  int ret = shmctl(shmid, IPC_RMID, nullptr);  // Please don't fail
-  if (ret != 0) {
-    fprintf(stderr, "eRPC HugeAlloc: Error freeing SHM ID %d\n", shmid);
-    exit(-1);
-  }
-
-  ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_buf)));
-  if (ret != 0) {
-    fprintf(stderr, "HugeAlloc: Error freeing SHM buf for key %d.\n", shm_key);
-    exit(-1);
-  }
-}
 }  // namespace erpc
