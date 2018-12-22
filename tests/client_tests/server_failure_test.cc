@@ -82,8 +82,10 @@ void generic_test_func(Nexus *nexus, size_t) {
 
   auto session_num = static_cast<size_t>(c.session_num_arr[0]);
   for (auto &s : c.rpc->session_vec[session_num]->sslot_arr) {
-    s.client_info.enqueue_request_tsc -=
-        ms_to_cycles(rpc->kServerFailureTimeoutMs, rpc->get_freq_ghz());
+    _unused(s);
+    // XXX:
+    // s.client_info.enqueue_request_tsc -=
+    //    ms_to_cycles(rpc->kServerFailureTimeoutMs, rpc->get_freq_ghz());
   }
 
   rpc->run_event_loop_once();

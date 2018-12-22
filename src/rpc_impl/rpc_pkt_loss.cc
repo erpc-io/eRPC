@@ -21,9 +21,8 @@ void Rpc<TTr>::pkt_loss_scan_st() {
       continue;
     }
 
-    // Check if the server has failed
-    if (to_msec(ev_loop_tsc - cur->client_info.enqueue_request_tsc, freq_ghz) >
-        kServerFailureTimeoutMs) {
+    // Check if the server has failed. XXX.
+    if (false) {
       // We cannot destroy this session while it still has packets in the
       // wheel. We will try again in the next epoch.
       bool session_pkts_in_wheel = false;
