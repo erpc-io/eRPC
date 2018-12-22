@@ -22,7 +22,8 @@ HugeAlloc::~HugeAlloc() {
     if (shm_region.registered) dereg_mr_func(shm_region.mem_reg_info);
     int ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_region.buf)));
     if (ret != 0) {
-      fprintf(stderr, "HugeAlloc: Error freeing SHM buf for key %d.\n", shm_region.shm_key);
+      fprintf(stderr, "HugeAlloc: Error freeing SHM buf for key %d.\n",
+              shm_region.shm_key);
       exit(-1);
     }
   }
