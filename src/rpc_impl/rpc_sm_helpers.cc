@@ -9,17 +9,22 @@ namespace erpc {
 template <class TTr>
 void Rpc<TTr>::handle_sm_rx_st() {
   assert(in_dispatch());
-  MtQueue<SmPkt> &queue = nexus_hook.sm_rx_queue;
+  MtQueue<SmWorkItem> &queue = nexus_hook.sm_rx_queue;
 
   while (queue.size > 0) {
-    const SmPkt sm_pkt = queue.unlocked_pop();  // Lock is held only briefly
+    const SmWorkItem wi = queue.unlocked_pop();
+    assert(!wi.is_reset());
 
+    // Here, it's not a reset item, so we have a valid SM packet
+    const SmPkt sm_pkt = wi.sm_pkt;
+
+    // If it's an SM response, remove pending requests for this session
     if (sm_pkt.is_resp() &&
         sm_pending_reqs.count(sm_pkt.client.session_num) > 0) {
       sm_pending_reqs.erase(sm_pending_reqs.find(sm_pkt.client.session_num));
     }
 
-    switch (sm_pkt.pkt_type) {
+    switch (wi.sm_pkt.pkt_type) {
       case SmPktType::kConnectReq: handle_connect_req_st(sm_pkt); break;
       case SmPktType::kDisconnectReq: handle_disconnect_req_st(sm_pkt); break;
       case SmPktType::kConnectResp: {

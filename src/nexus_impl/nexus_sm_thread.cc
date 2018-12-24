@@ -33,10 +33,11 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
       Hook *target_hook = const_cast<Hook *>(ctx.reg_hooks_arr[target_rpc_id]);
 
       if (target_hook != nullptr) {
-        target_hook->sm_rx_queue.unlocked_push(sm_pkt);
+        target_hook->sm_rx_queue.unlocked_push(
+            SmWorkItem(target_rpc_id, sm_pkt));
       } else {
-        // We don't have an Rpc object for the target Rpc. Send a response iff
-        // it's a request packet.
+        // We don't have an Rpc object for the target Rpc. Send an error
+        // response iff it's a request packet.
         if (sm_pkt.is_req()) {
           LOG_INFO(
               "eRPC Nexus: Received session management request for invalid "
