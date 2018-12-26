@@ -15,6 +15,10 @@ namespace erpc {
 template <typename T>
 class Rpc;
 
+/// If a client cannot contact a remote server for this much time, we assume
+/// that the server has failed
+static constexpr size_t kServerFailureTimeoutMs = 500;
+
 /// A work item exchanged between an Rpc thread and an SM thread. This does
 /// not have any Nexus-related members, so it's outside the Nexus class.
 class SmWorkItem {
@@ -160,9 +164,14 @@ class Nexus {
   class SmThreadCtx {
    public:
     // Installed by the Nexus
-    std::string hostname;           ///< User-provided hostname of this node
-    uint16_t sm_udp_port;           ///< The Nexus's session management port
-    volatile bool *kill_switch;     ///< The Nexus's kill switch
+    std::string hostname;  ///< User-provided hostname of this node
+    uint16_t sm_udp_port;  ///< The Nexus's session management port
+    double freq_ghz;       ///< RDTSC frequency
+
+    /// The kill switch installed by the Nexus. When this becomes true, the SM
+    /// thread should terminate itself.
+    volatile bool *kill_switch;
+
     volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
     std::mutex *nexus_lock;
   };

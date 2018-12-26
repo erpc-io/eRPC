@@ -50,6 +50,7 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
   SmThreadCtx sm_thread_ctx;
   sm_thread_ctx.hostname = hostname;
   sm_thread_ctx.sm_udp_port = sm_udp_port;
+  sm_thread_ctx.freq_ghz = freq_ghz;
   sm_thread_ctx.kill_switch = &kill_switch;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.nexus_lock = &nexus_lock;
