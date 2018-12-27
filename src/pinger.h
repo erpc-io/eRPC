@@ -1,6 +1,7 @@
 #pragma once
 
 #include <queue>
+#include <sstream>
 #include <unordered_map>
 #include "common.h"
 #include "rpc_constants.h"
@@ -27,10 +28,13 @@ namespace erpc {
  */
 class Pinger {
  public:
+  static constexpr bool kVerbose = true;
   enum class PingEventType : bool { kSend, kCheck };
 
   Pinger(double freq_ghz, size_t machine_failure_timeout_ms)
-      : failure_timeout_tsc(ms_to_cycles(machine_failure_timeout_ms, freq_ghz)),
+      : freq_ghz(freq_ghz),
+        creation_tsc(rdtsc()),
+        failure_timeout_tsc(ms_to_cycles(machine_failure_timeout_ms, freq_ghz)),
         ping_send_delta_tsc(failure_timeout_tsc / 10),
         ping_check_delta_tsc(failure_timeout_tsc / 2) {}
 
@@ -79,6 +83,21 @@ class Pinger {
   }
 
  private:
+  /// Return the microseconds between tsc and this pinger's creation time
+  double us_since_creation(size_t tsc) const {
+    return to_usec(tsc - creation_tsc, freq_ghz);
+  }
+
+  /// Return a string representation of a ping event. This is outside the
+  /// PingEvent class because we need creation_tsc.
+  std::string ev_to_string(const PingEvent &e) const {
+    std::ostringstream ret;
+    ret << "[Type: " << (e.type == PingEventType::kSend ? "send" : "check")
+        << ", hostname " << e.hostname << ", time " << us_since_creation(e.tsc)
+        << " us]";
+    return ret.str();
+  }
+
   /**
    * @brief The main pinging work: Send keepalive pings, and check expired
    * timers
@@ -90,7 +109,18 @@ class Pinger {
       if (ping_event_queue.empty()) break;
 
       const auto next_ev = ping_event_queue.top();  // Copy-out
-      if (in_future(next_ev.tsc)) break;
+      if (in_future(next_ev.tsc)) {
+        if (kVerbose) {
+          printf("pinger (%.3f us): Event %s is in the future\n",
+                 us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
+        }
+        break;
+      }
+
+      if (kVerbose) {
+        printf("pinger (%.3f us): Handling event %s\n",
+               us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
+      }
 
       ping_event_queue.pop();  // Consume the event
 
@@ -119,15 +149,26 @@ class Pinger {
   static bool in_future(size_t tsc) { return tsc > rdtsc(); }
 
   void enqueue_ping_send(const char *hostname) {
-    ping_event_queue.emplace(PingEventType::kSend, hostname,
-                             rdtsc() + ping_send_delta_tsc);
+    PingEvent e(PingEventType::kSend, hostname, rdtsc() + ping_send_delta_tsc);
+    if (kVerbose) {
+      printf("pinger (%.3f us): Enqueueing event %s\n",
+             us_since_creation(rdtsc()), ev_to_string(e).c_str());
+    }
+    ping_event_queue.push(e);
   }
 
   void enqueue_ping_check(const char *hostname) {
-    ping_event_queue.emplace(PingEventType::kCheck, hostname,
-                             rdtsc() + ping_check_delta_tsc);
+    PingEvent e(PingEventType::kCheck, hostname,
+                rdtsc() + ping_check_delta_tsc);
+    if (kVerbose) {
+      printf("pinger (%.3f us): Enqueueing event %s\n",
+             us_since_creation(rdtsc()), ev_to_string(e).c_str());
+    }
+    ping_event_queue.push(e);
   }
 
+  const double freq_ghz;             // TSC frequency
+  const size_t creation_tsc;         // Time at which this pinger was created
   const size_t failure_timeout_tsc;  // Machine failure timeout in TSC cycles
 
   // We send pings every every ping_send_delta_tsc cycles. This duration is
