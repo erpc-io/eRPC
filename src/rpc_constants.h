@@ -51,6 +51,15 @@ static constexpr size_t kMaxBgThreads = 8;
 static constexpr size_t kMaxPhyPorts = 16;
 
 /**
+ * @relates Rpc
+ *
+ * @brief If a client cannot ping a remote server for this duration, we assume
+ * that the server has failed. If a server does not hear from a client for this
+ * duration, we assume that the client has failed.
+ */
+static constexpr size_t kServerFailureTimeoutMs = 500;
+
+/**
  * @brief Return the datapath UDP port used for an Rpc object in a process
  *
  * @param mgmt_udp_port The management UDP port of the process

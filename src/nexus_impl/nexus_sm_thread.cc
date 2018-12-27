@@ -29,7 +29,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
           sm_pkt.is_req() ? sm_pkt.server.rpc_id : sm_pkt.client.rpc_id;
 
       // Lock the Nexus to prevent Rpc registration while we lookup the hook
-      ctx.nexus_lock->lock();
+      ctx.reg_hooks_lock->lock();
       Hook *target_hook = const_cast<Hook *>(ctx.reg_hooks_arr[target_rpc_id]);
 
       if (target_hook != nullptr) {
@@ -57,7 +57,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
         }
       }
 
-      ctx.nexus_lock->unlock();
+      ctx.reg_hooks_lock->unlock();
     }
   }
 

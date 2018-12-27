@@ -14,7 +14,8 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
       hostname(extract_hostname_from_uri(local_uri)),
       sm_udp_port(std::stoi(extract_udp_port_from_uri(local_uri))),
       numa_node(numa_node),
-      num_bg_threads(num_bg_threads) {
+      num_bg_threads(num_bg_threads),
+      pinger(freq_ghz) {
   if (kTesting) {
     LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   }
@@ -52,8 +53,9 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
   sm_thread_ctx.sm_udp_port = sm_udp_port;
   sm_thread_ctx.freq_ghz = freq_ghz;
   sm_thread_ctx.kill_switch = &kill_switch;
+  sm_thread_ctx.pinger = &pinger;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
-  sm_thread_ctx.nexus_lock = &nexus_lock;
+  sm_thread_ctx.reg_hooks_lock = &reg_hooks_lock;
 
   // Bind the session management thread to the last lcore on numa_node
   size_t sm_thread_lcore_index = num_lcores_per_numa_node() - 1;
@@ -88,9 +90,9 @@ Nexus::~Nexus() {
 }
 
 bool Nexus::rpc_id_exists(uint8_t rpc_id) {
-  nexus_lock.lock();
+  reg_hooks_lock.lock();
   bool ret = (reg_hooks_arr[rpc_id] != nullptr);
-  nexus_lock.unlock();
+  reg_hooks_lock.unlock();
   return ret;
 }
 
@@ -99,7 +101,7 @@ void Nexus::register_hook(Hook *hook) {
   assert(rpc_id <= kMaxRpcId);
   assert(reg_hooks_arr[rpc_id] == nullptr);
 
-  nexus_lock.lock();
+  reg_hooks_lock.lock();
 
   req_func_registration_allowed = false;  // Disable future Ops registration
   reg_hooks_arr[rpc_id] = hook;           // Save the hook
@@ -109,7 +111,7 @@ void Nexus::register_hook(Hook *hook) {
     hook->bg_req_queue_arr[i] = &bg_req_queue[i];
   }
 
-  nexus_lock.unlock();
+  reg_hooks_lock.unlock();
 }
 
 void Nexus::unregister_hook(Hook *hook) {
@@ -118,9 +120,9 @@ void Nexus::unregister_hook(Hook *hook) {
   assert(reg_hooks_arr[rpc_id] == hook);
   LOG_INFO("eRPC Nexus: Deregistering Rpc %u.\n", rpc_id);
 
-  nexus_lock.lock();
+  reg_hooks_lock.lock();
   reg_hooks_arr[rpc_id] = nullptr;
-  nexus_lock.unlock();
+  reg_hooks_lock.unlock();
 }
 
 int Nexus::register_req_func(uint8_t req_type, erpc_req_func_t req_func,

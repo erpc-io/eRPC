@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <unordered_map>
 #include "common.h"
+#include "pinger.h"
 #include "session.h"
 #include "sm_types.h"
 #include "util/logger.h"
@@ -14,10 +15,6 @@ namespace erpc {
 // Forward declaration for friendship
 template <typename T>
 class Rpc;
-
-/// If a client cannot contact a remote server for this much time, we assume
-/// that the server has failed
-static constexpr size_t kServerFailureTimeoutMs = 500;
 
 /// A work item exchanged between an Rpc thread and an SM thread. This does
 /// not have any Nexus-related members, so it's outside the Nexus class.
@@ -172,8 +169,9 @@ class Nexus {
     /// thread should terminate itself.
     volatile bool *kill_switch;
 
+    Pinger *pinger;                 ///< The Nexus's keepalive pinger
     volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
-    std::mutex *nexus_lock;
+    std::mutex *reg_hooks_lock;
   };
 
   /// The background thread
@@ -198,11 +196,11 @@ class Nexus {
   /// the Nexus and gets a copy of req_func_arr
   bool req_func_registration_allowed = true;
 
-  std::mutex nexus_lock;  ///< Lock for concurrent access to this Nexus
-
-  /// Rpc-Nexus hooks. Non-null hooks are valid.
+  /// Rpc-Nexus hooks. All non-null hooks are valid.
   Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};
+  std::mutex reg_hooks_lock;  ///< Lock for concurrent access to the hooks array
 
+  Pinger pinger;              ///< The keepalive pinger
   volatile bool kill_switch;  ///< Used to turn off SM and background threads
 
   std::thread sm_thread;  ///< The session management thread
