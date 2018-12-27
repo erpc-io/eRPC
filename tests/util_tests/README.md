@@ -1,1 +1,1 @@
-Tests for eRPC utilities.
+Tests for eRPC components and utilities
