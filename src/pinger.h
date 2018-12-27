@@ -10,7 +10,21 @@
 
 namespace erpc {
 
-/// A thread-safe class for managing keepalive pings
+/**
+ * @brief A thread-safe keepalive pinger
+ *
+ * This class has two main tasks: For RPC clients, it sends ping requests to
+ * servers at fixed intervals. For both RPC clients and servers, it checks for
+ * timeouts, also at fixed intervals. These tasks are scheduled using a
+ * time-based priority queue.
+ *
+ * For efficiency, if a machine creates multiple sessions to a remote machine,
+ * only one instance of the remote hostname is tracked by the pinger.
+ *
+ * This pinger is designed to keep the CPU use of eRPC's management thread close
+ * to zero in the steady state. An earlier version of eRPC's timeout detection
+ * used a reliable UDP library called ENet, which had non-negligible CPU use.
+ */
 class Pinger {
  public:
   enum class PingEventType : bool { kSend, kCheck };
@@ -53,19 +67,20 @@ class Pinger {
     size_t cur_tsc = rdtsc();
 
     map_last_ping_rx.emplace(client_hostname, cur_tsc);
-
     enqueue_ping_check(client_hostname);
   }
 
-  /// Receive a ping request from a remote client or server
+  /// Receive any ping packet
   void unlocked_receive_ping_req_or_resp(const char *remote_hostname) {
     std::lock_guard<std::mutex> lock(pinger_mutex);
+
+    if (map_last_ping_rx.count(remote_hostname) == 0) return;
     map_last_ping_rx.emplace(remote_hostname, rdtsc());
   }
 
  private:
   /// The main ping work: send pings, and check expired timers
-  void do_one() {
+  void do_one(std::vector<std::string> &failed_hostnames) {
     while (true) {
       if (ping_event_queue.empty()) break;
 
@@ -85,7 +100,9 @@ class Pinger {
           assert(map_last_ping_rx.count(next_ev.hostname) == 1);
           size_t last_ping_rx = map_last_ping_rx[next_ev.hostname];
           if (rdtsc() - last_ping_rx > failure_timeout_tsc) {
-            // XXX: next_ev.hostname has failed
+            failed_hostnames.push_back(next_ev.hostname);
+          } else {
+            enqueue_ping_check(next_ev.hostname.c_str());
           }
           break;
         }
