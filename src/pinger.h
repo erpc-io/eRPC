@@ -51,7 +51,7 @@ class Pinger {
 
   struct PingEventComparator {
     bool operator()(const PingEvent &p1, const PingEvent &p2) {
-      return p1.tsc < p2.tsc;
+      return p1.tsc > p2.tsc;
     }
   };
 
