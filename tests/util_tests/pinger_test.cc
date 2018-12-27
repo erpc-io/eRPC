@@ -31,7 +31,7 @@ TEST(PingerTest, Client) {
   pinger.ping_udp_client.enable_recording();
 
   pinger.unlocked_add_remote_server("server_1");
-  usleep(kTestMachineFailureTimeoutMs * 1000);
+  usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
 
   std::vector<std::string> failed_servers;
   pinger.do_one(failed_servers);

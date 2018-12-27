@@ -28,7 +28,7 @@ namespace erpc {
  */
 class Pinger {
  public:
-  static constexpr bool kVerbose = true;
+  static constexpr bool kVerbose = false;
   enum class PingEventType : bool { kSend, kCheck };
 
   Pinger(double freq_ghz, size_t machine_failure_timeout_ms)
