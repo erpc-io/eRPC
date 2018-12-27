@@ -79,7 +79,12 @@ class Pinger {
   }
 
  private:
-  /// The main ping work: send pings, and check expired timers
+  /**
+   * @brief The main pinging work: Send keepalive pings, and check expired
+   * timers
+   * 
+   * @param failed_hostnames The list of failed remote hosts
+   */
   void do_one(std::vector<std::string> &failed_hostnames) {
     while (true) {
       if (ping_event_queue.empty()) break;
