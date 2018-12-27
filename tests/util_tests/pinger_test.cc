@@ -5,9 +5,15 @@
 
 using namespace erpc;
 
-static double kFreqGhz = 2.5;
+static double kTestFreqGhz = 2.5;
+static double kTestMachineFailureTimeoutMs = 1;
 
-TEST(PingerTest, Base) { Pinger pinger(kFreqGhz); }
+TEST(PingerTest, Base) {
+  Pinger pinger(kTestFreqGhz, kTestMachineFailureTimeoutMs);
+  pinger.ping_udp_client.enable_recording();
+
+  pinger.unlocked_add_remote_server("server_1");
+}
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

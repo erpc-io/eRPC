@@ -57,7 +57,7 @@ static constexpr size_t kMaxPhyPorts = 16;
  * that the server has failed. If a server does not hear from a client for this
  * duration, we assume that the client has failed.
  */
-static constexpr size_t kServerFailureTimeoutMs = 500;
+static constexpr size_t kMachineFailureTimeoutMs = 500;
 
 /**
  * @brief Return the datapath UDP port used for an Rpc object in a process

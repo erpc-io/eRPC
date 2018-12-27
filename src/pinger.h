@@ -29,8 +29,8 @@ class Pinger {
  public:
   enum class PingEventType : bool { kSend, kCheck };
 
-  Pinger(double freq_ghz)
-      : failure_timeout_tsc(ms_to_cycles(kServerFailureTimeoutMs, freq_ghz)),
+  Pinger(double freq_ghz, size_t machine_failure_timeout_ms)
+      : failure_timeout_tsc(ms_to_cycles(machine_failure_timeout_ms, freq_ghz)),
         ping_send_delta_tsc(failure_timeout_tsc / 10),
         ping_check_delta_tsc(failure_timeout_tsc / 2) {}
 
@@ -82,7 +82,7 @@ class Pinger {
   /**
    * @brief The main pinging work: Send keepalive pings, and check expired
    * timers
-   * 
+   *
    * @param failed_hostnames The list of failed remote hosts
    */
   void do_one(std::vector<std::string> &failed_hostnames) {

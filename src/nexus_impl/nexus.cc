@@ -15,7 +15,7 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
       sm_udp_port(std::stoi(extract_udp_port_from_uri(local_uri))),
       numa_node(numa_node),
       num_bg_threads(num_bg_threads),
-      pinger(freq_ghz) {
+      pinger(freq_ghz, kMachineFailureTimeoutMs) {
   if (kTesting) {
     LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   }
