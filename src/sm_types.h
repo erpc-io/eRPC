@@ -32,6 +32,8 @@ enum class SessionState {
 
 /// Packet types used for session management
 enum class SmPktType : int {
+  kPingReq,         ///< Ping request
+  kPingResp,        ///< Ping response
   kConnectReq,      ///< Session connect request
   kConnectResp,     ///< Session connect response
   kDisconnectReq,   ///< Session disconnect request
@@ -71,6 +73,8 @@ static std::string session_state_str(SessionState state) {
 
 static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
+    case SmPktType::kPingReq: return "[Ping request]";
+    case SmPktType::kPingResp: return "[Ping response]";
     case SmPktType::kConnectReq: return "[Connect request]";
     case SmPktType::kConnectResp: return "[Connect response]";
     case SmPktType::kDisconnectReq: return "[Disconnect request]";
@@ -83,6 +87,8 @@ static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
 /// Check if a session management packet type is valid
 static bool sm_pkt_type_is_valid(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
+    case SmPktType::kPingReq:
+    case SmPktType::kPingResp:
     case SmPktType::kConnectReq:
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectReq:
@@ -96,8 +102,10 @@ static bool sm_pkt_type_is_valid(SmPktType sm_pkt_type) {
 static bool sm_pkt_type_is_req(SmPktType sm_pkt_type) {
   assert(sm_pkt_type_is_valid(sm_pkt_type));
   switch (sm_pkt_type) {
+    case SmPktType::kPingReq:
     case SmPktType::kConnectReq:
     case SmPktType::kDisconnectReq: return true;
+    case SmPktType::kPingResp:
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp: return false;
   }
@@ -109,8 +117,10 @@ static bool sm_pkt_type_is_req(SmPktType sm_pkt_type) {
 static SmPktType sm_pkt_type_req_to_resp(SmPktType sm_pkt_type) {
   assert(sm_pkt_type_is_req(sm_pkt_type));
   switch (sm_pkt_type) {
+    case SmPktType::kPingReq: return SmPktType::kPingResp;
     case SmPktType::kConnectReq: return SmPktType::kConnectResp;
     case SmPktType::kDisconnectReq: return SmPktType::kDisconnectResp;
+    case SmPktType::kPingResp:
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp: break;
   }
@@ -234,6 +244,33 @@ class SmPkt {
         uniq_token(uniq_token),
         client(client),
         server(server) {}
+
+  // A ping request is a management packet where most fields are invalid
+  SmPkt make_ping_req(TransportType transport_type,
+                      const std::string &server_hostname,
+                      const std::string &local_hostname) {
+    SmPkt req;
+    req.pkt_type = SmPktType::kPingReq;
+    req.err_type = SmErrType::kNoError;
+    req.uniq_token = 0;
+
+    // The Rpc ID, session number, and UDP port in req's session endpoints is
+    // already invalid.
+    strcpy(req.client.hostname, local_hostname.c_str());
+    req.client.transport_type = transport_type;
+
+    strcpy(req.server.hostname, server_hostname.c_str());
+    req.server.transport_type = transport_type;
+
+    return req;
+  }
+
+  // The response to a ping is the same packet but with packet type switched
+  SmPkt make_ping_resp(const SmPkt &ping_req) {
+    SmPkt ping_resp = ping_req;
+    ping_resp.pkt_type = SmPktType::kPingResp;
+    return ping_resp;
+  }
 
   bool is_req() const { return sm_pkt_type_is_req(pkt_type); }
   bool is_resp() const { return !is_req(); }
