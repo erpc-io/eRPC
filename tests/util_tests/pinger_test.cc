@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <algorithm>
 
 #define private public
 #include "pinger.h"
@@ -7,6 +8,12 @@ using namespace erpc;
 
 static double kTestFreqGhz = 2.5;
 static double kTestMachineFailureTimeoutMs = 1;
+
+/// Return true iff vec contains s
+static bool str_vec_contains(const std::vector<std::string> &vec,
+                             const std::string &s) {
+  return std::find(vec.begin(), vec.end(), s) != vec.end();
+}
 
 TEST(PingerTest, PriorityQueueOrderTest) {
   std::priority_queue<Pinger::PingEvent, std::vector<Pinger::PingEvent>,
@@ -49,14 +56,18 @@ TEST(PingerTest, Client) {
   pinger.ping_udp_client.enable_recording();
 
   pinger.unlocked_add_remote_server("server_1:1");
+  pinger.unlocked_add_remote_server("server_2:1");
+  pinger.unlocked_add_remote_server("server_1:2");
+
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
 
-  std::vector<std::string> failed_servers;
-  pinger.do_one(failed_servers);
+  std::vector<std::string> failed_uris;
+  pinger.do_one(failed_uris);
 
-  // Check the pinger's sent_vec
-  assert(failed_servers.size() == 1);
-  assert(failed_servers.front() == "server_1:1");
+  assert(failed_uris.size() == 3);
+  assert(str_vec_contains(failed_uris, "server_1:1"));
+  assert(str_vec_contains(failed_uris, "server_2:1"));
+  assert(str_vec_contains(failed_uris, "server_1:2"));
 }
 
 int main(int argc, char **argv) {

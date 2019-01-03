@@ -62,8 +62,8 @@ class Pinger {
     size_t cur_tsc = rdtsc();
     map_last_ping_rx.emplace(rem_uri, cur_tsc);
 
-    enqueue_ping_send(rem_uri);
-    enqueue_ping_check(rem_uri);
+    schedule_ping_send(rem_uri);
+    schedule_ping_check(rem_uri);
   }
 
   /// Add a remote client to the tracking set
@@ -72,7 +72,7 @@ class Pinger {
     size_t cur_tsc = rdtsc();
 
     map_last_ping_rx.emplace(client_uri, cur_tsc);
-    enqueue_ping_check(client_uri);
+    schedule_ping_check(client_uri);
   }
 
   /// Receive any ping packet
@@ -114,7 +114,7 @@ class Pinger {
 
       switch (next_ev.type) {
         case PingEventType::kSend: {
-          enqueue_ping_send(next_ev.rem_uri);
+          schedule_ping_send(next_ev.rem_uri);
           break;
         }
 
@@ -124,7 +124,7 @@ class Pinger {
           if (rdtsc() - last_ping_rx > failure_timeout_tsc) {
             failed_uris.push_back(next_ev.rem_uri);
           } else {
-            enqueue_ping_check(next_ev.rem_uri.c_str());
+            schedule_ping_check(next_ev.rem_uri.c_str());
           }
           break;
         }
@@ -151,19 +151,19 @@ class Pinger {
   /// Return true iff a timestamp is in the future
   static bool in_future(size_t tsc) { return tsc > rdtsc(); }
 
-  void enqueue_ping_send(const std::string &rem_uri) {
+  void schedule_ping_send(const std::string &rem_uri) {
     PingEvent e(PingEventType::kSend, rem_uri, rdtsc() + ping_send_delta_tsc);
     if (kVerbose) {
-      printf("pinger (%.3f us): Enqueueing event %s\n",
+      printf("pinger (%.3f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     ping_event_queue.push(e);
   }
 
-  void enqueue_ping_check(const std::string &rem_uri) {
+  void schedule_ping_check(const std::string &rem_uri) {
     PingEvent e(PingEventType::kCheck, rem_uri, rdtsc() + ping_check_delta_tsc);
     if (kVerbose) {
-      printf("pinger (%.3f us): Enqueueing event %s\n",
+      printf("pinger (%.3f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     ping_event_queue.push(e);
