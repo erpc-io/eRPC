@@ -20,7 +20,7 @@ namespace erpc {
  * time-based priority queue.
  *
  * For efficiency, if a machine creates multiple sessions to a remote machine,
- * only one instance of the remote hostname is tracked by the pinger.
+ * only one instance of the remote URI is tracked by the pinger.
  *
  * This pinger is designed to keep the CPU use of eRPC's management thread close
  * to zero in the steady state. An earlier version of eRPC's timeout detection
@@ -35,11 +35,11 @@ class Pinger {
   class PingEvent {
    public:
     PingEventType type;
-    std::string hostname;  // The remote node that the ping was sent to
-    uint64_t tsc;          // The time at which this event is triggered
+    std::string rem_uri;  // The remote process for receiving/sending pings
+    uint64_t tsc;         // The time at which this event is triggered
 
-    PingEvent(PingEventType type, const char *hostname, uint64_t tsc)
-        : type(type), hostname(hostname), tsc(tsc) {}
+    PingEvent(PingEventType type, const std::string &rem_uri, uint64_t tsc)
+        : type(type), rem_uri(rem_uri), tsc(tsc) {}
   };
 
   struct PingEventComparator {
@@ -57,39 +57,42 @@ class Pinger {
         ping_check_delta_tsc(failure_timeout_tsc / 2) {}
 
   /// Add a remote server to the tracking set
-  void unlocked_add_remote_server(const char *server_hostname) {
+  void unlocked_add_remote_server(const std::string &rem_uri) {
     std::lock_guard<std::mutex> lock(pinger_mutex);
     size_t cur_tsc = rdtsc();
-    map_last_ping_rx.emplace(server_hostname, cur_tsc);
+    map_last_ping_rx.emplace(rem_uri, cur_tsc);
 
-    enqueue_ping_send(server_hostname);
-    enqueue_ping_check(server_hostname);
+    enqueue_ping_send(rem_uri);
+    enqueue_ping_check(rem_uri);
   }
 
   /// Add a remote client to the tracking set
-  void unlocked_add_remote_client(const char *client_hostname) {
+  void unlocked_add_remote_client(const std::string &client_uri) {
     std::lock_guard<std::mutex> lock(pinger_mutex);
     size_t cur_tsc = rdtsc();
 
-    map_last_ping_rx.emplace(client_hostname, cur_tsc);
-    enqueue_ping_check(client_hostname);
+    map_last_ping_rx.emplace(client_uri, cur_tsc);
+    enqueue_ping_check(client_uri);
   }
 
   /// Receive any ping packet
-  void unlocked_receive_ping_req_or_resp(const char *remote_hostname) {
+  void unlocked_receive_ping_req_or_resp(const SmPkt &sm_pkt) {
     std::lock_guard<std::mutex> lock(pinger_mutex);
 
-    if (map_last_ping_rx.count(remote_hostname) == 0) return;
-    map_last_ping_rx.emplace(remote_hostname, rdtsc());
+    const auto rem_uri =
+        sm_pkt.is_req() ? sm_pkt.client.uri() : sm_pkt.server.uri();
+
+    if (map_last_ping_rx.count(rem_uri) == 0) return;
+    map_last_ping_rx.emplace(rem_uri, rdtsc());
   }
 
   /**
    * @brief The main pinging work: Send keepalive pings, and check expired
    * timers
    *
-   * @param failed_hostnames The list of failed remote hosts
+   * @param failed_uris The list of failed remote URIs to fill-in
    */
-  void do_one(std::vector<std::string> &failed_hostnames) {
+  void do_one(std::vector<std::string> &failed_uris) {
     while (true) {
       if (ping_event_queue.empty()) break;
 
@@ -111,18 +114,17 @@ class Pinger {
 
       switch (next_ev.type) {
         case PingEventType::kSend: {
-          // XXX: Send a ping to next_ev.hostname
-          enqueue_ping_send(next_ev.hostname.c_str());
+          enqueue_ping_send(next_ev.rem_uri);
           break;
         }
 
         case PingEventType::kCheck: {
-          assert(map_last_ping_rx.count(next_ev.hostname) == 1);
-          size_t last_ping_rx = map_last_ping_rx[next_ev.hostname];
+          assert(map_last_ping_rx.count(next_ev.rem_uri) == 1);
+          size_t last_ping_rx = map_last_ping_rx[next_ev.rem_uri];
           if (rdtsc() - last_ping_rx > failure_timeout_tsc) {
-            failed_hostnames.push_back(next_ev.hostname);
+            failed_uris.push_back(next_ev.rem_uri);
           } else {
-            enqueue_ping_check(next_ev.hostname.c_str());
+            enqueue_ping_check(next_ev.rem_uri.c_str());
           }
           break;
         }
@@ -141,7 +143,7 @@ class Pinger {
   std::string ev_to_string(const PingEvent &e) const {
     std::ostringstream ret;
     ret << "[Type: " << (e.type == PingEventType::kSend ? "send" : "check")
-        << ", hostname " << e.hostname << ", time " << us_since_creation(e.tsc)
+        << ", URI " << e.rem_uri << ", time " << us_since_creation(e.tsc)
         << " us]";
     return ret.str();
   }
@@ -149,8 +151,8 @@ class Pinger {
   /// Return true iff a timestamp is in the future
   static bool in_future(size_t tsc) { return tsc > rdtsc(); }
 
-  void enqueue_ping_send(const char *hostname) {
-    PingEvent e(PingEventType::kSend, hostname, rdtsc() + ping_send_delta_tsc);
+  void enqueue_ping_send(const std::string &rem_uri) {
+    PingEvent e(PingEventType::kSend, rem_uri, rdtsc() + ping_send_delta_tsc);
     if (kVerbose) {
       printf("pinger (%.3f us): Enqueueing event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
@@ -158,9 +160,8 @@ class Pinger {
     ping_event_queue.push(e);
   }
 
-  void enqueue_ping_check(const char *hostname) {
-    PingEvent e(PingEventType::kCheck, hostname,
-                rdtsc() + ping_check_delta_tsc);
+  void enqueue_ping_check(const std::string &rem_uri) {
+    PingEvent e(PingEventType::kCheck, rem_uri, rdtsc() + ping_check_delta_tsc);
     if (kVerbose) {
       printf("pinger (%.3f us): Enqueueing event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());

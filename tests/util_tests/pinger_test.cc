@@ -30,7 +30,7 @@ TEST(PingerTest, Client) {
   Pinger pinger(kTestFreqGhz, kTestMachineFailureTimeoutMs);
   pinger.ping_udp_client.enable_recording();
 
-  pinger.unlocked_add_remote_server("server_1");
+  pinger.unlocked_add_remote_server("server_1:1");
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
 
   std::vector<std::string> failed_servers;
@@ -38,7 +38,7 @@ TEST(PingerTest, Client) {
 
   // Check the pinger's sent_vec
   assert(failed_servers.size() == 1);
-  assert(failed_servers.front() == "server_1");
+  assert(failed_servers.front() == "server_1:1");
 }
 
 int main(int argc, char **argv) {

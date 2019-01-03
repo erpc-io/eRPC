@@ -186,6 +186,11 @@ class SessionEndpoint {
     memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));
   }
 
+  /// Return this endpoint's URI
+  std::string uri() const {
+    return std::string(hostname) + ":" + std::to_string(sm_udp_port);
+  }
+
   /// Return a string with a name for this session endpoint, containing
   /// its hostname, Rpc ID, and the session number.
   inline std::string name() const {
