@@ -26,6 +26,24 @@ TEST(PingerTest, PriorityQueueOrderTest) {
   ping_event_queue.pop();
 }
 
+TEST(PingerTest, URISplitTest) {
+  std::string hostname;
+  uint16_t udp_port;
+
+  std::string uri = "server1:12345";
+  split_uri(uri, hostname, udp_port);
+  assert(hostname == "server1" && udp_port == 12345);
+
+  uri = "akalianode-5.RDMA.ron-PG0.wisc.cloudlab.us:31850";
+  split_uri(uri, hostname, udp_port);
+  assert(hostname == "akalianode-5.RDMA.ron-PG0.wisc.cloudlab.us" &&
+         udp_port == 31850);
+
+  uri = "192.168.18.2:1";
+  split_uri(uri, hostname, udp_port);
+  assert(hostname == "192.168.18.2" && udp_port == 1);
+}
+
 TEST(PingerTest, Client) {
   Pinger pinger(kTestFreqGhz, kTestMachineFailureTimeoutMs);
   pinger.ping_udp_client.enable_recording();

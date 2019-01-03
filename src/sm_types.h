@@ -287,4 +287,14 @@ static SmPkt sm_construct_resp(const SmPkt &req_sm_pkt, SmErrType err_type) {
   resp_sm_pkt.err_type = err_type;
   return resp_sm_pkt;
 }
+
+// Split a well-formed URI into its hostname and UDP port components
+void split_uri(const std::string &uri, std::string &hostname,
+               uint16_t &udp_port) {
+  size_t colon_pos = uri.find(':');
+  hostname = uri.substr(0, colon_pos /* = length of hostname */);
+  udp_port =
+      std::stoi(uri.substr(colon_pos + 1, std::string::npos /* till end */));
+}
+
 }  // namespace erpc
