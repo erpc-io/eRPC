@@ -27,18 +27,11 @@ namespace erpc {
  * used a reliable UDP library called ENet, which had non-negligible CPU use.
  */
 class Pinger {
- public:
+ private:
   static constexpr bool kVerbose = false;
   enum class PingEventType : bool { kSend, kCheck };
 
-  Pinger(double freq_ghz, size_t machine_failure_timeout_ms)
-      : freq_ghz(freq_ghz),
-        creation_tsc(rdtsc()),
-        failure_timeout_tsc(ms_to_cycles(machine_failure_timeout_ms, freq_ghz)),
-        ping_send_delta_tsc(failure_timeout_tsc / 10),
-        ping_check_delta_tsc(failure_timeout_tsc / 2) {}
-
-  /// Information saved by the SM thread about a management ping
+  /// Management ping info in the priority queue
   class PingEvent {
    public:
     PingEventType type;
@@ -54,6 +47,14 @@ class Pinger {
       return p1.tsc > p2.tsc;
     }
   };
+
+ public:
+  Pinger(double freq_ghz, size_t machine_failure_timeout_ms)
+      : freq_ghz(freq_ghz),
+        creation_tsc(rdtsc()),
+        failure_timeout_tsc(ms_to_cycles(machine_failure_timeout_ms, freq_ghz)),
+        ping_send_delta_tsc(failure_timeout_tsc / 10),
+        ping_check_delta_tsc(failure_timeout_tsc / 2) {}
 
   /// Add a remote server to the tracking set
   void unlocked_add_remote_server(const char *server_hostname) {
@@ -80,22 +81,6 @@ class Pinger {
 
     if (map_last_ping_rx.count(remote_hostname) == 0) return;
     map_last_ping_rx.emplace(remote_hostname, rdtsc());
-  }
-
- private:
-  /// Return the microseconds between tsc and this pinger's creation time
-  double us_since_creation(size_t tsc) const {
-    return to_usec(tsc - creation_tsc, freq_ghz);
-  }
-
-  /// Return a string representation of a ping event. This is outside the
-  /// PingEvent class because we need creation_tsc.
-  std::string ev_to_string(const PingEvent &e) const {
-    std::ostringstream ret;
-    ret << "[Type: " << (e.type == PingEventType::kSend ? "send" : "check")
-        << ", hostname " << e.hostname << ", time " << us_since_creation(e.tsc)
-        << " us]";
-    return ret.str();
   }
 
   /**
@@ -143,6 +128,22 @@ class Pinger {
         }
       }
     }
+  }
+
+ private:
+  /// Return the microseconds between tsc and this pinger's creation time
+  double us_since_creation(size_t tsc) const {
+    return to_usec(tsc - creation_tsc, freq_ghz);
+  }
+
+  /// Return a string representation of a ping event. This is outside the
+  /// PingEvent class because we need creation_tsc.
+  std::string ev_to_string(const PingEvent &e) const {
+    std::ostringstream ret;
+    ret << "[Type: " << (e.type == PingEventType::kSend ? "send" : "check")
+        << ", hostname " << e.hostname << ", time " << us_since_creation(e.tsc)
+        << " us]";
+    return ret.str();
   }
 
   /// Return true iff a timestamp is in the future

@@ -246,9 +246,9 @@ class SmPkt {
         server(server) {}
 
   // A ping request is a management packet where most fields are invalid
-  SmPkt make_ping_req(TransportType transport_type,
-                      const std::string &server_hostname,
-                      const std::string &local_hostname) {
+  static SmPkt make_ping_req(TransportType transport_type,
+                             const std::string &server_hostname,
+                             const std::string &local_hostname) {
     SmPkt req;
     req.pkt_type = SmPktType::kPingReq;
     req.err_type = SmErrType::kNoError;
@@ -266,7 +266,7 @@ class SmPkt {
   }
 
   // The response to a ping is the same packet but with packet type switched
-  SmPkt make_ping_resp(const SmPkt &ping_req) {
+  static SmPkt make_ping_resp(const SmPkt &ping_req) {
     SmPkt ping_resp = ping_req;
     ping_resp.pkt_type = SmPktType::kPingResp;
     return ping_resp;
