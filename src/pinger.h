@@ -6,6 +6,7 @@
 #include "common.h"
 #include "rpc_constants.h"
 #include "sm_types.h"
+#include "util/autorun_helpers.h"
 #include "util/timer.h"
 #include "util/udp_client.h"
 
@@ -49,8 +50,11 @@ class Pinger {
   };
 
  public:
-  Pinger(double freq_ghz, size_t machine_failure_timeout_ms)
-      : freq_ghz(freq_ghz),
+  Pinger(std::string hostname, uint16_t sm_udp_port, double freq_ghz,
+         size_t machine_failure_timeout_ms)
+      : hostname(hostname),
+        sm_udp_port(sm_udp_port),
+        freq_ghz(freq_ghz),
         creation_tsc(rdtsc()),
         failure_timeout_tsc(ms_to_cycles(machine_failure_timeout_ms, freq_ghz)),
         ping_send_delta_tsc(failure_timeout_tsc / 10),
@@ -114,6 +118,10 @@ class Pinger {
 
       switch (next_ev.type) {
         case PingEventType::kSend: {
+          SmPkt ping_req = make_ping_req(next_ev.rem_uri);
+          ping_udp_client.send(ping_req.server.hostname,
+                               ping_req.server.sm_udp_port, ping_req);
+
           schedule_ping_send(next_ev.rem_uri);
           break;
         }
@@ -133,6 +141,28 @@ class Pinger {
   }
 
  private:
+  // A ping request is a management packet where most fields are invalid
+  SmPkt make_ping_req(const std::string &server_uri) {
+    SmPkt req;
+    req.pkt_type = SmPktType::kPingReq;
+    req.err_type = SmErrType::kNoError;
+    req.uniq_token = 0;
+
+    std::string server_hostname;
+    uint16_t server_sm_udp_port;
+    split_uri(server_uri, server_hostname, server_sm_udp_port);
+
+    // In req's session endpoints, the transport type, Rpc ID, and session
+    // number are already invalid.
+    strcpy(req.client.hostname, hostname.c_str());
+    req.client.sm_udp_port = sm_udp_port;
+
+    strcpy(req.server.hostname, server_hostname.c_str());
+    req.server.sm_udp_port = server_sm_udp_port;
+
+    return req;
+  }
+
   /// Return the microseconds between tsc and this pinger's creation time
   double us_since_creation(size_t tsc) const {
     return to_usec(tsc - creation_tsc, freq_ghz);
@@ -169,16 +199,19 @@ class Pinger {
     ping_event_queue.push(e);
   }
 
-  const double freq_ghz;             // TSC frequency
-  const size_t creation_tsc;         // Time at which this pinger was created
-  const size_t failure_timeout_tsc;  // Machine failure timeout in TSC cycles
+  const std::string hostname;  /// This process's local hostname
+  const uint16_t sm_udp_port;  /// This process's management UDP port
 
-  // We send pings every every ping_send_delta_tsc cycles. This duration is
-  // around a tenth of the failure timeout.
+  const double freq_ghz;             /// TSC frequency
+  const size_t creation_tsc;         /// Time at which this pinger was created
+  const size_t failure_timeout_tsc;  /// Machine failure timeout in TSC cycles
+
+  /// We send pings every every ping_send_delta_tsc cycles. This duration is
+  /// around a tenth of the failure timeout.
   const size_t ping_send_delta_tsc;
 
-  // We check pings every every ping_check_delta_tsc cycles. This duration is
-  // around half of the failure timeout. XXX: Explain.
+  /// We check pings every every ping_check_delta_tsc cycles. This duration is
+  /// around half of the failure timeout. XXX: Explain.
   const size_t ping_check_delta_tsc;
 
   std::priority_queue<PingEvent, std::vector<PingEvent>, PingEventComparator>

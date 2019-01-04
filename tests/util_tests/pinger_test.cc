@@ -6,8 +6,10 @@
 
 using namespace erpc;
 
-static double kTestFreqGhz = 2.5;
-static double kTestMachineFailureTimeoutMs = 1;
+static constexpr double kTestFreqGhz = 2.5;
+static constexpr double kTestMachineFailureTimeoutMs = 1;
+static constexpr const char *kTestLocalHostname = "localhost";
+static constexpr uint16_t kTestLocalSmUdpPort = 31850;
 
 /// Return true iff vec contains s
 static bool str_vec_contains(const std::vector<std::string> &vec,
@@ -52,7 +54,8 @@ TEST(PingerTest, URISplitTest) {
 }
 
 TEST(PingerTest, Client) {
-  Pinger pinger(kTestFreqGhz, kTestMachineFailureTimeoutMs);
+  Pinger pinger(kTestLocalHostname, kTestLocalSmUdpPort, kTestFreqGhz,
+                kTestMachineFailureTimeoutMs);
   pinger.ping_udp_client.enable_recording();
 
   pinger.unlocked_add_remote_server("server_1:1");

@@ -41,20 +41,28 @@ static bool is_valid_uri(std::string uri) {
   return split.size() == 2 && split[0].length() > 0 && split[1].length() > 0;
 }
 
-/// Extract the hostname from a URI formatted as hostname:udp_port
+// Split a well-formed URI into its hostname and UDP port components
+static void split_uri(const std::string &uri, std::string &hostname,
+                      uint16_t &udp_port) {
+  assert(is_valid_uri(uri));
+  size_t colon_pos = uri.find(':');
+  hostname = uri.substr(0, colon_pos /* = length of hostname */);
+  udp_port =
+      std::stoi(uri.substr(colon_pos + 1, std::string::npos /* till end */));
+}
+
+/// Extract just the hostname from a URI formatted as hostname:udp_port
 static std::string extract_hostname_from_uri(std::string uri) {
-  rt_assert(is_valid_uri(uri), "Invalid uri " + uri);
-  std::vector<std::string> split_vec;
-  boost::split(split_vec, uri, boost::is_any_of(":"));
-  return split_vec[0];
+  assert(is_valid_uri(uri));
+  size_t colon_pos = uri.find(':');
+  return uri.substr(0, colon_pos /* = length of hostname */);
 }
 
 /// Extract the UDP port from a URI formatted as hostname:udp_port
-static std::string extract_udp_port_from_uri(std::string uri) {
-  rt_assert(is_valid_uri(uri), "Invalid uri " + uri);
-  std::vector<std::string> split_vec;
-  boost::split(split_vec, uri, boost::is_any_of(":"));
-  return split_vec[1];
+static uint16_t extract_udp_port_from_uri(std::string uri) {
+  assert(is_valid_uri(uri));
+  size_t colon_pos = uri.find(':');
+  return std::stoi(uri.substr(colon_pos + 1, std::string::npos /* till end */));
 }
 
 /// Return the hostname of the process with index process_i, from the autorun

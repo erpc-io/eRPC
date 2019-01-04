@@ -23,8 +23,7 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
   }
 
   std::string rem_hostname = extract_hostname_from_uri(remote_uri);
-  std::string rem_sm_udp_port_str = extract_udp_port_from_uri(remote_uri);
-  uint16_t rem_sm_udp_port = std::stoi(rem_sm_udp_port_str);
+  uint16_t rem_sm_udp_port = extract_udp_port_from_uri(remote_uri);
 
   // Check remote hostname
   if (rem_hostname.length() == 0 || rem_hostname.length() > kMaxHostnameLen) {

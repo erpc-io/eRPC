@@ -250,26 +250,6 @@ class SmPkt {
         client(client),
         server(server) {}
 
-  // A ping request is a management packet where most fields are invalid
-  static SmPkt make_ping_req(TransportType transport_type,
-                             const std::string &server_hostname,
-                             const std::string &local_hostname) {
-    SmPkt req;
-    req.pkt_type = SmPktType::kPingReq;
-    req.err_type = SmErrType::kNoError;
-    req.uniq_token = 0;
-
-    // The Rpc ID, session number, and UDP port in req's session endpoints is
-    // already invalid.
-    strcpy(req.client.hostname, local_hostname.c_str());
-    req.client.transport_type = transport_type;
-
-    strcpy(req.server.hostname, server_hostname.c_str());
-    req.server.transport_type = transport_type;
-
-    return req;
-  }
-
   // The response to a ping is the same packet but with packet type switched
   static SmPkt make_ping_resp(const SmPkt &ping_req) {
     SmPkt ping_resp = ping_req;
@@ -286,15 +266,6 @@ static SmPkt sm_construct_resp(const SmPkt &req_sm_pkt, SmErrType err_type) {
   resp_sm_pkt.pkt_type = sm_pkt_type_req_to_resp(req_sm_pkt.pkt_type);
   resp_sm_pkt.err_type = err_type;
   return resp_sm_pkt;
-}
-
-// Split a well-formed URI into its hostname and UDP port components
-void split_uri(const std::string &uri, std::string &hostname,
-               uint16_t &udp_port) {
-  size_t colon_pos = uri.find(':');
-  hostname = uri.substr(0, colon_pos /* = length of hostname */);
-  udp_port =
-      std::stoi(uri.substr(colon_pos + 1, std::string::npos /* till end */));
 }
 
 }  // namespace erpc
