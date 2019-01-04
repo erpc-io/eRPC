@@ -16,31 +16,6 @@ namespace erpc {
 template <typename T>
 class Rpc;
 
-/// A work item exchanged between an Rpc thread and an SM thread. This does
-/// not have any Nexus-related members, so it's outside the Nexus class.
-class SmWorkItem {
-  enum class Reset { kFalse, kTrue };
-
- public:
-  SmWorkItem(uint8_t rpc_id, SmPkt sm_pkt)
-      : reset(Reset::kFalse), rpc_id(rpc_id), sm_pkt(sm_pkt) {}
-
-  SmWorkItem(std::string reset_rem_hostname)
-      : reset(Reset::kTrue),
-        rpc_id(kInvalidRpcId),
-        reset_rem_hostname(reset_rem_hostname) {}
-
-  bool is_reset() const { return reset == Reset::kTrue; }
-
-  const Reset reset;     ///< Is this work item a reset?
-  const uint8_t rpc_id;  ///< The local Rpc ID, invalid for reset work items
-
-  SmPkt sm_pkt;  ///< The session management packet, for non-reset work items
-
-  /// The remote hostname to reset, valid for reset work items
-  std::string reset_rem_hostname;
-};
-
 /**
  * @brief A per-process library object used for initializing eRPC
  */
