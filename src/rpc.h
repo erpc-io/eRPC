@@ -25,10 +25,11 @@ namespace erpc {
 /**
  * \mainpage
  *
- * eRPC is a high-performance remote procedure call system for datacenters.
- * The <a href="https://github.com/efficient/eRPC">source code</a> is maintained
- * on GitHub. A <a href="https://arxiv.org/pdf/1806.00680.pdf">preprint</a>
- * describing the system is available.
+ * eRPC is a fast remote procedure call library designed for datacenter
+ * networks. The <a href="https://github.com/efficient/eRPC">source code</a> is
+ * maintained on GitHub. Our USENIX NSDI
+ * <a href="http://www.cs.cmu.edu/~akalia/doc/nsdi19/erpc_nsdi19.pdf">paper</a>
+ * describes eRPC's design in detail.
  *
  * See the API documentation tab for details on how to use eRPC. Using eRPC
  * requires the following steps:
