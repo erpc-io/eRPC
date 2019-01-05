@@ -103,14 +103,14 @@ class Pinger {
       const auto next_ev = ping_event_queue.top();  // Copy-out
       if (in_future(next_ev.tsc)) {
         if (kVerbose) {
-          printf("pinger (%.3f us): Event %s is in the future\n",
+          printf("pinger (%.1f us): Event %s is in the future\n",
                  us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
         }
         break;
       }
 
       if (kVerbose) {
-        printf("pinger (%.3f us): Handling event %s\n",
+        printf("pinger (%.1f us): Handling event %s\n",
                us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
       }
 
@@ -184,7 +184,7 @@ class Pinger {
   void schedule_ping_send(const std::string &rem_uri) {
     PingEvent e(PingEventType::kSend, rem_uri, rdtsc() + ping_send_delta_tsc);
     if (kVerbose) {
-      printf("pinger (%.3f us): Scheduling event %s\n",
+      printf("pinger (%.1f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     ping_event_queue.push(e);
@@ -193,7 +193,7 @@ class Pinger {
   void schedule_ping_check(const std::string &rem_uri) {
     PingEvent e(PingEventType::kCheck, rem_uri, rdtsc() + ping_check_delta_tsc);
     if (kVerbose) {
-      printf("pinger (%.3f us): Scheduling event %s\n",
+      printf("pinger (%.1f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     ping_event_queue.push(e);

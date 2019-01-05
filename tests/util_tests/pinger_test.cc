@@ -10,6 +10,7 @@ static constexpr double kTestFreqGhz = 2.5;
 static constexpr double kTestMachineFailureTimeoutMs = 1;
 static constexpr const char *kTestLocalHostname = "localhost";
 static constexpr uint16_t kTestLocalSmUdpPort = 31850;
+static constexpr const char *kTestLocalUri = "localhost:31850";
 
 /// Return true iff vec contains s
 static bool str_vec_contains(const std::vector<std::string> &vec,
@@ -54,23 +55,39 @@ TEST(PingerTest, URISplitTest) {
 }
 
 TEST(PingerTest, Client) {
+  std::vector<std::string> failed_uris;
   Pinger pinger(kTestLocalHostname, kTestLocalSmUdpPort, kTestFreqGhz,
                 kTestMachineFailureTimeoutMs);
   pinger.ping_udp_client.enable_recording();
 
-  pinger.unlocked_add_remote_server("server_1:1");
-  pinger.unlocked_add_remote_server("server_2:1");
-  pinger.unlocked_add_remote_server("server_1:2");
+  pinger.unlocked_add_remote_server("127.0.0.1:1");
+  pinger.unlocked_add_remote_server("127.0.0.1:2");
+  pinger.unlocked_add_remote_server("localhost:2");
 
+  // Test ping sending. To check that all pings are sent, we encode the
+  // sent packets into strings and add them to a set.
+  usleep(2 * to_usec(pinger.ping_send_delta_tsc, kTestFreqGhz));  // wiggle-room
+  pinger.do_one(failed_uris);
+
+  const std::vector<SmPkt> &sent_vec = pinger.ping_udp_client.sent_vec;
+  assert(sent_vec.size() >= 3);
+  std::set<std::string> SP;  // Sent pings
+
+  for (auto &sm_pkt : sent_vec) {
+    SP.insert(sm_pkt.client.uri() + "-" + sm_pkt.server.uri());
+  }
+  assert(SP.count(std::string(kTestLocalUri) + "-" + "127.0.0.1:1") > 0);
+  assert(SP.count(std::string(kTestLocalUri) + "-" + "127.0.0.1:2") > 0);
+  assert(SP.count(std::string(kTestLocalUri) + "-" + "localhost:2") > 0);
+
+  // Test failure timeout
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
-
-  std::vector<std::string> failed_uris;
   pinger.do_one(failed_uris);
 
   assert(failed_uris.size() == 3);
-  assert(str_vec_contains(failed_uris, "server_1:1"));
-  assert(str_vec_contains(failed_uris, "server_2:1"));
-  assert(str_vec_contains(failed_uris, "server_1:2"));
+  assert(str_vec_contains(failed_uris, "127.0.0.1:1"));
+  assert(str_vec_contains(failed_uris, "127.0.0.1:2"));
+  assert(str_vec_contains(failed_uris, "localhost:2"));
 }
 
 int main(int argc, char **argv) {
