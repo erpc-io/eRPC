@@ -55,8 +55,8 @@ TEST(HeartbeatMgrTest, URISplitTest) {
 }
 
 TEST(HeartbeatMgrTest, Basic) {
-  HeartbeatMgr heartbeat_mgr(kTestLocalHostname, kTestLocalSmUdpPort, kTestFreqGhz,
-                      kTestMachineFailureTimeoutMs);
+  HeartbeatMgr heartbeat_mgr(kTestLocalHostname, kTestLocalSmUdpPort,
+                             kTestFreqGhz, kTestMachineFailureTimeoutMs);
   std::vector<std::string> failed_uris;
 
   heartbeat_mgr.hb_udp_client.enable_recording();
@@ -69,8 +69,8 @@ TEST(HeartbeatMgrTest, Basic) {
 
   // Test heartbeat sending. To check that all heartbeats are sent, we encode
   // the sent packets into strings and add them to a set.
-  usleep(2 *
-         to_usec(heartbeat_mgr.hb_send_delta_tsc, kTestFreqGhz));  // wiggle-room
+  usleep(2 * to_usec(heartbeat_mgr.hb_send_delta_tsc,
+                     kTestFreqGhz));  // wiggle-room
   heartbeat_mgr.do_one(failed_uris);
 
   assert(sent_vec.size() >= 3);

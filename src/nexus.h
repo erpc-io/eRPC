@@ -175,8 +175,8 @@ class Nexus {
   Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};
   std::mutex reg_hooks_lock;  ///< Lock for concurrent access to the hooks array
 
-  HeartbeatMgr heartbeat_mgr;        ///< The heartbeat manager
-  volatile bool kill_switch;  ///< Used to turn off SM and background threads
+  HeartbeatMgr heartbeat_mgr;  ///< The heartbeat manager
+  volatile bool kill_switch;   ///< Used to turn off SM and background threads
 
   std::thread sm_thread;  ///< The session management thread
   MtQueue<BgWorkItem> bg_req_queue[kMaxBgThreads];  ///< Background req queues

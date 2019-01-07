@@ -51,7 +51,7 @@ class HeartbeatMgr {
 
  public:
   HeartbeatMgr(std::string hostname, uint16_t sm_udp_port, double freq_ghz,
-            size_t machine_failure_timeout_ms)
+               size_t machine_failure_timeout_ms)
       : hostname(hostname),
         sm_udp_port(sm_udp_port),
         freq_ghz(freq_ghz),
@@ -88,10 +88,22 @@ class HeartbeatMgr {
       if (hb_event_queue.empty()) break;
 
       const auto next_ev = hb_event_queue.top();  // Copy-out
+
+      // Stop processing the event queue when the top event is in the future
       if (in_future(next_ev.tsc)) {
         if (kVerbose) {
           printf("heartbeat_mgr (%.1f us): Event %s is in the future\n",
                  us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
+        }
+        break;
+      }
+
+      if (map_last_hb_rx.count(next_ev.rem_uri) == 0) {
+        if (kVerbose) {
+          printf(
+              "heartbeat_mgr (%.1f us): Remote URI for event %s is not "
+              "in tracking set. Ignoring.\n",
+              us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
         }
         break;
       }
@@ -101,7 +113,7 @@ class HeartbeatMgr {
                us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
       }
 
-    hb_event_queue.pop();  // Consume the event
+      hb_event_queue.pop();  // Consume the event
 
       switch (next_ev.type) {
         case EventType::kSend: {
@@ -114,10 +126,16 @@ class HeartbeatMgr {
         }
 
         case EventType::kCheck: {
-          assert(map_last_hb_rx.count(next_ev.rem_uri) == 1);
           size_t last_ping_rx = map_last_hb_rx[next_ev.rem_uri];
           if (rdtsc() - last_ping_rx > failure_timeout_tsc) {
             failed_uris.push_back(next_ev.rem_uri);
+
+            // Stop tracking rem_uri
+            if (kVerbose) {
+              printf("heartbeat_mgr (%.1f us): Stopping tracking %s\n",
+                     us_since_creation(rdtsc()), next_ev.rem_uri.c_str());
+            }
+            map_last_hb_rx.erase(map_last_hb_rx.find(next_ev.rem_uri));
           } else {
             schedule_hb_check(next_ev.rem_uri.c_str());
           }
@@ -204,6 +222,12 @@ class HeartbeatMgr {
 
   std::priority_queue<Event, std::vector<Event>, EventComparator>
       hb_event_queue;
+
+  // This map servers two purposes. First, its value for a remote URI is
+  // the timestamp when we last received a heartbeat from the remote process.
+  // Second, the set of remote URIs in the map is our remote tracking set.
+  // Since we cannot delete efficiently from the event priority queue, events
+  // for remote URIs not in this map are ignored when they are dequeued.
   std::unordered_map<std::string, uint64_t> map_last_hb_rx;
 
   UDPClient<SmPkt> hb_udp_client;
