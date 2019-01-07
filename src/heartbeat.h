@@ -13,21 +13,21 @@
 namespace erpc {
 
 /**
- * @brief A thread-safe keepalive pinger
+ * @brief A thread-safe heartbeat manager
  *
- * This class has two main tasks: For RPC clients, it sends ping requests to
- * servers at fixed intervals. For both RPC clients and servers, it checks for
- * timeouts, also at fixed intervals. These tasks are scheduled using a
- * time-based priority queue.
+ * This class has two main tasks: First, it sends heartbeat messages to remote
+ * processes at fixed intervals. Second, it checks for timeouts, also at fixed
+ * intervals. These tasks are scheduled using a time-based priority queue.
  *
- * For efficiency, if a machine creates multiple sessions to a remote machine,
- * only one instance of the remote URI is tracked by the pinger.
+ * For efficiency, if a process has multiple sessions to a remote process,
+ * only one instance of the remote URI is tracked..
  *
- * This pinger is designed to keep the CPU use of eRPC's management thread close
- * to zero in the steady state. An earlier version of eRPC's timeout detection
- * used a reliable UDP library called ENet, which had non-negligible CPU use.
+ * This heartbeat manager is designed to keep the CPU use of eRPC's management
+ * thread close to zero in the steady state. An earlier version of eRPC's
+ * timeout detection used a reliable UDP library called ENet, which had
+ * non-negligible CPU use.
  */
-class Pinger {
+class Heartbeat {
  private:
   static constexpr bool kVerbose = false;
   enum class PingEventType : bool { kSend, kCheck };
@@ -50,8 +50,8 @@ class Pinger {
   };
 
  public:
-  Pinger(std::string hostname, uint16_t sm_udp_port, double freq_ghz,
-         size_t machine_failure_timeout_ms)
+  Heartbeat(std::string hostname, uint16_t sm_udp_port, double freq_ghz,
+            size_t machine_failure_timeout_ms)
       : hostname(hostname),
         sm_udp_port(sm_udp_port),
         freq_ghz(freq_ghz),
@@ -62,7 +62,7 @@ class Pinger {
 
   /// Add a remote server to the tracking set
   void unlocked_add_remote_server(const std::string &rem_uri) {
-    std::lock_guard<std::mutex> lock(pinger_mutex);
+    std::lock_guard<std::mutex> lock(heartbeat_mutex);
     size_t cur_tsc = rdtsc();
     map_last_ping_rx.emplace(rem_uri, cur_tsc);
 
@@ -72,7 +72,7 @@ class Pinger {
 
   /// Add a remote client to the tracking set
   void unlocked_add_remote_client(const std::string &client_uri) {
-    std::lock_guard<std::mutex> lock(pinger_mutex);
+    std::lock_guard<std::mutex> lock(heartbeat_mutex);
     size_t cur_tsc = rdtsc();
 
     map_last_ping_rx.emplace(client_uri, cur_tsc);
@@ -81,7 +81,7 @@ class Pinger {
 
   /// Receive any ping packet
   void unlocked_receive_ping_req_or_resp(const SmPkt &sm_pkt) {
-    std::lock_guard<std::mutex> lock(pinger_mutex);
+    std::lock_guard<std::mutex> lock(heartbeat_mutex);
 
     const auto rem_uri =
         sm_pkt.is_req() ? sm_pkt.client.uri() : sm_pkt.server.uri();
@@ -103,14 +103,14 @@ class Pinger {
       const auto next_ev = ping_event_queue.top();  // Copy-out
       if (in_future(next_ev.tsc)) {
         if (kVerbose) {
-          printf("pinger (%.1f us): Event %s is in the future\n",
+          printf("heartbeat (%.1f us): Event %s is in the future\n",
                  us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
         }
         break;
       }
 
       if (kVerbose) {
-        printf("pinger (%.1f us): Handling event %s\n",
+        printf("heartbeat (%.1f us): Handling event %s\n",
                us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
       }
 
@@ -163,7 +163,7 @@ class Pinger {
     return req;
   }
 
-  /// Return the microseconds between tsc and this pinger's creation time
+  /// Return the microseconds between tsc and this manager's creation time
   double us_since_creation(size_t tsc) const {
     return to_usec(tsc - creation_tsc, freq_ghz);
   }
@@ -184,7 +184,7 @@ class Pinger {
   void schedule_ping_send(const std::string &rem_uri) {
     PingEvent e(PingEventType::kSend, rem_uri, rdtsc() + ping_send_delta_tsc);
     if (kVerbose) {
-      printf("pinger (%.1f us): Scheduling event %s\n",
+      printf("heartbeat (%.1f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     ping_event_queue.push(e);
@@ -193,7 +193,7 @@ class Pinger {
   void schedule_ping_check(const std::string &rem_uri) {
     PingEvent e(PingEventType::kCheck, rem_uri, rdtsc() + ping_check_delta_tsc);
     if (kVerbose) {
-      printf("pinger (%.1f us): Scheduling event %s\n",
+      printf("heartbeat (%.1f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     ping_event_queue.push(e);
@@ -203,7 +203,7 @@ class Pinger {
   const uint16_t sm_udp_port;  /// This process's management UDP port
 
   const double freq_ghz;             /// TSC frequency
-  const size_t creation_tsc;         /// Time at which this pinger was created
+  const size_t creation_tsc;         /// Time at which this manager was created
   const size_t failure_timeout_tsc;  /// Machine failure timeout in TSC cycles
 
   /// We send pings every every ping_send_delta_tsc cycles. This duration is
@@ -220,6 +220,6 @@ class Pinger {
 
   UDPClient<SmPkt> ping_udp_client;
 
-  std::mutex pinger_mutex;  // Protects this pinger
+  std::mutex heartbeat_mutex;  // Protects this heartbeat manager
 };
 }

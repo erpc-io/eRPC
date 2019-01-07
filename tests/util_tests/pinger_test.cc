@@ -2,7 +2,7 @@
 #include <algorithm>
 
 #define private public
-#include "pinger.h"
+#include "heartbeat.h"
 
 using namespace erpc;
 
@@ -18,13 +18,13 @@ static bool str_vec_contains(const std::vector<std::string> &vec,
   return std::find(vec.begin(), vec.end(), s) != vec.end();
 }
 
-TEST(PingerTest, PriorityQueueOrderTest) {
-  std::priority_queue<Pinger::PingEvent, std::vector<Pinger::PingEvent>,
-                      Pinger::PingEventComparator>
+TEST(HeartbeatTest, PriorityQueueOrderTest) {
+  std::priority_queue<Heartbeat::PingEvent, std::vector<Heartbeat::PingEvent>,
+                      Heartbeat::PingEventComparator>
       ping_event_queue;
-  ping_event_queue.emplace(Pinger::PingEventType::kSend, "hostname_1", 1);
-  ping_event_queue.emplace(Pinger::PingEventType::kCheck, "hostname_2", 3);
-  ping_event_queue.emplace(Pinger::PingEventType::kSend, "hostname_3", 2);
+  ping_event_queue.emplace(Heartbeat::PingEventType::kSend, "hostname_1", 1);
+  ping_event_queue.emplace(Heartbeat::PingEventType::kCheck, "hostname_2", 3);
+  ping_event_queue.emplace(Heartbeat::PingEventType::kSend, "hostname_3", 2);
 
   assert(ping_event_queue.top().tsc == 1);
   ping_event_queue.pop();
@@ -36,7 +36,7 @@ TEST(PingerTest, PriorityQueueOrderTest) {
   ping_event_queue.pop();
 }
 
-TEST(PingerTest, URISplitTest) {
+TEST(HeartbeatTest, URISplitTest) {
   std::string hostname;
   uint16_t udp_port;
 
@@ -54,23 +54,24 @@ TEST(PingerTest, URISplitTest) {
   assert(hostname == "192.168.18.2" && udp_port == 1);
 }
 
-TEST(PingerTest, Client) {
-  Pinger pinger(kTestLocalHostname, kTestLocalSmUdpPort, kTestFreqGhz,
-                kTestMachineFailureTimeoutMs);
+TEST(HeartbeatTest, Client) {
+  Heartbeat heartbeat(kTestLocalHostname, kTestLocalSmUdpPort, kTestFreqGhz,
+                      kTestMachineFailureTimeoutMs);
   std::vector<std::string> failed_uris;
 
-  pinger.ping_udp_client.enable_recording();
-  std::vector<SmPkt> &sent_vec = pinger.ping_udp_client.sent_vec;
+  heartbeat.ping_udp_client.enable_recording();
+  std::vector<SmPkt> &sent_vec = heartbeat.ping_udp_client.sent_vec;
 
   // The client will sent actual UDP packets, so we need valid addresses
-  pinger.unlocked_add_remote_server("127.0.0.1:1");
-  pinger.unlocked_add_remote_server("127.0.0.1:2");
-  pinger.unlocked_add_remote_server("localhost:2");
+  heartbeat.unlocked_add_remote_server("127.0.0.1:1");
+  heartbeat.unlocked_add_remote_server("127.0.0.1:2");
+  heartbeat.unlocked_add_remote_server("localhost:2");
 
   // Test ping sending. To check that all pings are sent, we encode the
   // sent packets into strings and add them to a set.
-  usleep(2 * to_usec(pinger.ping_send_delta_tsc, kTestFreqGhz));  // wiggle-room
-  pinger.do_one(failed_uris);
+  usleep(2 *
+         to_usec(heartbeat.ping_send_delta_tsc, kTestFreqGhz));  // wiggle-room
+  heartbeat.do_one(failed_uris);
 
   assert(sent_vec.size() >= 3);
   std::set<std::string> SP;  // Sent pings
@@ -84,7 +85,7 @@ TEST(PingerTest, Client) {
 
   // Test failure timeout
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
-  pinger.do_one(failed_uris);
+  heartbeat.do_one(failed_uris);
 
   assert(failed_uris.size() == 3);
   assert(str_vec_contains(failed_uris, "127.0.0.1:1"));
@@ -95,26 +96,26 @@ TEST(PingerTest, Client) {
   sent_vec.clear();
   failed_uris.clear();
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
-  pinger.do_one(failed_uris);
+  heartbeat.do_one(failed_uris);
   assert(sent_vec.empty());
   assert(failed_uris.empty());
 }
 
-TEST(PingerTest, Server) {
-  Pinger pinger(kTestLocalHostname, kTestLocalSmUdpPort, kTestFreqGhz,
-                kTestMachineFailureTimeoutMs);
+TEST(HeartbeatTest, Server) {
+  Heartbeat heartbeat(kTestLocalHostname, kTestLocalSmUdpPort, kTestFreqGhz,
+                      kTestMachineFailureTimeoutMs);
   std::vector<std::string> failed_uris;
 
-  pinger.ping_udp_client.enable_recording();
+  heartbeat.ping_udp_client.enable_recording();
 
   // The server never sends pings, so any addresses are fine
-  pinger.unlocked_add_remote_client("client_1:1");
-  pinger.unlocked_add_remote_client("client_1:2");
-  pinger.unlocked_add_remote_client("client_2:3");
+  heartbeat.unlocked_add_remote_client("client_1:1");
+  heartbeat.unlocked_add_remote_client("client_1:2");
+  heartbeat.unlocked_add_remote_client("client_2:3");
 
   // Test failure timeout
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
-  pinger.do_one(failed_uris);
+  heartbeat.do_one(failed_uris);
 
   assert(failed_uris.size() == 3);
   assert(str_vec_contains(failed_uris, "client_1:1"));
@@ -122,12 +123,12 @@ TEST(PingerTest, Server) {
   assert(str_vec_contains(failed_uris, "client_2:3"));
 
   // The server should never send pings
-  assert(pinger.ping_udp_client.sent_vec.empty());
+  assert(heartbeat.ping_udp_client.sent_vec.empty());
 
   // All clients have failed, so no failures should be detected from now
   failed_uris.clear();
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
-  pinger.do_one(failed_uris);
+  heartbeat.do_one(failed_uris);
   assert(failed_uris.empty());
 }
 

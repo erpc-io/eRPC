@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <unordered_map>
 #include "common.h"
-#include "pinger.h"
+#include "heartbeat.h"
 #include "session.h"
 #include "sm_types.h"
 #include "util/logger.h"
@@ -144,7 +144,7 @@ class Nexus {
     /// thread should terminate itself.
     volatile bool *kill_switch;
 
-    Pinger *pinger;                 ///< The Nexus's keepalive pinger
+    Heartbeat *heartbeat;           ///< The Nexus's heartbeat manager
     volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
     std::mutex *reg_hooks_lock;
   };
@@ -175,7 +175,7 @@ class Nexus {
   Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};
   std::mutex reg_hooks_lock;  ///< Lock for concurrent access to the hooks array
 
-  Pinger pinger;              ///< The keepalive pinger
+  Heartbeat heartbeat;        ///< The heartbeat manager
   volatile bool kill_switch;  ///< Used to turn off SM and background threads
 
   std::thread sm_thread;  ///< The session management thread
