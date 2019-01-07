@@ -15,7 +15,7 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
       sm_udp_port(extract_udp_port_from_uri(local_uri)),
       numa_node(numa_node),
       num_bg_threads(num_bg_threads),
-      heartbeat(hostname, sm_udp_port, freq_ghz, kMachineFailureTimeoutMs) {
+      heartbeat_mgr(hostname, sm_udp_port, freq_ghz, kMachineFailureTimeoutMs) {
   if (kTesting) {
     LOG_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   }
@@ -53,7 +53,7 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
   sm_thread_ctx.sm_udp_port = sm_udp_port;
   sm_thread_ctx.freq_ghz = freq_ghz;
   sm_thread_ctx.kill_switch = &kill_switch;
-  sm_thread_ctx.heartbeat = &heartbeat;
+  sm_thread_ctx.heartbeat_mgr = &heartbeat_mgr;
   sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
   sm_thread_ctx.reg_hooks_lock = &reg_hooks_lock;
 
