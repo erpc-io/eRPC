@@ -1,7 +1,7 @@
 eRPC is a fast and general-purpose RPC library for datacenter networks.
-We have a [preprint](https://arxiv.org/pdf/1806.00680.pdf) that describes the
-system. [Documentation](http://www.cs.cmu.edu/~akalia/erpc_doc) is available
-online.
+Our NSDI 2019 [paper](http://www.cs.cmu.edu/~akalia/doc/nsdi19/erpc_nsdi19.pdf)
+describes the system in detail.
+[Documentation](http://www.cs.cmu.edu/~akalia/erpc_doc) is available online.
 
 Some highlights:
  * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
@@ -17,14 +17,20 @@ Some highlights:
 
 ## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+
- * Install _exactly one_ of the following, mutually-incompatible packages:
+ * See `scripts/packages/` for required software packages for your distro. 
+   Install _exactly one_ of the following, mutually-incompatible packages:
    * Mellanox OFED for Mellanox NICs
    * System-wide DPDK for other, DPDK-compatible NICs
- * See `scripts/packages/` for required software packages for your distro
- * At least 1024 huge pages on every NUMA node, and unlimited SHM limits
- * UDP ports 31850 and 31851 should be open on the management network.
-   `scripts/firewalld/erpc_firewall.sh` opens them on systems running
-   `firewalld`.
+ * NICs: Fast (10 GbE+) bare-metal NICs are needed for good performance. eRPC
+   works best with Mellanox Ethernet and InfiniBand NICs. Any DPDK-capable NICs
+   also work well. Slower/virtual NICs can still be used for testing and
+   development.
+ * System configuration:
+   * At least 1024 huge pages on every NUMA node, and unlimited SHM limits
+   * On a machine with `n` eRPC processes, eRPC uses kernel UDP ports
+     `{31850, ..., 31850 + n - 1}.` These ports should be open on the management
+     network. See `scripts/firewalld/erpc_firewall.sh` for systems running
+     `firewalld`.
 
 ## eRPC quickstart
  * Build and run the test suite:
@@ -59,7 +65,7 @@ Some highlights:
    or DPDK-capable NICs (e.g., on your desktop or in a virtual machine). This is
    for development only: eRPC is not designed to perform well in these settings.
    eRPC has been tested on KVM virtual machines and in Amazon EC2.
- * Create an emulated RoCE device with [SoftRoCE](https://community.mellanox.com/community/support/software-drivers/mellanox-ofed/blog/2017/12/22/how-to-configure-soft-roce-with-mellanox-ofed-42)
+ * Create an emulated RoCE device with [SoftRoCE] (instructions soon).
  * Compile eRPC with `DTRANSPORT=infiniband -DROCE=on`
 
 ## Configuring and running the provided applications
