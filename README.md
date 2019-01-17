@@ -6,8 +6,8 @@ describes the system in detail.
 Some highlights:
  * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
  * Low latency: 2.3 microseconds round-trip RPC latency with UDP over Ethernet
- * Performance for small 32-byte RPCs: ~10 million RPCs/sec with one CPU core,
-   60--80 million RPCs/sec with one NIC.
+ * Performance for small 32-byte RPCs: ~10M RPCs/sec with one CPU core,
+   60--80M RPCs/sec with one NIC.
  * Bandwidth for large RPC: 75 Gbps on one connection (one CPU core at server
    and client) for 8 MB RPCs
  * Scalability: 20000 RPC sessions per server
