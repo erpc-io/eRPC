@@ -39,6 +39,16 @@ struct enq_req_args_t {
         cont_etid(cont_etid) {}
 };
 
+/// The arguments to enqueue_response()
+struct enq_resp_args_t {
+  ReqHandle *req_handle;
+  MsgBuffer *resp_msgbuf;
+
+  enq_resp_args_t() {}
+  enq_resp_args_t(ReqHandle *req_handle, MsgBuffer *resp_msgbuf) :
+      req_handle(req_handle), resp_msgbuf(resp_msgbuf) {}
+};
+
 // Forward declaration for friendship
 template <typename T>
 class Rpc;
@@ -71,7 +81,6 @@ class Session {
       // This buries all MsgBuffers
       memset(static_cast<void *>(&sslot), 0, sizeof(SSlot));
 
-      sslot.prealloc_used = true;  // There's no user-allocated memory to free
       sslot.session = this;
       sslot.is_client = is_client();
       sslot.index = sslot_i;

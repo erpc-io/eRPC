@@ -243,8 +243,12 @@ class Rpc {
    * This can be called outside the request handler.
    *
    * @param req_handle The handle passed to the request handler by eRPC
+   * 
+   * @param resp_msgbuf The message buffer containing the response. This must
+   * be either the request handle's preallocated response buffer, or its dynamic
+   * response buffer.
    */
-  void enqueue_response(ReqHandle *req_handle);
+  void enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf);
 
   /// Run the event loop for some milliseconds
   inline void run_event_loop(size_t timeout_ms) {
@@ -436,16 +440,13 @@ class Rpc {
    *
    * This does not fully validate the MsgBuffer, since we don't want to
    * conditionally bury only initialized MsgBuffers.
-   *
-   * The server's response MsgBuffers are always backed by dynamic memory, since
-   * even prealloc response MsgBuffers are non-fake: the \p prealloc_used field
-   * is used to decide if we need to free memory.
    */
   inline void bury_resp_msgbuf_server_st(SSlot *sslot) {
     assert(in_dispatch());
 
-    // Free the response MsgBuffer iff it is not preallocated
-    if (unlikely(!sslot->prealloc_used)) {
+    // Free the response MsgBuffer iff it's the dynamically allocated response.
+    // This high-specificity checks prevents freeing a null tx_msgbuf.
+    if (sslot->tx_msgbuf == &sslot->dyn_resp_msgbuf) {
       MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
       free_msg_buffer(*tx_msgbuf);
       // Need not nullify tx_msgbuf->buffer.buf: we'll just nullify tx_msgbuf
@@ -977,7 +978,7 @@ class Rpc {
   /// Queues for datapath API requests from background threads
   struct {
     MtQueue<enq_req_args_t> _enqueue_request;
-    MtQueue<ReqHandle *> _enqueue_response;
+    MtQueue<enq_resp_args_t> _enqueue_response;
   } bg_queues;
 
   // Misc

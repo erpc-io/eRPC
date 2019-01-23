@@ -25,9 +25,12 @@ class SSlot {
   ~SSlot() {}
 
   // Server-only members. Exposed to req handlers, so not kept in server struct.
-  MsgBuffer dyn_resp_msgbuf;  ///< Dynamic buffer to store RPC response
-  MsgBuffer pre_resp_msgbuf;  ///< Preallocated buffer to store RPC response
-  bool prealloc_used;         ///< Did the handler use \p pre_resp_msgbuf?
+  
+  /// A preallocated msgbuf for single-packet responses
+  MsgBuffer pre_resp_msgbuf;
+
+  /// A non-preallocated msgbuf for possibly multi-packet responses
+  MsgBuffer dyn_resp_msgbuf;
 
  private:
   // Members that are valid for both server and client

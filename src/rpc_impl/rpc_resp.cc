@@ -8,10 +8,10 @@ namespace erpc {
 //
 // So sslot->rx_msgbuf may or may not be valid at this point.
 template <class TTr>
-void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
+void Rpc<TTr>::enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf) {
   // When called from a background thread, enqueue to the foreground thread
   if (unlikely(!in_dispatch())) {
-    bg_queues._enqueue_response.unlocked_push(req_handle);
+    bg_queues._enqueue_response.unlocked_push(enq_resp_args_t(req_handle, resp_msgbuf));
     return;
   }
 
@@ -34,9 +34,6 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle) {
 
     return;  // During session reset, don't add packets to TX burst
   }
-
-  MsgBuffer *resp_msgbuf =
-      sslot->prealloc_used ? &sslot->pre_resp_msgbuf : &sslot->dyn_resp_msgbuf;
 
   // Fill in packet 0's header
   pkthdr_t *resp_pkthdr_0 = resp_msgbuf->get_pkthdr_0();

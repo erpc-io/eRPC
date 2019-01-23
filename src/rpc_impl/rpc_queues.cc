@@ -72,8 +72,8 @@ void Rpc<TTr>::process_bg_queues_enqueue_response_st() {
   const size_t cmds_to_process = queue.size;  // Reduce cache line traffic
 
   for (size_t i = 0; i < cmds_to_process; i++) {
-    ReqHandle *req_handle = queue.unlocked_pop();
-    enqueue_response(req_handle);
+    enq_resp_args_t enq_resp_args = queue.unlocked_pop();
+    enqueue_response(enq_resp_args.req_handle, enq_resp_args.resp_msgbuf);
   }
 }
 
