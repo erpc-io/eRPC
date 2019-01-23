@@ -57,7 +57,6 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   uint8_t resp_byte = req_msgbuf->buf[0];
 
   // Use dynamic response
-  req_handle->prealloc_used = false;
   erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
   resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(FLAGS_resp_size);
 
@@ -71,7 +70,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->stat_rx_bytes_tot += FLAGS_req_size;
   c->stat_tx_bytes_tot += FLAGS_resp_size;
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &resp_msgbuf);
 }
 
 void app_cont_func(void *_context, size_t _tag) {

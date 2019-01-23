@@ -33,14 +33,13 @@ void req_handler(ReqHandle *req_handle, void *_c) {
 
   memcpy(reinterpret_cast<char *>(req_handle->dyn_resp_msgbuf.buf),
          reinterpret_cast<char *>(req_msgbuf->buf), resp_size);
-  req_handle->prealloc_used = false;
 
   test_printf(
       "Server: Received request of length %zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
       resp_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
 
 /// The common continuation function for all subtests

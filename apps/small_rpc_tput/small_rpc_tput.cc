@@ -168,7 +168,6 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   // Preallocated response optimization knob
   if (kAppOptDisablePreallocResp) {
-    req_handle->prealloc_used = false;
     erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
     resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_msg_size);
     assert(resp_msgbuf.buf != nullptr);
@@ -178,8 +177,8 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
     } else {
       memcpy(resp_msgbuf.buf, req_msgbuf->buf, FLAGS_msg_size);
     }
+    c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
   } else {
-    req_handle->prealloc_used = true;
     erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                    FLAGS_msg_size);
 
@@ -188,9 +187,8 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
     } else {
       memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, FLAGS_msg_size);
     }
+    c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
   }
-
-  c->rpc->enqueue_response(req_handle);
 }
 
 void app_cont_func(void *_context, size_t _tag) {

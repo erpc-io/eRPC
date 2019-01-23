@@ -114,7 +114,6 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_appendentries_response_t));
-  req_handle->prealloc_used = true;
 
   // Only the buffers for entries in the append
   int e = raft_recv_appendentries(
@@ -125,7 +124,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   if (msg_ae.entries != static_msg_entry_arr) delete[] msg_ae.entries;
 
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kSendAeResp);
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 void appendentries_cont(erpc::RespHandle *, void *, size_t);  // Fwd decl

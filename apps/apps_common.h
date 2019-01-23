@@ -194,11 +194,10 @@ static constexpr uint8_t kPingTimeoutMs = 50;
 void ping_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<BasicAppContext *>(_context);
 
-  req_handle->prealloc_used = true;
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp_msgbuf, kPingMsgSize);
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &resp_msgbuf);
 }
 
 void ping_cont_func(void *_context, size_t) {

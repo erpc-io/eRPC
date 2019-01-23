@@ -45,7 +45,6 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_requestvote_response_t));
-  req_handle->prealloc_used = true;
 
   auto *rv_resp =
       reinterpret_cast<msg_requestvote_response_t *>(resp_msgbuf.buf);
@@ -62,7 +61,7 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
          msg_requestvote_response_string(rv_resp).c_str(),
          erpc::get_formatted_time().c_str());
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 void requestvote_cont(erpc::RespHandle *, void *, size_t);  // Fwd decl

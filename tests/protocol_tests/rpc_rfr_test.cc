@@ -18,9 +18,9 @@ TEST_F(RpcTest, process_rfr_st) {
   sslot_0->cur_req_num = kSessionReqWindow;
   sslot_0->server_info.req_type = kTestReqType;
   sslot_0->dyn_resp_msgbuf = rpc->alloc_msg_buffer(kTestLargeMsgSize);
-  sslot_0->prealloc_used = false;
 
-  rpc->enqueue_response(reinterpret_cast<ReqHandle *>(sslot_0));
+  rpc->enqueue_response(reinterpret_cast<ReqHandle *>(sslot_0),
+                        &sslot_0->dyn_resp_msgbuf);
   ASSERT_EQ(sslot_0->server_info.sav_num_req_pkts, kNumReqPkts);
 
   pkthdr_tx_queue->pop();  // Remove the response packet

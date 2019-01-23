@@ -11,7 +11,8 @@ template <class TTr>
 void Rpc<TTr>::enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf) {
   // When called from a background thread, enqueue to the foreground thread
   if (unlikely(!in_dispatch())) {
-    bg_queues._enqueue_response.unlocked_push(enq_resp_args_t(req_handle, resp_msgbuf));
+    bg_queues._enqueue_response.unlocked_push(
+        enq_resp_args_t(req_handle, resp_msgbuf));
     return;
   }
 

@@ -243,7 +243,7 @@ class Rpc {
    * This can be called outside the request handler.
    *
    * @param req_handle The handle passed to the request handler by eRPC
-   * 
+   *
    * @param resp_msgbuf The message buffer containing the response. This must
    * be either the request handle's preallocated response buffer, or its dynamic
    * response buffer.

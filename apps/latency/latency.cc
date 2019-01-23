@@ -58,10 +58,9 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->file_offset += copy_size;
 #endif
 
-  req_handle->prealloc_used = true;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                  kAppRespSize);
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 void server_func(erpc::Nexus *nexus) {

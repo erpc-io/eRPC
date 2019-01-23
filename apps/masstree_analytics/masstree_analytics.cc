@@ -27,13 +27,12 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
     printf("main: Handling point request in eRPC thread %zu.\n", etid);
   }
 
-  req_handle->prealloc_used = true;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                  sizeof(resp_t));
 
   if (kBypassMasstree) {
     // Send a garbage response
-    c->rpc->enqueue_response(req_handle);
+    c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
     return;
   }
 
@@ -55,7 +54,7 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   resp->resp_type = success ? RespType::kFound : RespType::kNotFound;
   resp->value = value;  // Garbage is OK in case of kNotFound
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 void range_req_handler(erpc::ReqHandle *req_handle, void *_context) {
@@ -82,14 +81,13 @@ void range_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   size_t count =
       mti->sum_in_range(req->range_req.key, req->range_req.range, ti);
 
-  req_handle->prealloc_used = true;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                  sizeof(resp_t));
   auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf.buf);
   resp->resp_type = RespType::kFound;
   resp->range_count = count;
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 // Helper function for clients

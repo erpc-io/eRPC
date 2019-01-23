@@ -120,8 +120,7 @@ void req_handler_pb(ReqHandle *req_handle, void *_c) {
     req_handle->dyn_resp_msgbuf.buf[i] = req_msgbuf_pb->buf[i] + 1;
   }
 
-  req_handle->prealloc_used = false;
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
 
 /// The primary's continuation function when it gets a response from a backup
@@ -164,8 +163,7 @@ void primary_cont_func(void *_c, size_t _tag) {
   delete srv_req_info;
 
   // Send response to the client
-  req_handle_cp->prealloc_used = false;
-  c->rpc->enqueue_response(req_handle_cp);
+  c->rpc->enqueue_response(req_handle_cp, &req_handle_cp->dyn_resp_msgbuf);
 }
 
 ///

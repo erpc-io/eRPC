@@ -6,8 +6,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *) {
   rpc->resize_msg_buffer(&resp, kMsgSize);
   sprintf(reinterpret_cast<char *>(resp.buf), "hello");
 
-  req_handle->prealloc_used = true;
-  rpc->enqueue_response(req_handle);
+  rpc->enqueue_response(req_handle, &resp);
 }
 
 int main() {

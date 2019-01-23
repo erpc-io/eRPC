@@ -25,7 +25,7 @@ class SSlot {
   ~SSlot() {}
 
   // Server-only members. Exposed to req handlers, so not kept in server struct.
-  
+
   /// A preallocated msgbuf for single-packet responses
   MsgBuffer pre_resp_msgbuf;
 

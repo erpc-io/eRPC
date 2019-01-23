@@ -173,10 +173,9 @@ static void req_handler(ReqHandle *req_handle, void *_context) {
   const size_t resp_size = req_msgbuf->get_data_size();
 
   req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(resp_size);
-  req_handle->prealloc_used = false;
   memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
 
-  context->rpc->enqueue_response(req_handle);
+  context->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
   context->num_req_handler_calls++;
 }
 

@@ -7,8 +7,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_c) {
 
   auto &resp = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp, sizeof(size_t));
-  req_handle->prealloc_used = true;
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 void cont_func(void *_c, size_t) {

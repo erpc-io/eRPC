@@ -45,8 +45,8 @@ struct enq_resp_args_t {
   MsgBuffer *resp_msgbuf;
 
   enq_resp_args_t() {}
-  enq_resp_args_t(ReqHandle *req_handle, MsgBuffer *resp_msgbuf) :
-      req_handle(req_handle), resp_msgbuf(resp_msgbuf) {}
+  enq_resp_args_t(ReqHandle *req_handle, MsgBuffer *resp_msgbuf)
+      : req_handle(req_handle), resp_msgbuf(resp_msgbuf) {}
 };
 
 // Forward declaration for friendship

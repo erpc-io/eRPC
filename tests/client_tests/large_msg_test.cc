@@ -33,7 +33,6 @@ void req_handler(ReqHandle *req_handle, void *_c) {
 
   req_handle->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(resp_size);
   memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
-  req_handle->prealloc_used = false;
 
   size_t user_alloc_tot = c->rpc->get_stat_user_alloc_tot();
   test_printf(
@@ -41,7 +40,7 @@ void req_handler(ReqHandle *req_handle, void *_c) {
       "Rpc memory used = %zu bytes (%.3f MB)\n",
       resp_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
 
 /// The common continuation function for all subtests. This checks that the

@@ -40,8 +40,6 @@ void req_handler(ReqHandle *req_handle, void *_c) {
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf->get_data_size();
 
-  req_handle->prealloc_used = false;
-
   // eRPC will free the MsgBuffer
   req_handle->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(req_size);
   memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, req_size);
@@ -52,7 +50,7 @@ void req_handler(ReqHandle *req_handle, void *_c) {
       "Rpc memory used = %zu bytes (%.3f MB)\n",
       req_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
 
 void cont_func(void *, size_t);  // Forward declaration

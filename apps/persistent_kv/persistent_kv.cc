@@ -145,7 +145,6 @@ inline void drain_batch(ServerContext *c) {
 
   for (size_t i = 0; i < c->num_reqs_in_batch; i++) {
     erpc::ReqHandle *req_handle = c->req_handle_arr[i];
-    req_handle->prealloc_used = true;
     erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
 
     if (c->is_set_arr[i]) {
@@ -161,7 +160,7 @@ inline void drain_batch(ServerContext *c) {
       }
     }
 
-    c->rpc->enqueue_response(req_handle);
+    c->rpc->enqueue_response(req_handle, &resp);
   }
 
   c->stats.num_resps_tot += c->num_reqs_in_batch;
@@ -173,12 +172,11 @@ inline void drain_batch(ServerContext *c) {
 void max_key_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
 
-  req_handle->prealloc_used = true;
   erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp, sizeof(size_t));
   *reinterpret_cast<size_t *>(resp.buf) = c->max_key;
 
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &resp);
 }
 
 void kv_req_handler(erpc::ReqHandle *req_handle, void *_context) {
@@ -187,7 +185,6 @@ void kv_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req = req_handle->get_req_msgbuf();
   size_t req_size = req->get_data_size();
 
-  req_handle->prealloc_used = true;
   erpc::MsgBuffer &resp = req_handle->pre_resp_msgbuf;
   c->rpc->resize_msg_buffer(&resp, sizeof(Value));  // sizeof(Result) is smaller
 
@@ -325,7 +322,7 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
 }
 
 // Key-value RPC client code
-void kv_cont_func(erpc::RespHandle *, void *, size_t);
+void kv_cont_func(void *, size_t);
 inline void kv_send_req(ClientContext &c, size_t ws_i) {
   c.start_tsc[ws_i] = erpc::rdtsc();
 

@@ -33,9 +33,7 @@ void req_handler(ReqHandle *req_handle, void *_c) {
   size_t resp_size = req_msgbuf->get_data_size();
   Rpc<CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf, resp_size);
   memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
-  req_handle->prealloc_used = true;
-
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 /// The common continuation function for all subtests. This checks that the
