@@ -44,7 +44,7 @@ bool change_leader_to_node(AppContext *c, int raft_node_id) {
   exit(0);
 }
 
-void client_cont(erpc::RespHandle *, void *, size_t);  // Forward declaration
+void client_cont(void *, size_t);  // Forward declaration
 
 void send_req_one(AppContext *c) {
   c->client.req_start_tsc = erpc::rdtsc();
@@ -67,7 +67,7 @@ void send_req_one(AppContext *c) {
       &c->client.req_msgbuf, &c->client.resp_msgbuf, client_cont, 0 /* tag */);
 }
 
-void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
+void client_cont(void *_context, size_t) {
   auto *c = static_cast<AppContext *>(_context);
   double latency_us = erpc::to_usec(erpc::rdtsc() - c->client.req_start_tsc,
                                     c->rpc->get_freq_ghz());
@@ -147,7 +147,6 @@ void client_cont(erpc::RespHandle *resp_handle, void *_context, size_t) {
     change_leader_to_any(c);
   }
 
-  c->rpc->release_response(resp_handle);
   send_req_one(c);
 }
 

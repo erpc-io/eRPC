@@ -85,8 +85,7 @@ void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
 
   c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                             sizeof(client_resp_t));
-  req_handle->prealloc_used = true;
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &resp_msgbuf);
 }
 
 void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
