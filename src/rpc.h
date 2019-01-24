@@ -245,8 +245,15 @@ class Rpc {
    * @param req_handle The handle passed to the request handler by eRPC
    *
    * @param resp_msgbuf The message buffer containing the response. This must
-   * be either the request handle's preallocated response buffer, or its dynamic
-   * response buffer.
+   * be either the request handle's preallocated response buffer or its
+   * dynamic response. The preallocated response buffer may be used for only
+   * responses that fit in one packet, in which case it is the better choice.
+   * 
+   * @note The restriction on resp_msgbuf is inconvenient to the user because
+   * they cannot provide an arbitrary application-owned buffer. Unfortunately,
+   * supporting this feature will require passing the response MsgBuffer by
+   * value instead of reference since eRPC provides no application callback for
+   * when the response can be re-used or freed.
    */
   void enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf);
 
