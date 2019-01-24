@@ -21,7 +21,7 @@ static constexpr size_t kTestNumaNode = 0;
 static constexpr size_t kTestUniqToken = 42;
 static constexpr size_t kTestRpcId = 0;  // ID of the fixture's Rpc
 static constexpr size_t kTestReqType = 1;
-static constexpr size_t kTestTag = 0;
+static constexpr void *kTestTag = nullptr;
 static constexpr size_t kTestSmallMsgSize = 32;
 static constexpr size_t kTestLargeMsgSize = KB(128);
 static constexpr double kTestLinkBandwidth = 56.0 * 1000 * 1000 * 1000 / 8;
@@ -180,7 +180,7 @@ static void req_handler(ReqHandle *req_handle, void *_context) {
 }
 
 /// The common continuation for subtests.
-static void cont_func(void *_context, size_t) {
+static void cont_func(void *_context, void *) {
   auto *context = static_cast<RpcTest *>(_context);
   context->num_cont_func_calls++;
 }

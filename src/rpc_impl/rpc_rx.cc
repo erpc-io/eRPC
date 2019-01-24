@@ -82,7 +82,7 @@ void Rpc<TTr>::submit_bg_req_st(SSlot *sslot) {
 }
 
 template <class TTr>
-void Rpc<TTr>::submit_bg_resp_st(erpc_cont_func_t cont_func, size_t tag,
+void Rpc<TTr>::submit_bg_resp_st(erpc_cont_func_t cont_func, void *tag,
                                  size_t bg_etid) {
   assert(in_dispatch());
   assert(nexus->num_bg_threads > 0);

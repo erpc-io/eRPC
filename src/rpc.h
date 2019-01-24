@@ -233,7 +233,7 @@ class Rpc {
    */
   void enqueue_request(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
                        MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func,
-                       size_t tag, size_t cont_etid = kInvalidBgETid);
+                       void *tag, size_t cont_etid = kInvalidBgETid);
 
   /**
    * @brief Enqueue a response for transmission at the server. See ReqHandle
@@ -248,7 +248,7 @@ class Rpc {
    * be either the request handle's preallocated response buffer or its
    * dynamic response. The preallocated response buffer may be used for only
    * responses that fit in one packet, in which case it is the better choice.
-   * 
+   *
    * @note The restriction on resp_msgbuf is inconvenient to the user because
    * they cannot provide an arbitrary application-owned buffer. Unfortunately,
    * supporting this feature will require passing the response MsgBuffer by
@@ -794,8 +794,7 @@ class Rpc {
    *
    * @param bg_etid eRPC thread ID of the background thread to submit to
    */
-  void submit_bg_resp_st(erpc_cont_func_t cont_func, size_t tag,
-                         size_t bg_etid);
+  void submit_bg_resp_st(erpc_cont_func_t cont_func, void *tag, size_t bg_etid);
 
   //
   // Queue handlers

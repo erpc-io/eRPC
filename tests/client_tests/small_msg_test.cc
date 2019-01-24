@@ -39,8 +39,9 @@ void req_handler(ReqHandle *req_handle, void *_c) {
 /// The common continuation function for all subtests. This checks that the
 /// request buffer is identical to the response buffer, and increments the
 /// number of responses in the context
-void cont_func(void *_c, size_t tag) {
+void cont_func(void *_c, void *_tag) {
   auto *c = static_cast<AppContext *>(_c);
+  size_t tag = reinterpret_cast<size_t>(_tag);
   ASSERT_EQ(c->resp_msgbufs[tag].get_data_size(), config_msg_size);
 
   for (size_t i = 0; i < config_msg_size; i++) {
@@ -93,7 +94,7 @@ void generic_test_func(Nexus *nexus, size_t) {
 
         rpc->enqueue_request(session_num_arr[sess_i], kTestReqType,
                              &cur_req_msgbuf, &c.resp_msgbufs[iter_req_i],
-                             cont_func, iter_req_i);
+                             cont_func, reinterpret_cast<void *>(iter_req_i));
 
         iter_req_i++;
       }

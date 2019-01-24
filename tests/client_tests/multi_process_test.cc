@@ -10,7 +10,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_c) {
   c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
-void cont_func(void *_c, size_t) {
+void cont_func(void *_c, void *) {
   auto *c = static_cast<BasicAppContext *>(_c);
   c->num_rpc_resps++;
 }
@@ -52,7 +52,8 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
     if (i == process_id) continue;
 
     c.rpc->enqueue_request(c.session_num_arr[i], kTestReqType,
-                           &c.req_msgbufs[i], &c.resp_msgbufs[i], cont_func, 0);
+                           &c.req_msgbufs[i], &c.resp_msgbufs[i], cont_func,
+                           nullptr);
   }
 
   wait_for_rpc_resps_or_timeout(c, num_processes - 1);

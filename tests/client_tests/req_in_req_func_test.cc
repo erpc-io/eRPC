@@ -39,7 +39,7 @@ union client_tag_t {
     uint16_t msgbuf_i;
     uint32_t req_size;
   } s;
-  size_t _tag;
+  void *_tag;
 
   client_tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size) {
     s.req_i = req_i;
@@ -47,9 +47,9 @@ union client_tag_t {
     s.req_size = req_size;
   }
 
-  client_tag_t(size_t _tag) : _tag(_tag) {}
+  client_tag_t(void *_tag) : _tag(_tag) {}
 };
-static_assert(sizeof(client_tag_t) == sizeof(size_t), "");
+static_assert(sizeof(client_tag_t) == sizeof(void *), "");
 
 /// Extended context for client
 class AppContext : public BasicAppContext {
@@ -63,7 +63,7 @@ class AppContext : public BasicAppContext {
 ///
 
 // Forward declaration
-void primary_cont_func(void *, size_t);
+void primary_cont_func(void *, void *);
 
 /// The primary's request handler for client-to-primary requests. Forwards the
 /// received request to one of the backup servers.
@@ -96,7 +96,7 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_c) {
   c->rpc->enqueue_request(c->session_num_arr[1], kTestReqTypePB,
                           &srv_req_info->req_msgbuf_pb,
                           &srv_req_info->resp_msgbuf_pb, primary_cont_func,
-                          reinterpret_cast<size_t>(srv_req_info));
+                          reinterpret_cast<void *>(srv_req_info));
 }
 
 /// The backups' request handler for primary-to-backup to requests. Echoes the
@@ -124,7 +124,7 @@ void req_handler_pb(ReqHandle *req_handle, void *_c) {
 }
 
 /// The primary's continuation function when it gets a response from a backup
-void primary_cont_func(void *_c, size_t _tag) {
+void primary_cont_func(void *_c, void *_tag) {
   auto *c = static_cast<BasicAppContext *>(_c);
   assert(!c->is_client);
   ASSERT_EQ(c->rpc->in_background(), primary_bg);
@@ -169,7 +169,7 @@ void primary_cont_func(void *_c, size_t _tag) {
 ///
 /// Client-side code
 ///
-void client_cont_func(void *, size_t);  // Forward declaration
+void client_cont_func(void *, void *);  // Forward declaration
 
 /// Enqueue a request to server 0 using the request MsgBuffer index msgbuf_i
 void client_request_helper(AppContext *c, size_t msgbuf_i) {
@@ -194,12 +194,12 @@ void client_request_helper(AppContext *c, size_t msgbuf_i) {
 
   c->rpc->enqueue_request(c->session_num_arr[0], kTestReqTypeCP,
                           &c->req_msgbufs[msgbuf_i], &c->resp_msgbufs[msgbuf_i],
-                          client_cont_func, *reinterpret_cast<size_t *>(&tag));
+                          client_cont_func, tag._tag);
 
   c->num_reqs_sent++;
 }
 
-void client_cont_func(void *_c, size_t _tag) {
+void client_cont_func(void *_c, void *_tag) {
   // Extract info from tag
   auto tag = static_cast<client_tag_t>(_tag);
   size_t req_size = tag.s.req_size;

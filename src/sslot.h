@@ -53,7 +53,7 @@ class SSlot {
     struct {
       MsgBuffer *resp_msgbuf;      ///< User-supplied response buffer
       erpc_cont_func_t cont_func;  ///< Continuation function for the request
-      size_t tag;                  ///< Tag of the request
+      void *tag;                   ///< Tag of the request
 
       /// Number of packets sent. Packets up to (num_tx - 1) have been sent.
       size_t num_tx;

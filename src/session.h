@@ -23,12 +23,12 @@ struct enq_req_args_t {
   MsgBuffer *req_msgbuf;
   MsgBuffer *resp_msgbuf;
   erpc_cont_func_t cont_func;
-  size_t tag;
+  void *tag;
   size_t cont_etid;
 
   enq_req_args_t() {}
   enq_req_args_t(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
-                 MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func, size_t tag,
+                 MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func, void *tag,
                  size_t cont_etid)
       : session_num(session_num),
         req_type(req_type),

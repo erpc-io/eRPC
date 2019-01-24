@@ -69,7 +69,7 @@ class Nexus {
 
     static inline BgWorkItem make_resp_item(void *context,
                                             erpc_cont_func_t cont_func,
-                                            size_t tag) {
+                                            void *tag) {
       BgWorkItem ret;
       ret.wi_type = BgWorkItemType::kResp;
       ret.context = context;
@@ -88,7 +88,7 @@ class Nexus {
     // Fields for continuations. For continuations, we have lost ownership of
     // the request slot, so the work item contains all needed info by value.
     erpc_cont_func_t cont_func;
-    size_t tag;
+    void *tag;
 
     bool is_req() const { return wi_type == BgWorkItemType::kReq; }
   };

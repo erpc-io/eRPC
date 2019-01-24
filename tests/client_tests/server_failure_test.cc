@@ -43,8 +43,9 @@ void req_handler(ReqHandle *req_handle, void *_c) {
 }
 
 /// The common continuation function for all subtests
-void cont_func(void *_c, size_t tag) {
+void cont_func(void *_c, void *_tag) {
   auto *c = static_cast<AppContext *>(_c);
+  size_t tag = reinterpret_cast<size_t>(_tag);
   const MsgBuffer &resp_msgbuf = c->resp_msgbufs[tag];
 
   assert(resp_msgbuf.get_data_size() == 0);
@@ -76,7 +77,8 @@ void generic_test_func(Nexus *nexus, size_t) {
     rpc->resize_msg_buffer(&c.req_msgbufs[i], req_size);
 
     rpc->enqueue_request(c.session_num_arr[0], kTestReqType, &c.req_msgbufs[i],
-                         &c.resp_msgbufs[i], cont_func, i /* tag */);
+                         &c.resp_msgbufs[i], cont_func,
+                         reinterpret_cast<void *>(i) /* tag */);
   }
 
   auto session_num = static_cast<size_t>(c.session_num_arr[0]);

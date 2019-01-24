@@ -9,7 +9,7 @@ namespace erpc {
 template <class TTr>
 void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
                                MsgBuffer *req_msgbuf, MsgBuffer *resp_msgbuf,
-                               erpc_cont_func_t cont_func, size_t tag,
+                               erpc_cont_func_t cont_func, void *tag,
                                size_t cont_etid) {
   // When called from a background thread, enqueue to the foreground thread
   if (unlikely(!in_dispatch())) {

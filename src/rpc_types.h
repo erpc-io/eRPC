@@ -41,7 +41,7 @@ typedef void (*erpc_req_func_t)(ReqHandle *req_handle, void *context);
  * @param context The context that was used while creating the Rpc object
  * @param tag The tag used by the application for this request
  */
-typedef void (*erpc_cont_func_t)(void *context, size_t tag);
+typedef void (*erpc_cont_func_t)(void *context, void *tag);
 
 /**
  * @relates Rpc

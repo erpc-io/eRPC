@@ -24,7 +24,7 @@ union tag_t {
 
   tag_t(size_t _tag) : _tag(_tag) {}
 };
-static_assert(sizeof(tag_t) == sizeof(size_t), "");
+static_assert(sizeof(tag_t) == sizeof(void *), "");
 
 /// Per-thread application context
 class AppContext : public BasicAppContext {
@@ -53,7 +53,7 @@ void req_handler(ReqHandle *req_handle, void *_c) {
   c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
 
-void cont_func(void *, size_t);  // Forward declaration
+void cont_func(void *, void *);  // Forward declaration
 
 /// Enqueue a request using the request MsgBuffer with index = msgbuf_i
 void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
@@ -72,12 +72,12 @@ void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
 
   c->rpc->enqueue_request(c->session_num_arr[0], kTestReqType,
                           &c->req_msgbufs[msgbuf_i], &c->resp_msgbufs[msgbuf_i],
-                          cont_func, tag._tag);
+                          cont_func, reinterpret_cast<void *>(tag._tag));
 
   c->num_reqs_sent++;
 }
 
-void cont_func(void *_c, size_t _tag) {
+void cont_func(void *_c, void *_tag) {
   auto *c = static_cast<AppContext *>(_c);
   assert(c->is_client);
   auto tag = *reinterpret_cast<tag_t *>(&_tag);

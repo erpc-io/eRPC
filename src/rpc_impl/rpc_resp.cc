@@ -140,7 +140,7 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // The sslot may get re-used immediately if there's backlog, or later from a
   // request enqueued by a background thread. So, copy-out needed fields.
   const erpc_cont_func_t _cont_func = ci.cont_func;
-  const size_t _tag = ci.tag;
+  void *_tag = ci.tag;
   const size_t _cont_etid = ci.cont_etid;
 
   Session *session = sslot->session;
