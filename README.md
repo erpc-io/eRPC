@@ -4,7 +4,7 @@ describes the system in detail.
 [Documentation](http://www.cs.cmu.edu/~akalia/erpc_doc) is available online.
 
 Some highlights:
- * Multiple supported networks: UDP (without or with PFC), InfiniBand, and RoCE
+ * Multiple supported networks: Ethernet, InfiniBand, and RoCE
  * Low latency: 2.3 microseconds round-trip RPC latency with UDP over Ethernet
  * Performance for small 32-byte RPCs: ~10M RPCs/sec with one CPU core,
    60--80M RPCs/sec with one NIC.
