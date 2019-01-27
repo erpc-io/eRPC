@@ -36,16 +36,16 @@ union tag_t {
     uint64_t msgbuf_i : 32;
   } s;
 
-  size_t _tag;
+  void *_tag;
 
   tag_t(uint64_t batch_i, uint64_t msgbuf_i) {
     s.batch_i = batch_i;
     s.msgbuf_i = msgbuf_i;
   }
-  tag_t(size_t _tag) : _tag(_tag) {}
+  tag_t(void *_tag) : _tag(_tag) {}
 };
 
-static_assert(sizeof(tag_t) == sizeof(size_t), "");
+static_assert(sizeof(tag_t) == sizeof(void *), "");
 
 // Per-batch context
 class BatchContext {
@@ -119,7 +119,7 @@ class AppContext : public BasicAppContext {
   ~AppContext() {}
 };
 
-void app_cont_func(void *, size_t);  // Forward declaration
+void app_cont_func(void *, void *);  // Forward declaration
 
 // Send all requests for a batch
 void send_reqs(AppContext *c, size_t batch_i) {
@@ -146,7 +146,7 @@ void send_reqs(AppContext *c, size_t batch_i) {
     tag_t tag(batch_i, i);
     c->rpc->enqueue_request(c->fast_get_rand_session_num(), kAppReqType,
                             &bc.req_msgbuf[i], &bc.resp_msgbuf[i],
-                            app_cont_func, tag._tag);
+                            app_cont_func, reinterpret_cast<void *>(tag._tag));
   }
 }
 
@@ -191,7 +191,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   }
 }
 
-void app_cont_func(void *_context, size_t _tag) {
+void app_cont_func(void *_context, void *_tag) {
   auto *c = static_cast<AppContext *>(_context);
   auto tag = static_cast<tag_t>(_tag);
 

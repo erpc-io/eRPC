@@ -44,7 +44,7 @@ bool change_leader_to_node(AppContext *c, int raft_node_id) {
   exit(0);
 }
 
-void client_cont(void *, size_t);  // Forward declaration
+void client_cont(void *, void *);  // Forward declaration
 
 void send_req_one(AppContext *c) {
   c->client.req_start_tsc = erpc::rdtsc();
@@ -64,10 +64,10 @@ void send_req_one(AppContext *c) {
   connection_t &conn = c->conn_vec[c->client.leader_idx];
   c->rpc->enqueue_request(
       conn.session_num, static_cast<uint8_t>(ReqType::kClientReq),
-      &c->client.req_msgbuf, &c->client.resp_msgbuf, client_cont, 0 /* tag */);
+      &c->client.req_msgbuf, &c->client.resp_msgbuf, client_cont, nullptr);
 }
 
-void client_cont(void *_context, size_t) {
+void client_cont(void *_context, void *) {
   auto *c = static_cast<AppContext *>(_context);
   double latency_us = erpc::to_usec(erpc::rdtsc() - c->client.req_start_tsc,
                                     c->rpc->get_freq_ghz());

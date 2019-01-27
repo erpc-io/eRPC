@@ -73,16 +73,17 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   }
 }
 
-void app_cont_func(void *, size_t);
+void app_cont_func(void *, void *);
 inline void send_req(ClientContext &c, size_t ws_i) {
   c.start_tsc[ws_i] = erpc::rdtsc();
   c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppReqType,
                          &c.req_msgbuf[ws_i], &c.resp_msgbuf[ws_i],
-                         app_cont_func, ws_i);
+                         app_cont_func, reinterpret_cast<void *>(ws_i));
 }
 
-void app_cont_func(void *_context, size_t ws_i) {
+void app_cont_func(void *_context, void *_ws_i) {
   auto *c = static_cast<ClientContext *>(_context);
+  auto ws_i = reinterpret_cast<size_t>(_ws_i);
   assert(c->resp_msgbuf[ws_i].get_data_size() == FLAGS_resp_size);
 
   double req_lat_us =

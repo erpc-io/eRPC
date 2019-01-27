@@ -64,7 +64,7 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
-void requestvote_cont(void *, size_t);  // Fwd decl
+void requestvote_cont(void *, void *);  // Fwd decl
 
 // Raft callback for sending requestvote request
 static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
@@ -93,13 +93,13 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   c->rpc->enqueue_request(conn->session_num,
                           static_cast<uint8_t>(ReqType::kRequestVote),
                           &rrt->req_msgbuf, &rrt->resp_msgbuf, requestvote_cont,
-                          reinterpret_cast<size_t>(rrt));
+                          reinterpret_cast<void *>(rrt));
   return 0;
 }
 
-void requestvote_cont(void *_context, size_t tag) {
+void requestvote_cont(void *_context, void *_tag) {
   auto *c = static_cast<AppContext *>(_context);
-  auto *rrt = reinterpret_cast<raft_req_tag_t *>(tag);
+  auto *rrt = reinterpret_cast<raft_req_tag_t *>(_tag);
 
   auto *msg_rv_resp =
       reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf);

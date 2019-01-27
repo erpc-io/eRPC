@@ -322,7 +322,7 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
 }
 
 // Key-value RPC client code
-void kv_cont_func(void *, size_t);
+void kv_cont_func(void *, void *);
 inline void kv_send_req(ClientContext &c, size_t ws_i) {
   c.start_tsc[ws_i] = erpc::rdtsc();
 
@@ -354,14 +354,15 @@ inline void kv_send_req(ClientContext &c, size_t ws_i) {
   // Send request to a random server
   c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppKvReqType,
                          &c.req_msgbuf[ws_i], &c.resp_msgbuf[ws_i],
-                         kv_cont_func, ws_i);
+                         kv_cont_func, reinterpret_cast<void *>(ws_i));
 }
 
-void kv_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
-  const erpc::MsgBuffer *resp = resp_handle->get_resp_msgbuf();
+void kv_cont_func(void *_context, void *_ws_i) {
+  auto *c = static_cast<ClientContext *>(_context);
+  size_t ws_i = reinterpret_cast<size_t>(_ws_i);
+  const erpc::MsgBuffer *resp = &c->resp_msgbuf[ws_i];
   _unused(resp);
 
-  auto *c = static_cast<ClientContext *>(_context);
   if (c->is_set_arr[ws_i]) {
     // SET response
     assert(resp->get_data_size() == sizeof(Result));
@@ -383,8 +384,6 @@ void kv_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t ws_i) {
     printf("Thread %zu: received %s response. Window slot %zu\n", c->thread_id,
            c->is_set_arr[ws_i] ? "SET" : "GET", ws_i);
   }
-
-  c->rpc->release_response(resp_handle);
 
   double req_lat_us =
       erpc::to_usec(erpc::rdtsc() - c->start_tsc[ws_i], c->rpc->get_freq_ghz());
@@ -415,7 +414,7 @@ void create_sessions(ClientContext &c) {
 }
 
 // max_key client RPC code
-void max_key_cont_func(erpc::RespHandle *, void *, size_t);
+void max_key_cont_func(void *, void *);
 inline void max_key_send_req(ClientContext &c) {
   // Use window slot 0
   erpc::MsgBuffer &req = c.req_msgbuf[0];
@@ -424,12 +423,12 @@ inline void max_key_send_req(ClientContext &c) {
   // All partitions are the same, so send to anyone
   c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppMaxKeyReqType,
                          &c.req_msgbuf[0], &c.resp_msgbuf[0], max_key_cont_func,
-                         0);
+                         nullptr);
 }
 
-void max_key_cont_func(erpc::RespHandle *resp_handle, void *_context, size_t) {
+void max_key_cont_func(void *_context, void *) {
   auto *c = static_cast<ClientContext *>(_context);
-  const erpc::MsgBuffer *resp = resp_handle->get_resp_msgbuf();
+  const erpc::MsgBuffer *resp = &c->resp_msgbuf[0];
   size_t max_key = *reinterpret_cast<size_t *>(resp->buf);
 
   printf("thread %zu: max_key = %zu\n", c->thread_id, max_key);

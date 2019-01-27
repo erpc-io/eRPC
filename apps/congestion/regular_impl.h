@@ -38,7 +38,7 @@ void connect_sessions_func_regular(AppContext *c) {
   }
 }
 
-void cont_regular(erpc::RespHandle *, void *, size_t);  // Forward declaration
+void cont_regular(void *, void *);  // Forward declaration
 
 // Send a regular request using this MsgBuffer
 void send_req_regular(AppContext *c, size_t msgbuf_idx) {
@@ -54,7 +54,7 @@ void send_req_regular(AppContext *c, size_t msgbuf_idx) {
   c->req_ts[msgbuf_idx] = erpc::rdtsc();
   c->rpc->enqueue_request(c->session_num_vec[session_idx], kAppReqTypeRegular,
                           &req_msgbuf, &c->resp_msgbuf[msgbuf_idx],
-                          cont_regular, msgbuf_idx);
+                          cont_regular, reinterpret_cast<void *>(msgbuf_idx));
 }
 
 // Request handler for regular traffic
@@ -63,29 +63,28 @@ void req_handler_regular(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
 
   if (FLAGS_regular_resp_size <= erpc::CTransport::kMaxDataPerPkt) {
-    req_handle->prealloc_used = true;
     erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
     c->rpc->resize_msg_buffer(&resp_msgbuf, FLAGS_regular_resp_size);
     resp_msgbuf.buf[0] = req_msgbuf->buf[0];  // Touch the response
+    c->rpc->enqueue_response(req_handle, &resp_msgbuf);
   } else {
-    req_handle->prealloc_used = false;
     erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
     resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_regular_resp_size);
     resp_msgbuf.buf[0] = req_msgbuf->buf[0];  // Touch the response
+    c->rpc->enqueue_response(req_handle, &resp_msgbuf);
   }
-
-  c->rpc->enqueue_response(req_handle);
 }
 
 // Continuation for regular traffic
-void cont_regular(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
-  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  size_t msgbuf_idx = _tag;
+void cont_regular(void *_context, void *_msgbuf_idx) {
+  auto *c = static_cast<AppContext *>(_context);
+  auto msgbuf_idx = reinterpret_cast<size_t>(_msgbuf_idx);
+
+  const erpc::MsgBuffer *resp_msgbuf = &c->resp_msgbuf[msgbuf_idx];
   if (kAppVerbose) {
     printf("congestion: Received regular resp for msgbuf %zu.\n", msgbuf_idx);
   }
 
-  auto *c = static_cast<AppContext *>(_context);
   double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
                               c->rpc->get_freq_ghz());
   c->regular_latency.update(usec / FLAGS_regular_latency_divisor);
@@ -93,7 +92,6 @@ void cont_regular(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
   assert(resp_msgbuf->get_data_size() == FLAGS_regular_resp_size);
   erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte);  // Touch
 
-  c->rpc->release_response(resp_handle);
   send_req_regular(c, msgbuf_idx);  // Clock this response
 }
 

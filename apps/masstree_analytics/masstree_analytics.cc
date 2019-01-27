@@ -13,7 +13,7 @@ size_t get_random_key(AppContext *c) {
                     sizeof(size_t));
 }
 
-void app_cont_func(void *, size_t);  // Forward declaration
+void app_cont_func(void *, void *);  // Forward declaration
 
 void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
@@ -124,12 +124,12 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
   c->client.req_ts[msgbuf_idx] = erpc::rdtsc();
   c->rpc->enqueue_request(0, req.req_type, &req_msgbuf,
                           &c->client.resp_msgbuf[msgbuf_idx], app_cont_func,
-                          msgbuf_idx);
+                          reinterpret_cast<void *>(msgbuf_idx));
 }
 
-void app_cont_func(void *_context, size_t _tag) {
+void app_cont_func(void *_context, void *_msgbuf_idx) {
   auto *c = static_cast<AppContext *>(_context);
-  const size_t msgbuf_idx = _tag;
+  const auto msgbuf_idx = reinterpret_cast<size_t>(_msgbuf_idx);
   if (kAppVerbose) {
     printf("main: Received response for msgbuf %zu.\n", msgbuf_idx);
   }

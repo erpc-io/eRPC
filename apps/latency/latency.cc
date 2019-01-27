@@ -102,14 +102,14 @@ void connect_session(ClientContext &c) {
   }
 }
 
-void app_cont_func(void *, size_t);
+void app_cont_func(void *, void *);
 inline void send_req(ClientContext &c) {
   c.start_tsc = erpc::rdtsc();
   c.rpc->enqueue_request(c.session_num_vec[0], kAppReqType, &c.req_msgbuf,
-                         &c.resp_msgbuf, app_cont_func, 0);
+                         &c.resp_msgbuf, app_cont_func, nullptr);
 }
 
-void app_cont_func(void *_context, size_t) {
+void app_cont_func(void *_context, void *) {
   auto *c = static_cast<ClientContext *>(_context);
   assert(c->resp_msgbuf.get_data_size() == kAppRespSize);
 

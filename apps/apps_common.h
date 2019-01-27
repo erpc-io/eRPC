@@ -200,7 +200,7 @@ void ping_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle, &resp_msgbuf);
 }
 
-void ping_cont_func(void *_context, size_t) {
+void ping_cont_func(void *_context, void *) {
   auto *c = static_cast<BasicAppContext *>(_context);
   c->ping_pending = false;  // Mark ping as completed
 }
@@ -224,7 +224,7 @@ void ping_all_blocking(BasicAppContext &c) {
 
     c.ping_pending = true;
     c.rpc->enqueue_request(session_num, kPingReqHandlerType, &ping_req,
-                           &ping_resp, ping_cont_func, 0);
+                           &ping_resp, ping_cont_func, nullptr);
 
     size_t ms_elapsed = 0;
     while (c.ping_pending) {

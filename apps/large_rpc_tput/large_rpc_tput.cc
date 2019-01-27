@@ -31,7 +31,7 @@ static constexpr bool kAppClientCheckResp = false;   // Check entire response
 // Profile-specifc session connection function
 std::function<void(AppContext *)> connect_sessions_func = nullptr;
 
-void app_cont_func(void *, size_t);  // Forward declaration
+void app_cont_func(void *, void *);  // Forward declaration
 
 // Send a request using this MsgBuffer
 void send_req(AppContext *c, size_t msgbuf_idx) {
@@ -46,7 +46,7 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
   c->req_ts[msgbuf_idx] = erpc::rdtsc();
   c->rpc->enqueue_request(c->session_num_vec[0], kAppReqType, &req_msgbuf,
                           &c->resp_msgbuf[msgbuf_idx], app_cont_func,
-                          msgbuf_idx);
+                          reinterpret_cast<void *>(msgbuf_idx));
 
   c->stat_tx_bytes_tot += FLAGS_req_size;
 }
@@ -73,9 +73,10 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle, &resp_msgbuf);
 }
 
-void app_cont_func(void *_context, size_t _tag) {
+void app_cont_func(void *_context, void *_tag) {
   auto *c = static_cast<AppContext *>(_context);
-  size_t msgbuf_idx = _tag;
+  auto msgbuf_idx = reinterpret_cast<size_t>(_tag);
+
   const erpc::MsgBuffer &resp_msgbuf = c->resp_msgbuf[msgbuf_idx];
   if (kAppVerbose) {
     printf("large_rpc_tput: Received response for msgbuf %zu.\n", msgbuf_idx);

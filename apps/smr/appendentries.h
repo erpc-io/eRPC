@@ -127,7 +127,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
-void appendentries_cont(void *, size_t);  // Fwd decl
+void appendentries_cont(void *, void *);  // Fwd decl
 
 // Raft callback for sending appendentries message
 static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
@@ -172,14 +172,14 @@ static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
   c->rpc->enqueue_request(conn->session_num,
                           static_cast<uint8_t>(ReqType::kAppendEntries),
                           &rrt->req_msgbuf, &rrt->resp_msgbuf,
-                          appendentries_cont, reinterpret_cast<size_t>(rrt));
+                          appendentries_cont, reinterpret_cast<void *>(rrt));
   return 0;
 }
 
-void appendentries_cont(void *_context, size_t tag) {
+void appendentries_cont(void *_context, void *_tag) {
   auto *c = static_cast<AppContext *>(_context);
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kRecvAeResp);
-  auto *rrt = reinterpret_cast<raft_req_tag_t *>(tag);
+  auto *rrt = reinterpret_cast<raft_req_tag_t *>(_tag);
 
   if (likely(rrt->resp_msgbuf.get_data_size() > 0)) {
     // The RPC was successful

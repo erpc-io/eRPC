@@ -38,7 +38,7 @@ void connect_sessions_func_incast(AppContext *c) {
   }
 }
 
-void cont_incast(erpc::RespHandle *, void *, size_t);  // Forward declaration
+void cont_incast(void *, void *);  // Forward declaration
 
 // Send an incast request using this MsgBuffer
 void send_req_incast(AppContext *c, size_t msgbuf_idx) {
@@ -51,7 +51,8 @@ void send_req_incast(AppContext *c, size_t msgbuf_idx) {
   }
 
   c->rpc->enqueue_request(c->session_num_vec[0], kAppReqTypeIncast, &req_msgbuf,
-                          &c->resp_msgbuf[msgbuf_idx], cont_incast, msgbuf_idx);
+                          &c->resp_msgbuf[msgbuf_idx], cont_incast,
+                          reinterpret_cast<void *>(msgbuf_idx));
 
   c->incast_tx_bytes += FLAGS_incast_req_size;
 }
@@ -60,28 +61,27 @@ void send_req_incast(AppContext *c, size_t msgbuf_idx) {
 void req_handler_incast(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
 
-  req_handle->prealloc_used = false;
   erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
   resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(FLAGS_incast_resp_size);
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   resp_msgbuf.buf[0] = req_msgbuf->buf[0];  // Touch the response
-  c->rpc->enqueue_response(req_handle);
+  c->rpc->enqueue_response(req_handle, &resp_msgbuf);
 }
 
 // Continuation for incast traffic
-void cont_incast(erpc::RespHandle *resp_handle, void *_context, size_t _tag) {
-  const erpc::MsgBuffer *resp_msgbuf = resp_handle->get_resp_msgbuf();
-  size_t msgbuf_idx = _tag;
+void cont_incast(void *_context, size_t _msgbuf_idx) {
+  auto *c = static_cast<AppContext *>(_context);
+  auto msgbuf_idx = reinterpret_cast<size_t>(_msgbuf_idx);
+
+  const erpc::MsgBuffer *resp_msgbuf = &c->resp_msgbuf[msgbuf_idx];
   if (kAppVerbose) {
     printf("congestion: Received response for msgbuf %zu.\n", msgbuf_idx);
   }
 
-  auto *c = static_cast<AppContext *>(_context);
   assert(resp_msgbuf->get_data_size() == FLAGS_incast_resp_size);
   erpc::rt_assert(resp_msgbuf->buf[0] == kAppDataByte);  // Touch
 
-  c->rpc->release_response(resp_handle);
   send_req_incast(c, msgbuf_idx);
 }
 
