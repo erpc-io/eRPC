@@ -30,7 +30,10 @@ namespace erpc {
 class HeartbeatMgr {
  private:
   static constexpr bool kVerbose = false;
-  enum class EventType : bool { kSend, kCheck };
+  enum class EventType : bool {
+    kSend,  // Send a heartbeat to the remote URI
+    kCheck  // Check that we have received a heartbeat from the remote URI
+  };
 
   /// Heartbeat info in the priority queue
   class Event {
@@ -60,7 +63,7 @@ class HeartbeatMgr {
         hb_send_delta_tsc(failure_timeout_tsc / 10),
         hb_check_delta_tsc(failure_timeout_tsc / 2) {}
 
-  /// Add a remote process to the tracking set
+  /// Add a remote URI to the tracking set
   void unlocked_add_remote(const std::string &remote_uri) {
     std::lock_guard<std::mutex> lock(heartbeat_mutex);
     size_t cur_tsc = rdtsc();
@@ -85,9 +88,9 @@ class HeartbeatMgr {
    */
   void do_one(std::vector<std::string> &failed_uris) {
     while (true) {
-      if (hb_event_queue.empty()) break;
+      if (hb_event_pqueue.empty()) break;
 
-      const auto next_ev = hb_event_queue.top();  // Copy-out
+      const auto next_ev = hb_event_pqueue.top();  // Copy-out
 
       // Stop processing the event queue when the top event is in the future
       if (in_future(next_ev.tsc)) {
@@ -113,7 +116,7 @@ class HeartbeatMgr {
                us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
       }
 
-      hb_event_queue.pop();  // Consume the event
+      hb_event_pqueue.pop();  // Consume the event
 
       switch (next_ev.type) {
         case EventType::kSend: {
@@ -193,7 +196,7 @@ class HeartbeatMgr {
       printf("heartbeat_mgr (%.1f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
-    hb_event_queue.push(e);
+    hb_event_pqueue.push(e);
   }
 
   void schedule_hb_check(const std::string &rem_uri) {
@@ -202,7 +205,7 @@ class HeartbeatMgr {
       printf("heartbeat_mgr (%.1f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
-    hb_event_queue.push(e);
+    hb_event_pqueue.push(e);
   }
 
   const std::string hostname;  /// This process's local hostname
@@ -217,17 +220,19 @@ class HeartbeatMgr {
   const size_t hb_send_delta_tsc;
 
   /// We check heartbeats every every hb_check_delta_tsc cycles. This duration
-  /// is around half of the failure timeout. XXX: Explain.
+  /// is around half of the failure timeout #nyquist.
   const size_t hb_check_delta_tsc;
 
   std::priority_queue<Event, std::vector<Event>, EventComparator>
-      hb_event_queue;
+      hb_event_pqueue;
 
-  // This map servers two purposes. First, its value for a remote URI is
-  // the timestamp when we last received a heartbeat from the remote process.
-  // Second, the set of remote URIs in the map is our remote tracking set.
-  // Since we cannot delete efficiently from the event priority queue, events
-  // for remote URIs not in this map are ignored when they are dequeued.
+  // This map servers two purposes:
+  //
+  // 1. Its value for a remote URI is the timestamp when we last received a
+  //    heartbeat from the remote URI.
+  // 2. The set of remote URIs in the map is our remote tracking set. Since we
+  //    cannot delete efficiently from the event priority queue, events for
+  //    remote URIs not in this map are ignored when they are dequeued.
   std::unordered_map<std::string, uint64_t> map_last_hb_rx;
 
   UDPClient<SmPkt> hb_udp_client;

@@ -21,19 +21,19 @@ static bool str_vec_contains(const std::vector<std::string> &vec,
 TEST(HeartbeatMgrTest, PriorityQueueOrderTest) {
   std::priority_queue<HeartbeatMgr::Event, std::vector<HeartbeatMgr::Event>,
                       HeartbeatMgr::EventComparator>
-      hb_event_queue;
-  hb_event_queue.emplace(HeartbeatMgr::EventType::kSend, "hostname_1", 1);
-  hb_event_queue.emplace(HeartbeatMgr::EventType::kCheck, "hostname_2", 3);
-  hb_event_queue.emplace(HeartbeatMgr::EventType::kSend, "hostname_3", 2);
+      hb_event_pqueue;
+  hb_event_pqueue.emplace(HeartbeatMgr::EventType::kSend, "hostname_1", 1);
+  hb_event_pqueue.emplace(HeartbeatMgr::EventType::kCheck, "hostname_2", 3);
+  hb_event_pqueue.emplace(HeartbeatMgr::EventType::kSend, "hostname_3", 2);
 
-  assert(hb_event_queue.top().tsc == 1);
-  hb_event_queue.pop();
+  assert(hb_event_pqueue.top().tsc == 1);
+  hb_event_pqueue.pop();
 
-  assert(hb_event_queue.top().tsc == 2);
-  hb_event_queue.pop();
+  assert(hb_event_pqueue.top().tsc == 2);
+  hb_event_pqueue.pop();
 
-  assert(hb_event_queue.top().tsc == 3);
-  hb_event_queue.pop();
+  assert(hb_event_pqueue.top().tsc == 3);
+  hb_event_pqueue.pop();
 }
 
 TEST(HeartbeatMgrTest, URISplitTest) {
