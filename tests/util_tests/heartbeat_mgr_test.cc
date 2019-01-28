@@ -7,7 +7,7 @@
 using namespace erpc;
 
 static constexpr double kTestFreqGhz = 2.5;
-static constexpr double kTestMachineFailureTimeoutMs = 1;
+static constexpr double kTestMachineFailureTimeoutMs = 50;
 static constexpr const char *kTestLocalHostname = "localhost";
 static constexpr uint16_t kTestLocalSmUdpPort = 31850;
 static constexpr const char *kTestLocalUri = "localhost:31850";
@@ -67,10 +67,11 @@ TEST(HeartbeatMgrTest, Basic) {
   heartbeat_mgr.unlocked_add_remote("127.0.0.1:2");
   heartbeat_mgr.unlocked_add_remote("localhost:2");
 
-  // Test heartbeat sending. To check that all heartbeats are sent, we encode
-  // the sent packets into strings and add them to a set.
-  usleep(2 * to_usec(heartbeat_mgr.hb_send_delta_tsc,
-                     kTestFreqGhz));  // wiggle-room
+  // Test heartbeat sending
+  //
+  // To check that all heartbeats are sent, we encode the sent packets into
+  // strings and add them to a set.
+  usleep(2 * to_usec(heartbeat_mgr.hb_send_delta_tsc, kTestFreqGhz));  // wiggle
   heartbeat_mgr.do_one(failed_uris);
 
   assert(sent_vec.size() >= 3);
@@ -83,14 +84,28 @@ TEST(HeartbeatMgrTest, Basic) {
   assert(SH.count(std::string(kTestLocalUri) + "-" + "127.0.0.1:2") > 0);
   assert(SH.count(std::string(kTestLocalUri) + "-" + "localhost:2") > 0);
 
-  // Test failure timeout
+  // Test failure timeout for the latter two URIs
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
+
+  // Receive a heartbeat from remote "127.0.0.1:1".
+  //
+  // The test can fail if this process gets prempted for
+  // kTestMachineFailureTimeoutMs between unlocked_receive_hb() and do_one()
+  heartbeat_mgr.unlocked_receive_hb(
+      HeartbeatMgr::make_heartbeat("127.0.0.1", 1, kTestLocalUri));
   heartbeat_mgr.do_one(failed_uris);
 
-  assert(failed_uris.size() == 3);
-  assert(str_vec_contains(failed_uris, "127.0.0.1:1"));
+  assert(failed_uris.size() == 2);
+  assert(!str_vec_contains(failed_uris, "127.0.0.1:1"));
   assert(str_vec_contains(failed_uris, "127.0.0.1:2"));
   assert(str_vec_contains(failed_uris, "localhost:2"));
+
+  // Now wait for the first URI to time out
+  failed_uris.clear();
+  usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
+  heartbeat_mgr.do_one(failed_uris);
+  assert(failed_uris.size() == 1);
+  assert(str_vec_contains(failed_uris, "127.0.0.1:1"));
 
   // All servers have failed, so no heartbeats should be sent from now
   sent_vec.clear();

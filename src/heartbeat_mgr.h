@@ -29,7 +29,7 @@ namespace erpc {
  */
 class HeartbeatMgr {
  private:
-  static constexpr bool kVerbose = false;
+  static constexpr bool kVerbose = true;
   enum class EventType : bool {
     kSend,  // Send a heartbeat to the remote URI
     kCheck  // Check that we have received a heartbeat from the remote URI
@@ -66,6 +66,11 @@ class HeartbeatMgr {
   /// Add a remote URI to the tracking set
   void unlocked_add_remote(const std::string &remote_uri) {
     std::lock_guard<std::mutex> lock(heartbeat_mutex);
+    if (kVerbose) {
+      printf("heartbeat_mgr (%.0f us): Starting tracking URI %s\n",
+             us_since_creation(rdtsc()), remote_uri.c_str());
+    }
+
     size_t cur_tsc = rdtsc();
 
     map_last_hb_rx.emplace(remote_uri, cur_tsc);
@@ -73,11 +78,22 @@ class HeartbeatMgr {
     schedule_hb_check(remote_uri);
   }
 
-  /// Receive any heartbeat
+  /// Receive a heartbeat
   void unlocked_receive_hb(const SmPkt &sm_pkt) {
     std::lock_guard<std::mutex> lock(heartbeat_mutex);
 
-    if (map_last_hb_rx.count(sm_pkt.client.uri()) == 0) return;
+    if (map_last_hb_rx.count(sm_pkt.client.uri()) == 0) {
+      if (kVerbose) {
+        printf("heartbeat_mgr (%.0f us): Ignoring heartbeat from URI %s\n",
+               us_since_creation(rdtsc()), sm_pkt.client.uri().c_str());
+      }
+      return;
+    }
+
+    if (kVerbose) {
+      printf("heartbeat_mgr (%.0f us): Receiving heartbeat from URI %s\n",
+             us_since_creation(rdtsc()), sm_pkt.client.uri().c_str());
+    }
     map_last_hb_rx.emplace(sm_pkt.client.uri(), rdtsc());
   }
 
@@ -95,7 +111,7 @@ class HeartbeatMgr {
       // Stop processing the event queue when the top event is in the future
       if (in_future(next_ev.tsc)) {
         if (kVerbose) {
-          printf("heartbeat_mgr (%.1f us): Event %s is in the future\n",
+          printf("heartbeat_mgr (%.0f us): Event %s is in the future\n",
                  us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
         }
         break;
@@ -104,7 +120,7 @@ class HeartbeatMgr {
       if (map_last_hb_rx.count(next_ev.rem_uri) == 0) {
         if (kVerbose) {
           printf(
-              "heartbeat_mgr (%.1f us): Remote URI for event %s is not "
+              "heartbeat_mgr (%.0f us): Remote URI for event %s is not "
               "in tracking set. Ignoring.\n",
               us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
         }
@@ -112,7 +128,7 @@ class HeartbeatMgr {
       }
 
       if (kVerbose) {
-        printf("heartbeat_mgr (%.1f us): Handling event %s\n",
+        printf("heartbeat_mgr (%.0f us): Handling event %s\n",
                us_since_creation(rdtsc()), ev_to_string(next_ev).c_str());
       }
 
@@ -120,7 +136,8 @@ class HeartbeatMgr {
 
       switch (next_ev.type) {
         case EventType::kSend: {
-          SmPkt heartbeat = make_heartbeat(next_ev.rem_uri);
+          SmPkt heartbeat =
+              make_heartbeat(hostname, sm_udp_port, next_ev.rem_uri);
           hb_udp_client.send(heartbeat.server.hostname,
                              heartbeat.server.sm_udp_port, heartbeat);
 
@@ -133,9 +150,8 @@ class HeartbeatMgr {
           if (rdtsc() - last_ping_rx > failure_timeout_tsc) {
             failed_uris.push_back(next_ev.rem_uri);
 
-            // Stop tracking rem_uri
             if (kVerbose) {
-              printf("heartbeat_mgr (%.1f us): Stopping tracking %s\n",
+              printf("heartbeat_mgr (%.0f us): Remote URI %s failed\n",
                      us_since_creation(rdtsc()), next_ev.rem_uri.c_str());
             }
             map_last_hb_rx.erase(map_last_hb_rx.find(next_ev.rem_uri));
@@ -149,27 +165,31 @@ class HeartbeatMgr {
   }
 
  private:
-  // A heartbeat packet is a management packet where most fields are invalid.
-  // The SmPkt's client is the sender.
-  SmPkt make_heartbeat(const std::string &remote_uri) {
-    SmPkt req;
-    req.pkt_type = SmPktType::kPingReq;
-    req.err_type = SmErrType::kNoError;
-    req.uniq_token = 0;
+  // Create a heartbeat packet send by the local URI to the remote URI.
+  //
+  // A heartbeat packet is a session management packet where most fields are
+  // invalid. The local sender acts as the SmPkt's client.
+  static SmPkt make_heartbeat(const std::string &local_hostname,
+                              uint16_t local_sm_udp_port,
+                              const std::string &remote_uri) {
+    SmPkt sm_hb;
+    sm_hb.pkt_type = SmPktType::kPingReq;
+    sm_hb.err_type = SmErrType::kNoError;
+    sm_hb.uniq_token = 0;
 
     std::string remote_hostname;
     uint16_t remote_sm_udp_port;
     split_uri(remote_uri, remote_hostname, remote_sm_udp_port);
 
-    // In req's session endpoints, the transport type, Rpc ID, and session
+    // In sm_hb's session endpoints, the transport type, Rpc ID, and session
     // number are already invalid.
-    strcpy(req.client.hostname, hostname.c_str());
-    req.client.sm_udp_port = sm_udp_port;
+    strcpy(sm_hb.client.hostname, local_hostname.c_str());
+    sm_hb.client.sm_udp_port = local_sm_udp_port;
 
-    strcpy(req.server.hostname, remote_hostname.c_str());
-    req.server.sm_udp_port = remote_sm_udp_port;
+    strcpy(sm_hb.server.hostname, remote_hostname.c_str());
+    sm_hb.server.sm_udp_port = remote_sm_udp_port;
 
-    return req;
+    return sm_hb;
   }
 
   /// Return the microseconds between tsc and this manager's creation time
@@ -182,8 +202,8 @@ class HeartbeatMgr {
   std::string ev_to_string(const Event &e) const {
     std::ostringstream ret;
     ret << "[Type: " << (e.type == EventType::kSend ? "send" : "check")
-        << ", URI " << e.rem_uri << ", time " << us_since_creation(e.tsc)
-        << " us]";
+        << ", URI " << e.rem_uri << ", time "
+        << static_cast<size_t>(us_since_creation(e.tsc)) << " us]";
     return ret.str();
   }
 
@@ -193,7 +213,7 @@ class HeartbeatMgr {
   void schedule_hb_send(const std::string &rem_uri) {
     Event e(EventType::kSend, rem_uri, rdtsc() + hb_send_delta_tsc);
     if (kVerbose) {
-      printf("heartbeat_mgr (%.1f us): Scheduling event %s\n",
+      printf("heartbeat_mgr (%.0f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     hb_event_pqueue.push(e);
@@ -202,7 +222,7 @@ class HeartbeatMgr {
   void schedule_hb_check(const std::string &rem_uri) {
     Event e(EventType::kCheck, rem_uri, rdtsc() + hb_check_delta_tsc);
     if (kVerbose) {
-      printf("heartbeat_mgr (%.1f us): Scheduling event %s\n",
+      printf("heartbeat_mgr (%.0f us): Scheduling event %s\n",
              us_since_creation(rdtsc()), ev_to_string(e).c_str());
     }
     hb_event_pqueue.push(e);
