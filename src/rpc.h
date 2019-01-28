@@ -214,11 +214,11 @@ class Rpc {
    * @param req_type The type of the request. The server for this remote
    * procedure call must have a registered handler for this request type.
    *
-   * @param req_msgbuf The MsgBuffer containing the request data,
+   * @param req_msgbuf The MsgBuffer containing the request data
    *
    * @param resp_msgbuf The MsgBuffer that will contain the response data when
-   * the continuation is invoked. This must be large enough to accomodate any
-   * response for this request.
+   * the continuation is invoked. Its allocation size be large enough to
+   * accomodate any response for this request.
    *
    * @param cont_func The continuation that will be invoked when this request
    * completes. See erpc_req_func_t.
