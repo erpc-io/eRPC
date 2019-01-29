@@ -53,6 +53,7 @@ void cont_func(void *_c, void *_tag) {
   test_printf("Client: Received response of length %zu.\n",
               resp_msgbuf.get_data_size());
 
+  assert(resp_msgbuf.get_data_size() == c->req_msgbufs[tag].get_data_size());
   for (size_t i = 0; i < resp_msgbuf.get_data_size(); i++) {
     assert(resp_msgbuf.buf[i] == static_cast<uint8_t>(tag));
   }
@@ -99,9 +100,7 @@ void generic_test_func(Nexus *nexus, size_t) {
             &c.fastrand, rpc->get_max_data_per_pkt(), rpc->get_max_msg_size());
 
         rpc->resize_msg_buffer(&cur_req_msgbuf, req_size);
-        for (size_t i = 0; i < req_size; i++) {
-          cur_req_msgbuf.buf[i] = static_cast<uint8_t>(iter_req_i);
-        }
+        memset(cur_req_msgbuf.buf, static_cast<uint8_t>(iter_req_i), req_size);
 
         rpc->enqueue_request(session_num_arr[sess_i], kTestReqType,
                              &cur_req_msgbuf, &c.resp_msgbufs[iter_req_i],
