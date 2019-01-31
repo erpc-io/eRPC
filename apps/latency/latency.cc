@@ -87,10 +87,8 @@ void server_func(erpc::Nexus *nexus) {
 
 void connect_session(ClientContext &c) {
   std::string server_uri = erpc::get_uri_for_process(0);
-  if (FLAGS_sm_verbose == 1) {
-    printf("Process %zu: Creating session to %s.\n", FLAGS_process_id,
-           server_uri.c_str());
-  }
+  printf("Process %zu: Creating session to %s.\n", FLAGS_process_id,
+         server_uri.c_str());
 
   int session_num = c.rpc->create_session(server_uri, 0 /* tid */);
   erpc::rt_assert(session_num >= 0, "Failed to create session");
