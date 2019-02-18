@@ -6,6 +6,8 @@
 
 namespace erpc {
 
+const unsigned int PRE_BUF_SIZE = 32 * 1024;
+
 // We need to handle all types of errors in remote arguments that the client can
 // make when calling create_session(), which cannot check for such errors.
 template <class TTr>
@@ -81,7 +83,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
   for (size_t i = 0; i < kSessionReqWindow; i++) {
     MsgBuffer &msgbuf_i = session->sslot_arr[i].pre_resp_msgbuf;
-    msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
+    msgbuf_i = alloc_msg_buffer(PRE_BUF_SIZE);
 
     if (msgbuf_i.buf == nullptr) {
       // Cleanup everything allocated for this session
