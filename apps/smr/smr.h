@@ -28,6 +28,9 @@ extern "C" {
 
 static constexpr bool kUsePmem = false;
 
+// We have only 3 pmem machines, so client runs on the third server machine
+static constexpr bool kColocateClientWithLastServer = kUsePmem;
+
 // We sometimes run a server and client on the same server
 static constexpr size_t kAppServerRpcId = 2;  // Rpc ID of all Raft servers
 static constexpr size_t kAppClientRpcId = 3;  // Rpc ID of the Raft client
@@ -47,8 +50,8 @@ static_assert(sizeof(FixedTable::ft_key_t) == kAppKeySize, "");
 // Debug/measurement
 static constexpr bool kAppTimeEnt = false;
 static constexpr bool kAppMeasureCommitLatency = true;  // Leader latency
-static constexpr bool kAppVerbose = false;
-static constexpr bool kAppEnableRaftConsoleLog = false;  // Non-null console log
+static constexpr bool kAppVerbose = true;
+static constexpr bool kAppEnableRaftConsoleLog = true;  // Non-null console log
 
 // willemt/raft uses a very large 1000 ms election timeout
 static constexpr size_t kAppRaftElectionTimeoutMsec = 1000;

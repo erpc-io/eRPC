@@ -4,9 +4,6 @@
 #include "server.h"
 #include "util/numautils.h"
 
-// This is needed on a cluster where I have only three machines
-static constexpr bool kColocateClientWithLastServer = true;
-
 int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   signal(SIGINT, ctrl_c_handler);
