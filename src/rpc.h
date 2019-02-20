@@ -320,6 +320,11 @@ class Rpc {
     context = _context;
   }
 
+  /// Change this Rpc's preallocated response message buffer size
+  inline void set_pre_resp_msgbuf_size(size_t new_pre_resp_msgbuf_size) {
+    pre_resp_msgbuf_size = new_pre_resp_msgbuf_size;
+  }
+
   /// Retrieve this Rpc's hugepage allocator. For expert use only.
   inline HugeAlloc *get_huge_alloc() const {
     rt_assert(nexus->num_bg_threads == 0,
@@ -1021,7 +1026,7 @@ class Rpc {
   /// LOG_TRACE and other macros.
   FILE *trace_file;
 
-  /// Datapath stats that can be disabled
+  /// Datapath stats that can be disabled at compile-time
   struct {
     size_t ev_loop_calls = 0;
     size_t pkts_tx = 0;
@@ -1038,6 +1043,11 @@ class Rpc {
     /// a received packet, because a request reference was still in the wheel.
     size_t still_in_wheel_during_retx = 0;
   } pkt_loss_stats;
+
+  /// Size of the preallocated response buffer. This is one packet by default,
+  /// but some applications might benefit from a larger preallocated buffer,
+  /// at the expense of increased memory utilization.
+  size_t pre_resp_msgbuf_size = TTr::kMaxDataPerPkt;
 };
 
 // This goes at the end of every Rpc implementation file to force compilation

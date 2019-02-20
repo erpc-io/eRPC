@@ -81,7 +81,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
   for (size_t i = 0; i < kSessionReqWindow; i++) {
     MsgBuffer &msgbuf_i = session->sslot_arr[i].pre_resp_msgbuf;
-    msgbuf_i = alloc_msg_buffer(TTr::kMaxDataPerPkt);
+    msgbuf_i = alloc_msg_buffer(pre_resp_msgbuf_size);
 
     if (msgbuf_i.buf == nullptr) {
       // Cleanup everything allocated for this session

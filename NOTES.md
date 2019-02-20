@@ -111,9 +111,10 @@
 ## Short-term TODOs
  * Session reset and machine failure detection broke when I changed session
    management to use UDP instead of ENet.
+ * `pkt\_loss\_stats` is more hotly-accessed than its placement in `class Rpc`.
  * In `rpc_enqueue_request.cc`, why don't we always have to set `cont_etid`?
  * Make a list of functions allowed in request and continuation handler. For
-   example, `run_ev_loop()` and `delete rpc` are not allowed, and eRPC does not
+   example, re-entering the event loop isn't allowed, and eRPC does not
    guard against these errors.
  * Make apps use BasicAppContext and `basic_sm_handler`.
  * Use `rt_assert` in src and apps.
