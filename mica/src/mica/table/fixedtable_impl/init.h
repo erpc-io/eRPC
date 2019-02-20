@@ -35,8 +35,9 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
   erpc::rt_assert(log_num_buckets <= 32, "");
 
   num_buckets = 1ull << log_num_buckets;
-  erpc::rt_assert(num_buckets < std::numeric_limits<int>::max(), "");
-  erpc::rt_assert(num_extra_buckets < std::numeric_limits<int>::max(), "");
+  erpc::rt_assert(num_buckets < std::numeric_limits<uint32_t>::max() / 2, "");
+  erpc::rt_assert(num_extra_buckets < std::numeric_limits<uint32_t>::max() / 2,
+                  "");
 
   num_buckets_ = static_cast<uint32_t>(num_buckets);
   num_buckets_mask_ = static_cast<uint32_t>(num_buckets - 1);

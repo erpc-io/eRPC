@@ -26,7 +26,7 @@ extern "C" {
 #include "pmem_log.h"
 #include "util/autorun_helpers.h"
 
-static constexpr bool kUsePmem = true;
+static constexpr bool kUsePmem = false;
 
 // We sometimes run a server and client on the same server
 static constexpr size_t kAppServerRpcId = 2;  // Rpc ID of all Raft servers
