@@ -212,7 +212,7 @@ set(CLIENT_TESTS
   req_in_cont_func_test
   req_in_req_func_test
   packet_loss_test
-  server_failure_test
+  #server_failure_test
   multi_process_test)
 
 set(PROTOCOL_TESTS
