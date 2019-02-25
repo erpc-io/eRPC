@@ -66,11 +66,13 @@ static void output_log_header(int level);
 #endif
 
 #if LOG_LEVEL >= LOG_LEVEL_INFO
+#undef LOG_INFO
 #define LOG_INFO(...)                                    \
   output_log_header(LOG_DEFAULT_STREAM, LOG_LEVEL_INFO); \
   fprintf(LOG_DEFAULT_STREAM, __VA_ARGS__);              \
   fflush(LOG_DEFAULT_STREAM)
 #else
+#undef LOG_INFO
 #define LOG_INFO(...) ((void)0)
 #endif
 
