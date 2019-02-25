@@ -33,6 +33,9 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
   // ID, so we don't need sm_udp_port like Raw transport.
   _unused(sm_udp_port);
 
+  // @TODO: double initialization workaround
+  eal_initialized = true;
+
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
   rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
