@@ -68,11 +68,12 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   size = round_up<kHugepageSize>(size);
 
   int shm_key, shm_id;
+  uint8_t *shm_buf;
 
   if (numa_node == kMaxNumaNodes) { // special case
     shm_key = 0;
     shm_id = 0;
-    uint8_t *shm_buf = static_cast<uint8_t *>(malloc(size));
+    shm_buf = static_cast<uint8_t *>(malloc(size));
   }
   else {
 
@@ -119,7 +120,7 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
       }
     }
 
-    uint8_t *shm_buf = static_cast<uint8_t *>(shmat(shm_id, nullptr, 0));
+    shm_buf = static_cast<uint8_t *>(shmat(shm_id, nullptr, 0));
     rt_assert(shm_buf != nullptr,
               "eRPC HugeAlloc: shmat() failed. Key = " + std::to_string(shm_key));
 
