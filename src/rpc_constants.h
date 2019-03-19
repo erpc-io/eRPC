@@ -41,7 +41,7 @@ static constexpr size_t kMaxNumaNodes = 8;
  * @relates Rpc
  * @brief Identifier for using heap memory instead of NUMA memory.
  */
-static constexpr size_t kNoNumaNode = 10000;
+static constexpr size_t kNoNumaNode = UINT8_MAX - 1;
 
 
 
@@ -49,7 +49,7 @@ static constexpr size_t kNoNumaNode = 10000;
  * @relates Rpc
  * @brief Maximum number of background threads per process
  */
-static constexpr size_t kMaxBgThreads = UINT8_MAX - 1;
+static constexpr size_t kMaxBgThreads = 8;
 
 /**
  * @relates Rpc
