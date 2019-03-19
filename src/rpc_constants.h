@@ -37,6 +37,13 @@ static_assert(kBaseSmUdpPort + kMaxNumERpcProcesses +
  * @brief Maximum number of NUMA nodes per machine
  */
 static constexpr size_t kMaxNumaNodes = 8;
+/**
+ * @relates Rpc
+ * @brief Identifier for using heap memory instead of NUMA memory.
+ */
+static constexpr size_t kNoNumaNode = UINT8_MAX - 1;
+
+
 
 /**
  * @relates Rpc

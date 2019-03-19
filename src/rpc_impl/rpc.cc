@@ -29,7 +29,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   rt_assert(rpc_id != kInvalidRpcId, "Invalid Rpc ID");
   rt_assert(!nexus->rpc_id_exists(rpc_id), "Rpc ID already exists");
   rt_assert(phy_port < kMaxPhyPorts, "Invalid physical port");
-  rt_assert(numa_node < kMaxNumaNodes, "Invalid NUMA node");
+  rt_assert(numa_node < kMaxNumaNodes || numa_node == kNoNumaNode, "Invalid NUMA node");
 
   tls_registry = &nexus->tls_registry;
   tls_registry->init();  // Initialize thread-local variables for this thread

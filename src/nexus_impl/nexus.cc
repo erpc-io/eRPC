@@ -24,7 +24,7 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
                 sm_udp_port < (kBaseSmUdpPort + kMaxNumERpcProcesses),
             "Invalid management UDP port");
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
-  rt_assert(numa_node < kMaxNumaNodes, "Invalid NUMA node");
+  rt_assert(numa_node < kMaxNumaNodes || numa_node == kNoNumaNode, "Invalid NUMA node");
 
   kill_switch = false;
 
