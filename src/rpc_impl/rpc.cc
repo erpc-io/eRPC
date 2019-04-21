@@ -35,7 +35,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   tls_registry->init();  // Initialize thread-local variables for this thread
   creator_etid = get_etid();
 
-  if (LOG_LEVEL >= LOG_LEVEL_REORDER) {
+  if (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_REORDER) {
     auto trace_filename = "/tmp/erpc_trace_" +
                           std::to_string(nexus->sm_udp_port) +
                           std::to_string(rpc_id);
@@ -115,7 +115,7 @@ Rpc<TTr>::~Rpc() {
 
   nexus->unregister_hook(&nexus_hook);
 
-  if (LOG_LEVEL >= LOG_LEVEL_REORDER) fclose(trace_file);
+  if (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_REORDER) fclose(trace_file);
 }
 
 FORCE_COMPILE_TRANSPORTS

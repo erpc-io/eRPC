@@ -86,7 +86,7 @@ static inline void poll_cq_one_helper(struct ibv_cq *cq) {
   size_t num_tries = 0;
   while (ibv_poll_cq(cq, 1, &wc) == 0) {
     // Do nothing while we have no CQE or poll_cq error
-    if (LOG_LEVEL == LOG_LEVEL_INFO) {
+    if (ERPC_LOG_LEVEL == ERPC_LOG_LEVEL_INFO) {
       num_tries++;
       if (unlikely(num_tries == GB(1))) {
         fprintf(stderr, "eRPC: Warning. Stuck in poll_cq().");
