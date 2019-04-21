@@ -34,9 +34,9 @@ void Rpc<TTr>::process_wheel_st() {
     size_t pkt_num = ent.pkt_num;
     size_t crd_i = pkt_num % kSessionCredits;
 
-    LOG_CC("Rpc %u: lsn/req/pkt %u,%zu/%zu, reaped at %.3f us.\n", rpc_id,
-           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
-           to_usec(cur_tsc - creation_tsc, freq_ghz));
+    ERPC_CC("Rpc %u: lsn/req/pkt %u,%zu/%zu, reaped at %.3f us.\n", rpc_id,
+            sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
+            to_usec(cur_tsc - creation_tsc, freq_ghz));
 
     auto &ci = sslot->client_info;
     if (pkt_num < sslot->tx_msgbuf->num_pkts) {

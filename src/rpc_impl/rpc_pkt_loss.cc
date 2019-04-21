@@ -33,15 +33,15 @@ void Rpc<TTr>::pkt_loss_scan_st() {
       if (session_pkts_in_wheel) {
         pkt_loss_stats.still_in_wheel_during_retx++;
 
-        LOG_REORDER(
+        ERPC_REORDER(
             "Rpc %u, lsn %u: Could not reset because packets still in wheel.\n",
             rpc_id, cur->session->local_session_num);
         continue;
       }
 
       // If we are here, we will destroy the session
-      LOG_INFO("Rpc %u, lsn %u: Server disconnected. Destroying session.\n",
-               rpc_id, cur->session->local_session_num);
+      ERPC_INFO("Rpc %u, lsn %u: Server disconnected. Destroying session.\n",
+                rpc_id, cur->session->local_session_num);
       drain_tx_batch_and_dma_queue();
 
       // In this case, we will delete sslots of this session from the active RPC
@@ -99,7 +99,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   assert(credits + delta <= kSessionCredits);
 
   if (unlikely(delta == 0)) {
-    LOG_REORDER("%s: False positive. Ignoring.\n", issue_msg);
+    ERPC_REORDER("%s: False positive. Ignoring.\n", issue_msg);
     return;
   }
 
@@ -110,7 +110,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   // from the wheel is too complex.
   if (unlikely(sslot->client_info.wheel_count > 0)) {
     pkt_loss_stats.still_in_wheel_during_retx++;
-    LOG_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
+    ERPC_REORDER("%s: Packets still in wheel. Ignoring.\n", issue_msg);
     return;
   }
 
@@ -118,8 +118,8 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
   pkt_loss_stats.num_re_tx++;
   sslot->session->client_info.num_re_tx++;
 
-  LOG_REORDER("%s: Retransmitting %s.\n", issue_msg,
-              ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
+  ERPC_REORDER("%s: Retransmitting %s.\n", issue_msg,
+               ci.num_rx < req_msgbuf->num_pkts ? "requests" : "RFRs");
   credits += delta;
   ci.num_tx = ci.num_rx;
   ci.progress_tsc = ev_loop_tsc;

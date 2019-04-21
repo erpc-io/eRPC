@@ -91,7 +91,7 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
 
         case ENOMEM:
           // Out of memory - this is OK
-          LOG_WARN(
+          ERPC_WARN(
               "eRPC HugeAlloc: Insufficient hugepages. Can't reserve %lu MB.\n",
               size / MB(1));
           return Buffer(nullptr, 0, 0);

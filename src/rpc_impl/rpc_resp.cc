@@ -26,8 +26,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf) {
     // A session reset could be waiting for this enqueue_response()
     assert(session->state == SessionState::kResetInProgress);
 
-    LOG_WARN("Rpc %u, lsn %u: enqueue_response() while reset in progress.\n",
-             rpc_id, session->local_session_num);
+    ERPC_WARN("Rpc %u, lsn %u: enqueue_response() while reset in progress.\n",
+              rpc_id, session->local_session_num);
 
     // Mark enqueue_response() as completed
     assert(sslot->server_info.req_type != kInvalidReqType);
@@ -75,7 +75,7 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
 
   // Handle reordering
   if (unlikely(!in_order_client(sslot, pkthdr))) {
-    LOG_REORDER(
+    ERPC_REORDER(
         "Rpc %u, lsn %u (%s): Received out-of-order response. "
         "Packet %zu/%zu, sslot %zu/%s. Dropping.\n",
         rpc_id, sslot->session->local_session_num,

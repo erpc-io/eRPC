@@ -58,7 +58,7 @@ void Rpc<TTr>::bury_session_st(Session *session) {
 
 template <class TTr>
 void Rpc<TTr>::sm_pkt_udp_tx_st(const SmPkt &sm_pkt) {
-  LOG_INFO("Rpc %u: Sending packet %s.\n", rpc_id, sm_pkt.to_string().c_str());
+  ERPC_INFO("Rpc %u: Sending packet %s.\n", rpc_id, sm_pkt.to_string().c_str());
   const std::string rem_hostname =
       sm_pkt.is_req() ? sm_pkt.server.hostname : sm_pkt.client.hostname;
   const uint16_t rem_sm_udp_port =

@@ -37,8 +37,8 @@ IBTransport::IBTransport(uint16_t sm_udp_port, uint8_t rpc_id, uint8_t phy_port,
   init_verbs_structs();
   init_mem_reg_funcs();
 
-  LOG_INFO("IBTransport created for ID %u. Device %s, port %d.\n", rpc_id,
-           resolve.ib_ctx->device->name, resolve.dev_port_id);
+  ERPC_INFO("IBTransport created for ID %u. Device %s, port %d.\n", rpc_id,
+            resolve.ib_ctx->device->name, resolve.dev_port_id);
 }
 
 void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
@@ -54,7 +54,7 @@ void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 //
 // We only need to clean up non-hugepage structures.
 IBTransport::~IBTransport() {
-  LOG_INFO("Destroying transport for ID %u\n", rpc_id);
+  ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
   exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy send QP");
@@ -198,10 +198,10 @@ void IBTransport::init_verbs_structs() {
 
   int probe_ret = ibv_post_recv(qp, nullptr, &bad_wr);
   if (probe_ret != kModdedProbeRet) {
-    LOG_WARN("Modded driver unavailable. Performance will be low.\n");
+    ERPC_WARN("Modded driver unavailable. Performance will be low.\n");
     use_fast_recv = false;
   } else {
-    LOG_WARN("Modded driver available.\n");
+    ERPC_WARN("Modded driver available.\n");
     use_fast_recv = true;
   }
 }

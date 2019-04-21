@@ -24,13 +24,13 @@ void Rpc<TTr>::process_comps_st() {
 
     Session *session = session_vec[pkthdr->dest_session_num];
     if (unlikely(session == nullptr)) {
-      LOG_WARN("Rpc %u: Received %s for buried session. Dropping.\n", rpc_id,
-               pkthdr->to_string().c_str());
+      ERPC_WARN("Rpc %u: Received %s for buried session. Dropping.\n", rpc_id,
+                pkthdr->to_string().c_str());
       continue;
     }
 
     if (unlikely(!session->is_connected())) {
-      LOG_WARN(
+      ERPC_WARN(
           "Rpc %u: Received %s for unconnected session (state %s). Dropping.\n",
           rpc_id, pkthdr->to_string().c_str(),
           session_state_str(session->state).c_str());
@@ -38,7 +38,7 @@ void Rpc<TTr>::process_comps_st() {
     }
 
     // If we are here, we have a valid packet for a connected session
-    LOG_TRACE(
+    ERPC_TRACE(
         "Rpc %u, lsn %u (%s): RX %s.\n", rpc_id, session->local_session_num,
         session->get_remote_hostname().c_str(), pkthdr->to_string().c_str());
 

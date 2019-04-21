@@ -72,7 +72,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
              pkt_size - sizeof(pkthdr_t));
     }
 
-    LOG_TRACE(
+    ERPC_TRACE(
         "  Transport: TX (idx = %zu, drop = %u). pkthdr = %s. Frame  = %s.\n",
         i, item.drop, pkthdr->to_string().c_str(),
         frame_header_to_string(&pkthdr->headroom[0]).c_str());
@@ -86,7 +86,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
                                     num_pkts - nb_tx_new);
       retry_count++;
       if (unlikely(retry_count == 1000000000)) {
-        LOG_WARN("Rpc %u stuck in rte_eth_tx_burst", rpc_id);
+        ERPC_WARN("Rpc %u stuck in rte_eth_tx_burst", rpc_id);
         retry_count = 0;
       }
     }
@@ -109,19 +109,19 @@ size_t DpdkTransport::rx_burst() {
 
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     _unused(pkthdr);
-    LOG_TRACE("  Transport: RX pkthdr = %s. Frame = %s.\n",
-              pkthdr->to_string().c_str(),
-              frame_header_to_string(&pkthdr->headroom[0]).c_str());
+    ERPC_TRACE("  Transport: RX pkthdr = %s. Frame = %s.\n",
+               pkthdr->to_string().c_str(),
+               frame_header_to_string(&pkthdr->headroom[0]).c_str());
 
 #if DEBUG
     if (unlikely(ntohl(pkthdr->get_ipv4_hdr()->dst_ip) != resolve.ipv4_addr ||
                  ntohs(pkthdr->get_udp_hdr()->dst_port) != rx_flow_udp_port)) {
-      LOG_ERROR("Invalid packet. Pkt: %u %s %s. Me: %u %s %s\n",
-                ntohs(pkthdr->get_udp_hdr()->dst_port),
-                ipv4_to_string(pkthdr->get_ipv4_hdr()->dst_ip).c_str(),
-                mac_to_string(pkthdr->get_eth_hdr()->dst_mac).c_str(),
-                rx_flow_udp_port, ipv4_to_string(resolve.ipv4_addr).c_str(),
-                mac_to_string(resolve.mac_addr).c_str());
+      ERPC_ERROR("Invalid packet. Pkt: %u %s %s. Me: %u %s %s\n",
+                 ntohs(pkthdr->get_udp_hdr()->dst_port),
+                 ipv4_to_string(pkthdr->get_ipv4_hdr()->dst_ip).c_str(),
+                 mac_to_string(pkthdr->get_eth_hdr()->dst_mac).c_str(),
+                 rx_flow_udp_port, ipv4_to_string(resolve.ipv4_addr).c_str(),
+                 mac_to_string(resolve.mac_addr).c_str());
       exit(-1);
     }
 #endif

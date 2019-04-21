@@ -138,10 +138,10 @@ class DpdkTransport : public Transport {
       int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_NTUPLE,
                                         RTE_ETH_FILTER_ADD, &ntuple);
       if (ret != 0) {
-        LOG_WARN("Failed to add ntuple filter. This could be survivable.\n");
+        ERPC_WARN("Failed to add ntuple filter. This could be survivable.\n");
       } else {
-        LOG_WARN("Installed ntuple flow rule. Queue %zu, RX UDP port = %u.\n",
-                 qp_id, udp_port);
+        ERPC_WARN("Installed ntuple flow rule. Queue %zu, RX UDP port = %u.\n",
+                  qp_id, udp_port);
       }
       installed = (ret == 0);
     }
@@ -163,8 +163,8 @@ class DpdkTransport : public Transport {
                                         RTE_ETH_FILTER_ADD, &filter);
       rt_assert(ret == 0, "Failed to add flow rule: ", strerror(-1 * ret));
 
-      LOG_WARN("Installed flow-director rule. Queue %zu, RX UDP port = %u.\n",
-               qp_id, udp_port);
+      ERPC_WARN("Installed flow-director rule. Queue %zu, RX UDP port = %u.\n",
+                qp_id, udp_port);
     }
   }
 

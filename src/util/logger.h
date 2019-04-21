@@ -49,57 +49,57 @@ namespace erpc {
 static void output_log_header(int level);
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_ERROR
-#define LOG_ERROR(...)                                              \
+#define ERPC_ERROR(...)                                             \
   output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_ERROR); \
   fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);                    \
   fflush(ERPC_LOG_DEFAULT_STREAM)
 #else
-#define LOG_ERROR(...) ((void)0)
+#define ERPC_ERROR(...) ((void)0)
 #endif
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_WARN
-#define LOG_WARN(...)                                              \
+#define ERPC_WARN(...)                                             \
   output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_WARN); \
   fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);                   \
   fflush(ERPC_LOG_DEFAULT_STREAM)
 #else
-#define LOG_WARN(...) ((void)0)
+#define ERPC_WARN(...) ((void)0)
 #endif
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_INFO
-#define LOG_INFO(...)                                              \
+#define ERPC_INFO(...)                                             \
   output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_INFO); \
   fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);                   \
   fflush(ERPC_LOG_DEFAULT_STREAM)
 #else
-#define LOG_INFO(...) ((void)0)
+#define ERPC_INFO(...) ((void)0)
 #endif
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_REORDER
-#define LOG_REORDER(...)                                                   \
+#define ERPC_REORDER(...)                                                  \
   output_log_header(trace_file_or_default_stream, ERPC_LOG_LEVEL_REORDER); \
   fprintf(trace_file_or_default_stream, __VA_ARGS__);                      \
   fflush(trace_file_or_default_stream)
 #else
-#define LOG_REORDER(...) ((void)0)
+#define ERPC_REORDER(...) ((void)0)
 #endif
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_TRACE
-#define LOG_TRACE(...)                                                   \
+#define ERPC_TRACE(...)                                                  \
   output_log_header(trace_file_or_default_stream, ERPC_LOG_LEVEL_TRACE); \
   fprintf(trace_file_or_default_stream, __VA_ARGS__);                    \
   fflush(trace_file_or_default_stream)
 #else
-#define LOG_TRACE(...) ((void)0)
+#define ERPC_TRACE(...) ((void)0)
 #endif
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_CC
-#define LOG_CC(...)                                                   \
+#define ERPC_CC(...)                                                  \
   output_log_header(trace_file_or_default_stream, ERPC_LOG_LEVEL_CC); \
   fprintf(trace_file_or_default_stream, __VA_ARGS__);                 \
   fflush(trace_file_or_default_stream)
 #else
-#define LOG_CC(...) ((void)0)
+#define ERPC_CC(...) ((void)0)
 #endif
 
 /// Return decent-precision time formatted as seconds:microseconds

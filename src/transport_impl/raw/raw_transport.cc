@@ -26,7 +26,7 @@ RawTransport::RawTransport(uint16_t sm_udp_port, uint8_t rpc_id,
   init_verbs_structs();
   init_mem_reg_funcs();
 
-  LOG_WARN(
+  ERPC_WARN(
       "RawTransport created for Rpc ID %u. Device %s/%s, port %d. "
       "IPv4 %s, MAC %s. Datapath UDP port %u.\n",
       rpc_id, resolve.ibdev_name.c_str(), resolve.netdev_name.c_str(),
@@ -48,7 +48,7 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 //
 // We only need to clean up non-hugepage structures.
 RawTransport::~RawTransport() {
-  LOG_INFO("Destroying transport for ID %u\n", rpc_id);
+  ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
 
   if (kDumb) {
     exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP");
@@ -264,7 +264,7 @@ void RawTransport::install_flow_rule() {
   struct ibv_qp *qp_for_flow = kDumb ? mp_recv_qp : qp;
   assert(qp_for_flow != nullptr);
 
-  LOG_WARN(
+  ERPC_WARN(
       "Installing flow rule for Rpc %u. NUMA node = %zu. "
       "Flow RX UDP port = %u.\n",
       rpc_id, numa_node, rx_flow_udp_port);

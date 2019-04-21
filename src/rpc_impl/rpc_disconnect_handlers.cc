@@ -24,7 +24,7 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
   // Handle reordering. We don't need the session token for this.
   Session *session = session_vec.at(session_num);
   if (session == nullptr) {
-    LOG_INFO("%s: Duplicate request. Re-sending response.\n", issue_msg);
+    ERPC_INFO("%s: Duplicate request. Re-sending response.\n", issue_msg);
     sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kNoError));
     return;
   }
@@ -41,14 +41,15 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
 
     // If there's a response in this sslot, we've finished sending it
     if (sslot.tx_msgbuf != nullptr) {
-      assert(sslot.server_info.num_rx == sslot.server_info.sav_num_req_pkts +
-                                             sslot.tx_msgbuf->num_pkts - 1);
+      assert(sslot.server_info.num_rx ==
+             sslot.server_info.sav_num_req_pkts + sslot.tx_msgbuf->num_pkts -
+                 1);
     }
   }
 
   free_ring_entries();
 
-  LOG_INFO("%s. None. Sending response.\n", issue_msg);
+  ERPC_INFO("%s. None. Sending response.\n", issue_msg);
   sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kNoError));
 
   bury_session_st(session);
@@ -75,7 +76,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   // Handle reordering. We don't need the session token for this.
   Session *session = session_vec[session_num];
   if (session == nullptr) {
-    LOG_INFO("%s: Duplicate response. Ignoring.\n", issue_msg);
+    ERPC_INFO("%s: Duplicate response. Ignoring.\n", issue_msg);
     return;
   }
 
@@ -84,7 +85,7 @@ void Rpc<TTr>::handle_disconnect_resp_st(const SmPkt &sm_pkt) {
   assert(session->client == sm_pkt.client);
   assert(session->server == sm_pkt.server);
 
-  LOG_INFO("%s: None. Session disconnected.\n", issue_msg);
+  ERPC_INFO("%s: None. Session disconnected.\n", issue_msg);
   free_ring_entries();  // Free before callback to allow creating a new session
   sm_handler(session->local_session_num, SmEventType::kDisconnected,
              SmErrType::kNoError, context);

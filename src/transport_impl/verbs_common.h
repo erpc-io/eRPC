@@ -59,7 +59,7 @@ static Transport::MemRegInfo ibv_reg_mr_wrapper(struct ibv_pd *pd, void *buf,
   struct ibv_mr *mr = ibv_reg_mr(pd, buf, size, IBV_ACCESS_LOCAL_WRITE);
   rt_assert(mr != nullptr, "Failed to register mr.");
 
-  LOG_INFO("Registered %zu MB (lkey = %u)\n", size / MB(1), mr->lkey);
+  ERPC_INFO("Registered %zu MB (lkey = %u)\n", size / MB(1), mr->lkey);
   return Transport::MemRegInfo(mr, mr->lkey);
 }
 
@@ -72,11 +72,11 @@ static void ibv_dereg_mr_wrapper(Transport::MemRegInfo mr) {
 
   int ret = ibv_dereg_mr(ib_mr);
   if (ret != 0) {
-    LOG_ERROR("Memory degistration failed. size %zu B, lkey %u\n", size / MB(1),
-              lkey);
+    ERPC_ERROR("Memory degistration failed. size %zu B, lkey %u\n",
+               size / MB(1), lkey);
   }
 
-  LOG_INFO("Deregistered %zu MB (lkey = %u)\n", size / MB(1), lkey);
+  ERPC_INFO("Deregistered %zu MB (lkey = %u)\n", size / MB(1), lkey);
 }
 
 /// Polls a CQ for one completion. In verbose mode only, prints a warning
@@ -209,8 +209,9 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
         double total_gbps = num_lanes * gbps_per_lane;
         resolve.bandwidth = total_gbps * (1000 * 1000 * 1000) / 8.0;
 
-        LOG_INFO("Port %u resolved to device %s, port %u. Speed = %.2f Gbps.\n",
-                 phy_port, ib_ctx->device->name, port_i, total_gbps);
+        ERPC_INFO(
+            "Port %u resolved to device %s, port %u. Speed = %.2f Gbps.\n",
+            phy_port, ib_ctx->device->name, port_i, total_gbps);
 
         return;
       }

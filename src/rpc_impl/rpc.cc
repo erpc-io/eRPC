@@ -82,7 +82,7 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   nexus_hook.rpc_id = rpc_id;
   nexus->register_hook(&nexus_hook);
 
-  LOG_INFO("Rpc %u created. eRPC TID = %zu.\n", rpc_id, creator_etid);
+  ERPC_INFO("Rpc %u created. eRPC TID = %zu.\n", rpc_id, creator_etid);
 
   active_rpcs_root_sentinel.client_info.next = &active_rpcs_tail_sentinel;
   active_rpcs_root_sentinel.client_info.prev = nullptr;
@@ -103,7 +103,7 @@ Rpc<TTr>::~Rpc() {
     if (session != nullptr) delete session;
   }
 
-  LOG_INFO("Destroying Rpc %u.\n", rpc_id);
+  ERPC_INFO("Destroying Rpc %u.\n", rpc_id);
 
   // First delete the hugepage allocator. This deregisters and deletes the
   // SHM regions. Deregistration is done using \p transport's deregistration

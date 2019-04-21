@@ -18,7 +18,7 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
 
   // Check that the caller is the creator thread
   if (!in_dispatch()) {
-    LOG_WARN("%s: Caller thread is not the creator thread.\n", issue_msg);
+    ERPC_WARN("%s: Caller thread is not the creator thread.\n", issue_msg);
     return -EPERM;
   }
 
@@ -27,20 +27,20 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
 
   // Check remote hostname
   if (rem_hostname.length() == 0 || rem_hostname.length() > kMaxHostnameLen) {
-    LOG_WARN("%s: Invalid remote hostname.\n", issue_msg);
+    ERPC_WARN("%s: Invalid remote hostname.\n", issue_msg);
     return -EINVAL;
   }
 
   // Creating a session to one's own Rpc as the client is not allowed
   if (rem_hostname == nexus->hostname && rem_rpc_id == rpc_id &&
       rem_sm_udp_port == nexus->sm_udp_port) {
-    LOG_WARN("%s: Remote Rpc is same as local.\n", issue_msg);
+    ERPC_WARN("%s: Remote Rpc is same as local.\n", issue_msg);
     return -EINVAL;
   }
 
   // Ensure that we have ring buffers for this session
   if (!have_ring_entries()) {
-    LOG_WARN("%s: Ring buffers exhausted.\n", issue_msg);
+    ERPC_WARN("%s: Ring buffers exhausted.\n", issue_msg);
     return -ENOMEM;
   }
 
@@ -81,29 +81,29 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
           session_num);
 
   if (!in_dispatch()) {
-    LOG_WARN("%s: Caller thread is not creator.\n", issue_msg);
+    ERPC_WARN("%s: Caller thread is not creator.\n", issue_msg);
     return -EPERM;
   }
 
   if (!is_usr_session_num_in_range_st(session_num)) {
-    LOG_WARN("%s: Invalid session number.\n", issue_msg);
+    ERPC_WARN("%s: Invalid session number.\n", issue_msg);
     return -EINVAL;
   }
 
   Session *session = session_vec[static_cast<size_t>(session_num)];
   if (session == nullptr) {
-    LOG_WARN("%s: Session already destroyed.\n", issue_msg);
+    ERPC_WARN("%s: Session already destroyed.\n", issue_msg);
     return -EPERM;
   }
 
   if (!session->is_client()) {
-    LOG_WARN("%s: User cannot destroy server session.\n", issue_msg);
+    ERPC_WARN("%s: User cannot destroy server session.\n", issue_msg);
     return -EINVAL;
   }
 
   // A session can be destroyed only when all its sslots are free
   if (session->client_info.sslot_free_vec.size() != kSessionReqWindow) {
-    LOG_WARN("%s: Session has pending RPC requests.\n", issue_msg);
+    ERPC_WARN("%s: Session has pending RPC requests.\n", issue_msg);
     return -EBUSY;
   }
 
@@ -116,24 +116,24 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   switch (session->state) {
     case SessionState::kConnectInProgress:
       // Can't disconnect right now. User needs to wait.
-      LOG_WARN("%s: Session connection in progress.\n", issue_msg);
+      ERPC_WARN("%s: Session connection in progress.\n", issue_msg);
       return -EPERM;
 
     case SessionState::kConnected:
-      LOG_INFO("Rpc %u, lsn %u: Sending disconnect request to [%s, %u].\n",
-               rpc_id, session->local_session_num, session->server.hostname,
-               session->server.rpc_id);
+      ERPC_INFO("Rpc %u, lsn %u: Sending disconnect request to [%s, %u].\n",
+                rpc_id, session->local_session_num, session->server.hostname,
+                session->server.rpc_id);
 
       session->state = SessionState::kDisconnectInProgress;
       send_sm_req_st(session);
       return 0;
 
     case SessionState::kDisconnectInProgress:
-      LOG_WARN("%s: Session disconnection in progress.\n", issue_msg);
+      ERPC_WARN("%s: Session disconnection in progress.\n", issue_msg);
       return -EALREADY;
 
     case SessionState::kResetInProgress:
-      LOG_WARN("%s: None. Session reset in progress.\n", issue_msg);
+      ERPC_WARN("%s: None. Session reset in progress.\n", issue_msg);
       return 0;
 
     default: throw std::runtime_error("Invalid session state");

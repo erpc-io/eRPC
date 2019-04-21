@@ -54,10 +54,10 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     used_qp_ids[phy_port].insert(qp_id);
 
     if (eal_initialized) {
-      LOG_INFO("Rpc %u skipping DPDK initialization, queues ID = %zu.\n",
-               rpc_id, qp_id);
+      ERPC_INFO("Rpc %u skipping DPDK initialization, queues ID = %zu.\n",
+                rpc_id, qp_id);
     } else {
-      LOG_INFO("Rpc %u initializing DPDK, queues ID = %zu.\n", rpc_id, qp_id);
+      ERPC_INFO("Rpc %u initializing DPDK, queues ID = %zu.\n", rpc_id, qp_id);
 
       // n: channels, m: maximum memory in megabytes
       const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
@@ -84,7 +84,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
   resolve_phy_port();
   init_mem_reg_funcs();
 
-  LOG_WARN(
+  ERPC_WARN(
       "DpdkTransport created for Rpc ID %u, queue %zu, "
       "datapath udp port = %u\n",
       rpc_id, qp_id, rx_flow_udp_port);
@@ -114,8 +114,8 @@ void DpdkTransport::setup_phy_port() {
   rte_eth_dev_info_get(phy_port, &dev_info);
   rt_assert(dev_info.rx_desc_lim.nb_max >= kNumRxRingEntries,
             "Device RX ring too small");
-  LOG_INFO("Initializing port %u with driver %s\n", phy_port,
-           dev_info.driver_name);
+  ERPC_INFO("Initializing port %u with driver %s\n", phy_port,
+            dev_info.driver_name);
 
   // Create per-thread RX and TX queues
   rte_eth_conf eth_conf;
@@ -155,7 +155,7 @@ void DpdkTransport::setup_phy_port() {
     ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
                                   RTE_ETH_FILTER_SET, &fi);
     if (ret != 0) {
-      LOG_WARN("Failed to set flow director fields. Could be survivable...\n");
+      ERPC_WARN("Failed to set flow director fields. Could be survivable...\n");
     }
   }
 
@@ -213,7 +213,7 @@ void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 }
 
 DpdkTransport::~DpdkTransport() {
-  LOG_INFO("Destroying transport for ID %u\n", rpc_id);
+  ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
 
   rte_mempool_free(mempool);
 
@@ -243,16 +243,17 @@ void DpdkTransport::resolve_phy_port() {
     resolve.bandwidth =
         static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
   } else {
-    LOG_WARN("Port %u bandwidth not reported by DPDK. Using default 10 Gbps.\n",
-             phy_port);
+    ERPC_WARN(
+        "Port %u bandwidth not reported by DPDK. Using default 10 Gbps.\n",
+        phy_port);
     link.link_speed = 10000;
     resolve.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
   }
 
-  LOG_INFO("Resolved port %u: MAC %s, IPv4 %s, bandwidth %.1f Gbps\n", phy_port,
-           mac_to_string(resolve.mac_addr).c_str(),
-           ipv4_to_string(htonl(resolve.ipv4_addr)).c_str(),
-           resolve.bandwidth * 8.0 / (1000 * 1000 * 1000));
+  ERPC_INFO("Resolved port %u: MAC %s, IPv4 %s, bandwidth %.1f Gbps\n",
+            phy_port, mac_to_string(resolve.mac_addr).c_str(),
+            ipv4_to_string(htonl(resolve.ipv4_addr)).c_str(),
+            resolve.bandwidth * 8.0 / (1000 * 1000 * 1000));
 }
 
 void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {

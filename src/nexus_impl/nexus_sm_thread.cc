@@ -22,8 +22,8 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
       rt_assert(static_cast<size_t>(ret) == sizeof(sm_pkt),
                 "eRPC Nexus: Invalid SM packet RX size.");
 
-      LOG_INFO("eRPC Nexus: Received SM packet %s\n",
-               sm_pkt.to_string().c_str());
+      ERPC_INFO("eRPC Nexus: Received SM packet %s\n",
+                sm_pkt.to_string().c_str());
 
       uint8_t target_rpc_id =
           sm_pkt.is_req() ? sm_pkt.server.rpc_id : sm_pkt.client.rpc_id;
@@ -39,7 +39,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
         // We don't have an Rpc object for the target Rpc. Send an error
         // response iff it's a request packet.
         if (sm_pkt.is_req()) {
-          LOG_INFO(
+          ERPC_INFO(
               "eRPC Nexus: Received session management request for invalid "
               "Rpc %u from %s. Sending response.\n",
               target_rpc_id, sm_pkt.client.name().c_str());
@@ -50,7 +50,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
           udp_client.send(resp_sm_pkt.client.hostname,
                           resp_sm_pkt.client.sm_udp_port, resp_sm_pkt);
         } else {
-          LOG_INFO(
+          ERPC_INFO(
               "eRPC Nexus: Received session management response for invalid "
               "Rpc %u from %s. Dropping.\n",
               target_rpc_id, sm_pkt.client.name().c_str());
@@ -61,7 +61,7 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
     }
   }
 
-  LOG_INFO("eRPC Nexus: Session management thread exiting.\n");
+  ERPC_INFO("eRPC Nexus: Session management thread exiting.\n");
   return;
 }
 

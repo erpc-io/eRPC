@@ -26,13 +26,14 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
     const Session *session = session_vec[srv_session_num];
     if (session == nullptr || session->state != SessionState::kConnected) {
-      LOG_INFO("%s: Duplicate request, and response is unneeded.\n", issue_msg);
+      ERPC_INFO("%s: Duplicate request, and response is unneeded.\n",
+                issue_msg);
       return;
     } else {
       SmPkt resp_sm_pkt = sm_construct_resp(sm_pkt, SmErrType::kNoError);
       resp_sm_pkt.server = session->server;  // Re-send server endpoint info
 
-      LOG_INFO("%s: Duplicate request. Re-sending response.\n", issue_msg);
+      ERPC_INFO("%s: Duplicate request. Re-sending response.\n", issue_msg);
       sm_pkt_udp_tx_st(resp_sm_pkt);
       return;
     }
@@ -42,15 +43,15 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
   // Check that the transport matches
   if (sm_pkt.server.transport_type != transport->transport_type) {
-    LOG_WARN("%s: Invalid transport %s. Sending response.\n", issue_msg,
-             Transport::get_name(sm_pkt.server.transport_type).c_str());
+    ERPC_WARN("%s: Invalid transport %s. Sending response.\n", issue_msg,
+              Transport::get_name(sm_pkt.server.transport_type).c_str());
     sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kInvalidTransport));
     return;
   }
 
   // Check if we are allowed to create another session
   if (!have_ring_entries()) {
-    LOG_WARN("%s: Ring buffers exhausted. Sending response.\n", issue_msg);
+    ERPC_WARN("%s: Ring buffers exhausted. Sending response.\n", issue_msg);
     sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kRingExhausted));
     return;
   }
@@ -67,8 +68,8 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
   if (!resolve_success) {
     std::string routing_info_str = TTr::routing_info_str(&client_rinfo);
-    LOG_WARN("%s: Unable to resolve routing info %s. Sending response.\n",
-             issue_msg, routing_info_str.c_str());
+    ERPC_WARN("%s: Unable to resolve routing info %s. Sending response.\n",
+              issue_msg, routing_info_str.c_str());
     sm_pkt_udp_tx_st(
         sm_construct_resp(sm_pkt, SmErrType::kRoutingResolutionFailure));
     return;
@@ -92,7 +93,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
       }
 
       free(session);
-      LOG_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
+      ERPC_WARN("%s: Failed to allocate prealloc MsgBuffer.\n", issue_msg);
       sm_pkt_udp_tx_st(sm_construct_resp(sm_pkt, SmErrType::kOutOfMemory));
       return;
     }
@@ -118,7 +119,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   SmPkt resp_sm_pkt = sm_construct_resp(sm_pkt, SmErrType::kNoError);
   resp_sm_pkt.server = session->server;
 
-  LOG_INFO("%s: None. Sending response.\n", issue_msg);
+  ERPC_INFO("%s: None. Sending response.\n", issue_msg);
   sm_pkt_udp_tx_st(resp_sm_pkt);
   return;
 }
@@ -142,7 +143,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   Session *session = session_vec[session_num];
   if (session == nullptr ||
       session->state != SessionState::kConnectInProgress) {
-    LOG_INFO("%s: Duplicate response. Ignoring.\n", issue_msg);
+    ERPC_INFO("%s: Duplicate response. Ignoring.\n", issue_msg);
     return;
   }
 
@@ -157,8 +158,8 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   // Handle special error cases for which we retry the connect request
   if (sm_pkt.err_type == SmErrType::kInvalidRemoteRpcId) {
     if (retry_connect_on_invalid_rpc_id) {
-      LOG_INFO("%s: Invalid remote Rpc ID. Dropping. Scan will retry later.\n",
-               issue_msg);
+      ERPC_INFO("%s: Invalid remote Rpc ID. Dropping. Scan will retry later.\n",
+                issue_msg);
       sm_pending_reqs.insert(session->local_session_num);  // Duplicates fine
       return;
     }
@@ -166,8 +167,8 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
 
   if (sm_pkt.err_type != SmErrType::kNoError) {
     // The server didn't allocate session resources, so we can just destroy
-    LOG_WARN("%s: Error %s.\n", issue_msg,
-             sm_err_type_str(sm_pkt.err_type).c_str());
+    ERPC_WARN("%s: Error %s.\n", issue_msg,
+              sm_err_type_str(sm_pkt.err_type).c_str());
 
     free_ring_entries();  // Free before callback to allow creating new session
     sm_handler(session->local_session_num, SmEventType::kConnectFailed,
@@ -191,8 +192,8 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   if (!resolve_success) {
     // Free server resources by disconnecting. No connected (with error)
     // callback will be invoked.
-    LOG_WARN("%s: Failed to resolve server routing info. Disconnecting.\n",
-             issue_msg);
+    ERPC_WARN("%s: Failed to resolve server routing info. Disconnecting.\n",
+              issue_msg);
 
     session->server = sm_pkt.server;  // Needed for disconnect response later
 
@@ -210,7 +211,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
 
   session->client_info.cc.prev_desired_tx_tsc = rdtsc();
 
-  LOG_INFO("%s: None. Session connected.\n", issue_msg);
+  ERPC_INFO("%s: None. Session connected.\n", issue_msg);
   sm_handler(session->local_session_num, SmEventType::kConnected,
              SmErrType::kNoError, context);
 }

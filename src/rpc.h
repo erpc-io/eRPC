@@ -660,11 +660,11 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*tx_msgbuf->get_pkthdr_n(pkt_idx));
     }
 
-    LOG_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s\n", rpc_id,
-              sslot->session->local_session_num,
-              sslot->session->get_remote_hostname().c_str(),
-              tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(),
-              sslot->progress_str().c_str(), item.drop ? " Drop." : "");
+    ERPC_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s\n", rpc_id,
+               sslot->session->local_session_num,
+               sslot->session->get_remote_hostname().c_str(),
+               tx_msgbuf->get_pkthdr_str(pkt_idx).c_str(),
+               sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -688,11 +688,11 @@ class Rpc {
       testing.pkthdr_tx_queue.push(*ctrl_msgbuf->get_pkthdr_0());
     }
 
-    LOG_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s.\n", rpc_id,
-              sslot->session->local_session_num,
-              sslot->session->get_remote_hostname().c_str(),
-              ctrl_msgbuf->get_pkthdr_str(0).c_str(),
-              sslot->progress_str().c_str(), item.drop ? " Drop." : "");
+    ERPC_TRACE("Rpc %u, lsn %u (%s): TX %s. Slot %s.%s.\n", rpc_id,
+               sslot->session->local_session_num,
+               sslot->session->get_remote_hostname().c_str(),
+               ctrl_msgbuf->get_pkthdr_str(0).c_str(),
+               sslot->progress_str().c_str(), item.drop ? " Drop." : "");
 
     tx_batch_i++;
     if (tx_batch_i == TTr::kPostlist) do_tx_burst_st();
@@ -705,9 +705,9 @@ class Rpc {
     size_t ref_tsc = dpath_rdtsc();
     size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
-    LOG_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n", rpc_id,
-           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
-           to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
+    ERPC_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n",
+            rpc_id, sslot->session->local_session_num, sslot->cur_req_num,
+            pkt_num, to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
     wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
     sslot->client_info.in_wheel[pkt_num % kSessionCredits] = true;
@@ -722,9 +722,9 @@ class Rpc {
     size_t ref_tsc = dpath_rdtsc();
     size_t desired_tx_tsc = sslot->session->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
-    LOG_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n", rpc_id,
-           sslot->session->local_session_num, sslot->cur_req_num, pkt_num,
-           to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
+    ERPC_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n",
+            rpc_id, sslot->session->local_session_num, sslot->cur_req_num,
+            pkt_num, to_usec(desired_tx_tsc - creation_tsc, freq_ghz));
 
     wheel->insert(wheel_ent_t(sslot, pkt_num), ref_tsc, desired_tx_tsc);
     sslot->client_info.in_wheel[pkt_num % kSessionCredits] = true;
@@ -1023,7 +1023,7 @@ class Rpc {
   } testing;
 
   /// File for dispatch thread trace output. This is used indirectly by
-  /// LOG_TRACE and other macros.
+  /// ERPC_TRACE and other macros.
   FILE *trace_file;
 
   /// Datapath stats that can be disabled at compile-time
