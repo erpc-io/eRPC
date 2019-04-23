@@ -16,6 +16,23 @@ class AppContext : public BasicAppContext {
   FastRand fastrand;  ///< Used for picking large message sizes
 };
 
+/// Application-level header carried in each request and response
+struct app_hdr_t {
+  size_t id;
+  size_t req_size;
+  size_t resp_size;
+  uint8_t byte_contents;
+  uint8_t pad[7];
+
+  app_hdr_t(size_t req_size, size_t resp_size, uint8_t byte_contents)
+      : req_size(req_size),
+        resp_size(resp_size),
+        byte_contents(byte_contents) {}
+
+  app_hdr_t() {}
+};
+static_assert(sizeof(app_hdr_t) % sizeof(size_t) == 0, "");
+
 /// Configuration for controlling the test
 size_t config_num_iters;         ///< The number of iterations
 size_t config_num_sessions;      ///< Number of sessions created by client
@@ -25,20 +42,24 @@ size_t config_num_bg_threads;    ///< Number of background threads
 /// The common request handler for all subtests
 void req_handler(ReqHandle *req_handle, void *_c) {
   auto *c = static_cast<AppContext *>(_c);
-  assert(!c->is_client);
   if (config_num_bg_threads > 0) assert(c->rpc->in_background());
 
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  size_t resp_size = req_msgbuf->get_data_size();
+  const auto *app_hdr = reinterpret_cast<app_hdr_t *>(req_msgbuf->buf);
 
-  req_handle->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(resp_size);
-  memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
+  auto &resp = req_handle->dyn_resp_msgbuf;
+  resp = c->rpc->alloc_msg_buffer_or_die(app_hdr->resp_size);
+
+  *reinterpret_cast<app_hdr_t *>(resp.buf) = *app_hdr;  // Copy app req header
+  memset(resp.buf + sizeof(app_hdr_t), app_hdr->byte_contents,
+         app_hdr->resp_size - sizeof(app_hdr_t));
 
   size_t user_alloc_tot = c->rpc->get_stat_user_alloc_tot();
   test_printf(
-      "Server: Received request of length %zu. "
+      "Server: Received request. Req/resp length: %zu/%zu. "
       "Rpc memory used = %zu bytes (%.3f MB)\n",
-      resp_size, user_alloc_tot, 1.0 * user_alloc_tot / MB(1));
+      app_hdr->req_size, app_hdr->resp_size, user_alloc_tot,
+      1.0 * user_alloc_tot / MB(1));
 
   c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
@@ -49,13 +70,20 @@ void req_handler(ReqHandle *req_handle, void *_c) {
 void cont_func(void *_c, void *_tag) {
   auto *c = static_cast<AppContext *>(_c);
   auto tag = reinterpret_cast<size_t>(_tag);
-  const MsgBuffer &resp_msgbuf = c->resp_msgbufs[tag];
-  test_printf("Client: Received response of length %zu.\n",
-              resp_msgbuf.get_data_size());
 
-  assert(resp_msgbuf.get_data_size() == c->req_msgbufs[tag].get_data_size());
-  for (size_t i = 0; i < resp_msgbuf.get_data_size(); i++) {
-    assert(resp_msgbuf.buf[i] == static_cast<uint8_t>(tag));
+  const MsgBuffer &req_msgbuf = c->req_msgbufs[tag];
+  const MsgBuffer &resp_msgbuf = c->resp_msgbufs[tag];
+  const auto *app_hdr = reinterpret_cast<app_hdr_t *>(req_msgbuf.buf);
+
+  test_printf("Client: Received response. Req/resp length %zu/%zu.\n",
+              req_msgbuf.get_data_size(), resp_msgbuf.get_data_size());
+
+  // Check the response's header and contents
+  assert(memcmp(req_msgbuf.buf, resp_msgbuf.buf, sizeof(app_hdr_t)) == 0);
+
+  assert(resp_msgbuf.get_data_size() == app_hdr->resp_size);
+  for (size_t i = sizeof(app_hdr_t); i < resp_msgbuf.get_data_size(); i++) {
+    assert(resp_msgbuf.buf[i] == app_hdr->byte_contents);
   }
 
   assert(c->is_client);
@@ -96,9 +124,18 @@ void generic_test_func(Nexus *nexus, size_t) {
         assert(iter_req_i < tot_reqs_per_iter);
         MsgBuffer &cur_req_msgbuf = c.req_msgbufs[iter_req_i];
 
-        size_t req_size = get_rand_msg_size(&c.fastrand, rpc);
+        // Generate request metadata
+        size_t min_msg_size = sizeof(app_hdr_t) + sizeof(size_t);
+        size_t req_size = get_rand_msg_size(&c.fastrand, rpc, min_msg_size);
+        size_t resp_size = get_rand_msg_size(&c.fastrand, rpc, min_msg_size);
+        uint8_t byte_contents = c.fastrand.next_u32() % UINT8_MAX;
+
         rpc->resize_msg_buffer(&cur_req_msgbuf, req_size);
-        memset(cur_req_msgbuf.buf, static_cast<uint8_t>(iter_req_i), req_size);
+        auto *app_hdr = reinterpret_cast<app_hdr_t *>(cur_req_msgbuf.buf);
+        *app_hdr = app_hdr_t(req_size, resp_size, byte_contents);
+
+        memset(cur_req_msgbuf.buf + sizeof(app_hdr_t), byte_contents,
+               req_size - sizeof(app_hdr_t));
 
         rpc->enqueue_request(session_num_arr[sess_i], kTestReqType,
                              &cur_req_msgbuf, &c.resp_msgbufs[iter_req_i],

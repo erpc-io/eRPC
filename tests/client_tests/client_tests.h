@@ -92,7 +92,7 @@ size_t get_rand_msg_size(FastRand *fast_rand, const Rpc<CTransport> *rpc) {
 /// min_msg_size
 size_t get_rand_msg_size(FastRand *fast_rand, const Rpc<CTransport> *rpc,
                          size_t min_msg_size) {
-  assert(min_msg_size >= rpc->get_max_msg_size() * .8);
+  assert(min_msg_size <= rpc->get_max_msg_size() * .9);  // Too slow otherwise
 
   while (true) {
     size_t ret = get_rand_msg_size(fast_rand, rpc);
