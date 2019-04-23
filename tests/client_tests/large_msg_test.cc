@@ -96,9 +96,7 @@ void generic_test_func(Nexus *nexus, size_t) {
         assert(iter_req_i < tot_reqs_per_iter);
         MsgBuffer &cur_req_msgbuf = c.req_msgbufs[iter_req_i];
 
-        size_t req_size = get_rand_msg_size(
-            &c.fastrand, rpc->get_max_data_per_pkt(), rpc->get_max_msg_size());
-
+        size_t req_size = get_rand_msg_size(&c.fastrand, rpc);
         rpc->resize_msg_buffer(&cur_req_msgbuf, req_size);
         memset(cur_req_msgbuf.buf, static_cast<uint8_t>(iter_req_i), req_size);
 

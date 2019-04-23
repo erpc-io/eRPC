@@ -62,13 +62,10 @@ class ReqFuncRegInfo {
 
 enum class ConnectServers : bool { kTrue, kFalse };
 
-/// Pick a random non-zero message size smaller than \p max_msg_size, with an
-/// approximately X% chance of the message fitting in one packet. Other
-/// messages have a 80% chance of fitting in 10 packets. This reduces test
-/// running time.
-size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
-                         size_t max_msg_size) {
-  assert(max_msg_size > max_data_per_pkt * 10);
+/// Pick a random non-zero message size, with an approximately X% chance of the
+/// message fitting in one packet. Other messages have a 80% chance of fitting
+/// in 10 packets. This reduces test running time.
+size_t get_rand_msg_size(FastRand *fast_rand, const Rpc<CTransport> *rpc) {
   // Hack to return some constant data:
   // if (fast_rand != nullptr) return 3000;
 
@@ -76,16 +73,30 @@ size_t get_rand_msg_size(FastRand *fast_rand, size_t max_data_per_pkt,
   if (fast_rand->next_u32() % 100 < X) {
     // Choose a single-packet message
     uint32_t sample = fast_rand->next_u32();
-    return (sample % max_data_per_pkt) + 1;
+    return (sample % rpc->get_max_data_per_pkt()) + 1;
   } else {
     if (fast_rand->next_u32() % 100 < 80) {
       // Choose a message size that fits in 1 to 10 packets
       uint32_t num_pkts = (fast_rand->next_u32() % 10) + 1;
-      return (fast_rand->next_u32() % (num_pkts * max_data_per_pkt)) + 1;
+      return (fast_rand->next_u32() %
+              (num_pkts * rpc->get_max_data_per_pkt())) +
+             1;
     } else {
       // Choose any message size up to the max size
-      return (fast_rand->next_u32() % max_msg_size) + 1;
+      return (fast_rand->next_u32() % rpc->get_max_msg_size()) + 1;
     }
+  }
+}
+
+/// Similar to get_rand_msg_size(), but the returned size is at least
+/// min_msg_size
+size_t get_rand_msg_size(FastRand *fast_rand, const Rpc<CTransport> *rpc,
+                         size_t min_msg_size) {
+  assert(min_msg_size >= rpc->get_max_msg_size() * .8);
+
+  while (true) {
+    size_t ret = get_rand_msg_size(fast_rand, rpc);
+    if (ret >= min_msg_size) return ret;
   }
 }
 

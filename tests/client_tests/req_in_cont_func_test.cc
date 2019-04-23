@@ -59,9 +59,7 @@ void cont_func(void *, void *);  // Forward declaration
 void enqueue_request_helper(AppContext *c, size_t msgbuf_i) {
   assert(msgbuf_i < kSessionReqWindow);
 
-  size_t req_size =
-      get_rand_msg_size(&c->fast_rand, c->rpc->get_max_data_per_pkt(),
-                        c->rpc->get_max_msg_size());
+  size_t req_size = get_rand_msg_size(&c->fast_rand, c->rpc);
   c->rpc->resize_msg_buffer(&c->req_msgbufs[msgbuf_i], req_size);
 
   tag_t tag(static_cast<uint16_t>(c->num_reqs_sent),
