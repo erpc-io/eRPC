@@ -111,6 +111,8 @@ class RpcTest : public ::testing::Test {
 
     session->remote_session_num = session->server.session_num;
     session->state = SessionState::kConnected;
+    session->client_info.cc.prev_desired_tx_tsc = rdtsc();
+
     return session;
   }
 
