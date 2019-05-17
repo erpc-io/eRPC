@@ -112,11 +112,14 @@ class Session {
    */
   inline size_t cc_getupdate_tx_tsc(size_t ref_tsc, size_t pkt_size) {
     double ns_delta = 1000000000 * (pkt_size / client_info.cc.timely.rate);
+    double cycle_delta = ns_to_cycles(ns_delta, freq_ghz);
 
-    size_t &prev_desired_tx_tsc = client_info.cc.prev_desired_tx_tsc;
-    prev_desired_tx_tsc += ns_to_cycles(ns_delta, freq_ghz);
-    prev_desired_tx_tsc = std::max(ref_tsc, prev_desired_tx_tsc);
-    return prev_desired_tx_tsc;
+    size_t desired_tx_tsc = client_info.cc.prev_desired_tx_tsc + cycle_delta;
+    desired_tx_tsc = std::max(desired_tx_tsc, ref_tsc);
+
+    client_info.cc.prev_desired_tx_tsc = desired_tx_tsc;
+
+    return desired_tx_tsc;
   }
 
   /// Return true iff this session is uncongested
