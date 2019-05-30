@@ -6,7 +6,11 @@ if [ "$#" -ne 1 ]; then
 	exit
 fi
 
-bad_nodes="hp097"
+# Fill this up with nodes that you don't want. Example:
+# bad_nodes = "hp097"
+bad_nodes=""
+
+# We'll place the nodes under switch n in topodir/switch_n
 topodir="/tmp/xl170_topo"
 rm -rf $topodir
 mkdir $topodir
@@ -33,7 +37,7 @@ for ((i = 1; i <= $1; i++)); do
 done
 wait
 
-# Here, temp contains <hostname> <switch_id>
+# Here, file temp contains <hostname> <switch_id>
 # Print out the nodes under each switch
 echo ""
 for ((switch_i = 0; switch_i < 5; switch_i++)); do
