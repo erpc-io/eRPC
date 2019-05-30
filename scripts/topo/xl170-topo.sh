@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# Prints the nodes under each switch in CloudLab's xl170 cluster
+#
+# * Prints the nodes under each switch in CloudLab's xl170 cluster
+#
+# * This script assumes that node n is named
+#   akalianode-n.RDMA.ron-PG0.utah.cloudlab.us
+#
+# * Usage: In a cluster with N experiment nodes, run ./xl170-topo.sh N
+#
+
 if [ "$#" -ne 1 ]; then
   echo "Illegal number of parameters"
 	echo "Usage: ./xl170-topo.sh <number of nodes to look up>"
