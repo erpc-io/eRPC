@@ -95,8 +95,11 @@ class Rpc {
    * \param sm_handler The session management callback that is invoked when
    * sessions are successfully created or destroyed.
    *
-   * @param phy_port An Rpc object uses one physical port. This is the
-   * zero-based index of that port among active ports.
+   * @param phy_port An Rpc object uses one physical port on the NIC. phy_port
+   * is the zero-based index of that port among active ports, as listed by
+   * `ibv_devinfo` for Raw, InfiniBand, and RoCE transports; or by
+   * `dpdk-devbind` for DPDK transport.
+   * 
    * @throw runtime_error if construction fails
    */
   Rpc(Nexus *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,
