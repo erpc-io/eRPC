@@ -36,6 +36,8 @@ Some highlights:
 ## eRPC quickstart
  * Build and run the test suite:
    `cmake . -DPERF=OFF -DTRANSPORT=infiniband; make -j; sudo ctest`.
+   * `DPERF=OFF` enables debugging, which greatly reduces performance. Set
+     `DPERF=ON` for performance measurements.
    * Here, `infiniband` should be replaced with `raw` for Mellanox Ethernet
      NICs, or `dpdk` for Intel Ethernet NICs.
    * A machine with two ports is needed to run the unit tests if DPDK is chosen.
@@ -76,7 +78,7 @@ Some highlights:
  * To build an application, create `scripts/autorun_app_file` and change its
    contents to one of the available directory names in `apps/`. See
    `scripts/example_autorun_app_file` for an example. Then generate a
-   Makefile using `cmake . -DPERF=ON/OFF -DTRANSPORT=raw/infiniband/dpdk`. 
+   Makefile using `cmake . -DPERF=ON -DTRANSPORT=raw/infiniband/dpdk`. 
  * Each application directory in `apps/` contains a config file
    that must specify all flags defined in `apps/apps_common.h`. For example,
    `num_processes` specifies the total number of eRPC processes in the cluster.

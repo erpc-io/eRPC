@@ -31,7 +31,7 @@ set(COMPILE_ERPC_LIB ON)
 # Options exposed to the user
 set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(ROCE "Use RoCE if TRANSPORT is infiniband" OFF)
-option(PERF "Compile for performance" OFF)
+option(PERF "Compile for performance" ON)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
 cmake_dependent_option(LTO "Use link time optimization" ON "PERF" OFF)

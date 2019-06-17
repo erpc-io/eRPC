@@ -228,7 +228,7 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
 
   // If we are here, port resolution has failed
   assert(resolve.ib_ctx == nullptr);
-  xmsg << "Failed to resolve RoCE port index " << std::to_string(phy_port);
+  xmsg << "Failed to resolve verbs port index " << std::to_string(phy_port);
   throw std::runtime_error(xmsg.str());
 }
 }  // namespace erpc
