@@ -147,7 +147,7 @@ set(SOURCES
   src/util/tls_registry.cc)
 
 # Boost
-find_package(Boost) 
+find_package(Boost)
 if(Boost_FOUND)
   message(STATUS "Boost include directory = ${Boost_INCLUDE_DIRS}")
   include_directories(system ${Boost_INCLUDE_DIRS})
