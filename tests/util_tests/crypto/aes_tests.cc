@@ -1,9 +1,38 @@
+/*
+  Copyright(c) 2011-2017 Intel Corporation All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in
+      the documentation and/or other materials provided with the
+      distribution.
+    * Neither the name of Intel Corporation nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #include <gtest/gtest.h>
 #include <isa-l_crypto/aes_gcm.h>  //FROM ISA LIB
 #include <sys/time.h>
 #include <unistd.h>
 
-// IV is the Initialization Vector. it is to be completely random. it is
+// IV is the Initialization Vector. It is to be completely random. It is
 // necessary for the GCM mode of AES to function.
 
 // AAD is Authenticated Additional Data. That is, data that is not encrypted
@@ -167,7 +196,7 @@ TEST(AesGcmTest, CorrectnessBig) {
   unsigned char AAD_big[(kAADLengthBig)] = {
       0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, 0xfe, 0xed,
       0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, 0xab, 0xad, 0xda, 0xd2};
-  ;
+
   // Prefills the gcm data with key values for each round
   // and the initial sub hash key for tag encoding
   // This is only required once for a given key
@@ -221,7 +250,7 @@ TEST(AesGcmTest, PerfSmall) {
   mk_rand_data(IV, GCM_IV_LEN);
   memcpy(&IV[GCM_IV_END_START], IVend, sizeof(IVend));
 
-  // Prefills the gcm data with key values for each round
+  // Pre-fills the gcm data with key values for each round
   // and the initial sub hash key for tag encoding
   // This is only required once for a given key
   aesni_gcm128_pre(key128, &gdata);
@@ -231,7 +260,7 @@ TEST(AesGcmTest, PerfSmall) {
       "IV length:%d; ADD length:%zu; Key length:%d \n",
       kTestLenSmall, GCM_IV_LEN, kAADLength, GCM_128_KEY_LEN);
 
-  // Perfomance for small Plaintext
+  // Performance for small plaintext
   {
     struct perf start, stop;
     perf_start(&start);
@@ -285,11 +314,11 @@ TEST(AesGcmTest, PerfBig) {
   aesni_gcm128_pre(key128, &gdata);
 
   printf(
-      "AES GCM performace parameters big plain text length:%zu; "
+      "AES GCM performance parameters big plain text length:%zu; "
       "IV length:%d; ADD length:%zu; Key length:%d \n",
       kTestLenBig, GCM_IV_LEN, kAADLength, GCM_128_KEY_LEN);
 
-  // Performance for big Plaintext
+  // Performance for big plaintext
   {
     struct perf start, stop;
     perf_start(&start);
