@@ -37,6 +37,8 @@ void Rpc<TTr>::handle_disconnect_req_st(const SmPkt &sm_pkt) {
   // Responses for all sslots must have been sent
   for (const SSlot &sslot : session->sslot_arr) {
     const auto &si = sslot.server_info;
+    _unused(si);
+
     assert(si.req_msgbuf.is_buried() && si.req_type == kInvalidReqType);
 
     // If there's a response in this sslot, we've finished sending it
