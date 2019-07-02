@@ -14,6 +14,6 @@ sudo apt -y install libnuma-dev libgflags-dev libgtest-dev libboost-dev
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
 
 # DPDK drivers
-sudo apt -y install dpdk libdpdk-dev dpdk-igb-uio-dkms
+# sudo apt -y install dpdk libdpdk-dev dpdk-igb-uio-dkms
 
 # Verbs drivers must be installed from Mellanox OFED
