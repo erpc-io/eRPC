@@ -44,7 +44,9 @@ namespace erpc {
  *      Use Rpc::enqueue_response to send the reply.
  * -# For an RPC client thread:
  *    - Create an Rpc endpoint using the Nexus
- *    - Connect to remote endpoints with Rpc::create_session
+ *    - Connect to remote endpoints with Rpc::create_session, specifying the
+ *      server's "control network" hostname. The connection handshake is done
+ *      over the kernel's network stack.
  *    - Create buffers to store request and response messages with
  *      Rpc::alloc_msg_buffer
  *    - Send a request with Rpc::enqueue_request, specifying a continuation
