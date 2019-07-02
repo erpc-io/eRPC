@@ -93,8 +93,9 @@ Some highlights:
      are needed. Run `scripts/do.sh <i> <i % 2>` on machine i in
      `{0, ..., num_machines - 1}`.
  * To automatically run an application at all processes in
-   `scripts/autorun_process_file`, run `scripts/run-all.sh`. Application
-   statistics generated in a run can be collected using `scripts/proc-out.sh`.
+   `scripts/autorun_process_file`, run `scripts/run-all.sh`. For some
+   applications, statistics generated in a run can be collected and processed
+   using `scripts/proc-out.sh`.
 
 ## Getting help
  * GitHub issues are preferred over email. Please include the following
