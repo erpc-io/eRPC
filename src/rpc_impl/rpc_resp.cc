@@ -97,7 +97,9 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   if (likely(pkthdr->msg_size <= TTr::kMaxDataPerPkt)) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size);
 
-    // Copy eRPC header and data, but not Transport headroom
+    // Copy eRPC header and data (but not Transport headroom). The eRPC header
+    // will be needed (e.g., to determine the request type) if the continuation
+    // runs in a background thread.
     memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
            pkthdr->msg_size + sizeof(pkthdr_t) - kHeadroom);
 
