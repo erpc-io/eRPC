@@ -18,9 +18,8 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
   sprintf(issue_msg, "Rpc %u: Received connect request from %s. Issue", rpc_id,
           sm_pkt.client.name().c_str());
 
-  // Handle reordering
+  // Handle duplicate session connect requests
   if (conn_req_token_map.count(sm_pkt.uniq_token) > 0) {
-    // We've received this connect request before
     uint16_t srv_session_num = conn_req_token_map[sm_pkt.uniq_token];
     assert(session_vec.size() > srv_session_num);
 
