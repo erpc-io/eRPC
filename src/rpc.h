@@ -514,7 +514,8 @@ class Rpc {
   // Datapath helpers
   //
 
-  /// Convert a response packet number to its index in the response MsgBuffer
+  /// Convert a response packet's wire protocol packet number (pkt_num) to its
+  /// index in the response MsgBuffer
   static inline size_t resp_ntoi(size_t pkt_num, size_t num_req_pkts) {
     return pkt_num - (num_req_pkts - 1);
   }
