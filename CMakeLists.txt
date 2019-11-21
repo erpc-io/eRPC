@@ -150,7 +150,7 @@ set(SOURCES
 find_package(Boost)
 if(Boost_FOUND)
   message(STATUS "Boost include directory = ${Boost_INCLUDE_DIRS}")
-  include_directories(system ${Boost_INCLUDE_DIRS})
+  include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 else()
   message(FATAL_ERROR "Boost not found.")
 endif()
