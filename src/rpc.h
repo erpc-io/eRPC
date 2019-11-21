@@ -101,7 +101,7 @@ class Rpc {
    * is the zero-based index of that port among active ports, as listed by
    * `ibv_devinfo` for Raw, InfiniBand, and RoCE transports; or by
    * `dpdk-devbind` for DPDK transport.
-   * 
+   *
    * @throw runtime_error if construction fails
    */
   Rpc(Nexus *nexus, void *context, uint8_t rpc_id, sm_handler_t sm_handler,
