@@ -762,15 +762,15 @@ class Rpc {
   }
 
   /// Return a credit to this session
-  inline void bump_credits(Session *session) {
+  static inline void bump_credits(Session *session) {
     assert(session->is_client());
     assert(session->client_info.credits < kSessionCredits);
     session->client_info.credits++;
   }
 
   /// Copy the data from a packet to a MsgBuffer at a packet index
-  inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, size_t pkt_idx,
-                                  const pkthdr_t *pkthdr) {
+  static inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, size_t pkt_idx,
+                                         const pkthdr_t *pkthdr) {
     size_t offset = pkt_idx * TTr::kMaxDataPerPkt;
     size_t to_copy = std::min(TTr::kMaxDataPerPkt, pkthdr->msg_size - offset);
     memcpy(&msgbuf->buf[offset], pkthdr + 1, to_copy);  // From end of pkthdr
