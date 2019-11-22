@@ -19,6 +19,7 @@
 #include "util/rand.h"
 #include "util/timer.h"
 #include "util/udp_client.h"
+#include "util/virt2phy.h"
 
 namespace erpc {
 
@@ -1002,6 +1003,10 @@ class Rpc {
     MtQueue<enq_req_args_t> _enqueue_request;
     MtQueue<enq_resp_args_t> _enqueue_response;
   } bg_queues;
+
+  /// Physical address translation
+  Virt2Phy *v2p;
+  std::unordered_map<uint64_t, uint64_t> hugepage_v2p_cache;
 
   // Misc
   SlowRand slow_rand;  ///< A slow random generator for "real" randomness

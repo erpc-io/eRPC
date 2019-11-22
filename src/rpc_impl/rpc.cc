@@ -46,6 +46,8 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     }
   }
 
+  if (kEnableIOAT) v2p = new Virt2Phy();
+
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for
   // the hugepage allocator.
