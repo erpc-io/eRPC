@@ -611,6 +611,12 @@ class Rpc {
   // Datapath processing
   //
 
+  /// Implementation of the run_event_loop(timeout) API function
+  void run_event_loop_timeout_st(size_t timeout_ms);
+
+  /// Actually run one iteration of the event loop
+  void run_event_loop_do_one_st();
+
   /// Enqueue client packets for a sslot that has at least one credit and
   /// request packets to send. Packets may be added to the timing wheel or the
   /// TX burst; credits are used in both cases.
@@ -634,21 +640,34 @@ class Rpc {
    */
   void process_resp_one_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
-  //
-  // Event loop
-  //
+  /**
+   * @brief Enqueue an explicit credit return
+   *
+   * @param sslot The session slot to send the explicit CR for
+   * @param req_pkthdr The packet header of the request packet that triggered
+   * this explicit CR. The packet number of req_pkthdr is copied to the CR.
+   */
+  void enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
 
-  /// Implementation of the run_event_loop(timeout) API function
-  void run_event_loop_timeout_st(size_t timeout_ms);
+  /**
+   * @brief Process an explicit credit return packet
+   * @param rx_tsc Timestamp at which the packet was received
+   */
+  void process_expl_cr_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
 
-  /// Actually run one iteration of the event loop
-  void run_event_loop_do_one_st();
+  /**
+   * @brief Enqueue a request-for-response. This doesn't modify credits or
+   * sslot's num_tx.
+   *
+   * @param sslot The session slot to send the RFR for
+   * @param req_pkthdr The packet header of the response packet that triggered
+   * this RFR. Since one response packet can trigger multiple RFRs, the RFR's
+   * packet number should be computed from num_tx, not from resp_pkthdr.
+   */
+  void enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
 
-  /// Return true iff a packet should be dropped
-  inline bool roll_pkt_drop() {
-    static constexpr uint32_t billion = 1000000000;
-    return ((fast_rand.next_u32() % billion) < faults.pkt_drop_thresh_billion);
-  }
+  /// Process a request-for-response
+  void process_rfr_st(SSlot *, const pkthdr_t *);
 
   /**
    * @brief Enqueue a data packet from sslot's tx_msgbuf for tx_burst
@@ -883,34 +902,11 @@ class Rpc {
     sslot->session->client_info.cc.timely.update_rate(rx_tsc, rtt_tsc);
   }
 
-  /**
-   * @brief Enqueue an explicit credit return
-   *
-   * @param sslot The session slot to send the explicit CR for
-   * @param req_pkthdr The packet header of the request packet that triggered
-   * this explicit CR. The packet number of req_pkthdr is copied to the CR.
-   */
-  void enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr);
-
-  /**
-   * @brief Process an explicit credit return packet
-   * @param rx_tsc Timestamp at which the packet was received
-   */
-  void process_expl_cr_st(SSlot *, const pkthdr_t *, size_t rx_tsc);
-
-  /**
-   * @brief Enqueue a request-for-response. This doesn't modify credits or
-   * sslot's num_tx.
-   *
-   * @param sslot The session slot to send the RFR for
-   * @param req_pkthdr The packet header of the response packet that triggered
-   * this RFR. Since one response packet can trigger multiple RFRs, the RFR's
-   * packet number should be computed from num_tx, not from resp_pkthdr.
-   */
-  void enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
-
-  /// Process a request-for-response
-  void process_rfr_st(SSlot *, const pkthdr_t *);
+  /// Return true iff a packet should be dropped
+  inline bool roll_pkt_drop() {
+    static constexpr uint32_t billion = 1000000000;
+    return ((fast_rand.next_u32() % billion) < faults.pkt_drop_thresh_billion);
+  }
 
  public:
   // Hooks for apps to modify eRPC behavior
