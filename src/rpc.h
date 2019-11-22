@@ -112,7 +112,7 @@ class Rpc {
 
   /**
    * @brief Create a hugepage-backed buffer for storing request or response
-   * messages.
+   * messages. Safe to call from background threads (TS).
    *
    * @param max_data_size If this call is successful, the returned MsgBuffer
    * contains space for this many application data bytes. The MsgBuffer should
@@ -152,7 +152,8 @@ class Rpc {
   }
 
   /**
-   * @brief Resize a MsgBuffer to fit a request or response
+   * @brief Resize a MsgBuffer to fit a request or response. Safe to call from
+   * background threads (TS).
    *
    * @param msg_buffer The MsgBuffer to resize
    *
@@ -172,7 +173,8 @@ class Rpc {
     msg_buffer->resize(new_data_size, new_num_pkts);
   }
 
-  /// Free a MsgBuffer created by alloc_msg_buffer()
+  /// Free a MsgBuffer created by alloc_msg_buffer(). Safe to call from
+  /// background threads (TS).
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     lock_cond(&huge_alloc_lock);
     huge_alloc->free_buf(msg_buffer.buffer);
@@ -211,7 +213,8 @@ class Rpc {
 
   /**
    * @brief Enqueue a request for transmission. This always succeeds. eRPC owns
-   * \p msg_buffer until it invokes the continuation callback.
+   * \p msg_buffer until it invokes the continuation callback. This function is
+   * safe to call from background threads (TS).
    *
    * @param session_num The session number to send the request on. This session
    * must be connected.
@@ -243,7 +246,8 @@ class Rpc {
   /**
    * @brief Enqueue a response for transmission at the server. See ReqHandle
    * for details about creating the response. On calling this, the application
-   * loses ownership of the request and response MsgBuffer.
+   * loses ownership of the request and response MsgBuffer. This function is
+   * safe to call from background threads (TS).
    *
    * This can be called outside the request handler.
    *
@@ -319,7 +323,8 @@ class Rpc {
   /// Return the Timing Wheel for this Rpc. Expert use only.
   TimingWheel *get_wheel() { return wheel; }
 
-  /// Set this Rpc's context
+  /// Set this Rpc's optaque context, which is passed to request handlers and
+  /// continuations.
   inline void set_context(void *_context) {
     rt_assert(context == nullptr, "Cannot reset non-null Rpc context");
     context = _context;
