@@ -91,6 +91,7 @@ endif()
 # Debug mode
 if(DEBUG)
   message(STATUS "Debugging is enabled. Perf will be low.")
+  add_definitions(-Og)
 else(DEBUG)
   message(STATUS "Debugging is disabled.")
   add_definitions(-DNDEBUG)

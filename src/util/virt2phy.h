@@ -78,7 +78,7 @@ class HugepageCachingVirt2Phy {
  public:
   uint64_t translate(void *_va) {
     uint64_t va = reinterpret_cast<uint64_t>(_va);
-    uint64_t va_2MB = (va & (MB(2)));
+    uint64_t va_2MB = (va & ~(MB(2) - 1));
 
     auto result = v2p_cache.find(va_2MB);
     if (likely(result != v2p_cache.end())) {
