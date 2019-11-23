@@ -241,6 +241,7 @@ endif()
 # These are not run using ctest
 set(UTIL_TESTS
   huge_alloc_test
+  hugepage_caching_virt2phy_test
   timing_wheel_test
   heartbeat_mgr_test
   rand_test

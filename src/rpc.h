@@ -1000,9 +1000,8 @@ class Rpc {
     MtQueue<enq_resp_args_t> _enqueue_response;
   } bg_queues;
 
-  /// Physical address translation
-  Virt2Phy *v2p;
-  std::unordered_map<uint64_t, uint64_t> hugepage_v2p_cache;
+  /// Physical address translation for IOAT
+  HugepageCachingVirt2Phy *hugepage_caching_virt2phy;
 
   // Misc
   SlowRand slow_rand;  ///< A slow random generator for "real" randomness
