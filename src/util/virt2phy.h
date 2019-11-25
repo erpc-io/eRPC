@@ -52,7 +52,7 @@ class Virt2Phy {
     if (ret < 0) {
       fprintf(stderr, "cannot read /proc/self/pagemap: %s\n", strerror(errno));
       return 0;
-    } else if (ret != kPfnMaskSize) {
+    } else if (ret != static_cast<int>(kPfnMaskSize)) {
       fprintf(stderr,
               "read %d bytes from /proc/self/pagemap but expected %zu:\n", ret,
               kPfnMaskSize);

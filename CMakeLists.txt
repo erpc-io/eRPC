@@ -12,8 +12,6 @@ add_definitions(-std=c++11 -march=native -g)
 add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
 add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro)
 
-set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
-
 # Unit tests
 enable_testing()
 find_package(GTest REQUIRED)
@@ -32,6 +30,7 @@ set(COMPILE_ERPC_LIB ON)
 set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(ROCE "Use RoCE if TRANSPORT is infiniband" OFF)
 option(PERF "Compile for performance" ON)
+option(IOAT "Enable I/OAT DMA engine acceleration" OFF)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
 cmake_dependent_option(LTO "Use link time optimization" ON "PERF" OFF)
@@ -156,23 +155,21 @@ else()
   message(FATAL_ERROR "Boost not found.")
 endif()
 
-# Transport-specific. Mellanox OFED drivers are the best choice for raw and
-# infiniband, but they do not play well with DPDK. So we compile only one
-# transport. Other transports are exluded using preprocessor macros.
-string(TOUPPER ${TRANSPORT} DEFINE_TRANSPORT)
-add_definitions(-D${DEFINE_TRANSPORT}=true)
-message(STATUS "Selected transport = ${TRANSPORT}.")
-set(CONFIG_IS_ROCE false)
-
-if(TRANSPORT STREQUAL "dpdk")
-  find_library(DPDK_LIB dpdk)
-  if(NOT DPDK_LIB)
-    message(FATAL_ERROR "dpdk library not found")
+# DPDK: We might need DPDK even if the transport isn't DPDK (e.g, for I/OAT)
+if(TRANSPORT STREQUAL "dpdk" OR IOAT) 
+  if(IOAT)
+    message(STATUS "I/OAT acceleration is enabled")
   endif()
 
-  set(LIBRARIES ${LIBRARIES} dpdk dl)
-  set(CONFIG_TRANSPORT "DpdkTransport")
-  set(CONFIG_HEADROOM 40)
+  message(STATUS "DPDK is required")
+
+  find_library(DPDK_LIB dpdk)
+  if(NOT DPDK_LIB)
+    message(FATAL_ERROR "DPDK library not found")
+  endif()
+
+  add_definitions(-Wno-deprecated-declarations)
+  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive dl)
 
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
@@ -181,9 +178,23 @@ if(TRANSPORT STREQUAL "dpdk")
   if (DPDK_INCLUDE_DIR)
     message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
   else()
-    message(FATAL_ERROR "DPDK include directory not found. Please install DPDK.")
+    message(FATAL_ERROR "DPDK include directory not found")
   endif()
+
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+endif()
+
+# Transport-specific. Mellanox OFED drivers are the best choice for "raw" and
+# "infiniband" transports, but they do not play well with DPDK. So we compile
+# only one transport. Other transports are exluded using preprocessor macros.
+string(TOUPPER ${TRANSPORT} DEFINE_TRANSPORT)
+add_definitions(-D${DEFINE_TRANSPORT}=true)
+message(STATUS "Selected transport = ${TRANSPORT}.")
+set(CONFIG_IS_ROCE false)
+
+if(TRANSPORT STREQUAL "dpdk")
+  set(CONFIG_TRANSPORT "DpdkTransport")
+  set(CONFIG_HEADROOM 40)
 else()
   find_library(IBVERBS_LIB ibverbs)
   if(NOT IBVERBS_LIB)
@@ -250,6 +261,8 @@ set(UTIL_TESTS
   fixed_vector_test
   timely_test
   numautil_test)
+
+set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
 # Compile the library
 if(COMPILE_ERPC_LIB)

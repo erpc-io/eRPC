@@ -122,7 +122,7 @@ void DpdkTransport::setup_phy_port() {
   memset(&eth_conf, 0, sizeof(eth_conf));
 
   eth_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
-  eth_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+  eth_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
 #if RTE_VER_YEAR < 18
   eth_conf.rxmode.ignore_offload_bitfield = 1;  // Use offloads below instead
 #endif
@@ -225,7 +225,7 @@ DpdkTransport::~DpdkTransport() {
 }
 
 void DpdkTransport::resolve_phy_port() {
-  struct ether_addr mac;
+  struct rte_ether_addr mac;
   rte_eth_macaddr_get(phy_port, &mac);
   memcpy(resolve.mac_addr, &mac.addr_bytes, sizeof(resolve.mac_addr));
 

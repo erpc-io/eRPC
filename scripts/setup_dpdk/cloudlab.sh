@@ -2,8 +2,8 @@
 # Script to bind all experimental interfaces to DPDK on any CloudLab cluster.
 # This works because CloudLab assigns 10.* IP addresses to all experimental
 # interfaces.
-sudo modprobe uio
-sudo modprobe igb_uio
+#sudo modprobe uio
+#sudo modprobe igb_uio
 
 # Bind CloudLab's experimental interface (10.*.*.*) to DPDK
 if [ ! -f "$(dirname $0)"/ifname ]; then

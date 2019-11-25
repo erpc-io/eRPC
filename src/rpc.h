@@ -909,6 +909,9 @@ class Rpc {
     return ((fast_rand.next_u32() % billion) < faults.pkt_drop_thresh_billion);
   }
 
+  /// Initialize the I/OAT DMA engine channel for this Rpc object
+  void setup_ioat();
+
  public:
   // Hooks for apps to modify eRPC behavior
 
