@@ -46,7 +46,10 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
     }
   }
 
-  if (kEnableIOAT) hugepage_caching_virt2phy = new HugepageCachingVirt2Phy();
+  if (kEnableIOAT) {
+    setup_ioat();
+    hugepage_caching_virt2phy = new HugepageCachingVirt2Phy();
+  }
 
   // Partially initialize the transport without using hugepages. This
   // initializes the transport's memory registration functions required for

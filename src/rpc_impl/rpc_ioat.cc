@@ -1,5 +1,7 @@
-#include <rte_ioat_rawdev.h>
 #include <rte_rawdev.h>
+// Newline to prevent reordering rte_ioat_rawdev.h before rte_rawdev.h
+#include <rte_ioat_rawdev.h>
+
 #include "rpc.h"
 #include "util/externs.h"
 
@@ -20,12 +22,14 @@ void Rpc<TTr>::setup_ioat() {
     ERPC_INFO("I/OAT setup for Rpc %u initializing DPDK\n", rpc_id);
 
     // RTE_LOG_WARNING is log level 5
-    const char *rte_argv[] = {"-c", "1",  "-n",  "4", "--log-level",
-                              "5",  "-m", "128", NULL};
+    const char *rte_argv[] = {"-c", "1",  "-n",  "6", "--log-level",
+                              "0",  "-m", "128", NULL};
 
     int rte_argc = sizeof(rte_argv) / sizeof(rte_argv[0]) - 1;
     int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
-    _unused(ret);
+    rt_assert(ret >= 0, "Failed to initialize DPDK");
+
+    dpdk_initialized = true;
   } else {
     ERPC_INFO("I/OAT setup for Rpc %u skipping DPDK initialization\n", rpc_id);
   }

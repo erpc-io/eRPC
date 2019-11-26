@@ -9,7 +9,7 @@ include(CMakeDependentOption)
 set(CMAKE_CXX_COMPILER g++)
 
 add_definitions(-std=c++11 -march=native -g)
-add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
+add_definitions(-Wall -Wextra -Werror -fpermissive -Wsign-conversion -Wold-style-cast)
 add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro)
 
 # Unit tests
@@ -90,7 +90,7 @@ endif()
 # Debug mode
 if(DEBUG)
   message(STATUS "Debugging is enabled. Perf will be low.")
-  add_definitions(-Og)
+  add_definitions(-g)
 else(DEBUG)
   message(STATUS "Debugging is disabled.")
   add_definitions(-DNDEBUG)
@@ -136,6 +136,7 @@ set(SOURCES
   src/rpc_impl/rpc_reset_handlers.cc
   src/rpc_impl/rpc_sm_api.cc
   src/rpc_impl/rpc_sm_helpers.cc
+  src/rpc_impl/rpc_ioat.cc
   src/transport_impl/transport.cc
   src/transport_impl/dpdk/dpdk_transport.cc
   src/transport_impl/dpdk/dpdk_transport_datapath.cc

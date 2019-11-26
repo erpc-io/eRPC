@@ -61,12 +61,12 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
                 rpc_id, qp_id);
 
       // n: channels, m: maximum memory in megabytes
-      const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
+      const char *rte_argv[] = {"-c", "1",  "-n",   "6",    "--log-level",
                                 "0",  "-m", "1024", nullptr};
       int rte_argc =
           static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
-      rt_assert(ret >= 0, "rte_eal_init failed");
+      rt_assert(ret >= 0, "Failed to initialize DPDK");
 
       dpdk_initialized = true;
     }
