@@ -13,9 +13,9 @@ namespace erpc {
 
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 
-static volatile bool port_initialized[RTE_MAX_ETHPORTS];
+static volatile bool port_initialized[RTE_MAX_ETHPORTS];  // Uses dpdk_lock
 
-/// The set of queue IDs in use by Rpc objects in this process
+/// The set of queue IDs in use by Rpc objects in this process. Uses dpdk_lock.
 static std::set<size_t> used_qp_ids[RTE_MAX_ETHPORTS];
 
 /// mempool_arr[i][j] is the mempool to use for port i, queue j

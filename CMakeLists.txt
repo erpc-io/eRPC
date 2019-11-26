@@ -160,6 +160,7 @@ endif()
 if(TRANSPORT STREQUAL "dpdk" OR IOAT) 
   if(IOAT)
     message(STATUS "I/OAT acceleration is enabled")
+    set(CONFIG_ENABLE_IOAT true)
   endif()
 
   message(STATUS "DPDK is required")

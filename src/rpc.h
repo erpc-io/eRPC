@@ -1003,8 +1003,9 @@ class Rpc {
     MtQueue<enq_resp_args_t> _enqueue_response;
   } bg_queues;
 
-  /// Physical address translation for IOAT
+  /// The caching hugepage virtual-to-physical address translator for I/OAT
   HugepageCachingVirt2Phy *hugepage_caching_virt2phy;
+  size_t ioat_dev_id;  ///< I/OAT device ID used by this Rpc object
 
   // Misc
   SlowRand slow_rand;  ///< A slow random generator for "real" randomness
