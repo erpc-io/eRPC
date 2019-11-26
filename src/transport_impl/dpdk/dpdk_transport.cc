@@ -6,14 +6,13 @@
 #include <rte_version.h>
 #include <set>
 #include "dpdk_transport.h"
+#include "util/externs.h"
 #include "util/huge_alloc.h"
 
 namespace erpc {
 
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 
-static std::mutex eal_lock;
-static volatile bool eal_initialized;
 static volatile bool port_initialized[RTE_MAX_ETHPORTS];
 
 /// The set of queue IDs in use by Rpc objects in this process
@@ -38,7 +37,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
   {
     // The first thread to grab the lock initializes DPDK
-    eal_lock.lock();
+    dpdk_lock.lock();
 
     // Get an available queue on phy_port. This does not require phy_port to
     // be initialized.
@@ -53,11 +52,13 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     }
     used_qp_ids[phy_port].insert(qp_id);
 
-    if (eal_initialized) {
-      ERPC_INFO("Rpc %u skipping DPDK initialization, queues ID = %zu.\n",
-                rpc_id, qp_id);
+    if (dpdk_initialized) {
+      ERPC_INFO(
+          "DPDK transport for Rpc %u skipping initialization, queue ID = %zu\n",
+          rpc_id, qp_id);
     } else {
-      ERPC_INFO("Rpc %u initializing DPDK, queues ID = %zu.\n", rpc_id, qp_id);
+      ERPC_INFO("DPDK transport for Rpc %u initializing DPDK, queue ID = %zu\n",
+                rpc_id, qp_id);
 
       // n: channels, m: maximum memory in megabytes
       const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",

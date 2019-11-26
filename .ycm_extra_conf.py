@@ -39,7 +39,7 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
-    '-DINFINIBAND=true',
+    '-DDPDK=true',
     '-isystem' + str(home_dir) + '/dpdk/include/dpdk/',
     '-I' + str(home_dir) + '/eRPC/src',
     '-I' + str(home_dir) + '/eRPC/third_party',
@@ -54,6 +54,7 @@ flags = [
     '-Wno-unused-function',
     '-Wold-style-cast',
     '-Wsign-conversion',
+    '-Wno-deprecated-declarations',
     '-std=c++11',
 ]
 

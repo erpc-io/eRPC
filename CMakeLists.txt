@@ -144,6 +144,7 @@ set(SOURCES
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
   src/util/huge_alloc.cc
+  src/util/externs.cc
   src/util/tls_registry.cc)
 
 # Boost
