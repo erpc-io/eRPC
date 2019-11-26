@@ -1,7 +1,5 @@
-#pragma once
-
+#include "externs.h"
 #include <atomic>
-#include "common.h"
 
 namespace erpc {
 

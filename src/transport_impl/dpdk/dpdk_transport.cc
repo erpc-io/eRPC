@@ -68,7 +68,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
       rt_assert(ret >= 0, "rte_eal_init failed");
 
-      eal_initialized = true;
+      dpdk_initialized = true;
     }
 
     if (!port_initialized[phy_port]) {
@@ -79,7 +79,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     // Here, mempools for phy_port have been initialized
     mempool = mempool_arr[phy_port][qp_id];
 
-    eal_lock.unlock();
+    dpdk_lock.unlock();
   }
 
   resolve_phy_port();
@@ -219,9 +219,9 @@ DpdkTransport::~DpdkTransport() {
   rte_mempool_free(mempool);
 
   {
-    eal_lock.lock();
+    dpdk_lock.lock();
     used_qp_ids[phy_port].erase(used_qp_ids[phy_port].find(qp_id));
-    eal_lock.unlock();
+    dpdk_lock.unlock();
   }
 }
 
