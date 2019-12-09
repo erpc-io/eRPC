@@ -90,7 +90,6 @@ endif()
 # Debug mode
 if(DEBUG)
   message(STATUS "Debugging is enabled. Perf will be low.")
-  add_definitions(-g)
 else(DEBUG)
   message(STATUS "Debugging is disabled.")
   add_definitions(-DNDEBUG)
@@ -100,10 +99,10 @@ endif(DEBUG)
 # Testing for packet loss, machine failure, etc
 if(TESTING)
   message(STATUS "Testing is enabled. Performance will be low.")
-  add_definitions(-DTESTING=true)
+  add_definitions(-DERPC_TESTING=true)
 else(TESTING)
   message(STATUS "Testing is disabled, so tests may fail.")
-  add_definitions(-DTESTING=false)
+  add_definitions(-DERPC_TESTING=false)
 endif(TESTING)
 
 # Link-time optimization
@@ -157,13 +156,18 @@ else()
   message(FATAL_ERROR "Boost not found.")
 endif()
 
+# I/OAT
+if(IOAT)
+  message(STATUS "I/OAT acceleration is enabled. This is an experimental feature.")
+  set(CONFIG_ENABLE_IOAT true)
+  add_definitions(-DERPC_IOAT=true)
+else()
+  message(STATUS "I/OAT acceleration is disabled")
+  set(CONFIG_ENABLE_IOAT false)
+endif()
+
 # DPDK: We might need DPDK even if the transport isn't DPDK (e.g, for I/OAT)
 if(TRANSPORT STREQUAL "dpdk" OR IOAT) 
-  if(IOAT)
-    message(STATUS "I/OAT acceleration is enabled")
-    set(CONFIG_ENABLE_IOAT true)
-  endif()
-
   message(STATUS "DPDK is required")
 
   find_library(DPDK_LIB dpdk)
@@ -191,7 +195,7 @@ endif()
 # "infiniband" transports, but they do not play well with DPDK. So we compile
 # only one transport. Other transports are exluded using preprocessor macros.
 string(TOUPPER ${TRANSPORT} DEFINE_TRANSPORT)
-add_definitions(-D${DEFINE_TRANSPORT}=true)
+add_definitions(-DERPC_${DEFINE_TRANSPORT}=true)
 message(STATUS "Selected transport = ${TRANSPORT}.")
 set(CONFIG_IS_ROCE false)
 

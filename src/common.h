@@ -31,10 +31,10 @@ namespace erpc {
 #define MB(x) (static_cast<size_t>(x) << 20)
 #define GB(x) (static_cast<size_t>(x) << 30)
 
-#ifndef TESTING
+#ifndef ERPC_TESTING
 static constexpr bool kTesting = false;
 #else
-static constexpr bool kTesting = TESTING;
+static constexpr bool kTesting = ERPC_TESTING;
 #endif
 
 // General constants

@@ -1,3 +1,15 @@
+/**
+ * @file rpc_ioat.cc
+ *
+ * @brief I/OAT helpers for eRPC. This code is compiled conditionally after
+ * checking ERPC_IOAT to avoid requiring users to install DPDK.
+ *
+ * Dummy implementations of class functions are at the end of this file. This
+ * allows compiling the rest of eRPC without ifdef-ing all I/OAT helper calls.
+ */
+
+#ifdef ERPC_IOAT
+
 #include <rte_rawdev.h>
 // Newline to prevent reordering rte_ioat_rawdev.h before rte_rawdev.h
 #include <rte_ioat_rawdev.h>
@@ -36,6 +48,7 @@ void Rpc<TTr>::setup_ioat() {
 
   size_t rawdev_count = rte_rawdev_count();
   rt_assert(rawdev_count >= 1, "No I/OAT devices online");
+  ERPC_INFO("%zu I/OAT devices are online\n", rawdev_count);
 
   ioat_dev_id = SIZE_MAX;
   for (size_t i = 0; i < rawdev_count; i++) {
@@ -75,6 +88,38 @@ void Rpc<TTr>::setup_ioat() {
   dpdk_lock.unlock();
 }
 
+template <class TTr>
+void Rpc<TTr>::teardown_ioat() {
+  dpdk_lock.lock();
+
+  dpdk_lock.unlock();
+}
+
 FORCE_COMPILE_TRANSPORTS
 
 }  // namespace erpc
+
+#else
+
+#include "rpc.h"
+
+namespace erpc {
+
+static void ioat_disabled_error() {
+  rt_assert(false, "I/OAT function called while I/OAT is disabled\n");
+}
+
+template <class TTr>
+void Rpc<TTr>::setup_ioat() {
+  ioat_disabled_error();
+}
+
+template <class TTr>
+void Rpc<TTr>::teardown_ioat() {
+  ioat_disabled_error();
+}
+
+FORCE_COMPILE_TRANSPORTS
+
+}  // namespace erpc
+#endif

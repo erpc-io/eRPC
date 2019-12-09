@@ -912,6 +912,9 @@ class Rpc {
   /// Initialize the I/OAT DMA engine channel for this Rpc object
   void setup_ioat();
 
+  /// Teardown the I/OAT DMA engine channel for this Rpc object
+  void teardown_ioat();
+
  public:
   // Hooks for apps to modify eRPC behavior
 
