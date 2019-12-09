@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifdef RAW
+#ifdef ERPC_RAW
 
 #include "mlx5_defs.h"
 #include "transport.h"

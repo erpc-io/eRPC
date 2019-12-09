@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifdef DPDK
+#ifdef ERPC_DPDK
 
 #include "transport.h"
 #include "transport_impl/eth_common.h"

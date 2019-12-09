@@ -1,4 +1,4 @@
-#ifdef DPDK
+#ifdef ERPC_DPDK
 
 #include <iomanip>
 #include <stdexcept>

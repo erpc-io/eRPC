@@ -1,4 +1,4 @@
-#ifdef INFINIBAND
+#ifdef ERPC_INFINIBAND
 
 #include "ib_transport.h"
 
