@@ -93,7 +93,7 @@ void Rpc<TTr>::pkt_loss_retransmit_st(SSlot *sslot) {
           "Rpc %u, lsn %u (%s): Pkt loss suspected for req %zu (%s). Action",
           rpc_id, sslot->session->local_session_num,
           sslot->session->get_remote_hostname().c_str(),
-          req_msgbuf->get_req_num(), sslot->progress_str().c_str());
+          req_msgbuf->get_pkthdr_0()->req_num, sslot->progress_str().c_str());
 
   const size_t delta = ci.num_tx - ci.num_rx;
   assert(credits + delta <= kSessionCredits);

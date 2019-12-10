@@ -1,4 +1,4 @@
-#ifdef DPDK
+#ifdef ERPC_DPDK
 
 #include <iomanip>
 #include <stdexcept>
@@ -6,17 +6,16 @@
 #include <rte_version.h>
 #include <set>
 #include "dpdk_transport.h"
+#include "util/externs.h"
 #include "util/huge_alloc.h"
 
 namespace erpc {
 
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 
-static std::mutex eal_lock;
-static volatile bool eal_initialized;
-static volatile bool port_initialized[RTE_MAX_ETHPORTS];
+static volatile bool port_initialized[RTE_MAX_ETHPORTS];  // Uses dpdk_lock
 
-/// The set of queue IDs in use by Rpc objects in this process
+/// The set of queue IDs in use by Rpc objects in this process. Uses dpdk_lock.
 static std::set<size_t> used_qp_ids[RTE_MAX_ETHPORTS];
 
 /// mempool_arr[i][j] is the mempool to use for port i, queue j
@@ -38,7 +37,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
   {
     // The first thread to grab the lock initializes DPDK
-    eal_lock.lock();
+    dpdk_lock.lock();
 
     // Get an available queue on phy_port. This does not require phy_port to
     // be initialized.
@@ -53,21 +52,23 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     }
     used_qp_ids[phy_port].insert(qp_id);
 
-    if (eal_initialized) {
-      ERPC_INFO("Rpc %u skipping DPDK initialization, queues ID = %zu.\n",
-                rpc_id, qp_id);
+    if (dpdk_initialized) {
+      ERPC_INFO(
+          "DPDK transport for Rpc %u skipping initialization, queue ID = %zu\n",
+          rpc_id, qp_id);
     } else {
-      ERPC_INFO("Rpc %u initializing DPDK, queues ID = %zu.\n", rpc_id, qp_id);
+      ERPC_INFO("DPDK transport for Rpc %u initializing DPDK, queue ID = %zu\n",
+                rpc_id, qp_id);
 
       // n: channels, m: maximum memory in megabytes
-      const char *rte_argv[] = {"-c", "1",  "-n",   "4",    "--log-level",
+      const char *rte_argv[] = {"-c", "1",  "-n",   "6",    "--log-level",
                                 "0",  "-m", "1024", nullptr};
       int rte_argc =
           static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
-      rt_assert(ret >= 0, "rte_eal_init failed");
+      rt_assert(ret >= 0, "Failed to initialize DPDK");
 
-      eal_initialized = true;
+      dpdk_initialized = true;
     }
 
     if (!port_initialized[phy_port]) {
@@ -78,7 +79,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     // Here, mempools for phy_port have been initialized
     mempool = mempool_arr[phy_port][qp_id];
 
-    eal_lock.unlock();
+    dpdk_lock.unlock();
   }
 
   resolve_phy_port();
@@ -122,7 +123,7 @@ void DpdkTransport::setup_phy_port() {
   memset(&eth_conf, 0, sizeof(eth_conf));
 
   eth_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
-  eth_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+  eth_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
 #if RTE_VER_YEAR < 18
   eth_conf.rxmode.ignore_offload_bitfield = 1;  // Use offloads below instead
 #endif
@@ -218,14 +219,14 @@ DpdkTransport::~DpdkTransport() {
   rte_mempool_free(mempool);
 
   {
-    eal_lock.lock();
+    dpdk_lock.lock();
     used_qp_ids[phy_port].erase(used_qp_ids[phy_port].find(qp_id));
-    eal_lock.unlock();
+    dpdk_lock.unlock();
   }
 }
 
 void DpdkTransport::resolve_phy_port() {
-  struct ether_addr mac;
+  struct rte_ether_addr mac;
   rte_eth_macaddr_get(phy_port, &mac);
   memcpy(resolve.mac_addr, &mac.addr_bytes, sizeof(resolve.mac_addr));
 

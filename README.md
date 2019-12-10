@@ -21,7 +21,9 @@ Some highlights:
  * See `scripts/packages/` for required software packages for your distro. 
    Install _exactly one_ of the following, mutually-incompatible packages:
    * Mellanox OFED for Mellanox NICs
-   * System-wide DPDK for other, DPDK-compatible NICs
+   * For other DPDK-compatible NICs, a system-wide installation from the latest
+     DPDK sources (e.g., `sudo make install T=x86_64-native-linuxapp-gcc
+     DESTDIR=/usr`).
  * NICs: Fast (10 GbE+) bare-metal NICs are needed for good performance. eRPC
    works best with Mellanox Ethernet and InfiniBand NICs. Any DPDK-capable NICs
    also work well. Slower/virtual NICs can still be used for testing and

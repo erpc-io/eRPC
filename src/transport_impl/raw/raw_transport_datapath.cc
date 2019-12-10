@@ -1,4 +1,4 @@
-#ifdef RAW
+#ifdef ERPC_RAW
 
 #include "raw_transport.h"
 #include "util/huge_alloc.h"
@@ -10,7 +10,6 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
   for (size_t i = 0; i < num_pkts; i++) {
     const tx_burst_item_t& item = tx_burst_arr[i];
     const MsgBuffer* msg_buffer = item.msg_buffer;
-    assert(msg_buffer->is_valid());  // Can be fake for control packets
 
     // Verify constant fields of work request
     struct ibv_send_wr& wr = send_wr[i];

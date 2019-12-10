@@ -1,4 +1,4 @@
-#ifdef RAW
+#ifdef ERPC_RAW
 
 #include <iomanip>
 #include <stdexcept>

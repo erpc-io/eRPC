@@ -18,5 +18,5 @@ class TlsRegistry {
 
   /// Return the eRPC thread ID of the caller
   size_t get_etid() const;
-};  // End erpc
+};
 }  // namespace erpc

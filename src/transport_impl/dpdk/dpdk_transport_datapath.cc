@@ -1,4 +1,4 @@
-#ifdef DPDK
+#ifdef ERPC_DPDK
 
 #include "dpdk_transport.h"
 #include "util/huge_alloc.h"
@@ -35,7 +35,6 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
   for (size_t i = 0; i < num_pkts; i++) {
     const tx_burst_item_t &item = tx_burst_arr[i];
     const MsgBuffer *msg_buffer = item.msg_buffer;
-    assert(msg_buffer->is_valid());  // Can be fake for control packets
 
     tx_mbufs[i] = rte_pktmbuf_alloc(mempool);
     assert(tx_mbufs[i] != nullptr);

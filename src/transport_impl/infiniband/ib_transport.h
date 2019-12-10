@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifdef INFINIBAND
+#ifdef ERPC_INFINIBAND
 
 #include "transport.h"
 #include "transport_impl/verbs_common.h"

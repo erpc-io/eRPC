@@ -127,7 +127,7 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   }
 
   // Here, the complete response has been received. All references to sslot must
-  // be removed before invalidating it.
+  // have been removed previously, before invalidating the sslot (done next).
   // 1. The TX batch or DMA queue cannot contain a reference because we drain
   //    it after retransmission.
   // 2. The wheel cannot contain a reference because we (a) wait for sslot to
@@ -138,9 +138,9 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   sslot->tx_msgbuf = nullptr;  // Mark response as received
   delete_from_active_rpc_list(*sslot);
 
-  // Free-up this sslot, and clear up one request from the backlog if needed.
-  // The sslot may get re-used immediately if there's backlog, or later from a
-  // request enqueued by a background thread. So, copy-out needed fields.
+  // Free-up this sslot by copying-out needed fields. The sslot may get re-used
+  // immediately if there are backlogged requests, or much later from a request
+  // enqueued by a background thread.
   const erpc_cont_func_t _cont_func = ci.cont_func;
   void *_tag = ci.tag;
   const size_t _cont_etid = ci.cont_etid;
@@ -148,6 +148,7 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   Session *session = sslot->session;
   session->client_info.sslot_free_vec.push_back(sslot->index);
 
+  // Clear up one request from the backlog if needed
   if (!session->client_info.enq_req_backlog.empty()) {
     // We just got a new sslot, and we should have no more if there's backlog
     assert(session->client_info.sslot_free_vec.size() == 1);

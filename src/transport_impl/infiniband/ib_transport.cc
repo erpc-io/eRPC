@@ -1,4 +1,4 @@
-#ifdef INFINIBAND
+#ifdef ERPC_INFINIBAND
 
 #include <iomanip>
 #include <stdexcept>

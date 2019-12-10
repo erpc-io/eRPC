@@ -4,8 +4,7 @@ project(eRPC)
 include(CMakeDependentOption)
 
 # Pick a compiler
-#set(CMAKE_CXX_COMPILER clang++-6.0)
-#set(CMAKE_CXX_COMPILER g++-8)
+#set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_COMPILER g++)
 
 add_definitions(-std=c++11 -march=native -g)
@@ -100,10 +99,10 @@ endif(DEBUG)
 # Testing for packet loss, machine failure, etc
 if(TESTING)
   message(STATUS "Testing is enabled. Performance will be low.")
-  add_definitions(-DTESTING=true)
+  add_definitions(-DERPC_TESTING=true)
 else(TESTING)
   message(STATUS "Testing is disabled, so tests may fail.")
-  add_definitions(-DTESTING=false)
+  add_definitions(-DERPC_TESTING=false)
 endif(TESTING)
 
 # Link-time optimization
@@ -144,6 +143,7 @@ set(SOURCES
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
   src/util/huge_alloc.cc
+  src/util/externs.cc
   src/util/tls_registry.cc)
 
 # Boost
@@ -159,14 +159,14 @@ endif()
 # infiniband, but they do not play well with DPDK. So we compile only one
 # transport. Other transports are exluded using preprocessor macros.
 string(TOUPPER ${TRANSPORT} DEFINE_TRANSPORT)
-add_definitions(-D${DEFINE_TRANSPORT}=true)
+add_definitions(-DERPC_${DEFINE_TRANSPORT}=true)
 message(STATUS "Selected transport = ${TRANSPORT}.")
 set(CONFIG_IS_ROCE false)
 
 if(TRANSPORT STREQUAL "dpdk")
   find_library(DPDK_LIB dpdk)
   if(NOT DPDK_LIB)
-    message(FATAL_ERROR "dpdk library not found")
+    message(FATAL_ERROR "DPDK library not found")
   endif()
 
   set(LIBRARIES ${LIBRARIES} dpdk dl)
@@ -180,7 +180,7 @@ if(TRANSPORT STREQUAL "dpdk")
   if (DPDK_INCLUDE_DIR)
     message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
   else()
-    message(FATAL_ERROR "DPDK include directory not found. Please install DPDK.")
+    message(FATAL_ERROR "DPDK include directory not found")
   endif()
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 else()
@@ -241,6 +241,7 @@ endif()
 # These are not run using ctest
 set(UTIL_TESTS
   huge_alloc_test
+  hugepage_caching_virt2phy_test
   timing_wheel_test
   heartbeat_mgr_test
   rand_test

@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifndef DPDK
+#ifndef ERPC_DPDK
 
 #include <dirent.h>
 #include <infiniband/verbs.h>

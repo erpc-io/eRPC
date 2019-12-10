@@ -26,7 +26,7 @@ void Nexus::bg_thread_func(BgThreadCtx ctx) {
 
       if (wi.is_req()) {
         SSlot *s = wi.sslot;  // For requests, we have a valid sslot
-        uint8_t req_type = s->server_info.req_msgbuf.get_req_type();
+        uint8_t req_type = s->server_info.req_type;
         const ReqFunc &req_func = ctx.req_func_arr->at(req_type);
         req_func.req_func(static_cast<ReqHandle *>(s), wi.context);
       } else {

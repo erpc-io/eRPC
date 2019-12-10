@@ -40,6 +40,7 @@ flags = [
     '-x',
     'c++',
     '-DINFINIBAND=true',
+    '-isystem' + str(home_dir) + '/dpdk/include/dpdk/',
     '-I' + str(home_dir) + '/eRPC/src',
     '-I' + str(home_dir) + '/eRPC/third_party',
     '-I' + str(home_dir) + '/eRPC/mica/src',
@@ -53,6 +54,7 @@ flags = [
     '-Wno-unused-function',
     '-Wold-style-cast',
     '-Wsign-conversion',
+    '-Wno-deprecated-declarations',
     '-std=c++11',
 ]
 

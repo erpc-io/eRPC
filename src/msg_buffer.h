@@ -45,22 +45,8 @@ class MsgBuffer {
         (n - 1) * sizeof(pkthdr_t));
   }
 
-  ///@{ Accessors for the packet header
-  inline bool is_req() const { return get_pkthdr_0()->is_req(); }
-  inline bool is_resp() const { return get_pkthdr_0()->is_resp(); }
-  inline bool is_expl_cr() const { return get_pkthdr_0()->is_expl_cr(); }
-  inline bool is_rfr() const { return get_pkthdr_0()->is_rfr(); }
-  inline uint64_t get_req_num() const { return get_pkthdr_0()->req_num; }
-  inline uint64_t get_pkt_type() const { return get_pkthdr_0()->pkt_type; }
-  ///@}
-
   std::string get_pkthdr_str(size_t pkt_idx) const {
     return get_pkthdr_n(pkt_idx)->to_string();
-  }
-
-  /// Basic validity check that every MsgBuffer must satisfy
-  inline bool is_valid() const {
-    return buf != nullptr && get_pkthdr_0()->magic == kPktHdrMagic;
   }
 
   /// Return true iff this MsgBuffer uses a dynamically-allocated MsgBuffer.
@@ -107,7 +93,7 @@ class MsgBuffer {
     assert(buffer.class_size >=
            max_data_size + max_num_pkts * sizeof(pkthdr_t));
 
-    pkthdr_t *pkthdr_0 = reinterpret_cast<pkthdr_t *>(buffer.buf);
+    pkthdr_t *pkthdr_0 = get_pkthdr_0();
     pkthdr_0->magic = kPktHdrMagic;
 
     // UDP checksum for raw Ethernet. Useless for other transports.
@@ -125,7 +111,6 @@ class MsgBuffer {
         max_num_pkts(1),
         num_pkts(1),
         buf(reinterpret_cast<uint8_t *>(pkthdr) + sizeof(pkthdr_t)) {
-    assert(pkthdr->check_magic());  // pkthdr is the zeroth header
     // max_data_size can be zero for control packets, so can't assert
 
     buffer.buf = nullptr;  // Mark as a non-dynamic ("fake") MsgBuffer
@@ -143,9 +128,6 @@ class MsgBuffer {
   // The real constructors are private
   MsgBuffer() {}
   ~MsgBuffer() {}
-
-  /// Return the request type of this message buffer
-  inline uint8_t get_req_type() const { return get_pkthdr_0()->req_type; }
 
   /**
    * Return the current amount of data in this message buffer. This can be

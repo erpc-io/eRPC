@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifdef DPDK
+#ifdef ERPC_DPDK
 
 #include "transport.h"
 #include "transport_impl/eth_common.h"
@@ -89,7 +89,7 @@ class DpdkTransport : public Transport {
   /// to be in host-byte order.
   static uint32_t get_port_ipv4_addr(size_t phy_port) {
     // For now, we use the LSBs of the port's MAC address
-    struct ether_addr mac;
+    struct rte_ether_addr mac;
     rte_eth_macaddr_get(phy_port, &mac);
 
     uint32_t ret;

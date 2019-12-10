@@ -10,6 +10,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <unordered_map>
+#include "common.h"
 
 namespace erpc {
 
@@ -50,7 +52,7 @@ class Virt2Phy {
     if (ret < 0) {
       fprintf(stderr, "cannot read /proc/self/pagemap: %s\n", strerror(errno));
       return 0;
-    } else if (ret != kPfnMaskSize) {
+    } else if (ret != static_cast<int>(kPfnMaskSize)) {
       fprintf(stderr,
               "read %d bytes from /proc/self/pagemap but expected %zu:\n", ret,
               kPfnMaskSize);
@@ -70,6 +72,29 @@ class Virt2Phy {
  private:
   int fd;
   size_t page_size;
+};
+
+class HugepageCachingVirt2Phy {
+ public:
+  uint64_t translate(void *_va) {
+    uint64_t va = reinterpret_cast<uint64_t>(_va);
+    uint64_t va_2MB = (va & ~(MB(2) - 1));
+
+    auto result = v2p_cache.find(va_2MB);
+    if (likely(result != v2p_cache.end())) {
+      return result->second + (va % MB(2));
+    }
+
+    // Here, we have a cache miss
+    uint64_t phy_addr = v2p.translate(reinterpret_cast<void *>(va_2MB));
+    v2p_cache.emplace(va_2MB, phy_addr);
+
+    return phy_addr + (va % MB(2));
+  }
+
+ private:
+  Virt2Phy v2p;
+  std::unordered_map<uint64_t, uint64_t> v2p_cache;
 };
 
 }  // namespace erpc
