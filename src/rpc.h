@@ -906,10 +906,10 @@ class Rpc {
     return ((fast_rand.next_u32() % billion) < faults.pkt_drop_thresh_billion);
   }
 
-  /// Initialize the I/OAT DMA engine channel for this Rpc object
+  /// Initialize the IOAT DMA engine channel for this Rpc object
   void setup_ioat();
 
-  /// Teardown the I/OAT DMA engine channel for this Rpc object
+  /// Teardown the IOAT DMA engine channel for this Rpc object
   void teardown_ioat();
 
  public:

@@ -149,7 +149,6 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
 template <class TTr>
 void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   assert(in_dispatch());
-  MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
 
   // Handle reordering
   bool is_next_pkt_same_req =  // Is this the next packet in this request?
@@ -164,7 +163,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     char issue_msg[kMaxIssueMsgLen];
     sprintf(issue_msg,
             "Rpc %u, lsn %u: Received out-of-order request. "
-            "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Action",
+            "Req/pkt numbers: %zu/%u (pkt), %zu/%zu (sslot). Action",
             rpc_id, sslot->session->local_session_num, pkthdr->req_num,
             pkthdr->pkt_num, sslot->cur_req_num, sslot->server_info.num_rx);
 
@@ -198,6 +197,8 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
     }
     return;
   }
+
+  MsgBuffer &req_msgbuf = sslot->server_info.req_msgbuf;
 
   // Allocate or locate the request MsgBuffer
   if (pkthdr->pkt_num == 0) {
