@@ -166,7 +166,6 @@ class Rpc {
    */
   static inline void resize_msg_buffer(MsgBuffer *msg_buffer,
                                        size_t new_data_size) {
-    assert(msg_buffer->is_valid());  // Can be fake
     assert(new_data_size <= msg_buffer->max_data_size);
 
     // Avoid division for single-packet data sizes
@@ -678,7 +677,6 @@ class Rpc {
                                       size_t *tx_ts) {
     assert(in_dispatch());
     const MsgBuffer *tx_msgbuf = sslot->tx_msgbuf;
-    assert(tx_msgbuf->is_req() || tx_msgbuf->is_resp());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;
@@ -706,7 +704,6 @@ class Rpc {
   inline void enqueue_hdr_tx_burst_st(SSlot *sslot, MsgBuffer *ctrl_msgbuf,
                                       size_t *tx_ts) {
     assert(in_dispatch());
-    assert(ctrl_msgbuf->is_expl_cr() || ctrl_msgbuf->is_rfr());
 
     Transport::tx_burst_item_t &item = tx_burst_arr[tx_batch_i];
     item.routing_info = sslot->session->remote_routing_info;

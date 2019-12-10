@@ -140,9 +140,7 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
     // For background request handlers, we need a RX ring--independent copy of
     // the request. The allocated req_msgbuf is freed by the background thread.
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
-    assert(req_msgbuf.buf != nullptr);
-    memcpy(req_msgbuf.get_pkthdr_0(), pkthdr,
-           pkthdr->msg_size + sizeof(pkthdr_t));
+    memcpy(req_msgbuf.buf, pkthdr + 1, pkthdr->msg_size);  // Omit header
     submit_bg_req_st(sslot);
     return;
   }
@@ -212,7 +210,6 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
 
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     assert(req_msgbuf.buf != nullptr);
-    *(req_msgbuf.get_pkthdr_0()) = *pkthdr;
 
     // Update sslot tracking
     sslot->cur_req_num = pkthdr->req_num;
@@ -225,8 +222,7 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   // Send a credit return for every request packet except the last in sequence
   if (pkthdr->pkt_num != req_msgbuf.num_pkts - 1) enqueue_cr_st(sslot, pkthdr);
 
-  // Header 0 was copied earlier. Request packet's index = packet number.
-  copy_data_to_msgbuf(&req_msgbuf, pkthdr->pkt_num, pkthdr);
+  copy_data_to_msgbuf(&req_msgbuf, pkthdr->pkt_num, pkthdr);  // Omits header
 
   // Invoke the request handler iff we have all the request packets
   if (sslot->server_info.num_rx != req_msgbuf.num_pkts) return;
