@@ -55,5 +55,5 @@ rm -f autorun_process_file
 #gen_apt $1
 #gen_utah $1
 #gen_clemson $1
-gen_wisc $1
-#gen_intel
+#gen_wisc $1
+gen_intel

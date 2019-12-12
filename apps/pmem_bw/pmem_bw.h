@@ -5,6 +5,7 @@
 #include "../apps_common.h"
 #include "rpc.h"
 #include "util/numautils.h"
+#include "util/virt2phy.h"
 
 static constexpr size_t kAppReqType = 1;
 static constexpr uint8_t kAppDataByte = 3;  // Data transferred in req & resp
@@ -47,13 +48,19 @@ static_assert(sizeof(app_stats_t) == 64, "");
 class ServerContext : public BasicAppContext {
  public:
   size_t thread_id = 0;
-  size_t pmem_write_bytes = 0;
-  double pmem_write_cycles = 0;
 
-  size_t cur_offset = 0;
-  size_t offset_lo = 0;
-  size_t offset_hi = 0;
+  struct {
+    size_t write_bytes = 0;
+    double write_cycles = 0;
 
+    size_t cur_offset = 0;
+    size_t offset_lo = 0;
+    size_t offset_hi = 0;
+
+    uint64_t offset_lo_paddr = 0;
+  } pmem;
+
+  erpc::HugepageCachingVirt2Phy hpcaching_v2p;
   uint8_t* pbuf;
 };
 

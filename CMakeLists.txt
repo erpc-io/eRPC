@@ -27,6 +27,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 # liberpc will be compiled unless profile-guided optimization or LTO is enabled
 set(COMPILE_ERPC_LIB ON)
 
+# DPDK may be needed for different reasons (e.g., the transport is DPDK, or
+# if the transport is not DPDK but the application needs DPDK libraries)
+set(DPDK_NEEDED "false")
+
 # Options exposed to the user
 set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(ROCE "Use RoCE if TRANSPORT is infiniband" OFF)
@@ -164,25 +168,9 @@ message(STATUS "Selected transport = ${TRANSPORT}.")
 set(CONFIG_IS_ROCE false)
 
 if(TRANSPORT STREQUAL "dpdk")
-  find_library(DPDK_LIB dpdk)
-  if(NOT DPDK_LIB)
-    message(FATAL_ERROR "DPDK library not found")
-  endif()
-
-  set(LIBRARIES ${LIBRARIES} dpdk dl)
   set(CONFIG_TRANSPORT "DpdkTransport")
   set(CONFIG_HEADROOM 40)
-
-  # DPDK include directory. Locating rte_config.h does not work on some systems.
-  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
-  # from the real DPDK include directory (/usr/include/dpdk/).
-  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
-  if (DPDK_INCLUDE_DIR)
-    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
-  else()
-    message(FATAL_ERROR "DPDK include directory not found")
-  endif()
-  include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+  set(DPDK_NEEDED "true") # We'll resolve DPDK later
 else()
   find_library(IBVERBS_LIB ibverbs)
   if(NOT IBVERBS_LIB)
@@ -327,8 +315,31 @@ elseif(APP STREQUAL "latency")
   set(LIBRARIES ${LIBRARIES} ${PMEM})
 elseif(APP STREQUAL "pmem_bw")
   set(LIBRARIES ${LIBRARIES} ${PMEM})
+  message(STATUS "DPDK is needed for pmem_bw application")
+  add_definitions(-fpermissive)
+  set(DPDK_NEEDED "true")
 elseif(APP STREQUAL "persistent_kv")
   set(LIBRARIES ${LIBRARIES} ${PMEM} cityhash)
+endif()
+
+if(DPDK_NEEDED STREQUAL "true")
+  find_library(DPDK_LIB dpdk)
+  if(NOT DPDK_LIB)
+    message(FATAL_ERROR "DPDK library not found")
+  endif()
+
+  set(LIBRARIES ${LIBRARIES} dpdk dl)
+
+  # DPDK include directory. Locating rte_config.h does not work on some systems.
+  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+  # from the real DPDK include directory (/usr/include/dpdk/).
+  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  if (DPDK_INCLUDE_DIR)
+    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+  else()
+    message(FATAL_ERROR "DPDK include directory not found")
+  endif()
+  include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 endif()
 
 # Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO

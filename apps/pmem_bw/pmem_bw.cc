@@ -6,6 +6,9 @@
 
 #include "pmem_bw.h"
 #include <libpmem.h>
+#include <rte_rawdev.h>
+// Newline to prevent reordering
+#include <rte_ioat_rawdev.h>
 #include <signal.h>
 #include <cstring>
 #include "util/autorun_helpers.h"
@@ -15,6 +18,11 @@ static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;
 static constexpr const char *kAppPmemFile = "/dev/dax0.0";
 static constexpr size_t kAppPmemFileSize = GB(32);
+
+// IOAT
+static constexpr bool kUseIoat = true;
+static constexpr size_t kIoatDevID = 0;
+static constexpr size_t kIoatRingSize = 512;
 
 void app_cont_func(void *, void *);  // Forward declaration
 
@@ -41,33 +49,94 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   erpc::rt_assert(req_msgbuf->get_data_size() == FLAGS_req_size);
 
-  if (c->cur_offset + FLAGS_req_size >= c->offset_hi) {
-    c->cur_offset = c->offset_lo;
+  if (c->pmem.cur_offset + FLAGS_req_size >= c->pmem.offset_hi) {
+    c->pmem.cur_offset = c->pmem.offset_lo;
   }
 
   size_t start = erpc::rdtsc();
-  pmem_memcpy_persist(&c->pbuf[c->cur_offset], req_msgbuf->buf, FLAGS_req_size);
-  c->pmem_write_bytes += FLAGS_req_size;
-  c->pmem_write_cycles += (erpc::rdtsc() - start);
 
-  if (c->pmem_write_bytes >= GB(2)) {
-    size_t wr_nsec =
-        erpc::to_nsec(c->pmem_write_cycles, c->rpc->get_freq_ghz());
-    printf("Server thread %zu: Pmem write tput = %.2f GB/s\n", c->thread_id,
-           c->pmem_write_bytes * 1.0 / wr_nsec);
+  if (kUseIoat) {
+    // The pmem file has contiguous physical addresses
+    uint64_t dst_paddr =
+        c->pmem.offset_lo_paddr + (c->pmem.cur_offset - c->pmem.offset_lo);
+    uint64_t src_paddr = c->hpcaching_v2p.translate(req_msgbuf->buf);
 
-    c->pmem_write_bytes = 0;
-    c->pmem_write_cycles = 0;
+    int ret = rte_ioat_enqueue_copy(kIoatDevID, src_paddr, dst_paddr,
+                                    FLAGS_req_size, 0, 0, 0);
+    erpc::rt_assert(ret == 1, "Error with rte_ioat_enqueue_copy");
+
+    rte_ioat_do_copies(kIoatDevID);
+
+    while (true) {
+      uintptr_t _src, _dst;
+      int ret = rte_ioat_completed_copies(kIoatDevID, 1u, &_src, &_dst);
+      erpc::rt_assert(ret >= 0, "rte_ioat_completed_copies error");
+
+      if (ret > 0) break;
+    }
+  } else {
+    pmem_memcpy_persist(&c->pbuf[c->pmem.cur_offset], req_msgbuf->buf,
+                        FLAGS_req_size);
   }
 
-  c->cur_offset += FLAGS_req_size;
+  c->pmem.write_bytes += FLAGS_req_size;
+  c->pmem.write_cycles += (erpc::rdtsc() - start);
+
+  if (c->pmem.write_bytes >= GB(2)) {
+    size_t wr_nsec =
+        erpc::to_nsec(c->pmem.write_cycles, c->rpc->get_freq_ghz());
+    printf("Server thread %zu: Pmem write tput = %.2f GB/s\n", c->thread_id,
+           c->pmem.write_bytes * 1.0 / wr_nsec);
+
+    c->pmem.write_bytes = 0;
+    c->pmem.write_cycles = 0;
+  }
+
+  c->pmem.cur_offset += FLAGS_req_size;
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                  FLAGS_resp_size);
   c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
+// Initialize and start device kIoatDevID
+void setup_ioat_device() {
+  // RTE_LOG_WARNING is log level 5
+  const char *rte_argv[] = {"-c", "1",  "-n",  "6", "--log-level",
+                            "5",  "-m", "128", NULL};
+
+  int rte_argc = sizeof(rte_argv) / sizeof(rte_argv[0]) - 1;
+  int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
+  erpc::rt_assert(ret >= 0, "rte_eal_init failed");
+
+  struct rte_rawdev_info info;
+  info.dev_private = nullptr;
+
+  erpc::rt_assert(rte_rawdev_info_get(kIoatDevID, &info) == 0);
+  erpc::rt_assert(std::string(info.driver_name).find("ioat") !=
+                  std::string::npos);
+
+  struct rte_ioat_rawdev_config p;
+  memset(&info, 0, sizeof(info));
+  info.dev_private = &p;
+
+  rte_rawdev_info_get(kIoatDevID, &info);
+  erpc::rt_assert(p.ring_size == 0, "Initial ring size is non-zero");
+
+  p.ring_size = kIoatRingSize;
+  erpc::rt_assert(rte_rawdev_configure(kIoatDevID, &info) == 0,
+                  "rte_rawdev_configure failed");
+
+  rte_rawdev_info_get(kIoatDevID, &info);
+  erpc::rt_assert(p.ring_size == kIoatRingSize, "Wrong ring size");
+
+  erpc::rt_assert(rte_rawdev_start(kIoatDevID) == 0, "Rawdev start failed");
+
+  printf("Started IOAT device %zu\n", kIoatDevID);
+}
+
 // The function executed by each client thread in the cluster
 void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
+  setup_ioat_device();
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   uint8_t phy_port = port_vec.at(0);
 
@@ -79,9 +148,14 @@ void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
   c.rpc = &rpc;
   c.thread_id = thread_id;
   c.pbuf = pbuf;
-  c.offset_lo = (kAppPmemFileSize / FLAGS_num_proc_0_threads) * thread_id;
-  c.offset_hi = (kAppPmemFileSize / FLAGS_num_proc_0_threads) * (thread_id + 1);
-  c.cur_offset = c.offset_lo;
+  c.pmem.offset_lo = (kAppPmemFileSize / FLAGS_num_proc_0_threads) * thread_id;
+  c.pmem.offset_hi =
+      (kAppPmemFileSize / FLAGS_num_proc_0_threads) * (thread_id + 1);
+  c.pmem.cur_offset = c.pmem.offset_lo;
+
+  if (kUseIoat) {
+    c.pmem.offset_lo_paddr = c.hpcaching_v2p.translate(&pbuf[c.pmem.offset_lo]);
+  }
 
   while (true) {
     rpc.run_event_loop(1000);
