@@ -1,5 +1,5 @@
 --test_ms 30000
---req_size 7900000
+--req_size 1900000
 --resp_size 32
 --num_processes 2
 --num_proc_0_threads 1

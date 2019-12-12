@@ -59,6 +59,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
     // The pmem file has contiguous physical addresses
     uint64_t dst_paddr =
         c->pmem.offset_lo_paddr + (c->pmem.cur_offset - c->pmem.offset_lo);
+
     uint64_t src_paddr = c->hpcaching_v2p.translate(req_msgbuf->buf);
 
     int ret = rte_ioat_enqueue_copy(kIoatDevID, src_paddr, dst_paddr,
@@ -107,6 +108,10 @@ void setup_ioat_device() {
   int rte_argc = sizeof(rte_argv) / sizeof(rte_argv[0]) - 1;
   int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
   erpc::rt_assert(ret >= 0, "rte_eal_init failed");
+
+  size_t count = rte_rawdev_count();
+  printf("Fount %zu rawdev devices\n", count);
+  erpc::rt_assert(count >= 1, "No rawdev devices available");
 
   struct rte_rawdev_info info;
   info.dev_private = nullptr;
@@ -272,6 +277,11 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid conc");
   erpc::rt_assert(FLAGS_process_id < FLAGS_num_processes, "Invalid process ID");
+
+  // Physical addrs of msgbufs aren't contiguous across huge pages, the
+  // split copying isn't implemented yet.
+  erpc::rt_assert(FLAGS_req_size < KB(1900),
+                  "Req size too large for IOAT DMA for now");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
