@@ -7,7 +7,7 @@
 #include "pmem_bw.h"
 #include <libpmem.h>
 #include <rte_rawdev.h>
-// Newline to prevent reordering
+// Newline to prevent reordering rte_ioat_rawdev.h before rte_rawdev.h
 #include <rte_ioat_rawdev.h>
 #include <signal.h>
 #include <cstring>
@@ -17,7 +17,7 @@
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;
 static constexpr const char *kAppPmemFile = "/dev/dax0.0";
-static constexpr size_t kAppPmemFileSize = GB(32);
+static constexpr size_t kAppPmemFileSize = GB(8);
 
 // IOAT
 static constexpr size_t kIoatDevID = 0;
@@ -59,6 +59,11 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
                     "Destination physical address isn't 64-byte aligned, which "
                     "causes poor IOAT DMA performance");
 
+    // Save the pmem file offset that we're copying to for checking after the
+    // DMA complets. We save into pre_resp_msgbuf to avoid dynyamic alloc.
+    *reinterpret_cast<size_t *>(req_handle->pre_resp_msgbuf.buf) =
+        c->pmem.cur_offset;
+
     uint64_t src_paddr = c->hpcaching_v2p.translate(req_msgbuf->buf);
 
     int ret =
@@ -68,27 +73,13 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
     rte_ioat_do_copies(kIoatDevID);
 
-    while (true) {
-      uintptr_t _req_handle_cb, _dummy_cb;
-      int ret = rte_ioat_completed_copies(kIoatDevID, 1u, &_req_handle_cb,
-                                          &_dummy_cb);
-
-      erpc::rt_assert(ret >= 0, "rte_ioat_completed_copies error");
-      if (ret == 0) break;  // No new completions
-
-      // We have a completion
-      auto *req_handle = reinterpret_cast<erpc::ReqHandle *>(_req_handle_cb);
-      c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
-    }
   } else {
     pmem_memcpy_persist(&c->pbuf[c->pmem.cur_offset], req_msgbuf->buf,
                         FLAGS_req_size);
+    c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
   }
 
   c->pmem.cur_offset += FLAGS_req_size;
-  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                 FLAGS_resp_size);
-  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
 }
 
 // Initialize and start device kIoatDevID
@@ -155,7 +146,42 @@ void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
   }
 
   while (true) {
-    rpc.run_event_loop(1000);
+    rpc.run_event_loop_once();
+
+    // Check for IOAT DMA completions
+    while (FLAGS_use_ioat == 1 && true) {
+      uintptr_t _req_handle_cb, _dummy_cb;
+      int ret = rte_ioat_completed_copies(kIoatDevID, 1u, &_req_handle_cb,
+                                          &_dummy_cb);
+
+      erpc::rt_assert(ret >= 0, "rte_ioat_completed_copies error");
+      if (ret == 0) break;  // No new completions
+
+      // We have a DMA completion
+      auto *req_handle = reinterpret_cast<erpc::ReqHandle *>(_req_handle_cb);
+
+      {
+        // Check DMA copy result
+        size_t file_copy_offset =
+            *reinterpret_cast<size_t *>(req_handle->pre_resp_msgbuf.buf);
+        size_t rand_msgbug_index = c.fastrand.next_u32() % FLAGS_req_size;
+
+        uint8_t pmem_file_byte = c.pbuf[file_copy_offset + rand_msgbug_index];
+        uint8_t msgbuf_byte =
+            req_handle->get_req_msgbuf()->buf[rand_msgbug_index];
+
+        if (unlikely(pmem_file_byte != msgbuf_byte)) {
+          fprintf(stderr, "DMA copy fail: File [%zu, %u], msgbuf [%zu, %u].\n",
+                  file_copy_offset, pmem_file_byte, rand_msgbug_index,
+                  msgbuf_byte);
+        }
+      }
+
+      erpc::Rpc<erpc::CTransport>::resize_msg_buffer(
+          &req_handle->pre_resp_msgbuf, FLAGS_resp_size);
+      c.rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
+    }
+
     if (ctrl_c_pressed == 1) break;
   }
 }
@@ -270,10 +296,17 @@ int main(int argc, char **argv) {
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid conc");
   erpc::rt_assert(FLAGS_process_id < FLAGS_num_processes, "Invalid process ID");
 
-  // Physical addrs of msgbufs aren't contiguous across huge pages, the
-  // split copying isn't implemented yet.
+  // Physical addrs of msgbufs aren't contiguous across huge pages. I haven't
+  // implemented the split copying yet.
   erpc::rt_assert(FLAGS_req_size < KB(1900),
                   "Req size too large for IOAT DMA for now");
+
+  // In the IOAT mode, we check pmem file contents after a DMA write completes
+  // asynchronously. For correctness, we must prevent data written by copy #i
+  // from being overwritten by copy #(i + n), by restricting n
+  erpc::rt_assert(
+      kAppPmemFileSize / FLAGS_req_size >= 2 * FLAGS_concurrency,
+      "Concurrency too large. DMA writes will overwrite each other.");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);

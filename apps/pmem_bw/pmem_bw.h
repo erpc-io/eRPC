@@ -20,7 +20,7 @@ DEFINE_uint64(num_proc_0_threads, 0, "Threads in process 0");
 DEFINE_uint64(num_proc_other_threads, 0, "Threads in process with ID != 0");
 DEFINE_uint64(req_size, 0, "Request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
-DEFINE_uint64(concurrency, 0, "Concurrent requests per thread");
+DEFINE_uint64(concurrency, 0, "Concurrent requests per client thread");
 DEFINE_uint64(use_ioat, 0, "Use IOAT DMA acceleration");
 
 struct app_stats_t {

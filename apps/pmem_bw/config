@@ -5,6 +5,6 @@
 --num_processes 2
 --num_proc_0_threads 1
 --num_proc_other_threads 1
---concurrency 1
+--concurrency 8
 --numa_0_ports 0
 --numa_1_ports 1
