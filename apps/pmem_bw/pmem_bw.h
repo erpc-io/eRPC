@@ -21,6 +21,7 @@ DEFINE_uint64(num_proc_other_threads, 0, "Threads in process with ID != 0");
 DEFINE_uint64(req_size, 0, "Request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent requests per thread");
+DEFINE_uint64(use_ioat, 0, "Use IOAT DMA acceleration");
 
 struct app_stats_t {
   double rx_gbps;
@@ -50,14 +51,11 @@ class ServerContext : public BasicAppContext {
   size_t thread_id = 0;
 
   struct {
-    size_t write_bytes = 0;
-    double write_cycles = 0;
+    size_t cur_offset = 0;  // This thread's current offset in the pmem file
+    size_t offset_lo = 0;   // This thread's starting offset in the pmem file
+    size_t offset_hi = 0;   // This thread's ending offset in the pmem file
 
-    size_t cur_offset = 0;
-    size_t offset_lo = 0;
-    size_t offset_hi = 0;
-
-    uint64_t offset_lo_paddr = 0;
+    uint64_t file_base_paddr = 0;
   } pmem;
 
   erpc::HugepageCachingVirt2Phy hpcaching_v2p;

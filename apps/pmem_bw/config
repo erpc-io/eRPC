@@ -1,5 +1,6 @@
 --test_ms 30000
---req_size 1900000
+--use_ioat 1
+--req_size 1900032
 --resp_size 32
 --num_processes 2
 --num_proc_0_threads 1

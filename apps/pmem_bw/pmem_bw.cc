@@ -20,7 +20,6 @@ static constexpr const char *kAppPmemFile = "/dev/dax0.0";
 static constexpr size_t kAppPmemFileSize = GB(32);
 
 // IOAT
-static constexpr bool kUseIoat = true;
 static constexpr size_t kIoatDevID = 0;
 static constexpr size_t kIoatRingSize = 512;
 
@@ -53,44 +52,37 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
     c->pmem.cur_offset = c->pmem.offset_lo;
   }
 
-  size_t start = erpc::rdtsc();
-
-  if (kUseIoat) {
+  if (FLAGS_use_ioat == 1) {
     // The pmem file has contiguous physical addresses
-    uint64_t dst_paddr =
-        c->pmem.offset_lo_paddr + (c->pmem.cur_offset - c->pmem.offset_lo);
+    uint64_t dst_paddr = c->pmem.file_base_paddr + c->pmem.cur_offset;
+    erpc::rt_assert(dst_paddr % 64 == 0,
+                    "Destination physical address isn't 64-byte aligned, which "
+                    "causes poor IOAT DMA performance");
 
     uint64_t src_paddr = c->hpcaching_v2p.translate(req_msgbuf->buf);
 
-    int ret = rte_ioat_enqueue_copy(kIoatDevID, src_paddr, dst_paddr,
-                                    FLAGS_req_size, 0, 0, 0);
+    int ret =
+        rte_ioat_enqueue_copy(kIoatDevID, src_paddr, dst_paddr, FLAGS_req_size,
+                              reinterpret_cast<uintptr_t>(req_handle), 0, 0);
     erpc::rt_assert(ret == 1, "Error with rte_ioat_enqueue_copy");
 
     rte_ioat_do_copies(kIoatDevID);
 
     while (true) {
-      uintptr_t _src, _dst;
-      int ret = rte_ioat_completed_copies(kIoatDevID, 1u, &_src, &_dst);
-      erpc::rt_assert(ret >= 0, "rte_ioat_completed_copies error");
+      uintptr_t _req_handle_cb, _dummy_cb;
+      int ret = rte_ioat_completed_copies(kIoatDevID, 1u, &_req_handle_cb,
+                                          &_dummy_cb);
 
-      if (ret > 0) break;
+      erpc::rt_assert(ret >= 0, "rte_ioat_completed_copies error");
+      if (ret == 0) break;  // No new completions
+
+      // We have a completion
+      auto *req_handle = reinterpret_cast<erpc::ReqHandle *>(_req_handle_cb);
+      c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
     }
   } else {
     pmem_memcpy_persist(&c->pbuf[c->pmem.cur_offset], req_msgbuf->buf,
                         FLAGS_req_size);
-  }
-
-  c->pmem.write_bytes += FLAGS_req_size;
-  c->pmem.write_cycles += (erpc::rdtsc() - start);
-
-  if (c->pmem.write_bytes >= GB(2)) {
-    size_t wr_nsec =
-        erpc::to_nsec(c->pmem.write_cycles, c->rpc->get_freq_ghz());
-    printf("Server thread %zu: Pmem write tput = %.2f GB/s\n", c->thread_id,
-           c->pmem.write_bytes * 1.0 / wr_nsec);
-
-    c->pmem.write_bytes = 0;
-    c->pmem.write_cycles = 0;
   }
 
   c->pmem.cur_offset += FLAGS_req_size;
@@ -158,8 +150,8 @@ void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
       (kAppPmemFileSize / FLAGS_num_proc_0_threads) * (thread_id + 1);
   c.pmem.cur_offset = c.pmem.offset_lo;
 
-  if (kUseIoat) {
-    c.pmem.offset_lo_paddr = c.hpcaching_v2p.translate(&pbuf[c.pmem.offset_lo]);
+  if (FLAGS_use_ioat == 1) {
+    c.pmem.file_base_paddr = c.hpcaching_v2p.translate(&pbuf[0]);
   }
 
   while (true) {
