@@ -76,6 +76,8 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   } else {
     pmem_memcpy_persist(&c->pbuf[c->pmem.cur_offset], req_msgbuf->buf,
                         FLAGS_req_size);
+    erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+                                                   FLAGS_resp_size);
     c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
   }
 
@@ -143,6 +145,16 @@ void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
 
   if (FLAGS_use_ioat == 1) {
     c.pmem.file_base_paddr = c.hpcaching_v2p.translate(&pbuf[0]);
+
+    // Check physical address continuity at some random addresses
+    for (size_t i = 0; i < 10; i++) {
+      erpc::SlowRand slow_rand;
+      size_t rand_offset = slow_rand.next_u64() % kAppPmemFileSize;
+
+      erpc::rt_assert(c.hpcaching_v2p.translate(&pbuf[rand_offset]) ==
+                          c.pmem.file_base_paddr + rand_offset,
+                      "Error: Pmem file physical addresses are not contiguous");
+    }
   }
 
   while (true) {
