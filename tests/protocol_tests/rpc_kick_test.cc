@@ -66,7 +66,9 @@ TEST_F(RpcClientKickTest, kick_st_full_response) {
 
 /// Kick a sslot that hasn't transmitted all request packets
 TEST_F(RpcClientKickTest, kick_st_req_pkts) {
-  assert(rpc->faults.hard_wheel_bypass == false);  // Wheel won't be bypassed
+  // This test requires the timing wheel to be enabled
+  assert(rpc->faults.hard_wheel_bypass == false);
+  assert(kEnableCc == true);
 
   // enqueue_request() calls kick_st()
   rpc->enqueue_request(0, kTestReqType, &req, &resp, cont_func, kTestTag);
