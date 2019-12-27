@@ -31,5 +31,11 @@ static constexpr bool kCcOptTimelyBypass = kEnableCcOpts;
 
 static_assert(kCcRTT || !kCcRateComp, "");  // Rate comp => RTT measurement
 
+/// Invoke request handlers directly on RX ring buffers to avoid copying
+/// to a dynamically-allocated msgbuf. Enabling this optimization restricts
+/// ownership of single-packet request msgbufs at the server to the duration
+/// of the request handler.
+static constexpr bool kZeroCopyRX = true;
+
 static constexpr bool kDatapathStats = false;
 }  // namespace erpc

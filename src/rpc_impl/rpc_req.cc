@@ -131,14 +131,19 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
   sslot->server_info.req_func_type = req_func.req_func_type;
 
   if (likely(!req_func.is_background())) {
-    // For foreground request handlers, a "fake" static request MsgBuffer
-    // suffices -- it's valid for the duration of req_func().
-    req_msgbuf = MsgBuffer(pkthdr, pkthdr->msg_size);
+    if (kZeroCopyRX) {
+      // For foreground request handlers, a "fake" static request msgbuf
+      // suffices. This improves performance, but it restricts ownership of the
+      // request msgbuf to the duration of req_func.
+      req_msgbuf = MsgBuffer(pkthdr, pkthdr->msg_size);
+    } else {
+      req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
+      memcpy(req_msgbuf.buf, pkthdr + 1, pkthdr->msg_size);  // Omit header
+    }
     req_func.req_func(static_cast<ReqHandle *>(sslot), context);
     return;
   } else {
-    // For background request handlers, we need a RX ring--independent copy of
-    // the request. The allocated req_msgbuf is freed by the background thread.
+    // Background request handlers need an RX ring--independent request copy
     req_msgbuf = alloc_msg_buffer(pkthdr->msg_size);
     memcpy(req_msgbuf.buf, pkthdr + 1, pkthdr->msg_size);  // Omit header
     submit_bg_req_st(sslot);

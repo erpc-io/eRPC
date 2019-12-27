@@ -19,12 +19,17 @@ class ReqHandle;
 /**
  * @relates Rpc
  *
- * @brief The type of the request handler function invoked at the server when a
- * request is received. The application owns the request handle (and therefore
- * the request message buffer) until it calls Rpc::enqueue_response.
+ * @brief The type of the request handler function invoked at the server on
+ * receiving a request.
  *
- * The application need not enqueue the response in the body of the request
- * handler. This is true even if the request handler is foreground-mode.
+ * The application need not enqueue the response inside the request handler.
+ * It can do so later.
+ *
+ * Request buffer ownership: The application owns the request message buffer
+ * until it enqueues the response, except in one common case. If zero-copy
+ * RX is enabled (i.e., kZeroCopyRx is true) and the request message fits in
+ * one packet, the application owns the request message buffer for only the
+ * duration of the request handler.
  *
  * @param ReqHandle A handle to the received request
  * @param context The context that was used while creating the Rpc object
