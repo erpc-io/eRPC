@@ -1,10 +1,11 @@
 --test_ms 30000
 --use_ioat 1
---req_size 1900032
+--min_req_size 1024
+--max_req_size 131072
 --resp_size 32
 --num_processes 2
 --num_proc_0_threads 1
 --num_proc_other_threads 1
---concurrency 8
+--concurrency 32
 --numa_0_ports 0
 --numa_1_ports 1

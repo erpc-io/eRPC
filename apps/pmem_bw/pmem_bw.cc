@@ -17,7 +17,7 @@
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;
 static constexpr const char *kAppPmemFile = "/dev/dax0.0";
-static constexpr size_t kAppPmemFileSize = GB(8);
+static constexpr size_t kAppPmemFileSize = GB(32);
 
 // IOAT
 static constexpr size_t kIoatDevID = 0;
@@ -25,49 +25,41 @@ static constexpr size_t kIoatRingSize = 512;
 
 void app_cont_func(void *, void *);  // Forward declaration
 
-// Send a request using this MsgBuffer
-void send_req(ClientContext *c, size_t msgbuf_idx) {
-  erpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
-  assert(req_msgbuf.get_data_size() == FLAGS_req_size);
-
-  if (kAppVerbose) {
-    printf("large_rpc_tput: Thread %zu sending request using msgbuf_idx %zu.\n",
-           c->thread_id, msgbuf_idx);
-  }
-
-  c->rpc->enqueue_request(c->session_num_vec[0], kAppReqType, &req_msgbuf,
-                          &c->resp_msgbuf[msgbuf_idx], app_cont_func,
-                          reinterpret_cast<void *>(msgbuf_idx));
-
-  c->stat_tx_bytes_tot += FLAGS_req_size;
-}
+struct dma_context_t {
+  size_t file_offset;
+  size_t req_size;
+};
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  erpc::rt_assert(req_msgbuf->get_data_size() == FLAGS_req_size);
+  size_t req_size = req_msgbuf->get_data_size();
 
-  if (c->pmem.cur_offset + FLAGS_req_size >= c->pmem.offset_hi) {
+  if (c->pmem.cur_offset + req_size >= c->pmem.offset_hi) {
     c->pmem.cur_offset = c->pmem.offset_lo;
   }
 
   if (FLAGS_use_ioat == 1) {
+    // Save the DMA context into pre_resp_msgbuf to save a dynamic allocation
+    auto *dma_ctx =
+        reinterpret_cast<dma_context_t *>(req_handle->pre_resp_msgbuf.buf);
+    dma_ctx->file_offset = c->pmem.cur_offset;
+    dma_ctx->req_size = req_size;
+
     // The pmem file has contiguous physical addresses
     uint64_t dst_paddr = c->pmem.file_base_paddr + c->pmem.cur_offset;
     erpc::rt_assert(dst_paddr % 64 == 0,
                     "Destination physical address isn't 64-byte aligned, which "
                     "causes poor IOAT DMA performance");
 
-    // Save the pmem file offset that we're copying to for checking after the
-    // DMA complets. We save into pre_resp_msgbuf to avoid dynyamic alloc.
     *reinterpret_cast<size_t *>(req_handle->pre_resp_msgbuf.buf) =
         c->pmem.cur_offset;
 
     uint64_t src_paddr = c->hpcaching_v2p.translate(req_msgbuf->buf);
 
     int ret =
-        rte_ioat_enqueue_copy(kIoatDevID, src_paddr, dst_paddr, FLAGS_req_size,
+        rte_ioat_enqueue_copy(kIoatDevID, src_paddr, dst_paddr, req_size,
                               reinterpret_cast<uintptr_t>(req_handle), 0, 0);
     erpc::rt_assert(ret == 1, "Error with rte_ioat_enqueue_copy");
 
@@ -75,13 +67,13 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   } else {
     pmem_memcpy_persist(&c->pbuf[c->pmem.cur_offset], req_msgbuf->buf,
-                        FLAGS_req_size);
+                        req_size);
     erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                    FLAGS_resp_size);
     c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
   }
 
-  c->pmem.cur_offset += FLAGS_req_size;
+  c->pmem.cur_offset += req_size;
 }
 
 // Initialize and start device kIoatDevID
@@ -147,8 +139,8 @@ void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
     c.pmem.file_base_paddr = c.hpcaching_v2p.translate(&pbuf[0]);
 
     // Check physical address continuity at some random addresses
-    for (size_t i = 0; i < 10; i++) {
-      erpc::SlowRand slow_rand;
+    erpc::SlowRand slow_rand;
+    for (size_t i = 0; i < 1000; i++) {
       size_t rand_offset = slow_rand.next_u64() % kAppPmemFileSize;
 
       erpc::rt_assert(c.hpcaching_v2p.translate(&pbuf[rand_offset]) ==
@@ -174,17 +166,19 @@ void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
 
       {
         // Check DMA copy result
-        size_t file_copy_offset =
-            *reinterpret_cast<size_t *>(req_handle->pre_resp_msgbuf.buf);
-        size_t rand_msgbug_index = c.fastrand.next_u32() % FLAGS_req_size;
+        auto *dma_ctx =
+            reinterpret_cast<dma_context_t *>(req_handle->pre_resp_msgbuf.buf);
 
-        uint8_t pmem_file_byte = c.pbuf[file_copy_offset + rand_msgbug_index];
+        size_t rand_msgbug_index = c.fastrand.next_u32() % dma_ctx->req_size;
+
+        uint8_t pmem_file_byte =
+            c.pbuf[dma_ctx->file_offset + rand_msgbug_index];
         uint8_t msgbuf_byte =
             req_handle->get_req_msgbuf()->buf[rand_msgbug_index];
 
         if (unlikely(pmem_file_byte != msgbuf_byte)) {
           fprintf(stderr, "DMA copy fail: File [%zu, %u], msgbuf [%zu, %u].\n",
-                  file_copy_offset, pmem_file_byte, rand_msgbug_index,
+                  dma_ctx->file_offset, pmem_file_byte, rand_msgbug_index,
                   msgbuf_byte);
         }
       }
@@ -196,6 +190,23 @@ void server_func(size_t thread_id, erpc::Nexus *nexus, uint8_t *pbuf) {
 
     if (ctrl_c_pressed == 1) break;
   }
+}
+
+// Send a request using this MsgBuffer
+void send_req(ClientContext *c, size_t msgbuf_idx) {
+  erpc::MsgBuffer &req_msgbuf = c->req_msgbuf[msgbuf_idx];
+  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_msgbuf, c->cur_req_size);
+
+  if (kAppVerbose) {
+    printf("large_rpc_tput: Thread %zu sending request using msgbuf_idx %zu.\n",
+           c->thread_id, msgbuf_idx);
+  }
+
+  c->rpc->enqueue_request(c->session_num_vec[0], kAppReqType, &req_msgbuf,
+                          &c->resp_msgbuf[msgbuf_idx], app_cont_func,
+                          reinterpret_cast<void *>(msgbuf_idx));
+
+  c->stat_tx_bytes_tot += c->cur_req_size;
 }
 
 void app_cont_func(void *_context, void *_tag) {
@@ -242,6 +253,8 @@ void client_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   ClientContext c;
   c.thread_id = thread_id;
   c.app_stats = app_stats;
+  c.cur_req_size = FLAGS_min_req_size;
+
   if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
@@ -274,6 +287,8 @@ void client_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   }
 
   clock_gettime(CLOCK_REALTIME, &c.tput_t0);
+
+  size_t num_prints = 0;
   for (size_t i = 0; i < FLAGS_test_ms; i += kAppEvLoopMs) {
     rpc.run_event_loop(kAppEvLoopMs);
     if (unlikely(ctrl_c_pressed == 1)) break;
@@ -292,17 +307,33 @@ void client_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     c.rpc->reset_num_re_tx(c.session_num_vec[0]);
 
     printf(
-        "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps. "
-        "Credits %zu (best = 32).\n",
-        c.thread_id, stats.rx_gbps, stats.tx_gbps, erpc::kSessionCredits);
+        "large_rpc_tput: Thread %zu, cur_req_size %zu: "
+        "Tput {RX %.2f, TX %.2f} Gbps. Credits %zu (best = 32).\n",
+        c.thread_id, c.cur_req_size, stats.rx_gbps, stats.tx_gbps,
+        erpc::kSessionCredits);
 
     clock_gettime(CLOCK_REALTIME, &c.tput_t0);
+    num_prints++;
+    if (num_prints == 2) {
+      num_prints = 0;
+      c.cur_req_size *= 2;
+      if (c.cur_req_size > FLAGS_max_req_size) {
+        c.cur_req_size = FLAGS_min_req_size;
+      }
+    }
   }
 
   // We don't disconnect sessions
 }
 
 int main(int argc, char **argv) {
+  static_assert(erpc::kZeroCopyRX == false,
+                "This test needs RX ring--independent requests");
+  static_assert(erpc::kEnableCc == false,
+                "Disable congestion control for performance");
+  static_assert(erpc::kSessionReqWindow >= 32,
+                "Increase eRPC's session request window for performance");
+
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   erpc::rt_assert(FLAGS_concurrency <= kAppMaxConcurrency, "Invalid conc");
@@ -310,14 +341,14 @@ int main(int argc, char **argv) {
 
   // Physical addrs of msgbufs aren't contiguous across huge pages. I haven't
   // implemented the split copying yet.
-  erpc::rt_assert(FLAGS_req_size < KB(1900),
+  erpc::rt_assert(FLAGS_max_req_size < KB(1900),
                   "Req size too large for IOAT DMA for now");
 
   // In the IOAT mode, we check pmem file contents after a DMA write completes
   // asynchronously. For correctness, we must prevent data written by copy #i
   // from being overwritten by copy #(i + n), by restricting n
   erpc::rt_assert(
-      kAppPmemFileSize / FLAGS_req_size >= 2 * FLAGS_concurrency,
+      kAppPmemFileSize / FLAGS_max_req_size >= 2 * FLAGS_concurrency,
       "Concurrency too large. DMA writes will overwrite each other.");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
@@ -330,7 +361,7 @@ int main(int argc, char **argv) {
 
   if (FLAGS_process_id == 0) {
     // Each thread needs at least FLAGS_req_size space in the buffer
-    erpc::rt_assert(kAppPmemFileSize >= FLAGS_req_size * num_threads);
+    erpc::rt_assert(kAppPmemFileSize >= FLAGS_max_req_size * num_threads);
 
     printf("Server: Mapping pmem file for all threads...");
     uint8_t *pbuf = erpc::map_devdax_file(kAppPmemFile, kAppPmemFileSize);

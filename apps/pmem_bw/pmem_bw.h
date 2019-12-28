@@ -18,7 +18,8 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 // Flags
 DEFINE_uint64(num_proc_0_threads, 0, "Threads in process 0");
 DEFINE_uint64(num_proc_other_threads, 0, "Threads in process with ID != 0");
-DEFINE_uint64(req_size, 0, "Request data size");
+DEFINE_uint64(min_req_size, 0, "Minimum request data size");
+DEFINE_uint64(max_req_size, 0, "Maximum request data size");
 DEFINE_uint64(resp_size, 0, "Response data size");
 DEFINE_uint64(concurrency, 0, "Concurrent requests per client thread");
 DEFINE_uint64(use_ioat, 0, "Use IOAT DMA acceleration");
@@ -71,6 +72,8 @@ class ClientContext : public BasicAppContext {
   size_t stat_rx_bytes_tot = 0;  // Total bytes received
   size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
 
+  size_t cur_req_size = 0;
+
   erpc::MsgBuffer req_msgbuf[kAppMaxConcurrency];
   erpc::MsgBuffer resp_msgbuf[kAppMaxConcurrency];
 };
@@ -78,10 +81,10 @@ class ClientContext : public BasicAppContext {
 // Allocate request and response MsgBuffers
 void alloc_req_resp_msg_buffers(ClientContext* c) {
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    c->req_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_req_size);
+    c->req_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_max_req_size);
     c->resp_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_resp_size);
 
     // Fill the request regardless of kAppMemset. This is a one-time thing.
-    memset(c->req_msgbuf[i].buf, i, FLAGS_req_size);
+    memset(c->req_msgbuf[i].buf, i, FLAGS_max_req_size);
   }
 }
