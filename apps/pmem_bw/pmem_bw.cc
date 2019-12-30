@@ -198,7 +198,7 @@ void send_req(ClientContext *c, size_t msgbuf_idx) {
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_msgbuf, c->cur_req_size);
 
   if (kAppVerbose) {
-    printf("large_rpc_tput: Thread %zu sending request using msgbuf_idx %zu.\n",
+    printf("pmem_bw: Thread %zu sending request using msgbuf_idx %zu.\n",
            c->thread_id, msgbuf_idx);
   }
 
@@ -215,7 +215,7 @@ void app_cont_func(void *_context, void *_tag) {
 
   const erpc::MsgBuffer &resp_msgbuf = c->resp_msgbuf[msgbuf_idx];
   if (kAppVerbose) {
-    printf("large_rpc_tput: Received response for msgbuf %zu.\n", msgbuf_idx);
+    printf("pmem_bw: Received response for msgbuf %zu.\n", msgbuf_idx);
   }
 
   erpc::rt_assert(resp_msgbuf.get_data_size() == FLAGS_resp_size,
@@ -234,9 +234,8 @@ void client_connect_sessions(BasicAppContext *c) {
 
   c->session_num_vec.resize(1);
 
-  printf(
-      "large_rpc_tput: Thread %zu: Creating 1 session to proc 0, thread %zu.\n",
-      c->thread_id, rem_tid);
+  printf("pmem_bw: Thread %zu: Creating 1 session to proc 0, thread %zu.\n",
+         c->thread_id, rem_tid);
 
   c->session_num_vec[0] =
       c->rpc->create_session(erpc::get_uri_for_process(0), rem_tid);
@@ -270,9 +269,9 @@ void client_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   client_connect_sessions(&c);
 
   if (c.session_num_vec.size() > 0) {
-    printf("large_rpc_tput: Thread %zu: All sessions connected.\n", thread_id);
+    printf("pmem_bw: Thread %zu: All sessions connected.\n", thread_id);
   } else {
-    printf("large_rpc_tput: Thread %zu: No sessions created.\n", thread_id);
+    printf("pmem_bw: Thread %zu: No sessions created.\n", thread_id);
   }
 
   alloc_req_resp_msg_buffers(&c);
@@ -307,7 +306,7 @@ void client_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     c.rpc->reset_num_re_tx(c.session_num_vec[0]);
 
     printf(
-        "large_rpc_tput: Thread %zu, cur_req_size %zu: "
+        "pmem_bw: Thread %zu, cur_req_size %zu: "
         "Tput {RX %.2f, TX %.2f} Gbps. Credits %zu (best = 32).\n",
         c.thread_id, c.cur_req_size, stats.rx_gbps, stats.tx_gbps,
         erpc::kSessionCredits);
