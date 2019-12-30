@@ -1,0 +1,11 @@
+--test_ms 1000000
+--num_processes 3
+--num_proc_0_threads 1
+--num_proc_other_threads 8
+--concurrency 32
+--min_log_entry_size 64
+--max_log_entry_size 2048
+--prints_per_log_entry_size 5
+--use_rotating 1
+--numa_0_ports 0
+--numa_1_ports 1

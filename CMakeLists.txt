@@ -320,6 +320,8 @@ elseif(APP STREQUAL "pmem_bw")
   set(DPDK_NEEDED "true")
 elseif(APP STREQUAL "persistent_kv")
   set(LIBRARIES ${LIBRARIES} ${PMEM} cityhash)
+elseif(APP STREQUAL "log")
+  set(LIBRARIES ${LIBRARIES} ${PMEM})
 endif()
 
 if(DPDK_NEEDED STREQUAL "true")
