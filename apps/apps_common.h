@@ -5,7 +5,6 @@
 #pragma once
 
 #include <gflags/gflags.h>
-#include <boost/algorithm/string.hpp>
 #include <set>
 #include "rpc.h"
 #include "util/latency.h"
@@ -38,14 +37,10 @@ std::vector<size_t> flags_get_numa_ports(size_t numa_node) {
       numa_node == 0 ? FLAGS_numa_0_ports : FLAGS_numa_1_ports;
   if (port_str.size() == 0) return ret;
 
-  std::vector<std::string> split_vec;
-  boost::split(split_vec, port_str, boost::is_any_of(","));
+  std::vector<std::string> split_vec = erpc::split(port_str, ',');
   erpc::rt_assert(split_vec.size() > 0);
 
-  for (auto &s : split_vec) {
-    boost::trim(s);
-    ret.push_back(std::stoull(s));
-  }
+  for (auto &s : split_vec) ret.push_back(std::stoull(s));  // stoull trims ' '
 
   return ret;
 }

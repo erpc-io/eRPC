@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <boost/algorithm/string.hpp>
 #include <cerrno>
 #include <limits>
 #include <mutex>
@@ -60,9 +59,8 @@ static constexpr size_t kInvalidBgETid = kMaxBgThreads;
 /// this returns the original hostname.
 static std::string trim_hostname(const std::string hostname) {
   if (hostname.find("akalia") != std::string::npos) {
-    std::vector<std::string> split;
-    boost::split(split, hostname, boost::is_any_of("."));
-    return split.at(0);
+    // If hostname doesn't have a dot, this just returns hostname
+    return hostname.substr(0, hostname.find("."));
   }
   return hostname;
 }

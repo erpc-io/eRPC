@@ -1,6 +1,5 @@
 #pragma once
 
-#include <boost/algorithm/string.hpp>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -8,7 +7,17 @@
 
 namespace erpc {
 
-// Return the nth line from a file, with leading and trailing space trimmed
+// Tokenize the input string by the delimiter into a vector
+static std::vector<std::string> split(std::string input, char delimiter) {
+  std::vector<std::string> ret;
+  std::stringstream ss(input);
+  std::string token;
+
+  while (getline(ss, token, delimiter)) ret.push_back(token);
+  return ret;
+}
+
+// Return the nth line from a file
 static std::string get_line_n(std::string filename, size_t n) {
   std::ifstream in(filename.c_str());
 
@@ -22,23 +31,22 @@ static std::string get_line_n(std::string filename, size_t n) {
 
   std::getline(in, s);
   erpc::rt_assert(!s.empty(), "Insufficient lines in " + filename);
-
-  boost::algorithm::trim(s);
   return s;
 }
 
 static bool is_valid_process_line(std::string line) {
-  std::vector<std::string> split;
-  boost::split(split, line, boost::is_any_of(" "));
+  // The line must not have leading or trailing space
+  if (line.at(0) == ' ' || line.at(line.length() - 1) == ' ') return false;
 
-  return split.size() == 3 && split[0].length() > 0 && split[1].length() > 0 &&
-         split[2].length() > 0;
+  std::vector<std::string> splits = split(line, ' ');
+
+  return splits.size() == 3 && splits[0].length() > 0 &&
+         splits[1].length() > 0 && splits[2].length() > 0;
 }
 
 static bool is_valid_uri(std::string uri) {
-  std::vector<std::string> split;
-  boost::split(split, uri, boost::is_any_of(":"));
-  return split.size() == 2 && split[0].length() > 0 && split[1].length() > 0;
+  std::vector<std::string> splits = split(uri, ':');
+  return splits.size() == 2 && splits[0].length() > 0 && splits[1].length() > 0;
 }
 
 // Split a well-formed URI into its hostname and UDP port components
@@ -73,8 +81,7 @@ static std::string get_hostname_for_process(size_t process_i) {
   std::string line = get_line_n(process_file, process_i);
   rt_assert(is_valid_process_line(line), "Invalid process line " + line);
 
-  std::vector<std::string> split_vec;
-  boost::split(split_vec, line, boost::is_any_of(" "));
+  std::vector<std::string> split_vec = split(line, ' ');
   return split_vec[0];
 }
 
@@ -85,8 +92,7 @@ static std::string get_udp_port_for_process(size_t process_i) {
   std::string process_file = "../eRPC/scripts/autorun_process_file";
   std::string line = get_line_n(process_file, process_i);
 
-  std::vector<std::string> split_vec;
-  boost::split(split_vec, line, boost::is_any_of(" "));
+  std::vector<std::string> split_vec = split(line, ' ');
   return split_vec[1];
 }
 

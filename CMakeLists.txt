@@ -150,15 +150,6 @@ set(SOURCES
   src/util/externs.cc
   src/util/tls_registry.cc)
 
-# Boost
-find_package(Boost)
-if(Boost_FOUND)
-  message(STATUS "Boost include directory = ${Boost_INCLUDE_DIRS}")
-  include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-else()
-  message(FATAL_ERROR "Boost not found.")
-endif()
-
 # Transport-specific. Mellanox OFED drivers are the best choice for raw and
 # infiniband, but they do not play well with DPDK. So we compile only one
 # transport. Other transports are exluded using preprocessor macros.
