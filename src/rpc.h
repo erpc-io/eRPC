@@ -181,14 +181,21 @@ class Rpc {
   }
 
   /**
-   * @brief Create a session to a remote Rpc object and initiate session
-   * connection. A session management callback of type \p kConnected or
-   * \p kConnectFailed will be invoked if this call is successful.
+   * @brief A session is a connection between two eRPC endpoints (similar to a
+   * TCP connection). This function creates a session to a remote Rpc object and
+   * initiates session connection. A session management callback of type \p
+   * kConnected or \p kConnectFailed will be invoked after session creation
+   * completes or fails.
    *
    * @return The local session number (>= 0) of the session if the session
-   * is successfully created, negative errno otherwise.
+   * handshake is successfully initiated, negative errno otherwise.
    *
-   * @param remote_uri The remote Nexus's URI, formatted as hostname:udp_port
+   * @param remote_uri The remote Nexus's URI, formatted as hostname:udp_port.
+   * The hostname (or IP address) should be under the remote kernel's control.
+   * For example, with DPDK, the userspace driver takes full control of a port.
+   * That port's IP address is meaningful only prior to its binding with DPDK,
+   * so it won't work in create_session.
+   *
    * @param rem_rpc_id The ID of the remote Rpc object
    */
   int create_session(std::string remote_uri, uint8_t rem_rpc_id) {
