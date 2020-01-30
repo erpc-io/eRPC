@@ -7,7 +7,7 @@
 sudo apt update
 
 # Toolchain
-sudo apt -y install g++-8 cmake
+sudo apt -y install g++ cmake make
 
 # General libs
 sudo apt -y install libnuma-dev libgflags-dev libgtest-dev libboost-dev
