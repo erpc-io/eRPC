@@ -16,7 +16,7 @@ sudo rpm -Uvh /tmp/epel-release*rpm
 ### Packages required for eRPC
 ###
 sudo yum -y install gcc-c++ cmake numactl-devel numactl bc gflags-devel \
-  boost-devel gtest gtest-devel libpmem libpmem-devel dpdk dpdk-devel
+  gtest gtest-devel libpmem libpmem-devel dpdk dpdk-devel
 
 ###
 ### Packages required to install Mellanox OFED
