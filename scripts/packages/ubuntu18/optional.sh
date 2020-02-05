@@ -21,3 +21,8 @@ git clone https://github.com/anujkaliaiitd/systemish.git ~/systemish
 # Vundle
 git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 vim -c 'PluginInstall' -c 'qa!'
+
+# Ripgrep
+sudo add-apt-repository ppa:x4121/ripgrep
+sudo apt-get update
+sudo apt install ripgrep
