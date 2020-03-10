@@ -6,16 +6,15 @@
 # Mellanox. However, eRPC should work with upstream mlx* packages as well
 
 # Update to the latest CentOS (e.g., CentOS 7.4 -> CentOS 7.5)
-sudo yum -y update
+# sudo yum -y update
 
-# This is required for yum to find most packages below
-wget -P /tmp/ https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm
-sudo rpm -Uvh /tmp/epel-release*rpm
+# Install EPEL (Extra Packages for Enterprise Linux), needed for many packages below
+sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
 ###
 ### Packages required for eRPC
 ###
-sudo yum -y install gcc-c++ cmake numactl-devel numactl bc gflags-devel \
+sudo yum -y install git gcc-c++ cmake numactl-devel numactl bc gflags-devel \
   gtest gtest-devel libpmem libpmem-devel dpdk dpdk-devel
 
 ###
