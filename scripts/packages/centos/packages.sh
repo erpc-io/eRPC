@@ -28,8 +28,8 @@ sudo yum -y install createrepo python2-devel elfutils-libelf-devel \
 ### Optional convenience packages
 ###
 
-# Update vim
-sudo curl -L https://copr.fedorainfracloud.org/coprs/mcepl/vim8/repo/epel-7/mcepl-vim8-epel-7.repo -o /etc/yum.repos.d/mcepl-vim8-epel-7.repo
+# Update vim. Find a repo from Fedora Copr if this link doesn't work
+sudo curl -L https://copr.fedorainfracloud.org/coprs/hnakamur/vim/repo/epel-7/hnakamur-vim-epel-7.repo -o /etc/yum.repos.d/hnakamur-vim-epel7.repo
 sudo yum -y update vim*
 
 # General packages not specific to eRPC
