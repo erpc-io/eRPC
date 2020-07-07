@@ -219,8 +219,8 @@ class Rpc {
 
   /**
    * @brief Enqueue a request for transmission. This always succeeds. eRPC owns
-   * \p msg_buffer until it invokes the continuation callback. This function is
-   * safe to call from background threads (TS).
+   * the request and response msgbufs until it invokes the continuation
+   * callback. This function is safe to call from background threads (TS).
    *
    * @param session_num The session number to send the request on. This session
    * must be connected.
