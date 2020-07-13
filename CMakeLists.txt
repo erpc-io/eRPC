@@ -24,9 +24,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
-# liberpc will be compiled unless profile-guided optimization or LTO is enabled
-set(COMPILE_ERPC_LIB ON)
-
 # DPDK may be needed for different reasons (e.g., the transport is DPDK, or
 # if the transport is not DPDK but the application needs DPDK libraries)
 set(DPDK_NEEDED "false")
@@ -37,7 +34,6 @@ option(ROCE "Use RoCE if TRANSPORT is infiniband" OFF)
 option(PERF "Compile for performance" ON)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
-cmake_dependent_option(LTO "Use link time optimization" ON "PERF" OFF)
 
 # Parse the user-exposed options
 if(PERF)
@@ -55,7 +51,6 @@ if(PGO STREQUAL "generate")
   message(STATUS "Profile-guided optimization (generate mode) is enabled. Performance will be low.")
   add_definitions(-fprofile-generate)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-generate")
-  set(COMPILE_ERPC_LIB OFF)
 elseif(PGO STREQUAL "use")
   message(STATUS "Profile-guided optimization (use mode) is enabled.")
   add_definitions(-fprofile-use -fprofile-correction)
@@ -108,16 +103,6 @@ else(TESTING)
   message(STATUS "Testing is disabled, so tests may fail.")
   add_definitions(-DERPC_TESTING=false)
 endif(TESTING)
-
-# Link-time optimization
-if(LTO)
-  message(STATUS "LTO is enabled. eRPC library won't be compiled.")
-  set(COMPILE_ERPC_LIB OFF)
-  add_definitions(-flto)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
-else(LTO)
-  message(STATUS "LTO is disabled. Performance will be low.")
-endif(LTO)
 
 set(SOURCES
   src/nexus_impl/nexus.cc
@@ -230,10 +215,7 @@ set(UTIL_TESTS
   numautil_test)
 
 # Compile the library
-if(COMPILE_ERPC_LIB)
-  message(STATUS "Compiling eRPC as a library")
-  add_library(erpc ${SOURCES})
-endif()
+add_library(erpc ${SOURCES})
 
 # Compile the tests
 if(TESTING)
@@ -268,16 +250,15 @@ else()
   message(STATUS "No autorun_app_file found. No application will be compiled.")
   return()
 endif()
-
 message(STATUS "Compiling app = " ${APP})
 
-# Add app-specific defines now, isolating them from the tests
+# Add app-specific defines now, isolating them from the library and tests
 
 # libpmem is installable from package managers in only recent distros. If it's
 # not present, don't link it in.
 find_library(PMEM_LIB pmem)
 if(NOT PMEM_LIB)
-  message(STATUS "pmem library not found")
+  message(STATUS "Persistent memory library (libpmem) not found")
   set(PMEM "")
 else()
   set(PMEM "pmem")
@@ -335,12 +316,9 @@ if(DPDK_NEEDED STREQUAL "true")
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 endif()
 
-# Compile only the one application. If COMPILE_ERPC_LIB is false, we use LTO
-# for the app. LTO is hard to do with a compiled library.
-if(COMPILE_ERPC_LIB)
-  add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES})
-  target_link_libraries(${APP} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-else(COMPILE_ERPC_LIB)
-  add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES})
-  target_link_libraries(${APP} ${GTEST_LIBRARIES} ${LIBRARIES})
-endif(COMPILE_ERPC_LIB)
+# Using link-time optimization sometimes requires building with sources instead
+# of liberpc. See the hello world example's Makefile for an example of
+# compiling with liberpc.
+add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES})
+target_compile_options(${APP} PRIVATE "-flto")
+target_link_libraries(${APP} ${GTEST_LIBRARIES} ${LIBRARIES})
