@@ -9,7 +9,7 @@ set(CMAKE_CXX_COMPILER g++)
 
 add_definitions(-std=c++11 -march=native -g)
 add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
-add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro)
+add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
@@ -297,12 +297,13 @@ elseif(APP STREQUAL "log")
 endif()
 
 if(DPDK_NEEDED STREQUAL "true")
+  message(STATUS "DPDK needed to build eRPC")
   find_library(DPDK_LIB dpdk)
   if(NOT DPDK_LIB)
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive dl)
+  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive numa dl bverbs mlx4 mlx5)
 
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
@@ -314,6 +315,8 @@ if(DPDK_NEEDED STREQUAL "true")
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+else()
+  message(STATUS "DPDK not needed to build eRPC")
 endif()
 
 # Using link-time optimization sometimes requires building with sources instead
