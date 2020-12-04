@@ -303,7 +303,7 @@ if(DPDK_NEEDED STREQUAL "true")
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive numa dl bverbs mlx4 mlx5)
+  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive numa dl ibverbs mlx4 mlx5)
 
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked

@@ -120,9 +120,20 @@ class DpdkTransport : public Transport {
                                 uint32_t ipv4_addr, uint16_t udp_port) {
     bool installed = false;
 
+    const int ntuple_filter_supported =
+        rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE);
+
+    const int fdir_filter_supported =
+        rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR);
+
+    if (ntuple_filter_supported != 0 && fdir_filter_supported != 0) {
+      ERPC_WARN("No flow steering supported by NIC. Apps likely won't work.\n");
+      return;
+    }
+
     // Try the simplest filter first. I couldn't get FILTER_FDIR to work with
     // ixgbe, although it technically supports flow director.
-    if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_NTUPLE) == 0) {
+    if (ntuple_filter_supported == 0) {
       struct rte_eth_ntuple_filter ntuple;
       memset(&ntuple, 0, sizeof(ntuple));
       ntuple.flags = RTE_5TUPLE_FLAGS;
@@ -146,8 +157,7 @@ class DpdkTransport : public Transport {
       installed = (ret == 0);
     }
 
-    if (!installed &&
-        rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
+    if (!installed && fdir_filter_supported == 0) {
       // Use fdir filter for i40e (5-tuple not supported)
       rte_eth_fdir_filter filter;
       memset(&filter, 0, sizeof(filter));
@@ -161,7 +171,7 @@ class DpdkTransport : public Transport {
 
       int ret = rte_eth_dev_filter_ctrl(phy_port, RTE_ETH_FILTER_FDIR,
                                         RTE_ETH_FILTER_ADD, &filter);
-      rt_assert(ret == 0, "Failed to add flow rule: ", strerror(-1 * ret));
+      rt_assert(ret == 0, "Failed to add fdir flow rule: ", strerror(-1 * ret));
 
       ERPC_WARN("Installed flow-director rule. Queue %zu, RX UDP port = %u.\n",
                 qp_id, udp_port);
