@@ -13,7 +13,7 @@ namespace erpc {
 static constexpr size_t kRpcRTOUs = 5000;
 
 // Congestion control
-static constexpr bool kEnableCc = true;
+static constexpr bool kEnableCc = false;
 static constexpr bool kEnableCcOpts = true;
 
 static constexpr bool kCcRTT = kEnableCc;       ///< Measure per-packet RTT
