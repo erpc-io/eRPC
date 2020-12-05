@@ -18,20 +18,20 @@ Some highlights:
 
 ## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+
- * See `scripts/packages/` for required software packages for your distro.
+ * See `scripts/packages/` for required software packages for your distro. 
    Install _exactly one_ of the following, mutually-incompatible packages:
    * Mellanox OFED for Mellanox NICs
-   * For other DPDK-compatible NICs, a system-wide installation from DPDK
-     19.11.5 LTS sources (i.e., `sudo make install T=x86_64-native-linuxapp-gcc
-     DESTDIR=/usr`). Other DPDK versions are not supported.
+   * For other DPDK-compatible NICs, a system-wide installation from the latest
+     DPDK sources (e.g., `sudo make install T=x86_64-native-linuxapp-gcc
+     DESTDIR=/usr`).
  * NICs: Fast (10 GbE+) bare-metal NICs are needed for good performance. eRPC
    works best with Mellanox Ethernet and InfiniBand NICs. Any DPDK-capable NICs
    also work well. Slower/virtual NICs can still be used for testing and
    development.
  * System configuration:
    * At least 1024 huge pages on every NUMA node, and unlimited SHM limits
-   * On a machine with `n` eRPC processes, eRPC uses kernel UDP ports `{31850,
-     ..., 31850 + n - 1}.` These ports should be open on the management
+   * On a machine with `n` eRPC processes, eRPC uses kernel UDP ports
+     `{31850, ..., 31850 + n - 1}.` These ports should be open on the management
      network. See `scripts/firewalld/erpc_firewall.sh` for systems running
      `firewalld`.
 
@@ -65,56 +65,13 @@ Some highlights:
  * Mellanox drivers optimized specially for eRPC are available in the `drivers`
    directory
 
-## Running eRPC over DPDK on Microsoft Azure VMs
-
-  * eRPC works well on Azure VMs with accelerated networking. For now, eRPC
-    supports only one RPC ID per machine on Azure.
-
-  * Configuring an Azure VM (do this for two VMs):
-    * Uncheck "Accelerated Networking" when launching the VM from the Azure
-      portal (e.g., F32s-v2). This VM should have just the control network
-      (i.e., `eth0`) and `lo` interfaces.
-    * Add a NIC to Azure via the Azure CLI: `az network nic create
-      --resource-group <your resource group> --name <a name for the NIC>
-      --vnet-name <name of the VMs' virtual network> --subnet default
-      --accelerated-networking true --subscription <Azure subscription, if
-      any>`
-    * Stop the VM launched earlier, and attach the NIC created in the previous
-      step ("Networking" -> "Attach network interface").
-    * Start the VM. It should have a new interface called `eth1`, which eRPC
-      will use for DPDK traffic.
-
-  * Prepare DPDK 19.11.5:
-    * Install pre-requisite libraries and modules:
-       * `sudo apt install rdma-core libibverbs-dev`
-       * `sudo modprobe ib_uverbs`
-       * `sudo modprobe mlx4_ib`
-    * Download the [DPDK 19.11.5 tarball](https://core.dpdk.org/download/) and
-      extract it. Other DPDK versions are not supported.
-    * Edit `config/common_base` by changing `CONFIG_RTE_LIBRTE_MLX5_PMD` and
-      `CONFIG_RTE_LIBRTE_MLX4_PMD` to `y` instead of `n`.
-    * Build and install DPDK: `sudo make install T=x86_64-native-linuxapp-gcc
-      DESTDIR=/usr`
-
-    * Create hugepages:
-```
-sudo bash -c "echo 2048 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages"
-sudo mkdir /mnt/huge
-sudo mount -t hugetlbfs nodev /mnt/huge
-```
-
-  * Build eRPC with `cmake . -DTRANSPORT=dpdk -DAZURE=on; make`
-  * Create the file `scripts/autorun_process_file` like below. Here, do not use
-    the IP addresses of the accelerated NIC (i.e., not of `eth1`).
-```
-<Control network IPv4 address of VM #1> 31850 0
-<Control network IPv4 address of VM #2> 31850 0
-```
-
-  * Run the eRPC application (a latency benchmark by default):
-    * At VM #1: `./scripts/do.sh 0 0`
-    * At VM #2: `./scripts/do.sh 1 0`
-
+## Running eRPC without fast bare-metal NICs:
+ * Follow these instructions to try out eRPC on a machine without fast Mellanox
+   or DPDK-capable NICs (e.g., on your desktop or in a virtual machine). This is
+   for development only: eRPC is not designed to perform well in these settings.
+   eRPC has been tested on KVM virtual machines and in Amazon EC2.
+ * Create an emulated RoCE device with [SoftRoCE] (instructions soon).
+ * Compile eRPC with `DTRANSPORT=infiniband -DROCE=on`
 
 ## Configuring and running the provided applications
  * The `apps` directory contains a suite of benchmarks and examples. The
