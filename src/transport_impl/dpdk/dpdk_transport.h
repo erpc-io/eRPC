@@ -25,10 +25,13 @@ class DpdkTransport : public Transport {
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kDPDK;
   static constexpr size_t kMTU = 1024;
-  static constexpr size_t kMaxQueuesPerPort = 16;
+  static constexpr size_t kMaxQueuesPerPort = kIsAzure ? 1 : 16;
 
   static constexpr size_t kNumTxRingDesc = 128;
   static constexpr size_t kPostlist = 32;
+
+  // If true, install flow steering rules into the NIC
+  static constexpr bool kInstallFlowRules = kIsAzure ? false : true;
 
   // The PMD may inline internally, but this class doesn't do it
   static constexpr size_t kMaxInline = 0;
@@ -49,7 +52,7 @@ class DpdkTransport : public Transport {
   /// Per-element size for the packet buffer memory pool
   static constexpr size_t kMbufSize =
       (static_cast<uint32_t>(sizeof(struct rte_mbuf)) + RTE_PKTMBUF_HEADROOM +
-       kMTU);
+       2048 /* For Azure, kMTU = 1024 does not work here */);
 
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
@@ -87,14 +90,28 @@ class DpdkTransport : public Transport {
 
   /// Get the IPv4 address for \p phy_port. The returned IPv4 address is assumed
   /// to be in host-byte order.
-  static uint32_t get_port_ipv4_addr(size_t phy_port) {
-    // For now, we use the LSBs of the port's MAC address
-    struct rte_ether_addr mac;
-    rte_eth_macaddr_get(phy_port, &mac);
+  uint32_t get_port_ipv4_addr(size_t phy_port) {
+    _unused(phy_port);
+    if (kIsAzure) {
+      // This routine gets the IPv4 address of the interface called eth1
+      int fd = socket(AF_INET, SOCK_DGRAM, 0);
+      struct ifreq ifr;
+      ifr.ifr_addr.sa_family = AF_INET;
+      strncpy(ifr.ifr_name, "eth1", IFNAMSIZ - 1);
+      int ret = ioctl(fd, SIOCGIFADDR, &ifr);
+      rt_assert(ret == 0, "DPDK: Failed to get IPv4 address of eth1");
+      close(fd);
+      return ntohl(
+          reinterpret_cast<sockaddr_in *>(&ifr.ifr_addr)->sin_addr.s_addr);
+    } else {
+      // As a hack, use the LSBs of the port's MAC address for IP address
+      struct rte_ether_addr mac;
+      rte_eth_macaddr_get(phy_port, &mac);
 
-    uint32_t ret;
-    memcpy(&ret, &mac.addr_bytes[2], sizeof(ret));
-    return ret;
+      uint32_t ret;
+      memcpy(&ret, &mac.addr_bytes[2], sizeof(ret));
+      return ret;
+    }
   }
 
   // raw_transport_datapath.cc

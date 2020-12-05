@@ -92,15 +92,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 }
 
 void DpdkTransport::setup_phy_port() {
-#if RTE_VER_YEAR >= 18 && RTE_VER_MONTH >= 5
-  // rte_eth_dev_count() was deprecated in DPDK 18.05
   uint16_t num_ports = rte_eth_dev_count_avail();
-#else
-  uint16_t num_ports = rte_eth_dev_count();
-#endif
-
-  // If dpdk-devbind shows available ports, this can sometimes happen if we
-  // numactl-membind the process to a different NUMA node than the NIC's.
   if (phy_port >= num_ports) {
     fprintf(stderr,
             "Port %u (0-based) requested, but only %u DPDK ports available. If "
@@ -115,6 +107,8 @@ void DpdkTransport::setup_phy_port() {
   rte_eth_dev_info_get(phy_port, &dev_info);
   rt_assert(dev_info.rx_desc_lim.nb_max >= kNumRxRingEntries,
             "Device RX ring too small");
+  rt_assert(dev_info.tx_desc_lim.nb_max >= kNumTxRingDesc,
+            "Device TX ring too small");
   ERPC_INFO("Initializing port %u with driver %s\n", phy_port,
             dev_info.driver_name);
 
@@ -124,9 +118,6 @@ void DpdkTransport::setup_phy_port() {
 
   eth_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
   eth_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
-#if RTE_VER_YEAR < 18
-  eth_conf.rxmode.ignore_offload_bitfield = 1;  // Use offloads below instead
-#endif
   eth_conf.rxmode.offloads = 0;
 
   eth_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
@@ -144,7 +135,8 @@ void DpdkTransport::setup_phy_port() {
 
   // Set flow director fields if flow director is supported. It's OK if the
   // FILTER_SET command fails (e.g., on ConnectX-4 NICs).
-  if (rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
+  if (kInstallFlowRules &&
+      rte_eth_dev_filter_supported(phy_port, RTE_ETH_FILTER_FDIR) == 0) {
     struct rte_eth_fdir_filter_info fi;
     memset(&fi, 0, sizeof(fi));
     fi.info_type = RTE_ETH_FDIR_FILTER_INPUT_SET_SELECT;
@@ -183,7 +175,8 @@ void DpdkTransport::setup_phy_port() {
 
     int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
                                      &eth_rx_conf, mempool_arr[phy_port][i]);
-    rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(i));
+    rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(i) +
+                            ". Error " + strerror(-1 * ret));
 
     rte_eth_txconf eth_tx_conf;
     memset(&eth_tx_conf, 0, sizeof(eth_tx_conf));
@@ -192,16 +185,16 @@ void DpdkTransport::setup_phy_port() {
     eth_tx_conf.tx_thresh.wthresh = 0;
     eth_tx_conf.tx_free_thresh = 0;
     eth_tx_conf.tx_rs_thresh = 0;
-#if RTE_VER_YEAR < 18
-    eth_tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;  // Use offloads below instead
-#endif
-    eth_tx_conf.offloads = kOffloads;
+    eth_tx_conf.offloads = eth_conf.txmode.offloads;
+
     ret = rte_eth_tx_queue_setup(phy_port, i, kNumTxRingDesc, numa_node,
                                  &eth_tx_conf);
     rt_assert(ret == 0, "Failed to setup TX queue: " + std::to_string(i));
 
-    install_flow_rule(phy_port, i, get_port_ipv4_addr(phy_port),
-                      udp_port_for_queue(phy_port, i));
+    if (kInstallFlowRules) {
+      install_flow_rule(phy_port, i, get_port_ipv4_addr(phy_port),
+                        udp_port_for_queue(phy_port, i));
+    }
   }
 
   rte_eth_dev_start(phy_port);

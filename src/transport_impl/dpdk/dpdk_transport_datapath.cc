@@ -19,9 +19,11 @@ static void format_pkthdr(pkthdr_t *pkthdr,
     memset(&eth_hdr->dst_mac, 0, sizeof(eth_hdr->dst_mac));
   }
 
+  // On most bare-metal clusters, a zero IP checksum works fine.
+  // But on Azure VMs we need a valid checksum.
   ipv4_hdr_t *ipv4_hdr = pkthdr->get_ipv4_hdr();
-  assert(ipv4_hdr->check == 0);
   ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
+  ipv4_hdr->check = get_ipv4_checksum(ipv4_hdr);
 
   udp_hdr_t *udp_hdr = pkthdr->get_udp_hdr();
   assert(udp_hdr->check == 0);
@@ -72,8 +74,8 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
     }
 
     ERPC_TRACE(
-        "  Transport: TX (idx = %zu, drop = %u). pkthdr = %s. Frame  = %s.\n",
-        i, item.drop, pkthdr->to_string().c_str(),
+        "Transport: TX (idx = %zu, drop = %u). pkthdr = %s. Frame  = %s.\n", i,
+        item.drop, pkthdr->to_string().c_str(),
         frame_header_to_string(&pkthdr->headroom[0]).c_str());
   }
 
