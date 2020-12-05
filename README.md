@@ -70,7 +70,9 @@ Some highlights:
   * eRPC works well on Azure VMs with accelerated networking. For now, eRPC
     supports only one RPC ID per machine on Azure.
 
-  * Configuring an Azure VM (do this for two VMs):
+  * Configure two Azure VMs as below. Use the same resource group and
+    availability zone for both VMs
+
     * Uncheck "Accelerated Networking" when launching the VM from the Azure
       portal (e.g., F32s-v2). This VM should have just the control network
       (i.e., `eth0`) and `lo` interfaces.
