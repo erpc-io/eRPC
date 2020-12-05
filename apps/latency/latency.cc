@@ -138,15 +138,16 @@ void client_func(erpc::Nexus *nexus) {
   connect_session(c);
 
   printf("Process %zu: Session connected. Starting work.\n", FLAGS_process_id);
-  printf("write_size median_us 5th_us 99th_us 999th_us\n");
+  printf("write_size median_us 5th_us 99th_us 999th_us max_us\n");
 
   send_req(c);
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(kAppEvLoopMs);  // 1 second
     if (ctrl_c_pressed == 1) break;
-    printf("%zu %.1f %.1f %.1f %.1f\n", c.req_size,
+    printf("%zu %.1f %.1f %.1f %.1f %.1f\n", c.req_size,
            c.latency.perc(.5) / kAppLatFac, c.latency.perc(.05) / kAppLatFac,
-           c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac);
+           c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac,
+           c.latency.max() / kAppLatFac);
 
     c.req_size *= 2;
     if (c.req_size > kAppMaxReqSize) c.req_size = kAppMinReqSize;
