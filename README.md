@@ -70,7 +70,7 @@ Some highlights:
   * eRPC works well on Azure VMs with accelerated networking. For now, eRPC
     supports only one RPC ID per machine on Azure.
 
-  * Configure two Azure VMs as below. Use the same resource group and
+  * Configure two Ubuntu 18.04 VMs as below. Use the same resource group and
     availability zone for both VMs
 
     * Uncheck "Accelerated Networking" when launching the VM from the Azure
@@ -88,7 +88,8 @@ Some highlights:
 
   * Prepare DPDK 19.11.5:
     * Install pre-requisite libraries and modules:
-       * `sudo apt install rdma-core libibverbs-dev`
+       * `sudo apt install make cmake g++ gcc libnuma-dev rdma-core libibverbs-dev libgflags-dev libgtest-dev numactl`
+       * `(cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)`
        * `sudo modprobe ib_uverbs`
        * `sudo modprobe mlx4_ib`
     * Download the [DPDK 19.11.5 tarball](https://core.dpdk.org/download/) and
@@ -105,12 +106,12 @@ sudo mkdir /mnt/huge
 sudo mount -t hugetlbfs nodev /mnt/huge
 ```
 
-  * Build eRPC with `cmake . -DTRANSPORT=dpdk -DAZURE=on; make`
+  * Build eRPC's latency benchmark with `cmake . -DTRANSPORT=dpdk -DAZURE=on; make latency`
   * Create the file `scripts/autorun_process_file` like below. Here, do not use
     the IP addresses of the accelerated NIC (i.e., not of `eth1`).
 ```
-<Control network IPv4 address of VM #1> 31850 0
-<Control network IPv4 address of VM #2> 31850 0
+<Public IPv4 address of VM #1> 31850 0
+<Public IPv4 address of VM #2> 31850 0
 ```
 
   * Run the eRPC application (a latency benchmark by default):
