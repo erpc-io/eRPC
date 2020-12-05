@@ -170,8 +170,29 @@ static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
   ipv4_hdr->check = 0;
 }
 
-/// Format the UDP header for a UDP packet. All value arguments are in host-byte
-/// order. \p data_size is the data payload size in the UDP packet.
+// Compute IP header checksum (copied from DPDK testpmd)
+static uint16_t get_ipv4_checksum(const ipv4_hdr_t* ipv4_hdr) {
+  auto* ptr16 = reinterpret_cast<const uint16_t*>(ipv4_hdr);
+  uint32_t ip_cksum = 0;
+  ip_cksum += ptr16[0];
+  ip_cksum += ptr16[1];
+  ip_cksum += ptr16[2];
+  ip_cksum += ptr16[3];
+  ip_cksum += ptr16[4];
+  ip_cksum += ptr16[6];
+  ip_cksum += ptr16[7];
+  ip_cksum += ptr16[8];
+  ip_cksum += ptr16[9];
+  ip_cksum = ((ip_cksum & 0xFFFF0000) >> 16) + (ip_cksum & 0x0000FFFF);
+  if (ip_cksum > 65535) ip_cksum -= 65535;
+  ip_cksum = (~ip_cksum) & 0x0000FFFF;
+  if (ip_cksum == 0) ip_cksum = 0xFFFF;
+
+  return static_cast<uint16_t>(ip_cksum);
+}
+
+/// Format the UDP header for a UDP packet. All value arguments are in
+/// host-byte order. \p data_size is the data payload size in the UDP packet.
 static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
                            uint16_t dst_port, uint16_t data_size) {
   udp_hdr->src_port = htons(src_port);
