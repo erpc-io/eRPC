@@ -24,10 +24,9 @@ Some highlights:
    * For other DPDK-compatible NICs, a system-wide installation from DPDK
      19.11.5 LTS sources (i.e., `sudo make install T=x86_64-native-linuxapp-gcc
      DESTDIR=/usr`). Other DPDK versions are not supported.
- * NICs: Fast (10 GbE+) bare-metal NICs are needed for good performance. eRPC
-   works best with Mellanox Ethernet and InfiniBand NICs. Any DPDK-capable NICs
-   also work well. Slower/virtual NICs can still be used for testing and
-   development.
+ * NICs: Fast (10 GbE+) NICs are needed for good performance. eRPC works best
+   with Mellanox Ethernet and InfiniBand NICs. Any DPDK-capable NICs
+   also work well.
  * System configuration:
    * At least 1024 huge pages on every NUMA node, and unlimited SHM limits
    * On a machine with `n` eRPC processes, eRPC uses kernel UDP ports `{31850,
@@ -55,10 +54,10 @@ Some highlights:
 ## Supported bare-metal NICs:
  * Ethernet/UDP mode:
    * ConnectX-4 or newer Mellanox Ethernet NICs: Use `DTRANSPORT=raw`
-   * DPDK-compatible NICs that support flow-director: Use `DTRANSPORT=dpdk`
+   * DPDK-enabled NICs that support flow-director: Use `DTRANSPORT=dpdk`
      * Intel 82599 and Intel X710 NICs have been tested
-     * Virtual NICs have not been tested
      * `raw` transport is faster for Mellanox NICs, which also support DPDK
+   * DPDK-enabled NICs on Microsoft Azure: Use `-DTRANSPORT=dpdk -DAZURE=on`
    * ConnectX-3 Ethernet NICs are supported in eRPC's RoCE mode
  * RDMA (InfiniBand/RoCE) NICs: Use `DTRANSPORT=infiniband`. Add `DROCE=on`
    if using RoCE.
@@ -71,19 +70,19 @@ Some highlights:
     supports only one RPC ID per machine on Azure.
 
   * Configure two Ubuntu 18.04 VMs as below. Use the same resource group and
-    availability zone for both VMs
+    availability zone for both VMs.
 
-    * Uncheck "Accelerated Networking" when launching the VM from the Azure
-      portal (e.g., F32s-v2). This VM should have just the control network
-      (i.e., `eth0`) and `lo` interfaces.
+    * Uncheck "Accelerated Networking" when launching each VM from the Azure
+      portal (e.g., F32s-v2). For now, this VM should have just the control
+      network (i.e., `eth0`) and `lo` interfaces.
     * Add a NIC to Azure via the Azure CLI: `az network nic create
       --resource-group <your resource group> --name <a name for the NIC>
       --vnet-name <name of the VMs' virtual network> --subnet default
       --accelerated-networking true --subscription <Azure subscription, if
       any>`
     * Stop the VM launched earlier, and attach the NIC created in the previous
-      step ("Networking" -> "Attach network interface").
-    * Start the VM. It should have a new interface called `eth1`, which eRPC
+      step to the VM (i.e., in "Networking" -> "Attach network interface").
+    * Re-start the VM. It should have a new interface called `eth1`, which eRPC
       will use for DPDK traffic.
 
   * Prepare DPDK 19.11.5:
@@ -114,7 +113,7 @@ sudo mount -t hugetlbfs nodev /mnt/huge
 <Public IPv4 address of VM #2> 31850 0
 ```
 
-  * Run the eRPC application (a latency benchmark by default):
+  * Run the eRPC application (the latency benchmark by default):
     * At VM #1: `./scripts/do.sh 0 0`
     * At VM #2: `./scripts/do.sh 1 0`
 
