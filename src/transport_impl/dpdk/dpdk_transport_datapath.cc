@@ -1,5 +1,6 @@
 #ifdef ERPC_DPDK
 
+#include <rte_thash.h>
 #include "dpdk_transport.h"
 #include "util/huge_alloc.h"
 
@@ -19,8 +20,8 @@ static void format_pkthdr(pkthdr_t *pkthdr,
     memset(&eth_hdr->dst_mac, 0, sizeof(eth_hdr->dst_mac));
   }
 
-  // On most bare-metal clusters, a zero IP checksum works fine.
-  // But on Azure VMs we need a valid checksum.
+  // On most bare-metal clusters, a zero IP checksum works fine. But on Azure
+  // VMs we need a valid checksum.
   ipv4_hdr_t *ipv4_hdr = pkthdr->get_ipv4_hdr();
   ipv4_hdr->tot_len = htons(pkt_size - sizeof(eth_hdr_t));
   ipv4_hdr->check = get_ipv4_checksum(ipv4_hdr);

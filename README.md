@@ -66,8 +66,7 @@ Some highlights:
 
 ## Running eRPC over DPDK on Microsoft Azure VMs
 
-  * eRPC works well on Azure VMs with accelerated networking. For now, eRPC
-    supports only one RPC ID per machine on Azure.
+  * eRPC works well on Azure VMs with accelerated networking.
 
   * Configure two Ubuntu 18.04 VMs as below. Use the same resource group and
     availability zone for both VMs.

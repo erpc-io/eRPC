@@ -25,13 +25,10 @@ class DpdkTransport : public Transport {
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kDPDK;
   static constexpr size_t kMTU = 1024;
-  static constexpr size_t kMaxQueuesPerPort = kIsAzure ? 1 : 16;
+  static constexpr size_t kMaxQueuesPerPort = 16;
 
   static constexpr size_t kNumTxRingDesc = 128;
   static constexpr size_t kPostlist = 32;
-
-  // If true, install flow steering rules into the NIC
-  static constexpr bool kInstallFlowRules = kIsAzure ? false : true;
 
   // The PMD may inline internally, but this class doesn't do it
   static constexpr size_t kMaxInline = 0;
@@ -204,8 +201,8 @@ class DpdkTransport : public Transport {
 
   size_t rx_ring_head = 0, rx_ring_tail = 0;
 
-  uint16_t rx_flow_udp_port = 0;
-  size_t qp_id = SIZE_MAX;  ///< The RX/TX queue pair for this Transport
+  uint16_t rx_flow_udp_port = 0;  ///< The UDP port this transport listens on
+  size_t qp_id = SIZE_MAX;        ///< The RX/TX queue pair for this Transport
 
   // We don't use DPDK's lcore threads, so a shared mempool with per-lcore
   // cache won't work. Instead, we use per-thread pools with zero cached mbufs.
@@ -213,9 +210,10 @@ class DpdkTransport : public Transport {
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
-    uint32_t ipv4_addr;    ///< The port's IPv4 address in host-byte order
-    uint8_t mac_addr[6];   ///< The port's MAC address
-    size_t bandwidth = 0;  ///< Link bandwidth in bytes per second
+    uint32_t ipv4_addr;   // The port's IPv4 address in host-byte order
+    uint8_t mac_addr[6];  // The port's MAC address
+    size_t bandwidth;     // Link bandwidth in bytes per second
+    size_t reta_size;     // Number of entries in NIC RX indirection table
   } resolve;
 };
 

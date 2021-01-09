@@ -55,25 +55,6 @@ static std::string ipv4_to_string(uint32_t ipv4_addr) {
   return str;
 }
 
-/// eRPC session endpoint routing info for Ethernet-based transports. The MAC
-/// address is in the byte order retrived from the driver. The IPv4 address and
-/// UDP port are in host-byte order.
-struct eth_routing_info_t {
-  uint8_t mac[6];
-  uint32_t ipv4_addr;
-  uint16_t udp_port;
-
-  std::string to_string() {
-    std::ostringstream ret;
-    ret << "[MAC " << mac_to_string(mac) << ", IP " << ipv4_to_string(ipv4_addr)
-        << ", UDP port " << std::to_string(udp_port) << "]";
-
-    return std::string(ret.str());
-  }
-  // This must be smaller than Transport::kMaxRoutingInfoSize, but a static
-  // assert here causes a circular dependency.
-};
-
 struct eth_hdr_t {
   uint8_t dst_mac[6];
   uint8_t src_mac[6];
@@ -135,6 +116,33 @@ struct udp_hdr_t {
 static constexpr size_t kInetHdrsTotSize =
     sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
 static_assert(kInetHdrsTotSize == 42, "");
+
+/// eRPC session endpoint routing info for Ethernet-based transports. The MAC
+/// address is in the byte order retrived from the driver. The IPv4 address and
+/// UDP port are in host-byte order.
+struct eth_routing_info_t {
+  uint8_t mac[6];
+  uint32_t ipv4_addr;            // The IPv4 address for this endpoint
+  uint16_t udp_port;             // The UDP port this endpoint listens on
+  uint16_t rxq_id = UINT16_MAX;  // The NIC RX queue ID this endpoint listens on
+
+  // Number of entries in this endpoint's NIC RSS indirection table
+  uint16_t reta_size = UINT16_MAX;
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[MAC " << mac_to_string(mac) << ", IP " << ipv4_to_string(ipv4_addr)
+        << ", UDP port " << std::to_string(udp_port) << ", RQ queue ID "
+        << (rxq_id == UINT16_MAX ? " N/A " : std::to_string(rxq_id))
+        << ", RETA size "
+        << ((reta_size == UINT16_MAX) ? " N/A" : std::to_string(reta_size))
+        << "]";
+
+    return std::string(ret.str());
+  }
+  // This must be smaller than Transport::kMaxRoutingInfoSize, but a static
+  // assert here causes a circular dependency.
+};
 
 static std::string frame_header_to_string(uint8_t* buf) {
   auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(buf);
