@@ -15,8 +15,8 @@ raw:
 	g++ -g -std=c++11 -o server server.cc -I ../src -L ../build $(LIBS) -libverbs -DERPC_RAW=true
 	g++ -g -std=c++11 -o client client.cc -I ../src -L ../build $(LIBS) -libverbs -DERPC_RAW=true
 dpdk:
-	g++ -g -std=c++11 -o server server.cc -I ../src -I /usr/local/include/dpdk -L ../build $(LIBS) -ldpdk -DERPC_DPDK=true -march=native
-	g++ -g -std=c++11 -o client client.cc -I ../src -I /usr/local/include/dpdk -L ../build $(LIBS) -ldpdk -DERPC_DPDK=true -march=native
+	g++ -g -std=c++11 -o server server.cc -I ../src -I /usr/include/dpdk -L ../build $(LIBS) -ldpdk -ldl -DERPC_DPDK=true -march=native
+	g++ -g -std=c++11 -o client client.cc -I ../src -I /usr/include/dpdk -L ../build $(LIBS) -ldpdk -ldl -DERPC_DPDK=true -march=native
 clean:
 	rm server client
 

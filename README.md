@@ -104,7 +104,13 @@ sudo mkdir /mnt/huge
 sudo mount -t hugetlbfs nodev /mnt/huge
 ```
 
-  * Build eRPC's latency benchmark with `cmake . -DTRANSPORT=dpdk -DAZURE=on; make latency`
+  * Build eRPC's library and latency benchmark:
+```
+cmake . -DTRANSPORT=dpdk -DAZURE=on
+make
+make latency
+```
+
   * Create the file `scripts/autorun_process_file` like below. Here, do not use
     the IP addresses of the accelerated NIC (i.e., not of `eth1`).
 ```
