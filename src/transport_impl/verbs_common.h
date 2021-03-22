@@ -194,6 +194,7 @@ static void common_resolve_phy_port(uint8_t phy_port, size_t mtu,
           case 8: gbps_per_lane = 10.0; break;
           case 16: gbps_per_lane = 14.0; break;
           case 32: gbps_per_lane = 25.0; break;
+          case 64: gbps_per_lane = 50.0; break;
           default: rt_assert(false, "Invalid active speed");
         };
 
