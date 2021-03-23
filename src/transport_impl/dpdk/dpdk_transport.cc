@@ -110,11 +110,22 @@ void DpdkTransport::setup_phy_port() {
   uint16_t num_ports = rte_eth_dev_count_avail();
   if (phy_port >= num_ports) {
     fprintf(stderr,
-            "Port %u (0-based) requested, but only %u DPDK ports available. If "
-            "you have a DPDK-bound port, ensure that (a) the NIC's NUMA node "
-            "has huge pages, and (b) the process is not pinned "
-            "(e.g., via numactl) to a different NUMA node than the NIC's.\n",
+            "Error: Port %u (0-based) requested, but only %u DPDK ports "
+            "available. Please ensure:\n",
             phy_port, num_ports);
+    fprintf(stderr,
+            "1. If you have a DPDK-capable port, ensure that (a) the NIC's "
+            "NUMA node has huge pages, and (b) this process is not pinned "
+            "(e.g., via numactl) to a different NUMA node than the NIC's.\n");
+
+    const char* ld_library_path = getenv("LD_LIBRARY_PATH");
+    const char* library_path = getenv("LIBRARY_PATH");
+
+    fprintf(stderr,
+            "2. Your LD_LIBRARY_PATH (= %s) and/or LIBRARY_PATH (= %s) "
+            "contains the NIC's userspace libraries (e.g., libmlx5.so).\n",
+            ld_library_path == nullptr ? "not set" : ld_library_path,
+            library_path == nullptr ? "not set" : library_path);
     rt_assert(false);
   }
 
