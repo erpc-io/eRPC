@@ -41,7 +41,8 @@ namespace erpc {
  *    - Run the event loop with Rpc::run_event_loop. The request handler will
  *      be invoked when requests are received from clients.
  *    - Create the response in the request handle supplied to the handler.
- *      Use Rpc::enqueue_response to send the reply.
+ *      Use Rpc::enqueue_response with either of the two response handle msgbufs
+ *      to send the reply.
  * -# For an RPC client thread:
  *    - Create an Rpc endpoint using the Nexus
  *    - Connect to remote endpoints with Rpc::create_session, specifying the
@@ -61,8 +62,11 @@ namespace erpc {
  * Applications use it to create sessions with remote Rpc objects, send and
  * receive requests and responses, and run the event loop.
  *
- * None of the functions are thread safe. eRPC's worker (background) threads
- * have restricted concurrent access to Rpc objects.
+ * None of the functions are thread safe for user threads.
+ *
+ * eRPC's worker (background) threads have limited; concurrent access to Rpc
+ * objects. The functions with the _st can be called from only the foreground
+ * thread that owns the Rpc object.
  *
  * @tparam TTr The unreliable transport
  */
@@ -250,10 +254,12 @@ class Rpc {
                        void *tag, size_t cont_etid = kInvalidBgETid);
 
   /**
-   * @brief Enqueue a response for transmission at the server. See ReqHandle
-   * for details about creating the response. On calling this, the application
-   * loses ownership of the request and response MsgBuffer. This function is
-   * safe to call from background threads (TS).
+   * @brief Enqueue a response for transmission at the server. This must
+   * be either the request handle's preallocated response buffer or its
+   * dynamic response.  See ReqHandle for details about creating the response.
+   * On calling this, the application loses ownership of the request and
+   * response MsgBuffer. This function is safe to call from background threads
+   * (TS).
    *
    * This can be called outside the request handler.
    *

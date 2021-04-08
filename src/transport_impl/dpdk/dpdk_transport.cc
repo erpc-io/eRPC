@@ -118,8 +118,8 @@ void DpdkTransport::setup_phy_port() {
             "NUMA node has huge pages, and (b) this process is not pinned "
             "(e.g., via numactl) to a different NUMA node than the NIC's.\n");
 
-    const char* ld_library_path = getenv("LD_LIBRARY_PATH");
-    const char* library_path = getenv("LIBRARY_PATH");
+    const char *ld_library_path = getenv("LD_LIBRARY_PATH");
+    const char *library_path = getenv("LIBRARY_PATH");
 
     fprintf(stderr,
             "2. Your LD_LIBRARY_PATH (= %s) and/or LIBRARY_PATH (= %s) "
@@ -278,65 +278,32 @@ void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   ri->reta_size = resolve.reta_size;
 }
 
-/**
- * @brief Return a source UDP port for which the RSS target queue at the remote
- * receiver for the ntuple {src_ip, dst_ip, src_port, dst_port} will be
- * remote_queue_id.
- *
- * All ntuple arguments and return value is in host-byte order
- *
- * @param remote_queue_id The remote NIC RX queue to target
- * @param remote_reta_size The number of entries in the remote NIC's RSS
- * indirection table
- * @param src_ip This NIC's IPv4 address
- * @param dst_ip The remote NIC's IPv4 address
- * @param dst_port The UDP port the remote endpoint is listening on
- * @return The source UDP port this endpoint should use for targeting
- */
-static uint16_t get_udp_src_port_for_target_queue(size_t remote_queue_id,
-                                                  size_t remote_reta_size,
-                                                  uint32_t src_ip,
-                                                  uint32_t dst_ip,
-                                                  uint16_t dst_port) {
-  uint16_t src_port = kBaseEthUDPPort;
-  for (; src_port < UINT16_MAX; src_port++) {
-    union rte_thash_tuple tuple;
-    tuple.v4.src_addr = src_ip;
-    tuple.v4.dst_addr = dst_ip;
-    tuple.v4.sport = src_port;
-    tuple.v4.dport = dst_port;
-    uint32_t rss_l3l4 = rte_softrss(reinterpret_cast<uint32_t *>(&tuple),
-                                    RTE_THASH_V4_L4_LEN, default_rss_key);
-
-    size_t target_queue =
-        (rss_l3l4 % remote_reta_size) % DpdkTransport::kMaxQueuesPerPort;
-    if (target_queue == remote_queue_id) break;
-  }
-
-  if (src_port == UINT16_MAX) {
-    ERPC_ERROR(
-        "Failed to find src port that targets remote queue %zu. "
-        "Remote RETA size = %zu.\n",
-        remote_queue_id, remote_reta_size);
-    rt_assert(false);
-  }
-
-  return src_port;
-}
-
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
 bool DpdkTransport::resolve_remote_routing_info(
     RoutingInfo *routing_info) const {
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
 
-  // Save/use info from routing_info before we overwrite it
+  // XXX: The header generation below will overwrite routing_info. We must
+  // save/use info from routing_info before that.
   uint8_t remote_mac[6];
   memcpy(remote_mac, ri->mac, 6);
   const uint32_t remote_ipv4_addr = ri->ipv4_addr;
   const uint16_t remote_udp_port = ri->udp_port;
-  const uint16_t udp_src_port = get_udp_src_port_for_target_queue(
-      ri->rxq_id, ri->reta_size, resolve.ipv4_addr, remote_ipv4_addr,
-      remote_udp_port);
+
+  uint16_t i = kBaseEthUDPPort;
+  for (; i < UINT16_MAX; i++) {
+    union rte_thash_tuple tuple;
+    tuple.v4.src_addr = resolve.ipv4_addr;
+    tuple.v4.dst_addr = remote_ipv4_addr;
+    tuple.v4.sport = i;
+    tuple.v4.dport = remote_udp_port;
+    uint32_t rss_l3l4 = rte_softrss(reinterpret_cast<uint32_t *>(&tuple),
+                                    RTE_THASH_V4_L4_LEN, default_rss_key);
+    if ((rss_l3l4 % ri->reta_size) % DpdkTransport::kMaxQueuesPerPort ==
+        ri->rxq_id)
+      break;
+  }
+  rt_assert(i < UINT16_MAX, "Scan error");
 
   // Overwrite routing_info by constructing the packet header in place
   static_assert(kMaxRoutingInfoSize >= kInetHdrsTotSize, "");
@@ -348,7 +315,7 @@ bool DpdkTransport::resolve_remote_routing_info(
   gen_ipv4_header(ipv4_hdr, resolve.ipv4_addr, remote_ipv4_addr, 0);
 
   auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
-  gen_udp_header(udp_hdr, udp_src_port, remote_udp_port, 0);
+  gen_udp_header(udp_hdr, i, remote_udp_port, 0);
 
   return true;
 }
