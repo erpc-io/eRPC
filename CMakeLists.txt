@@ -127,13 +127,13 @@ set(SOURCES
   src/rpc_impl/rpc_sm_helpers.cc
   src/transport_impl/transport.cc
   src/transport_impl/dpdk/dpdk_transport.cc
+  src/transport_impl/dpdk/dpdk_init.cc
   src/transport_impl/dpdk/dpdk_transport_datapath.cc
   src/transport_impl/infiniband/ib_transport.cc
   src/transport_impl/infiniband/ib_transport_datapath.cc
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
   src/util/huge_alloc.cc
-  src/util/externs.cc
   src/util/tls_registry.cc)
 
 # Transport-specific. Mellanox OFED drivers are the best choice for raw and

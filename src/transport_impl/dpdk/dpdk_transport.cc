@@ -7,7 +7,7 @@
 #include <rte_version.h>
 #include <set>
 #include "dpdk_transport.h"
-#include "util/externs.h"
+#include "dpdk_externs.h"
 #include "util/huge_alloc.h"
 
 namespace erpc {
@@ -49,7 +49,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
   {
     // The first thread to grab the lock initializes DPDK
-    dpdk_lock.lock();
+    g_dpdk_lock.lock();
 
     // Get an available queue on phy_port. This does not require phy_port to
     // be initialized.
@@ -64,7 +64,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     }
     g_used_qp_ids[phy_port].insert(qp_id);
 
-    if (dpdk_initialized) {
+    if (g_dpdk_initialized) {
       ERPC_INFO(
           "DPDK transport for Rpc %u skipping initialization, queue ID = %zu\n",
           rpc_id, qp_id);
@@ -85,7 +85,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
       rt_assert(ret >= 0, "Failed to initialize DPDK");
 
-      dpdk_initialized = true;
+      g_dpdk_initialized = true;
     }
 
     if (!g_port_initialized[phy_port]) {
@@ -96,7 +96,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     // Here, mempools for phy_port have been initialized
     mempool = g_mempool_arr[phy_port][qp_id];
 
-    dpdk_lock.unlock();
+    g_dpdk_lock.unlock();
   }
 
   resolve_phy_port();
@@ -211,9 +211,9 @@ DpdkTransport::~DpdkTransport() {
   rte_mempool_free(mempool);
 
   {
-    dpdk_lock.lock();
+    g_dpdk_lock.lock();
     g_used_qp_ids[phy_port].erase(g_used_qp_ids[phy_port].find(qp_id));
-    dpdk_lock.unlock();
+    g_dpdk_lock.unlock();
   }
 }
 
