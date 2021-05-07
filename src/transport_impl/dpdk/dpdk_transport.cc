@@ -15,6 +15,9 @@ namespace erpc {
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
 
+static_assert(kHeadroom == 40, "Invalid packet header headroom for DPDK");
+static_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Wrong headroom");
+
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
@@ -25,9 +28,6 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
   // For DPDK, we compute the datapath UDP port using the physical port and Rpc
   // ID, so we don't need sm_udp_port like Raw transport.
   _unused(sm_udp_port);
-
-  rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
-  rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
 
   {
     // The first thread to grab the lock initializes DPDK
