@@ -72,7 +72,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
     if (!g_port_initialized[phy_port]) {
       g_port_initialized[phy_port] = true;
-      setup_phy_port();
+      setup_phy_port(phy_port, numa_node);
     }
 
     // Here, mempools for phy_port have been initialized

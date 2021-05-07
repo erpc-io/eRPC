@@ -5,7 +5,9 @@
 
 namespace erpc {
 
-void DpdkTransport::setup_phy_port() {
+constexpr uint8_t DpdkTransport::kDefaultRssKey[];
+
+void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node) {
   uint16_t num_ports = rte_eth_dev_count_avail();
   if (phy_port >= num_ports) {
     fprintf(stderr,
