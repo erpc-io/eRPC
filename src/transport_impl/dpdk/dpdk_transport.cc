@@ -15,14 +15,6 @@ namespace erpc {
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
 
-/// Key used for RSS hashing
-static constexpr uint8_t default_rss_key[] = {
-    0x2c, 0xc6, 0x81, 0xd1, 0x5b, 0xdb, 0xf4, 0xf7, 0xfc, 0xa2,
-    0x83, 0x19, 0xdb, 0x1a, 0x3e, 0x94, 0x6b, 0x9e, 0x38, 0xd9,
-    0x2c, 0x9c, 0x03, 0xd1, 0xad, 0x99, 0x44, 0xa7, 0xd9, 0x56,
-    0x3d, 0x59, 0x06, 0x3c, 0x25, 0xf3, 0xfc, 0x1f, 0xdc, 0x2a,
-};
-
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
 // allocator is provided.
@@ -95,98 +87,6 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
   ERPC_WARN(
       "DpdkTransport created for Rpc ID %u, queue %zu, datapath UDP port %u\n",
       rpc_id, qp_id, rx_flow_udp_port);
-}
-
-void DpdkTransport::setup_phy_port() {
-  uint16_t num_ports = rte_eth_dev_count_avail();
-  if (phy_port >= num_ports) {
-    fprintf(stderr,
-            "Error: Port %u (0-based) requested, but only %u DPDK ports "
-            "available. Please ensure:\n",
-            phy_port, num_ports);
-    fprintf(stderr,
-            "1. If you have a DPDK-capable port, ensure that (a) the NIC's "
-            "NUMA node has huge pages, and (b) this process is not pinned "
-            "(e.g., via numactl) to a different NUMA node than the NIC's.\n");
-
-    const char *ld_library_path = getenv("LD_LIBRARY_PATH");
-    const char *library_path = getenv("LIBRARY_PATH");
-
-    fprintf(stderr,
-            "2. Your LD_LIBRARY_PATH (= %s) and/or LIBRARY_PATH (= %s) "
-            "contains the NIC's userspace libraries (e.g., libmlx5.so).\n",
-            ld_library_path == nullptr ? "not set" : ld_library_path,
-            library_path == nullptr ? "not set" : library_path);
-    rt_assert(false);
-  }
-
-  rte_eth_dev_info dev_info;
-  rte_eth_dev_info_get(phy_port, &dev_info);
-  rt_assert(dev_info.rx_desc_lim.nb_max >= kNumRxRingEntries,
-            "Device RX ring too small");
-  rt_assert(dev_info.tx_desc_lim.nb_max >= kNumTxRingDesc,
-            "Device TX ring too small");
-  ERPC_INFO("Initializing port %u with driver %s\n", phy_port,
-            dev_info.driver_name);
-
-  // Create per-thread RX and TX queues
-  rte_eth_conf eth_conf;
-  memset(&eth_conf, 0, sizeof(eth_conf));
-
-  eth_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
-  eth_conf.rx_adv_conf.rss_conf.rss_key =
-      const_cast<uint8_t *>(default_rss_key);
-  eth_conf.rx_adv_conf.rss_conf.rss_key_len = 40;
-  eth_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_UDP;
-
-  eth_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
-  eth_conf.txmode.offloads = kOffloads;
-
-  int ret = rte_eth_dev_configure(phy_port, kMaxQueuesPerPort,
-                                  kMaxQueuesPerPort, &eth_conf);
-  rt_assert(ret == 0, "Ethdev configuration error: ", strerror(-1 * ret));
-
-  // Set up all RX and TX queues and start the device. This can't be done later
-  // on a per-thread basis since we must start the device to use any queue.
-  // Once the device is started, more queues cannot be added without stopping
-  // and reconfiguring the device.
-  for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
-    std::string pname =
-        "mempool-erpc-" + std::to_string(phy_port) + "-" + std::to_string(i);
-    g_mempool_arr[phy_port][i] =
-        rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
-                                0 /* priv size */, kMbufSize, numa_node);
-    rt_assert(g_mempool_arr[phy_port][i] != nullptr,
-              "Mempool create failed: " + dpdk_strerror());
-
-    rte_eth_rxconf eth_rx_conf;
-    memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
-    eth_rx_conf.rx_thresh.pthresh = 8;
-    eth_rx_conf.rx_thresh.hthresh = 0;
-    eth_rx_conf.rx_thresh.wthresh = 0;
-    eth_rx_conf.rx_free_thresh = 0;
-    eth_rx_conf.rx_drop_en = 0;
-
-    int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
-                                     &eth_rx_conf, g_mempool_arr[phy_port][i]);
-    rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(i) +
-                            ". Error " + strerror(-1 * ret));
-
-    rte_eth_txconf eth_tx_conf;
-    memset(&eth_tx_conf, 0, sizeof(eth_tx_conf));
-    eth_tx_conf.tx_thresh.pthresh = 32;
-    eth_tx_conf.tx_thresh.hthresh = 0;
-    eth_tx_conf.tx_thresh.wthresh = 0;
-    eth_tx_conf.tx_free_thresh = 0;
-    eth_tx_conf.tx_rs_thresh = 0;
-    eth_tx_conf.offloads = eth_conf.txmode.offloads;
-
-    ret = rte_eth_tx_queue_setup(phy_port, i, kNumTxRingDesc, numa_node,
-                                 &eth_tx_conf);
-    rt_assert(ret == 0, "Failed to setup TX queue: " + std::to_string(i));
-  }
-
-  rte_eth_dev_start(phy_port);
 }
 
 void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
@@ -289,7 +189,7 @@ bool DpdkTransport::resolve_remote_routing_info(
     tuple.v4.sport = i;
     tuple.v4.dport = remote_udp_port;
     uint32_t rss_l3l4 = rte_softrss(reinterpret_cast<uint32_t *>(&tuple),
-                                    RTE_THASH_V4_L4_LEN, default_rss_key);
+                                    RTE_THASH_V4_L4_LEN, kDefaultRssKey);
     if ((rss_l3l4 % ri->reta_size) % DpdkTransport::kMaxQueuesPerPort ==
         ri->rxq_id)
       break;

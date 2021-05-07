@@ -51,6 +51,16 @@ class DpdkTransport : public Transport {
   /// Maximum data bytes (i.e., non-header) in a packet
   static constexpr size_t kMaxDataPerPkt = (kMTU - sizeof(pkthdr_t));
 
+  static constexpr size_t kRssKeySize = 40;  /// RSS key size in bytes
+
+  /// Key used for RSS hashing
+  const uint8_t kDefaultRssKey[kRssKeySize] = {
+      0x2c, 0xc6, 0x81, 0xd1, 0x5b, 0xdb, 0xf4, 0xf7, 0xfc, 0xa2,
+      0x83, 0x19, 0xdb, 0x1a, 0x3e, 0x94, 0x6b, 0x9e, 0x38, 0xd9,
+      0x2c, 0x9c, 0x03, 0xd1, 0xad, 0x99, 0x44, 0xa7, 0xd9, 0x56,
+      0x3d, 0x59, 0x06, 0x3c, 0x25, 0xf3, 0xfc, 0x1f, 0xdc, 0x2a,
+  };
+
   DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id, uint8_t phy_port,
                 size_t numa_node, FILE *trace_file);
   void init_hugepage_structures(HugeAlloc *huge_alloc, uint8_t **rx_ring);
