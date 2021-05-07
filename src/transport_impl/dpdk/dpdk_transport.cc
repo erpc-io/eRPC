@@ -15,13 +15,15 @@ namespace erpc {
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
 
-static volatile bool port_initialized[RTE_MAX_ETHPORTS];  // Uses dpdk_lock
+// These globals are shared among different DpdkTransport objects
+
+static volatile bool g_port_initialized[RTE_MAX_ETHPORTS];  // Uses dpdk_lock
 
 /// The set of queue IDs in use by Rpc objects in this process. Uses dpdk_lock.
-static std::set<size_t> used_qp_ids[RTE_MAX_ETHPORTS];
+static std::set<size_t> g_used_qp_ids[RTE_MAX_ETHPORTS];
 
-/// mempool_arr[i][j] is the mempool to use for port i, queue j
-rte_mempool *mempool_arr[RTE_MAX_ETHPORTS][DpdkTransport::kMaxQueuesPerPort];
+/// g_mempool_arr[i][j] is the mempool to use for port i, queue j
+rte_mempool *g_mempool_arr[RTE_MAX_ETHPORTS][DpdkTransport::kMaxQueuesPerPort];
 
 /// Key used for RSS hashing
 static constexpr uint8_t default_rss_key[] = {
@@ -51,16 +53,16 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
     // Get an available queue on phy_port. This does not require phy_port to
     // be initialized.
-    rt_assert(used_qp_ids[phy_port].size() < kMaxQueuesPerPort,
+    rt_assert(g_used_qp_ids[phy_port].size() < kMaxQueuesPerPort,
               "No queues left on port " + std::to_string(phy_port));
     for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
-      if (used_qp_ids[phy_port].count(i) == 0) {
+      if (g_used_qp_ids[phy_port].count(i) == 0) {
         qp_id = i;
         rx_flow_udp_port = udp_port_for_queue(phy_port, qp_id);
         break;
       }
     }
-    used_qp_ids[phy_port].insert(qp_id);
+    g_used_qp_ids[phy_port].insert(qp_id);
 
     if (dpdk_initialized) {
       ERPC_INFO(
@@ -86,13 +88,13 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       dpdk_initialized = true;
     }
 
-    if (!port_initialized[phy_port]) {
-      port_initialized[phy_port] = true;
+    if (!g_port_initialized[phy_port]) {
+      g_port_initialized[phy_port] = true;
       setup_phy_port();
     }
 
     // Here, mempools for phy_port have been initialized
-    mempool = mempool_arr[phy_port][qp_id];
+    mempool = g_mempool_arr[phy_port][qp_id];
 
     dpdk_lock.unlock();
   }
@@ -101,8 +103,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
   init_mem_reg_funcs();
 
   ERPC_WARN(
-      "DpdkTransport created for Rpc ID %u, queue %zu, "
-      "datapath udp port = %u\n",
+      "DpdkTransport created for Rpc ID %u, queue %zu, datapath UDP port %u\n",
       rpc_id, qp_id, rx_flow_udp_port);
 }
 
@@ -162,10 +163,10 @@ void DpdkTransport::setup_phy_port() {
   for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
     std::string pname =
         "mempool-erpc-" + std::to_string(phy_port) + "-" + std::to_string(i);
-    mempool_arr[phy_port][i] =
+    g_mempool_arr[phy_port][i] =
         rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
                                 0 /* priv size */, kMbufSize, numa_node);
-    rt_assert(mempool_arr[phy_port][i] != nullptr,
+    rt_assert(g_mempool_arr[phy_port][i] != nullptr,
               "Mempool create failed: " + dpdk_strerror());
 
     rte_eth_rxconf eth_rx_conf;
@@ -177,7 +178,7 @@ void DpdkTransport::setup_phy_port() {
     eth_rx_conf.rx_drop_en = 0;
 
     int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
-                                     &eth_rx_conf, mempool_arr[phy_port][i]);
+                                     &eth_rx_conf, g_mempool_arr[phy_port][i]);
     rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(i) +
                             ". Error " + strerror(-1 * ret));
 
@@ -211,7 +212,7 @@ DpdkTransport::~DpdkTransport() {
 
   {
     dpdk_lock.lock();
-    used_qp_ids[phy_port].erase(used_qp_ids[phy_port].find(qp_id));
+    g_used_qp_ids[phy_port].erase(g_used_qp_ids[phy_port].find(qp_id));
     dpdk_lock.unlock();
   }
 }
