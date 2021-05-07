@@ -9,7 +9,7 @@
 function fix_class_case() {
   echo "Fixing class case"
   for i in 1 2; do
-    run-clang-tidy-10.py -header-filter="(cc|nexus_impl|rpc_impl|transport_impl|util).*" \
+    run-clang-tidy-10.py -header-filter="(.|cc|nexus_impl|rpc_impl|transport_impl|util).*" \
       -checks='-*,readability-identifier-naming' \
       -config="{CheckOptions: [ {key: readability-identifier-naming.ClassCase, value: CamelCase},
                                 {key: readability-identifier-naming.StructCase, value: lower_case}
@@ -20,7 +20,7 @@ function fix_class_case() {
 
 function fix_member_case() {
   echo "Fixing member case"
-  run-clang-tidy-10.py -header-filter="(cc|nexus_impl|rpc_impl|transport_impl|util).*" \
+  run-clang-tidy-10.py -header-filter="(.|cc|nexus_impl|rpc_impl|transport_impl|util).*" \
     -checks='-*,readability-identifier-naming' \
     -config="{CheckOptions: [ {key: readability-identifier-naming.MemberCase, value: lower_case},
                               {key: readability-identifier-naming.MemberSuffix, value: '_'}
@@ -30,7 +30,7 @@ function fix_member_case() {
 
 function fix_variable_case() {
   echo "Fixing variable case"
-  run-clang-tidy-10.py -header-filter="(cc|nexus_impl|rpc_impl|transport_impl|util).*" \
+  run-clang-tidy-10.py -header-filter="(.|cc|nexus_impl|rpc_impl|transport_impl|util).*" \
     -checks='-*,readability-identifier-naming' \
     -config="{CheckOptions: [ {key: readability-identifier-naming.VariableCase, value: lower_case},
                               {key: readability-identifier-naming.VariableSuffix, value: ''},
