@@ -6,24 +6,14 @@
 #include <rte_thash.h>
 #include <rte_version.h>
 #include <set>
-#include "dpdk_transport.h"
 #include "dpdk_externs.h"
+#include "dpdk_transport.h"
 #include "util/huge_alloc.h"
 
 namespace erpc {
 
 constexpr size_t DpdkTransport::kMaxDataPerPkt;
 static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
-
-// These globals are shared among different DpdkTransport objects
-
-static volatile bool g_port_initialized[RTE_MAX_ETHPORTS];  // Uses dpdk_lock
-
-/// The set of queue IDs in use by Rpc objects in this process. Uses dpdk_lock.
-static std::set<size_t> g_used_qp_ids[RTE_MAX_ETHPORTS];
-
-/// g_mempool_arr[i][j] is the mempool to use for port i, queue j
-rte_mempool *g_mempool_arr[RTE_MAX_ETHPORTS][DpdkTransport::kMaxQueuesPerPort];
 
 /// Key used for RSS hashing
 static constexpr uint8_t default_rss_key[] = {

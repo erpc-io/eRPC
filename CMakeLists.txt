@@ -128,6 +128,7 @@ set(SOURCES
   src/transport_impl/transport.cc
   src/transport_impl/dpdk/dpdk_transport.cc
   src/transport_impl/dpdk/dpdk_init.cc
+  src/transport_impl/dpdk/dpdk_externs.cc
   src/transport_impl/dpdk/dpdk_transport_datapath.cc
   src/transport_impl/infiniband/ib_transport.cc
   src/transport_impl/infiniband/ib_transport_datapath.cc
