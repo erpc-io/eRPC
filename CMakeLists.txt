@@ -226,32 +226,6 @@ set(UTIL_TESTS
 # Compile the library
 add_library(erpc ${SOURCES})
 
-# Compile the tests
-if(TESTING)
-  foreach(test_name IN LISTS CLIENT_TESTS)
-    add_executable(${test_name} tests/client_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-    add_test(NAME ${test_name} COMMAND ${test_name})
-  endforeach()
-
-  foreach(test_name IN LISTS PROTOCOL_TESTS)
-    add_executable(${test_name} tests/protocol_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-    add_test(NAME ${test_name} COMMAND ${test_name})
-  endforeach()
-
-  foreach(test_name IN LISTS TRANSPORT_TESTS)
-    add_executable(${test_name} tests/transport_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-    add_test(NAME ${test_name} COMMAND ${test_name})
-  endforeach()
-
-  foreach(test_name IN LISTS UTIL_TESTS)
-    add_executable(${test_name} tests/util_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
-  endforeach()
-endif()
-
 # The app to compile. Only one app is compiled to reduce compile time.
 if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/autorun_app_file")
   file(STRINGS "scripts/autorun_app_file" APP)
@@ -334,3 +308,29 @@ endif()
 add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES})
 target_compile_options(${APP} PRIVATE "-flto")
 target_link_libraries(${APP} ${GTEST_LIBRARIES} ${LIBRARIES})
+
+# Compile the tests
+if(TESTING)
+  foreach(test_name IN LISTS CLIENT_TESTS)
+    add_executable(${test_name} tests/client_tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    add_test(NAME ${test_name} COMMAND ${test_name})
+  endforeach()
+
+  foreach(test_name IN LISTS PROTOCOL_TESTS)
+    add_executable(${test_name} tests/protocol_tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    add_test(NAME ${test_name} COMMAND ${test_name})
+  endforeach()
+
+  foreach(test_name IN LISTS TRANSPORT_TESTS)
+    add_executable(${test_name} tests/transport_tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    add_test(NAME ${test_name} COMMAND ${test_name})
+  endforeach()
+
+  foreach(test_name IN LISTS UTIL_TESTS)
+    add_executable(${test_name} tests/util_tests/${test_name}.cc)
+    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+  endforeach()
+endif()
