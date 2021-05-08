@@ -300,6 +300,13 @@ if(DPDK_NEEDED STREQUAL "true")
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+
+  # Build the eRPC DPDK management daemon
+  add_executable(erpc_dpdk_daemon
+    src/transport_impl/dpdk/dpdk_daemon.cc
+    src/transport_impl/dpdk/dpdk_externs.cc
+    src/transport_impl/dpdk/dpdk_init.cc)
+  target_link_libraries(erpc_dpdk_daemon ${LIBRARIES})
 else()
   message(STATUS "DPDK not needed to build eRPC")
 endif()

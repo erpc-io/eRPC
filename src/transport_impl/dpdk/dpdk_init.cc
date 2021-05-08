@@ -7,7 +7,9 @@ namespace erpc {
 
 constexpr uint8_t DpdkTransport::kDefaultRssKey[];
 
-void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node) {
+void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
+                                   DpdkProcType proc_type) {
+  _unused(proc_type);
   uint16_t num_ports = rte_eth_dev_count_avail();
   if (phy_port >= num_ports) {
     fprintf(stderr,
@@ -60,8 +62,7 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node) {
   // Once the device is started, more queues cannot be added without stopping
   // and reconfiguring the device.
   for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
-    std::string pname =
-        "mempool-erpc-" + std::to_string(phy_port) + "-" + std::to_string(i);
+    const std::string pname = get_mempool_name(phy_port, i);
     g_mempool_arr[phy_port][i] =
         rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
                                 0 /* priv size */, kMbufSize, numa_node);

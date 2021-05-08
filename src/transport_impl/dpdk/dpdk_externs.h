@@ -22,6 +22,8 @@ extern volatile bool g_dpdk_initialized;
 
 extern volatile bool g_port_initialized[RTE_MAX_ETHPORTS];
 
+extern volatile DpdkTransport::DpdkProcType g_dpdk_proc_type;
+
 /// The set of queue IDs in use by Rpc objects in this process
 extern std::set<size_t> g_used_qp_ids[RTE_MAX_ETHPORTS];
 

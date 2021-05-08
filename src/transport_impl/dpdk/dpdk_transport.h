@@ -22,6 +22,8 @@ namespace erpc {
 
 class DpdkTransport : public Transport {
  public:
+  enum class DpdkProcType { kPrimary, kSecondary };
+
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kDPDK;
   static constexpr size_t kMTU = 1024;
@@ -71,6 +73,12 @@ class DpdkTransport : public Transport {
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
   size_t get_bandwidth() const { return resolve.bandwidth; }
 
+  /// Get the mempool name to use for this port and queue pair ID
+  static std::string get_mempool_name(size_t phy_port, size_t qp_id) {
+    return std::string("erpc-mp") + std::to_string(phy_port) +
+           std::string("-") + std::to_string(qp_id);
+  }
+
   static std::string routing_info_str(RoutingInfo *ri) {
     return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
   }
@@ -118,17 +126,18 @@ class DpdkTransport : public Transport {
     }
   }
 
-  // raw_transport_datapath.cc
+  // dpdk_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);
   void tx_flush();
   size_t rx_burst();
   void post_recvs(size_t num_recvs);
 
- private:
-  /// Do DPDK initialization for \p phy_port. \p phy_port must not have been
-  /// already initialized.
-  static void setup_phy_port(uint16_t phy_port, size_t numa_node);
+  /// Do DPDK initialization for \p phy_port as a primary or secondary DPDK
+  /// process type. \p phy_port must not have been already initialized.
+  static void setup_phy_port(uint16_t phy_port, size_t numa_node,
+                             DpdkProcType proc_type);
 
+ private:
   /**
    * @brief Resolve fields in \p resolve using \p phy_port
    * @throw runtime_error if the port cannot be resolved

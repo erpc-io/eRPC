@@ -56,27 +56,48 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
       // n: channels, m: maximum memory in megabytes
       const char *rte_argv[] = {
+          "--proc-type", "auto",
           "-c",          "1",
           "-n",          "6",
           "--log-level", (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_INFO) ? "8" : "0",
           "-m",          "1024",
           nullptr};
 
-      int rte_argc =
+      const int rte_argc =
           static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
       rt_assert(ret >= 0, "Failed to initialize DPDK");
 
+      g_dpdk_proc_type = ((rte_eal_process_type() == RTE_PROC_PRIMARY)
+                              ? DpdkProcType::kPrimary
+                              : DpdkProcType::kSecondary);
+      if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
+        ERPC_WARN(
+            "Running as primary DPDK process. eRPC DPDK daemon is not "
+            "running.\n");
+      } else {
+        ERPC_WARN(
+            "Running as secondary DPDK process. eRPC DPDK daemon is "
+            "running.\n");
+        g_port_initialized[phy_port] = true;
+      }
+
       g_dpdk_initialized = true;
     }
 
-    if (!g_port_initialized[phy_port]) {
-      g_port_initialized[phy_port] = true;
-      setup_phy_port(phy_port, numa_node);
+    if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
+      if (!g_port_initialized[phy_port]) {
+        g_port_initialized[phy_port] = true;
+        setup_phy_port(phy_port, numa_node, DpdkProcType::kPrimary);
+      }
+      mempool = g_mempool_arr[phy_port][qp_id];
+    } else {
+      const std::string mempool_name = get_mempool_name(phy_port, qp_id);
+      mempool = rte_mempool_lookup(mempool_name.c_str());
+      rt_assert(mempool != nullptr,
+                std::string("Failed to find eRPC DPDK daemon's mempool ") +
+                    mempool_name.c_str());
     }
-
-    // Here, mempools for phy_port have been initialized
-    mempool = g_mempool_arr[phy_port][qp_id];
 
     g_dpdk_lock.unlock();
   }
