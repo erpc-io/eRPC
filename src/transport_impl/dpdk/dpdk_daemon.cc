@@ -46,6 +46,20 @@ int main(int argc, char **argv) {
 
   erpc::ERPC_WARN("eRPC DPDK daemon: Successfully initialized DPDK EAL\n");
 
+  const std::string memzone_name = erpc::DpdkTransport::get_memzone_name();
+  const rte_memzone *memzone = rte_memzone_reserve(
+      memzone_name.c_str(), sizeof(erpc::DpdkTransport::memzone_contents_t),
+      FLAGS_numa_node, RTE_MEMZONE_2MB);
+  erpc::rt_assert(memzone != nullptr,
+                  "eRPC DPDK daemon: Failed to create memzone");
+  erpc::ERPC_WARN(
+      "eRPC DPDK daemon: Successfully initialized shared memzone %s\n",
+      memzone_name.c_str());
+
+  auto *memzone_contents =
+      reinterpret_cast<erpc::DpdkTransport::memzone_contents_t *>(
+          memzone->addr);
+
   erpc::DpdkTransport::setup_phy_port(
       FLAGS_phy_port, FLAGS_numa_node,
       erpc::DpdkTransport::DpdkProcType::kPrimary);
@@ -61,6 +75,7 @@ int main(int argc, char **argv) {
             FLAGS_phy_port);
     exit(-1);
   }
+  memzone_contents->link_ = link;
 
   sleep(100000);
   return 0;

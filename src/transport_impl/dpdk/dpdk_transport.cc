@@ -77,6 +77,20 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
             "Running as primary DPDK process. eRPC DPDK daemon is not "
             "running.\n");
       } else {
+        // We're running as a secondary process, but we need to ensure that the
+        // primary process is in fact the daemon, and not a regular non-daemon
+        // eRPC process.
+        const std::string memzone_name = get_memzone_name();
+        auto dpdk_memzone = rte_memzone_lookup(memzone_name.c_str());
+        if (dpdk_memzone == nullptr) {
+          ERPC_ERROR(
+              "Memzone %s not found. This can happen if another non-daemon "
+              "eRPC process is running.\n",
+              memzone_name.c_str());
+          exit(-1);
+        }
+        g_memzone = reinterpret_cast<memzone_contents_t *>(dpdk_memzone->addr);
+
         ERPC_WARN(
             "Running as secondary DPDK process. eRPC DPDK daemon is "
             "running.\n");
@@ -154,11 +168,16 @@ void DpdkTransport::resolve_phy_port() {
               "Too few entries in NIC RSS indirection table");
   }
 
-  // Resolve bandwidth
+  // Resolve bandwidth. XXX: For some reason, rte_eth_link_get() does not work
+  // in secondary DPDK processes in DPDK 19.11.
   struct rte_eth_link link;
-  rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
-  rt_assert(link.link_status == ETH_LINK_UP,
-            "Port " + std::to_string(phy_port) + " is down.");
+  if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
+    rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
+    rt_assert(link.link_status == ETH_LINK_UP,
+              "Port " + std::to_string(phy_port) + " is down.");
+  } else {
+    link = g_memzone->link_;
+  }
 
   if (link.link_speed != ETH_SPEED_NUM_NONE) {
     // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.

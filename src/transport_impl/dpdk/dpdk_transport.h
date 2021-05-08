@@ -22,6 +22,11 @@ namespace erpc {
 
 class DpdkTransport : public Transport {
  public:
+  /// Contents of the memzone created by the daemon
+  struct memzone_contents_t {
+    struct rte_eth_link link_;
+  };
+
   enum class DpdkProcType { kPrimary, kSecondary };
 
   // Transport-specific constants
@@ -80,6 +85,10 @@ class DpdkTransport : public Transport {
     rt_assert(ret.length() < RTE_MEMPOOL_NAMESIZE, "Mempool name too long");
     return ret;
   }
+
+  /// Get the name of the memzone shared between the DPDK daemon and eRPC
+  /// processes
+  static std::string get_memzone_name() { return "erpc_daemon_memzone"; }
 
   static std::string routing_info_str(RoutingInfo *ri) {
     return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
