@@ -54,14 +54,15 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       ERPC_INFO("DPDK transport for Rpc %u initializing DPDK, queue ID = %zu\n",
                 rpc_id, qp_id);
 
-      // n: channels, m: maximum memory in megabytes
+      // clang-format off
       const char *rte_argv[] = {
-          "--proc-type", "auto",
-          "-c",          "1",
-          "-n",          "6",
-          "--log-level", (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_INFO) ? "8" : "0",
-          "-m",          "1024",
+          "-c",            "1",
+          "-n",            "6",  // Memory channels
+          "-m",            "1024", // Max memory in megabytes
+          "--proc-type",   "auto",
+          "--log-level",   (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_INFO) ? "8" : "0",
           nullptr};
+      // clang-format on
 
       const int rte_argc =
           static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;

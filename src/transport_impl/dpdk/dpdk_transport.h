@@ -75,8 +75,10 @@ class DpdkTransport : public Transport {
 
   /// Get the mempool name to use for this port and queue pair ID
   static std::string get_mempool_name(size_t phy_port, size_t qp_id) {
-    return std::string("erpc-mp") + std::to_string(phy_port) +
-           std::string("-") + std::to_string(qp_id);
+    const std::string ret = std::string("erpc-mp-") + std::to_string(phy_port) +
+                            std::string("-") + std::to_string(qp_id);
+    rt_assert(ret.length() < RTE_MEMPOOL_NAMESIZE, "Mempool name too long");
+    return ret;
   }
 
   static std::string routing_info_str(RoutingInfo *ri) {
