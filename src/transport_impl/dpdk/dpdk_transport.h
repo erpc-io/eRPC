@@ -22,9 +22,16 @@ namespace erpc {
 
 class DpdkTransport : public Transport {
  public:
+  static constexpr size_t kMaxQueuesPerPort = 16;
+
   /// Contents of the memzone created by the daemon
   struct memzone_contents_t {
-    struct rte_eth_link link_;
+    pthread_mutex_t lock_;      /// Guard for reading/writing to the memzone
+    struct rte_eth_link link_;  /// Resolved link status
+
+    /// owner_pid_[i] is the PID of the process that owns QP #i. Zero means
+    /// the corresponding QP is free.
+    size_t owner_pid_[kMaxQueuesPerPort];
   };
 
   enum class DpdkProcType { kPrimary, kSecondary };
@@ -32,7 +39,6 @@ class DpdkTransport : public Transport {
   // Transport-specific constants
   static constexpr TransportType kTransportType = TransportType::kDPDK;
   static constexpr size_t kMTU = 1024;
-  static constexpr size_t kMaxQueuesPerPort = 16;
 
   static constexpr size_t kNumTxRingDesc = 128;
   static constexpr size_t kPostlist = 32;

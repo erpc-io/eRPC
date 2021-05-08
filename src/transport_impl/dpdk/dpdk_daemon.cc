@@ -59,6 +59,8 @@ int main(int argc, char **argv) {
   auto *memzone_contents =
       reinterpret_cast<erpc::DpdkTransport::memzone_contents_t *>(
           memzone->addr);
+  memset(memzone_contents, 0, sizeof(erpc::DpdkTransport::memzone_contents_t));
+  pthread_mutex_init(&memzone_contents->lock_, NULL);
 
   erpc::DpdkTransport::setup_phy_port(
       FLAGS_phy_port, FLAGS_numa_node,
@@ -77,6 +79,23 @@ int main(int argc, char **argv) {
   }
   memzone_contents->link_ = link;
 
-  sleep(100000);
+  while (true) {
+    sleep(1);
+
+    pthread_mutex_lock(&memzone_contents->lock_);
+    {
+      size_t num_qps_used = 0;
+      for (size_t i = 0; i < erpc::DpdkTransport::kMaxQueuesPerPort; i++) {
+        if (memzone_contents->owner_pid_[i] != 0) {
+          erpc::ERPC_INFO("eRPC DPDK daemon: Process ID %zu owns queue %zu\n",
+                          memzone_contents->owner_pid_[i], i);
+          num_qps_used++;
+        }
+      }
+      erpc::ERPC_INFO("eRPC DPDK daemon: %zu free QPs\n",
+                      erpc::DpdkTransport::kMaxQueuesPerPort - num_qps_used);
+    }
+    pthread_mutex_unlock(&memzone_contents->lock_);
+  }
   return 0;
 }

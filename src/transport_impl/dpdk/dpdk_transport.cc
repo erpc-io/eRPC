@@ -134,7 +134,7 @@ void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 DpdkTransport::~DpdkTransport() {
   ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
 
-  rte_mempool_free(mempool);
+  if (g_dpdk_proc_type == DpdkProcType::kPrimary) rte_mempool_free(mempool);
 
   {
     g_dpdk_lock.lock();
