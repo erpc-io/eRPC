@@ -39,7 +39,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
     const tx_burst_item_t &item = tx_burst_arr[i];
     const MsgBuffer *msg_buffer = item.msg_buffer;
 
-    tx_mbufs[i] = rte_pktmbuf_alloc(mempool);
+    tx_mbufs[i] = rte_pktmbuf_alloc(mempool_);
     assert(tx_mbufs[i] != nullptr);
 
     pkthdr_t *pkthdr;
@@ -66,7 +66,7 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
       memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *), pkthdr,
              sizeof(pkthdr_t));
 
-      tx_mbufs[i]->next = rte_pktmbuf_alloc(mempool);
+      tx_mbufs[i]->next = rte_pktmbuf_alloc(mempool_);
       assert(tx_mbufs[i]->next != nullptr);
       tx_mbufs[i]->next->data_len = pkt_size - sizeof(pkthdr_t);
       memcpy(rte_pktmbuf_mtod(tx_mbufs[i]->next, uint8_t *),
@@ -80,11 +80,11 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
         frame_header_to_string(&pkthdr->headroom[0]).c_str());
   }
 
-  size_t nb_tx_new = rte_eth_tx_burst(phy_port, qp_id, tx_mbufs, num_pkts);
+  size_t nb_tx_new = rte_eth_tx_burst(phy_port, qp_id_, tx_mbufs, num_pkts);
   if (unlikely(nb_tx_new != num_pkts)) {
     size_t retry_count = 0;
     while (nb_tx_new != num_pkts) {
-      nb_tx_new += rte_eth_tx_burst(phy_port, qp_id, &tx_mbufs[nb_tx_new],
+      nb_tx_new += rte_eth_tx_burst(phy_port, qp_id_, &tx_mbufs[nb_tx_new],
                                     num_pkts - nb_tx_new);
       retry_count++;
       if (unlikely(retry_count == 1000000000)) {
@@ -103,32 +103,32 @@ void DpdkTransport::tx_flush() {
 
 size_t DpdkTransport::rx_burst() {
   struct rte_mbuf *rx_pkts[kRxBatchSize];
-  size_t nb_rx_new = rte_eth_rx_burst(phy_port, qp_id, rx_pkts, kRxBatchSize);
+  size_t nb_rx_new = rte_eth_rx_burst(phy_port, qp_id_, rx_pkts, kRxBatchSize);
 
   for (size_t i = 0; i < nb_rx_new; i++) {
-    rx_ring[rx_ring_head] = rte_pktmbuf_mtod(rx_pkts[i], uint8_t *);
-    assert(dpdk_dtom(rx_ring[rx_ring_head]) == rx_pkts[i]);
+    rx_ring_[rx_ring_head_] = rte_pktmbuf_mtod(rx_pkts[i], uint8_t *);
+    assert(dpdk_dtom(rx_ring_[rx_ring_head_]) == rx_pkts[i]);
 
-    auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
+    auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring_[rx_ring_head_]);
     _unused(pkthdr);
     ERPC_TRACE("  Transport: RX pkthdr = %s. Frame = %s.\n",
                pkthdr->to_string().c_str(),
                frame_header_to_string(&pkthdr->headroom[0]).c_str());
 
 #if DEBUG
-    if (unlikely(ntohl(pkthdr->get_ipv4_hdr()->dst_ip) != resolve.ipv4_addr ||
-                 ntohs(pkthdr->get_udp_hdr()->dst_port) != rx_flow_udp_port)) {
+    if (unlikely(ntohl(pkthdr->get_ipv4_hdr()->dst_ip) != resolve_.ipv4_addr ||
+                 ntohs(pkthdr->get_udp_hdr()->dst_port) != rx_flow_udp_port_)) {
       ERPC_ERROR("Invalid packet. Pkt: %u %s %s. Me: %u %s %s\n",
                  ntohs(pkthdr->get_udp_hdr()->dst_port),
                  ipv4_to_string(pkthdr->get_ipv4_hdr()->dst_ip).c_str(),
                  mac_to_string(pkthdr->get_eth_hdr()->dst_mac).c_str(),
-                 rx_flow_udp_port, ipv4_to_string(resolve.ipv4_addr).c_str(),
-                 mac_to_string(resolve.mac_addr).c_str());
+                 rx_flow_udp_port_, ipv4_to_string(resolve_.ipv4_addr).c_str(),
+                 mac_to_string(resolve_.mac_addr).c_str());
       exit(-1);
     }
 #endif
 
-    rx_ring_head = (rx_ring_head + 1) % kNumRxRingEntries;
+    rx_ring_head_ = (rx_ring_head_ + 1) % kNumRxRingEntries;
   }
 
   return nb_rx_new;
@@ -136,13 +136,13 @@ size_t DpdkTransport::rx_burst() {
 
 void DpdkTransport::post_recvs(size_t num_recvs) {
   for (size_t i = 0; i < num_recvs; i++) {
-    auto *mbuf = dpdk_dtom(rx_ring[rx_ring_tail]);
+    auto *mbuf = dpdk_dtom(rx_ring_[rx_ring_tail_]);
 #if DEBUG
     rte_mbuf_sanity_check(mbuf, true /* is_header */);
 #endif
     rte_pktmbuf_free(mbuf);
 
-    rx_ring_tail = (rx_ring_tail + 1) % kNumRxRingEntries;
+    rx_ring_tail_ = (rx_ring_tail_ + 1) % kNumRxRingEntries;
   }
 }
 

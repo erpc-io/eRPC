@@ -91,25 +91,27 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     }
 
     // Get an available queue on phy_port
-    const size_t qp_id = g_memzone->get_qp(phy_port, 33 /* XXX */);
-    if (qp_id != SIZE_MAX) {
-      ERPC_INFO("DPDK transport for Rpc %u got QP %zu\n", rpc_id, qp_id);
+    qp_id_ = g_memzone->get_qp(phy_port, 33 /* XXX */);
+    if (qp_id_ != SIZE_MAX) {
+      ERPC_INFO("DPDK transport for Rpc %u got QP %zu\n", rpc_id, qp_id_);
     } else {
-      ERPC_ERROR("DPDK transport for Rpc %u got QP %zu\n", rpc_id, qp_id);
+      ERPC_ERROR("DPDK transport for Rpc %u failed to get free QP\n", rpc_id);
+      throw std::runtime_error("Failed to get DPDK QP");
     }
 
-    if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
+    if (g_dpdk_proc_type == DpdkProcType::kSecondary) {
+      // The eRPC DPDK management daemon has already initialized phy_port
+      const std::string mempool_name = get_mempool_name(phy_port, qp_id_);
+      mempool_ = rte_mempool_lookup(mempool_name.c_str());
+      rt_assert(mempool_ != nullptr,
+                std::string("Failed to find eRPC DPDK daemon's mempool ") +
+                    mempool_name.c_str());
+    } else {
       if (!g_port_initialized[phy_port]) {
         g_port_initialized[phy_port] = true;
         setup_phy_port(phy_port, numa_node, DpdkProcType::kPrimary);
       }
-      mempool = g_mempool_arr[phy_port][qp_id];
-    } else {
-      const std::string mempool_name = get_mempool_name(phy_port, qp_id);
-      mempool = rte_mempool_lookup(mempool_name.c_str());
-      rt_assert(mempool != nullptr,
-                std::string("Failed to find eRPC DPDK daemon's mempool ") +
-                    mempool_name.c_str());
+      mempool_ = g_mempool_arr[phy_port][qp_id_];
     }
 
     g_dpdk_lock.unlock();
@@ -120,29 +122,29 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
   ERPC_WARN(
       "DpdkTransport created for Rpc ID %u, queue %zu, datapath UDP port %u\n",
-      rpc_id, qp_id, rx_flow_udp_port);
+      rpc_id, qp_id_, rx_flow_udp_port_);
 }
 
 void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
                                              uint8_t **rx_ring) {
   this->huge_alloc = huge_alloc;
-  this->rx_ring = rx_ring;
+  this->rx_ring_ = rx_ring;
 }
 
 DpdkTransport::~DpdkTransport() {
   ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
-  if (g_dpdk_proc_type == DpdkProcType::kPrimary) rte_mempool_free(mempool);
+  if (g_dpdk_proc_type == DpdkProcType::kPrimary) rte_mempool_free(mempool_);
 
-  int ret = g_memzone->free_qp(phy_port, qp_id);
+  int ret = g_memzone->free_qp(phy_port, qp_id_);
   rt_assert(ret == 0, "Failed to free QP\n");
 }
 
 void DpdkTransport::resolve_phy_port() {
   struct rte_ether_addr mac;
   rte_eth_macaddr_get(phy_port, &mac);
-  memcpy(resolve.mac_addr, &mac.addr_bytes, sizeof(resolve.mac_addr));
+  memcpy(resolve_.mac_addr, &mac.addr_bytes, sizeof(resolve_.mac_addr));
 
-  resolve.ipv4_addr = get_port_ipv4_addr(phy_port);
+  resolve_.ipv4_addr = get_port_ipv4_addr(phy_port);
 
   // Resolve RSS indirection table size
   struct rte_eth_dev_info dev_info;
@@ -155,10 +157,10 @@ void DpdkTransport::resolve_phy_port() {
     // MLX4 NICs report a reta size of zero, but they use 128 internally
     rt_assert(dev_info.reta_size == 0,
               "Unexpected RETA size for MLX4 NIC (expected zero)");
-    resolve.reta_size = 128;
+    resolve_.reta_size = 128;
   } else {
-    resolve.reta_size = dev_info.reta_size;
-    rt_assert(resolve.reta_size >= kMaxQueuesPerPort,
+    resolve_.reta_size = dev_info.reta_size;
+    rt_assert(resolve_.reta_size >= kMaxQueuesPerPort,
               "Too few entries in NIC RSS indirection table");
   }
 
@@ -176,32 +178,32 @@ void DpdkTransport::resolve_phy_port() {
   if (link.link_speed != ETH_SPEED_NUM_NONE) {
     // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.
     rt_assert(link.link_speed >= 10000, "Link too slow");
-    resolve.bandwidth =
+    resolve_.bandwidth =
         static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
   } else {
     ERPC_WARN(
         "Port %u bandwidth not reported by DPDK. Using default 10 Gbps.\n",
         phy_port);
     link.link_speed = 10000;
-    resolve.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
+    resolve_.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
   }
 
   ERPC_INFO(
       "Resolved port %u: MAC %s, IPv4 %s, RETA size %zu entries, bandwidth "
       "%.1f Gbps\n",
-      phy_port, mac_to_string(resolve.mac_addr).c_str(),
-      ipv4_to_string(htonl(resolve.ipv4_addr)).c_str(), resolve.reta_size,
-      resolve.bandwidth * 8.0 / (1000 * 1000 * 1000));
+      phy_port, mac_to_string(resolve_.mac_addr).c_str(),
+      ipv4_to_string(htonl(resolve_.ipv4_addr)).c_str(), resolve_.reta_size,
+      resolve_.bandwidth * 8.0 / (1000 * 1000 * 1000));
 }
 
 void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
-  memcpy(ri->mac, resolve.mac_addr, 6);
-  ri->ipv4_addr = resolve.ipv4_addr;
-  ri->udp_port = rx_flow_udp_port;
-  ri->rxq_id = qp_id;
-  ri->reta_size = resolve.reta_size;
+  memcpy(ri->mac, resolve_.mac_addr, 6);
+  ri->ipv4_addr = resolve_.ipv4_addr;
+  ri->udp_port = rx_flow_udp_port_;
+  ri->rxq_id = qp_id_;
+  ri->reta_size = resolve_.reta_size;
 }
 
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
@@ -219,7 +221,7 @@ bool DpdkTransport::resolve_remote_routing_info(
   uint16_t i = kBaseEthUDPPort;
   for (; i < UINT16_MAX; i++) {
     union rte_thash_tuple tuple;
-    tuple.v4.src_addr = resolve.ipv4_addr;
+    tuple.v4.src_addr = resolve_.ipv4_addr;
     tuple.v4.dst_addr = remote_ipv4_addr;
     tuple.v4.sport = i;
     tuple.v4.dport = remote_udp_port;
@@ -235,10 +237,10 @@ bool DpdkTransport::resolve_remote_routing_info(
   static_assert(kMaxRoutingInfoSize >= kInetHdrsTotSize, "");
 
   auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(ri);
-  gen_eth_header(eth_hdr, &resolve.mac_addr[0], remote_mac);
+  gen_eth_header(eth_hdr, &resolve_.mac_addr[0], remote_mac);
 
   auto *ipv4_hdr = reinterpret_cast<ipv4_hdr_t *>(&eth_hdr[1]);
-  gen_ipv4_header(ipv4_hdr, resolve.ipv4_addr, remote_ipv4_addr, 0);
+  gen_ipv4_header(ipv4_hdr, resolve_.ipv4_addr, remote_ipv4_addr, 0);
 
   auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
   gen_udp_header(udp_hdr, i, remote_udp_port, 0);

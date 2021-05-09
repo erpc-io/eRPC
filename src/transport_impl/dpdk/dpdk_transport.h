@@ -215,7 +215,7 @@ class DpdkTransport : public Transport {
 
   void fill_local_routing_info(RoutingInfo *routing_info) const;
   bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
-  size_t get_bandwidth() const { return resolve.bandwidth; }
+  size_t get_bandwidth() const { return resolve_.bandwidth; }
 
   /// Get the mempool name to use for this port and queue pair ID
   static std::string get_mempool_name(size_t phy_port, size_t qp_id) {
@@ -363,16 +363,16 @@ class DpdkTransport : public Transport {
 
   /// For DPDK, the RX ring buffers might not always be used in a circular
   /// order. Instead, we write pointers to the Rpc's RX ring.
-  uint8_t **rx_ring;
+  uint8_t **rx_ring_;
 
-  size_t rx_ring_head = 0, rx_ring_tail = 0;
+  size_t rx_ring_head_ = 0, rx_ring_tail_ = 0;
 
-  uint16_t rx_flow_udp_port = 0;  ///< The UDP port this transport listens on
-  size_t qp_id = SIZE_MAX;        ///< The RX/TX queue pair for this Transport
+  uint16_t rx_flow_udp_port_ = 0;  ///< The UDP port this transport listens on
+  size_t qp_id_ = SIZE_MAX;        ///< The RX/TX queue pair for this Transport
 
   // We don't use DPDK's lcore threads, so a shared mempool with per-lcore
   // cache won't work. Instead, we use per-thread pools with zero cached mbufs.
-  rte_mempool *mempool;
+  rte_mempool *mempool_;
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
@@ -380,7 +380,7 @@ class DpdkTransport : public Transport {
     uint8_t mac_addr[6];  // The port's MAC address
     size_t bandwidth;     // Link bandwidth in bytes per second
     size_t reta_size;     // Number of entries in NIC RX indirection table
-  } resolve;
+  } resolve_;
 };
 
 }  // namespace erpc
