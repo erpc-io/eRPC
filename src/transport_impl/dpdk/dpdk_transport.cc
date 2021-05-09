@@ -33,26 +33,11 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     // The first thread to grab the lock initializes DPDK
     g_dpdk_lock.lock();
 
-    // Get an available queue on phy_port. This does not require phy_port to
-    // be initialized.
-    rt_assert(g_used_qp_ids[phy_port].size() < kMaxQueuesPerPort,
-              "No queues left on port " + std::to_string(phy_port));
-    for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
-      if (g_used_qp_ids[phy_port].count(i) == 0) {
-        qp_id = i;
-        rx_flow_udp_port = udp_port_for_queue(phy_port, qp_id);
-        break;
-      }
-    }
-    g_used_qp_ids[phy_port].insert(qp_id);
-
     if (g_dpdk_initialized) {
-      ERPC_INFO(
-          "DPDK transport for Rpc %u skipping initialization, queue ID = %zu\n",
-          rpc_id, qp_id);
+      ERPC_INFO("DPDK transport for Rpc %u skipping DPDK EAL initialization.\n",
+                rpc_id);
     } else {
-      ERPC_INFO("DPDK transport for Rpc %u initializing DPDK, queue ID = %zu\n",
-                rpc_id, qp_id);
+      ERPC_INFO("DPDK transport for Rpc %u initializing DPDK EAL.\n", rpc_id);
 
       // clang-format off
       const char *rte_argv[] = {
@@ -72,10 +57,15 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       g_dpdk_proc_type = ((rte_eal_process_type() == RTE_PROC_PRIMARY)
                               ? DpdkProcType::kPrimary
                               : DpdkProcType::kSecondary);
+
       if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
         ERPC_WARN(
             "Running as primary DPDK process. eRPC DPDK daemon is not "
             "running.\n");
+
+        // Create a fake memzone
+        g_memzone = new ownership_memzone_t();
+        g_memzone->init();
       } else {
         // We're running as a secondary process, but we need to ensure that the
         // primary process is in fact the daemon, and not a regular non-daemon
@@ -89,7 +79,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
               memzone_name.c_str());
           exit(-1);
         }
-        g_memzone = reinterpret_cast<memzone_contents_t *>(dpdk_memzone->addr);
+        g_memzone = reinterpret_cast<ownership_memzone_t *>(dpdk_memzone->addr);
 
         ERPC_WARN(
             "Running as secondary DPDK process. eRPC DPDK daemon is "
@@ -98,6 +88,14 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       }
 
       g_dpdk_initialized = true;
+    }
+
+    // Get an available queue on phy_port
+    const size_t qp_id = g_memzone->get_qp(phy_port, 33 /* XXX */);
+    if (qp_id != SIZE_MAX) {
+      ERPC_INFO("DPDK transport for Rpc %u got QP %zu\n", rpc_id, qp_id);
+    } else {
+      ERPC_ERROR("DPDK transport for Rpc %u got QP %zu\n", rpc_id, qp_id);
     }
 
     if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
@@ -133,14 +131,10 @@ void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 
 DpdkTransport::~DpdkTransport() {
   ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
-
   if (g_dpdk_proc_type == DpdkProcType::kPrimary) rte_mempool_free(mempool);
 
-  {
-    g_dpdk_lock.lock();
-    g_used_qp_ids[phy_port].erase(g_used_qp_ids[phy_port].find(qp_id));
-    g_dpdk_lock.unlock();
-  }
+  int ret = g_memzone->free_qp(phy_port, qp_id);
+  rt_assert(ret == 0, "Failed to free QP\n");
 }
 
 void DpdkTransport::resolve_phy_port() {
@@ -176,7 +170,7 @@ void DpdkTransport::resolve_phy_port() {
     rt_assert(link.link_status == ETH_LINK_UP,
               "Port " + std::to_string(phy_port) + " is down.");
   } else {
-    link = g_memzone->link_;
+    link = g_memzone->link_[phy_port];
   }
 
   if (link.link_speed != ETH_SPEED_NUM_NONE) {

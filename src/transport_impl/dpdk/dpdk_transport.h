@@ -24,14 +24,147 @@ class DpdkTransport : public Transport {
  public:
   static constexpr size_t kMaxQueuesPerPort = 16;
 
-  /// Contents of the memzone created by the daemon
-  struct memzone_contents_t {
-    pthread_mutex_t lock_;      /// Guard for reading/writing to the memzone
-    struct rte_eth_link link_;  /// Resolved link status
+  /// Contents of the memzone created by the eRPC DPDK daemon process
+  struct ownership_memzone_t {
+   private:
+    pthread_mutex_t lock_;  /// Guard for reading/writing to the memzone
+    size_t epoch_;  /// Incremented after each QP ownership change attempt
+    size_t num_qps_available_;
 
-    /// owner_pid_[i] is the PID of the process that owns QP #i. Zero means
-    /// the corresponding QP is free.
-    size_t owner_pid_[kMaxQueuesPerPort];
+    struct {
+      /// pid_ is the PID of the process that owns QP #i. Zero means
+      /// the corresponding QP is free.
+      int pid_;
+
+      /// proc_random_id_ is a random number installed by the process that owns
+      /// QP #i. This is used to defend against PID reuse.
+      size_t proc_random_id_;
+    } owner_[kMaxPhyPorts][kMaxQueuesPerPort];
+
+   public:
+    struct rte_eth_link link_[kMaxPhyPorts];  /// Resolved link status
+
+    void init() {
+      pthread_mutex_init(&lock_, nullptr);
+      memset(this, 0, sizeof(ownership_memzone_t));
+      num_qps_available_ = kMaxQueuesPerPort;
+    }
+
+    size_t get_epoch() {
+      size_t ret;
+      pthread_mutex_lock(&lock_);
+      ret = epoch_;
+      pthread_mutex_unlock(&lock_);
+      return ret;
+    }
+
+    size_t get_num_qps_available() {
+      size_t ret;
+      pthread_mutex_lock(&lock_);
+      ret = num_qps_available_;
+      pthread_mutex_unlock(&lock_);
+      return ret;
+    }
+
+    std::string get_summary(size_t phy_port) {
+      pthread_mutex_lock(&lock_);
+      std::ostringstream ret;
+      ret << "[" << this->num_qps_available_ << " QPs of " << kMaxQueuesPerPort
+          << " available] ";
+      ret << "[Ownership: ";
+
+      for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
+        auto &owner = owner_[phy_port][i];
+        if (owner.pid_ != 0) {
+          ret << "QP #" << i << ", "
+              << "PID " << owner.pid_ << ", ";
+        }
+      }
+      ret << "]";
+      pthread_mutex_unlock(&lock_);
+
+      return ret.str();
+    }
+
+    /**
+     * @brief Try to get a free QP
+     *
+     * @param phy_port The DPDK port ID to try getting a free QP from
+     * @param proc_random_id A unique random process ID of the calling process
+     *
+     * @return If successful, the machine-wide global index of the free QP
+     * reserved on phy_port. Else return SIZE_MAX.
+     */
+    size_t get_qp(size_t phy_port, size_t proc_random_id) {
+      pthread_mutex_lock(&lock_);
+      epoch_++;
+      size_t ret = SIZE_MAX;
+      const int my_pid = getpid();
+
+      // Check for sanity
+      for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
+        auto &owner = owner_[phy_port][i];
+        if (owner.pid_ == my_pid && owner.proc_random_id_ != proc_random_id) {
+          ERPC_ERROR(
+              "eRPC DpdkTransport: Found another process with same PID (%d) as "
+              "mine. Process random IDs: mine %zu, other: %zu\n",
+              my_pid, proc_random_id, owner.proc_random_id_);
+          pthread_mutex_unlock(&lock_);
+          return SIZE_MAX;
+        }
+      }
+
+      for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
+        auto &owner = owner_[phy_port][i];
+        if (owner.pid_ == 0) {
+          ret = i;
+          owner.pid_ = my_pid;
+          owner.proc_random_id_ = proc_random_id;
+          num_qps_available_--;
+          pthread_mutex_unlock(&lock_);
+          return i;
+        }
+      }
+
+      pthread_mutex_unlock(&lock_);
+      return ret;
+    }
+
+    /**
+     * @brief Try to return a QP that was previously reserved from this
+     * ownership manager
+     *
+     * @param phy_port The DPDK port ID to try returning the QP to
+     * @param qp_id The QP ID returned by this manager during reservation
+     *
+     * @return 0 if success, else errno
+     */
+    int free_qp(size_t phy_port, size_t qp_id) {
+      const int my_pid = getpid();
+      pthread_mutex_lock(&lock_);
+      epoch_++;
+      auto &owner = owner_[phy_port][qp_id];
+      if (owner.pid_ == 0) {
+        ERPC_ERROR("eRPC DpdkTransport: PID %d tried to already-free QP %zu.\n",
+                   my_pid, qp_id);
+        pthread_mutex_unlock(&lock_);
+        return EALREADY;
+      }
+
+      if (owner.pid_ != my_pid) {
+        ERPC_ERROR(
+            "eRPC DpdkTransport: PID %d tried to free QP %zu owned by PID "
+            "%d. Disallowed.\n",
+            my_pid, qp_id, owner.pid_);
+        pthread_mutex_unlock(&lock_);
+        return EPERM;
+      }
+
+      num_qps_available_++;
+      owner_[phy_port][qp_id].pid_ = 0;
+      pthread_mutex_unlock(&lock_);
+      return 0;
+    }
   };
 
   enum class DpdkProcType { kPrimary, kSecondary };

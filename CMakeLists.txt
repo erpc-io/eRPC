@@ -213,6 +213,11 @@ if(TRANSPORT STREQUAL "raw")
     raw_transport_test)
 endif()
 
+if(TRANSPORT STREQUAL "dpdk")
+  set(TRANSPORT_TESTS
+    dpdk_ownership_memzone_test)
+endif()
+
 # These are not run using ctest
 set(UTIL_TESTS
   huge_alloc_test

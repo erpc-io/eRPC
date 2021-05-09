@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
 
   const std::string memzone_name = erpc::DpdkTransport::get_memzone_name();
   const rte_memzone *memzone = rte_memzone_reserve(
-      memzone_name.c_str(), sizeof(erpc::DpdkTransport::memzone_contents_t),
+      memzone_name.c_str(), sizeof(erpc::DpdkTransport::ownership_memzone_t),
       FLAGS_numa_node, RTE_MEMZONE_2MB);
   erpc::rt_assert(memzone != nullptr,
                   "eRPC DPDK daemon: Failed to create memzone");
@@ -57,10 +57,9 @@ int main(int argc, char **argv) {
       memzone_name.c_str());
 
   auto *memzone_contents =
-      reinterpret_cast<erpc::DpdkTransport::memzone_contents_t *>(
+      reinterpret_cast<erpc::DpdkTransport::ownership_memzone_t *>(
           memzone->addr);
-  memset(memzone_contents, 0, sizeof(erpc::DpdkTransport::memzone_contents_t));
-  pthread_mutex_init(&memzone_contents->lock_, NULL);
+  memzone_contents->init();
 
   erpc::DpdkTransport::setup_phy_port(
       FLAGS_phy_port, FLAGS_numa_node,
@@ -77,25 +76,17 @@ int main(int argc, char **argv) {
             FLAGS_phy_port);
     exit(-1);
   }
-  memzone_contents->link_ = link;
+  memzone_contents->link_[FLAGS_phy_port] = link;
 
+  size_t prev_epoch = 0;
   while (true) {
     sleep(1);
-
-    pthread_mutex_lock(&memzone_contents->lock_);
-    {
-      size_t num_qps_used = 0;
-      for (size_t i = 0; i < erpc::DpdkTransport::kMaxQueuesPerPort; i++) {
-        if (memzone_contents->owner_pid_[i] != 0) {
-          erpc::ERPC_INFO("eRPC DPDK daemon: Process ID %zu owns queue %zu\n",
-                          memzone_contents->owner_pid_[i], i);
-          num_qps_used++;
-        }
-      }
-      erpc::ERPC_INFO("eRPC DPDK daemon: %zu free QPs\n",
-                      erpc::DpdkTransport::kMaxQueuesPerPort - num_qps_used);
+    size_t cur_epoch = memzone_contents->get_epoch();
+    if (cur_epoch != prev_epoch) {
+      erpc::ERPC_WARN("eRPC DPDK daemon: %s\n",
+                      memzone_contents->get_summary(FLAGS_phy_port).c_str());
+      prev_epoch = cur_epoch;
     }
-    pthread_mutex_unlock(&memzone_contents->lock_);
   }
   return 0;
 }

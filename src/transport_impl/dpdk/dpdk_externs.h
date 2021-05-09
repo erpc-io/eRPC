@@ -24,12 +24,9 @@ extern bool g_port_initialized[RTE_MAX_ETHPORTS];
 
 extern DpdkTransport::DpdkProcType g_dpdk_proc_type;
 
-/// A pointer to the memzone created by the eRPC DPDK daemon, if the daemon
-/// exists
-extern DpdkTransport::memzone_contents_t *g_memzone;
-
-/// The set of queue IDs in use by Rpc objects in this process
-extern std::set<size_t> g_used_qp_ids[RTE_MAX_ETHPORTS];
+/// If the DPDK management daemon exists, this is a pointer to the memzone
+/// created by the daemon. Else, it's a normal heap pointer.
+extern DpdkTransport::ownership_memzone_t *g_memzone;
 
 /// g_mempool_arr[i][j] is the mempool to use for port i, queue j
 extern rte_mempool
