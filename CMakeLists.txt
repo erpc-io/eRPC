@@ -7,7 +7,7 @@ include(CMakeDependentOption)
 #set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_COMPILER g++)
 
-add_definitions(-std=c++11 -march=native -g)
+add_definitions(-std=c++11 -march=native)
 add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
 add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations)
 
@@ -90,10 +90,11 @@ endif()
 # Debug mode
 if(DEBUG)
   message(STATUS "Debugging is enabled. Perf will be low.")
+  set(CMAKE_BUILD_TYPE Debug)
+  SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 else(DEBUG)
   message(STATUS "Debugging is disabled.")
-  add_definitions(-DNDEBUG)
-  add_definitions(-O2)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif(DEBUG)
 
 # Testing for packet loss, machine failure, etc
@@ -320,7 +321,9 @@ endif()
 # of liberpc. See the hello world example's Makefile for an example of
 # compiling with liberpc.
 add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES})
-target_compile_options(${APP} PRIVATE "-flto")
+if(PERF)
+  target_compile_options(${APP} PRIVATE "-flto")
+endif()
 target_link_libraries(${APP} ${GTEST_LIBRARIES} ${LIBRARIES})
 
 # Compile the tests
