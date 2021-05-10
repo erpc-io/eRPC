@@ -56,10 +56,10 @@ int main(int argc, char **argv) {
       "eRPC DPDK daemon: Successfully initialized shared memzone %s\n",
       memzone_name.c_str());
 
-  auto *memzone_contents =
+  auto *ownership_memzone =
       reinterpret_cast<erpc::DpdkTransport::ownership_memzone_t *>(
           memzone->addr);
-  memzone_contents->init();
+  ownership_memzone->init();
 
   erpc::DpdkTransport::setup_phy_port(
       FLAGS_phy_port, FLAGS_numa_node,
@@ -76,17 +76,18 @@ int main(int argc, char **argv) {
             FLAGS_phy_port);
     exit(-1);
   }
-  memzone_contents->link_[FLAGS_phy_port] = link;
+  ownership_memzone->link_[FLAGS_phy_port] = link;
 
   size_t prev_epoch = 0;
   while (true) {
     sleep(1);
-    size_t cur_epoch = memzone_contents->get_epoch();
+    size_t cur_epoch = ownership_memzone->get_epoch();
     if (cur_epoch != prev_epoch) {
       erpc::ERPC_WARN("eRPC DPDK daemon: %s\n",
-                      memzone_contents->get_summary(FLAGS_phy_port).c_str());
+                      ownership_memzone->get_summary(FLAGS_phy_port).c_str());
       prev_epoch = cur_epoch;
     }
+    ownership_memzone->daemon_reclaim_qps_from_crashed(FLAGS_phy_port);
   }
   return 0;
 }

@@ -101,6 +101,17 @@ void DpdkTransport::tx_flush() {
   return;
 }
 
+void DpdkTransport::drain_rx_queue() {
+  struct rte_mbuf *rx_pkts[kRxBatchSize];
+
+  while (true) {
+    size_t nb_rx_new =
+        rte_eth_rx_burst(phy_port, qp_id_, rx_pkts, kRxBatchSize);
+    if (nb_rx_new == 0) return;
+    for (size_t i = 0; i < nb_rx_new; i++) rte_pktmbuf_free(rx_pkts[i]);
+  }
+}
+
 size_t DpdkTransport::rx_burst() {
   struct rte_mbuf *rx_pkts[kRxBatchSize];
   size_t nb_rx_new = rte_eth_rx_burst(phy_port, qp_id_, rx_pkts, kRxBatchSize);

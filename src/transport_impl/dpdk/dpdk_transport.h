@@ -17,12 +17,14 @@
 #include <rte_ethdev.h>
 #include <rte_ip.h>
 #include <rte_mbuf.h>
+#include <signal.h>
 
 namespace erpc {
 
 class DpdkTransport : public Transport {
  public:
   static constexpr size_t kMaxQueuesPerPort = 16;
+  static constexpr size_t kInvalidQpId = SIZE_MAX;
 
   /// Contents of the memzone created by the eRPC DPDK daemon process
   struct ownership_memzone_t {
@@ -69,18 +71,20 @@ class DpdkTransport : public Transport {
     std::string get_summary(size_t phy_port) {
       pthread_mutex_lock(&lock_);
       std::ostringstream ret;
-      ret << "[" << this->num_qps_available_ << " QPs of " << kMaxQueuesPerPort
+      ret << "[" << num_qps_available_ << " QPs of " << kMaxQueuesPerPort
           << " available] ";
-      ret << "[Ownership: ";
 
-      for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
-        auto &owner = owner_[phy_port][i];
-        if (owner.pid_ != 0) {
-          ret << "QP #" << i << ", "
-              << "PID " << owner.pid_ << ", ";
+      if (num_qps_available_ < kMaxQueuesPerPort) {
+        ret << "[Ownership: ";
+        for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
+          auto &owner = owner_[phy_port][i];
+          if (owner.pid_ != 0) {
+            ret << "[QP #" << i << ", "
+                << "PID " << owner.pid_ << "] ";
+          }
         }
+        ret << "]";
       }
-      ret << "]";
       pthread_mutex_unlock(&lock_);
 
       return ret.str();
@@ -93,12 +97,11 @@ class DpdkTransport : public Transport {
      * @param proc_random_id A unique random process ID of the calling process
      *
      * @return If successful, the machine-wide global index of the free QP
-     * reserved on phy_port. Else return SIZE_MAX.
+     * reserved on phy_port. Else return kInvalidQpId.
      */
     size_t get_qp(size_t phy_port, size_t proc_random_id) {
       pthread_mutex_lock(&lock_);
       epoch_++;
-      size_t ret = SIZE_MAX;
       const int my_pid = getpid();
 
       // Check for sanity
@@ -110,14 +113,13 @@ class DpdkTransport : public Transport {
               "mine. Process random IDs: mine %zu, other: %zu\n",
               my_pid, proc_random_id, owner.proc_random_id_);
           pthread_mutex_unlock(&lock_);
-          return SIZE_MAX;
+          return kInvalidQpId;
         }
       }
 
       for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
         auto &owner = owner_[phy_port][i];
         if (owner.pid_ == 0) {
-          ret = i;
           owner.pid_ = my_pid;
           owner.proc_random_id_ = proc_random_id;
           num_qps_available_--;
@@ -127,7 +129,7 @@ class DpdkTransport : public Transport {
       }
 
       pthread_mutex_unlock(&lock_);
-      return ret;
+      return kInvalidQpId;
     }
 
     /**
@@ -164,6 +166,24 @@ class DpdkTransport : public Transport {
       owner_[phy_port][qp_id].pid_ = 0;
       pthread_mutex_unlock(&lock_);
       return 0;
+    }
+
+    /// Free-up QPs reserved by processes that exited before freeing a QP.
+    /// This is safe, but it can leak QPs because of PID reuse.
+    void daemon_reclaim_qps_from_crashed(size_t phy_port) {
+      pthread_mutex_lock(&lock_);
+
+      for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
+        auto &owner = owner_[phy_port][i];
+        if (kill(owner.pid_, 0) != 0) {
+          // This means that owner.pid_ is dead
+          ERPC_WARN("eRPC DPDK daemon: Reclaiming QP %zu from crashed PID %d\n",
+                    i, owner.pid_);
+          num_qps_available_++;
+          owner_[phy_port][i].pid_ = 0;
+        }
+      }
+      pthread_mutex_unlock(&lock_);
     }
   };
 
@@ -294,6 +314,10 @@ class DpdkTransport : public Transport {
    */
   void resolve_phy_port();
 
+  /// Poll for packets on this transport's RX queue until there are no more
+  /// packets left
+  void drain_rx_queue();
+
   /// Install a flow rule for queue \p qp_id on port \p phy_port. The IPv4 and
   /// UDP address are in host-byte order.
   static void install_flow_rule(size_t phy_port, size_t qp_id,
@@ -368,7 +392,7 @@ class DpdkTransport : public Transport {
   size_t rx_ring_head_ = 0, rx_ring_tail_ = 0;
 
   uint16_t rx_flow_udp_port_ = 0;  ///< The UDP port this transport listens on
-  size_t qp_id_ = SIZE_MAX;        ///< The RX/TX queue pair for this Transport
+  size_t qp_id_ = kInvalidQpId;    ///< The RX/TX queue pair for this Transport
 
   // We don't use DPDK's lcore threads, so a shared mempool with per-lcore
   // cache won't work. Instead, we use per-thread pools with zero cached mbufs.

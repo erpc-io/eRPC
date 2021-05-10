@@ -92,7 +92,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
     // Get an available queue on phy_port
     qp_id_ = g_memzone->get_qp(phy_port, 33 /* XXX */);
-    if (qp_id_ != SIZE_MAX) {
+    if (qp_id_ != kInvalidQpId) {
       ERPC_INFO("DPDK transport for Rpc %u got QP %zu\n", rpc_id, qp_id_);
     } else {
       ERPC_ERROR("DPDK transport for Rpc %u failed to get free QP\n", rpc_id);
@@ -106,6 +106,17 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       rt_assert(mempool_ != nullptr,
                 std::string("Failed to find eRPC DPDK daemon's mempool ") +
                     mempool_name.c_str());
+
+      const size_t n_avail = rte_mempool_avail_count(mempool_);
+      if (n_avail < kNumMbufs) {
+        ERPC_WARN(
+            "DPDK transport for Rpc %u: Mempool has only %zu free mbufs "
+            "out of %zu. %zu mbufs have been leaked by previous processes that "
+            "owned this mempool.\n",
+            rpc_id, n_avail, kNumMbufs, (kNumMbufs - n_avail));
+      }
+
+      drain_rx_queue();
     } else {
       if (!g_port_initialized[phy_port]) {
         g_port_initialized[phy_port] = true;
@@ -135,8 +146,11 @@ DpdkTransport::~DpdkTransport() {
   ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
   if (g_dpdk_proc_type == DpdkProcType::kPrimary) rte_mempool_free(mempool_);
 
-  int ret = g_memzone->free_qp(phy_port, qp_id_);
-  rt_assert(ret == 0, "Failed to free QP\n");
+  if (qp_id_ != kInvalidQpId) {
+    drain_rx_queue();
+    int ret = g_memzone->free_qp(phy_port, qp_id_);
+    rt_assert(ret == 0, "Failed to free QP\n");
+  }
 }
 
 void DpdkTransport::resolve_phy_port() {

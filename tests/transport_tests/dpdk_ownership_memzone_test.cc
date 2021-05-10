@@ -14,27 +14,30 @@ static constexpr size_t kTestPhyPort = 0;
 static constexpr size_t kProc0RandomId = 11;
 static constexpr size_t kProc1RandomId = 22;
 
+// gtest does not like static constexprs
+const size_t k_max_queues_per_port = DpdkTransport::kMaxQueuesPerPort;
+onst size_t k_invalid_qp_id = DpdkTransport::kInvalidQpId;
+
 TEST(DpdkOwnershipMemzoneTest, basic) {
   DpdkTransport::ownership_memzone_t omz;
   omz.init();
-  const size_t max_queues_per_port = DpdkTransport::kMaxQueuesPerPort;
 
   ASSERT_EQ(omz.get_epoch(), 0);
-  ASSERT_EQ(omz.get_num_qps_available(), max_queues_per_port);
+  ASSERT_EQ(omz.get_num_qps_available(), k_max_queues_per_port);
 
   size_t qp_id = omz.get_qp(kTestPhyPort, kProc0RandomId);
   ASSERT_EQ(qp_id, 0);
-  ASSERT_EQ(omz.get_num_qps_available(), max_queues_per_port - 1);
+  ASSERT_EQ(omz.get_num_qps_available(), k_max_queues_per_port - 1);
 
   // Try to free an already-free QP
   int ret = omz.free_qp(kTestPhyPort, 1);
   ASSERT_EQ(ret, EALREADY);
-  ASSERT_EQ(omz.get_num_qps_available(), max_queues_per_port - 1);
+  ASSERT_EQ(omz.get_num_qps_available(), k_max_queues_per_port - 1);
 
   // Free QP 0
   ret = omz.free_qp(kTestPhyPort, 0);
   ASSERT_EQ(ret, 0);
-  ASSERT_EQ(omz.get_num_qps_available(), max_queues_per_port);
+  ASSERT_EQ(omz.get_num_qps_available(), k_max_queues_per_port);
 
   // Pretend like QP 0 is owned by a different process, then try to free it
   omz.owner_[kTestPhyPort][0].pid_ = INT_MAX;
@@ -53,7 +56,7 @@ TEST(DpdkOwnershipMemzoneTest, ran_out) {
     ASSERT_EQ(ret, i);
   }
   int ret = omz.get_qp(kTestPhyPort, kProc0RandomId);
-  ASSERT_EQ(ret, SIZE_MAX);
+  ASSERT_EQ(ret, k_invalid_qp_id);
   ASSERT_EQ(omz.num_qps_available_, 0);
 
   // Free QP #3 and check if we can re-get it
