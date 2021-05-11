@@ -144,13 +144,11 @@ void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 
 DpdkTransport::~DpdkTransport() {
   ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
+  drain_rx_queue();
   if (g_dpdk_proc_type == DpdkProcType::kPrimary) rte_mempool_free(mempool_);
 
-  if (qp_id_ != kInvalidQpId) {
-    drain_rx_queue();
-    int ret = g_memzone->free_qp(phy_port, qp_id_);
-    rt_assert(ret == 0, "Failed to free QP\n");
-  }
+  int ret = g_memzone->free_qp(phy_port, qp_id_);
+  rt_assert(ret == 0, "Failed to free QP\n");
 }
 
 void DpdkTransport::resolve_phy_port() {

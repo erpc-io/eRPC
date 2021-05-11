@@ -16,7 +16,7 @@ static constexpr size_t kProc1RandomId = 22;
 
 // gtest does not like static constexprs
 const size_t k_max_queues_per_port = DpdkTransport::kMaxQueuesPerPort;
-onst size_t k_invalid_qp_id = DpdkTransport::kInvalidQpId;
+const size_t k_invalid_qp_id = DpdkTransport::kInvalidQpId;
 
 TEST(DpdkOwnershipMemzoneTest, basic) {
   DpdkTransport::ownership_memzone_t omz;
