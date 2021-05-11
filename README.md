@@ -85,8 +85,13 @@ Some highlights:
       will use for DPDK traffic.
 
   * Prepare DPDK 19.11.5:
-    * Install pre-requisite libraries and modules:
-       * `sudo apt install make cmake g++ gcc libnuma-dev rdma-core libibverbs-dev libgflags-dev libgtest-dev numactl`
+    * [rdma-core](https://github.com/linux-rdma/rdma-core) must be installed
+      from source. First, install its dependencies listed in rdma-core's README.
+      Then, in the `rdma-core` directory:
+       * `cmake .`
+       * `sudo make install`
+    * Install upstream pre-requisite libraries and modules:
+       * `sudo apt install make cmake g++ gcc libnuma-dev libibverbs-dev libgflags-dev libgtest-dev numactl`
        * `(cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)`
        * `sudo modprobe ib_uverbs`
        * `sudo modprobe mlx4_ib`
