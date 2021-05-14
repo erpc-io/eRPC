@@ -29,8 +29,7 @@ class Nexus {
    * This UDP port is used for listening to management packets, and it must
    * be in [#kBaseSmUdpPort, #kBaseSmUdpPort + #kMaxNumERpcProcesses).
    *
-   * @param numa_node The NUMA node used by eRPC for this process. Only one eRPC
-   * process may run per NUMA node.
+   * @param numa_node The NUMA node used by eRPC for this process
    *
    * @param num_bg_threads The number of background RPC request processing
    * threads to launch.
