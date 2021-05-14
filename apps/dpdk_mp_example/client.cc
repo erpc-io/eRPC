@@ -8,13 +8,12 @@ static constexpr size_t kMaxMsgSize = 128;
 static constexpr size_t kClientUDPPort = 31850;
 
 DEFINE_string(client_name, "", "Client hostname or IP address");
-DEFINE_string(server_name, "", "Client hostname or IP address");
-DEFINE_uint64(
-    server_0_port, SIZE_MAX,
-    "Client-only flag: Management UDP port of the first server process");
-DEFINE_uint64(
-    server_1_port, SIZE_MAX,
-    "Client-only flag: Management UDP port of the second server process");
+DEFINE_string(server_name, "", "Server hostname or IP address");
+DEFINE_uint64(client_port, kClientUDPPort, "Client UDP port");
+DEFINE_uint64(server_0_port, SIZE_MAX,
+              "Management UDP port of the first server process");
+DEFINE_uint64(server_1_port, SIZE_MAX,
+              "Management UDP port of the second server process");
 
 erpc::Rpc<erpc::CTransport> *rpc;
 erpc::MsgBuffer req_0, req_1;
@@ -29,20 +28,20 @@ void sm_handler(int, erpc::SmEventType, erpc::SmErrType, void *) {}
 
 int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  erpc::rt_assert(FLAGS_server_0_port != SIZE_MAX,
-                  "Must specify server #0's port");
-  erpc::rt_assert(FLAGS_server_1_port != SIZE_MAX,
-                  "Must specify server #1's port");
   erpc::rt_assert(FLAGS_client_name.length() != 0,
                   "Must specify client's hostname");
   erpc::rt_assert(FLAGS_server_name.length() != 0,
                   "Must specify server's hostname");
+  erpc::rt_assert(FLAGS_server_0_port != SIZE_MAX,
+                  "Must specify server #0's port");
+  erpc::rt_assert(FLAGS_server_1_port != SIZE_MAX,
+                  "Must specify server #1's port");
 
-  std::string client_uri =
-      FLAGS_client_name + ":" + std::to_string(kClientUDPPort);
+  const std::string client_uri =
+      FLAGS_client_name + ":" + std::to_string(FLAGS_client_port);
   erpc::Nexus nexus(client_uri, 0, 0);
 
-  rpc = new erpc::Rpc<erpc::CTransport>(&nexus, nullptr, 0, sm_handler);
+  rpc = new erpc::Rpc<erpc::CTransport>(&nexus, nullptr, 1, sm_handler);
 
   const std::string server_0_uri =
       FLAGS_server_name + ":" + std::to_string(FLAGS_server_0_port);
@@ -65,7 +64,7 @@ int main(int argc, char **argv) {
                        &resp_0 /* tag */);
   rpc->enqueue_request(session_num_1, kReqType, &req_1, &resp_1, cont_func,
                        &resp_1 /* tag */);
-  rpc->run_event_loop(100);
+  rpc->run_event_loop(100 /* ms */);
 
   delete rpc;
 }
