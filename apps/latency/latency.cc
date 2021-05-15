@@ -6,13 +6,6 @@
 #include "rpc.h"
 #include "util/autorun_helpers.h"
 #include "util/numautils.h"
-#include "util/pmem.h"
-
-#define USE_PMEM false
-
-#if USE_PMEM == true
-#include <libpmem.h>
-#endif
 
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
@@ -23,18 +16,13 @@ static constexpr size_t kAppRespSize = 8;
 static constexpr size_t kAppMinReqSize = 64;
 static constexpr size_t kAppMaxReqSize = 1024;
 
-// If true, we persist client requests to a persistent log
-static constexpr bool kAppUsePmem = true;
-static constexpr const char *kAppPmemFile = "/dev/dax12.0";
-static constexpr size_t kAppPmemFileSize = GB(4);
-
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
+DEFINE_uint64(num_server_processes, 1, "Number of server processes");
+
 class ServerContext : public BasicAppContext {
  public:
-  size_t file_offset = 0;
-  uint8_t *pbuf;
 };
 
 class ClientContext : public BasicAppContext {
@@ -48,16 +36,6 @@ class ClientContext : public BasicAppContext {
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
-
-#if USE_PMEM == true
-  const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  const size_t copy_size = req_msgbuf->get_data_size();
-  if (c->file_offset + copy_size >= kAppPmemFileSize) c->file_offset = 0;
-  pmem_memcpy_persist(&c->pbuf[c->file_offset], req_msgbuf->buf, copy_size);
-
-  c->file_offset += copy_size;
-#endif
-
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
                                                  kAppRespSize);
   c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
@@ -72,39 +50,36 @@ void server_func(erpc::Nexus *nexus) {
                                   basic_sm_handler, phy_port);
   c.rpc = &rpc;
 
-#if USE_PMEM == true
-  printf("Mapping pmem file...");
-  c.pbuf = erpc::map_devdax_file(kAppPmemFile, kAppPmemFileSize);
-  pmem_memset_persist(c.pbuf, 0, kAppPmemFileSize);
-  printf("done.\n");
-#endif
-
   while (true) {
     rpc.run_event_loop(1000);
     if (ctrl_c_pressed == 1) break;
   }
 }
 
-void connect_session(ClientContext &c) {
-  std::string server_uri = erpc::get_uri_for_process(0);
-  printf("Process %zu: Creating session to %s.\n", FLAGS_process_id,
-         server_uri.c_str());
+void connect_sessions(ClientContext &c) {
+  for (size_t i = 0; i < FLAGS_num_server_processes; i++) {
+    const std::string server_uri = erpc::get_uri_for_process(i);
+    printf("Process %zu: Creating session to %s.\n", FLAGS_process_id,
+           server_uri.c_str());
 
-  int session_num = c.rpc->create_session(server_uri, 0 /* tid */);
-  erpc::rt_assert(session_num >= 0, "Failed to create session");
-  c.session_num_vec.push_back(session_num);
+    const int session_num =
+        c.rpc->create_session(server_uri, 0 /* tid at server */);
+    erpc::rt_assert(session_num >= 0, "Failed to create session");
+    c.session_num_vec.push_back(session_num);
 
-  while (c.num_sm_resps != 1) {
-    c.rpc->run_event_loop(kAppEvLoopMs);
-    if (unlikely(ctrl_c_pressed == 1)) return;
+    while (c.num_sm_resps != (i + 1)) {
+      c.rpc->run_event_loop(kAppEvLoopMs);
+      if (unlikely(ctrl_c_pressed == 1)) return;
+    }
   }
 }
 
 void app_cont_func(void *, void *);
 inline void send_req(ClientContext &c) {
   c.start_tsc = erpc::rdtsc();
-  c.rpc->enqueue_request(c.session_num_vec[0], kAppReqType, &c.req_msgbuf,
-                         &c.resp_msgbuf, app_cont_func, nullptr);
+  const size_t server_id = c.fastrand.next_u32() % FLAGS_num_server_processes;
+  c.rpc->enqueue_request(c.session_num_vec[server_id], kAppReqType,
+                         &c.req_msgbuf, &c.resp_msgbuf, app_cont_func, nullptr);
 }
 
 void app_cont_func(void *_context, void *) {
@@ -135,7 +110,7 @@ void client_func(erpc::Nexus *nexus) {
   c.rpc->resize_msg_buffer(&c.req_msgbuf, c.req_size);
   c.rpc->resize_msg_buffer(&c.resp_msgbuf, c.req_size);
 
-  connect_session(c);
+  connect_sessions(c);
 
   printf("Process %zu: Session connected. Starting work.\n", FLAGS_process_id);
   printf("write_size median_us 5th_us 99th_us 999th_us max_us\n");
@@ -168,8 +143,9 @@ int main(int argc, char **argv) {
                     FLAGS_numa_node, 0);
   nexus.register_req_func(kAppReqType, req_handler);
 
-  auto t =
-      std::thread(FLAGS_process_id == 0 ? server_func : client_func, &nexus);
+  auto t = std::thread(
+      FLAGS_process_id < FLAGS_num_server_processes ? server_func : client_func,
+      &nexus);
   erpc::bind_to_core(t, FLAGS_numa_node, 0);
   t.join();
 }

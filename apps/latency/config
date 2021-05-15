@@ -1,5 +1,5 @@
 --test_ms 20000
 --sm_verbose 0
---num_processes 2
+--num_server_processes 1
 --numa_0_ports 0
 --numa_1_ports 1,3
