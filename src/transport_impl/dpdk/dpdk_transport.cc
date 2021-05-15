@@ -9,6 +9,7 @@
 #include "dpdk_externs.h"
 #include "dpdk_transport.h"
 #include "util/huge_alloc.h"
+#include "util/numautils.h"
 
 namespace erpc {
 
@@ -41,7 +42,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
       // clang-format off
       const char *rte_argv[] = {
-          "-c",            "1",
+          "-c",            "0x0",
           "-n",            "6",  // Memory channels
           "-m",            "1024", // Max memory in megabytes
           "--proc-type",   "auto",
@@ -53,6 +54,9 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
           static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
       rt_assert(ret >= 0, "Failed to initialize DPDK");
+
+      // rte_eal_init() sets process core affinity to only core #0, undo this
+      clear_affinity_for_process();
 
       dpdk_proc_type_ = ((rte_eal_process_type() == RTE_PROC_PRIMARY)
                              ? DpdkProcType::kPrimary
@@ -150,7 +154,9 @@ void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 DpdkTransport::~DpdkTransport() {
   ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
   drain_rx_queue();
-  if (g_dpdk_proc_type == DpdkProcType::kPrimary) rte_mempool_free(mempool_);
+
+  // XXX: For now, leak mempool_
+  // if (dpdk_proc_type_ == DpdkProcType::kPrimary) rte_mempool_free(mempool_);
 
   int ret = g_memzone->free_qp(phy_port, qp_id_);
   rt_assert(ret == 0, "Failed to free QP\n");
