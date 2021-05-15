@@ -36,9 +36,9 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
   creator_etid = get_etid();
 
   if (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_REORDER) {
-    auto trace_filename = "/tmp/erpc_trace_" +
-                          std::to_string(nexus->sm_udp_port) +
-                          std::to_string(rpc_id);
+    const auto trace_filename = "/tmp/erpc_trace_" +
+                                std::to_string(nexus->sm_udp_port) + "-rpc_" +
+                                std::to_string(rpc_id);
     trace_file = fopen(trace_filename.c_str(), "w");
     if (trace_file == nullptr) {
       delete huge_alloc;

@@ -99,6 +99,8 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       throw std::runtime_error("Failed to get DPDK QP");
     }
 
+    rx_flow_udp_port_ = kBaseEthUDPPort + qp_id_;
+
     if (g_dpdk_proc_type == DpdkProcType::kSecondary) {
       // The eRPC DPDK management daemon has already initialized phy_port
       const std::string mempool_name = get_mempool_name(phy_port, qp_id_);

@@ -122,7 +122,7 @@ size_t DpdkTransport::rx_burst() {
 
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring_[rx_ring_head_]);
     _unused(pkthdr);
-    ERPC_TRACE("  Transport: RX pkthdr = %s. Frame = %s.\n",
+    ERPC_TRACE("Transport: RX pkthdr = %s. Frame = %s.\n",
                pkthdr->to_string().c_str(),
                frame_header_to_string(&pkthdr->headroom[0]).c_str());
 

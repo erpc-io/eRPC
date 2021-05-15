@@ -24,9 +24,6 @@ namespace erpc {
 
 static constexpr uint16_t kIPEtherType = 0x800;
 static constexpr uint16_t kIPHdrProtocol = 0x11;
-
-/// The datapath destination UDP port for Rpc ID x is based on
-/// kBaseEthUDPPort and the Rpc's NUMA node
 static constexpr uint16_t kBaseEthUDPPort = 10000;
 
 static std::string mac_to_string(const uint8_t* mac) {
