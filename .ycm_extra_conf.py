@@ -40,8 +40,6 @@ flags = [
     '-x',
     'c++',
     '-DERPC_DPDK=true',
-    '-DERPC_RAW=true',
-    '-DERPC_INFINIBAND=true',
     '-isystem' + str(home_dir) + '/dpdk/include/dpdk/',
     '-I' + str(home_dir) + '/eRPC/src',
     '-I' + str(home_dir) + '/eRPC/third_party',

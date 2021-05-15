@@ -54,11 +54,11 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       int ret = rte_eal_init(rte_argc, const_cast<char **>(rte_argv));
       rt_assert(ret >= 0, "Failed to initialize DPDK");
 
-      g_dpdk_proc_type = ((rte_eal_process_type() == RTE_PROC_PRIMARY)
-                              ? DpdkProcType::kPrimary
-                              : DpdkProcType::kSecondary);
+      dpdk_proc_type_ = ((rte_eal_process_type() == RTE_PROC_PRIMARY)
+                             ? DpdkProcType::kPrimary
+                             : DpdkProcType::kSecondary);
 
-      if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
+      if (dpdk_proc_type_ == DpdkProcType::kPrimary) {
         ERPC_WARN(
             "Running as primary DPDK process. eRPC DPDK daemon is not "
             "running.\n");
@@ -100,14 +100,15 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     }
 
     rx_flow_udp_port_ = kBaseEthUDPPort + qp_id_;
+    const std::string mempool_name = get_mempool_name(phy_port, qp_id_);
 
-    if (g_dpdk_proc_type == DpdkProcType::kSecondary) {
+    if (dpdk_proc_type_ == DpdkProcType::kSecondary) {
       // The eRPC DPDK management daemon has already initialized phy_port
-      const std::string mempool_name = get_mempool_name(phy_port, qp_id_);
       mempool_ = rte_mempool_lookup(mempool_name.c_str());
       rt_assert(mempool_ != nullptr,
                 std::string("Failed to find eRPC DPDK daemon's mempool ") +
                     mempool_name.c_str());
+      drain_rx_queue();
 
       const size_t n_avail = rte_mempool_avail_count(mempool_);
       if (n_avail < kNumMbufs) {
@@ -117,14 +118,16 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
             "owned this mempool.\n",
             rpc_id, n_avail, kNumMbufs, (kNumMbufs - n_avail));
       }
-
-      drain_rx_queue();
     } else {
       if (!g_port_initialized[phy_port]) {
         g_port_initialized[phy_port] = true;
         setup_phy_port(phy_port, numa_node, DpdkProcType::kPrimary);
       }
-      mempool_ = g_mempool_arr[phy_port][qp_id_];
+
+      mempool_ = rte_mempool_lookup(mempool_name.c_str());
+      rt_assert(
+          mempool_ != nullptr,
+          std::string("Failed to find self's mempool ") + mempool_name.c_str());
     }
 
     g_dpdk_lock.unlock();
@@ -181,7 +184,7 @@ void DpdkTransport::resolve_phy_port() {
   // Resolve bandwidth. XXX: For some reason, rte_eth_link_get() does not work
   // in secondary DPDK processes in DPDK 19.11.
   struct rte_eth_link link;
-  if (g_dpdk_proc_type == DpdkProcType::kPrimary) {
+  if (dpdk_proc_type_ == DpdkProcType::kPrimary) {
     rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
     rt_assert(link.link_status == ETH_LINK_UP,
               "Port " + std::to_string(phy_port) + " is down.");

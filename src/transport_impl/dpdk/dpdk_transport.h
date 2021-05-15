@@ -391,6 +391,9 @@ class DpdkTransport : public Transport {
 
   size_t rx_ring_head_ = 0, rx_ring_tail_ = 0;
 
+  /// Primary or secondary DPDK process type for this process
+  DpdkTransport::DpdkProcType dpdk_proc_type_;
+
   uint16_t rx_flow_udp_port_ = 0;  ///< The UDP port this transport listens on
   size_t qp_id_ = kInvalidQpId;    ///< The RX/TX queue pair for this Transport
 

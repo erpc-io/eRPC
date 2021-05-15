@@ -46,6 +46,7 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
   memset(&eth_conf, 0, sizeof(eth_conf));
 
   eth_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+  eth_conf.lpbk_mode = 1;
   eth_conf.rx_adv_conf.rss_conf.rss_key = const_cast<uint8_t *>(kDefaultRssKey);
   eth_conf.rx_adv_conf.rss_conf.rss_key_len = 40;
   eth_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_UDP;
@@ -63,11 +64,10 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
   // and reconfiguring the device.
   for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
     const std::string pname = get_mempool_name(phy_port, i);
-    g_mempool_arr[phy_port][i] =
+    rte_mempool *mempool =
         rte_pktmbuf_pool_create(pname.c_str(), kNumMbufs, 0 /* cache */,
                                 0 /* priv size */, kMbufSize, numa_node);
-    rt_assert(g_mempool_arr[phy_port][i] != nullptr,
-              "Mempool create failed: " + dpdk_strerror());
+    rt_assert(mempool != nullptr, "Mempool create failed: " + dpdk_strerror());
 
     rte_eth_rxconf eth_rx_conf;
     memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
@@ -78,7 +78,7 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
     eth_rx_conf.rx_drop_en = 0;
 
     int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
-                                     &eth_rx_conf, g_mempool_arr[phy_port][i]);
+                                     &eth_rx_conf, mempool);
     rt_assert(ret == 0, "Failed to setup RX queue: " + std::to_string(i) +
                             ". Error " + strerror(-1 * ret));
 

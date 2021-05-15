@@ -22,7 +22,7 @@ void Rpc<TTr>::process_comps_st() {
     assert(pkthdr->check_magic());
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
-    if (pkthdr->dest_session_num >= session_vec.size()) {
+    if (unlikely(pkthdr->dest_session_num >= session_vec.size())) {
       ERPC_WARN(
           "Rpc %u: Received %s for a session yet to be connected. Dropping.\n",
           rpc_id, pkthdr->to_string().c_str());
