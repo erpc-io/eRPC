@@ -9,12 +9,13 @@
 
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
-static constexpr double kAppLatFac = 10.0;    // Precision factor for latency
 static constexpr size_t kAppReqType = 1;      // eRPC request type
-
 static constexpr size_t kAppRespSize = 8;
 static constexpr size_t kAppMinReqSize = 64;
 static constexpr size_t kAppMaxReqSize = 1024;
+
+// Precision factor for latency measurement
+static constexpr double kAppLatFac = erpc::kIsAzure ? 1.0 : 10.0;
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
@@ -31,6 +32,11 @@ class ClientContext : public BasicAppContext {
   size_t req_size;  // Between kAppMinReqSize and kAppMaxReqSize
   erpc::Latency latency;
   erpc::MsgBuffer req_msgbuf, resp_msgbuf;
+
+  // If true, the client doubles its request size (up to kAppMaxReqSize) when
+  // issuing the next request, and resets this flag to false
+  bool double_req_size_ = false;
+
   ~ClientContext() {}
 };
 
@@ -42,6 +48,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
 }
 
 void server_func(erpc::Nexus *nexus) {
+  printf("Latency: Running server, process ID %zu\n", FLAGS_process_id);
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   uint8_t phy_port = port_vec.at(0);
 
@@ -76,15 +83,33 @@ void connect_sessions(ClientContext &c) {
 
 void app_cont_func(void *, void *);
 inline void send_req(ClientContext &c) {
+  if (c.double_req_size_) {
+    c.double_req_size_ = false;
+    c.req_size *= 2;
+    if (c.req_size > kAppMaxReqSize) c.req_size = kAppMinReqSize;
+
+    c.rpc->resize_msg_buffer(&c.req_msgbuf, c.req_size);
+    c.rpc->resize_msg_buffer(&c.resp_msgbuf, c.req_size);
+  }
+
   c.start_tsc = erpc::rdtsc();
   const size_t server_id = c.fastrand.next_u32() % FLAGS_num_server_processes;
   c.rpc->enqueue_request(c.session_num_vec[server_id], kAppReqType,
                          &c.req_msgbuf, &c.resp_msgbuf, app_cont_func, nullptr);
+  if (kAppVerbose) {
+    printf("Latency: Sending request of size %zu bytes to server #%zu\n",
+           c.req_msgbuf.get_data_size(), server_id);
+  }
 }
 
 void app_cont_func(void *_context, void *) {
   auto *c = static_cast<ClientContext *>(_context);
   assert(c->resp_msgbuf.get_data_size() == kAppRespSize);
+
+  if (kAppVerbose) {
+    printf("Latency: Received response of size %zu bytes\n",
+           c->resp_msgbuf.get_data_size());
+  }
 
   double req_lat_us =
       erpc::to_usec(erpc::rdtsc() - c->start_tsc, c->rpc->get_freq_ghz());
@@ -94,6 +119,7 @@ void app_cont_func(void *_context, void *) {
 }
 
 void client_func(erpc::Nexus *nexus) {
+  printf("Latency: Running client, process ID %zu\n", FLAGS_process_id);
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   uint8_t phy_port = port_vec.at(0);
 
@@ -112,7 +138,8 @@ void client_func(erpc::Nexus *nexus) {
 
   connect_sessions(c);
 
-  printf("Process %zu: Session connected. Starting work.\n", FLAGS_process_id);
+  printf("Latency: Process %zu: Session connected. Starting work.\n",
+         FLAGS_process_id);
   printf("write_size median_us 5th_us 99th_us 999th_us max_us\n");
 
   send_req(c);
@@ -124,11 +151,7 @@ void client_func(erpc::Nexus *nexus) {
            c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac,
            c.latency.max() / kAppLatFac);
 
-    c.req_size *= 2;
-    if (c.req_size > kAppMaxReqSize) c.req_size = kAppMinReqSize;
-    c.rpc->resize_msg_buffer(&c.req_msgbuf, c.req_size);
-    c.rpc->resize_msg_buffer(&c.resp_msgbuf, c.req_size);
-
+    c.double_req_size_ = true;
     c.latency.reset();
   }
 }
@@ -136,7 +159,6 @@ void client_func(erpc::Nexus *nexus) {
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
@@ -146,6 +168,18 @@ int main(int argc, char **argv) {
   auto t = std::thread(
       FLAGS_process_id < FLAGS_num_server_processes ? server_func : client_func,
       &nexus);
-  erpc::bind_to_core(t, FLAGS_numa_node, 0);
+
+  const size_t num_socket_cores =
+      erpc::get_lcores_for_numa_node(FLAGS_numa_node).size();
+  const size_t affinity_core = FLAGS_process_id % num_socket_cores;
+  printf("Latency: Will run on CPU core %zu\n", affinity_core);
+  if (FLAGS_process_id >= num_socket_cores) {
+    fprintf(stderr,
+            "Latency: Warning: The number of latency processes is close to "
+            "this machine's core count. This could be fine, but to ensure good "
+            "performance, please double-check for core collision.\n");
+  }
+
+  erpc::bind_to_core(t, FLAGS_numa_node, affinity_core);
   t.join();
 }
