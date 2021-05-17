@@ -81,7 +81,7 @@ struct pkthdr_t {
     return pkt_type == _pkt_type && pkt_num == _pkt_num;
   }
 
-  /// Return a string representation of this packet header
+  /// Return a string with the eRPC header fields in this packet header
   std::string to_string() const {
     std::ostringstream ret;
     ret << "[type " << pkt_type_str(pkt_type) << ", "
