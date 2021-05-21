@@ -46,6 +46,7 @@ CMakeScripts
 Makefile
 Testing
 CTestTestfile.cmake
+cmake-build*
 
 # gdb
 .gdb_history
@@ -66,3 +67,4 @@ gdb_history
 *.swp
 src/config.h
 .ycm_extra_conf.py
+.idea
