@@ -50,29 +50,29 @@ std::vector<size_t> flags_get_numa_ports(size_t numa_node) {
 template <class T>
 class AppMemPool {
  public:
-  size_t num_to_alloc = 1;
-  std::vector<T *> backing_ptr_vec;
-  std::vector<T *> pool;
+  size_t num_to_alloc_ = 1;
+  std::vector<T *> backing_ptr_vec_;
+  std::vector<T *> pool_;
 
   void extend_pool() {
-    T *backing_ptr = new T[num_to_alloc];
-    for (size_t i = 0; i < num_to_alloc; i++) pool.push_back(&backing_ptr[i]);
-    backing_ptr_vec.push_back(backing_ptr);
-    num_to_alloc *= 2;
+    T *backing_ptr = new T[num_to_alloc_];
+    for (size_t i = 0; i < num_to_alloc_; i++) pool_.push_back(&backing_ptr[i]);
+    backing_ptr_vec_.push_back(backing_ptr);
+    num_to_alloc_ *= 2;
   }
 
   T *alloc() {
-    if (pool.empty()) extend_pool();
-    T *ret = pool.back();
-    pool.pop_back();
+    if (pool_.empty()) extend_pool();
+    T *ret = pool_.back();
+    pool_.pop_back();
     return ret;
   }
 
-  void free(T *t) { pool.push_back(t); }
+  void free(T *t) { pool_.push_back(t); }
 
   AppMemPool() {}
   ~AppMemPool() {
-    for (T *ptr : backing_ptr_vec) delete[] ptr;
+    for (T *ptr : backing_ptr_vec_) delete[] ptr;
   }
 };
 
@@ -90,21 +90,21 @@ class TmpStat {
                     std::to_string(FLAGS_process_id);
 
     printf("Writing stats to file %s\n", filename.c_str());
-    stat_file = fopen(filename.c_str(), "w");
-    erpc::rt_assert(stat_file != nullptr, "Failed to open stat file");
+    stat_file_ = fopen(filename.c_str(), "w");
+    erpc::rt_assert(stat_file_ != nullptr, "Failed to open stat file");
 
-    fprintf(stat_file, "%s\n", header.c_str());
-    fflush(stat_file);
+    fprintf(stat_file_, "%s\n", header.c_str());
+    fflush(stat_file_);
   }
 
   ~TmpStat() {
-    fflush(stat_file);
-    fclose(stat_file);
+    fflush(stat_file_);
+    fclose(stat_file_);
   }
 
   void write(std::string stat) {
-    fprintf(stat_file, "%s\n", stat.c_str());
-    fflush(stat_file);
+    fprintf(stat_file_, "%s\n", stat.c_str());
+    fflush(stat_file_);
   }
 
  private:
@@ -115,31 +115,32 @@ class TmpStat {
     return false;
   }
 
-  FILE *stat_file;
+  FILE *stat_file_;
 };
 
 // Per-thread application context
 class BasicAppContext {
  public:
-  TmpStat *tmp_stat = nullptr;
-  erpc::Rpc<erpc::CTransport> *rpc = nullptr;
-  erpc::FastRand fastrand;
+  TmpStat *tmp_stat_ = nullptr;
+  erpc::Rpc<erpc::CTransport> *rpc_ = nullptr;
+  erpc::FastRand fastrand_;
 
-  std::vector<int> session_num_vec;
+  std::vector<int> session_num_vec_;
 
-  size_t thread_id;           // The ID of the thread that owns this context
-  size_t num_sm_resps = 0;    // Number of SM responses
-  bool ping_pending = false;  // Only one ping is allowed at a time
+  size_t thread_id_;           // The ID of the thread that owns this context
+  size_t num_sm_resps_ = 0;    // Number of SM responses
+  bool ping_pending_ = false;  // Only one ping is allowed at a time
 
   ~BasicAppContext() {
-    if (tmp_stat != nullptr) delete tmp_stat;
+    if (tmp_stat_ != nullptr) delete tmp_stat_;
   }
 
   // Use Lemire's trick to get a random session number from session_num_vec
   inline int fast_get_rand_session_num() {
-    uint32_t x = fastrand.next_u32();
-    size_t rand_index = (static_cast<size_t>(x) * session_num_vec.size()) >> 32;
-    return session_num_vec[rand_index];
+    uint32_t x = fastrand_.next_u32();
+    size_t rand_index =
+        (static_cast<size_t>(x) * session_num_vec_.size()) >> 32;
+    return session_num_vec_[rand_index];
   }
 };
 
@@ -147,7 +148,7 @@ class BasicAppContext {
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
                       erpc::SmErrType sm_err_type, void *_context) {
   auto *c = static_cast<BasicAppContext *>(_context);
-  c->num_sm_resps++;
+  c->num_sm_resps_++;
 
   erpc::rt_assert(
       sm_err_type == erpc::SmErrType::kNoError,
@@ -159,22 +160,22 @@ void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
   }
 
   // The callback gives us the eRPC session number - get the index in vector
-  size_t session_idx = c->session_num_vec.size();
-  for (size_t i = 0; i < c->session_num_vec.size(); i++) {
-    if (c->session_num_vec[i] == session_num) session_idx = i;
+  size_t session_idx = c->session_num_vec_.size();
+  for (size_t i = 0; i < c->session_num_vec_.size(); i++) {
+    if (c->session_num_vec_[i] == session_num) session_idx = i;
   }
 
-  erpc::rt_assert(session_idx < c->session_num_vec.size(),
+  erpc::rt_assert(session_idx < c->session_num_vec_.size(),
                   "SM callback for invalid session number.");
 
   if (FLAGS_sm_verbose == 1) {
     fprintf(stderr,
             "Process %zu, Rpc %u: Session number %d (index %zu) %s. Error %s. "
             "Time elapsed = %.3f s.\n",
-            FLAGS_process_id, c->rpc->get_rpc_id(), session_num, session_idx,
+            FLAGS_process_id, c->rpc_->get_rpc_id(), session_num, session_idx,
             erpc::sm_event_type_str(sm_event_type).c_str(),
             erpc::sm_err_type_str(sm_err_type).c_str(),
-            c->rpc->sec_since_creation());
+            c->rpc_->sec_since_creation());
   }
 }
 
@@ -189,15 +190,15 @@ static constexpr uint8_t kPingTimeoutMs = 50;
 void ping_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<BasicAppContext *>(_context);
 
-  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
-  c->rpc->resize_msg_buffer(&resp_msgbuf, kPingMsgSize);
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf_;
+  c->rpc_->resize_msg_buffer(&resp_msgbuf, kPingMsgSize);
 
-  c->rpc->enqueue_response(req_handle, &resp_msgbuf);
+  c->rpc_->enqueue_response(req_handle, &resp_msgbuf);
 }
 
 void ping_cont_func(void *_context, void *) {
   auto *c = static_cast<BasicAppContext *>(_context);
-  c->ping_pending = false;  // Mark ping as completed
+  c->ping_pending_ = false;  // Mark ping as completed
 }
 
 // Ping all sessions after connecting them
@@ -206,28 +207,28 @@ void ping_all_blocking(BasicAppContext &c) {
   erpc::MsgBuffer ping_req, ping_resp;
 
   // These buffers stay valid for the lifetime of the ping RPC
-  ping_req = c.rpc->alloc_msg_buffer_or_die(kPingMsgSize);
-  ping_resp = c.rpc->alloc_msg_buffer_or_die(kPingMsgSize);
+  ping_req = c.rpc_->alloc_msg_buffer_or_die(kPingMsgSize);
+  ping_resp = c.rpc_->alloc_msg_buffer_or_die(kPingMsgSize);
 
-  for (int &session_num : c.session_num_vec) {
-    auto srv_hostname = c.rpc->get_remote_hostname(session_num);
+  for (int &session_num : c.session_num_vec_) {
+    auto srv_hostname = c.rpc_->get_remote_hostname(session_num);
     if (hostname_set.count(srv_hostname) > 0) continue;
     hostname_set.insert(srv_hostname);
 
     printf("Process %zu, thread %zu: Pinging server %s.\n", FLAGS_process_id,
-           c.thread_id, srv_hostname.c_str());
+           c.thread_id_, srv_hostname.c_str());
 
-    c.ping_pending = true;
-    c.rpc->enqueue_request(session_num, kPingReqHandlerType, &ping_req,
-                           &ping_resp, ping_cont_func, nullptr);
+    c.ping_pending_ = true;
+    c.rpc_->enqueue_request(session_num, kPingReqHandlerType, &ping_req,
+                            &ping_resp, ping_cont_func, nullptr);
 
     size_t ms_elapsed = 0;
-    while (c.ping_pending) {
-      c.rpc->run_event_loop(kPingEvLoopMs);
+    while (c.ping_pending_) {
+      c.rpc_->run_event_loop(kPingEvLoopMs);
       ms_elapsed += kPingEvLoopMs;
       if (ms_elapsed > kPingTimeoutMs) {
         printf("Process %zu, thread %zu: Fabric to server broken %s.\n",
-               FLAGS_process_id, c.thread_id, srv_hostname.c_str());
+               FLAGS_process_id, c.thread_id_, srv_hostname.c_str());
         break;
       }
     }

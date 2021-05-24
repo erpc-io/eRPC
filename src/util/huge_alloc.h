@@ -18,21 +18,21 @@ namespace erpc {
 /// Information about an SHM region
 struct shm_region_t {
   // Constructor args
-  const int shm_key;      /// The key used to create the SHM region
-  const uint8_t *buf;     /// The start address of the allocated SHM buffer
-  const size_t size;      /// The size in bytes of the allocated SHM buffer
-  const bool registered;  /// Is this SHM region registered with the NIC?
+  const int shm_key_;      /// The key used to create the SHM region
+  const uint8_t *buf_;     /// The start address of the allocated SHM buffer
+  const size_t size_;      /// The size in bytes of the allocated SHM buffer
+  const bool registered_;  /// Is this SHM region registered with the NIC?
 
   /// The transport-specific memory registration info
-  Transport::MemRegInfo mem_reg_info;
+  Transport::mem_reg_info mem_reg_info_;
 
   shm_region_t(int shm_key, uint8_t *buf, size_t size, bool registered,
-               Transport::MemRegInfo mem_reg_info)
-      : shm_key(shm_key),
-        buf(buf),
-        size(size),
-        registered(registered),
-        mem_reg_info(mem_reg_info) {
+               Transport::mem_reg_info mem_reg_info)
+      : shm_key_(shm_key),
+        buf_(buf),
+        size_(size),
+        registered_(registered),
+        mem_reg_info_(mem_reg_info) {
     assert(size % kHugepageSize == 0);
   }
 };
@@ -56,19 +56,19 @@ enum class DoRegister { kTrue, kFalse };
  */
 class HugeAlloc {
  public:
-  static constexpr const char *alloc_fail_help_str =
+  static constexpr const char *kAllocFailHelpStr =
       "This could be due to insufficient huge pages or SHM limits.";
-  static const size_t kMinClassSize = 64;     /// Min allocation size
-  static const size_t kMinClassBitShift = 6;  /// For division by kMinClassSize
-  static_assert((kMinClassSize >> kMinClassBitShift) == 1, "");
+  static const size_t k_min_class_size = 64;     /// Min allocation size
+  static const size_t k_min_class_bit_shift = 6;  /// For division by kMinClassSize
+  static_assert((k_min_class_size >> k_min_class_bit_shift) == 1, "");
 
-  static const size_t kMaxClassSize = MB(8);  /// Max allocation size
-  static const size_t kNumClasses = 18;       /// 64 B (2^6), ..., 8 MB (2^23)
-  static_assert(kMaxClassSize == kMinClassSize << (kNumClasses - 1), "");
+  static const size_t k_max_class_size = MB(8);  /// Max allocation size
+  static const size_t k_num_classes = 18;       /// 64 B (2^6), ..., 8 MB (2^23)
+  static_assert(k_max_class_size == k_min_class_size << (k_num_classes - 1), "");
 
   /// Return the maximum size of a class
   static constexpr size_t class_max_size(size_t class_i) {
-    return kMinClassSize * (1ull << class_i);
+    return k_min_class_size * (1ull << class_i);
   }
 
   /**
@@ -120,27 +120,27 @@ class HugeAlloc {
 
   /// Free a Buffer
   inline void free_buf(Buffer buffer) {
-    assert(buffer.buf != nullptr);
+    assert(buffer.buf_ != nullptr);
 
-    size_t size_class = get_class(buffer.class_size);
-    assert(class_max_size(size_class) == buffer.class_size);
+    size_t size_class = get_class(buffer.class_size_);
+    assert(class_max_size(size_class) == buffer.class_size_);
 
-    freelist[size_class].push_back(buffer);
-    stats.user_alloc_tot -= buffer.class_size;
+    freelist_[size_class].push_back(buffer);
+    stats_.user_alloc_tot_ -= buffer.class_size_;
   }
 
-  inline size_t get_numa_node() { return numa_node; }
+  inline size_t get_numa_node() { return numa_node_; }
 
   /// Return the total amount of memory reserved as hugepages
   inline size_t get_stat_shm_reserved() const {
-    assert(stats.shm_reserved % kHugepageSize == 0);
-    return stats.shm_reserved;
+    assert(stats_.shm_reserved_ % kHugepageSize == 0);
+    return stats_.shm_reserved_;
   }
 
   /// Return the total amoung of memory allocated to the user
   inline size_t get_stat_user_alloc_tot() const {
-    assert(stats.user_alloc_tot % kMinClassSize == 0);
-    return stats.user_alloc_tot;
+    assert(stats_.user_alloc_tot_ % k_min_class_size == 0);
+    return stats_.user_alloc_tot_;
   }
 
   /// Print a summary of this allocator
@@ -152,17 +152,17 @@ class HugeAlloc {
    * @param size The size of the buffer, which may or may not be a class size
    */
   inline size_t get_class(size_t size) {
-    assert(size >= 1 && size <= kMaxClassSize);
+    assert(size >= 1 && size <= k_max_class_size);
     // Use bit shift instead of division to make debug-mode code a faster
-    return msb_index(static_cast<int>((size - 1) >> kMinClassBitShift));
+    return msb_index(static_cast<int>((size - 1) >> k_min_class_bit_shift));
   }
 
   /// Reference function for the optimized \p get_class function above
   inline size_t get_class_slow(size_t size) {
-    assert(size >= 1 && size <= kMaxClassSize);
+    assert(size >= 1 && size <= k_max_class_size);
 
     size_t size_class = 0;             // The size class for \p size
-    size_t class_lim = kMinClassSize;  // The max size for \p size_class
+    size_t class_lim = k_min_class_size;  // The max size for \p size_class
     while (size > class_lim) {
       size_class++;
       class_lim *= 2;
@@ -175,19 +175,19 @@ class HugeAlloc {
   /// previous class, which must be an empty class.
   inline void split(size_t size_class) {
     assert(size_class >= 1);
-    assert(!freelist[size_class].empty());
-    assert(freelist[size_class - 1].empty());
+    assert(!freelist_[size_class].empty());
+    assert(freelist_[size_class - 1].empty());
 
-    Buffer buffer = freelist[size_class].back();
-    freelist[size_class].pop_back();
-    assert(buffer.class_size == class_max_size(size_class));
+    Buffer buffer = freelist_[size_class].back();
+    freelist_[size_class].pop_back();
+    assert(buffer.class_size_ == class_max_size(size_class));
 
-    Buffer buffer_0 = Buffer(buffer.buf, buffer.class_size / 2, buffer.lkey);
-    Buffer buffer_1 = Buffer(buffer.buf + buffer.class_size / 2,
-                             buffer.class_size / 2, buffer.lkey);
+    Buffer buffer_0 = Buffer(buffer.buf_, buffer.class_size_ / 2, buffer.lkey_);
+    Buffer buffer_1 = Buffer(buffer.buf_ + buffer.class_size_ / 2,
+                             buffer.class_size_ / 2, buffer.lkey_);
 
-    freelist[size_class - 1].push_back(buffer_0);
-    freelist[size_class - 1].push_back(buffer_1);
+    freelist_[size_class - 1].push_back(buffer_0);
+    freelist_[size_class - 1].push_back(buffer_1);
   }
 
   /**
@@ -195,14 +195,14 @@ class HugeAlloc {
    * @param size_class Index of the non-empty size class to allocate from
    */
   inline Buffer alloc_from_class(size_t size_class) {
-    assert(size_class < kNumClasses);
+    assert(size_class < k_num_classes);
 
     // Use the Buffers at the back to improve locality
-    Buffer buffer = freelist[size_class].back();
-    assert(buffer.class_size = class_max_size(size_class));
-    freelist[size_class].pop_back();
+    Buffer buffer = freelist_[size_class].back();
+    assert(buffer.class_size_ = class_max_size(size_class));
+    freelist_[size_class].pop_back();
 
-    stats.user_alloc_tot += buffer.class_size;
+    stats_.user_alloc_tot_ += buffer.class_size_;
 
     return buffer;
   }
@@ -220,22 +220,22 @@ class HugeAlloc {
    */
   bool reserve_hugepages(size_t size);
 
-  std::vector<shm_region_t> shm_list;  /// SHM regions by increasing alloc size
-  std::vector<Buffer> freelist[kNumClasses];  /// Per-class freelist
+  std::vector<shm_region_t> shm_list_;  /// SHM regions by increasing alloc size
+  std::vector<Buffer> freelist_[k_num_classes];  /// Per-class freelist
 
-  SlowRand slow_rand;      /// RNG to generate SHM keys
-  const size_t numa_node;  /// NUMA node on which all memory is allocated
+  SlowRand slow_rand_;      /// RNG to generate SHM keys
+  const size_t numa_node_;  /// NUMA node on which all memory is allocated
 
-  Transport::reg_mr_func_t reg_mr_func;
-  Transport::dereg_mr_func_t dereg_mr_func;
+  Transport::reg_mr_func_t reg_mr_func_;
+  Transport::dereg_mr_func_t dereg_mr_func_;
 
-  size_t prev_allocation_size;  /// Size of previous hugepage reservation
+  size_t prev_allocation_size_;  /// Size of previous hugepage reservation
 
   // Stats
   struct {
-    size_t shm_reserved = 0;    /// Total hugepage memory reserved by allocator
-    size_t user_alloc_tot = 0;  /// Total memory allocated to user
-  } stats;
+    size_t shm_reserved_ = 0;    /// Total hugepage memory reserved by allocator
+    size_t user_alloc_tot_ = 0;  /// Total memory allocated to user
+  } stats_;
 };
 
 }  // namespace erpc

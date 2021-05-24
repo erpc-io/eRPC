@@ -17,7 +17,7 @@ constexpr size_t DpdkTransport::kMaxDataPerPkt;
 static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
 
 static_assert(kHeadroom == 40, "Invalid packet header headroom for DPDK");
-static_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Wrong headroom");
+static_assert(sizeof(pkthdr_t::headroom_) == kInetHdrsTotSize, "Wrong headroom");
 
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
@@ -147,31 +147,31 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
 void DpdkTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
                                              uint8_t **rx_ring) {
-  this->huge_alloc = huge_alloc;
+  this->huge_alloc_ = huge_alloc;
   this->rx_ring_ = rx_ring;
 }
 
 DpdkTransport::~DpdkTransport() {
-  ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
+  ERPC_INFO("Destroying transport for ID %u\n", rpc_id_);
   drain_rx_queue();
 
   // XXX: For now, leak mempool_
   // if (dpdk_proc_type_ == DpdkProcType::kPrimary) rte_mempool_free(mempool_);
 
-  int ret = g_memzone->free_qp(phy_port, qp_id_);
+  int ret = g_memzone->free_qp(phy_port_, qp_id_);
   rt_assert(ret == 0, "Failed to free QP\n");
 }
 
 void DpdkTransport::resolve_phy_port() {
   struct rte_ether_addr mac;
-  rte_eth_macaddr_get(phy_port, &mac);
-  memcpy(resolve_.mac_addr, &mac.addr_bytes, sizeof(resolve_.mac_addr));
+  rte_eth_macaddr_get(phy_port_, &mac);
+  memcpy(resolve_.mac_addr_, &mac.addr_bytes, sizeof(resolve_.mac_addr_));
 
-  resolve_.ipv4_addr = get_port_ipv4_addr(phy_port);
+  resolve_.ipv4_addr_ = get_port_ipv4_addr(phy_port_);
 
   // Resolve RSS indirection table size
   struct rte_eth_dev_info dev_info;
-  rte_eth_dev_info_get(phy_port, &dev_info);
+  rte_eth_dev_info_get(phy_port_, &dev_info);
 
   rt_assert(std::string(dev_info.driver_name) == "net_mlx4" or
                 std::string(dev_info.driver_name) == "net_mlx5",
@@ -180,10 +180,10 @@ void DpdkTransport::resolve_phy_port() {
     // MLX4 NICs report a reta size of zero, but they use 128 internally
     rt_assert(dev_info.reta_size == 0,
               "Unexpected RETA size for MLX4 NIC (expected zero)");
-    resolve_.reta_size = 128;
+    resolve_.reta_size_ = 128;
   } else {
-    resolve_.reta_size = dev_info.reta_size;
-    rt_assert(resolve_.reta_size >= kMaxQueuesPerPort,
+    resolve_.reta_size_ = dev_info.reta_size;
+    rt_assert(resolve_.reta_size_ >= kMaxQueuesPerPort,
               "Too few entries in NIC RSS indirection table");
   }
 
@@ -191,67 +191,67 @@ void DpdkTransport::resolve_phy_port() {
   // in secondary DPDK processes in DPDK 19.11.
   struct rte_eth_link link;
   if (dpdk_proc_type_ == DpdkProcType::kPrimary) {
-    rte_eth_link_get(static_cast<uint8_t>(phy_port), &link);
+    rte_eth_link_get(static_cast<uint8_t>(phy_port_), &link);
     rt_assert(link.link_status == ETH_LINK_UP,
-              "Port " + std::to_string(phy_port) + " is down.");
+              "Port " + std::to_string(phy_port_) + " is down.");
   } else {
-    link = g_memzone->link_[phy_port];
+    link = g_memzone->link_[phy_port_];
   }
 
   if (link.link_speed != ETH_SPEED_NUM_NONE) {
     // link_speed is in Mbps. The 10 Gbps check below is just a sanity check.
     rt_assert(link.link_speed >= 10000, "Link too slow");
-    resolve_.bandwidth =
+    resolve_.bandwidth_ =
         static_cast<size_t>(link.link_speed) * 1000 * 1000 / 8.0;
   } else {
     ERPC_WARN(
         "Port %u bandwidth not reported by DPDK. Using default 10 Gbps.\n",
-        phy_port);
+        phy_port_);
     link.link_speed = 10000;
-    resolve_.bandwidth = 10.0 * (1000 * 1000 * 1000) / 8.0;
+    resolve_.bandwidth_ = 10.0 * (1000 * 1000 * 1000) / 8.0;
   }
 
   ERPC_INFO(
       "Resolved port %u: MAC %s, IPv4 %s, RETA size %zu entries, bandwidth "
       "%.1f Gbps\n",
-      phy_port, mac_to_string(resolve_.mac_addr).c_str(),
-      ipv4_to_string(htonl(resolve_.ipv4_addr)).c_str(), resolve_.reta_size,
-      resolve_.bandwidth * 8.0 / (1000 * 1000 * 1000));
+      phy_port_, mac_to_string(resolve_.mac_addr_).c_str(),
+      ipv4_to_string(htonl(resolve_.ipv4_addr_)).c_str(), resolve_.reta_size_,
+      resolve_.bandwidth_ * 8.0 / (1000 * 1000 * 1000));
 }
 
-void DpdkTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
+void DpdkTransport::fill_local_routing_info(routing_info *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
-  memcpy(ri->mac, resolve_.mac_addr, 6);
-  ri->ipv4_addr = resolve_.ipv4_addr;
-  ri->udp_port = rx_flow_udp_port_;
-  ri->rxq_id = qp_id_;
-  ri->reta_size = resolve_.reta_size;
+  memcpy(ri->mac_, resolve_.mac_addr_, 6);
+  ri->ipv4_addr_ = resolve_.ipv4_addr_;
+  ri->udp_port_ = rx_flow_udp_port_;
+  ri->rxq_id_ = qp_id_;
+  ri->reta_size_ = resolve_.reta_size_;
 }
 
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
 bool DpdkTransport::resolve_remote_routing_info(
-    RoutingInfo *routing_info) const {
+    routing_info *routing_info) const {
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
 
   // XXX: The header generation below will overwrite routing_info. We must
   // save/use info from routing_info before that.
   uint8_t remote_mac[6];
-  memcpy(remote_mac, ri->mac, 6);
-  const uint32_t remote_ipv4_addr = ri->ipv4_addr;
-  const uint16_t remote_udp_port = ri->udp_port;
+  memcpy(remote_mac, ri->mac_, 6);
+  const uint32_t remote_ipv4_addr = ri->ipv4_addr_;
+  const uint16_t remote_udp_port = ri->udp_port_;
 
   uint16_t i = kBaseEthUDPPort;
   for (; i < UINT16_MAX; i++) {
     union rte_thash_tuple tuple;
-    tuple.v4.src_addr = resolve_.ipv4_addr;
+    tuple.v4.src_addr = resolve_.ipv4_addr_;
     tuple.v4.dst_addr = remote_ipv4_addr;
     tuple.v4.sport = i;
     tuple.v4.dport = remote_udp_port;
     uint32_t rss_l3l4 = rte_softrss(reinterpret_cast<uint32_t *>(&tuple),
                                     RTE_THASH_V4_L4_LEN, kDefaultRssKey);
-    if ((rss_l3l4 % ri->reta_size) % DpdkTransport::kMaxQueuesPerPort ==
-        ri->rxq_id)
+    if ((rss_l3l4 % ri->reta_size_) % DpdkTransport::kMaxQueuesPerPort ==
+        ri->rxq_id_)
       break;
   }
   rt_assert(i < UINT16_MAX, "Scan error");
@@ -260,10 +260,10 @@ bool DpdkTransport::resolve_remote_routing_info(
   static_assert(kMaxRoutingInfoSize >= kInetHdrsTotSize, "");
 
   auto *eth_hdr = reinterpret_cast<eth_hdr_t *>(ri);
-  gen_eth_header(eth_hdr, &resolve_.mac_addr[0], remote_mac);
+  gen_eth_header(eth_hdr, &resolve_.mac_addr_[0], remote_mac);
 
   auto *ipv4_hdr = reinterpret_cast<ipv4_hdr_t *>(&eth_hdr[1]);
-  gen_ipv4_header(ipv4_hdr, resolve_.ipv4_addr, remote_ipv4_addr, 0);
+  gen_ipv4_header(ipv4_hdr, resolve_.ipv4_addr_, remote_ipv4_addr, 0);
 
   auto *udp_hdr = reinterpret_cast<udp_hdr_t *>(&ipv4_hdr[1]);
   gen_udp_header(udp_hdr, i, remote_udp_port, 0);
@@ -272,17 +272,17 @@ bool DpdkTransport::resolve_remote_routing_info(
 }
 
 /// A dummy memory registration function
-static Transport::MemRegInfo dpdk_reg_mr_wrapper(void *, size_t) {
-  return Transport::MemRegInfo();
+static Transport::mem_reg_info dpdk_reg_mr_wrapper(void *, size_t) {
+  return Transport::mem_reg_info();
 }
 
 /// A dummy memory de-registration function
-static void dpdk_dereg_mr_wrapper(Transport::MemRegInfo) { return; }
+static void dpdk_dereg_mr_wrapper(Transport::mem_reg_info) { return; }
 
 void DpdkTransport::init_mem_reg_funcs() {
   using namespace std::placeholders;
-  reg_mr_func = std::bind(dpdk_reg_mr_wrapper, _1, _2);
-  dereg_mr_func = std::bind(dpdk_dereg_mr_wrapper, _1);
+  reg_mr_func_ = std::bind(dpdk_reg_mr_wrapper, _1, _2);
+  dereg_mr_func_ = std::bind(dpdk_dereg_mr_wrapper, _1);
 }
 }  // namespace erpc
 

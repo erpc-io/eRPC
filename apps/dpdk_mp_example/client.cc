@@ -21,7 +21,7 @@ erpc::MsgBuffer resp_0, resp_1;
 
 void cont_func(void *, void *tag) {
   auto *resp = reinterpret_cast<erpc::MsgBuffer *>(tag);
-  printf("Response: %s\n", reinterpret_cast<char *>(resp->buf));
+  printf("Response: %s\n", reinterpret_cast<char *>(resp->buf_));
 }
 
 void sm_handler(int, erpc::SmEventType, erpc::SmErrType, void *) {}

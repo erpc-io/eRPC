@@ -5,7 +5,7 @@ namespace erpc {
 class RpcSmTest : public RpcTest {
  public:
   RpcSmTest() {
-    rpc->udp_client.enable_recording();  // Record UDP transmissions
+    rpc_->udp_client_.enable_recording();  // Record UDP transmissions
   }
 
   /// A reusable check for session management tests. For the check to pass:
@@ -14,11 +14,11 @@ class RpcSmTest : public RpcTest {
   ///    front must match \p pkt_type and err_type.
   void common_check(size_t num_sessions, SmPktType pkt_type,
                     SmErrType err_type) const {
-    ASSERT_EQ(rpc->session_vec.size(), num_sessions);
-    ASSERT_FALSE(rpc->udp_client.sent_vec.empty());
-    const SmPkt &resp = rpc->udp_client.sent_vec.back();
-    ASSERT_EQ(resp.pkt_type, pkt_type);
-    ASSERT_EQ(resp.err_type, err_type);
+    ASSERT_EQ(rpc_->session_vec_.size(), num_sessions);
+    ASSERT_FALSE(rpc_->udp_client_.sent_vec_.empty());
+    const SmPkt &resp = rpc_->udp_client_.sent_vec_.back();
+    ASSERT_EQ(resp.pkt_type_, pkt_type);
+    ASSERT_EQ(resp.err_type_, err_type);
   }
 
  private:
@@ -35,26 +35,26 @@ TEST_F(RpcSmTest, handle_connect_req_st_reordering) {
                        kTestUniqToken, client, server);
 
   // Process first connect request - session is created
-  rpc->handle_connect_req_st(conn_req);
+  rpc_->handle_connect_req_st(conn_req);
   common_check(1, SmPktType::kConnectResp, SmErrType::kNoError);
 
   // Process connect request again.
   // New session is not created and response is re-sent.
-  rpc->handle_connect_req_st(conn_req);
+  rpc_->handle_connect_req_st(conn_req);
   common_check(1, SmPktType::kConnectResp, SmErrType::kNoError);
 
   // Destroy the session and re-handle connect request.
   // New session is not created and no response is sent.
-  rpc->bury_session_st(rpc->session_vec[0]);
-  rpc->udp_client.sent_vec.clear();
-  rpc->handle_connect_req_st(conn_req);
-  ASSERT_TRUE(rpc->udp_client.sent_vec.empty());
+  rpc_->bury_session_st(rpc_->session_vec_[0]);
+  rpc_->udp_client_.sent_vec_.clear();
+  rpc_->handle_connect_req_st(conn_req);
+  ASSERT_TRUE(rpc_->udp_client_.sent_vec_.empty());
 
   // Delete the client's connect request token and re-handle connect request.
   // New session *is* created and response is re-sent.
-  rpc->conn_req_token_map.clear();
-  rpc->session_vec.clear();
-  rpc->handle_connect_req_st(conn_req);
+  rpc_->conn_req_token_map_.clear();
+  rpc_->session_vec_.clear();
+  rpc_->handle_connect_req_st(conn_req);
   common_check(1, SmPktType::kConnectResp, SmErrType::kNoError);
 }
 
@@ -67,29 +67,29 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
 
   // Transport type mismatch
   SmPkt ttm_conn_req = conn_req;
-  ttm_conn_req.server.transport_type = TransportType::kInvalid;
-  rpc->handle_connect_req_st(ttm_conn_req);
+  ttm_conn_req.server_.transport_type_ = TransportType::kInvalid;
+  rpc_->handle_connect_req_st(ttm_conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kInvalidTransport);
 
   // Ring entries exhausted
-  const size_t initial_ring_entries_available = rpc->ring_entries_available;
-  rpc->ring_entries_available = kSessionCredits - 1;
-  rpc->handle_connect_req_st(conn_req);
+  const size_t initial_ring_entries_available = rpc_->ring_entries_available_;
+  rpc_->ring_entries_available_ = kSessionCredits - 1;
+  rpc_->handle_connect_req_st(conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kRingExhausted);
-  rpc->ring_entries_available = initial_ring_entries_available;  // Restore
+  rpc_->ring_entries_available_ = initial_ring_entries_available;  // Restore
 
   // Ring entries exhausted
-  rpc->ring_entries_available = 0;
-  rpc->handle_connect_req_st(conn_req);
+  rpc_->ring_entries_available_ = 0;
+  rpc_->handle_connect_req_st(conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kRingExhausted);
-  rpc->ring_entries_available = initial_ring_entries_available;
+  rpc_->ring_entries_available_ = initial_ring_entries_available;
 
   // Client routing info resolution fails
-  rpc->fault_inject_fail_resolve_rinfo_st();
-  rpc->handle_connect_req_st(conn_req);
+  rpc_->fault_inject_fail_resolve_rinfo_st();
+  rpc_->handle_connect_req_st(conn_req);
   common_check(0, SmPktType::kConnectResp,
                SmErrType::kRoutingResolutionFailure);
-  rpc->faults.fail_resolve_rinfo = false;  // Restore
+  rpc_->faults_.fail_resolve_rinfo_ = false;  // Restore
 
   // Out of hugepages
   //
@@ -100,19 +100,19 @@ TEST_F(RpcSmTest, handle_connect_req_st_errors) {
   // We hoard hugepages in two steps. First in large chunks for speed, then
   // until MTU-sized pages cannot be allocated.
   while (true) {
-    Buffer buffer = rpc->huge_alloc->alloc_raw(MB(16), DoRegister::kFalse);
-    if (buffer.buf == nullptr) break;
+    Buffer buffer = rpc_->huge_alloc_->alloc_raw(MB(16), DoRegister::kFalse);
+    if (buffer.buf_ == nullptr) break;
   }
 
   while (true) {
-    auto msgbuf = rpc->alloc_msg_buffer(rpc->get_max_data_per_pkt());
-    if (msgbuf.buf == nullptr) break;
+    auto msgbuf = rpc_->alloc_msg_buffer(rpc_->get_max_data_per_pkt());
+    if (msgbuf.buf_ == nullptr) break;
   }
 
-  size_t initial_alloc = rpc->huge_alloc->get_stat_user_alloc_tot();
-  rpc->handle_connect_req_st(conn_req);
+  size_t initial_alloc = rpc_->huge_alloc_->get_stat_user_alloc_tot();
+  rpc_->handle_connect_req_st(conn_req);
   common_check(0, SmPktType::kConnectResp, SmErrType::kOutOfMemory);
-  ASSERT_EQ(initial_alloc, rpc->huge_alloc->get_stat_user_alloc_tot());
+  ASSERT_EQ(initial_alloc, rpc_->huge_alloc_->get_stat_user_alloc_tot());
   // No more tests here because all hugepages are consumed
 }
 
@@ -130,20 +130,20 @@ TEST_F(RpcSmTest, handle_connect_resp_st_reordering) {
   create_client_session_init(client, server);
 
   // Process connect response. Session is connected, server session number saved
-  rpc->handle_connect_resp_st(conn_resp);
-  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnected);
-  ASSERT_EQ(rpc->session_vec[0]->server.session_num, 1);
+  rpc_->handle_connect_resp_st(conn_resp);
+  ASSERT_EQ(rpc_->session_vec_[0]->state_, SessionState::kConnected);
+  ASSERT_EQ(rpc_->session_vec_[0]->server_.session_num_, 1);
 
   // Process connect response again. This gets ignored.
-  rpc->handle_connect_resp_st(conn_resp);
-  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnected);
-  ASSERT_EQ(rpc->session_vec.size(), 1);
+  rpc_->handle_connect_resp_st(conn_resp);
+  ASSERT_EQ(rpc_->session_vec_[0]->state_, SessionState::kConnected);
+  ASSERT_EQ(rpc_->session_vec_.size(), 1);
 
   // Artificially destroy the session. Response gets ignored.
-  Session *clt_session = rpc->session_vec[0];
-  rpc->session_vec[0] = nullptr;
-  rpc->handle_connect_resp_st(conn_resp);  // No crash
-  rpc->session_vec[0] = clt_session;       // Restore
+  Session *clt_session = rpc_->session_vec_[0];
+  rpc_->session_vec_[0] = nullptr;
+  rpc_->handle_connect_resp_st(conn_resp);  // No crash
+  rpc_->session_vec_[0] = clt_session;      // Restore
 }
 
 TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
@@ -157,11 +157,11 @@ TEST_F(RpcSmTest, handle_connect_resp_st_resolve_error) {
 
   // Fail server routing resolution. Disconnect request is sent but session
   // is not destroyed.
-  rpc->fault_inject_fail_resolve_rinfo_st();
-  rpc->handle_connect_resp_st(conn_resp);
+  rpc_->fault_inject_fail_resolve_rinfo_st();
+  rpc_->handle_connect_resp_st(conn_resp);
   common_check(1, SmPktType::kDisconnectReq, SmErrType::kNoError);
-  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kDisconnectInProgress);
-  ASSERT_NE(rpc->session_vec[0], nullptr);
+  ASSERT_EQ(rpc_->session_vec_[0]->state_, SessionState::kDisconnectInProgress);
+  ASSERT_NE(rpc_->session_vec_[0], nullptr);
 }
 
 TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
@@ -174,9 +174,10 @@ TEST_F(RpcSmTest, handle_connect_resp_st_response_error) {
   create_client_session_init(client, server);
 
   // Process response with error. Session is destroyed and ring buffers released
-  rpc->handle_connect_resp_st(conn_resp);
-  ASSERT_EQ(rpc->session_vec[0], nullptr);
-  ASSERT_TRUE(rpc->ring_entries_available == rpc->transport->kNumRxRingEntries);
+  rpc_->handle_connect_resp_st(conn_resp);
+  ASSERT_EQ(rpc_->session_vec_[0], nullptr);
+  ASSERT_TRUE(rpc_->ring_entries_available_ ==
+              rpc_->transport_->kNumRxRingEntries);
   // No more tests here because session is destroyed
 }
 
@@ -194,15 +195,16 @@ TEST_F(RpcSmTest, handle_disconnect_req_st) {
 
   // Process first disconnect request
   // Session is destroyed, resources released, & response sent.
-  const size_t initial_alloc = rpc->huge_alloc->get_stat_user_alloc_tot();
-  rpc->handle_disconnect_req_st(disc_req);
+  const size_t initial_alloc = rpc_->huge_alloc_->get_stat_user_alloc_tot();
+  rpc_->handle_disconnect_req_st(disc_req);
   common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
-  ASSERT_EQ(rpc->session_vec[0], nullptr);
-  ASSERT_LT(rpc->huge_alloc->get_stat_user_alloc_tot(), initial_alloc);
-  ASSERT_TRUE(rpc->ring_entries_available == rpc->transport->kNumRxRingEntries);
+  ASSERT_EQ(rpc_->session_vec_[0], nullptr);
+  ASSERT_LT(rpc_->huge_alloc_->get_stat_user_alloc_tot(), initial_alloc);
+  ASSERT_TRUE(rpc_->ring_entries_available_ ==
+              rpc_->transport_->kNumRxRingEntries);
 
   // Process disconnect request again. Response is re-sent.
-  rpc->handle_disconnect_req_st(disc_req);
+  rpc_->handle_disconnect_req_st(disc_req);
   common_check(1, SmPktType::kDisconnectResp, SmErrType::kNoError);
 }
 
@@ -217,16 +219,17 @@ TEST_F(RpcSmTest, handle_disconnect_resp_st) {
 
   // Make session 0 a client session in kDisconnectInProgress
   create_client_session_init(client, server);  // In kConnectInProgress for now
-  rpc->session_vec[0]->state = SessionState::kDisconnectInProgress;
-  rpc->session_vec[0]->server.session_num = server.session_num;
+  rpc_->session_vec_[0]->state_ = SessionState::kDisconnectInProgress;
+  rpc_->session_vec_[0]->server_.session_num_ = server.session_num_;
 
   // Process first disconnect response
-  rpc->handle_disconnect_resp_st(disc_resp);
-  ASSERT_EQ(rpc->session_vec[0], nullptr);
-  ASSERT_TRUE(rpc->ring_entries_available == rpc->transport->kNumRxRingEntries);
+  rpc_->handle_disconnect_resp_st(disc_resp);
+  ASSERT_EQ(rpc_->session_vec_[0], nullptr);
+  ASSERT_TRUE(rpc_->ring_entries_available_ ==
+              rpc_->transport_->kNumRxRingEntries);
 
   // Process disconnect request again. This gets ignored.
-  rpc->handle_disconnect_resp_st(disc_resp);
+  rpc_->handle_disconnect_resp_st(disc_resp);
 }
 
 //
@@ -234,13 +237,13 @@ TEST_F(RpcSmTest, handle_disconnect_resp_st) {
 //
 TEST_F(RpcSmTest, create_session_st) {
   // Correct args
-  int session_num = rpc->create_session("localhost:31850", kTestRpcId + 1);
+  int session_num = rpc_->create_session("localhost:31850", kTestRpcId + 1);
   ASSERT_EQ(session_num, 0);
   common_check(1, SmPktType::kConnectReq, SmErrType::kNoError);
-  ASSERT_EQ(rpc->session_vec[0]->state, SessionState::kConnectInProgress);
+  ASSERT_EQ(rpc_->session_vec_[0]->state_, SessionState::kConnectInProgress);
 
   // Try to create session to self
-  session_num = rpc->create_session("localhost:31850", kTestRpcId);
+  session_num = rpc_->create_session("localhost:31850", kTestRpcId);
   ASSERT_LT(session_num, 0);
 }
 

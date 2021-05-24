@@ -171,36 +171,36 @@ static std::string sm_event_type_str(SmEventType event_type) {
 /// Basic metadata about a session end point, sent in session management packets
 class SessionEndpoint {
  public:
-  TransportType transport_type;
-  char hostname[kMaxHostnameLen];  ///< DNS-resolvable hostname
-  uint16_t sm_udp_port;            ///< Management UDP port
-  uint8_t rpc_id;                  ///< ID of the owner
-  uint16_t session_num;  ///< The session number of this endpoint in its Rpc
-  Transport::RoutingInfo routing_info;  ///< Endpoint's routing info
+  TransportType transport_type_;
+  char hostname_[kMaxHostnameLen];  ///< DNS-resolvable hostname
+  uint16_t sm_udp_port_;            ///< Management UDP port
+  uint8_t rpc_id_;                  ///< ID of the owner
+  uint16_t session_num_;  ///< The session number of this endpoint in its Rpc
+  Transport::routing_info routing_info_;  ///< Endpoint's routing info
 
   SessionEndpoint() {
-    memset(static_cast<void *>(hostname), 0, sizeof(hostname));
-    sm_udp_port = 0;  // UDP port 0 is naturally invalid
-    rpc_id = kInvalidRpcId;
-    session_num = kInvalidSessionNum;
-    memset(static_cast<void *>(&routing_info), 0, sizeof(routing_info));
+    memset(static_cast<void *>(hostname_), 0, sizeof(hostname_));
+    sm_udp_port_ = 0;  // UDP port 0 is naturally invalid
+    rpc_id_ = kInvalidRpcId;
+    session_num_ = kInvalidSessionNum;
+    memset(static_cast<void *>(&routing_info_), 0, sizeof(routing_info_));
   }
 
   /// Return this endpoint's URI
   std::string uri() const {
-    return std::string(hostname) + ":" + std::to_string(sm_udp_port);
+    return std::string(hostname_) + ":" + std::to_string(sm_udp_port_);
   }
 
   /// Return a string with a name for this session endpoint, containing
   /// its hostname, Rpc ID, and the session number.
   inline std::string name() const {
     std::ostringstream ret;
-    std::string session_num_str = (session_num == kInvalidSessionNum)
+    std::string session_num_str = (session_num_ == kInvalidSessionNum)
                                       ? "XX"
-                                      : std::to_string(session_num);
+                                      : std::to_string(session_num_);
 
-    ret << "[H: " << trim_hostname(hostname) << ":"
-        << std::to_string(sm_udp_port) << ", R: " << std::to_string(rpc_id)
+    ret << "[H: " << trim_hostname(hostname_) << ":"
+        << std::to_string(sm_udp_port_) << ", R: " << std::to_string(rpc_id_)
         << ", S: " << session_num_str << "]";
     return ret.str();
   }
@@ -208,8 +208,8 @@ class SessionEndpoint {
   /// Return a string with the name of the Rpc hosting this session endpoint.
   inline std::string rpc_name() const {
     std::ostringstream ret;
-    ret << "[H: " << trim_hostname(hostname) << ":"
-        << std::to_string(sm_udp_port) << ", R: " << std::to_string(rpc_id)
+    ret << "[H: " << trim_hostname(hostname_) << ":"
+        << std::to_string(sm_udp_port_) << ", R: " << std::to_string(rpc_id_)
         << "]";
     return ret.str();
   }
@@ -217,10 +217,10 @@ class SessionEndpoint {
   /// Compare two endpoints. RoutingInfo is left out because the SessionEndpoint
   /// object in session managament packets may not have routing info.
   bool operator==(const SessionEndpoint &other) const {
-    return transport_type == other.transport_type &&
-           strcmp(hostname, other.hostname) == 0 &&
-           sm_udp_port == other.sm_udp_port && rpc_id == other.rpc_id &&
-           session_num == other.session_num;
+    return transport_type_ == other.transport_type_ &&
+           strcmp(hostname_, other.hostname_) == 0 &&
+           sm_udp_port_ == other.sm_udp_port_ && rpc_id_ == other.rpc_id_ &&
+           session_num_ == other.session_num_;
   }
 };
 
@@ -228,15 +228,15 @@ class SessionEndpoint {
 /// servers. This is pretty large (~500 bytes), so use sparingly.
 class SmPkt {
  public:
-  SmPktType pkt_type;
-  SmErrType err_type;                ///< Error type, for responses only
-  conn_req_uniq_token_t uniq_token;  ///< The token for this session
-  SessionEndpoint client, server;    ///< Endpoint metadata
+  SmPktType pkt_type_;
+  SmErrType err_type_;                ///< Error type, for responses only
+  conn_req_uniq_token_t uniq_token_;  ///< The token for this session
+  SessionEndpoint client_, server_;   ///< Endpoint metadata
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << sm_pkt_type_str(pkt_type) << ", " << sm_err_type_str(err_type)
-        << ", client: " << client.name() << ", server: " << server.name();
+    ret << sm_pkt_type_str(pkt_type_) << ", " << sm_err_type_str(err_type_)
+        << ", client: " << client_.name() << ", server: " << server_.name();
     return ret.str();
   }
 
@@ -244,27 +244,27 @@ class SmPkt {
   SmPkt(SmPktType pkt_type, SmErrType err_type,
         conn_req_uniq_token_t uniq_token, SessionEndpoint client,
         SessionEndpoint server)
-      : pkt_type(pkt_type),
-        err_type(err_type),
-        uniq_token(uniq_token),
-        client(client),
-        server(server) {}
+      : pkt_type_(pkt_type),
+        err_type_(err_type),
+        uniq_token_(uniq_token),
+        client_(client),
+        server_(server) {}
 
   // The response to a ping is the same packet but with packet type switched
   static SmPkt make_ping_resp(const SmPkt &ping_req) {
     SmPkt ping_resp = ping_req;
-    ping_resp.pkt_type = SmPktType::kPingResp;
+    ping_resp.pkt_type_ = SmPktType::kPingResp;
     return ping_resp;
   }
 
-  bool is_req() const { return sm_pkt_type_is_req(pkt_type); }
+  bool is_req() const { return sm_pkt_type_is_req(pkt_type_); }
   bool is_resp() const { return !is_req(); }
 };
 
 static SmPkt sm_construct_resp(const SmPkt &req_sm_pkt, SmErrType err_type) {
   SmPkt resp_sm_pkt = req_sm_pkt;
-  resp_sm_pkt.pkt_type = sm_pkt_type_req_to_resp(req_sm_pkt.pkt_type);
-  resp_sm_pkt.err_type = err_type;
+  resp_sm_pkt.pkt_type_ = sm_pkt_type_req_to_resp(req_sm_pkt.pkt_type_);
+  resp_sm_pkt.err_type_ = err_type;
   return resp_sm_pkt;
 }
 
@@ -275,21 +275,21 @@ class SmWorkItem {
 
  public:
   SmWorkItem(uint8_t rpc_id, SmPkt sm_pkt)
-      : reset(Reset::kFalse), rpc_id(rpc_id), sm_pkt(sm_pkt) {}
+      : reset_(Reset::kFalse), rpc_id_(rpc_id), sm_pkt_(sm_pkt) {}
 
   SmWorkItem(std::string reset_rem_hostname)
-      : reset(Reset::kTrue),
-        rpc_id(kInvalidRpcId),
-        reset_rem_hostname(reset_rem_hostname) {}
+      : reset_(Reset::kTrue),
+        rpc_id_(kInvalidRpcId),
+        reset_rem_hostname_(reset_rem_hostname) {}
 
-  bool is_reset() const { return reset == Reset::kTrue; }
+  bool is_reset() const { return reset_ == Reset::kTrue; }
 
-  const Reset reset;     ///< Is this work item a reset?
-  const uint8_t rpc_id;  ///< The local Rpc ID, invalid for reset work items
+  const Reset reset_;     ///< Is this work item a reset?
+  const uint8_t rpc_id_;  ///< The local Rpc ID, invalid for reset work items
 
-  SmPkt sm_pkt;  ///< The session management packet, for non-reset work items
+  SmPkt sm_pkt_;  ///< The session management packet, for non-reset work items
 
   /// The remote hostname to reset, valid for reset work items
-  std::string reset_rem_hostname;
+  std::string reset_rem_hostname_;
 };
 }  // namespace erpc

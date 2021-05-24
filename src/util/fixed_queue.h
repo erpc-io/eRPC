@@ -20,31 +20,31 @@ class FixedQueue {
   ~FixedQueue() {}
 
   inline void push(T t) {
-    if (queue.size() == N) queue.pop();
-    queue.push(t);
+    if (queue_.size() == N) queue_.pop();
+    queue_.push(t);
   }
 
   inline T pop() {
-    rt_assert(queue.size() != 0, "Cannot pop empty queue");
-    T ret = queue.front();
-    queue.pop();
+    rt_assert(queue_.size() != 0, "Cannot pop empty queue");
+    T ret = queue_.front();
+    queue_.pop();
     return ret;
   }
 
   /// Clear the queue
   inline void clear() {
     std::queue<T> empty;
-    std::swap(queue, empty);
+    std::swap(queue_, empty);
   }
 
   /// Return the number of elements currently in the queue
-  inline size_t size() { return queue.size(); }
+  inline size_t size() { return queue_.size(); }
 
   /// Return the maximum capacity of the FixedQueue
   inline size_t capacity() { return N; }
 
  private:
-  std::queue<T> queue;
+  std::queue<T> queue_;
 };
 
 }  // namespace erpc

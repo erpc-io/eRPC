@@ -12,11 +12,11 @@ void sm_handler(int, erpc::SmEventType, erpc::SmErrType, void *) {}
 erpc::Rpc<erpc::CTransport> *rpc;
 
 void req_handler(erpc::ReqHandle *req_handle, void *) {
-  auto &resp = req_handle->pre_resp_msgbuf;
+  auto &resp = req_handle->pre_resp_msgbuf_;
   const std::string resp_str = "Hello from server " + FLAGS_server_name + ":" +
                                std::to_string(FLAGS_server_port);
   rpc->resize_msg_buffer(&resp, resp_str.length() + 1);
-  snprintf(reinterpret_cast<char *>(resp.buf), resp_str.size() + 1, "%s",
+  snprintf(reinterpret_cast<char *>(resp.buf_), resp_str.size() + 1, "%s",
            resp_str.c_str());
 
   rpc->enqueue_response(req_handle, &resp);

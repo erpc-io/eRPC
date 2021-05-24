@@ -60,9 +60,9 @@ class Nexus {
 
     static inline BgWorkItem make_req_item(void *context, SSlot *sslot) {
       BgWorkItem ret;
-      ret.wi_type = BgWorkItemType::kReq;
-      ret.context = context;
-      ret.sslot = sslot;
+      ret.wi_type_ = BgWorkItemType::kReq;
+      ret.context_ = context;
+      ret.sslot_ = sslot;
       return ret;
     }
 
@@ -70,39 +70,39 @@ class Nexus {
                                             erpc_cont_func_t cont_func,
                                             void *tag) {
       BgWorkItem ret;
-      ret.wi_type = BgWorkItemType::kResp;
-      ret.context = context;
-      ret.cont_func = cont_func;
-      ret.tag = tag;
+      ret.wi_type_ = BgWorkItemType::kResp;
+      ret.context_ = context;
+      ret.cont_func_ = cont_func;
+      ret.tag_ = tag;
       return ret;
     }
 
-    BgWorkItemType wi_type;
-    void *context;  ///< The Rpc's context
+    BgWorkItemType wi_type_;
+    void *context_;  ///< The Rpc's context
 
     // Fields for request handlers. For request handlers, we still have
     // ownership of the request slot, so we can hold it until enqueue_response.
-    SSlot *sslot;
+    SSlot *sslot_;
 
     // Fields for continuations. For continuations, we have lost ownership of
     // the request slot, so the work item contains all needed info by value.
-    erpc_cont_func_t cont_func;
-    void *tag;
+    erpc_cont_func_t cont_func_;
+    void *tag_;
 
-    bool is_req() const { return wi_type == BgWorkItemType::kReq; }
+    bool is_req() const { return wi_type_ == BgWorkItemType::kReq; }
   };
 
   /// A hook created by an Rpc thread, and shared with the Nexus
   class Hook {
    public:
-    uint8_t rpc_id;  ///< ID of the Rpc that created this hook
+    uint8_t rpc_id_;  ///< ID of the Rpc that created this hook
 
     /// Background thread request queues, installed by the Nexus
-    MtQueue<BgWorkItem> *bg_req_queue_arr[kMaxBgThreads] = {nullptr};
+    MtQueue<BgWorkItem> *bg_req_queue_arr_[kMaxBgThreads] = {nullptr};
 
     /// The Rpc thread's session management RX queue, installed by the Rpc.
     /// Work items from the SM thread for this Rpc are queued here.
-    MtQueue<SmWorkItem> sm_rx_queue;
+    MtQueue<SmWorkItem> sm_rx_queue_;
   };
 
   /// Check if a hook with for rpc_id exists in this Nexus. The caller must not
@@ -118,34 +118,34 @@ class Nexus {
   /// Background thread context
   class BgThreadCtx {
    public:
-    volatile bool *kill_switch;  ///< The Nexus's kill switch
+    volatile bool *kill_switch_;  ///< The Nexus's kill switch
 
     /// The Nexus's request functions array. Unlike Rpc threads that create a
     /// copy of the Nexus's request functions, background threads have a
     /// pointer. This is because background threads are launched before request
     /// functions are registered.
-    std::array<ReqFunc, kReqTypeArraySize> *req_func_arr;
+    std::array<ReqFunc, kReqTypeArraySize> *req_func_arr_;
 
-    TlsRegistry *tls_registry;          ///< The Nexus's thread-local registry
-    size_t bg_thread_index;             ///< Index of this background thread
-    MtQueue<BgWorkItem> *bg_req_queue;  ///< Background thread request queue
+    TlsRegistry *tls_registry_;          ///< The Nexus's thread-local registry
+    size_t bg_thread_index_;             ///< Index of this background thread
+    MtQueue<BgWorkItem> *bg_req_queue_;  ///< Background thread request queue
   };
 
   /// Session management thread context
   class SmThreadCtx {
    public:
     // Installed by the Nexus
-    std::string hostname;  ///< User-provided hostname of this node
-    uint16_t sm_udp_port;  ///< The Nexus's session management port
-    double freq_ghz;       ///< RDTSC frequency
+    std::string hostname_;  ///< User-provided hostname of this node
+    uint16_t sm_udp_port_;  ///< The Nexus's session management port
+    double freq_ghz_;       ///< RDTSC frequency
 
     /// The kill switch installed by the Nexus. When this becomes true, the SM
     /// thread should terminate itself.
-    volatile bool *kill_switch;
+    volatile bool *kill_switch_;
 
-    HeartbeatMgr *heartbeat_mgr;    ///< The Nexus's heartbeat manager
-    volatile Hook **reg_hooks_arr;  ///< The Nexus's hooks array
-    std::mutex *reg_hooks_lock;
+    HeartbeatMgr *heartbeat_mgr_;    ///< The Nexus's heartbeat manager
+    volatile Hook **reg_hooks_arr_;  ///< The Nexus's hooks array
+    std::mutex *reg_hooks_lock_;
   };
 
   /// The background thread
@@ -155,30 +155,30 @@ class Nexus {
   static void sm_thread_func(SmThreadCtx ctx);
 
   /// Read-mostly members exposed to Rpc threads
-  const double freq_ghz;        ///< TSC frequncy
-  const std::string hostname;   ///< The local host
-  const uint16_t sm_udp_port;   ///< UDP port for session management
-  const size_t numa_node;       ///< The NUMA node for this process
-  const size_t num_bg_threads;  ///< Background threads to process Rpc reqs
-  TlsRegistry tls_registry;     ///< A thread-local registry
+  const double freq_ghz_;        ///< TSC frequncy
+  const std::string hostname_;   ///< The local host
+  const uint16_t sm_udp_port_;   ///< UDP port for session management
+  const size_t numa_node_;       ///< The NUMA node for this process
+  const size_t num_bg_threads_;  ///< Background threads to process Rpc reqs
+  TlsRegistry tls_registry_;     ///< A thread-local registry
 
   /// The ground truth for registered request functions
-  std::array<ReqFunc, kReqTypeArraySize> req_func_arr;
-  const uint8_t pad[64] = {0};  ///< Separate read-write members from read-only
+  std::array<ReqFunc, kReqTypeArraySize> req_func_arr_;
+  const uint8_t pad_[64] = {0};  ///< Separate read-write members from read-only
 
   /// Request function registration is disallowed after any Rpc registers with
   /// the Nexus and gets a copy of req_func_arr
-  bool req_func_registration_allowed = true;
+  bool req_func_registration_allowed_ = true;
 
   /// Rpc-Nexus hooks. All non-null hooks are valid.
-  Hook *reg_hooks_arr[kMaxRpcId + 1] = {nullptr};
-  std::mutex reg_hooks_lock;  ///< Lock for concurrent access to the hooks array
+  Hook *reg_hooks_arr_[kMaxRpcId + 1] = {nullptr};
+  std::mutex reg_hooks_lock_;  ///< Lock for concurrent access to the hooks array
 
-  HeartbeatMgr heartbeat_mgr;  ///< The heartbeat manager
-  volatile bool kill_switch;   ///< Used to turn off SM and background threads
+  HeartbeatMgr heartbeat_mgr_;  ///< The heartbeat manager
+  volatile bool kill_switch_;   ///< Used to turn off SM and background threads
 
-  std::thread sm_thread;  ///< The session management thread
-  MtQueue<BgWorkItem> bg_req_queue[kMaxBgThreads];  ///< Background req queues
-  std::thread bg_thread_arr[kMaxBgThreads];  ///< Background thread context
+  std::thread sm_thread_;  ///< The session management thread
+  MtQueue<BgWorkItem> bg_req_queue_[kMaxBgThreads];  ///< Background req queues
+  std::thread bg_thread_arr_[kMaxBgThreads];  ///< Background thread context
 };
 }  // namespace erpc

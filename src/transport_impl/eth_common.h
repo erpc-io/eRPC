@@ -53,58 +53,58 @@ static std::string ipv4_to_string(uint32_t ipv4_addr) {
 }
 
 struct eth_hdr_t {
-  uint8_t dst_mac[6];
-  uint8_t src_mac[6];
-  uint16_t eth_type;
+  uint8_t dst_mac_[6];
+  uint8_t src_mac_[6];
+  uint16_t eth_type_;
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[ETH: dst " << mac_to_string(dst_mac) << ", src "
-        << mac_to_string(src_mac) << ", eth_type "
-        << std::to_string(ntohs(eth_type)) << "]";
+    ret << "[ETH: dst " << mac_to_string(dst_mac_) << ", src "
+        << mac_to_string(src_mac_) << ", eth_type "
+        << std::to_string(ntohs(eth_type_)) << "]";
     return ret.str();
   }
 } __attribute__((packed));
 
 struct ipv4_hdr_t {
-  uint8_t ihl : 4;
-  uint8_t version : 4;
-  uint8_t ecn : 2;
-  uint8_t dscp : 6;
-  uint16_t tot_len;
-  uint16_t id;
-  uint16_t frag_off;
-  uint8_t ttl;
-  uint8_t protocol;
-  uint16_t check;
-  uint32_t src_ip;
-  uint32_t dst_ip;
+  uint8_t ihl_ : 4;
+  uint8_t version_ : 4;
+  uint8_t ecn_ : 2;
+  uint8_t dscp_ : 6;
+  uint16_t tot_len_;
+  uint16_t id_;
+  uint16_t frag_off_;
+  uint8_t ttl_;
+  uint8_t protocol_;
+  uint16_t check_;
+  uint32_t src_ip_;
+  uint32_t dst_ip_;
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[IPv4: ihl " << std::to_string(ihl) << ", version "
-        << std::to_string(version) << ", ecn " << std::to_string(ecn)
-        << ", tot_len " << std::to_string(ntohs(tot_len)) << ", id "
-        << std::to_string(ntohs(id)) << ", frag_off "
-        << std::to_string(ntohs(frag_off)) << ", ttl " << std::to_string(ttl)
-        << ", protocol " << std::to_string(protocol) << ", check "
-        << std::to_string(check) << ", src IP " << ipv4_to_string(src_ip)
-        << ", dst IP " << ipv4_to_string(dst_ip) << "]";
+    ret << "[IPv4: ihl " << std::to_string(ihl_) << ", version "
+        << std::to_string(version_) << ", ecn " << std::to_string(ecn_)
+        << ", tot_len " << std::to_string(ntohs(tot_len_)) << ", id "
+        << std::to_string(ntohs(id_)) << ", frag_off "
+        << std::to_string(ntohs(frag_off_)) << ", ttl " << std::to_string(ttl_)
+        << ", protocol " << std::to_string(protocol_) << ", check "
+        << std::to_string(check_) << ", src IP " << ipv4_to_string(src_ip_)
+        << ", dst IP " << ipv4_to_string(dst_ip_) << "]";
     return ret.str();
   }
 } __attribute__((packed));
 
 struct udp_hdr_t {
-  uint16_t src_port;
-  uint16_t dst_port;
-  uint16_t len;
-  uint16_t check;
+  uint16_t src_port_;
+  uint16_t dst_port_;
+  uint16_t len_;
+  uint16_t check_;
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[UDP: src_port " << std::to_string(ntohs(src_port)) << ", dst_port "
-        << std::to_string(ntohs(dst_port)) << ", len "
-        << std::to_string(ntohs(len)) << ", check " << std::to_string(check)
+    ret << "[UDP: src_port " << std::to_string(ntohs(src_port_)) << ", dst_port "
+        << std::to_string(ntohs(dst_port_)) << ", len "
+        << std::to_string(ntohs(len_)) << ", check " << std::to_string(check_)
         << "]";
     return ret.str();
   }
@@ -118,21 +118,21 @@ static_assert(kInetHdrsTotSize == 42, "");
 /// address is in the byte order retrived from the driver. The IPv4 address and
 /// UDP port are in host-byte order.
 struct eth_routing_info_t {
-  uint8_t mac[6];
-  uint32_t ipv4_addr;            // The IPv4 address for this endpoint
-  uint16_t udp_port;             // The UDP port this endpoint listens on
-  uint16_t rxq_id = UINT16_MAX;  // The NIC RX queue ID this endpoint listens on
+  uint8_t mac_[6];
+  uint32_t ipv4_addr_;            // The IPv4 address for this endpoint
+  uint16_t udp_port_;             // The UDP port this endpoint listens on
+  uint16_t rxq_id_ = UINT16_MAX;  // The NIC RX queue ID this endpoint listens on
 
   // Number of entries in this endpoint's NIC RSS indirection table
-  uint16_t reta_size = UINT16_MAX;
+  uint16_t reta_size_ = UINT16_MAX;
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[MAC " << mac_to_string(mac) << ", IP " << ipv4_to_string(ipv4_addr)
-        << ", UDP port " << std::to_string(udp_port) << ", RQ queue ID "
-        << (rxq_id == UINT16_MAX ? " N/A " : std::to_string(rxq_id))
+    ret << "[MAC " << mac_to_string(mac_) << ", IP " << ipv4_to_string(ipv4_addr_)
+        << ", UDP port " << std::to_string(udp_port_) << ", RQ queue ID "
+        << (rxq_id_ == UINT16_MAX ? " N/A " : std::to_string(rxq_id_))
         << ", RETA size "
-        << ((reta_size == UINT16_MAX) ? " N/A" : std::to_string(reta_size))
+        << ((reta_size_ == UINT16_MAX) ? " N/A" : std::to_string(reta_size_))
         << "]";
 
     return std::string(ret.str());
@@ -152,27 +152,27 @@ static std::string frame_header_to_string(uint8_t* buf) {
 
 static void gen_eth_header(eth_hdr_t* eth_header, const uint8_t* src_mac,
                            const uint8_t* dst_mac) {
-  memcpy(eth_header->src_mac, src_mac, 6);
-  memcpy(eth_header->dst_mac, dst_mac, 6);
-  eth_header->eth_type = htons(kIPEtherType);
+  memcpy(eth_header->src_mac_, src_mac, 6);
+  memcpy(eth_header->dst_mac_, dst_mac, 6);
+  eth_header->eth_type_ = htons(kIPEtherType);
 }
 
 /// Format the IPv4 header for a UDP packet. All value arguments are in
 /// host-byte order. \p data_size is the data payload size in the UDP packet.
 static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
                             uint32_t dst_ip, uint16_t data_size) {
-  ipv4_hdr->version = 4;
-  ipv4_hdr->ihl = 5;
-  ipv4_hdr->ecn = 1;  // ECT => ECN-capable transport
-  ipv4_hdr->dscp = 0;
-  ipv4_hdr->tot_len = htons(sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t) + data_size);
-  ipv4_hdr->id = htons(0);
-  ipv4_hdr->frag_off = htons(0);
-  ipv4_hdr->ttl = 128;
-  ipv4_hdr->protocol = kIPHdrProtocol;
-  ipv4_hdr->src_ip = htonl(src_ip);
-  ipv4_hdr->dst_ip = htonl(dst_ip);
-  ipv4_hdr->check = 0;
+  ipv4_hdr->version_ = 4;
+  ipv4_hdr->ihl_ = 5;
+  ipv4_hdr->ecn_ = 1;  // ECT => ECN-capable transport
+  ipv4_hdr->dscp_ = 0;
+  ipv4_hdr->tot_len_ = htons(sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t) + data_size);
+  ipv4_hdr->id_ = htons(0);
+  ipv4_hdr->frag_off_ = htons(0);
+  ipv4_hdr->ttl_ = 128;
+  ipv4_hdr->protocol_ = kIPHdrProtocol;
+  ipv4_hdr->src_ip_ = htonl(src_ip);
+  ipv4_hdr->dst_ip_ = htonl(dst_ip);
+  ipv4_hdr->check_ = 0;
 }
 
 // Compute IP header checksum (copied from DPDK testpmd)
@@ -200,10 +200,10 @@ static uint16_t get_ipv4_checksum(const ipv4_hdr_t* ipv4_hdr) {
 /// host-byte order. \p data_size is the data payload size in the UDP packet.
 static void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
                            uint16_t dst_port, uint16_t data_size) {
-  udp_hdr->src_port = htons(src_port);
-  udp_hdr->dst_port = htons(dst_port);
-  udp_hdr->len = htons(sizeof(udp_hdr_t) + data_size);
-  udp_hdr->check = 0;
+  udp_hdr->src_port_ = htons(src_port);
+  udp_hdr->dst_port_ = htons(dst_port);
+  udp_hdr->len_ = htons(sizeof(udp_hdr_t) + data_size);
+  udp_hdr->check_ = 0;
 }
 
 /// Return the IPv4 address of a kernel-visible interface in host-byte order

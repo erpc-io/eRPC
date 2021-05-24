@@ -5,14 +5,14 @@ std::atomic<size_t> num_processes_ready;
 void req_handler(erpc::ReqHandle *req_handle, void *_c) {
   auto *c = reinterpret_cast<BasicAppContext *>(_c);
 
-  auto &resp = req_handle->pre_resp_msgbuf;
-  c->rpc->resize_msg_buffer(&resp, sizeof(size_t));
-  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
+  auto &resp = req_handle->pre_resp_msgbuf_;
+  c->rpc_->resize_msg_buffer(&resp, sizeof(size_t));
+  c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
 void cont_func(void *_c, void *) {
   auto *c = static_cast<BasicAppContext *>(_c);
-  c->num_rpc_resps++;
+  c->num_rpc_resps_++;
 }
 
 // This threads acts as a process with a Nexus
@@ -23,7 +23,7 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
 
   BasicAppContext c;
   Rpc<CTransport> rpc(&nexus, &c, 0, basic_sm_handler);
-  c.rpc = &rpc;
+  c.rpc_ = &rpc;
 
   // Barrier
   num_processes_ready++;
@@ -31,33 +31,33 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
     // Wait for Rpc objects to be registered with their Nexus
   }
 
-  c.session_num_arr = new int[num_processes];
-  c.req_msgbufs.resize(num_processes);
-  c.resp_msgbufs.resize(num_processes);
+  c.session_num_arr_ = new int[num_processes];
+  c.req_msgbufs_.resize(num_processes);
+  c.resp_msgbufs_.resize(num_processes);
   for (size_t i = 0; i < num_processes; i++) {
     if (i == process_id) continue;
 
     auto remote_uri = "localhost:" + std::to_string(kBaseSmUdpPort + i);
-    c.session_num_arr[i] = c.rpc->create_session(remote_uri, 0);
+    c.session_num_arr_[i] = c.rpc_->create_session(remote_uri, 0);
 
-    c.req_msgbufs[i] = c.rpc->alloc_msg_buffer_or_die(sizeof(size_t));
-    c.resp_msgbufs[i] = c.rpc->alloc_msg_buffer_or_die(sizeof(size_t));
+    c.req_msgbufs_[i] = c.rpc_->alloc_msg_buffer_or_die(sizeof(size_t));
+    c.resp_msgbufs_[i] = c.rpc_->alloc_msg_buffer_or_die(sizeof(size_t));
   }
 
   wait_for_sm_resps_or_timeout(c, num_processes - 1);
-  assert(c.num_sm_resps == num_processes - 1);
+  assert(c.num_sm_resps_ == num_processes - 1);
   printf("Process %zu: All sessions connected\n", process_id);
 
   for (size_t i = 0; i < num_processes; i++) {
     if (i == process_id) continue;
 
-    c.rpc->enqueue_request(c.session_num_arr[i], kTestReqType,
-                           &c.req_msgbufs[i], &c.resp_msgbufs[i], cont_func,
+    c.rpc_->enqueue_request(c.session_num_arr_[i], kTestReqType,
+                           &c.req_msgbufs_[i], &c.resp_msgbufs_[i], cont_func,
                            nullptr);
   }
 
   wait_for_rpc_resps_or_timeout(c, num_processes - 1);
-  assert(c.num_rpc_resps == num_processes - 1);
+  assert(c.num_rpc_resps_ == num_processes - 1);
 }
 
 TEST(MultiProcessTest, TwoProcesses) {

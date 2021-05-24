@@ -7,23 +7,23 @@ namespace erpc {
 HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
                      Transport::reg_mr_func_t reg_mr_func,
                      Transport::dereg_mr_func_t dereg_mr_func)
-    : numa_node(numa_node),
-      reg_mr_func(reg_mr_func),
-      dereg_mr_func(dereg_mr_func) {
+    : numa_node_(numa_node),
+      reg_mr_func_(reg_mr_func),
+      dereg_mr_func_(dereg_mr_func) {
   assert(numa_node <= kMaxNumaNodes);
 
-  if (initial_size < kMaxClassSize) initial_size = kMaxClassSize;
-  prev_allocation_size = initial_size;
+  if (initial_size < k_max_class_size) initial_size = k_max_class_size;
+  prev_allocation_size_ = initial_size;
 }
 
 HugeAlloc::~HugeAlloc() {
   // Deregister and detach the created SHM regions
-  for (shm_region_t &shm_region : shm_list) {
-    if (shm_region.registered) dereg_mr_func(shm_region.mem_reg_info);
-    int ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_region.buf)));
+  for (shm_region_t &shm_region : shm_list_) {
+    if (shm_region.registered_) dereg_mr_func_(shm_region.mem_reg_info_);
+    int ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_region.buf_)));
     if (ret != 0) {
       fprintf(stderr, "HugeAlloc: Error freeing SHM buf for key %d.\n",
-              shm_region.shm_key);
+              shm_region.shm_key_);
       exit(-1);
     }
   }
@@ -32,29 +32,29 @@ HugeAlloc::~HugeAlloc() {
 void HugeAlloc::print_stats() {
   fprintf(stderr, "eRPC HugeAlloc stats:\n");
   fprintf(stderr, "Total reserved SHM = %zu bytes (%.2f MB)\n",
-          stats.shm_reserved, 1.0 * stats.shm_reserved / MB(1));
+          stats_.shm_reserved_, 1.0 * stats_.shm_reserved_ / MB(1));
   fprintf(stderr, "Total memory allocated to user = %zu bytes (%.2f MB)\n",
-          stats.user_alloc_tot, 1.0 * stats.user_alloc_tot / MB(1));
+          stats_.user_alloc_tot_, 1.0 * stats_.user_alloc_tot_ / MB(1));
 
-  fprintf(stderr, "%zu SHM regions\n", shm_list.size());
+  fprintf(stderr, "%zu SHM regions\n", shm_list_.size());
   size_t shm_region_index = 0;
-  for (shm_region_t &shm_region : shm_list) {
+  for (shm_region_t &shm_region : shm_list_) {
     fprintf(stderr, "Region %zu, size %zu MB\n", shm_region_index,
-            shm_region.size / MB(1));
+            shm_region.size_ / MB(1));
     shm_region_index++;
   }
 
   fprintf(stderr, "Size classes:\n");
-  for (size_t i = 0; i < kNumClasses; i++) {
+  for (size_t i = 0; i < k_num_classes; i++) {
     size_t class_size = class_max_size(i);
     if (class_size < KB(1)) {
-      fprintf(stderr, "\t%zu B: %zu Buffers\n", class_size, freelist[i].size());
+      fprintf(stderr, "\t%zu B: %zu Buffers\n", class_size, freelist_[i].size());
     } else if (class_size < MB(1)) {
       fprintf(stderr, "\t%zu KB: %zu Buffers\n", class_size / KB(1),
-              freelist[i].size());
+              freelist_[i].size());
     } else {
       fprintf(stderr, "\t%zu MB: %zu Buffers\n", class_size / MB(1),
-              freelist[i].size());
+              freelist_[i].size());
     }
   }
 }
@@ -67,7 +67,7 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   while (true) {
     // Choose a positive SHM key. Negative is fine but it looks scary in the
     // error message.
-    shm_key = static_cast<int>(slow_rand.next_u64());
+    shm_key = static_cast<int>(slow_rand_.next_u64());
     shm_key = std::abs(shm_key);
 
     // Try to get an SHM region
@@ -115,63 +115,63 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   shmctl(shm_id, IPC_RMID, nullptr);
 
   // Bind the buffer to the NUMA node
-  const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node));
+  const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node_));
   long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
   rt_assert(ret == 0,
             "eRPC HugeAlloc: mbind() failed. Key " + std::to_string(shm_key));
 
   // If we are here, the allocation succeeded.  Register if needed.
   bool do_register_bool = (do_register == DoRegister::kTrue);
-  Transport::MemRegInfo reg_info;
-  if (do_register_bool) reg_info = reg_mr_func(shm_buf, size);
+  Transport::mem_reg_info reg_info;
+  if (do_register_bool) reg_info = reg_mr_func_(shm_buf, size);
 
   // Save the SHM region so we can free it later
-  shm_list.push_back(
+  shm_list_.push_back(
       shm_region_t(shm_key, shm_buf, size, do_register_bool, reg_info));
-  stats.shm_reserved += size;
+  stats_.shm_reserved_ += size;
 
   // buffer.class_size is invalid because we didn't allocate from a class
   return Buffer(shm_buf, SIZE_MAX,
-                do_register_bool ? reg_info.lkey : UINT32_MAX);
+                do_register_bool ? reg_info.lkey_ : UINT32_MAX);
 }
 
 Buffer HugeAlloc::alloc(size_t size) {
-  assert(size <= kMaxClassSize);
+  assert(size <= k_max_class_size);
 
   size_t size_class = get_class(size);
-  assert(size_class < kNumClasses);
+  assert(size_class < k_num_classes);
 
-  if (!freelist[size_class].empty()) {
+  if (!freelist_[size_class].empty()) {
     return alloc_from_class(size_class);
   } else {
     // There is no free Buffer in this class. Find the first larger class with
     // free Buffers.
     size_t next_class = size_class + 1;
-    for (; next_class < kNumClasses; next_class++) {
-      if (!freelist[next_class].empty()) break;
+    for (; next_class < k_num_classes; next_class++) {
+      if (!freelist_[next_class].empty()) break;
     }
 
-    if (next_class == kNumClasses) {
+    if (next_class == k_num_classes) {
       // There's no larger size class with free pages, we we need to allocate
       // more hugepages. This adds some Buffers to the largest class.
-      prev_allocation_size *= 2;
-      bool success = reserve_hugepages(prev_allocation_size);
+      prev_allocation_size_ *= 2;
+      bool success = reserve_hugepages(prev_allocation_size_);
       if (!success) {
-        prev_allocation_size /= 2;  // Restore the previous allocation
+        prev_allocation_size_ /= 2;  // Restore the previous allocation
         return Buffer(nullptr, 0, 0);
       } else {
-        next_class = kNumClasses - 1;
+        next_class = k_num_classes - 1;
       }
     }
 
     // If we're here, \p next_class has free Buffers
-    assert(next_class < kNumClasses);
+    assert(next_class < k_num_classes);
     while (next_class != size_class) {
       split(next_class);
       next_class--;
     }
 
-    assert(!freelist[size_class].empty());
+    assert(!freelist_[size_class].empty());
     return alloc_from_class(size_class);
   }
 
@@ -181,18 +181,18 @@ Buffer HugeAlloc::alloc(size_t size) {
 }
 
 bool HugeAlloc::reserve_hugepages(size_t size) {
-  assert(size >= kMaxClassSize);  // We need at least one max-sized buffer
+  assert(size >= k_max_class_size);  // We need at least one max-sized buffer
   Buffer buffer = alloc_raw(size, DoRegister::kTrue);
-  if (buffer.buf == nullptr) return false;
+  if (buffer.buf_ == nullptr) return false;
 
   // Add Buffers to the largest class
-  size_t num_buffers = size / kMaxClassSize;
+  size_t num_buffers = size / k_max_class_size;
   assert(num_buffers >= 1);
   for (size_t i = 0; i < num_buffers; i++) {
-    uint8_t *buf = buffer.buf + (i * kMaxClassSize);
-    uint32_t lkey = buffer.lkey;
+    uint8_t *buf = buffer.buf_ + (i * k_max_class_size);
+    uint32_t lkey = buffer.lkey_;
 
-    freelist[kNumClasses - 1].push_back(Buffer(buf, kMaxClassSize, lkey));
+    freelist_[k_num_classes - 1].push_back(Buffer(buf, k_max_class_size, lkey));
   }
 
   return true;

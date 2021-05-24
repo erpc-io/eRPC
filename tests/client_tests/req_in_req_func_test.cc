@@ -23,39 +23,39 @@ static constexpr uint8_t kTestReqTypePB = kTestReqType + 2;
 /// Per-request info maintained at the primary
 class PrimaryReqInfo {
  public:
-  size_t req_size_cp;        ///< Size of client-to-primary request
-  ReqHandle *req_handle_cp;  ///< Handle for client-to-primary request
-  MsgBuffer req_msgbuf_pb;   ///< MsgBuffer for primary-to-backup request
-  MsgBuffer resp_msgbuf_pb;  ///< MsgBuffer for primary-to-backup response
-  size_t etid;               ///< eRPC thread ID in the request handler
+  size_t req_size_cp_;        ///< Size of client-to-primary request
+  ReqHandle *req_handle_cp_;  ///< Handle for client-to-primary request
+  MsgBuffer req_msgbuf_pb_;   ///< MsgBuffer for primary-to-backup request
+  MsgBuffer resp_msgbuf_pb_;  ///< MsgBuffer for primary-to-backup response
+  size_t etid_;               ///< eRPC thread ID in the request handler
 
   PrimaryReqInfo(size_t req_size_cp, ReqHandle *req_handle_cp, size_t etid)
-      : req_size_cp(req_size_cp), req_handle_cp(req_handle_cp), etid(etid) {}
+      : req_size_cp_(req_size_cp), req_handle_cp_(req_handle_cp), etid_(etid) {}
 };
 
 union client_tag_t {
   struct {
-    uint16_t req_i;
-    uint16_t msgbuf_i;
-    uint32_t req_size;
-  } s;
-  void *_tag;
+    uint16_t req_i_;
+    uint16_t msgbuf_i_;
+    uint32_t req_size_;
+  } s_;
+  void *tag_;
 
   client_tag_t(uint16_t req_i, uint16_t msgbuf_i, uint32_t req_size) {
-    s.req_i = req_i;
-    s.msgbuf_i = msgbuf_i;
-    s.req_size = req_size;
+    s_.req_i_ = req_i;
+    s_.msgbuf_i_ = msgbuf_i;
+    s_.req_size_ = req_size;
   }
 
-  client_tag_t(void *_tag) : _tag(_tag) {}
+  client_tag_t(void *_tag) : tag_(_tag) {}
 };
 static_assert(sizeof(client_tag_t) == sizeof(void *), "");
 
 /// Extended context for client
 class AppContext : public BasicAppContext {
  public:
-  FastRand fast_rand;
-  size_t num_reqs_sent = 0;
+  FastRand fast_rand_;
+  size_t num_reqs_sent_ = 0;
 };
 
 ///
@@ -69,33 +69,33 @@ void primary_cont_func(void *, void *);
 /// received request to one of the backup servers.
 void req_handler_cp(ReqHandle *req_handle_cp, void *_c) {
   auto *c = static_cast<BasicAppContext *>(_c);
-  assert(!c->is_client);
-  ASSERT_EQ(c->rpc->in_background(), primary_bg);
+  assert(!c->is_client_);
+  ASSERT_EQ(c->rpc_->in_background(), primary_bg);
 
   // This will be freed by eRPC when the request handler returns
   const MsgBuffer *req_msgbuf_cp = req_handle_cp->get_req_msgbuf();
   size_t req_size_cp = req_msgbuf_cp->get_data_size();
 
   test_printf("Primary [Rpc %u]: Received request of length %zu\n",
-              c->rpc->get_rpc_id(), req_size_cp);
+              c->rpc_->get_rpc_id(), req_size_cp);
 
   // Record info for the request that we are now sending to the backup
   auto *srv_req_info =
-      new PrimaryReqInfo(req_size_cp, req_handle_cp, c->rpc->get_etid());
+      new PrimaryReqInfo(req_size_cp, req_handle_cp, c->rpc_->get_etid());
 
   // Allocate request and response MsgBuffers for the request to the backup
-  srv_req_info->req_msgbuf_pb = c->rpc->alloc_msg_buffer_or_die(req_size_cp);
-  srv_req_info->resp_msgbuf_pb = c->rpc->alloc_msg_buffer_or_die(req_size_cp);
+  srv_req_info->req_msgbuf_pb_ = c->rpc_->alloc_msg_buffer_or_die(req_size_cp);
+  srv_req_info->resp_msgbuf_pb_ = c->rpc_->alloc_msg_buffer_or_die(req_size_cp);
 
   // Request to backup = client-to-server request + 1
   for (size_t i = 0; i < req_size_cp; i++) {
-    srv_req_info->req_msgbuf_pb.buf[i] = req_msgbuf_cp->buf[i] + 1;
+    srv_req_info->req_msgbuf_pb_.buf_[i] = req_msgbuf_cp->buf_[i] + 1;
   }
 
   // Backup is server thread #1
-  c->rpc->enqueue_request(c->session_num_arr[1], kTestReqTypePB,
-                          &srv_req_info->req_msgbuf_pb,
-                          &srv_req_info->resp_msgbuf_pb, primary_cont_func,
+  c->rpc_->enqueue_request(c->session_num_arr_[1], kTestReqTypePB,
+                          &srv_req_info->req_msgbuf_pb_,
+                          &srv_req_info->resp_msgbuf_pb_, primary_cont_func,
                           reinterpret_cast<void *>(srv_req_info));
 }
 
@@ -103,67 +103,67 @@ void req_handler_cp(ReqHandle *req_handle_cp, void *_c) {
 /// received request back to the primary.
 void req_handler_pb(ReqHandle *req_handle, void *_c) {
   auto *c = static_cast<BasicAppContext *>(_c);
-  assert(!c->is_client);
-  ASSERT_EQ(c->rpc->in_background(), backup_bg);
+  assert(!c->is_client_);
+  ASSERT_EQ(c->rpc_->in_background(), backup_bg);
 
   const MsgBuffer *req_msgbuf_pb = req_handle->get_req_msgbuf();
   size_t req_size = req_msgbuf_pb->get_data_size();
 
   test_printf("Backup [Rpc %u]: Received request of length %zu.\n",
-              c->rpc->get_rpc_id(), req_size);
+              c->rpc_->get_rpc_id(), req_size);
 
   // eRPC will free dyn_resp_msgbuf
-  req_handle->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(req_size);
+  req_handle->dyn_resp_msgbuf_ = c->rpc_->alloc_msg_buffer_or_die(req_size);
 
   // Response to primary = request + 1
   for (size_t i = 0; i < req_size; i++) {
-    req_handle->dyn_resp_msgbuf.buf[i] = req_msgbuf_pb->buf[i] + 1;
+    req_handle->dyn_resp_msgbuf_.buf_[i] = req_msgbuf_pb->buf_[i] + 1;
   }
 
-  c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
+  c->rpc_->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf_);
 }
 
 /// The primary's continuation function when it gets a response from a backup
 void primary_cont_func(void *_c, void *_tag) {
   auto *c = static_cast<BasicAppContext *>(_c);
-  assert(!c->is_client);
-  ASSERT_EQ(c->rpc->in_background(), primary_bg);
+  assert(!c->is_client_);
+  ASSERT_EQ(c->rpc_->in_background(), primary_bg);
 
   auto *srv_req_info = reinterpret_cast<PrimaryReqInfo *>(_tag);
 
-  const MsgBuffer &resp_msgbuf_pb = srv_req_info->resp_msgbuf_pb;
+  const MsgBuffer &resp_msgbuf_pb = srv_req_info->resp_msgbuf_pb_;
   test_printf("Primary [Rpc %u]: Received response of length %zu\n",
-              c->rpc->get_rpc_id(), resp_msgbuf_pb.get_data_size());
+              c->rpc_->get_rpc_id(), resp_msgbuf_pb.get_data_size());
 
   // Check that we're still running in the same thread as for the
   // client-to-primary request
-  assert(srv_req_info->etid == c->rpc->get_etid());
+  assert(srv_req_info->etid_ == c->rpc_->get_etid());
 
   // Extract the request info
-  size_t req_size_cp = srv_req_info->req_size_cp;
-  ReqHandle *req_handle_cp = srv_req_info->req_handle_cp;
+  size_t req_size_cp = srv_req_info->req_size_cp_;
+  ReqHandle *req_handle_cp = srv_req_info->req_handle_cp_;
   assert(resp_msgbuf_pb.get_data_size() == req_size_cp);
 
   // Check the response from server #1
   for (size_t i = 0; i < req_size_cp; i++) {
-    assert(srv_req_info->req_msgbuf_pb.buf[i] + 1 == resp_msgbuf_pb.buf[i]);
+    assert(srv_req_info->req_msgbuf_pb_.buf_[i] + 1 == resp_msgbuf_pb.buf_[i]);
   }
 
   // eRPC will free dyn_resp_msgbuf
-  req_handle_cp->dyn_resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(req_size_cp);
+  req_handle_cp->dyn_resp_msgbuf_ = c->rpc_->alloc_msg_buffer_or_die(req_size_cp);
 
   // Response to client = server-to-server response + 1
   for (size_t i = 0; i < req_size_cp; i++) {
-    req_handle_cp->dyn_resp_msgbuf.buf[i] = resp_msgbuf_pb.buf[i] + 1;
+    req_handle_cp->dyn_resp_msgbuf_.buf_[i] = resp_msgbuf_pb.buf_[i] + 1;
   }
 
   // Free resources of the server-to-server request
-  c->rpc->free_msg_buffer(srv_req_info->req_msgbuf_pb);
-  c->rpc->free_msg_buffer(srv_req_info->resp_msgbuf_pb);
+  c->rpc_->free_msg_buffer(srv_req_info->req_msgbuf_pb_);
+  c->rpc_->free_msg_buffer(srv_req_info->resp_msgbuf_pb_);
   delete srv_req_info;
 
   // Send response to the client
-  c->rpc->enqueue_response(req_handle_cp, &req_handle_cp->dyn_resp_msgbuf);
+  c->rpc_->enqueue_response(req_handle_cp, &req_handle_cp->dyn_resp_msgbuf_);
 }
 
 ///
@@ -175,50 +175,50 @@ void client_cont_func(void *, void *);  // Forward declaration
 void client_request_helper(AppContext *c, size_t msgbuf_i) {
   assert(msgbuf_i < kSessionReqWindow);
 
-  size_t req_size = get_rand_msg_size(&c->fast_rand, c->rpc);
-  c->rpc->resize_msg_buffer(&c->req_msgbufs[msgbuf_i], req_size);
+  size_t req_size = get_rand_msg_size(&c->fast_rand_, c->rpc_);
+  c->rpc_->resize_msg_buffer(&c->req_msgbufs_[msgbuf_i], req_size);
 
   // Fill in all the bytes of the request MsgBuffer with msgbuf_i
   for (size_t i = 0; i < req_size; i++) {
-    c->req_msgbufs[msgbuf_i].buf[i] = kTestDataByte;
+    c->req_msgbufs_[msgbuf_i].buf_[i] = kTestDataByte;
   }
 
-  client_tag_t tag(static_cast<uint16_t>(c->num_reqs_sent),
+  client_tag_t tag(static_cast<uint16_t>(c->num_reqs_sent_),
                    static_cast<uint16_t>(msgbuf_i),
                    static_cast<uint32_t>(req_size));
   test_printf("Client [Rpc %u]: Sending request %zu of size %zu\n",
-              c->rpc->get_rpc_id(), c->num_reqs_sent, req_size);
+              c->rpc_->get_rpc_id(), c->num_reqs_sent_, req_size);
 
-  c->rpc->enqueue_request(c->session_num_arr[0], kTestReqTypeCP,
-                          &c->req_msgbufs[msgbuf_i], &c->resp_msgbufs[msgbuf_i],
-                          client_cont_func, tag._tag);
+  c->rpc_->enqueue_request(c->session_num_arr_[0], kTestReqTypeCP,
+                          &c->req_msgbufs_[msgbuf_i], &c->resp_msgbufs_[msgbuf_i],
+                          client_cont_func, tag.tag_);
 
-  c->num_reqs_sent++;
+  c->num_reqs_sent_++;
 }
 
 void client_cont_func(void *_c, void *_tag) {
   // Extract info from tag
   auto tag = static_cast<client_tag_t>(_tag);
-  size_t req_size = tag.s.req_size;
-  size_t msgbuf_i = tag.s.msgbuf_i;
+  size_t req_size = tag.s_.req_size_;
+  size_t msgbuf_i = tag.s_.msgbuf_i_;
 
   auto *c = static_cast<AppContext *>(_c);
-  assert(c->is_client);
+  assert(c->is_client_);
 
-  const MsgBuffer &resp_msgbuf = c->resp_msgbufs[msgbuf_i];
+  const MsgBuffer &resp_msgbuf = c->resp_msgbufs_[msgbuf_i];
 
   test_printf("Client [Rpc %u]: Received response for req %u, length = %zu.\n",
-              c->rpc->get_rpc_id(), tag.s.req_i, resp_msgbuf.get_data_size());
+              c->rpc_->get_rpc_id(), tag.s_.req_i_, resp_msgbuf.get_data_size());
 
   // Check the response
   ASSERT_EQ(resp_msgbuf.get_data_size(), req_size);
   for (size_t i = 0; i < req_size; i++) {
-    ASSERT_EQ(resp_msgbuf.buf[i], kTestDataByte + 3);
+    ASSERT_EQ(resp_msgbuf.buf_[i], kTestDataByte + 3);
   }
 
-  c->num_rpc_resps++;
+  c->num_rpc_resps_++;
 
-  if (c->num_reqs_sent < kTestNumReqs) {
+  if (c->num_reqs_sent_ < kTestNumReqs) {
     client_request_helper(c, msgbuf_i);
   }
 }
@@ -228,29 +228,29 @@ void client_thread(Nexus *nexus, size_t num_sessions) {
   AppContext c;
   client_connect_sessions(nexus, c, num_sessions, basic_sm_handler);
 
-  Rpc<CTransport> *rpc = c.rpc;
+  Rpc<CTransport> *rpc = c.rpc_;
 
   // Start by filling the request window
-  c.req_msgbufs.resize(erpc::kSessionReqWindow);
-  c.resp_msgbufs.resize(erpc::kSessionReqWindow);
+  c.req_msgbufs_.resize(erpc::kSessionReqWindow);
+  c.resp_msgbufs_.resize(erpc::kSessionReqWindow);
   for (size_t i = 0; i < erpc::kSessionReqWindow; i++) {
     const size_t sz = rpc->get_max_msg_size();
-    c.req_msgbufs[i] = rpc->alloc_msg_buffer_or_die(sz);
-    c.resp_msgbufs[i] = rpc->alloc_msg_buffer_or_die(sz);
+    c.req_msgbufs_[i] = rpc->alloc_msg_buffer_or_die(sz);
+    c.resp_msgbufs_[i] = rpc->alloc_msg_buffer_or_die(sz);
 
     client_request_helper(&c, i);
   }
 
   wait_for_rpc_resps_or_timeout(c, kTestNumReqs);
-  assert(c.num_rpc_resps == kTestNumReqs);
+  assert(c.num_rpc_resps_ == kTestNumReqs);
 
-  for (auto &mb : c.req_msgbufs) rpc->free_msg_buffer(mb);
-  for (auto &mb : c.resp_msgbufs) rpc->free_msg_buffer(mb);
+  for (auto &mb : c.req_msgbufs_) rpc->free_msg_buffer(mb);
+  for (auto &mb : c.resp_msgbufs_) rpc->free_msg_buffer(mb);
 
   // Disconnect the sessions
-  c.num_sm_resps = 0;
+  c.num_sm_resps_ = 0;
   for (size_t i = 0; i < num_sessions; i++) {
-    rpc->destroy_session(c.session_num_arr[i]);
+    rpc->destroy_session(c.session_num_arr_[i]);
   }
   wait_for_sm_resps_or_timeout(c, num_sessions);
   assert(rpc->num_active_sessions() == 0);

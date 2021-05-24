@@ -62,21 +62,21 @@ enum class ReqFuncType : uint8_t { kForeground, kBackground };
  */
 class ReqFunc {
  public:
-  erpc_req_func_t req_func;   ///< The handler function
-  ReqFuncType req_func_type;  ///< The handlers's mode (foreground/background)
+  erpc_req_func_t req_func_;   ///< The handler function
+  ReqFuncType req_func_type_;  ///< The handlers's mode (foreground/background)
 
   inline bool is_background() const {
-    return req_func_type == ReqFuncType::kBackground;
+    return req_func_type_ == ReqFuncType::kBackground;
   }
 
-  ReqFunc() { req_func = nullptr; }
+  ReqFunc() { req_func_ = nullptr; }
 
   ReqFunc(erpc_req_func_t req_func, ReqFuncType req_func_type)
-      : req_func(req_func), req_func_type(req_func_type) {
+      : req_func_(req_func), req_func_type_(req_func_type) {
     rt_assert(req_func != nullptr, "Invalid Ops with null handler function");
   }
 
   /// Check if this request handler is registered
-  inline bool is_registered() const { return req_func != nullptr; }
+  inline bool is_registered() const { return req_func_ != nullptr; }
 };
 }  // namespace erpc

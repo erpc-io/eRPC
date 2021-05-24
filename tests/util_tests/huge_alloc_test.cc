@@ -14,15 +14,15 @@ static constexpr size_t kSystem4KPages = kSystemHugepages * 512;
 using namespace erpc;
 
 // Dummy registration and deregistration functions
-Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
-  return Transport::MemRegInfo(DUMMY_MR_PTR,
+Transport::mem_reg_info reg_mr_wrapper(void *, size_t) {
+  return Transport::mem_reg_info(DUMMY_MR_PTR,
                                DUMMY_LKEY);  // *transport_mr, lkey
 }
 
-void dereg_mr_wrapper(Transport::MemRegInfo mr) {
+void dereg_mr_wrapper(Transport::mem_reg_info mr) {
   _unused(mr);
-  assert(mr.lkey == DUMMY_LKEY);
-  assert(mr.transport_mr == DUMMY_MR_PTR);
+  assert(mr.lkey_ == DUMMY_LKEY);
+  assert(mr.transport_mr_ == DUMMY_MR_PTR);
 }
 
 using namespace std::placeholders;
@@ -43,7 +43,7 @@ TEST(HugeAllocTest, PageAllocPerf) {
 
   while (true) {
     erpc::Buffer buffer = alloc->alloc(KB(4));
-    if (buffer.buf == nullptr) break;
+    if (buffer.buf_ == nullptr) break;
 
     num_pages_allocated++;
   }
@@ -70,8 +70,8 @@ TEST(HugeAllocTest, 2MBChunksSingleRun) {
 
   for (size_t i = 0; i < kSystemHugepages; i++) {
     erpc::Buffer buffer = alloc->alloc(MB(2));
-    if (buffer.buf != nullptr) {
-      EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+    if (buffer.buf_ != nullptr) {
+      EXPECT_EQ(buffer.lkey_, DUMMY_LKEY);
       num_hugepages_allocated++;
     } else {
       test_printf("Allocated %zu of %zu hugepages\n", num_hugepages_allocated,
@@ -92,9 +92,9 @@ TEST(HugeAllocTest, 2MBChunksMultiRun) {
     alloc = new erpc::HugeAlloc(1024, 0, reg_mr_func, dereg_mr_func);
     for (size_t i = 0; i < kSystemHugepages; i++) {
       erpc::Buffer buffer = alloc->alloc(MB(2));
-      if (buffer.buf == nullptr) break;
+      if (buffer.buf_ == nullptr) break;
 
-      EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+      EXPECT_EQ(buffer.lkey_, DUMMY_LKEY);
     }
 
     delete alloc;
@@ -120,7 +120,7 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
       size_t size = num_hugepages * erpc::kHugepageSize;
       erpc::Buffer buffer = alloc->alloc(size);
 
-      if (buffer.buf == nullptr) {
+      if (buffer.buf_ == nullptr) {
         test_printf(
             "Fraction of system memory reserved by alloc at "
             "failure = %.2f (best = 1.0)\n",
@@ -134,7 +134,7 @@ TEST(HugeAllocTest, VarMBChunksSingleRun) {
 
         break;
       } else {
-        EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+        EXPECT_EQ(buffer.lkey_, DUMMY_LKEY);
         app_memory += (num_hugepages * erpc::kHugepageSize);
         buffer_vec.push_back(buffer);
       }
@@ -173,7 +173,7 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
       new_app_memory = KB(4);
     }
 
-    if (buffer.buf == nullptr) {
+    if (buffer.buf_ == nullptr) {
       test_printf(
           "Fraction of system memory reserved by alloc at "
           "failure = %.2f\n",
@@ -184,7 +184,7 @@ TEST(HugeAllocTest, MixedPageHugepageSingleRun) {
                   (1.0 * app_memory / alloc->get_stat_shm_reserved()));
       break;
     } else {
-      EXPECT_EQ(buffer.lkey, DUMMY_LKEY);
+      EXPECT_EQ(buffer.lkey_, DUMMY_LKEY);
       app_memory += new_app_memory;
     }
   }
@@ -197,25 +197,25 @@ TEST(HugeAllocTest, RawAlloc) {
   // kMaxClassSize gets reserved by the allocator on initialization, so thi
   // is the max size we can hope to get.
   size_t max_alloc_size =
-      kSystemHugepages * MB(2) - erpc::HugeAlloc::kMaxClassSize;
+      kSystemHugepages * MB(2) - erpc::HugeAlloc::k_max_class_size;
 
   // Try reserving max memory multiple times to test allocator destructor
   for (size_t i = 0; i < 5; i++) {
     auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
     Buffer buffer = alloc->alloc_raw(max_alloc_size, DoRegister::kFalse);
-    ASSERT_NE(buffer.buf, nullptr);
-    ASSERT_EQ(buffer.class_size, SIZE_MAX);
+    ASSERT_NE(buffer.buf_, nullptr);
+    ASSERT_EQ(buffer.class_size_, SIZE_MAX);
     delete alloc;
   }
 
   // Try some corner cases
   auto *alloc = new erpc::HugeAlloc(1024, 0, nullptr, nullptr);
   Buffer buffer = alloc->alloc_raw(1, DoRegister::kFalse);  // 1 byte
-  ASSERT_NE(buffer.buf, nullptr);
-  ASSERT_EQ(buffer.class_size, SIZE_MAX);
+  ASSERT_NE(buffer.buf_, nullptr);
+  ASSERT_EQ(buffer.class_size_, SIZE_MAX);
 
   buffer = alloc->alloc_raw(MB(16) * 1024 * 1024, DoRegister::kFalse);
-  ASSERT_EQ(buffer.buf, nullptr);
+  ASSERT_EQ(buffer.buf_, nullptr);
 }
 
 int main(int argc, char **argv) {

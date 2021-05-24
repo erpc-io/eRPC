@@ -233,9 +233,9 @@ class DpdkTransport : public Transport {
 
   ~DpdkTransport();
 
-  void fill_local_routing_info(RoutingInfo *routing_info) const;
-  bool resolve_remote_routing_info(RoutingInfo *routing_info) const;
-  size_t get_bandwidth() const { return resolve_.bandwidth; }
+  void fill_local_routing_info(routing_info *routing_info) const;
+  bool resolve_remote_routing_info(routing_info *routing_info) const;
+  size_t get_bandwidth() const { return resolve_.bandwidth_; }
 
   /// Get the mempool name to use for this port and queue pair ID
   static std::string get_mempool_name(size_t phy_port, size_t qp_id) {
@@ -249,7 +249,7 @@ class DpdkTransport : public Transport {
   /// processes
   static std::string get_memzone_name() { return "erpc_daemon_memzone"; }
 
-  static std::string routing_info_str(RoutingInfo *ri) {
+  static std::string routing_info_str(routing_info *ri) {
     return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
   }
 
@@ -403,10 +403,10 @@ class DpdkTransport : public Transport {
 
   /// Info resolved from \p phy_port, must be filled by constructor.
   struct {
-    uint32_t ipv4_addr;   // The port's IPv4 address in host-byte order
-    uint8_t mac_addr[6];  // The port's MAC address
-    size_t bandwidth;     // Link bandwidth in bytes per second
-    size_t reta_size;     // Number of entries in NIC RX indirection table
+    uint32_t ipv4_addr_;   // The port's IPv4 address in host-byte order
+    uint8_t mac_addr_[6];  // The port's MAC address
+    size_t bandwidth_;     // Link bandwidth in bytes per second
+    size_t reta_size_;     // Number of entries in NIC RX indirection table
   } resolve_;
 };
 

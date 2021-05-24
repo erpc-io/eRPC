@@ -7,8 +7,8 @@ namespace erpc {
 
 class TlsRegistry {
  public:
-  TlsRegistry() : cur_etid(0) {}
-  std::atomic<size_t> cur_etid;
+  TlsRegistry() : cur_etid_(0) {}
+  std::atomic<size_t> cur_etid_;
 
   /// Initialize all the thread-local registry members
   void init();

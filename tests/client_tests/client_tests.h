@@ -33,27 +33,29 @@ bool server_check_all_disconnected = true;
 /// Basic context to derive from
 class BasicAppContext {
  public:
-  bool is_client;
-  Rpc<CTransport> *rpc = nullptr;
-  int *session_num_arr = nullptr;  ///< Sessions created as client
+  bool is_client_;
+  Rpc<CTransport> *rpc_ = nullptr;
+  int *session_num_arr_ = nullptr;  ///< Sessions created as client
 
-  size_t num_sm_resps = 0;   ///< Number of SM responses
-  size_t num_rpc_resps = 0;  ///< Number of Rpc responses
+  size_t num_sm_resps_ = 0;   ///< Number of SM responses
+  size_t num_rpc_resps_ = 0;  ///< Number of Rpc responses
 
-  std::vector<MsgBuffer> req_msgbufs;
-  std::vector<MsgBuffer> resp_msgbufs;
+  std::vector<MsgBuffer> req_msgbufs_;
+  std::vector<MsgBuffer> resp_msgbufs_;
 };
 
 /// Info required to register a request handler function
 class ReqFuncRegInfo {
  public:
-  const uint8_t req_type;
-  const erpc_req_func_t req_func;
-  const ReqFuncType req_func_type;
+  const uint8_t req_type_;
+  const erpc_req_func_t req_func_;
+  const ReqFuncType req_func_type_;
 
   ReqFuncRegInfo(uint8_t req_type, erpc_req_func_t req_func,
                  ReqFuncType req_func_type)
-      : req_type(req_type), req_func(req_func), req_func_type(req_func_type) {}
+      : req_type_(req_type),
+        req_func_(req_func),
+        req_func_type_(req_func_type) {}
 };
 
 enum class ConnectServers : bool { kTrue, kFalse };
@@ -65,8 +67,8 @@ size_t get_rand_msg_size(FastRand *fast_rand, const Rpc<CTransport> *rpc) {
   // Hack to return some constant data:
   // if (fast_rand != nullptr) return 3000;
 
-  size_t X = 50;
-  if (fast_rand->next_u32() % 100 < X) {
+  size_t x = 50;
+  if (fast_rand->next_u32() % 100 < x) {
     // Choose a single-packet message
     uint32_t sample = fast_rand->next_u32();
     return (sample % rpc->get_max_data_per_pkt()) + 1;
@@ -108,7 +110,7 @@ void basic_sm_handler(int session_num, SmEventType sm_event_type,
   _unused(_c);
 
   auto *c = static_cast<BasicAppContext *>(_c);
-  c->num_sm_resps++;
+  c->num_sm_resps_++;
 
   assert(sm_err_type == SmErrType::kNoError);
   assert(sm_event_type == SmEventType::kConnected ||
@@ -139,13 +141,13 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
                               ConnectServers connect_servers,
                               double pkt_loss_prob) {
   BasicAppContext c;
-  c.is_client = false;
+  c.is_client_ = false;
 
   Rpc<CTransport> rpc(nexus, static_cast<void *>(&c), rpc_id, sm_handler,
                       kTestServerPhyPort);
   if (kTesting) rpc.fault_inject_set_pkt_drop_prob_st(pkt_loss_prob);
 
-  c.rpc = &rpc;
+  c.rpc_ = &rpc;
   num_servers_up++;
 
   // Wait for all servers to come up
@@ -159,16 +161,16 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
                 rpc_id, num_srv_threads - 1);
 
     // Session number for server (kTestServerRpcId + x) is session_num_arr[x]
-    c.session_num_arr = new int[num_srv_threads];
+    c.session_num_arr_ = new int[num_srv_threads];
 
     // Create the sessions
     for (size_t i = 0; i < num_srv_threads; i++) {
       uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
       if (other_rpc_id == rpc_id) continue;
 
-      c.session_num_arr[i] = c.rpc->create_session(
+      c.session_num_arr_[i] = c.rpc_->create_session(
           "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
-      assert(c.session_num_arr[i] >= 0);
+      assert(c.session_num_arr_[i] >= 0);
     }
 
     // Wait for the sessions to connect
@@ -192,18 +194,18 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
       uint8_t other_rpc_id = static_cast<uint8_t>(kTestServerRpcId + i);
       if (other_rpc_id == rpc_id) continue;
 
-      c.rpc->destroy_session(c.session_num_arr[i]);
+      c.rpc_->destroy_session(c.session_num_arr_[i]);
     }
 
     // We cannot stop running the event loop after receiving the disconnect
     // responses required by this thread. We need to keep the event loop running
     // to send disconnect responses to other server threads.
-    c.num_sm_resps = 0;
+    c.num_sm_resps_ = 0;
     while (num_servers_up > 0) {
       rpc.run_event_loop(kTestEventLoopMs);
-      if (c.num_sm_resps == num_srv_threads - 1) {
+      if (c.num_sm_resps_ == num_srv_threads - 1) {
         num_servers_up--;  // Mark this server as down
-        c.num_sm_resps = 0;
+        c.num_sm_resps_ = 0;
       }
     }
   }
@@ -239,7 +241,8 @@ void launch_server_client_threads(
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
-    nexus.register_req_func(info.req_type, info.req_func, info.req_func_type);
+    nexus.register_req_func(info.req_type_, info.req_func_,
+                            info.req_func_type_);
   }
 
   num_servers_up = 0;
@@ -253,12 +256,12 @@ void launch_server_client_threads(
   // Launch one server Rpc thread for each client session
   for (size_t i = 0; i < num_sessions; i++) {
     // Server threads need an SM handler iff we're connecting servers together
-    sm_handler_t _sm_handler = connect_servers == ConnectServers::kFalse
-                                   ? basic_empty_sm_handler
-                                   : basic_sm_handler;
+    sm_handler_t sm_handler = connect_servers == ConnectServers::kFalse
+                                  ? basic_empty_sm_handler
+                                  : basic_sm_handler;
 
     server_threads[i] = std::thread(
-        basic_server_thread_func, &nexus, kTestServerRpcId + i, _sm_handler,
+        basic_server_thread_func, &nexus, kTestServerRpcId + i, sm_handler,
         num_sessions, connect_servers, srv_pkt_drop_prob);
   }
 
@@ -288,23 +291,23 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
   // Wait for all server threads to start
   while (!all_servers_ready) usleep(1);
 
-  c.is_client = true;
-  c.rpc = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
-                              sm_handler, kTestClientPhyPort);
+  c.is_client_ = true;
+  c.rpc_ = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
+                               sm_handler, kTestClientPhyPort);
 
   // Connect the sessions
-  c.session_num_arr = new int[num_sessions];
+  c.session_num_arr_ = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
-    c.session_num_arr[i] = c.rpc->create_session(
+    c.session_num_arr_[i] = c.rpc_->create_session(
         "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
   }
 
-  while (c.num_sm_resps < num_sessions) {
-    c.rpc->run_event_loop(kTestEventLoopMs);
+  while (c.num_sm_resps_ < num_sessions) {
+    c.rpc_->run_event_loop(kTestEventLoopMs);
   }
 
   // basic_sm_handler checks that the callbacks have no errors
-  assert(c.num_sm_resps == num_sessions);
+  assert(c.num_sm_resps_ == num_sessions);
 }
 
 /**
@@ -319,8 +322,8 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
   struct timespec start;
   clock_gettime(CLOCK_REALTIME, &start);
-  while (c.num_sm_resps < num_resps) {
-    c.rpc->run_event_loop(kTestEventLoopMs);
+  while (c.num_sm_resps_ < num_resps) {
+    c.rpc_->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = sec_since(start) * 1000;
     if (ms_elapsed > kTestMaxEventLoopMs) break;
@@ -338,8 +341,8 @@ void wait_for_rpc_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
   struct timespec start;
   clock_gettime(CLOCK_REALTIME, &start);
-  while (c.num_rpc_resps < num_resps) {
-    c.rpc->run_event_loop(kTestEventLoopMs);
+  while (c.num_rpc_resps_ < num_resps) {
+    c.rpc_->run_event_loop(kTestEventLoopMs);
 
     double ms_elapsed = sec_since(start) * 1000;
     if (ms_elapsed > kTestMaxEventLoopMs) break;

@@ -26,16 +26,16 @@ class Virt2Phy {
 
  public:
   Virt2Phy() {
-    fd = open("/proc/self/pagemap", O_RDONLY);
-    if (fd < 0) {
+    fd_ = open("/proc/self/pagemap", O_RDONLY);
+    if (fd_ < 0) {
       printf("%s(): cannot open /proc/self/pagemap\n", strerror(errno));
       exit(-1);
     }
 
-    page_size = static_cast<size_t>(getpagesize());  // Standard page size
+    page_size_ = static_cast<size_t>(getpagesize());  // Standard page size
   }
 
-  ~Virt2Phy() { close(fd); }
+  ~Virt2Phy() { close(fd_); }
 
   /**
    * @brief Return the physical address of this virtual address
@@ -43,11 +43,11 @@ class Virt2Phy {
    */
   uint64_t translate(const void *virtaddr) {
     auto virt_pfn = static_cast<unsigned long>(
-        reinterpret_cast<uint64_t>(virtaddr) / page_size);
+        reinterpret_cast<uint64_t>(virtaddr) / page_size_);
     size_t offset = sizeof(uint64_t) * virt_pfn;
 
     uint64_t page;
-    int ret = pread(fd, &page, kPfnMaskSize, static_cast<long>(offset));
+    int ret = pread(fd_, &page, kPfnMaskSize, static_cast<long>(offset));
 
     if (ret < 0) {
       fprintf(stderr, "cannot read /proc/self/pagemap: %s\n", strerror(errno));
@@ -63,38 +63,38 @@ class Virt2Phy {
     // Documentation)
     if ((page & 0x7fffffffffffffULL) == 0) return 0;
 
-    uint64_t physaddr = ((page & 0x7fffffffffffffULL) * page_size) +
-                        (reinterpret_cast<uint64_t>(virtaddr) % page_size);
+    uint64_t physaddr = ((page & 0x7fffffffffffffULL) * page_size_) +
+                        (reinterpret_cast<uint64_t>(virtaddr) % page_size_);
 
     return physaddr;
   }
 
  private:
-  int fd;
-  size_t page_size;
+  int fd_;
+  size_t page_size_;
 };
 
 class HugepageCachingVirt2Phy {
  public:
   uint64_t translate(void *_va) {
     uint64_t va = reinterpret_cast<uint64_t>(_va);
-    uint64_t va_2MB = (va & ~(MB(2) - 1));
+    uint64_t va_2_mb = (va & ~(MB(2) - 1));
 
-    auto result = v2p_cache.find(va_2MB);
-    if (likely(result != v2p_cache.end())) {
+    auto result = v2p_cache_.find(va_2_mb);
+    if (likely(result != v2p_cache_.end())) {
       return result->second + (va % MB(2));
     }
 
     // Here, we have a cache miss
-    uint64_t phy_addr = v2p.translate(reinterpret_cast<void *>(va_2MB));
-    v2p_cache.emplace(va_2MB, phy_addr);
+    uint64_t phy_addr = v2p_.translate(reinterpret_cast<void *>(va_2_mb));
+    v2p_cache_.emplace(va_2_mb, phy_addr);
 
     return phy_addr + (va % MB(2));
   }
 
  private:
-  Virt2Phy v2p;
-  std::unordered_map<uint64_t, uint64_t> v2p_cache;
+  Virt2Phy v2p_;
+  std::unordered_map<uint64_t, uint64_t> v2p_cache_;
 };
 
 }  // namespace erpc

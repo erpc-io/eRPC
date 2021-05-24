@@ -18,35 +18,35 @@ namespace erpc {
 
 /// The arguments to enqueue_request()
 struct enq_req_args_t {
-  int session_num;
-  uint8_t req_type;
-  MsgBuffer *req_msgbuf;
-  MsgBuffer *resp_msgbuf;
-  erpc_cont_func_t cont_func;
-  void *tag;
-  size_t cont_etid;
+  int session_num_;
+  uint8_t req_type_;
+  MsgBuffer *req_msgbuf_;
+  MsgBuffer *resp_msgbuf_;
+  erpc_cont_func_t cont_func_;
+  void *tag_;
+  size_t cont_etid_;
 
   enq_req_args_t() {}
   enq_req_args_t(int session_num, uint8_t req_type, MsgBuffer *req_msgbuf,
                  MsgBuffer *resp_msgbuf, erpc_cont_func_t cont_func, void *tag,
                  size_t cont_etid)
-      : session_num(session_num),
-        req_type(req_type),
-        req_msgbuf(req_msgbuf),
-        resp_msgbuf(resp_msgbuf),
-        cont_func(cont_func),
-        tag(tag),
-        cont_etid(cont_etid) {}
+      : session_num_(session_num),
+        req_type_(req_type),
+        req_msgbuf_(req_msgbuf),
+        resp_msgbuf_(resp_msgbuf),
+        cont_func_(cont_func),
+        tag_(tag),
+        cont_etid_(cont_etid) {}
 };
 
 /// The arguments to enqueue_response()
 struct enq_resp_args_t {
-  ReqHandle *req_handle;
-  MsgBuffer *resp_msgbuf;
+  ReqHandle *req_handle_;
+  MsgBuffer *resp_msgbuf_;
 
   enq_resp_args_t() {}
   enq_resp_args_t(ReqHandle *req_handle, MsgBuffer *resp_msgbuf)
-      : req_handle(req_handle), resp_msgbuf(resp_msgbuf) {}
+      : req_handle_(req_handle), resp_msgbuf_(resp_msgbuf) {}
 };
 
 // Forward declaration for friendship
@@ -63,45 +63,48 @@ class Session {
  private:
   Session(Role role, conn_req_uniq_token_t uniq_token, double freq_ghz,
           double link_bandwidth)
-      : role(role),
-        uniq_token(uniq_token),
-        freq_ghz(freq_ghz),
-        link_bandwidth(link_bandwidth) {
-    remote_routing_info =
-        is_client() ? &server.routing_info : &client.routing_info;
+      : role_(role),
+        uniq_token_(uniq_token),
+        freq_ghz_(freq_ghz),
+        link_bandwidth_(link_bandwidth) {
+    remote_routing_info_ =
+        is_client() ? &server_.routing_info_ : &client_.routing_info_;
 
-    if (is_client()) client_info.cc.timely = Timely(freq_ghz, link_bandwidth);
+    if (is_client())
+      client_info_.cc_.timely_ = Timely(freq_ghz, link_bandwidth);
 
     // Arrange the free slot vector so that slots are popped in order
     for (size_t i = 0; i < kSessionReqWindow; i++) {
       // Initialize session slot with index = sslot_i
       const size_t sslot_i = (kSessionReqWindow - 1 - i);
-      SSlot &sslot = sslot_arr[sslot_i];
+      SSlot &sslot = sslot_arr_[sslot_i];
 
       // This buries all MsgBuffers
       memset(static_cast<void *>(&sslot), 0, sizeof(SSlot));
 
-      sslot.session = this;
-      sslot.is_client = is_client();
-      sslot.index = sslot_i;
-      sslot.cur_req_num = sslot_i;  // 1st req num = (+kSessionReqWindow)
+      sslot.session_ = this;
+      sslot.is_client_ = is_client();
+      sslot.index_ = sslot_i;
+      sslot.cur_req_num_ = sslot_i;  // 1st req num = (+kSessionReqWindow)
 
       if (is_client()) {
-        for (auto &x : sslot.client_info.in_wheel) x = false;
+        for (auto &x : sslot.client_info_.in_wheel_) x = false;
       } else {
-        sslot.server_info.req_type = kInvalidReqType;
+        sslot.server_info_.req_type_ = kInvalidReqType;
       }
 
-      client_info.sslot_free_vec.push_back(sslot_i);
+      client_info_.sslot_free_vec_.push_back(sslot_i);
     }
   }
 
   /// All session resources are freed by the owner Rpc
   ~Session() {}
 
-  inline bool is_client() const { return role == Role::kClient; }
-  inline bool is_server() const { return role == Role::kServer; }
-  inline bool is_connected() const { return state == SessionState::kConnected; }
+  inline bool is_client() const { return role_ == Role::kClient; }
+  inline bool is_server() const { return role_ == Role::kServer; }
+  inline bool is_connected() const {
+    return state_ == SessionState::kConnected;
+  }
 
   /**
    * @brief Get the desired TX timestamp, and update TX timestamp tracking
@@ -111,64 +114,64 @@ class Session {
    * @return The desired TX timestamp for this packet
    */
   inline size_t cc_getupdate_tx_tsc(size_t ref_tsc, size_t pkt_size) {
-    double ns_delta = 1000000000 * (pkt_size / client_info.cc.timely.rate);
-    double cycle_delta = ns_to_cycles(ns_delta, freq_ghz);
+    double ns_delta = 1000000000 * (pkt_size / client_info_.cc_.timely_.rate_);
+    double cycle_delta = ns_to_cycles(ns_delta, freq_ghz_);
 
-    size_t desired_tx_tsc = client_info.cc.prev_desired_tx_tsc + cycle_delta;
+    size_t desired_tx_tsc = client_info_.cc_.prev_desired_tx_tsc_ + cycle_delta;
     desired_tx_tsc = std::max(desired_tx_tsc, ref_tsc);
 
-    client_info.cc.prev_desired_tx_tsc = desired_tx_tsc;
+    client_info_.cc_.prev_desired_tx_tsc_ = desired_tx_tsc;
 
     return desired_tx_tsc;
   }
 
   /// Return true iff this session is uncongested
   inline bool is_uncongested() const {
-    return client_info.cc.timely.rate == link_bandwidth;
+    return client_info_.cc_.timely_.rate_ == link_bandwidth_;
   }
 
   /// Return the hostname of the remote endpoint for a connected session
   std::string get_remote_hostname() const {
-    if (is_client()) return trim_hostname(server.hostname);
-    return trim_hostname(client.hostname);
+    if (is_client()) return trim_hostname(server_.hostname_);
+    return trim_hostname(client_.hostname_);
   }
 
-  const Role role;  ///< The role (server/client) of this session endpoint
-  const conn_req_uniq_token_t uniq_token;  ///< A cluster-wide unique token
-  const double freq_ghz;                   ///< TSC frequency
-  const double link_bandwidth;  ///< Link bandwidth in bytes per second
-  SessionState state;  ///< The management state of this session endpoint
-  SessionEndpoint client, server;  ///< Read-only endpoint metadata
+  const Role role_;  ///< The role (server/client) of this session endpoint
+  const conn_req_uniq_token_t uniq_token_;  ///< A cluster-wide unique token
+  const double freq_ghz_;                   ///< TSC frequency
+  const double link_bandwidth_;  ///< Link bandwidth in bytes per second
+  SessionState state_;  ///< The management state of this session endpoint
+  SessionEndpoint client_, server_;  ///< Read-only endpoint metadata
 
-  std::array<SSlot, kSessionReqWindow> sslot_arr;  ///< The session slots
+  std::array<SSlot, kSessionReqWindow> sslot_arr_;  ///< The session slots
 
   ///@{ Info saved for faster unconditional access
-  Transport::RoutingInfo *remote_routing_info;
-  uint16_t local_session_num;
-  uint16_t remote_session_num;
+  Transport::routing_info *remote_routing_info_;
+  uint16_t local_session_num_;
+  uint16_t remote_session_num_;
   ///@}
 
   /// Information that is required only at the client endpoint
   struct {
-    size_t credits = kSessionCredits;  ///< Currently available credits
+    size_t credits_ = kSessionCredits;  ///< Currently available credits
 
     /// Free session slots. We could use sslot pointers, but indices are useful
     /// in request number calculation.
-    FixedVector<size_t, kSessionReqWindow> sslot_free_vec;
+    FixedVector<size_t, kSessionReqWindow> sslot_free_vec_;
 
     /// Requests that spill over kSessionReqWindow are queued here
-    std::queue<enq_req_args_t> enq_req_backlog;
+    std::queue<enq_req_args_t> enq_req_backlog_;
 
-    size_t num_re_tx = 0;  ///< Number of retransmissions for this session
+    size_t num_re_tx_ = 0;  ///< Number of retransmissions for this session
 
     // Congestion control
     struct {
-      Timely timely;
-      size_t prev_desired_tx_tsc;  ///< Desired TX timestamp of the last packet
-    } cc;
+      Timely timely_;
+      size_t prev_desired_tx_tsc_;  ///< Desired TX timestamp of the last packet
+    } cc_;
 
-    size_t sm_req_ts;  ///< Timestamp of the last session management request
-  } client_info;
+    size_t sm_req_ts_;  ///< Timestamp of the last session management request
+  } client_info_;
 };
 
 }  // namespace erpc

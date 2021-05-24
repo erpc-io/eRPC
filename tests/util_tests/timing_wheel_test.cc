@@ -15,11 +15,11 @@ static constexpr size_t kTestPktSize = 1024;
 static constexpr size_t kTestNumPkts = 8000;
 
 // Dummy registration and deregistration functions
-Transport::MemRegInfo reg_mr_wrapper(void *, size_t) {
-  return Transport::MemRegInfo(0, 0);
+Transport::mem_reg_info reg_mr_wrapper(void *, size_t) {
+  return Transport::mem_reg_info(0, 0);
 }
 
-void dereg_mr_wrapper(Transport::MemRegInfo) {}
+void dereg_mr_wrapper(Transport::mem_reg_info) {}
 
 using namespace std::placeholders;
 typename Transport::reg_mr_func_t reg_mr_func =
@@ -30,35 +30,35 @@ typename Transport::dereg_mr_func_t dereg_mr_func =
 class TimingWheelTest : public ::testing::Test {
  public:
   TimingWheelTest() {
-    alloc = new HugeAlloc(MB(2), 0, reg_mr_func, dereg_mr_func);
+    alloc_ = new HugeAlloc(MB(2), 0, reg_mr_func, dereg_mr_func);
 
     timing_wheel_args_t args;
-    args.freq_ghz = measure_rdtsc_freq();
-    args.huge_alloc = alloc;
-    wheel = new TimingWheel(args);
+    args.freq_ghz_ = measure_rdtsc_freq();
+    args.huge_alloc_ = alloc_;
+    wheel_ = new TimingWheel(args);
 
-    freq_ghz = measure_rdtsc_freq();
+    freq_ghz_ = measure_rdtsc_freq();
   }
 
-  ~TimingWheelTest() { delete alloc; }
+  ~TimingWheelTest() { delete alloc_; }
 
-  HugeAlloc *alloc;
-  TimingWheel *wheel;
-  double freq_ghz;
+  HugeAlloc *alloc_;
+  TimingWheel *wheel_;
+  double freq_ghz_;
 };
 
 TEST_F(TimingWheelTest, Basic) {
   // Empty wheel
-  wheel->reap(rdtsc());
-  ASSERT_EQ(wheel->ready_queue.size(), 0);
+  wheel_->reap(rdtsc());
+  ASSERT_EQ(wheel_->ready_queue_.size(), 0);
 
   // One entry. Check that it's eventually sent.
   size_t ref_tsc = rdtsc();
-  size_t abs_tx_tsc = ref_tsc + wheel->wslot_width_tsc;
-  wheel->insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
+  size_t abs_tx_tsc = ref_tsc + wheel_->wslot_width_tsc_;
+  wheel_->insert(TimingWheel::get_dummy_ent(), ref_tsc, abs_tx_tsc);
 
-  wheel->reap(abs_tx_tsc + wheel->wslot_width_tsc);
-  ASSERT_EQ(wheel->ready_queue.size(), 1);
+  wheel_->reap(abs_tx_tsc + wheel_->wslot_width_tsc_);
+  ASSERT_EQ(wheel_->ready_queue_.size(), 1);
 }
 
 // This is not a fixture test because we use a different wheel for each rate
@@ -78,8 +78,8 @@ TEST(TimingWheelRateTest, RateTest) {
     // each iteration
     HugeAlloc alloc(MB(2), 0, reg_mr_func, dereg_mr_func);
     timing_wheel_args_t args;
-    args.freq_ghz = freq_ghz;
-    args.huge_alloc = &alloc;
+    args.freq_ghz_ = freq_ghz;
+    args.huge_alloc_ = &alloc;
 
     TimingWheel wheel(args);
 
@@ -101,13 +101,13 @@ TEST(TimingWheelRateTest, RateTest) {
       size_t cur_tsc = rdtsc();
       wheel.reap(cur_tsc);
 
-      size_t num_ready = wheel.ready_queue.size();
+      size_t num_ready = wheel.ready_queue_.size();
       assert(num_ready <= kSessionCredits);
 
       if (num_ready > 0) {
         num_pkts_sent += num_ready;
 
-        for (size_t i = 0; i < num_ready; i++) wheel.ready_queue.pop();
+        for (size_t i = 0; i < num_ready; i++) wheel.ready_queue_.pop();
 
         // Send more packets
         ref_tsc = rdtsc();

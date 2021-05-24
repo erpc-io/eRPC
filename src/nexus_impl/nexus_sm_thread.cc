@@ -9,12 +9,12 @@ static constexpr size_t kSmThreadRxBlockMs = 20;
 static constexpr size_t kUDPBufferSz = MB(4);
 
 void Nexus::sm_thread_func(SmThreadCtx ctx) {
-  UDPServer<SmPkt> udp_server(ctx.sm_udp_port, kSmThreadRxBlockMs,
+  UDPServer<SmPkt> udp_server(ctx.sm_udp_port_, kSmThreadRxBlockMs,
                               kUDPBufferSz);
   UDPClient<SmPkt> udp_client;
 
   // This is not a busy loop because of recv_blocking()
-  while (*ctx.kill_switch == false) {
+  while (*ctx.kill_switch_ == false) {
     SmPkt sm_pkt;
     ssize_t ret = udp_server.recv_blocking(sm_pkt);
 
@@ -26,14 +26,14 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
                 sm_pkt.to_string().c_str());
 
       uint8_t target_rpc_id =
-          sm_pkt.is_req() ? sm_pkt.server.rpc_id : sm_pkt.client.rpc_id;
+          sm_pkt.is_req() ? sm_pkt.server_.rpc_id_ : sm_pkt.client_.rpc_id_;
 
       // Lock the Nexus to prevent Rpc registration while we lookup the hook
-      ctx.reg_hooks_lock->lock();
-      Hook *target_hook = const_cast<Hook *>(ctx.reg_hooks_arr[target_rpc_id]);
+      ctx.reg_hooks_lock_->lock();
+      Hook *target_hook = const_cast<Hook *>(ctx.reg_hooks_arr_[target_rpc_id]);
 
       if (target_hook != nullptr) {
-        target_hook->sm_rx_queue.unlocked_push(
+        target_hook->sm_rx_queue_.unlocked_push(
             SmWorkItem(target_rpc_id, sm_pkt));
       } else {
         // We don't have an Rpc object for the target Rpc. Send an error
@@ -42,22 +42,22 @@ void Nexus::sm_thread_func(SmThreadCtx ctx) {
           ERPC_INFO(
               "eRPC Nexus: Received session management request for invalid "
               "Rpc %u from %s. Sending response.\n",
-              target_rpc_id, sm_pkt.client.name().c_str());
+              target_rpc_id, sm_pkt.client_.name().c_str());
 
           const SmPkt resp_sm_pkt =
               sm_construct_resp(sm_pkt, SmErrType::kInvalidRemoteRpcId);
 
-          udp_client.send(resp_sm_pkt.client.hostname,
-                          resp_sm_pkt.client.sm_udp_port, resp_sm_pkt);
+          udp_client.send(resp_sm_pkt.client_.hostname_,
+                          resp_sm_pkt.client_.sm_udp_port_, resp_sm_pkt);
         } else {
           ERPC_INFO(
               "eRPC Nexus: Received session management response for invalid "
               "Rpc %u from %s. Dropping.\n",
-              target_rpc_id, sm_pkt.client.name().c_str());
+              target_rpc_id, sm_pkt.client_.name().c_str());
         }
       }
 
-      ctx.reg_hooks_lock->unlock();
+      ctx.reg_hooks_lock_->unlock();
     }
   }
 

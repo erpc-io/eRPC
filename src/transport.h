@@ -35,34 +35,34 @@ class Transport {
    * This can contain both cluster-wide valid members (e.g., {LID, QPN}), and
    * members that are only locally valid (e.g., a pointer to \p ibv_ah).
    */
-  struct RoutingInfo {
-    uint8_t buf[kMaxRoutingInfoSize];
+  struct routing_info {
+    uint8_t buf_[kMaxRoutingInfoSize];
   };
 
   /// Generic struct to store memory registration info for any transport.
-  struct MemRegInfo {
-    void* transport_mr;  ///< The transport-specific memory region (eg, ibv_mr)
-    uint32_t lkey;       ///< The lkey of the memory region
+  struct mem_reg_info {
+    void* transport_mr_;  ///< The transport-specific memory region (eg, ibv_mr)
+    uint32_t lkey_;       ///< The lkey of the memory region
 
-    MemRegInfo(void* transport_mr, uint32_t lkey)
-        : transport_mr(transport_mr), lkey(lkey) {}
+    mem_reg_info(void* transport_mr, uint32_t lkey)
+        : transport_mr_(transport_mr), lkey_(lkey) {}
 
-    MemRegInfo() : transport_mr(nullptr), lkey(0xffffffff) {}
+    mem_reg_info() : transport_mr_(nullptr), lkey_(0xffffffff) {}
   };
 
   /// Info about a packet to transmit
   struct tx_burst_item_t {
-    RoutingInfo* routing_info;  ///< Routing info for this packet
-    MsgBuffer* msg_buffer;      ///< MsgBuffer for this packet
+    routing_info* routing_info_;  ///< Routing info for this packet
+    MsgBuffer* msg_buffer_;      ///< MsgBuffer for this packet
 
-    size_t pkt_idx;  /// Packet index (not pkt_num) in msg_buffer to transmit
-    size_t* tx_ts = nullptr;  ///< TX timestamp, only for congestion control
-    bool drop;                ///< Drop this packet. Used only with kTesting.
+    size_t pkt_idx_;  /// Packet index (not pkt_num) in msg_buffer to transmit
+    size_t* tx_ts_ = nullptr;  ///< TX timestamp, only for congestion control
+    bool drop_;                ///< Drop this packet. Used only with kTesting.
   };
 
   /// Generic types for memory registration and deregistration functions.
-  typedef std::function<MemRegInfo(void*, size_t)> reg_mr_func_t;
-  typedef std::function<void(MemRegInfo)> dereg_mr_func_t;
+  typedef std::function<mem_reg_info(void*, size_t)> reg_mr_func_t;
+  typedef std::function<void(mem_reg_info)> dereg_mr_func_t;
 
   static std::string get_name(TransportType transport_type) {
     switch (transport_type) {
@@ -133,7 +133,7 @@ class Transport {
   void post_recvs(size_t num_recvs);
 
   /// Fill-in local routing information
-  void fill_local_routing_info(RoutingInfo* routing_info) const;
+  void fill_local_routing_info(routing_info* routing_info) const;
 
   /**
    * @brief Try to resolve routing information received from a remote host. The
@@ -147,30 +147,30 @@ class Transport {
    *
    * @return True if resolution succeeds, false otherwise.
    */
-  bool resolve_remote_routing_info(RoutingInfo* routing_info) const;
+  bool resolve_remote_routing_info(routing_info* routing_info) const;
 
   /// Return the link bandwidth (bytes per second)
   size_t get_bandwidth() const;
 
   /// Return a string representation of \p routing_info
-  static std::string routing_info_str(RoutingInfo* routing_info);
+  static std::string routing_info_str(routing_info* routing_info);
 
   // Members that are needed by all transports. Constructor args first.
-  const TransportType transport_type;
-  const uint8_t rpc_id;    ///< The parent Rpc's ID
-  const uint8_t phy_port;  ///< 0-based index among active fabric ports
-  const size_t numa_node;  ///< The NUMA node of the parent Nexus
+  const TransportType transport_type_;
+  const uint8_t rpc_id_;    ///< The parent Rpc's ID
+  const uint8_t phy_port_;  ///< 0-based index among active fabric ports
+  const size_t numa_node_;  ///< The NUMA node of the parent Nexus
 
   // Other members
-  reg_mr_func_t reg_mr_func;      ///< The memory registration function
-  dereg_mr_func_t dereg_mr_func;  ///< The memory deregistration function
+  reg_mr_func_t reg_mr_func_;      ///< The memory registration function
+  dereg_mr_func_t dereg_mr_func_;  ///< The memory deregistration function
 
   // Members initialized after the hugepage allocator is provided
-  HugeAlloc* huge_alloc;  ///< The parent Rpc's hugepage allocator
-  FILE* trace_file;       ///< The parent Rpc's high-verbosity log file
+  HugeAlloc* huge_alloc_;  ///< The parent Rpc's hugepage allocator
+  FILE* trace_file_;       ///< The parent Rpc's high-verbosity log file
 
   struct {
-    size_t tx_flush_count = 0;  ///< Number of times tx_flush() has been called
-  } testing;
+    size_t tx_flush_count_ = 0;  ///< Number of times tx_flush() has been called
+  } testing_;
 };
 }  // namespace erpc

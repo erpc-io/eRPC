@@ -14,7 +14,7 @@ namespace erpc {
 template <class TTr>
 int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
-  sprintf(issue_msg, "Rpc %u: create_session() failed. Issue", rpc_id);
+  sprintf(issue_msg, "Rpc %u: create_session() failed. Issue", rpc_id_);
 
   // Check that the caller is the creator thread
   if (!in_dispatch()) {
@@ -32,8 +32,8 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
   }
 
   // Creating a session to one's own Rpc as the client is not allowed
-  if (rem_hostname == nexus->hostname && rem_rpc_id == rpc_id &&
-      rem_sm_udp_port == nexus->sm_udp_port) {
+  if (rem_hostname == nexus_->hostname_ && rem_rpc_id == rpc_id_ &&
+      rem_sm_udp_port == nexus_->sm_udp_port_) {
     ERPC_WARN("%s: Remote Rpc is same as local.\n", issue_msg);
     return -EINVAL;
   }
@@ -44,40 +44,40 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
     return -ENOMEM;
   }
 
-  auto *session = new Session(Session::Role::kClient, slow_rand.next_u64(),
-                              get_freq_ghz(), transport->get_bandwidth());
-  session->state = SessionState::kConnectInProgress;
-  session->local_session_num = session_vec.size();
+  auto *session = new Session(Session::Role::kClient, slow_rand_.next_u64(),
+                              get_freq_ghz(), transport_->get_bandwidth());
+  session->state_ = SessionState::kConnectInProgress;
+  session->local_session_num_ = session_vec_.size();
 
   // Fill in client and server endpoint metadata. Commented server fields will
   // be filled when the connect response is received.
-  SessionEndpoint &client_endpoint = session->client;
-  client_endpoint.transport_type = transport->transport_type;
-  strcpy(client_endpoint.hostname, nexus->hostname.c_str());
-  client_endpoint.sm_udp_port = nexus->sm_udp_port;
-  client_endpoint.rpc_id = rpc_id;
-  client_endpoint.session_num = session->local_session_num;
-  transport->fill_local_routing_info(&client_endpoint.routing_info);
+  SessionEndpoint &client_endpoint = session->client_;
+  client_endpoint.transport_type_ = transport_->transport_type_;
+  strcpy(client_endpoint.hostname_, nexus_->hostname_.c_str());
+  client_endpoint.sm_udp_port_ = nexus_->sm_udp_port_;
+  client_endpoint.rpc_id_ = rpc_id_;
+  client_endpoint.session_num_ = session->local_session_num_;
+  transport_->fill_local_routing_info(&client_endpoint.routing_info_);
 
-  SessionEndpoint &server_endpoint = session->server;
-  server_endpoint.transport_type = transport->transport_type;
-  strcpy(server_endpoint.hostname, rem_hostname.c_str());
-  server_endpoint.sm_udp_port = rem_sm_udp_port;
-  server_endpoint.rpc_id = rem_rpc_id;
+  SessionEndpoint &server_endpoint = session->server_;
+  server_endpoint.transport_type_ = transport_->transport_type_;
+  strcpy(server_endpoint.hostname_, rem_hostname.c_str());
+  server_endpoint.sm_udp_port_ = rem_sm_udp_port;
+  server_endpoint.rpc_id_ = rem_rpc_id;
   // server_endpoint.session_num = ??
   // server_endpoint.routing_info = ??
 
   alloc_ring_entries();
-  session_vec.push_back(session);  // Add to list of all sessions
+  session_vec_.push_back(session);  // Add to list of all sessions
 
   send_sm_req_st(session);
-  return client_endpoint.session_num;
+  return client_endpoint.session_num_;
 }
 
 template <class TTr>
 int Rpc<TTr>::destroy_session_st(int session_num) {
   char issue_msg[kMaxIssueMsgLen];  // The basic issue message
-  sprintf(issue_msg, "Rpc %u, lsn %u: destroy_session() failed. Issue", rpc_id,
+  sprintf(issue_msg, "Rpc %u, lsn %u: destroy_session() failed. Issue", rpc_id_,
           session_num);
 
   if (!in_dispatch()) {
@@ -90,7 +90,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
     return -EINVAL;
   }
 
-  Session *session = session_vec[static_cast<size_t>(session_num)];
+  Session *session = session_vec_[static_cast<size_t>(session_num)];
   if (session == nullptr) {
     ERPC_WARN("%s: Session already destroyed.\n", issue_msg);
     return -EPERM;
@@ -102,18 +102,19 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   }
 
   // A session can be destroyed only when all its sslots are free
-  if (session->client_info.sslot_free_vec.size() != kSessionReqWindow) {
+  if (session->client_info_.sslot_free_vec_.size() != kSessionReqWindow) {
     ERPC_WARN("%s: Session has pending RPC requests.\n", issue_msg);
     return -EBUSY;
   }
 
   // If we're here, RX and TX MsgBuffers in all sslots should be already buried
-  for (const SSlot &sslot : session->sslot_arr) {
-    assert(sslot.tx_msgbuf == nullptr);
-    if (!sslot.is_client) assert(sslot.server_info.req_msgbuf.buf == nullptr);
+  for (const SSlot &sslot : session->sslot_arr_) {
+    assert(sslot.tx_msgbuf_ == nullptr);
+    if (!sslot.is_client_)
+      assert(sslot.server_info_.req_msgbuf_.buf_ == nullptr);
   }
 
-  switch (session->state) {
+  switch (session->state_) {
     case SessionState::kConnectInProgress:
       // Can't disconnect right now. User needs to wait.
       ERPC_WARN("%s: Session connection in progress.\n", issue_msg);
@@ -121,10 +122,10 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
 
     case SessionState::kConnected:
       ERPC_INFO("Rpc %u, lsn %u: Sending disconnect request to [%s, %u].\n",
-                rpc_id, session->local_session_num, session->server.hostname,
-                session->server.rpc_id);
+                rpc_id_, session->local_session_num_,
+                session->server_.hostname_, session->server_.rpc_id_);
 
-      session->state = SessionState::kDisconnectInProgress;
+      session->state_ = SessionState::kDisconnectInProgress;
       send_sm_req_st(session);
       return 0;
 
@@ -146,7 +147,7 @@ size_t Rpc<TTr>::num_active_sessions_st() {
 
   size_t ret = 0;
   // session_vec can only be modified by the creator, so no need to lock
-  for (Session *session : session_vec) {
+  for (Session *session : session_vec_) {
     if (session != nullptr) ret++;
   }
 

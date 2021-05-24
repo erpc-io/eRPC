@@ -13,38 +13,38 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "Rpc %u, lsn %u: Trying to reset client session. State = %s. Issue",
-          rpc_id, session->local_session_num,
-          session_state_str(session->state).c_str());
+          rpc_id_, session->local_session_num_,
+          session_state_str(session->state_).c_str());
 
   // Erase session slots from credit stall queue
-  for (const SSlot &sslot : session->sslot_arr) {
-    stallq.erase(std::remove(stallq.begin(), stallq.end(), &sslot),
-                 stallq.end());
+  for (const SSlot &sslot : session->sslot_arr_) {
+    stallq_.erase(std::remove(stallq_.begin(), stallq_.end(), &sslot),
+                 stallq_.end());
   }
 
   // Invoke continuation-with-failure for all active requests
-  for (SSlot &sslot : session->sslot_arr) {
-    if (sslot.tx_msgbuf == nullptr) {
-      sslot.tx_msgbuf = nullptr;
+  for (SSlot &sslot : session->sslot_arr_) {
+    if (sslot.tx_msgbuf_ == nullptr) {
+      sslot.tx_msgbuf_ = nullptr;
       delete_from_active_rpc_list(sslot);
-      session->client_info.sslot_free_vec.push_back(sslot.index);
+      session->client_info_.sslot_free_vec_.push_back(sslot.index_);
 
-      MsgBuffer *resp_msgbuf = sslot.client_info.resp_msgbuf;
+      MsgBuffer *resp_msgbuf = sslot.client_info_.resp_msgbuf_;
       resize_msg_buffer(resp_msgbuf, 0);  // 0 response size marks the error
-      sslot.client_info.cont_func(context, sslot.client_info.tag);
+      sslot.client_info_.cont_func_(context_, sslot.client_info_.tag_);
     }
   }
 
-  assert(session->client_info.sslot_free_vec.size() == kSessionReqWindow);
+  assert(session->client_info_.sslot_free_vec_.size() == kSessionReqWindow);
 
   // Change state before failure continuations
-  session->state = SessionState::kDisconnectInProgress;
+  session->state_ = SessionState::kDisconnectInProgress;
 
   // Act similar to handling a disconnect response
   ERPC_INFO("%s: None. Session resetted.\n", issue_msg);
   free_ring_entries();  // Free before callback to allow creating new session
-  sm_handler(session->local_session_num, SmEventType::kDisconnected,
-             SmErrType::kSrvDisconnected, context);
+  sm_handler_(session->local_session_num_, SmEventType::kDisconnected,
+             SmErrType::kSrvDisconnected, context_);
   bury_session_st(session);
   return true;
 }
@@ -53,17 +53,17 @@ template <class TTr>
 bool Rpc<TTr>::handle_reset_server_st(Session *session) {
   assert(in_dispatch());
   assert(session->is_server());
-  session->state = SessionState::kResetInProgress;
+  session->state_ = SessionState::kResetInProgress;
 
   char issue_msg[kMaxIssueMsgLen];
   sprintf(issue_msg,
           "Rpc %u, lsn %u: Trying to reset server session. State = %s. Issue",
-          rpc_id, session->local_session_num,
-          session_state_str(session->state).c_str());
+          rpc_id_, session->local_session_num_,
+          session_state_str(session->state_).c_str());
 
   size_t pending_enqueue_resps = 0;
-  for (const SSlot &sslot : session->sslot_arr) {
-    if (sslot.server_info.req_type != kInvalidReqType) pending_enqueue_resps++;
+  for (const SSlot &sslot : session->sslot_arr_) {
+    if (sslot.server_info_.req_type_ != kInvalidReqType) pending_enqueue_resps++;
   }
 
   if (pending_enqueue_resps == 0) {
@@ -76,7 +76,7 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
     ERPC_WARN(
         "Rpc %u, lsn %u: Cannot reset server session. "
         "%zu enqueue_response pending.\n",
-        rpc_id, session->local_session_num, pending_enqueue_resps);
+        rpc_id_, session->local_session_num_, pending_enqueue_resps);
 
     return false;
   }

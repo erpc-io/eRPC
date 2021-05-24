@@ -37,7 +37,7 @@ namespace erpc {
 // erpc_trace_file_or_default_stream. This can be stdout for basic debugging, or
 // eRPC's trace file for more involved debugging.
 
-#define erpc_trace_file_or_default_stream trace_file
+#define erpc_trace_file_or_default_stream trace_file_
 //#define erpc_trace_file_or_default_stream ERPC_LOG_DEFAULT_STREAM
 
 // If ERPC_LOG_LEVEL is not defined, default to the highest level so that

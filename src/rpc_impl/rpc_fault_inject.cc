@@ -15,15 +15,15 @@ void Rpc<TTr>::fault_inject_check_ok() const {
 template <class TTr>
 void Rpc<TTr>::fault_inject_fail_resolve_rinfo_st() {
   fault_inject_check_ok();
-  faults.fail_resolve_rinfo = true;
+  faults_.fail_resolve_rinfo_ = true;
 }
 
 template <class TTr>
 void Rpc<TTr>::fault_inject_set_pkt_drop_prob_st(double p) {
   fault_inject_check_ok();
   assert(p == 0.0 || (p >= 1.0 / 1000000000 && p < .95));
-  faults.pkt_drop_prob = p;
-  faults.pkt_drop_thresh_billion = p * 1000000000;
+  faults_.pkt_drop_prob_ = p;
+  faults_.pkt_drop_thresh_billion_ = p * 1000000000;
 }
 
 FORCE_COMPILE_TRANSPORTS

@@ -28,10 +28,10 @@ class ServerContext : public BasicAppContext {
 
 class ClientContext : public BasicAppContext {
  public:
-  size_t start_tsc;
-  size_t req_size;  // Between kAppMinReqSize and kAppMaxReqSize
-  erpc::Latency latency;
-  erpc::MsgBuffer req_msgbuf, resp_msgbuf;
+  size_t start_tsc_;
+  size_t req_size_;  // Between kAppMinReqSize and kAppMaxReqSize
+  erpc::Latency latency_;
+  erpc::MsgBuffer req_msgbuf_, resp_msgbuf_;
 
   // If true, the client doubles its request size (up to kAppMaxReqSize) when
   // issuing the next request, and resets this flag to false
@@ -42,9 +42,9 @@ class ClientContext : public BasicAppContext {
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
-  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
                                                  kAppRespSize);
-  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
+  c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
 void server_func(erpc::Nexus *nexus) {
@@ -55,7 +55,7 @@ void server_func(erpc::Nexus *nexus) {
   ServerContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
                                   basic_sm_handler, phy_port);
-  c.rpc = &rpc;
+  c.rpc_ = &rpc;
 
   while (true) {
     rpc.run_event_loop(1000);
@@ -70,12 +70,12 @@ void connect_sessions(ClientContext &c) {
            server_uri.c_str());
 
     const int session_num =
-        c.rpc->create_session(server_uri, 0 /* tid at server */);
+        c.rpc_->create_session(server_uri, 0 /* tid at server */);
     erpc::rt_assert(session_num >= 0, "Failed to create session");
-    c.session_num_vec.push_back(session_num);
+    c.session_num_vec_.push_back(session_num);
 
-    while (c.num_sm_resps != (i + 1)) {
-      c.rpc->run_event_loop(kAppEvLoopMs);
+    while (c.num_sm_resps_ != (i + 1)) {
+      c.rpc_->run_event_loop(kAppEvLoopMs);
       if (unlikely(ctrl_c_pressed == 1)) return;
     }
   }
@@ -85,35 +85,35 @@ void app_cont_func(void *, void *);
 inline void send_req(ClientContext &c) {
   if (c.double_req_size_) {
     c.double_req_size_ = false;
-    c.req_size *= 2;
-    if (c.req_size > kAppMaxReqSize) c.req_size = kAppMinReqSize;
+    c.req_size_ *= 2;
+    if (c.req_size_ > kAppMaxReqSize) c.req_size_ = kAppMinReqSize;
 
-    c.rpc->resize_msg_buffer(&c.req_msgbuf, c.req_size);
-    c.rpc->resize_msg_buffer(&c.resp_msgbuf, c.req_size);
+    c.rpc_->resize_msg_buffer(&c.req_msgbuf_, c.req_size_);
+    c.rpc_->resize_msg_buffer(&c.resp_msgbuf_, c.req_size_);
   }
 
-  c.start_tsc = erpc::rdtsc();
-  const size_t server_id = c.fastrand.next_u32() % FLAGS_num_server_processes;
-  c.rpc->enqueue_request(c.session_num_vec[server_id], kAppReqType,
-                         &c.req_msgbuf, &c.resp_msgbuf, app_cont_func, nullptr);
+  c.start_tsc_ = erpc::rdtsc();
+  const size_t server_id = c.fastrand_.next_u32() % FLAGS_num_server_processes;
+  c.rpc_->enqueue_request(c.session_num_vec_[server_id], kAppReqType,
+                         &c.req_msgbuf_, &c.resp_msgbuf_, app_cont_func, nullptr);
   if (kAppVerbose) {
     printf("Latency: Sending request of size %zu bytes to server #%zu\n",
-           c.req_msgbuf.get_data_size(), server_id);
+           c.req_msgbuf_.get_data_size(), server_id);
   }
 }
 
 void app_cont_func(void *_context, void *) {
   auto *c = static_cast<ClientContext *>(_context);
-  assert(c->resp_msgbuf.get_data_size() == kAppRespSize);
+  assert(c->resp_msgbuf_.get_data_size() == kAppRespSize);
 
   if (kAppVerbose) {
     printf("Latency: Received response of size %zu bytes\n",
-           c->resp_msgbuf.get_data_size());
+           c->resp_msgbuf_.get_data_size());
   }
 
   double req_lat_us =
-      erpc::to_usec(erpc::rdtsc() - c->start_tsc, c->rpc->get_freq_ghz());
-  c->latency.update(static_cast<size_t>(req_lat_us * kAppLatFac));
+      erpc::to_usec(erpc::rdtsc() - c->start_tsc_, c->rpc_->get_freq_ghz());
+  c->latency_.update(static_cast<size_t>(req_lat_us * kAppLatFac));
 
   send_req(*c);
 }
@@ -127,14 +127,14 @@ void client_func(erpc::Nexus *nexus) {
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0,
                                   basic_sm_handler, phy_port);
 
-  rpc.retry_connect_on_invalid_rpc_id = true;
-  c.rpc = &rpc;
-  c.req_size = kAppMinReqSize;
+  rpc.retry_connect_on_invalid_rpc_id_ = true;
+  c.rpc_ = &rpc;
+  c.req_size_ = kAppMinReqSize;
 
-  c.req_msgbuf = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
-  c.resp_msgbuf = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
-  c.rpc->resize_msg_buffer(&c.req_msgbuf, c.req_size);
-  c.rpc->resize_msg_buffer(&c.resp_msgbuf, c.req_size);
+  c.req_msgbuf_ = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
+  c.resp_msgbuf_ = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
+  c.rpc_->resize_msg_buffer(&c.req_msgbuf_, c.req_size_);
+  c.rpc_->resize_msg_buffer(&c.resp_msgbuf_, c.req_size_);
 
   connect_sessions(c);
 
@@ -146,13 +146,13 @@ void client_func(erpc::Nexus *nexus) {
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(kAppEvLoopMs);  // 1 second
     if (ctrl_c_pressed == 1) break;
-    printf("%zu %.1f %.1f %.1f %.1f %.1f\n", c.req_size,
-           c.latency.perc(.5) / kAppLatFac, c.latency.perc(.05) / kAppLatFac,
-           c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac,
-           c.latency.max() / kAppLatFac);
+    printf("%zu %.1f %.1f %.1f %.1f %.1f\n", c.req_size_,
+           c.latency_.perc(.5) / kAppLatFac, c.latency_.perc(.05) / kAppLatFac,
+           c.latency_.perc(.99) / kAppLatFac, c.latency_.perc(.999) / kAppLatFac,
+           c.latency_.max() / kAppLatFac);
 
     c.double_req_size_ = true;
-    c.latency.reset();
+    c.latency_.reset();
   }
 }
 

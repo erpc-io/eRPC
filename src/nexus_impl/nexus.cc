@@ -10,119 +10,119 @@
 namespace erpc {
 
 Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
-    : freq_ghz(measure_rdtsc_freq()),
-      hostname(extract_hostname_from_uri(local_uri)),
-      sm_udp_port(extract_udp_port_from_uri(local_uri)),
-      numa_node(numa_node),
-      num_bg_threads(num_bg_threads),
-      heartbeat_mgr(hostname, sm_udp_port, freq_ghz, kMachineFailureTimeoutMs) {
+    : freq_ghz_(measure_rdtsc_freq()),
+      hostname_(extract_hostname_from_uri(local_uri)),
+      sm_udp_port_(extract_udp_port_from_uri(local_uri)),
+      numa_node_(numa_node),
+      num_bg_threads_(num_bg_threads),
+      heartbeat_mgr_(hostname_, sm_udp_port_, freq_ghz_, kMachineFailureTimeoutMs) {
   if (kTesting) {
     ERPC_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   }
 
-  rt_assert(sm_udp_port >= kBaseSmUdpPort &&
-                sm_udp_port < (kBaseSmUdpPort + kMaxNumERpcProcesses),
+  rt_assert(sm_udp_port_ >= kBaseSmUdpPort &&
+                sm_udp_port_ < (kBaseSmUdpPort + kMaxNumERpcProcesses),
             "Invalid management UDP port");
   rt_assert(num_bg_threads <= kMaxBgThreads, "Too many background threads");
   rt_assert(numa_node < kMaxNumaNodes, "Invalid NUMA node");
 
-  kill_switch = false;
+  kill_switch_ = false;
 
   // Launch background threads
   ERPC_INFO("eRPC Nexus: Launching %zu background threads.\n", num_bg_threads);
   for (size_t i = 0; i < num_bg_threads; i++) {
-    assert(tls_registry.cur_etid == i);
+    assert(tls_registry_.cur_etid_ == i);
 
     BgThreadCtx bg_thread_ctx;
-    bg_thread_ctx.kill_switch = &kill_switch;
-    bg_thread_ctx.req_func_arr = &req_func_arr;
-    bg_thread_ctx.tls_registry = &tls_registry;
-    bg_thread_ctx.bg_thread_index = i;
-    bg_thread_ctx.bg_req_queue = &bg_req_queue[i];
+    bg_thread_ctx.kill_switch_ = &kill_switch_;
+    bg_thread_ctx.req_func_arr_ = &req_func_arr_;
+    bg_thread_ctx.tls_registry_ = &tls_registry_;
+    bg_thread_ctx.bg_thread_index_ = i;
+    bg_thread_ctx.bg_req_queue_ = &bg_req_queue_[i];
 
-    bg_thread_arr[i] = std::thread(bg_thread_func, bg_thread_ctx);
+    bg_thread_arr_[i] = std::thread(bg_thread_func, bg_thread_ctx);
 
     // Wait for the launched thread to grab a eRPC thread ID, otherwise later
     // background threads or the foreground thread can grab ID = i.
-    while (tls_registry.cur_etid == i) usleep(1);
+    while (tls_registry_.cur_etid_ == i) usleep(1);
   }
 
   // Launch the session management thread
   SmThreadCtx sm_thread_ctx;
-  sm_thread_ctx.hostname = hostname;
-  sm_thread_ctx.sm_udp_port = sm_udp_port;
-  sm_thread_ctx.freq_ghz = freq_ghz;
-  sm_thread_ctx.kill_switch = &kill_switch;
-  sm_thread_ctx.heartbeat_mgr = &heartbeat_mgr;
-  sm_thread_ctx.reg_hooks_arr = const_cast<volatile Hook **>(reg_hooks_arr);
-  sm_thread_ctx.reg_hooks_lock = &reg_hooks_lock;
+  sm_thread_ctx.hostname_ = hostname_;
+  sm_thread_ctx.sm_udp_port_ = sm_udp_port_;
+  sm_thread_ctx.freq_ghz_ = freq_ghz_;
+  sm_thread_ctx.kill_switch_ = &kill_switch_;
+  sm_thread_ctx.heartbeat_mgr_ = &heartbeat_mgr_;
+  sm_thread_ctx.reg_hooks_arr_ = const_cast<volatile Hook **>(reg_hooks_arr_);
+  sm_thread_ctx.reg_hooks_lock_ = &reg_hooks_lock_;
 
   // Bind the session management thread to the last lcore on numa_node
   size_t sm_thread_lcore_index = num_lcores_per_numa_node() - 1;
   ERPC_INFO("eRPC Nexus: Launching session management thread on core %zu.\n",
             get_lcores_for_numa_node(numa_node).at(sm_thread_lcore_index));
-  sm_thread = std::thread(sm_thread_func, sm_thread_ctx);
-  bind_to_core(sm_thread, numa_node, sm_thread_lcore_index);
+  sm_thread_ = std::thread(sm_thread_func, sm_thread_ctx);
+  bind_to_core(sm_thread_, numa_node, sm_thread_lcore_index);
 
   ERPC_INFO("eRPC Nexus: Created with management UDP port %u, hostname %s.\n",
-            sm_udp_port, hostname.c_str());
+            sm_udp_port_, hostname_.c_str());
 }
 
 Nexus::~Nexus() {
   ERPC_INFO("eRPC Nexus: Destroying Nexus.\n");
 
   // Signal background and session management threads to kill themselves
-  kill_switch = true;
-  for (size_t i = 0; i < num_bg_threads; i++) bg_thread_arr[i].join();
-  sm_thread.join();
+  kill_switch_ = true;
+  for (size_t i = 0; i < num_bg_threads_; i++) bg_thread_arr_[i].join();
+  sm_thread_.join();
 
   // Reset thread-local storage to prevent errors if gtest reuses the process.
   // Rationale: At this point, eRPC-owned threads are dead. All worker threads
   // should be dead as well, so it's safe to reset TLS.
-  for (const Hook *hook : reg_hooks_arr) {
+  for (const Hook *hook : reg_hooks_arr_) {
     if (hook != nullptr) {
       ERPC_WARN("Rpc: Deleting Nexus, but a worker is still registered");
       assert(false);  // Die in debug mode
     }
   }
 
-  tls_registry.reset();
+  tls_registry_.reset();
 }
 
 bool Nexus::rpc_id_exists(uint8_t rpc_id) {
-  reg_hooks_lock.lock();
-  bool ret = (reg_hooks_arr[rpc_id] != nullptr);
-  reg_hooks_lock.unlock();
+  reg_hooks_lock_.lock();
+  bool ret = (reg_hooks_arr_[rpc_id] != nullptr);
+  reg_hooks_lock_.unlock();
   return ret;
 }
 
 void Nexus::register_hook(Hook *hook) {
-  uint8_t rpc_id = hook->rpc_id;
+  uint8_t rpc_id = hook->rpc_id_;
   assert(rpc_id <= kMaxRpcId);
-  assert(reg_hooks_arr[rpc_id] == nullptr);
+  assert(reg_hooks_arr_[rpc_id] == nullptr);
 
-  reg_hooks_lock.lock();
+  reg_hooks_lock_.lock();
 
-  req_func_registration_allowed = false;  // Disable future Ops registration
-  reg_hooks_arr[rpc_id] = hook;           // Save the hook
+  req_func_registration_allowed_ = false;  // Disable future Ops registration
+  reg_hooks_arr_[rpc_id] = hook;           // Save the hook
 
   // Install background request submission lists
-  for (size_t i = 0; i < num_bg_threads; i++) {
-    hook->bg_req_queue_arr[i] = &bg_req_queue[i];
+  for (size_t i = 0; i < num_bg_threads_; i++) {
+    hook->bg_req_queue_arr_[i] = &bg_req_queue_[i];
   }
 
-  reg_hooks_lock.unlock();
+  reg_hooks_lock_.unlock();
 }
 
 void Nexus::unregister_hook(Hook *hook) {
-  uint8_t rpc_id = hook->rpc_id;
+  uint8_t rpc_id = hook->rpc_id_;
   assert(rpc_id <= kMaxRpcId);
-  assert(reg_hooks_arr[rpc_id] == hook);
+  assert(reg_hooks_arr_[rpc_id] == hook);
   ERPC_INFO("eRPC Nexus: Deregistering Rpc %u.\n", rpc_id);
 
-  reg_hooks_lock.lock();
-  reg_hooks_arr[rpc_id] = nullptr;
-  reg_hooks_lock.unlock();
+  reg_hooks_lock_.lock();
+  reg_hooks_arr_[rpc_id] = nullptr;
+  reg_hooks_lock_.unlock();
 }
 
 int Nexus::register_req_func(uint8_t req_type, erpc_req_func_t req_func,
@@ -133,14 +133,14 @@ int Nexus::register_req_func(uint8_t req_type, erpc_req_func_t req_func,
           req_type);
 
   // If any Rpc is already registered, the user cannot register new Ops
-  if (!req_func_registration_allowed) {
+  if (!req_func_registration_allowed_) {
     ERPC_WARN("%s: Registration not allowed anymore.\n", issue_msg);
     return -EPERM;
   }
 
-  ReqFunc &arr_req_func = req_func_arr[req_type];
+  ReqFunc &arr_req_func = req_func_arr_[req_type];
 
-  if (req_func_arr[req_type].is_registered()) {
+  if (req_func_arr_[req_type].is_registered()) {
     ERPC_WARN("%s: Handler for this request type already exists.\n", issue_msg);
     return -EEXIST;
   }
@@ -150,7 +150,7 @@ int Nexus::register_req_func(uint8_t req_type, erpc_req_func_t req_func,
     return -EINVAL;
   }
 
-  if (req_func_type == ReqFuncType::kBackground && num_bg_threads == 0) {
+  if (req_func_type == ReqFuncType::kBackground && num_bg_threads_ == 0) {
     ERPC_WARN("%s: Background threads not available.\n", issue_msg);
     return -EPERM;
   }

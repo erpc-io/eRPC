@@ -40,41 +40,41 @@ class RpcTest : public ::testing::Test {
       return;
     }
 
-    nexus = new Nexus("localhost:31850", kTestNumaNode, 0);
-    rt_assert(nexus != nullptr, "Failed to create nexus");
-    nexus->register_req_func(kTestReqType, req_handler,
-                             ReqFuncType::kForeground);
-    nexus->kill_switch = true;  // Kill SM thread
+    nexus_ = new Nexus("localhost:31850", kTestNumaNode, 0);
+    rt_assert(nexus_ != nullptr, "Failed to create nexus");
+    nexus_->register_req_func(kTestReqType, req_handler,
+                              ReqFuncType::kForeground);
+    nexus_->kill_switch_ = true;  // Kill SM thread
 
-    rpc = new Rpc<CTransport>(nexus, nullptr, kTestRpcId, sm_handler,
-                              kTestPhyPort);
+    rpc_ = new Rpc<CTransport>(nexus_, nullptr, kTestRpcId, sm_handler,
+                               kTestPhyPort);
 
-    rt_assert(rpc != nullptr, "Failed to create Rpc");
+    rt_assert(rpc_ != nullptr, "Failed to create Rpc");
 
-    pkthdr_tx_queue = &rpc->testing.pkthdr_tx_queue;
+    pkthdr_tx_queue_ = &rpc_->testing_.pkthdr_tx_queue_;
 
     // Init local endpoint
-    local_endpoint.transport_type = rpc->transport->transport_type;
-    strcpy(local_endpoint.hostname, "localhost");
-    local_endpoint.sm_udp_port = 31850;
-    local_endpoint.rpc_id = kTestRpcId;
-    local_endpoint.session_num = 0;
-    rpc->transport->fill_local_routing_info(&local_endpoint.routing_info);
+    local_endpoint_.transport_type_ = rpc_->transport_->transport_type_;
+    strcpy(local_endpoint_.hostname_, "localhost");
+    local_endpoint_.sm_udp_port_ = 31850;
+    local_endpoint_.rpc_id_ = kTestRpcId;
+    local_endpoint_.session_num_ = 0;
+    rpc_->transport_->fill_local_routing_info(&local_endpoint_.routing_info_);
 
     // Init remote endpoint. Reusing local routing info & hostname is fine.
-    remote_endpoint.transport_type = rpc->transport->transport_type;
-    strcpy(remote_endpoint.hostname, "localhost");
-    remote_endpoint.sm_udp_port = 31850;
-    remote_endpoint.rpc_id = kTestRpcId + 1;
-    remote_endpoint.session_num = 1;
-    rpc->transport->fill_local_routing_info(&remote_endpoint.routing_info);
+    remote_endpoint_.transport_type_ = rpc_->transport_->transport_type_;
+    strcpy(remote_endpoint_.hostname_, "localhost");
+    remote_endpoint_.sm_udp_port_ = 31850;
+    remote_endpoint_.rpc_id_ = kTestRpcId + 1;
+    remote_endpoint_.session_num_ = 1;
+    rpc_->transport_->fill_local_routing_info(&remote_endpoint_.routing_info_);
 
-    rpc->set_context(this);
+    rpc_->set_context(this);
   }
 
   ~RpcTest() {
-    delete rpc;
-    delete nexus;
+    delete rpc_;
+    delete nexus_;
   }
 
   // Note that the session creation functions below do not use the
@@ -84,16 +84,16 @@ class RpcTest : public ::testing::Test {
   Session *create_client_session_init(const SessionEndpoint client,
                                       const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kClient, kTestUniqToken,
-                                rpc->get_freq_ghz(), kTestLinkBandwidth);
-    session->state = SessionState::kConnectInProgress;
-    session->local_session_num = rpc->session_vec.size();
+                                rpc_->get_freq_ghz(), kTestLinkBandwidth);
+    session->state_ = SessionState::kConnectInProgress;
+    session->local_session_num_ = rpc_->session_vec_.size();
 
-    session->client = client;
-    session->server = server;
-    session->server.session_num = kInvalidSessionNum;
+    session->client_ = client;
+    session->server_ = server;
+    session->server_.session_num_ = kInvalidSessionNum;
 
-    rpc->ring_entries_available -= kSessionCredits;
-    rpc->session_vec.push_back(session);
+    rpc_->ring_entries_available_ -= kSessionCredits;
+    rpc_->session_vec_.push_back(session);
 
     return session;
   }
@@ -102,16 +102,16 @@ class RpcTest : public ::testing::Test {
   Session *create_client_session_connected(const SessionEndpoint client,
                                            const SessionEndpoint server) {
     create_client_session_init(client, server);
-    Session *session = rpc->session_vec.back();
-    session->server.session_num = server.session_num;
+    Session *session = rpc_->session_vec_.back();
+    session->server_.session_num_ = server.session_num_;
 
-    auto &remote_rinfo = session->server.routing_info;
-    rt_assert(rpc->transport->resolve_remote_routing_info(&remote_rinfo),
+    auto &remote_rinfo = session->server_.routing_info_;
+    rt_assert(rpc_->transport_->resolve_remote_routing_info(&remote_rinfo),
               "Failed to resolve server routing info");
 
-    session->remote_session_num = session->server.session_num;
-    session->state = SessionState::kConnected;
-    session->client_info.cc.prev_desired_tx_tsc = rdtsc();
+    session->remote_session_num_ = session->server_.session_num_;
+    session->state_ = SessionState::kConnected;
+    session->client_info_.cc_.prev_desired_tx_tsc_ = rdtsc();
 
     return session;
   }
@@ -120,51 +120,51 @@ class RpcTest : public ::testing::Test {
   Session *create_server_session_init(const SessionEndpoint client,
                                       const SessionEndpoint server) {
     auto *session = new Session(Session::Role::kServer, kTestUniqToken,
-                                rpc->get_freq_ghz(), kTestLinkBandwidth);
-    session->state = SessionState::kConnected;
-    session->client = client;
-    session->server = server;
+                                rpc_->get_freq_ghz(), kTestLinkBandwidth);
+    session->state_ = SessionState::kConnected;
+    session->client_ = client;
+    session->server_ = server;
 
-    for (SSlot &sslot : session->sslot_arr) {
-      sslot.pre_resp_msgbuf =
-          rpc->alloc_msg_buffer_or_die(rpc->transport->kMaxDataPerPkt);
+    for (SSlot &sslot : session->sslot_arr_) {
+      sslot.pre_resp_msgbuf_ =
+          rpc_->alloc_msg_buffer_or_die(rpc_->transport_->kMaxDataPerPkt);
     }
 
-    auto &remote_rinfo = session->client.routing_info;
-    rt_assert(rpc->transport->resolve_remote_routing_info(&remote_rinfo),
+    auto &remote_rinfo = session->client_.routing_info_;
+    rt_assert(rpc_->transport_->resolve_remote_routing_info(&remote_rinfo),
               "Failed to resolve client routing info");
 
-    session->local_session_num = session->server.session_num;
-    session->remote_session_num = session->client.session_num;
+    session->local_session_num_ = session->server_.session_num_;
+    session->remote_session_num_ = session->client_.session_num_;
 
-    rpc->ring_entries_available -= kSessionCredits;
-    rpc->session_vec.push_back(session);
+    rpc_->ring_entries_available_ -= kSessionCredits;
+    rpc_->session_vec_.push_back(session);
     return session;
   }
 
-  SessionEndpoint get_local_endpoint() const { return local_endpoint; }
-  SessionEndpoint get_remote_endpoint() const { return remote_endpoint; }
+  SessionEndpoint get_local_endpoint() const { return local_endpoint_; }
+  SessionEndpoint get_remote_endpoint() const { return remote_endpoint_; }
 
   SessionEndpoint set_invalid_session_num(SessionEndpoint se) {
-    se.session_num = kInvalidSessionNum;
+    se.session_num_ = kInvalidSessionNum;
     return se;
   }
 
-  Rpc<CTransport> *rpc = nullptr;
-  FixedQueue<pkthdr_t, kSessionCredits> *pkthdr_tx_queue;
+  Rpc<CTransport> *rpc_ = nullptr;
+  FixedQueue<pkthdr_t, kSessionCredits> *pkthdr_tx_queue_;
 
  private:
-  Nexus *nexus = nullptr;
+  Nexus *nexus_ = nullptr;
 
   /// Endpoint in this Rpc (Rpc ID = kTestRpcId), with session number = 0
-  SessionEndpoint local_endpoint;
+  SessionEndpoint local_endpoint_;
 
   /// A remote endpoint with Rpc ID = kTestRpcId + 1, session number = 1
-  SessionEndpoint remote_endpoint;
+  SessionEndpoint remote_endpoint_;
 
   /// Useful counters for subtests
-  size_t num_req_handler_calls = 0;
-  size_t num_cont_func_calls = 0;
+  size_t num_req_handler_calls_ = 0;
+  size_t num_cont_func_calls_ = 0;
 };
 
 /// The common request handler for subtests. Works for any request size.
@@ -174,17 +174,17 @@ static void req_handler(ReqHandle *req_handle, void *_context) {
   const MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   const size_t resp_size = req_msgbuf->get_data_size();
 
-  req_handle->dyn_resp_msgbuf = context->rpc->alloc_msg_buffer(resp_size);
-  memcpy(req_handle->dyn_resp_msgbuf.buf, req_msgbuf->buf, resp_size);
+  req_handle->dyn_resp_msgbuf_ = context->rpc_->alloc_msg_buffer(resp_size);
+  memcpy(req_handle->dyn_resp_msgbuf_.buf_, req_msgbuf->buf_, resp_size);
 
-  context->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
-  context->num_req_handler_calls++;
+  context->rpc_->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf_);
+  context->num_req_handler_calls_++;
 }
 
 /// The common continuation for subtests.
 static void cont_func(void *_context, void *) {
   auto *context = static_cast<RpcTest *>(_context);
-  context->num_cont_func_calls++;
+  context->num_cont_func_calls_++;
 }
 
 }  // namespace erpc

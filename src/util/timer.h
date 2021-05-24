@@ -49,10 +49,10 @@ static double measure_rdtsc_freq() {
       static_cast<uint64_t>(end.tv_nsec - start.tv_nsec);
   uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
 
-  double _freq_ghz = rdtsc_cycles * 1.0 / clock_ns;
-  rt_assert(_freq_ghz >= 0.5 && _freq_ghz <= 5.0, "Invalid RDTSC frequency");
+  double freq_ghz = rdtsc_cycles * 1.0 / clock_ns;
+  rt_assert(freq_ghz >= 0.5 && freq_ghz <= 5.0, "Invalid RDTSC frequency");
 
-  return _freq_ghz;
+  return freq_ghz;
 }
 
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to seconds
@@ -104,23 +104,23 @@ static double ns_since(const struct timespec &t0) {
 /// Simple time that uses RDTSC
 class TscTimer {
  public:
-  size_t start_tsc = 0;
-  size_t tsc_sum = 0;
-  size_t num_calls = 0;
+  size_t start_tsc_ = 0;
+  size_t tsc_sum_ = 0;
+  size_t num_calls_ = 0;
 
-  inline void start() { start_tsc = rdtsc(); }
+  inline void start() { start_tsc_ = rdtsc(); }
   inline void stop() {
-    tsc_sum += (rdtsc() - start_tsc);
-    num_calls++;
+    tsc_sum_ += (rdtsc() - start_tsc_);
+    num_calls_++;
   }
 
   void reset() {
-    start_tsc = 0;
-    tsc_sum = 0;
-    num_calls = 0;
+    start_tsc_ = 0;
+    tsc_sum_ = 0;
+    num_calls_ = 0;
   }
 
-  size_t avg_cycles() const { return tsc_sum / num_calls; }
+  size_t avg_cycles() const { return tsc_sum_ / num_calls_; }
   double avg_sec(double freq_ghz) const {
     return to_sec(avg_cycles(), freq_ghz);
   }
