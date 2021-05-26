@@ -5,7 +5,7 @@ namespace erpc {
 template <class TTr>
 void Rpc<TTr>::process_comps_st() {
   assert(in_dispatch());
-  size_t num_pkts = transport_->rx_burst();
+  const size_t num_pkts = transport_->rx_burst();
   if (num_pkts == 0) return;
 
   // Measure RX burst size
@@ -19,7 +19,16 @@ void Rpc<TTr>::process_comps_st() {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring_[rx_ring_head_]);
     rx_ring_head_ = (rx_ring_head_ + 1) % Transport::kNumRxRingEntries;
 
-    assert(pkthdr->check_magic());
+    if (unlikely(!pkthdr->check_magic())) {
+      // This is very bad, but we can handle it
+      ERPC_ERROR(
+          "Rpc %u: Received %s with invalid magic. Packet headroom = %s. "
+          "Dropping.\n",
+          rpc_id_, pkthdr->to_string().c_str(),
+          pkthdr->headroom_string().c_str());
+      continue;
+    }
+
     assert(pkthdr->msg_size_ <= kMaxMsgSize);  // msg_size can be 0 here
 
     if (unlikely(pkthdr->dest_session_num_ >= session_vec_.size())) {
@@ -49,7 +58,7 @@ void Rpc<TTr>::process_comps_st() {
         "Rpc %u, lsn %u (%s): RX %s.\n", rpc_id_, session->local_session_num_,
         session->get_remote_hostname().c_str(), pkthdr->to_string().c_str());
 
-    size_t sslot_i = pkthdr->req_num_ % kSessionReqWindow;  // Bit shift
+    const size_t sslot_i = pkthdr->req_num_ % kSessionReqWindow;  // Bit shift
     SSlot *sslot = &session->sslot_arr_[sslot_i];
 
     switch (pkthdr->pkt_type_) {

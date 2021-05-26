@@ -24,6 +24,7 @@ DEFINE_uint64(num_server_processes, 1, "Number of server processes");
 
 class ServerContext : public BasicAppContext {
  public:
+  erpc::FastRand fast_rand_;
 };
 
 class ClientContext : public BasicAppContext {
@@ -44,6 +45,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
                                                  kAppRespSize);
+  // erpc::nano_sleep((c->fast_rand_.next_u32() % 5) * 1000 * 1000, 3.0);
   c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
