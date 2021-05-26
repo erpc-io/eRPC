@@ -58,7 +58,7 @@ struct pkthdr_t {
   uint64_t msg_size_ : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
   uint64_t dest_session_num_ : 16;    ///< Destination session number
   uint64_t pkt_type_ : 2;             ///< The packet type
-  uint64_t pkt_num_ : kPktNumBits;    ///< Monotonically increasing packet number
+  uint64_t pkt_num_ : kPktNumBits;  ///< Monotonically increasing packet number
 
   /// Request number, carried by all data and control packets for a request.
   uint64_t req_num_ : kReqNumBits;
@@ -88,9 +88,17 @@ struct pkthdr_t {
         << "dsn " << std::to_string(dest_session_num_) << ", "
         << "reqn " << std::to_string(req_num_) << ", "
         << "pktn " << std::to_string(pkt_num_) << ", "
-        << "msz " << std::to_string(msg_size_) << "]";
+        << "msz " << std::to_string(msg_size_) << ", "
+        << "magic " << std::to_string(magic_) << "]";
 
     return ret.str();
+  }
+
+  /// Return a string representation of this packet's headroom, which contains
+  /// the Ethernet packet header for Ethernet-based transports.
+  std::string headroom_string() const {
+    if (kHeadroom == 0) return "[Not available for IB]";
+    return frame_header_to_string(&headroom_[0]);
   }
 
   /// Return a pointer to the eRPC header in this packet header
