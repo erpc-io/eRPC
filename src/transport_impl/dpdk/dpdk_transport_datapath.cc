@@ -130,11 +130,11 @@ size_t DpdkTransport::rx_burst() {
     if (unlikely(ntohl(pkthdr->get_ipv4_hdr()->dst_ip) != resolve_.ipv4_addr ||
                  ntohs(pkthdr->get_udp_hdr()->dst_port) != rx_flow_udp_port_)) {
       ERPC_ERROR("Invalid packet. Pkt: %u %s %s. Me: %u %s %s\n",
-                 ntohs(pkthdr->get_udp_hdr()->dst_port),
-                 ipv4_to_string(pkthdr->get_ipv4_hdr()->dst_ip).c_str(),
-                 mac_to_string(pkthdr->get_eth_hdr()->dst_mac).c_str(),
-                 rx_flow_udp_port_, ipv4_to_string(resolve_.ipv4_addr).c_str(),
-                 mac_to_string(resolve_.mac_addr).c_str());
+                 ntohs(pkthdr->get_udp_hdr()->dst_port_),
+                 ipv4_to_string(pkthdr->get_ipv4_hdr()->dst_ip_).c_str(),
+                 mac_to_string(pkthdr->get_eth_hdr()->dst_mac_).c_str(),
+                 rx_flow_udp_port_, ipv4_to_string(resolve_.ipv4_addr_).c_str(),
+                 mac_to_string(resolve_.mac_addr_).c_str());
       exit(-1);
     }
 #endif
