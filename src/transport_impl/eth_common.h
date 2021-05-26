@@ -141,10 +141,10 @@ struct eth_routing_info_t {
   // assert here causes a circular dependency.
 };
 
-static std::string frame_header_to_string(uint8_t* buf) {
-  auto* eth_hdr = reinterpret_cast<eth_hdr_t*>(buf);
-  auto* ipv4_hdr = reinterpret_cast<ipv4_hdr_t*>(&eth_hdr[1]);
-  auto* udp_hdr = reinterpret_cast<udp_hdr_t*>(&ipv4_hdr[1]);
+static std::string frame_header_to_string(const uint8_t* buf) {
+  auto* eth_hdr = reinterpret_cast<const eth_hdr_t*>(buf);
+  auto* ipv4_hdr = reinterpret_cast<const ipv4_hdr_t*>(&eth_hdr[1]);
+  auto* udp_hdr = reinterpret_cast<const udp_hdr_t*>(&ipv4_hdr[1]);
 
   return eth_hdr->to_string() + ", " + ipv4_hdr->to_string() + ", " +
          udp_hdr->to_string();
