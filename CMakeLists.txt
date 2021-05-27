@@ -6,12 +6,16 @@ include(CMakeDependentOption)
 # Pick a compiler
 #set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
 
-add_definitions(-std=c++11 -march=native)
-add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
-add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations)
+# Common sub-projects
+set(HDR_HISTOGRAM_BUILD_PROGRAMS OFF CACHE BOOL "Minimize HDR histogram build")
+set(HDR_LOG_REQUIRED OFF CACHE BOOL "Disable HDR histogram's log to avoid zlib dependency")
+add_subdirectory(third_party/HdrHistogram_c)
 
-set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
+set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static)
 
 # Unit tests
 enable_testing()
@@ -229,7 +233,8 @@ set(UTIL_TESTS
   misc_test
   fixed_vector_test
   timely_test
-  numautil_test)
+  numautil_test
+  hdr_histogram_test)
 
 # Compile the library
 add_library(erpc ${SOURCES})
