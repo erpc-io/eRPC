@@ -22,7 +22,7 @@ TEST_F(RpcTest, process_resp_one_SMALL_st) {
   uint8_t remote_resp[sizeof(pkthdr_t) + kTestSmallMsgSize];
   auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(remote_resp);
   pkthdr_0->format(kTestReqType, kTestSmallMsgSize, client.session_num_,
-                   PktType::kPktTypeResp, 0 /* pkt_num */, kSessionReqWindow);
+                   PktType::kResp, 0 /* pkt_num */, kSessionReqWindow);
 
   size_t batch_rx_tsc = rdtsc();  // Stress batch TSC use
 

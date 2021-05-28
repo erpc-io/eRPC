@@ -42,7 +42,7 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf) {
   resp_pkthdr_0->req_type_ = sslot->server_info_.req_type_;
   resp_pkthdr_0->msg_size_ = resp_msgbuf->data_size_;
   resp_pkthdr_0->dest_session_num_ = session->remote_session_num_;
-  resp_pkthdr_0->pkt_type_ = kPktTypeResp;
+  resp_pkthdr_0->pkt_type_ = PktType::kResp;
   resp_pkthdr_0->pkt_num_ = sslot->server_info_.sav_num_req_pkts_ - 1;
   resp_pkthdr_0->req_num_ = sslot->cur_req_num_;
 

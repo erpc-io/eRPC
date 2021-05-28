@@ -15,7 +15,7 @@ void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
   rfr_pkthdr->req_type_ = resp_pkthdr->req_type_;
   rfr_pkthdr->msg_size_ = 0;
   rfr_pkthdr->dest_session_num_ = sslot->session_->remote_session_num_;
-  rfr_pkthdr->pkt_type_ = kPktTypeRFR;
+  rfr_pkthdr->pkt_type_ = PktType::kRFR;
   rfr_pkthdr->pkt_num_ = sslot->client_info_.num_tx_;
   rfr_pkthdr->req_num_ = resp_pkthdr->req_num_;
   rfr_pkthdr->magic_ = kPktHdrMagic;

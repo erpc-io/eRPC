@@ -54,7 +54,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   pkthdr_0->req_type_ = req_type;
   pkthdr_0->msg_size_ = req_msgbuf->data_size_;
   pkthdr_0->dest_session_num_ = session->remote_session_num_;
-  pkthdr_0->pkt_type_ = kPktTypeReq;
+  pkthdr_0->pkt_type_ = PktType::kReq;
   pkthdr_0->pkt_num_ = 0;
   pkthdr_0->req_num_ = sslot.cur_req_num_;
 

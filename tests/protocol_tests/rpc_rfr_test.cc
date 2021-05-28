@@ -27,9 +27,8 @@ TEST_F(RpcTest, process_rfr_st) {
 
   // The request-for-response packet that is recevied
   pkthdr_t rfr;
-  rfr.format(kTestReqType, 0 /* msg_size */, server.session_num_,
-             PktType::kPktTypeRFR, k_num_req_pkts /* pkt_num */,
-             kSessionReqWindow);
+  rfr.format(kTestReqType, 0 /* msg_size */, server.session_num_, PktType::kRFR,
+             k_num_req_pkts /* pkt_num */, kSessionReqWindow);
 
   // Receive RFR for an old request (past)
   // Expect: It's dropped
@@ -42,15 +41,13 @@ TEST_F(RpcTest, process_rfr_st) {
   // Receive an in-order RFR (in-order)
   // Expect: Response packet #1 is sent
   rpc_->process_rfr_st(sslot_0, &rfr);
-  ASSERT_TRUE(
-      pkthdr_tx_queue_->pop().matches(PktType::kPktTypeResp, k_num_req_pkts));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kResp, k_num_req_pkts));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, k_num_req_pkts + 1);
 
   // Receive the same RFR again (past)
   // Expect: Response packet is re-sent and TX queue is flushed
   rpc_->process_rfr_st(sslot_0, &rfr);
-  ASSERT_TRUE(
-      pkthdr_tx_queue_->pop().matches(PktType::kPktTypeResp, k_num_req_pkts));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kResp, k_num_req_pkts));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, k_num_req_pkts + 1);
   ASSERT_EQ(rpc_->transport_->testing_.tx_flush_count_, 1);
 
@@ -58,8 +55,7 @@ TEST_F(RpcTest, process_rfr_st) {
   // Expect: On resetting it, behavior should be exactly like an in-order RFR
   sslot_0->server_info_.num_rx_ = k_num_req_pkts;
   rpc_->process_rfr_st(sslot_0, &rfr);
-  ASSERT_TRUE(
-      pkthdr_tx_queue_->pop().matches(PktType::kPktTypeResp, k_num_req_pkts));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kResp, k_num_req_pkts));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, k_num_req_pkts + 1);
   ASSERT_EQ(rpc_->transport_->testing_.tx_flush_count_, 1);  // Unchanged
 

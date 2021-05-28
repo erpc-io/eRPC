@@ -15,7 +15,7 @@ void Rpc<TTr>::enqueue_cr_st(SSlot *sslot, const pkthdr_t *req_pkthdr) {
   cr_pkthdr->req_type_ = req_pkthdr->req_type_;
   cr_pkthdr->msg_size_ = 0;
   cr_pkthdr->dest_session_num_ = sslot->session_->remote_session_num_;
-  cr_pkthdr->pkt_type_ = kPktTypeExplCR;
+  cr_pkthdr->pkt_type_ = PktType::kExplCR;
   cr_pkthdr->pkt_num_ = req_pkthdr->pkt_num_;
   cr_pkthdr->req_num_ = req_pkthdr->req_num_;
   cr_pkthdr->magic_ = kPktHdrMagic;

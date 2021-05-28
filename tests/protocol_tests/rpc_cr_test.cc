@@ -25,7 +25,7 @@ TEST_F(RpcTest, process_expl_cr_st) {
   // Construct the basic explicit credit return packet
   pkthdr_t expl_cr;
   expl_cr.format(kTestReqType, 0 /* msg_size */, client.session_num_,
-                 PktType::kPktTypeExplCR, 0 /* pkt_num */, kSessionReqWindow);
+                 PktType::kExplCR, 0 /* pkt_num */, kSessionReqWindow);
 
   size_t batch_rx_tsc = rdtsc();  // Stress batch TSC use
 
@@ -41,8 +41,7 @@ TEST_F(RpcTest, process_expl_cr_st) {
   rpc_->process_expl_cr_st(sslot_0, &expl_cr, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info_.num_rx_, 1);
   ASSERT_EQ(clt_session->client_info_.credits_, 0);
-  ASSERT_TRUE(
-      pkthdr_tx_queue_->pop().matches(PktType::kPktTypeReq, kSessionCredits));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kReq, kSessionCredits));
 
   // Receive the same explicit credit return again (past)
   // Expect: It's dropped
@@ -56,8 +55,7 @@ TEST_F(RpcTest, process_expl_cr_st) {
   rpc_->process_expl_cr_st(sslot_0, &expl_cr, batch_rx_tsc);
   ASSERT_EQ(sslot_0->client_info_.num_rx_, 1);
   ASSERT_EQ(clt_session->client_info_.credits_, 0);
-  ASSERT_TRUE(
-      pkthdr_tx_queue_->pop().matches(PktType::kPktTypeReq, kSessionCredits));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kReq, kSessionCredits));
 
   // Receive explicit credit return for a future pkt in this request (roll-back)
   // Expect: It's dropped

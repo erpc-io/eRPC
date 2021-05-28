@@ -62,18 +62,21 @@ void Rpc<TTr>::process_comps_st() {
     SSlot *sslot = &session->sslot_arr_[sslot_i];
 
     switch (pkthdr->pkt_type_) {
-      case PktType::kPktTypeReq:
+      case PktType::kReq:
         pkthdr->msg_size_ <= TTr::kMaxDataPerPkt
             ? process_small_req_st(sslot, pkthdr)
             : process_large_req_one_st(sslot, pkthdr);
         break;
-      case PktType::kPktTypeResp: {
+      case PktType::kResp: {
         size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
         process_resp_one_st(sslot, pkthdr, rx_tsc);
         break;
       }
-      case PktType::kPktTypeRFR: process_rfr_st(sslot, pkthdr); break;
-      case PktType::kPktTypeExplCR: {
+      case PktType::kRFR: {
+        process_rfr_st(sslot, pkthdr);
+        break;
+      }
+      case PktType::kExplCR: {
         size_t rx_tsc = kCcOptBatchTsc ? batch_rx_tsc : dpath_rdtsc();
         process_expl_cr_st(sslot, pkthdr, rx_tsc);
         break;

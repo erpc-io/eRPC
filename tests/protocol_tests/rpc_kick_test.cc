@@ -92,8 +92,7 @@ TEST_F(RpcClientKickTest, kick_st_req_pkts) {
   pkthdr_tx_queue_->clear();
   ASSERT_EQ(wheel_tx_all(rpc_), 1);
   ASSERT_EQ(sslot_0_->client_info_.num_tx_, kSessionCredits + 1);
-  ASSERT_TRUE(
-      pkthdr_tx_queue_->pop().matches(PktType::kPktTypeReq, kSessionCredits));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kReq, kSessionCredits));
 
   // Kicking twice in a row without any RX in between is disallowed
   ASSERT_DEATH(rpc_->kick_req_st(sslot_0_), ".*");
@@ -119,8 +118,7 @@ TEST_F(RpcClientKickTest, kick_st_rfr_pkts) {
   ASSERT_EQ(pkthdr_tx_queue_->size(), kSessionCredits);
 
   for (size_t i = 0; i < kSessionCredits; i++) {
-    ASSERT_TRUE(
-        pkthdr_tx_queue_->pop().matches(PktType::kPktTypeRFR, req_npkts + i));
+    ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kRFR, req_npkts + i));
   }
 }
 

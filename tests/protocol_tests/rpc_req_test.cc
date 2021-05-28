@@ -12,7 +12,7 @@ TEST_F(RpcTest, process_small_req_st) {
   uint8_t req[sizeof(pkthdr_t) + kTestSmallMsgSize];
   auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(req);
   pkthdr_0->format(kTestReqType, kTestSmallMsgSize, server.session_num_,
-                   PktType::kPktTypeReq, 0 /* pkt_num */, kSessionReqWindow);
+                   PktType::kReq, 0 /* pkt_num */, kSessionReqWindow);
 
   // Receive an old request (past)
   // Expect: It's dropped
@@ -25,14 +25,14 @@ TEST_F(RpcTest, process_small_req_st) {
   // Expect: Response handler is called and response is sent
   rpc_->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(num_req_handler_calls_, 1);
-  ASSERT_EQ(pkthdr_tx_queue_->pop().pkt_type_, PktType::kPktTypeResp);
+  ASSERT_EQ(pkthdr_tx_queue_->pop().pkt_type_, PktType::kResp);
   num_req_handler_calls_ = 0;
 
   // Receive the same request again (past)
   // Expect: Request handler is not called. Resp is re-sent & TX queue flushed.
   rpc_->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(num_req_handler_calls_, 0);
-  ASSERT_EQ(pkthdr_tx_queue_->pop().pkt_type_, PktType::kPktTypeResp);
+  ASSERT_EQ(pkthdr_tx_queue_->pop().pkt_type_, PktType::kResp);
   ASSERT_EQ(rpc_->transport_->testing_.tx_flush_count_, 1);
 
   // Receive the same request again, but response is not ready (past)
@@ -48,7 +48,7 @@ TEST_F(RpcTest, process_small_req_st) {
   pkthdr_0->req_num_ += kSessionReqWindow;
   rpc_->process_small_req_st(sslot_0, pkthdr_0);
   ASSERT_EQ(num_req_handler_calls_, 1);
-  ASSERT_EQ(pkthdr_tx_queue_->pop().pkt_type_, PktType::kPktTypeResp);
+  ASSERT_EQ(pkthdr_tx_queue_->pop().pkt_type_, PktType::kResp);
   num_req_handler_calls_ = 0;
 }
 
@@ -65,7 +65,7 @@ TEST_F(RpcTest, process_large_req_one_st) {
   uint8_t req[CTransport::kMTU];
   auto *pkthdr_0 = reinterpret_cast<pkthdr_t *>(req);
   pkthdr_0->format(kTestReqType, kTestLargeMsgSize, server.session_num_,
-                   PktType::kPktTypeReq, 0 /* pkt_num */, kSessionReqWindow);
+                   PktType::kReq, 0 /* pkt_num */, kSessionReqWindow);
 
   // Receive a packet for a past request (past)
   // Expect: It's dropped
@@ -79,20 +79,20 @@ TEST_F(RpcTest, process_large_req_one_st) {
   // Receive the zeroth request packet (in-order)
   // Expect: Credit return is sent
   rpc_->process_large_req_one_st(sslot_0, pkthdr_0);
-  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kPktTypeExplCR, 0));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kExplCR, 0));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, 1);
 
   // Receive the next request packet (in-order)
   // Expect: Credit return is sent
   pkthdr_0->pkt_num_++;
   rpc_->process_large_req_one_st(sslot_0, pkthdr_0);
-  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kPktTypeExplCR, 1));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kExplCR, 1));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, 2);
 
   // Receive the same request packet again (past)
   // Expect: Credit return is re-sent and transport is NOT flushed - XXX?
   rpc_->process_large_req_one_st(sslot_0, pkthdr_0);
-  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kPktTypeExplCR, 1));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kExplCR, 1));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, 2);
   ASSERT_EQ(rpc_->transport_->testing_.tx_flush_count_, 0);
 
@@ -109,16 +109,16 @@ TEST_F(RpcTest, process_large_req_one_st) {
   sslot_0->server_info_.num_rx_ = num_pkts_in_req - 1;
   pkthdr_0->pkt_num_ = num_pkts_in_req - 1;
   rpc_->process_large_req_one_st(sslot_0, pkthdr_0);
-  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kPktTypeResp,
-                                              num_pkts_in_req - 1));
+  ASSERT_TRUE(
+      pkthdr_tx_queue_->pop().matches(PktType::kResp, num_pkts_in_req - 1));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, num_pkts_in_req);
   ASSERT_TRUE(sslot_0->server_info_.req_msgbuf_.is_buried());
 
   // Receive the last request packet again (past)
   // Expect: First response packet is sent and transport flushed
   rpc_->process_large_req_one_st(sslot_0, pkthdr_0);
-  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kPktTypeResp,
-                                              num_pkts_in_req - 1));
+  ASSERT_TRUE(
+      pkthdr_tx_queue_->pop().matches(PktType::kResp, num_pkts_in_req - 1));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, num_pkts_in_req);
   ASSERT_EQ(rpc_->transport_->testing_.tx_flush_count_, 1);
   rpc_->transport_->testing_.tx_flush_count_ = 0;
@@ -128,7 +128,7 @@ TEST_F(RpcTest, process_large_req_one_st) {
   assert(num_pkts_in_req > 5);
   pkthdr_0->pkt_num_ = 5;
   rpc_->process_large_req_one_st(sslot_0, pkthdr_0);
-  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kPktTypeExplCR, 5));
+  ASSERT_TRUE(pkthdr_tx_queue_->pop().matches(PktType::kExplCR, 5));
   ASSERT_EQ(sslot_0->server_info_.num_rx_, num_pkts_in_req);
   ASSERT_EQ(rpc_->transport_->testing_.tx_flush_count_, 0);
 }

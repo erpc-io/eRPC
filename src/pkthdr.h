@@ -34,18 +34,18 @@ static_assert(kPktHdrMagic < (1ull << k_pkt_hdr_magic_bits), "");
 /// These packet types are stored as bitfields in the packet header, so don't
 /// use an enum class here to avoid casting all over the place.
 enum PktType : uint64_t {
-  kPktTypeReq,     ///< Request data
-  kPktTypeRFR,     ///< Request for response
-  kPktTypeExplCR,  ///< Explicit credit return
-  kPktTypeResp,    ///< Response data
+  kReq,     ///< Request data
+  kRFR,     ///< Request for response
+  kExplCR,  ///< Explicit credit return
+  kResp,    ///< Response data
 };
 
 static std::string pkt_type_str(uint64_t pkt_type) {
   switch (pkt_type) {
-    case kPktTypeReq: return "REQ";
-    case kPktTypeRFR: return "RFR";
-    case kPktTypeExplCR: return "CR";
-    case kPktTypeResp: return "RESP";
+    case PktType::kReq: return "REQ";
+    case PktType::kRFR: return "RFR";
+    case PktType::kExplCR: return "CR";
+    case PktType::kResp: return "RESP";
   }
 
   throw std::runtime_error("Invalid packet type.");
@@ -133,10 +133,10 @@ struct pkthdr_t {
 
   inline bool check_magic() const { return magic_ == kPktHdrMagic; }
 
-  inline bool is_req() const { return pkt_type_ == kPktTypeReq; }
-  inline bool is_rfr() const { return pkt_type_ == kPktTypeRFR; }
-  inline bool is_resp() const { return pkt_type_ == kPktTypeResp; }
-  inline bool is_expl_cr() const { return pkt_type_ == kPktTypeExplCR; }
+  inline bool is_req() const { return pkt_type_ == PktType::kReq; }
+  inline bool is_rfr() const { return pkt_type_ == PktType::kRFR; }
+  inline bool is_resp() const { return pkt_type_ == PktType::kResp; }
+  inline bool is_expl_cr() const { return pkt_type_ == PktType::kExplCR; }
 
 } __attribute__((packed));
 
