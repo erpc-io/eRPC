@@ -47,9 +47,9 @@ namespace erpc {
 #endif
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_ERROR
-#define ERPC_ERROR(...)                                                  \
-  erpc_output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_ERROR); \
-  fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);                         \
+#define ERPC_ERROR(...)                                 \
+  erpc_output_log_header(stderr, ERPC_LOG_LEVEL_ERROR); \
+  fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);        \
   fflush(ERPC_LOG_DEFAULT_STREAM)
 #else
 #define ERPC_ERROR(...) ((void)0)

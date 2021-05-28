@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <cstring>
 #include "../apps_common.h"
+#include "HdrHistogram_c/src/hdr_histogram.h"
 #include "rpc.h"
 #include "util/autorun_helpers.h"
 #include "util/numautils.h"
@@ -15,7 +16,7 @@ static constexpr size_t kAppMinReqSize = 64;
 static constexpr size_t kAppMaxReqSize = 1024;
 
 // Precision factor for latency measurement
-static constexpr double kAppLatFac = erpc::kIsAzure ? 1.0 : 10.0;
+static constexpr int64_t kAppLatFac = erpc::kIsAzure ? 1 : 10;
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
@@ -28,17 +29,29 @@ class ServerContext : public BasicAppContext {
 };
 
 class ClientContext : public BasicAppContext {
+  static constexpr int64_t kMinLatencyMicros = 1;
+  static constexpr int64_t kMaxLatencyMicros = 1000 * 1000 * 100;  // 100 sec
+  static constexpr int64_t kLatencyPrecision = 2;  // Two significant digits
+
  public:
   size_t start_tsc_;
   size_t req_size_;  // Between kAppMinReqSize and kAppMaxReqSize
-  erpc::Latency latency_;
   erpc::MsgBuffer req_msgbuf_, resp_msgbuf_;
+  hdr_histogram *latency_hist_;
+  size_t latency_samples_ = 0;
+  size_t latency_samples_prev_ = 0;
 
   // If true, the client doubles its request size (up to kAppMaxReqSize) when
   // issuing the next request, and resets this flag to false
   bool double_req_size_ = false;
 
-  ~ClientContext() {}
+  ClientContext() {
+    int ret = hdr_init(kMinLatencyMicros, kMaxLatencyMicros, kLatencyPrecision,
+                       &latency_hist_);
+    erpc::rt_assert(ret == 0, "Failed to initialize latency histogram");
+  }
+
+  ~ClientContext() { hdr_close(latency_hist_); }
 };
 
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
@@ -97,7 +110,8 @@ inline void send_req(ClientContext &c) {
   c.start_tsc_ = erpc::rdtsc();
   const size_t server_id = c.fastrand_.next_u32() % FLAGS_num_server_processes;
   c.rpc_->enqueue_request(c.session_num_vec_[server_id], kAppReqType,
-                         &c.req_msgbuf_, &c.resp_msgbuf_, app_cont_func, nullptr);
+                          &c.req_msgbuf_, &c.resp_msgbuf_, app_cont_func,
+                          nullptr);
   if (kAppVerbose) {
     printf("Latency: Sending request of size %zu bytes to server #%zu\n",
            c.req_msgbuf_.get_data_size(), server_id);
@@ -113,9 +127,12 @@ void app_cont_func(void *_context, void *) {
            c->resp_msgbuf_.get_data_size());
   }
 
-  double req_lat_us =
+  const double req_lat_us =
       erpc::to_usec(erpc::rdtsc() - c->start_tsc_, c->rpc_->get_freq_ghz());
-  c->latency_.update(static_cast<size_t>(req_lat_us * kAppLatFac));
+
+  hdr_record_value(c->latency_hist_,
+                   static_cast<int64_t>(req_lat_us * kAppLatFac));
+  c->latency_samples_++;
 
   send_req(*c);
 }
@@ -142,19 +159,42 @@ void client_func(erpc::Nexus *nexus) {
 
   printf("Latency: Process %zu: Session connected. Starting work.\n",
          FLAGS_process_id);
-  printf("write_size median_us 5th_us 99th_us 999th_us max_us\n");
+  printf(
+      "median_us 5th_us 99th_us 999th_us 9999th_us 99.999th_us "
+      "99.9999th_us max_us [total_samples, total_time]\n");
 
   send_req(c);
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(kAppEvLoopMs);  // 1 second
     if (ctrl_c_pressed == 1) break;
-    printf("%zu %.1f %.1f %.1f %.1f %.1f\n", c.req_size_,
-           c.latency_.perc(.5) / kAppLatFac, c.latency_.perc(.05) / kAppLatFac,
-           c.latency_.perc(.99) / kAppLatFac, c.latency_.perc(.999) / kAppLatFac,
-           c.latency_.max() / kAppLatFac);
 
+    if (c.latency_samples_ == c.latency_samples_prev_) {
+      printf("No new responses in %.2f seconds\n", kAppEvLoopMs / 1000.0);
+      fprintf(stderr, "No new responses in %.2f seconds\n",
+              kAppEvLoopMs / 1000.0);
+    } else {
+      printf("%zu %zu %zu %zu %zu %zu %zu %zu %zu [%zu samples, %zu seconds]\n",
+             c.req_size_,
+             hdr_value_at_percentile(c.latency_hist_, 50.0) / kAppLatFac,
+             hdr_value_at_percentile(c.latency_hist_, 5.0) / kAppLatFac,
+             hdr_value_at_percentile(c.latency_hist_, 99) / kAppLatFac,
+             hdr_value_at_percentile(c.latency_hist_, 99.9) / kAppLatFac,
+             hdr_value_at_percentile(c.latency_hist_, 99.99) / kAppLatFac,
+             hdr_value_at_percentile(c.latency_hist_, 99.999) / kAppLatFac,
+             hdr_value_at_percentile(c.latency_hist_, 99.9999) / kAppLatFac,
+             hdr_max(c.latency_hist_) / kAppLatFac, c.latency_samples_,
+             i / 1000);
+    }
+
+    // Warmup for the first two seconds
+    if (i < 2) {
+      hdr_reset(c.latency_hist_);
+      c.latency_samples_ = 0;
+      c.latency_samples_prev_ = 0;
+    }
+
+    c.latency_samples_prev_ = c.latency_samples_;
     c.double_req_size_ = true;
-    c.latency_.reset();
   }
 }
 
