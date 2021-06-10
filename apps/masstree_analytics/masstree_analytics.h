@@ -110,10 +110,10 @@ class AppContext : public BasicAppContext {
 void alloc_req_resp_msg_buffers(AppContext *c) {
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_req_window; msgbuf_idx++) {
     c->client.req_msgbuf[msgbuf_idx] =
-        c->rpc->alloc_msg_buffer_or_die(sizeof(req_t));
+        c->rpc_->alloc_msg_buffer_or_die(sizeof(req_t));
 
     c->client.resp_msgbuf[msgbuf_idx] =
-        c->rpc->alloc_msg_buffer_or_die(sizeof(resp_t));
+        c->rpc_->alloc_msg_buffer_or_die(sizeof(resp_t));
   }
 }
 
