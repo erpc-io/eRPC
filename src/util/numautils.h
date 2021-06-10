@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <vector>
 #include "common.h"
+#include "util/logger.h"
 
 namespace erpc {
 
@@ -37,8 +38,17 @@ static void bind_to_core(std::thread &thread, size_t numa_node,
   CPU_ZERO(&cpuset);
   rt_assert(numa_node <= kMaxNumaNodes, "Invalid NUMA node");
 
-  auto lcore_vec = get_lcores_for_numa_node(numa_node);
-  size_t global_index = lcore_vec.at(numa_local_index);
+  const std::vector<size_t> lcore_vec = get_lcores_for_numa_node(numa_node);
+  if (numa_local_index >= lcore_vec.size()) {
+    ERPC_ERROR(
+        "eRPC: Requested binding to core %zu (zero-indexed) on NUMA node %zu, "
+        "which has only %zu cores. Ignoring, but this can cause very low "
+        "performance.\n",
+        numa_local_index, numa_node, lcore_vec.size());
+    return;
+  }
+
+  const size_t global_index = lcore_vec.at(numa_local_index);
 
   CPU_SET(global_index, &cpuset);
   int rc = pthread_setaffinity_np(thread.native_handle(), sizeof(cpu_set_t),
