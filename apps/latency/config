@@ -1,4 +1,4 @@
---test_ms 20000
+--test_ms 200000000
 --sm_verbose 0
 --num_server_processes 1
 --numa_0_ports 0

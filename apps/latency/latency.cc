@@ -160,7 +160,7 @@ void client_func(erpc::Nexus *nexus) {
   printf("Latency: Process %zu: Session connected. Starting work.\n",
          FLAGS_process_id);
   printf(
-      "median_us 5th_us 99th_us 999th_us 9999th_us 99.999th_us "
+      "median_us 5th_us 99th_us 99.9th_us 99.99th_us 99.999th_us "
       "99.9999th_us max_us [total_samples, total_time]\n");
 
   send_req(c);
@@ -172,6 +172,7 @@ void client_func(erpc::Nexus *nexus) {
       printf("No new responses in %.2f seconds\n", kAppEvLoopMs / 1000.0);
       fprintf(stderr, "No new responses in %.2f seconds\n",
               kAppEvLoopMs / 1000.0);
+      fflush(stderr);
     } else {
       printf("%zu %zu %zu %zu %zu %zu %zu %zu %zu [%zu samples, %zu seconds]\n",
              c.req_size_,
@@ -185,9 +186,11 @@ void client_func(erpc::Nexus *nexus) {
              hdr_max(c.latency_hist_) / kAppLatFac, c.latency_samples_,
              i / 1000);
     }
+    fflush(stdout);
 
-    // Warmup for the first two seconds
-    if (i < 2) {
+    // Warmup for the first two seconds. Also, reset percentiles every minute.
+    const size_t seconds = i / 1000;
+    if (seconds < 2 || (seconds % 60 == 0)) {
       hdr_reset(c.latency_hist_);
       c.latency_samples_ = 0;
       c.latency_samples_prev_ = 0;
