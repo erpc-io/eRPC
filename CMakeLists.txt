@@ -316,12 +316,6 @@ if(DPDK_NEEDED STREQUAL "true")
     src/transport_impl/dpdk/dpdk_externs.cc
     src/transport_impl/dpdk/dpdk_init.cc)
   target_link_libraries(erpc_dpdk_daemon ${LIBRARIES})
-
-  # Build the DPDK multi-process example
-  add_executable(dpdk_mp_server apps/dpdk_mp_example/server.cc)
-  target_link_libraries(dpdk_mp_server erpc ${LIBRARIES})
-  add_executable(dpdk_mp_client apps/dpdk_mp_example/client.cc)
-  target_link_libraries(dpdk_mp_client erpc ${LIBRARIES})
 else()
   message(STATUS "DPDK not needed to build eRPC")
 endif()
