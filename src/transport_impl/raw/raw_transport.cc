@@ -83,7 +83,7 @@ RawTransport::~RawTransport() {
   exit_assert(ibv_close_device(resolve.ib_ctx) == 0, "Failed to close device");
 }
 
-void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
+void RawTransport::fill_local_routing_info(routing_info_t *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
   memcpy(ri->mac, resolve.mac_addr, 6);
@@ -93,7 +93,7 @@ void RawTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
 
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
 bool RawTransport::resolve_remote_routing_info(
-    RoutingInfo *routing_info) const {
+    routing_info_t *routing_info) const {
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
   uint8_t remote_mac[6];
   memcpy(remote_mac, ri->mac, 6);

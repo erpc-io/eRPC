@@ -214,7 +214,7 @@ class SessionEndpoint {
     return ret.str();
   }
 
-  /// Compare two endpoints. RoutingInfo is left out because the SessionEndpoint
+  /// Compare two endpoints. Routing info is left out: the SessionEndpoint
   /// object in session managament packets may not have routing info.
   bool operator==(const SessionEndpoint &other) const {
     return transport_type_ == other.transport_type_ &&

@@ -110,11 +110,11 @@ void RawTransport::tx_flush() {
   auto* pkthdr = reinterpret_cast<pkthdr_t*>(buffer.buf);
 
   // Create a valid packet to self, but later we'll garble the destination IP
-  RoutingInfo self_ri;
+  routing_info_t self_ri;
   fill_local_routing_info(&self_ri);
   resolve_remote_routing_info(&self_ri);
 
-  memcpy(&pkthdr->headroom[0], &self_ri, sizeof(RoutingInfo));
+  memcpy(&pkthdr->headroom[0], &self_ri, sizeof(routing_info_t));
 
   auto* ipv4_hdr =
       reinterpret_cast<ipv4_hdr_t*>(&pkthdr->headroom[sizeof(eth_hdr_t)]);
