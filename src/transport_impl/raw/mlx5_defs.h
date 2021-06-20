@@ -5,7 +5,7 @@
 
 #pragma once
 
-#ifndef ERPC_DPDK
+#ifdef ERPC_RAW
 
 #include <infiniband/verbs.h>
 #include <inttypes.h>

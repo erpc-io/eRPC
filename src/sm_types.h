@@ -176,7 +176,7 @@ class SessionEndpoint {
   uint16_t sm_udp_port_;            ///< Management UDP port
   uint8_t rpc_id_;                  ///< ID of the owner
   uint16_t session_num_;  ///< The session number of this endpoint in its Rpc
-  Transport::routing_info routing_info_;  ///< Endpoint's routing info
+  Transport::routing_info_t routing_info_;  ///< Endpoint's routing info
 
   SessionEndpoint() {
     memset(static_cast<void *>(hostname_), 0, sizeof(hostname_));

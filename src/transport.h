@@ -35,7 +35,7 @@ class Transport {
    * This can contain both cluster-wide valid members (e.g., {LID, QPN}), and
    * members that are only locally valid (e.g., a pointer to \p ibv_ah).
    */
-  struct routing_info {
+  struct routing_info_t {
     uint8_t buf_[kMaxRoutingInfoSize];
   };
 
@@ -52,8 +52,8 @@ class Transport {
 
   /// Info about a packet to transmit
   struct tx_burst_item_t {
-    routing_info* routing_info_;  ///< Routing info for this packet
-    MsgBuffer* msg_buffer_;      ///< MsgBuffer for this packet
+    routing_info_t* routing_info_;  ///< Routing info for this packet
+    MsgBuffer* msg_buffer_;         ///< MsgBuffer for this packet
 
     size_t pkt_idx_;  /// Packet index (not pkt_num) in msg_buffer to transmit
     size_t* tx_ts_ = nullptr;  ///< TX timestamp, only for congestion control
@@ -133,7 +133,7 @@ class Transport {
   void post_recvs(size_t num_recvs);
 
   /// Fill-in local routing information
-  void fill_local_routing_info(routing_info* routing_info) const;
+  void fill_local_routing_info(routing_info_t* routing_info) const;
 
   /**
    * @brief Try to resolve routing information received from a remote host. The
@@ -147,13 +147,13 @@ class Transport {
    *
    * @return True if resolution succeeds, false otherwise.
    */
-  bool resolve_remote_routing_info(routing_info* routing_info) const;
+  bool resolve_remote_routing_info(routing_info_t* routing_info) const;
 
   /// Return the link bandwidth (bytes per second)
   size_t get_bandwidth() const;
 
   /// Return a string representation of \p routing_info
-  static std::string routing_info_str(routing_info* routing_info);
+  static std::string routing_info_str(routing_info_t* routing_info);
 
   // Members that are needed by all transports. Constructor args first.
   const TransportType transport_type_;

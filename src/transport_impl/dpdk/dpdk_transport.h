@@ -233,8 +233,8 @@ class DpdkTransport : public Transport {
 
   ~DpdkTransport();
 
-  void fill_local_routing_info(routing_info *routing_info) const;
-  bool resolve_remote_routing_info(routing_info *routing_info) const;
+  void fill_local_routing_info(routing_info_t *routing_info) const;
+  bool resolve_remote_routing_info(routing_info_t *routing_info) const;
   size_t get_bandwidth() const { return resolve_.bandwidth_; }
 
   /// Get the mempool name to use for this port and queue pair ID
@@ -249,7 +249,7 @@ class DpdkTransport : public Transport {
   /// processes
   static std::string get_memzone_name() { return "erpc_daemon_memzone"; }
 
-  static std::string routing_info_str(routing_info *ri) {
+  static std::string routing_info_str(routing_info_t *ri) {
     return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
   }
 

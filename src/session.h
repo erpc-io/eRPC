@@ -146,7 +146,7 @@ class Session {
   std::array<SSlot, kSessionReqWindow> sslot_arr_;  ///< The session slots
 
   ///@{ Info saved for faster unconditional access
-  Transport::routing_info *remote_routing_info_;
+  Transport::routing_info_t *remote_routing_info_;
   uint16_t local_session_num_;
   uint16_t remote_session_num_;
   ///@}

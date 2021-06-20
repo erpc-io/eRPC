@@ -17,7 +17,8 @@ constexpr size_t DpdkTransport::kMaxDataPerPkt;
 static_assert(sizeof(eth_routing_info_t) <= Transport::kMaxRoutingInfoSize, "");
 
 static_assert(kHeadroom == 40, "Invalid packet header headroom for DPDK");
-static_assert(sizeof(pkthdr_t::headroom_) == kInetHdrsTotSize, "Wrong headroom");
+static_assert(sizeof(pkthdr_t::headroom_) == kInetHdrsTotSize,
+              "Wrong headroom");
 
 // Initialize the protection domain, queue pair, and memory registration and
 // deregistration functions. RECVs will be initialized later when the hugepage
@@ -219,7 +220,8 @@ void DpdkTransport::resolve_phy_port() {
       resolve_.bandwidth_ * 8.0 / (1000 * 1000 * 1000));
 }
 
-void DpdkTransport::fill_local_routing_info(routing_info *routing_info) const {
+void DpdkTransport::fill_local_routing_info(
+    routing_info_t *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
   memcpy(ri->mac_, resolve_.mac_addr_, 6);
@@ -231,7 +233,7 @@ void DpdkTransport::fill_local_routing_info(routing_info *routing_info) const {
 
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
 bool DpdkTransport::resolve_remote_routing_info(
-    routing_info *routing_info) const {
+    routing_info_t *routing_info) const {
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
 
   // XXX: The header generation below will overwrite routing_info. We must

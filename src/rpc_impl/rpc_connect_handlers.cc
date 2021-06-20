@@ -57,7 +57,7 @@ void Rpc<TTr>::handle_connect_req_st(const SmPkt &sm_pkt) {
 
   // Try to resolve the client-provided routing info. If session creation
   // succeeds, we'll copy it to the server's session endpoint.
-  Transport::routing_info client_rinfo = sm_pkt.client_.routing_info_;
+  Transport::routing_info_t client_rinfo = sm_pkt.client_.routing_info_;
   bool resolve_success;
   if (kTesting && faults_.fail_resolve_rinfo_) {
     resolve_success = false;
@@ -180,7 +180,7 @@ void Rpc<TTr>::handle_connect_resp_st(const SmPkt &sm_pkt) {
   // If we are here, the server has created a session endpoint
 
   // Try to resolve the server-provided routing info
-  Transport::routing_info srv_routing_info = sm_pkt.server_.routing_info_;
+  Transport::routing_info_t srv_routing_info = sm_pkt.server_.routing_info_;
   bool resolve_success;
   if (kTesting && faults_.fail_resolve_rinfo_) {
     resolve_success = false;  // Inject fault
