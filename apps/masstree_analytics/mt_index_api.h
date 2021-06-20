@@ -1,3 +1,5 @@
+// Credits: Huanchen Zhang, Ziqi Wang
+
 #ifndef MT_INDEX_API_H
 #define MT_INDEX_API_H
 
