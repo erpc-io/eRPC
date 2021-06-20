@@ -18,7 +18,8 @@ RawTransport::RawTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     : Transport(TransportType::kRaw, rpc_id, phy_port, numa_node, trace_file),
       rx_flow_udp_port(get_dpath_udp_port(sm_udp_port, rpc_id)) {
   rt_assert(kHeadroom == 40, "Invalid packet header headroom for raw Ethernet");
-  rt_assert(sizeof(pkthdr_t::headroom) == kInetHdrsTotSize, "Invalid headroom");
+  rt_assert(sizeof(pkthdr_t::headroom_) == kInetHdrsTotSize,
+            "Invalid headroom");
 
   common_resolve_phy_port(phy_port, kMTU, kTransportType, resolve);
   raw_resolve_phy_port();
@@ -36,8 +37,7 @@ RawTransport::RawTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
 void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
                                             uint8_t **rx_ring) {
-  this->huge_alloc = huge_alloc;
-
+  this->huge_alloc_ = huge_alloc;
   init_recvs(rx_ring);
   init_sends();
 }
@@ -48,7 +48,7 @@ void RawTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 //
 // We only need to clean up non-hugepage structures.
 RawTransport::~RawTransport() {
-  ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
+  ERPC_INFO("Destroying transport for ID %u\n", rpc_id_);
 
   if (kDumb) {
     exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy QP");
@@ -86,9 +86,9 @@ RawTransport::~RawTransport() {
 void RawTransport::fill_local_routing_info(routing_info_t *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
-  memcpy(ri->mac, resolve.mac_addr, 6);
-  ri->ipv4_addr = resolve.ipv4_addr;
-  ri->udp_port = rx_flow_udp_port;
+  memcpy(ri->mac_, resolve.mac_addr, 6);
+  ri->ipv4_addr_ = resolve.ipv4_addr;
+  ri->udp_port_ = rx_flow_udp_port;
 }
 
 // Generate most fields of the L2--L4 headers now to avoid recomputation.
@@ -96,9 +96,9 @@ bool RawTransport::resolve_remote_routing_info(
     routing_info_t *routing_info) const {
   auto *ri = reinterpret_cast<eth_routing_info_t *>(routing_info);
   uint8_t remote_mac[6];
-  memcpy(remote_mac, ri->mac, 6);
-  uint32_t remote_ipv4_addr = ri->ipv4_addr;
-  uint16_t remote_udp_port = ri->udp_port;
+  memcpy(remote_mac, ri->mac_, 6);
+  uint32_t remote_ipv4_addr = ri->ipv4_addr_;
+  uint16_t remote_udp_port = ri->udp_port_;
 
   static_assert(kMaxRoutingInfoSize >= kInetHdrsTotSize, "");
 

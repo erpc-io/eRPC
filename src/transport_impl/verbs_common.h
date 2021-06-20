@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifndef ERPC_DPDK
+#if defined(ERPC_RAW) || defined(ERPC_INFINIBAND)
 
 #include <dirent.h>
 #include <infiniband/verbs.h>
