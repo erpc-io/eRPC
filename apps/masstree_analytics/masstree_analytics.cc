@@ -4,16 +4,21 @@
 #include "mica/util/cityhash/city.h"
 #include "util/autorun_helpers.h"
 
-// The keys in the index are 64-bit hashes of keys {0, ..., FLAGS_num_keys}.
-// This gives us random-ish 64-bit keys, without requiring actually maintaining
-// the set of inserted keys
-size_t get_random_key(AppContext *c) {
-  size_t _generator_key = c->fastrand_.next_u32() % FLAGS_num_keys;
-  return CityHash64(reinterpret_cast<const char *>(&_generator_key),
-                    sizeof(size_t));
+void app_cont_func(void *, void *);  // Forward declaration
+
+/// Generate the random key for this seed
+void key_gen(size_t seed, uint8_t *key) {
+  auto *key_64 = reinterpret_cast<uint64_t *>(key);
+  key_64[0] = CityHash64(reinterpret_cast<const char *>(&seed), sizeof(size_t));
+  for (size_t i = 1; i < MtIndex::kKeySize / sizeof(uint64_t); i++) {
+    key_64[i] = CityHash64(reinterpret_cast<const char *>(&key_64[i - 1]),
+                           sizeof(size_t));
+  }
 }
 
-void app_cont_func(void *, void *);  // Forward declaration
+/// Return the pre-known quantity stored in each 32-bit chunk of the value for
+/// the key for this seed
+uint32_t get_value32_for_seed(uint32_t seed) { return seed + 1; }
 
 void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
@@ -23,12 +28,8 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(etid >= FLAGS_num_server_bg_threads &&
          etid < FLAGS_num_server_bg_threads + FLAGS_num_server_fg_threads);
 
-  if (kAppVerbose) {
-    printf("main: Handling point request in eRPC thread %zu.\n", etid);
-  }
-
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
-                                                 sizeof(resp_t));
+                                                 sizeof(wire_resp_t));
 
   if (kBypassMasstree) {
     // Send a garbage response
@@ -41,17 +42,26 @@ void point_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(mti != nullptr && ti != nullptr);
 
   const auto *req_msgbuf = req_handle->get_req_msgbuf();
-  assert(req_msgbuf->get_data_size() == sizeof(req_t));
+  assert(req_msgbuf->get_data_size() == sizeof(wire_req_t));
 
-  auto *req = reinterpret_cast<const req_t *>(req_msgbuf->buf_);
+  auto *req = reinterpret_cast<const wire_req_t *>(req_msgbuf->buf_);
   assert(req->req_type == kAppPointReqType);
+  uint8_t key_copy[MtIndex::kKeySize];  // mti->get() modifies key
+  memcpy(key_copy, req->point_req.key, MtIndex::kKeySize);
 
-  size_t value = 0;
-  bool success = mti->get(req->point_req.key, value, ti);
-
-  auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf_.buf_);
+  auto *resp =
+      reinterpret_cast<wire_resp_t *>(req_handle->pre_resp_msgbuf_.buf_);
+  const bool success = mti->get(key_copy, resp->value, ti);
   resp->resp_type = success ? RespType::kFound : RespType::kNotFound;
-  resp->value = value;  // Garbage is OK in case of kNotFound
+
+  if (kAppVerbose) {
+    printf(
+        "main: Handled point request in eRPC thread %zu. Key %s, found %s, "
+        "value %s\n",
+        etid, req->to_string().c_str(), success ? "yes" : "no",
+        success ? resp->to_string().c_str() : "N/A");
+  }
+
   c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
@@ -71,58 +81,55 @@ void range_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   assert(mti != nullptr && ti != nullptr);
 
   const auto *req_msgbuf = req_handle->get_req_msgbuf();
-  assert(req_msgbuf->get_data_size() == sizeof(req_t));
+  assert(req_msgbuf->get_data_size() == sizeof(wire_req_t));
 
-  auto *req = reinterpret_cast<const req_t *>(req_msgbuf->buf_);
+  auto *req = reinterpret_cast<const wire_req_t *>(req_msgbuf->buf_);
   assert(req->req_type == kAppRangeReqType);
+  uint8_t key_copy[MtIndex::kKeySize];  // mti->sum_in_range() modifies key
+  memcpy(key_copy, req->point_req.key, MtIndex::kKeySize);
 
-  const size_t count =
-      mti->sum_in_range(req->range_req.key, req->range_req.range, ti);
+  const size_t count = mti->sum_in_range(key_copy, req->range_req.range, ti);
 
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
-                                                 sizeof(resp_t));
-  auto *resp = reinterpret_cast<resp_t *>(req_handle->pre_resp_msgbuf_.buf_);
+                                                 sizeof(wire_resp_t));
+  auto *resp =
+      reinterpret_cast<wire_resp_t *>(req_handle->pre_resp_msgbuf_.buf_);
   resp->resp_type = RespType::kFound;
   resp->range_count = count;
 
   c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
-// Helper function for clients
-req_t generate_request(AppContext *c) {
-  req_t req;
-  const size_t key = get_random_key(c);
+// Send one request using this MsgBuffer
+void send_req(AppContext *c, size_t msgbuf_idx) {
+  erpc::MsgBuffer &req_msgbuf = c->client.window_[msgbuf_idx].req_msgbuf_;
+  assert(req_msgbuf.get_data_size() == sizeof(wire_req_t));
+
+  // Generate a random request
+  wire_req_t req;
+  const size_t rand_key_index = c->fastrand_.next_u32() % FLAGS_num_keys;
+  key_gen(rand_key_index, req.point_req.key);
 
   if (c->fastrand_.next_u32() % 100 < FLAGS_range_req_percent) {
     // Generate a range request
     req.req_type = kAppRangeReqType;
-    req.range_req.key = key;
     req.range_req.range = FLAGS_range_size;
   } else {
-    // Generate a point request
-    req.req_type = kAppPointReqType;
-    req.point_req.key = key;
+    req.req_type = kAppPointReqType;  // Generate a point request
   }
 
-  return req;
-}
+  *reinterpret_cast<wire_req_t *>(req_msgbuf.buf_) = req;
 
-// Send one request using this MsgBuffer
-void send_req(AppContext *c, size_t msgbuf_idx) {
-  erpc::MsgBuffer &req_msgbuf = c->client.req_msgbuf[msgbuf_idx];
-  assert(req_msgbuf.get_data_size() == sizeof(req_t));
-
-  const req_t req = generate_request(c);
-  *reinterpret_cast<req_t *>(req_msgbuf.buf_) = req;
+  c->client.window_[msgbuf_idx].req_seed_ = rand_key_index;
+  c->client.window_[msgbuf_idx].req_ts_ = erpc::rdtsc();
 
   if (kAppVerbose) {
     printf("main: Enqueuing request with msgbuf_idx %zu.\n", msgbuf_idx);
   }
 
-  c->client.req_ts[msgbuf_idx] = erpc::rdtsc();
   c->rpc_->enqueue_request(0, req.req_type, &req_msgbuf,
-                           &c->client.resp_msgbuf[msgbuf_idx], app_cont_func,
-                           reinterpret_cast<void *>(msgbuf_idx));
+                           &c->client.window_[msgbuf_idx].resp_msgbuf_,
+                           app_cont_func, reinterpret_cast<void *>(msgbuf_idx));
 }
 
 void app_cont_func(void *_context, void *_msgbuf_idx) {
@@ -132,20 +139,36 @@ void app_cont_func(void *_context, void *_msgbuf_idx) {
     printf("main: Received response for msgbuf %zu.\n", msgbuf_idx);
   }
 
-  const auto &resp_msgbuf = c->client.resp_msgbuf[msgbuf_idx];
-  erpc::rt_assert(resp_msgbuf.get_data_size() == sizeof(resp_t),
+  const auto &resp_msgbuf = c->client.window_[msgbuf_idx].resp_msgbuf_;
+  erpc::rt_assert(resp_msgbuf.get_data_size() == sizeof(wire_resp_t),
                   "Invalid response size");
 
-  const double usec = erpc::to_usec(
-      erpc::rdtsc() - c->client.req_ts[msgbuf_idx], c->rpc_->get_freq_ghz());
+  const double usec =
+      erpc::to_usec(erpc::rdtsc() - c->client.window_[msgbuf_idx].req_ts_,
+                    c->rpc_->get_freq_ghz());
   assert(usec >= 0);
 
-  req_t *req = reinterpret_cast<req_t *>(c->client.req_msgbuf[msgbuf_idx].buf_);
+  const auto *req = reinterpret_cast<wire_req_t *>(
+      c->client.window_[msgbuf_idx].req_msgbuf_.buf_);
   assert(req->req_type == kAppPointReqType ||
          req->req_type == kAppRangeReqType);
 
   if (req->req_type == kAppPointReqType) {
     c->client.point_latency.update(static_cast<size_t>(usec * 10.0));  // < 1us
+
+    // Check the value
+    {
+      const auto *wire_resp = reinterpret_cast<wire_resp_t *>(resp_msgbuf.buf_);
+      const uint32_t recvd_value =
+          *reinterpret_cast<const uint32_t *>(wire_resp->value);
+      const uint32_t req_seed = c->client.window_[msgbuf_idx].req_seed_;
+      if (recvd_value != get_value32_for_seed(req_seed)) {
+        fprintf(stderr,
+                "main: Value mismatch. Req seed = %u, recvd_value (first four "
+                "bytes = %u)\n",
+                req_seed, recvd_value);
+      }
+    }
   } else {
     c->client.range_latency.update(static_cast<size_t>(usec));
   }
@@ -274,11 +297,39 @@ int main(int argc, char **argv) {
     MtIndex mti;
     mti.setup(ti);
 
+    printf("main: Populating masstree with %zu keys\n", FLAGS_num_keys);
     for (size_t i = 0; i < FLAGS_num_keys; i++) {
-      size_t key =
-          CityHash64(reinterpret_cast<const char *>(&i), sizeof(size_t));
-      size_t value = i;
+      const uint32_t req_seed = i;
+      uint8_t key[MtIndex::kKeySize];
+      uint8_t value[MtIndex::kValueSize];
+      key_gen(req_seed, key);
+
+      auto *value_32 = reinterpret_cast<uint32_t *>(value);
+      for (size_t j = 0; j < MtIndex::kValueSize / sizeof(uint32_t); j++) {
+        value_32[j] = get_value32_for_seed(req_seed);
+      }
+
+      if (kAppVerbose) {
+        fprintf(stderr, "PUT: Key: [");
+        for (size_t i = 0; i < MtIndex::kKeySize; i++) {
+          fprintf(stderr, "%u ", key[i]);
+        }
+        fprintf(stderr, "] Value: [");
+        for (size_t i = 0; i < MtIndex::kValueSize; i++) {
+          fprintf(stderr, "%u ", value[i]);
+        }
+        fprintf(stderr, "]\n");
+      }
+
       mti.put(key, value, ti);
+
+      // Progress bar
+      {
+        const size_t by_20 = FLAGS_num_keys / 20;
+        if (by_20 > 0 && i % by_20 == 0) {
+          printf("Done inserting %zu/%zu keys\n", i, FLAGS_num_keys);
+        }
+      }
     }
 
     // Create Masstree threadinfo structs for server threads

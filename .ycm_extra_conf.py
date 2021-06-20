@@ -46,7 +46,7 @@ flags = [
     '-I' + str(home_dir) + '/eRPC/third_party',
     '-I' + str(home_dir) + '/eRPC/third_party/googletest/googletest/include',
     '-I' + str(home_dir) + '/eRPC/mica/src',
-    '-I' + str(home_dir) + '/masstree-beta',
+    '-isystem' + '/home/ankalia/eRPC/third_party/masstree-beta',
     '-isystem' + '/usr/include/dpdk',
     '-isystem' + '/usr/local/include/dpdk',
     '-Wall',

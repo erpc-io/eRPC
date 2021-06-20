@@ -34,27 +34,54 @@ DEFINE_uint64(range_req_percent, 0, "Percentage of range scans");
 // Return true iff this machine is the one server
 bool is_server() { return FLAGS_process_id == 0; }
 
-struct req_t {
+struct wire_req_t {
   size_t req_type;
   union {
     struct {
-      size_t key;
+      uint8_t key[MtIndex::kKeySize];
     } point_req;
 
     struct {
-      size_t key;
+      uint8_t key[MtIndex::kKeySize];
       size_t range;  // The max number of keys after key to sum up
     } range_req;
   };
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[Type " << (req_type == kAppPointReqType ? "point" : "range")
+        << ", key: ";
+    if (req_type == kAppPointReqType) {
+      for (size_t i = 0; i < MtIndex::kKeySize; i++) {
+        ret << std::to_string(point_req.key[i]) << " ";
+      }
+    } else {
+      for (size_t i = 0; i < MtIndex::kKeySize; i++) {
+        ret << std::to_string(range_req.key[i]) << " ";
+      }
+    }
+    ret << "]";
+    return ret.str();
+  }
 };
 
 enum class RespType : size_t { kFound, kNotFound };
-struct resp_t {
+struct wire_resp_t {
   RespType resp_type;
   union {
-    size_t value;        // The value for point GETs
+    uint8_t value[MtIndex::kValueSize];
     size_t range_count;  // The range sum for range queries
   };
+
+  std::string to_string() const {
+    std::ostringstream ret;
+    ret << "[Value: ";
+    for (size_t i = 0; i < MtIndex::kValueSize; i++) {
+      ret << std::to_string(value[i]) << " ";
+    }
+    ret << "]";
+    return ret.str();
+  }
 };
 
 struct app_stats_t {
@@ -97,9 +124,12 @@ class AppContext : public BasicAppContext {
     erpc::Latency point_latency;  // Latency of point requests (factor = 10)
     erpc::Latency range_latency;  // Latency of point requests (factor = 1)
 
-    uint64_t req_ts[kAppMaxReqWindow];  // Per-request timestamps
-    erpc::MsgBuffer req_msgbuf[kAppMaxReqWindow];
-    erpc::MsgBuffer resp_msgbuf[kAppMaxReqWindow];
+    struct {
+      uint32_t req_seed_;
+      uint64_t req_ts_;
+      erpc::MsgBuffer req_msgbuf_;
+      erpc::MsgBuffer resp_msgbuf_;
+    } window_[kAppMaxReqWindow];
 
     erpc::FastRand fast_rand;
     size_t num_resps_tot = 0;  // Total responses received (range & point reqs)
@@ -109,11 +139,11 @@ class AppContext : public BasicAppContext {
 // Allocate request and response MsgBuffers
 void alloc_req_resp_msg_buffers(AppContext *c) {
   for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_req_window; msgbuf_idx++) {
-    c->client.req_msgbuf[msgbuf_idx] =
-        c->rpc_->alloc_msg_buffer_or_die(sizeof(req_t));
+    c->client.window_[msgbuf_idx].req_msgbuf_ =
+        c->rpc_->alloc_msg_buffer_or_die(sizeof(wire_req_t));
 
-    c->client.resp_msgbuf[msgbuf_idx] =
-        c->rpc_->alloc_msg_buffer_or_die(sizeof(resp_t));
+    c->client.window_[msgbuf_idx].resp_msgbuf_ =
+        c->rpc_->alloc_msg_buffer_or_die(sizeof(wire_resp_t));
   }
 }
 

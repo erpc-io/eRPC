@@ -18,6 +18,12 @@ typedef threadinfo threadinfo_t;
 
 class MtIndex {
  public:
+  static constexpr size_t kKeySize = 16;  /// Index key size in bytes
+  static_assert(sizeof(MtIndex::kKeySize) % sizeof(uint64_t) == 0, "");
+
+  static constexpr size_t kValueSize = 68;  /// Index value size in bytes
+  static_assert(sizeof(MtIndex::kValueSize) % sizeof(uint32_t) == 0, "");
+
   MtIndex() {}
   ~MtIndex() {}
 
@@ -26,15 +32,20 @@ class MtIndex {
     table_->initialize(*ti);
   }
 
-  inline void swap_endian(uint64_t &x) { x = __bswap_64(x); }
+  inline void swap_endian(uint8_t *key) {
+    auto *key_64 = reinterpret_cast<uint64_t *>(key);
+    for (size_t i = 0; i < kKeySize / sizeof(uint64_t); i++) {
+      key_64[i] = __bswap_64(key_64[i]);
+    }
+  }
 
   // Upsert
-  inline void put(size_t key, size_t value, threadinfo_t *ti) {
+  inline void put(uint8_t *key, uint8_t *value, threadinfo_t *ti) {
     swap_endian(key);
-    Str key_str(reinterpret_cast<const char *>(&key), sizeof(size_t));
+    Str key_str(reinterpret_cast<const char *>(key), kKeySize);
 
     Masstree::default_table::cursor_type lp(table_->table(), key_str);
-    bool found = lp.find_insert(*ti);
+    const bool found = lp.find_insert(*ti);
     if (!found) {
       ti->observe_phantoms(lp.node());
       qtimes_.ts = ti->update_timestamp();
@@ -45,47 +56,43 @@ class MtIndex {
       lp.value()->deallocate_rcu(*ti);
     }
 
-    Str value_str(reinterpret_cast<const char *>(&value), sizeof(size_t));
-
+    Str value_str(reinterpret_cast<const char *>(value), kValueSize);
     lp.value() = row_type::create1(value_str, qtimes_.ts, *ti);
     lp.finish(1, *ti);
   }
 
   // Get (unique value)
-  inline bool get(size_t key, size_t &value, threadinfo_t *ti) {
+  inline bool get(uint8_t *key, uint8_t *value, threadinfo_t *ti) {
     swap_endian(key);
-    Str key_str(reinterpret_cast<const char *>(&key), sizeof(size_t));
+    Str key_str(reinterpret_cast<const char *>(key), kKeySize);
 
     Masstree::default_table::unlocked_cursor_type lp(table_->table(), key_str);
-    bool found = lp.find_unlocked(*ti);
-
-    if (found) {
-      value = *reinterpret_cast<const size_t *>(lp.value()->col(0).s);
-    }
-
+    const bool found = lp.find_unlocked(*ti);
+    if (found) memcpy(value, lp.value()->col(0).s, kValueSize);
     return found;
   }
 
   // An object with callbacks passed to table.scan()
   struct scanner_t {
-    scanner_t(size_t range) : range(range), range_sum(0) {}
+    scanner_t(size_t range) : range_(range), range_sum_(0) {}
 
     template <typename SS2, typename K2>
     void visit_leaf(const SS2 &, const K2 &, threadinfo_t &) {}
 
     bool visit_value(Str, const row_type *row, threadinfo_t &) {
-      size_t value = *reinterpret_cast<const size_t *>(row->col(0).s);
-      range_sum += value;
-      range--;
-      return range > 0;
+      const size_t value = *reinterpret_cast<const size_t *>(row->col(0).s);
+      range_sum_ += value;
+      range_--;
+      return range_ > 0;
     }
 
-    size_t range;
-    size_t range_sum;
+    size_t range_;
+    size_t range_sum_;
   };
 
-  /// Return the sum of \p range keys including and after \p cur_key
-  size_t sum_in_range(size_t cur_key, size_t range, threadinfo_t *ti) {
+  /// Return the sum of the values (first eight bytes per value) of \p range
+  /// keys including and after \p cur_key
+  size_t sum_in_range(uint8_t *cur_key, size_t range, threadinfo_t *ti) {
     if (range == 0) return 0;
 
     swap_endian(cur_key);
@@ -93,7 +100,7 @@ class MtIndex {
 
     scanner_t scanner(range);
     table_->table().scan(cur_key_str, true, scanner, *ti);
-    return scanner.range_sum;
+    return scanner.range_sum_;
   }
 
  private:
