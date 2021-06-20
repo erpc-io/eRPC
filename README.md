@@ -19,11 +19,10 @@ Some highlights:
 ## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+
  * See `scripts/packages/` for required software packages for your distro.
-   Install _exactly one_ of the following, mutually-incompatible packages:
-   * Mellanox OFED for Mellanox NICs
-   * For other DPDK-compatible NICs, a system-wide installation from DPDK
-     19.11.5 LTS sources (i.e., `sudo make install T=x86_64-native-linuxapp-gcc
-     DESTDIR=/usr`). Other DPDK versions are not supported.
+ * The latest `rdma_core`, preferably installed from source
+ * For non-Mellanox DPDK-compatible NICs, a system-wide installation from DPDK
+   19.11.5 LTS sources (i.e., `sudo make install T=x86_64-native-linuxapp-gcc
+   DESTDIR=/usr`). Other DPDK versions are not supported.
  * NICs: Fast (10 GbE+) NICs are needed for good performance. eRPC works best
    with Mellanox Ethernet and InfiniBand NICs. Any DPDK-capable NICs
    also work well.
@@ -91,8 +90,7 @@ Some highlights:
        * `cmake .`
        * `sudo make install`
     * Install upstream pre-requisite libraries and modules:
-       * `sudo apt install make cmake g++ gcc libnuma-dev libibverbs-dev libgflags-dev libgtest-dev numactl`
-       * `(cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)`
+       * `sudo apt install make cmake g++ gcc libnuma-dev libibverbs-dev libgflags-dev numactl`
        * `sudo modprobe ib_uverbs`
        * `sudo modprobe mlx4_ib`
     * Download the [DPDK 19.11.5 tarball](https://core.dpdk.org/download/) and
@@ -157,7 +155,7 @@ make latency
  * GitHub issues are preferred over email. Please include the following
    information in the issue:
    * NIC model
-   * Mellanox OFED or DPDK version
+   * `rdma_core` version and DPDK version
    * Operating system
 
 ## Contact
