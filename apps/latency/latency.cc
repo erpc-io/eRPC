@@ -16,7 +16,7 @@ static constexpr size_t kAppMinReqSize = 64;
 static constexpr size_t kAppMaxReqSize = 1024;
 
 // Precision factor for latency measurement
-static constexpr int64_t kAppLatFac = erpc::kIsAzure ? 1 : 10;
+static constexpr double kAppLatFac = erpc::kIsAzure ? 1.0 : 10.0;
 
 volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
@@ -160,7 +160,7 @@ void client_func(erpc::Nexus *nexus) {
   printf("Latency: Process %zu: Session connected. Starting work.\n",
          FLAGS_process_id);
   printf(
-      "median_us 5th_us 99th_us 99.9th_us 99.99th_us 99.999th_us "
+      "req_size median_us 5th_us 99th_us 99.9th_us 99.99th_us 99.999th_us "
       "99.9999th_us max_us [total_samples, total_time]\n");
 
   send_req(c);
@@ -174,17 +174,18 @@ void client_func(erpc::Nexus *nexus) {
               kAppEvLoopMs / 1000.0);
       fflush(stderr);
     } else {
-      printf("%zu %zu %zu %zu %zu %zu %zu %zu %zu [%zu samples, %zu seconds]\n",
-             c.req_size_,
-             hdr_value_at_percentile(c.latency_hist_, 50.0) / kAppLatFac,
-             hdr_value_at_percentile(c.latency_hist_, 5.0) / kAppLatFac,
-             hdr_value_at_percentile(c.latency_hist_, 99) / kAppLatFac,
-             hdr_value_at_percentile(c.latency_hist_, 99.9) / kAppLatFac,
-             hdr_value_at_percentile(c.latency_hist_, 99.99) / kAppLatFac,
-             hdr_value_at_percentile(c.latency_hist_, 99.999) / kAppLatFac,
-             hdr_value_at_percentile(c.latency_hist_, 99.9999) / kAppLatFac,
-             hdr_max(c.latency_hist_) / kAppLatFac, c.latency_samples_,
-             i / 1000);
+      printf(
+          "%zu %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f "
+          "[%zu samples, %zu seconds]\n",
+          c.req_size_,
+          hdr_value_at_percentile(c.latency_hist_, 50.0) / kAppLatFac,
+          hdr_value_at_percentile(c.latency_hist_, 5.0) / kAppLatFac,
+          hdr_value_at_percentile(c.latency_hist_, 99) / kAppLatFac,
+          hdr_value_at_percentile(c.latency_hist_, 99.9) / kAppLatFac,
+          hdr_value_at_percentile(c.latency_hist_, 99.99) / kAppLatFac,
+          hdr_value_at_percentile(c.latency_hist_, 99.999) / kAppLatFac,
+          hdr_value_at_percentile(c.latency_hist_, 99.9999) / kAppLatFac,
+          hdr_max(c.latency_hist_) / kAppLatFac, c.latency_samples_, i / 1000);
     }
     fflush(stdout);
 
