@@ -15,7 +15,7 @@ sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noa
 ### Packages required for eRPC
 ###
 sudo yum -y install git gcc-c++ cmake numactl-devel numactl bc gflags-devel \
-  gtest gtest-devel libpmem libpmem-devel dpdk dpdk-devel
+  libpmem libpmem-devel dpdk dpdk-devel
 
 ###
 ### Packages required to install Mellanox OFED

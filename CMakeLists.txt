@@ -3,24 +3,38 @@ project(eRPC)
 
 include(CMakeDependentOption)
 
-# Pick a compiler
-#set(CMAKE_CXX_COMPILER clang++)
-set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
 
-# Common sub-projects
+# Parse the user-exposed options
+if(PERF)
+  message(STATUS "Compilation optimized for performance.")
+  message(STATUS "Debugging is disabled.")
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+  set(TESTING OFF)
+else(PERF)
+  message(STATUS "Compilation not optimized for performance.")
+  message(STATUS "Debugging is enabled. Perf will be low.")
+  set(CMAKE_BUILD_TYPE Debug)
+  SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+  set(TESTING ON)
+endif(PERF)
+
+# Common sub-projects: HdrHistogram
 set(HDR_HISTOGRAM_BUILD_PROGRAMS OFF CACHE BOOL "Minimize HDR histogram build")
 set(HDR_LOG_REQUIRED OFF CACHE BOOL "Disable HDR histogram's log to avoid zlib dependency")
 add_subdirectory(third_party/HdrHistogram_c)
 
-set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static)
-
-# Unit tests
+# Common sub-projects: GTest
+set(INSTALL_GTEST OFF)
+add_subdirectory(./third_party/googletest)
 enable_testing()
-find_package(GTest REQUIRED)
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
+set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static gtest gtest_main)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party)
 
@@ -39,17 +53,6 @@ option(AZURE "Configure DPDK for Azure if TRANSPORT is dpdk" OFF)
 option(PERF "Compile for performance" ON)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
-
-# Parse the user-exposed options
-if(PERF)
-  message(STATUS "Compilation optimized for performance.")
-  set(DEBUG OFF)
-  set(TESTING OFF)
-else(PERF)
-  message(STATUS "Compilation not optimized for performance.")
-  set(DEBUG ON)
-  set(TESTING ON)
-endif(PERF)
 
 # Profile-guided optimization
 if(PGO STREQUAL "generate")
@@ -90,16 +93,6 @@ else()
   message(STATUS "No logging level specified. Using warning level.")
   add_definitions(-DERPC_LOG_LEVEL=2)
 endif()
-
-# Debug mode
-if(DEBUG)
-  message(STATUS "Debugging is enabled. Perf will be low.")
-  set(CMAKE_BUILD_TYPE Debug)
-  SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
-else(DEBUG)
-  message(STATUS "Debugging is disabled.")
-  set(CMAKE_BUILD_TYPE RelWithDebInfo)
-endif(DEBUG)
 
 # Testing for packet loss, machine failure, etc
 if(TESTING)
@@ -327,30 +320,30 @@ add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES}
 if(PERF)
   target_compile_options(${APP} PRIVATE "-flto")
 endif()
-target_link_libraries(${APP} ${GTEST_LIBRARIES} ${LIBRARIES})
+target_link_libraries(${APP} ${LIBRARIES})
 
 # Compile the tests
 if(TESTING)
   foreach(test_name IN LISTS CLIENT_TESTS)
     add_executable(${test_name} tests/client_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    target_link_libraries(${test_name} erpc ${LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
   endforeach()
 
   foreach(test_name IN LISTS PROTOCOL_TESTS)
     add_executable(${test_name} tests/protocol_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    target_link_libraries(${test_name} erpc ${LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
   endforeach()
 
   foreach(test_name IN LISTS TRANSPORT_TESTS)
     add_executable(${test_name} tests/transport_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    target_link_libraries(${test_name} erpc ${LIBRARIES})
     add_test(NAME ${test_name} COMMAND ${test_name})
   endforeach()
 
   foreach(test_name IN LISTS UTIL_TESTS)
     add_executable(${test_name} tests/util_tests/${test_name}.cc)
-    target_link_libraries(${test_name} erpc ${GTEST_LIBRARIES} ${LIBRARIES})
+    target_link_libraries(${test_name} erpc ${LIBRARIES})
   endforeach()
 endif()

@@ -10,8 +10,7 @@ sudo apt update
 sudo apt -y install g++ cmake make
 
 # General libs
-sudo apt -y install libnuma-dev libgflags-dev libgtest-dev
-(cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
+sudo apt -y install libnuma-dev libgflags-dev
 
 # DPDK drivers
 # Latest DPDK: sudo make install T=x86_64-native-linuxapp-gcc DESTDIR=/usr
