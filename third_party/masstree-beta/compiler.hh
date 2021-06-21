@@ -25,12 +25,8 @@
 
 #define arraysize(a) (sizeof(a) / sizeof((a)[0]))
 
-#ifndef likely
 #define likely(x) __builtin_expect(!!(x), 1)
-#endif
-#ifndef unlikely
 #define unlikely(x) __builtin_expect(!!(x), 0)
-#endif
 
 #if HAVE_OFF_T_IS_LONG_LONG
 #define PRIdOFF_T "lld"
@@ -490,24 +486,38 @@ inline T* fetch_and_add(T** object, int addend) {
     return (T*) sco_t::fetch_and_add((type*) object, (type) (addend * sizeof(T)));
 }
 
-inline int8_t fetch_and_add(int8_t* object, int addend) {
-    return fetch_and_add(object, int8_t(addend));
+inline char fetch_and_add(char* object, int addend) {
+    return fetch_and_add(object, (char) addend);
 }
-inline uint8_t fetch_and_add(uint8_t* object, int addend) {
-    return fetch_and_add(object, uint8_t(addend));
+inline signed char fetch_and_add(signed char* object, int addend) {
+    return fetch_and_add(object, (signed char) addend);
 }
-inline int16_t fetch_and_add(int16_t* object, int addend) {
-    return fetch_and_add(object, int16_t(addend));
+inline unsigned char fetch_and_add(unsigned char* object, int addend) {
+    return fetch_and_add(object, (unsigned char) addend);
 }
-inline uint16_t fetch_and_add(uint16_t* object, int addend) {
-    return fetch_and_add(object, uint16_t(addend));
+inline short fetch_and_add(short* object, int addend) {
+    return fetch_and_add(object, (short) addend);
+}
+inline unsigned short fetch_and_add(unsigned short* object, int addend) {
+    return fetch_and_add(object, (unsigned short) addend);
 }
 inline unsigned fetch_and_add(unsigned* object, int addend) {
-    return fetch_and_add(object, unsigned(addend));
+    return fetch_and_add(object, (unsigned) addend);
+}
+inline long fetch_and_add(long* object, int addend) {
+    return fetch_and_add(object, (long) addend);
 }
 inline unsigned long fetch_and_add(unsigned long* object, int addend) {
-    return fetch_and_add(object, (unsigned long)(addend));
+    return fetch_and_add(object, (unsigned long) addend);
 }
+#if SIZEOF_LONG_LONG <= 8
+inline long long fetch_and_add(long long* object, int addend) {
+    return fetch_and_add(object, (long long) addend);
+}
+inline unsigned long long fetch_and_add(unsigned long long* object, int addend) {
+    return fetch_and_add(object, (unsigned long long) addend);
+}
+#endif
 
 
 /** @brief Test-and-set lock acquire. */
@@ -1045,9 +1055,7 @@ template <typename T> using is_reference = std::is_reference<T>;
 #else
 template <typename T> struct is_reference_helper : public false_type {};
 template <typename T> struct is_reference_helper<T&> : public true_type {};
-#if HAVE_CXX_RVALUE_REFERENCES
 template <typename T> struct is_reference_helper<T&&> : public true_type {};
-#endif
 template <typename T> struct is_reference
     : public integral_constant<bool, is_reference_helper<typename remove_cv<T>::type>::value> {};
 #endif
@@ -1139,9 +1147,7 @@ struct fast_argument;
 template <typename T> struct fast_argument<T, true> {
     static constexpr bool is_reference = true;
     typedef const T& type;
-#if HAVE_CXX_RVALUE_REFERENCES
     typedef void enable_rvalue_reference;
-#endif
 };
 template <typename T> struct fast_argument<T, false> {
     static constexpr bool is_reference = false;

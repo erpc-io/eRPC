@@ -76,7 +76,6 @@ class scanstackelt {
     }
 
     template <typename PX> friend class basic_table;
-    template <typename PX, typename HX> friend struct scan_iterator_impl;
 };
 
 struct forward_scan_helper {
@@ -95,7 +94,7 @@ struct forward_scan_helper {
     key_indexed_position lower_with_position(const K &k, const N *n) const {
         return N::bound_type::lower_by(k, *n, *n);
     }
-    void found() const {
+    void mark_key_complete() const {
     }
     int next(int ki) const {
         return ki + 1;
@@ -121,7 +120,6 @@ struct reverse_scan_helper {
     // Also, a node's size might change DURING a lower_bound operation.
     // The "backwards" ki must be calculated using the size taken by the
     // lower_bound, NOT some later size() (which might be bigger or smaller).
-    // The helper type reverse_scan_node allows this.
     reverse_scan_helper()
         : upper_bound_(false) {
     }
@@ -148,7 +146,7 @@ struct reverse_scan_helper {
     int next(int ki) const {
         return ki - 1;
     }
-    void found() const {
+    void mark_key_complete() const {
         upper_bound_ = false;
     }
     template <typename N, typename K>
@@ -280,7 +278,7 @@ int scanstackelt<P>::find_next(H &helper, key_type &ka, leafvalue_type &entry)
 
         // We know we can emit the data collected above.
         ka.assign_store_ikey(ikey);
-        helper.found();
+        helper.mark_key_complete();
         if (n_->keylenx_is_layer(keylenx)) {
             node_stack_.push_back(root_);
             node_stack_.push_back(n_);
@@ -294,8 +292,10 @@ int scanstackelt<P>::find_next(H &helper, key_type &ka, leafvalue_type &entry)
 
     if (!n_->has_changed(v_)) {
         n_ = helper.advance(n_, ka);
-        if (!n_)
+        if (!n_) {
+            helper.mark_key_complete();
             return scan_up;
+        }
         n_->prefetch();
     }
 
@@ -305,91 +305,6 @@ int scanstackelt<P>::find_next(H &helper, key_type &ka, leafvalue_type &entry)
     ki_ = helper.lower(ka, this);
     return scan_find_next;
 }
-
-// I think this is called stack-ripping?
-template <typename P, typename H>
-struct scan_iterator_impl {
-    typedef typename P::ikey_type ikey_type;
-    typedef typename basic_table<P>::node_type node_type;
-    typedef typename basic_table<P>::threadinfo threadinfo;
-    typedef typename node_type::key_type key_type;
-    typedef typename node_type::leaf_type::leafvalue_type leafvalue_type;
-    typedef typename basic_table<P>::value_type value_type;
-
-    typedef scanstackelt<P> stack_type;
-
-    scan_iterator_impl(node_type *root, Str firstkey, threadinfo &ti) {
-	memcpy(keybuf.s, firstkey.s, firstkey.len);
-	key = key_type(keybuf.s, firstkey.len);
-	stack.root_ = root;
-	entry = leafvalue_type::make_empty();
-	terminated = false;
-
-	// go down to the deepest layer
-	while (1) {
-	    state = stack.find_initial(helper, key, true, entry, ti);
-	    if (state != stack_type::scan_down) break;
-	    key.shift();
-	}
-	StateChange(ti);
-    }
-
-    void next(threadinfo &ti) {
-	stack.ki_ = helper.next(stack.ki_);
-	state = stack.find_next(helper, key, entry);
-	StateChange(ti);
-    }
-
-    void StateChange(threadinfo &ti) {
-	while (state != stack_type::scan_emit) {
-	    switch (state) {
-	    case stack_type::scan_find_next:
-		find_next:
-		state = stack.find_next(helper, key, entry);
-		break;
-
-	    case stack_type::scan_up:
-		do {
-		    if (stack.node_stack_.empty()) {
-			terminated = true;
-			return;
-		    }
-		    stack.n_ = static_cast<leaf<P>*>(stack.node_stack_.back());
-		    stack.node_stack_.pop_back();
-		    stack.root_ = stack.node_stack_.back();
-		    stack.node_stack_.pop_back();
-		    key.unshift();
-		} while (unlikely(key.empty()));
-		stack.v_ = helper.stable(stack.n_, key);
-		stack.perm_ = stack.n_->permutation();
-		stack.ki_ = helper.lower(key, &stack);
-		goto find_next;
-
-	    case stack_type::scan_down:
-		helper.shift_clear(key);
-		goto retry;
-
-	    case stack_type::scan_retry:
-		retry:
-		state = stack.find_retry(helper, key, ti);
-		break;
-	    }
-	}
-    }
-
-    union {
-        ikey_type x[(MASSTREE_MAXKEYLEN + sizeof(ikey_type) - 1)/sizeof(ikey_type)];
-        char s[MASSTREE_MAXKEYLEN];
-    } keybuf;
-
-    bool terminated;
-
-    H helper;
-    leafvalue_type entry;
-    int state;
-    key_type key;
-    stack_type stack;
-};
 
 template <typename P> template <typename H, typename F>
 int basic_table<P>::scan(H helper,

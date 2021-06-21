@@ -158,14 +158,21 @@ class key {
         return s;
     }
     int unparse_printable(char* data, int datalen) const {
-        String s = unparse().printable();
+        String s = unparse_printable();
         int cplen = std::min(s.length(), datalen);
         memcpy(data, s.data(), cplen);
         return cplen;
     }
+    String unparse_printable() const {
+        return unparse().printable();
+    }
     static String unparse_ikey(ikey_type ikey) {
         key<ikey_type> k(ikey);
         return k.unparse();
+    }
+    static String unparse_printable_ikey(ikey_type ikey) {
+        key<ikey_type> k(ikey);
+        return k.unparse_printable();
     }
 
     // used during scan

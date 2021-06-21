@@ -38,10 +38,10 @@ uint32_t xl[100];
 
 struct fake_threadinfo {
     static void* allocate(size_t sz, memtag = memtag_none) {
-	return new char[sz];
+        return new char[sz];
     }
     static void deallocate(void* p, size_t, memtag = memtag_none) {
-	delete[] reinterpret_cast<char*>(p);
+        delete[] reinterpret_cast<char*>(p);
     }
 };
 
@@ -49,9 +49,9 @@ struct fake_threadinfo {
 union myunion {
     uint32_t x;
     struct {
-	unsigned one : 1;
-	unsigned two : 2;
-	unsigned three : 3;
+        unsigned one : 1;
+        unsigned two : 2;
+        unsigned three : 3;
     };
 } xunion;
 
@@ -74,28 +74,28 @@ void test_atomics() {
     x = cmpxchg(&xl[0], 100, 200);
     assert(x == 100 && xl[0] == 200);
     if (bool_cmpxchg(&xl[0], 200, 300))
-	xl[1] = 400;
+        xl[1] = 400;
     assert(xl[0] == 300 && xl[1] == 400);
     if (bool_cmpxchg(&xl[0], 400, 100))
-	xl[1] = 500;
+        xl[1] = 500;
     assert(xl[0] == 300 && xl[1] == 400);
 }
 
 void test_psdes_nr() {
     kvrandom_psdes_nr r;
     union {
-	uint32_t u;
-	float f;
+        uint32_t u;
+        float f;
     } u;
 
-    r.reset(1);
-    u.u = r.next();
+    r.seed(1);
+    u.u = r();
     assert(u.u == 0x509C0C23U);
     u.u = r[99];
     assert(u.u == 0xA66CB41A);
 
-    r.reset(99);
-    u.u = r.next();
+    r.seed(99);
+    u.u = r();
     assert(u.u == 0x64300984);
     u.u = r[99];
     assert(u.u == 0x59BA89EB);
@@ -106,7 +106,7 @@ void time_random() {
     T r;
     uint32_t x = 0;
     for (int i = 0; i < 1000000000; ++i)
-	x ^= r.next();
+        x ^= r();
     assert(x != 0);
 }
 
@@ -121,7 +121,7 @@ void time_keyslice() {
     kvrandom_lcg_nr r;
     x ^= string_slice<T>::make(b, 1);
     for (int i = 0; i < 1000000000; ++i)
-	x ^= string_slice<T>::make(b + r.next() % 2048, r.next() % 16);
+        x ^= string_slice<T>::make(b + r() % 2048, r() % 16);
     assert(x);
 }
 
@@ -144,23 +144,23 @@ void test_kpermuter() {
     assert(k.size() == 3 && k[0] == 0 && k[1] == 3 && k[2] == 1 && k[3] == 2 && k[4] == 14);
     k.insert_selected(2, 11);
     assert(k.size() == 4 && k[0] == 0 && k[1] == 3 && k[2] == 7 && k[3] == 1 && k[4] == 2
-	   && k[5] == 14 && k[11] == 8 && k[12] == 6);
+           && k[5] == 14 && k[11] == 8 && k[12] == 6);
     k.insert_selected(2, 14);
     assert(k.size() == 5 && k[0] == 0 && k[1] == 3 && k[2] == 4 && k[3] == 7 && k[4] == 1 && k[5] == 2
-	   && k[6] == 14 && k[12] == 8 && k[13] == 6);
+           && k[6] == 14 && k[12] == 8 && k[13] == 6);
     k.exchange(0, 1);
     assert(k.size() == 5 && k[0] == 3 && k[1] == 0 && k[2] == 4 && k[3] == 7 && k[4] == 1 && k[5] == 2
-	   && k[6] == 14 && k[12] == 8 && k[13] == 6);
+           && k[6] == 14 && k[12] == 8 && k[13] == 6);
     k.remove_to_back(2);
     assert(k.size() == 4 && k[0] == 3 && k[1] == 0 && k[2] == 7 && k[3] == 1 && k[4] == 2
-	   && k[5] == 14 && k[11] == 8 && k[12] == 6 && k[14] == 4);
+           && k[5] == 14 && k[11] == 8 && k[12] == 6 && k[14] == 4);
     assert(k.back() == 4);
     i = k.insert_from_back(2);
     assert(k.size() == 5 && k[0] == 3 && k[1] == 0 && k[2] == 4 && k[3] == 7 && k[4] == 1 && k[5] == 2
-	   && k[6] == 14 && k[12] == 8 && k[13] == 6 && i == 4);
+           && k[6] == 14 && k[12] == 8 && k[13] == 6 && i == 4);
     k.exchange(0, 0);
     assert(k.size() == 5 && k[0] == 3 && k[1] == 0 && k[2] == 4 && k[3] == 7 && k[4] == 1 && k[5] == 2
-	   && k[6] == 14 && k[12] == 8 && k[13] == 6 && i == 4);
+           && k[6] == 14 && k[12] == 8 && k[13] == 6 && i == 4);
 
     assert(find_lowest_zero_nibble(0x0120U) == 0);
     assert(find_lowest_zero_nibble(0x0123U) == 3);
@@ -181,7 +181,7 @@ void test_string_slice() {
     typedef string_slice<uint32_t> ss_type;
     assert(ss_type::make("a", 1) == ss_type::make("aaa", 1));
     assert(ss_type::make_sloppy("0123abcdef" + 4, 1)
-	   == ss_type::make_sloppy("bcdea01293" + 4, 1));
+           == ss_type::make_sloppy("bcdea01293" + 4, 1));
     assert(ss_type::make_comparable("a", 1) < ss_type::make_comparable("b", 1));
     assert(ss_type::equals_sloppy("0123abcdef" + 4, "abcdea02345" + 5, 1));
     assert(ss_type::make_comparable("abcd", 4) < ss_type::make_comparable("abce", 4));
@@ -199,7 +199,7 @@ void test_string_bag() {
     typedef value_bag<uint16_t> bag_t;
     bag_t eb;
     if (eb.size() > sizeof(bag_t))
-	fprintf(stderr, "sizes are off: %zu vs. %zu\n", eb.size(), sizeof(bag_t));
+        fprintf(stderr, "sizes are off: %zu vs. %zu\n", eb.size(), sizeof(bag_t));
     assert(eb.size() <= sizeof(bag_t));
     bag_t* b = eb.update(0, Str("A", 1), 1, ti);
     assert(b->row_string() == Str("\001\000\006\000\007\000A", 7));
@@ -214,8 +214,8 @@ void test_string_bag() {
     b->deallocate(ti);
     b = bb;
     assert(b->row_string() == Str("\002\000"
-				  "\010\000\011\000\013\000"
-				  "ABB", 013));
+                                  "\010\000\011\000\013\000"
+                                  "ABB", 013));
     assert(b->ncol() == 2);
     assert(b->col(0) == Str("A", 1));
     assert(b->col(1) == Str("BB", 2));
@@ -224,8 +224,8 @@ void test_string_bag() {
     b->deallocate(ti);
     b = bb;
     assert(b->row_string() == Str("\004\000"
-				  "\014\000\015\000\017\000\017\000\022\000"
-				  "ABBCCC", 022));
+                                  "\014\000\015\000\017\000\017\000\022\000"
+                                  "ABBCCC", 022));
     assert(b->ncol() == 4);
     assert(b->col(0) == Str("A", 1));
     assert(b->col(1) == Str("BB", 2));
@@ -236,8 +236,8 @@ void test_string_bag() {
     b->deallocate(ti);
     b = bb;
     assert(b->row_string() == Str("\004\000"
-				  "\014\000\015\000\020\000\020\000\023\000"
-				  "AbbbCCC", 023));
+                                  "\014\000\015\000\020\000\020\000\023\000"
+                                  "AbbbCCC", 023));
     assert(b->ncol() == 4);
     assert(b->col(0) == Str("A", 1));
     assert(b->col(1) == Str("bbb", 3));
@@ -248,8 +248,8 @@ void test_string_bag() {
     b->deallocate(ti);
     b = bb;
     assert(b->row_string() == Str("\004\000"
-				  "\014\000\015\000\020\000\020\000\023\000"
-				  "abbbCCC", 023));
+                                  "\014\000\015\000\020\000\020\000\023\000"
+                                  "abbbCCC", 023));
     assert(b->ncol() == 4);
     assert(b->col(0) == Str("a", 1));
     assert(b->col(1) == Str("bbb", 3));
@@ -260,8 +260,8 @@ void test_string_bag() {
     b->deallocate(ti);
     b = bb;
     assert(b->row_string() == Str("\004\000"
-				  "\014\000\015\000\015\000\015\000\020\000"
-				  "aCCC", 020));
+                                  "\014\000\015\000\015\000\015\000\020\000"
+                                  "aCCC", 020));
     assert(b->ncol() == 4);
     assert(b->col(0) == Str("a", 1));
     assert(b->col(1) == Str("", 0));
@@ -332,29 +332,29 @@ void test_json()
     assert(j["x22"]["time"] == "Tue Feb  7 20:20:33 2012");
     assert(j["x22"]["cores"] == 2);
     {
-	Json::object_iterator it = j.obegin();
-	assert(it.key() == "x22");
-	++it;
-	assert(it.key() == "x23");
-	++it;
-	assert(it.key() == "x24");
-	++it;
-	assert(it.key() == "b");
-	++it;
-	assert(it.key() == "c");
+        Json::object_iterator it = j.obegin();
+        assert(it.key() == "x22");
+        ++it;
+        assert(it.key() == "x23");
+        ++it;
+        assert(it.key() == "x24");
+        ++it;
+        assert(it.key() == "b");
+        ++it;
+        assert(it.key() == "c");
     }
 
     {
-	Json jcopy = j;
-	assert(j.size() == 5);
-	int count = 0;
-	for (Json::iterator it = jcopy.begin(); it != jcopy.end(); ++it) {
-	    it->second = Json();
-	    ++count;
-	}
-	assert(!jcopy["x22"]);
-	assert(j["x22"]["cores"] == 2);
-	assert(count == jcopy.size());
+        Json jcopy = j;
+        assert(j.size() == 5);
+        int count = 0;
+        for (Json::iterator it = jcopy.begin(); it != jcopy.end(); ++it) {
+            it->second = Json();
+            ++count;
+        }
+        assert(!jcopy["x22"]);
+        assert(j["x22"]["cores"] == 2);
+        assert(count == jcopy.size());
     }
 
     assert(!j["x49"]);
@@ -389,19 +389,19 @@ void test_json()
 
     j.assign_parse("{\"a\":1,\"b\":true,\"c\":\"\"}");
     {
-	int i = 0;
-	bool b = false;
-	String s;
-	assert(j.get("a", i));
-	assert(i == 1);
-	assert(j.get("a", i).get("b", b));
-	assert(b == true);
-	assert(!j.get("a", s).status());
-	assert(!j.get("a", s).status(b));
-	assert(b == false);
-	assert(j.get("a", k));
-	assert(k == Json(1));
-	assert(!j.get("cc", k));
+        int i = 0;
+        bool b = false;
+        String s;
+        assert(j.get("a", i));
+        assert(i == 1);
+        assert(j.get("a", i).get("b", b));
+        assert(b == true);
+        assert(!j.get("a", s).status());
+        assert(!j.get("a", s).status(b));
+        assert(b == false);
+        assert(j.get("a", k));
+        assert(k == Json(1));
+        assert(!j.get("cc", k));
     }
 
     j["a"] = Json(5);

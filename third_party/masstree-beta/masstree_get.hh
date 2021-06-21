@@ -14,7 +14,7 @@
  * is legally binding.
  */
 #ifndef MASSTREE_GET_HH
-#define MASSTREE_GET_HH 1
+#define MASSTREE_GET_HH
 #include "masstree_tcursor.hh"
 #include "masstree_key.hh"
 namespace Masstree {
@@ -111,6 +111,7 @@ bool tcursor<P>::find_locked(threadinfo& ti)
     } else if (unlikely(n_->deleted_layer())) {
         ka_.unshift_all();
         root = const_cast<node_base<P>*>(root_);
+        n_->unlock();
         goto retry;
     }
     return state_;

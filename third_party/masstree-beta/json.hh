@@ -76,9 +76,7 @@ class Json {
     inline Json();
     inline Json(const Json& x);
     template <typename P> inline Json(const Json_proxy_base<P>& x);
-#if HAVE_CXX_RVALUE_REFERENCES
     inline Json(Json&& x);
-#endif
     inline Json(const null_t& x);
     inline Json(int x);
     inline Json(unsigned x);
@@ -305,9 +303,7 @@ class Json {
 
     // Assignment
     inline Json& operator=(const Json& x);
-#if HAVE_CXX_RVALUE_REFERENCES
     inline Json& operator=(Json&& x);
-#endif
     inline Json& operator=(int x);
     inline Json& operator=(unsigned x);
     inline Json& operator=(long x);
@@ -1339,11 +1335,9 @@ class Json_object_proxy : public Json_proxy_base<Json_object_proxy<T> > {
     Json& operator=(const Json& x) {
         return value() = x;
     }
-#if HAVE_CXX_RVALUE_REFERENCES
     Json& operator=(Json&& x) {
         return value() = std::move(x);
     }
-#endif
     Json& operator=(const Json_object_proxy<T>& x) {
         return value() = x.cvalue();
     }
@@ -1369,11 +1363,9 @@ class Json_object_str_proxy : public Json_proxy_base<Json_object_str_proxy<T> > 
     Json& operator=(const Json& x) {
         return value() = x;
     }
-#if HAVE_CXX_RVALUE_REFERENCES
     Json& operator=(Json&& x) {
         return value() = std::move(x);
     }
-#endif
     Json& operator=(const Json_object_str_proxy<T>& x) {
         return value() = x.cvalue();
     }
@@ -1399,11 +1391,9 @@ class Json_array_proxy : public Json_proxy_base<Json_array_proxy<T> > {
     Json& operator=(const Json& x) {
         return value() = x;
     }
-#if HAVE_CXX_RVALUE_REFERENCES
     Json& operator=(Json&& x) {
         return value() = std::move(x);
     }
-#endif
     Json& operator=(const Json_array_proxy<T>& x) {
         return value() = x.cvalue();
     }
@@ -1514,13 +1504,11 @@ template <typename P> inline Json::Json(const Json_proxy_base<P>& x)
     if (u_.x.x && (u_.x.type == j_array || u_.x.type == j_object))
         u_.x.x->ref();
 }
-#if HAVE_CXX_RVALUE_REFERENCES
 /** @overload */
 inline Json::Json(Json&& x)
     : u_(std::move(x.u_)) {
-    memset(&x, 0, sizeof(x));
+    memset(&x.u_, 0, sizeof(x.u_));
 }
-#endif
 /** @brief Construct simple Json values. */
 inline Json::Json(int x) {
     u_.i.x = x;
@@ -2945,13 +2933,11 @@ inline Json& Json::operator=(const Json& x) {
     return *this;
 }
 
-#if HAVE_CXX_RVALUE_REFERENCES
 inline Json& Json::operator=(Json&& x) {
     using std::swap;
     swap(u_, x.u_);
     return *this;
 }
-#endif
 
 /** @cond never */
 template <typename U>

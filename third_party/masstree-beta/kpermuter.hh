@@ -56,9 +56,9 @@ template <> struct sized_kpermuter_info<2> {
            full_value = (uint64_t) 0xEDCBA98765432100ULL };
 };
 
-template <int width> class kpermuter {
+template <int W> class kpermuter {
   public:
-    typedef sized_kpermuter_info<(width > 3) + (width > 7) + (width > 15)> info;
+    typedef sized_kpermuter_info<(W > 3) + (W > 7) + (W > 15)> info;
     typedef typename info::storage_type storage_type;
     typedef typename info::value_type value_type;
     enum { max_width = (int) (sizeof(storage_type) * 2 - 1) };
@@ -76,7 +76,7 @@ template <int width> class kpermuter {
 
         Elements will be allocated in order 0, 1, ..., @a width - 1. */
     static inline value_type make_empty() {
-        value_type p = (value_type) info::initial_value >> ((max_width - width) << 2);
+        value_type p = (value_type) info::initial_value >> ((max_width - W) << 2);
         return p & ~(value_type) 15;
     }
     /** @brief Return a permuter with size @a n.
@@ -85,7 +85,7 @@ template <int width> class kpermuter {
         (*this)[i] == i. Elements n through @a width - 1 are free, and will be
         allocated in that order. */
     static inline value_type make_sorted(int n) {
-        value_type mask = (n == width ? (value_type) 0 : (value_type) 16 << (n << 2)) - 1;
+        value_type mask = (n == W ? (value_type) 0 : (value_type) 16 << (n << 2)) - 1;
         return (make_empty() << (n << 2))
             | ((value_type) info::full_value & mask)
             | n;
@@ -95,13 +95,16 @@ template <int width> class kpermuter {
     int size() const {
         return x_ & 15;
     }
+    static int width() {
+        return W;
+    }
     /** @brief Return the permuter's element @a i.
         @pre 0 <= i < width */
     int operator[](int i) const {
         return (x_ >> ((i << 2) + 4)) & 15;
     }
     int back() const {
-        return (*this)[width - 1];
+        return (*this)[W - 1];
     }
     value_type value() const {
         return x_;
@@ -147,7 +150,6 @@ template <int width> class kpermuter {
         @pre size() <= @a si
         @return The newly allocated element. */
     void insert_selected(int di, int si) {
-        (void) width;
         int value = (*this)[si];
         value_type mask = ((value_type) 256 << (si << 2)) - 1;
         // increment size, leave lower slots unchanged
@@ -177,10 +179,9 @@ template <int width> class kpermuter {
         <li>q[q.size()] == p[i]</li>
         </ul> */
     void remove(int i) {
-        (void) width;
-        if (int(x_ & 15) == i + 1)
+        if (int(x_ & 15) == i + 1) {
             --x_;
-        else {
+        } else {
             int rot_amount = ((x_ & 15) - i - 1) << 2;
             value_type rot_mask =
                 (((value_type) 16 << rot_amount) - 1) << ((i + 1) << 2);
@@ -212,13 +213,13 @@ template <int width> class kpermuter {
     void remove_to_back(int i) {
         value_type mask = ~(((value_type) 16 << (i << 2)) - 1);
         // clear unused slots
-        value_type x = x_ & (((value_type) 16 << (width << 2)) - 1);
+        value_type x = x_ & (((value_type) 16 << (W << 2)) - 1);
         // decrement size, leave lower slots unchanged
         x_ = ((x - 1) & ~mask)
             // shift higher entries down
             | ((x >> 4) & mask)
             // shift removed element up
-            | ((x & mask) << ((width - i - 1) << 2));
+            | ((x & mask) << ((W - i - 1) << 2));
     }
     /** @brief Rotate the permuter's elements between @a i and size().
         @pre 0 <= @a i <= @a j <= size()
@@ -236,12 +237,12 @@ template <int width> class kpermuter {
         <li>Given k with i <= k < q.size(), q[k] == p[i + (k - i + j - i) mod (size() - i)]</li>
         </ul> */
     void rotate(int i, int j) {
-        value_type mask = (i == width ? (value_type) 0 : (value_type) 16 << (i << 2)) - 1;
+        value_type mask = (i == W ? (value_type) 0 : (value_type) 16 << (i << 2)) - 1;
         // clear unused slots
-        value_type x = x_ & (((value_type) 16 << (width << 2)) - 1);
+        value_type x = x_ & (((value_type) 16 << (W << 2)) - 1);
         x_ = (x & mask)
             | ((x >> ((j - i) << 2)) & ~mask)
-            | ((x & ~mask) << ((width - j) << 2));
+            | ((x & ~mask) << ((W - j) << 2));
     }
     /** @brief Exchange the elements at positions @a i and @a j. */
     void exchange(int i, int j) {
@@ -251,8 +252,8 @@ template <int width> class kpermuter {
     /** @brief Exchange positions of values @a x and @a y. */
     void exchange_values(int x, int y) {
         value_type diff = 0, p = x_;
-        for (int i = 0; i < width; ++i, diff <<= 4, p <<= 4) {
-            int v = (p >> (width << 2)) & 15;
+        for (int i = 0; i < W; ++i, diff <<= 4, p <<= 4) {
+            int v = (p >> (W << 2)) & 15;
             diff ^= -((v == x) | (v == y)) & (x ^ y);
         }
         x_ ^= diff;
@@ -260,10 +261,10 @@ template <int width> class kpermuter {
 
     lcdf::String unparse() const;
 
-    bool operator==(const kpermuter<width>& x) const {
+    bool operator==(const kpermuter<W>& x) const {
         return x_ == x.x_;
     }
-    bool operator!=(const kpermuter<width>& x) const {
+    bool operator!=(const kpermuter<W>& x) const {
         return !(*this == x);
     }
 
@@ -274,8 +275,8 @@ template <int width> class kpermuter {
     value_type x_;
 };
 
-template <int width>
-lcdf::String kpermuter<width>::unparse() const
+template <int W>
+lcdf::String kpermuter<W>::unparse() const
 {
     char buf[max_width + 3], *s = buf;
     value_type p(x_);
@@ -283,18 +284,21 @@ lcdf::String kpermuter<width>::unparse() const
     int n = p & 15;
     p >>= 4;
     for (int i = 0; true; ++i) {
-        if (i == n)
+        if (i == n) {
             *s++ = ':';
-        if (i == width)
+        }
+        if (i == W) {
             break;
-        if ((p & 15) < 10)
+        }
+        if ((p & 15) < 10) {
             *s++ = '0' + (p & 15);
-        else
+        } else {
             *s++ = 'a' + (p & 15) - 10;
+        }
         seen |= 1 << (p & 15);
         p >>= 4;
     }
-    if (seen != (1 << width) - 1) {
+    if (seen != (1 << W) - 1) {
         *s++ = '?';
         *s++ = '!';
     }

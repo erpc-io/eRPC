@@ -92,11 +92,12 @@ class nodeversion {
     }
     template <typename SF>
     nodeversion<P> lock(nodeversion<P> expected, SF spin_function) {
-        while (1) {
+        while (true) {
             if (!(expected.v_ & P::lock_bit)
                 && bool_cmpxchg(&v_, expected.v_,
-                                expected.v_ | P::lock_bit))
+                                expected.v_ | P::lock_bit)) {
                 break;
+            }
             spin_function();
             expected.v_ = v_;
         }
@@ -105,6 +106,24 @@ class nodeversion {
         acquire_fence();
         masstree_invariant(expected.v_ == v_);
         return expected;
+    }
+
+    bool try_lock() {
+        return try_lock(relax_fence_function());
+    }
+    template <typename SF>
+    bool try_lock(SF spin_function) {
+        value_type expected = v_;
+        if (!(expected & P::lock_bit)
+            && bool_cmpxchg(&v_, expected, expected | P::lock_bit)) {
+            masstree_invariant(!(expected & P::dirty_mask));
+            acquire_fence();
+            masstree_invariant((expected | P::lock_bit) == v_);
+            return true;
+        } else {
+            spin_function();
+            return false;
+        }
     }
 
     void unlock() {
@@ -159,6 +178,7 @@ class nodeversion {
         acquire_fence();
     }
     void mark_nonroot() {
+        masstree_invariant(locked());
         v_ &= ~P::root_bit;
         acquire_fence();
     }
@@ -245,6 +265,14 @@ class singlethreaded_nodeversion {
     template <typename SF>
     singlethreaded_nodeversion<P> lock(singlethreaded_nodeversion<P>, SF) {
         return *this;
+    }
+
+    bool try_lock() {
+        return true;
+    }
+    template <typename SF>
+    bool try_lock(SF) {
+        return true;
     }
 
     void unlock() {

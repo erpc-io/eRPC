@@ -23,6 +23,7 @@ namespace Masstree {
 using lcdf::Str;
 using lcdf::String;
 
+class key_unparse_printable_string;
 template <typename T> class value_print;
 
 template <int LW = 15, int IW = LW> struct nodeparams {
@@ -32,11 +33,12 @@ template <int LW = 15, int IW = LW> struct nodeparams {
     static constexpr bool prefetch = true;
     static constexpr int bound_method = bound_method_binary;
     static constexpr int debug_level = 0;
-    static constexpr bool printable_keys = true;
     typedef uint64_t ikey_type;
     typedef uint32_t nodeversion_value_type;
     static constexpr bool need_phantom_epoch = true;
     typedef uint64_t phantom_epoch_type;
+    static constexpr ssize_t print_max_indent_depth = 12;
+    typedef key_unparse_printable_string key_unparse_type;
 };
 
 template <int LW, int IW> constexpr int nodeparams<LW, IW>::leaf_width;
@@ -51,9 +53,6 @@ template <typename P> class key;
 template <typename P> class basic_table;
 template <typename P> class unlocked_tcursor;
 template <typename P> class tcursor;
-
-template <typename P, typename H> struct scan_iterator_impl;
-struct forward_scan_helper;
 
 template <typename P>
 class basic_table {
@@ -81,14 +80,7 @@ class basic_table {
     template <typename F>
     int rscan(Str firstkey, bool matchfirst, F& scanner, threadinfo& ti) const;
 
-    typedef scan_iterator_impl<P, forward_scan_helper> forward_scan_iterator_impl;
-
-    template <class T>
-    T *find_iterator(Str firstkey, threadinfo &ti) const {
-      return new T(root_, firstkey, ti);
-    }
-
-    inline void print(FILE* f = 0, int indent = 0) const;
+    inline void print(FILE* f = 0) const;
 
   private:
     node_type* root_;

@@ -30,14 +30,24 @@ int threadinfo::no_pool_value;
 #endif
 
 inline threadinfo::threadinfo(int purpose, int index) {
-    memset(this, 0, sizeof(*this));
+    gc_epoch_ = perform_gc_epoch_ = 0;
+    logger_ = nullptr;
+    next_ = nullptr;
     purpose_ = purpose;
     index_ = index;
+
+    for (size_t i = 0; i != sizeof(pool_) / sizeof(pool_[0]); ++i) {
+        pool_[i] = nullptr;
+    }
 
     void *limbo_space = allocate(sizeof(limbo_group), memtag_limbo);
     mark(tc_limbo_slots, limbo_group::capacity);
     limbo_head_ = limbo_tail_ = new(limbo_space) limbo_group;
     ts_ = 2;
+
+    for (size_t i = 0; i != sizeof(counters_) / sizeof(counters_[0]); ++i) {
+        counters_[i] = 0;
+    }
 }
 
 threadinfo *threadinfo::make(int purpose, int index) {
@@ -208,21 +218,21 @@ void threadinfo::refill_pool(int nl) {
         superpage_size = read_superpage_size();
     if (superpage_size != (size_t) -1) {
         pool_size = superpage_size;
-# if MAP_HUGETLB
-        pool = mmap(0, pool_size, PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | MAP_POPULATE, -1, 0);
-        if (pool == MAP_FAILED) {
-            perror("mmap superpage");
-            pool = 0;
-            superpage_size = (size_t) -1;
-        }
-# elif MADV_HUGEPAGE
+# if MADV_HUGEPAGE
         if ((r = posix_memalign(&pool, pool_size, pool_size)) != 0) {
             fprintf(stderr, "posix_memalign superpage: %s\n", strerror(r));
             pool = 0;
             superpage_size = (size_t) -1;
         } else if (madvise(pool, pool_size, MADV_HUGEPAGE) != 0) {
             perror("madvise superpage");
+            superpage_size = (size_t) -1;
+        }
+# elif MAP_HUGETLB
+        pool = mmap(0, pool_size, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
+        if (pool == MAP_FAILED) {
+            perror("mmap superpage");
+            pool = 0;
             superpage_size = (size_t) -1;
         }
 # else

@@ -14,7 +14,7 @@
  * is legally binding.
  */
 #ifndef MASSTREE_SPLIT_HH
-#define MASSTREE_SPLIT_HH 1
+#define MASSTREE_SPLIT_HH
 #include "masstree_tcursor.hh"
 #include "btree_leaflink.hh"
 namespace Masstree {
@@ -23,14 +23,15 @@ namespace Masstree {
 template <typename P>
 inline typename P::ikey_type
 leaf<P>::ikey_after_insert(const permuter_type& perm, int i,
-                           const key_type& ka, int ka_i) const
+                           const tcursor<P>* cursor) const
 {
-    if (i < ka_i)
+    if (i < cursor->kx_.i) {
         return this->ikey0_[perm[i]];
-    else if (i == ka_i)
-        return ka.ikey();
-    else
+    } else if (i == cursor->kx_.i) {
+        return cursor->ka_.ikey();
+    } else {
         return this->ikey0_[perm[i - 1]];
+    }
 }
 
 /** @brief Split this node into *@a nr and insert @a ka at position @a p.
@@ -47,40 +48,46 @@ leaf<P>::ikey_after_insert(const permuter_type& perm, int i,
     *@a nr, and 2 for the sequential-order optimization (@a ka went into *@a
     nr and no other keys were moved). */
 template <typename P>
-int leaf<P>::split_into(leaf<P>* nr, int p, const key_type& ka,
+int leaf<P>::split_into(leaf<P>* nr, tcursor<P>* cursor,
                         ikey_type& split_ikey, threadinfo& ti)
 {
+    masstree_precondition(!this->concurrent || (this->locked() && nr->locked()));
+    masstree_precondition(this->size() >= this->width - 1);
+
     // B+tree leaf insertion.
     // Split *this, with items [0,T::width), into *this + nr, simultaneously
     // inserting "ka:value" at position "p" (0 <= p <= T::width).
 
-    // Let mid = floor(T::width / 2) + 1. After the split,
-    // "*this" contains [0,mid) and "nr" contains [mid,T::width+1).
-    // If p < mid, then x goes into *this, and the first element of nr
-    //   will be former item (mid - 1).
-    // If p >= mid, then x goes into nr.
-    masstree_precondition(!this->concurrent || (this->locked() && nr->locked()));
-    masstree_precondition(this->size() >= this->width - 1);
+    // `mid` determines the split point. Post-split, `*this` contains [0,mid)
+    // and `nr` contains [mid,T::width+1).
+    // If `p < mid`, then the new item goes into `*this`, and the first element
+    //   of `nr` will be former item (mid - 1).
+    // If `p >= mid`, then the new item goes into nr.
 
-    int width = this->size();   // == this->width or this->width - 1
-    int mid = this->width / 2 + 1;
-    if (p == 0 && !this->prev_)
-        mid = 1;
-    else if (p == width && !this->next_.ptr)
-        mid = width;
-
-    // Never separate keys with the same ikey0.
+    // pick initial insertion point
     permuter_type perml(this->permutation_);
-    ikey_type mid_ikey = ikey_after_insert(perml, mid, ka, p);
-    if (mid_ikey == ikey_after_insert(perml, mid - 1, ka, p)) {
+    int width = perml.size();   // == this->width or this->width - 1
+    int mid = this->width / 2 + 1;
+    int p = cursor->kx_.i;
+    if (p == 0 && !this->prev_) {
+        // reverse-sequential optimization
+        mid = 1;
+    } else if (p == width && !this->next_.ptr) {
+        // sequential optimization
+        mid = width;
+    }
+
+    // adjust insertion point to keep keys with the same ikey0 together
+    ikey_type mid_ikey = ikey_after_insert(perml, mid, cursor);
+    if (mid_ikey == ikey_after_insert(perml, mid - 1, cursor)) {
         int midl = mid - 2, midr = mid + 1;
-        while (1) {
+        while (true) {
             if (midr <= width
-                && mid_ikey != ikey_after_insert(perml, midr, ka, p)) {
+                && mid_ikey != ikey_after_insert(perml, midr, cursor)) {
                 mid = midr;
                 break;
             } else if (midl >= 0
-                       && mid_ikey != ikey_after_insert(perml, midl, ka, p)) {
+                       && mid_ikey != ikey_after_insert(perml, midl, cursor)) {
                 mid = midl + 1;
                 break;
             }
@@ -89,28 +96,33 @@ int leaf<P>::split_into(leaf<P>* nr, int p, const key_type& ka,
         masstree_invariant(mid > 0 && mid <= width);
     }
 
+    // move items to `nr`
     typename permuter_type::value_type pv = perml.value_from(mid - (p < mid));
-    for (int x = mid; x <= width; ++x)
-        if (x == p)
-            nr->assign_initialize(x - mid, ka, ti);
-        else {
+    for (int x = mid; x <= width; ++x) {
+        if (x == p) {
+            nr->assign_initialize(x - mid, cursor->ka_, ti);
+        } else {
             nr->assign_initialize(x - mid, this, pv & 15, ti);
             pv >>= 4;
         }
+    }
     permuter_type permr = permuter_type::make_sorted(width + 1 - mid);
-    if (p >= mid)
+    if (p >= mid) {
         permr.remove_to_back(p - mid);
+    }
     nr->permutation_ = permr.value();
+    split_ikey = nr->ikey0_[0];
 
+    // link `nr` across leaves
     btree_leaflink<leaf<P>, P::concurrent>::link_split(this, nr);
 
-    split_ikey = nr->ikey0_[0];
-    return p >= mid ? 1 + (mid == width) : 0;
+    // return split type
+    return p < mid ? 0 : 1 + (mid == width);
 }
 
 template <typename P>
-int internode<P>::split_into(internode<P> *nr, int p, ikey_type ka,
-                             node_base<P> *value, ikey_type& split_ikey,
+int internode<P>::split_into(internode<P>* nr, int p, ikey_type ka,
+                             node_base<P>* value, ikey_type& split_ikey,
                              int split_type)
 {
     // B+tree internal node insertion.
@@ -148,8 +160,9 @@ int internode<P>::split_into(internode<P> *nr, int p, ikey_type ka,
         split_ikey = this->ikey0_[mid];
     }
 
-    for (int i = 0; i <= nr->nkeys_; ++i)
+    for (int i = 0; i <= nr->nkeys_; ++i) {
         nr->child_[i]->set_parent(nr);
+    }
 
     this->mark_split();
     if (p < mid) {
@@ -181,41 +194,48 @@ bool tcursor<P>::make_split(threadinfo& ti)
         }
     }
 
-    node_type* n = n_;
     node_type* child = leaf_type::make(n_->ksuf_used_capacity(), n_->phantom_epoch(), ti);
     child->assign_version(*n_);
     ikey_type xikey[2];
-    int split_type = n_->split_into(static_cast<leaf_type *>(child),
-                                    kx_.i, ka_, xikey[0], ti);
-    bool sense = false;
+    int split_type = n_->split_into(static_cast<leaf_type*>(child),
+                                    this, xikey[0], ti);
+    unsigned sense = 0;
+    node_type* n = n_;
+    uint32_t height = 0;
 
-    while (1) {
+    while (true) {
         masstree_invariant(!n->concurrent || (n->locked() && child->locked() && (n->isleaf() || n->splitting())));
         internode_type *next_child = 0;
 
         internode_type *p = n->locked_parent(ti);
 
-        if (!n->parent_exists(p)) {
-            internode_type *nn = internode_type::make(ti);
+        int kp = -1;
+        if (n->parent_exists(p)) {
+            kp = internode_type::bound_type::upper(xikey[sense], *p);
+            p->mark_insert();
+        }
+
+        if (kp < 0 || p->height_ > height + 1) {
+            internode_type *nn = internode_type::make(height + 1, ti);
             nn->child_[0] = n;
             nn->assign(0, xikey[sense], child);
             nn->nkeys_ = 1;
-            nn->make_layer_root();
+            if (kp < 0) {
+                nn->make_layer_root();
+            } else {
+                nn->set_parent(p);
+                p->child_[kp] = nn;
+            }
             fence();
             n->set_parent(nn);
         } else {
-            int kp = internode_type::bound_type::upper(xikey[sense], *p);
-
-            if (p->size() < p->width)
-                p->mark_insert();
-            else {
-                next_child = internode_type::make(ti);
+            if (p->size() >= p->width) {
+                next_child = internode_type::make(height + 1, ti);
                 next_child->assign_version(*p);
                 next_child->mark_nonroot();
                 kp = p->split_into(next_child, kp, xikey[sense],
-                                   child, xikey[!sense], split_type);
+                                   child, xikey[sense ^ 1], split_type);
             }
-
             if (kp >= 0) {
                 p->shift_up(kp + 1, kp, p->size() - kp);
                 p->assign(kp, xikey[sense], child);
@@ -224,46 +244,53 @@ bool tcursor<P>::make_split(threadinfo& ti)
             }
         }
 
-        if (n->isleaf()) {
-            leaf_type *nl = static_cast<leaf_type *>(n);
-            leaf_type *nr = static_cast<leaf_type *>(child);
+        // complete split by stripping shifted items from left node
+        // (this is delayed until both nodes are reachable because
+        // creating new internodes is expensive; might as well leave items
+        // in the left leaf reachable until that's done)
+        if (n == n_) {
+            leaf_type* nl = static_cast<leaf_type*>(n);
+            leaf_type* nr = static_cast<leaf_type*>(child);
+            // shrink `nl` to only the relevant items
             permuter_type perml(nl->permutation_);
             int width = perml.size();
             perml.set_size(width - nr->size());
             // removed item, if any, must be @ perml.size()
-            if (width != nl->width)
+            if (width != nl->width) {
                 perml.exchange(perml.size(), nl->width - 1);
+            }
             nl->mark_split();
             nl->permutation_ = perml.value();
+            // account for split
             if (split_type == 0) {
                 kx_.p = perml.back();
                 nl->assign(kx_.p, ka_, ti);
+                new_nodes_.emplace_back(nr, nr->full_unlocked_version_value());
             } else {
                 kx_.i = kx_.p = kx_.i - perml.size();
                 n_ = nr;
-            }
-            // versions/sizes shouldn't change after this
-            if (nl != n_) {
-                assert(nr == n_);
-                // we don't add n_ until lp.finish() is called (this avoids next_version_value() annoyances)
                 updated_v_ = nl->full_unlocked_version_value();
-            } else
-                new_nodes_.emplace_back(nr, nr->full_unlocked_version_value());
+            }
         }
 
-        if (n != n_)
+        // hand-over-hand locking
+        if (n != n_) {
             n->unlock();
-        if (child != n_)
+        }
+        if (child != n_) {
             child->unlock();
+        }
         if (next_child) {
             n = p;
             child = next_child;
-            sense = !sense;
+            sense ^= 1;
+            ++height;
         } else if (p) {
             p->unlock();
             break;
-        } else
+        } else {
             break;
+        }
     }
 
     return false;

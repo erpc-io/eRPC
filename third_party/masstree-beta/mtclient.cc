@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <limits.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -43,6 +44,7 @@
 #include "clp.h"
 
 const char *serverip = "127.0.0.1";
+static Json test_param;
 
 typedef void (*get_async_cb)(struct child *c, struct async *a,
                              bool has_val, const Str &val);
@@ -190,6 +192,9 @@ struct kvtest_client {
     }
     int prefixLen() const {
         return ::prefixLen;
+    }
+    Json param(const String& name, Json default_value = Json()) {
+        return test_param.count(name) ? test_param.at(name) : default_value;
     }
     double now() const {
         return ::now();
@@ -562,19 +567,36 @@ main(int argc, char *argv[])
           getratio = clp->val.i;
           break;
       case opt_minkeyletter:
+          assert(strlen(clp->vstr) == 1);
           minkeyletter = clp->vstr[0];
           break;
       case opt_maxkeyletter:
+          assert(strlen(clp->vstr) == 1);
           maxkeyletter = clp->vstr[0];
           break;
       case opt_nofork:
           dofork = !clp->negated;
           break;
-      case Clp_NotOption:
-          test = testrunner::find(clp->vstr);
-          if (!test)
-              usage();
+      case Clp_NotOption: {
+          // check for parameter setting
+          if (const char* eqchr = strchr(clp->vstr, '=')) {
+              Json& param = test_param[String(clp->vstr, eqchr)];
+              const char* end_vstr = clp->vstr + strlen(clp->vstr);
+              if (param.assign_parse(eqchr + 1, end_vstr)) {
+                  // OK, param was valid JSON
+              } else if (eqchr[1] != 0) {
+                  param = String(eqchr + 1, end_vstr);
+              } else {
+                  param = Json();
+              }
+          } else {
+              test = testrunner::find(clp->vstr);
+              if (!test) {
+                  usage();
+              }
+          }
           break;
+      }
       case Clp_BadOption:
           usage();
           break;

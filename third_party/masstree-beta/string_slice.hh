@@ -40,11 +40,13 @@ template <typename T> struct string_slice {
 
     /** @brief Return a T containing data from a string's prefix. */
     static T make(const char *s, int len) {
-        if (len <= 0)
+        if (len <= 0) {
             return 0;
+        }
 #if HAVE_UNALIGNED_ACCESS
-        if (len >= size)
+        if (len >= size) {
             return *reinterpret_cast<const T *>(s);
+        }
 #endif
         union_type u(0);
         memcpy(u.s, s, std::min(len, size));
@@ -70,11 +72,13 @@ template <typename T> struct string_slice {
         short strings. These accesses may observe data outside the range [@a
         s, @a s + len). */
     static T make_sloppy(const char *s, int len) {
-        if (len <= 0)
+        if (len <= 0) {
             return 0;
+        }
 #if HAVE_UNALIGNED_ACCESS
-        if (len >= size)
+        if (len >= size) {
             return *reinterpret_cast<const T *>(s);
+        }
 # if WORDS_BIGENDIAN
         return *reinterpret_cast<const T *>(s) & (~T(0) << (8 * (size - len)));
 # elif WORDS_BIGENDIAN_SET
@@ -111,8 +115,9 @@ template <typename T> struct string_slice {
     static int unparse_comparable(char *buf, int buflen, T value) {
         union_type u(host_to_net_order(value));
         int l = size;
-        while (l > 0 && u.s[l - 1] == 0)
+        while (l > 0 && u.s[l - 1] == 0) {
             --l;
+        }
         l = std::min(l, buflen);
         memcpy(buf, u.s, l);
         return l;
@@ -142,14 +147,15 @@ template <typename T> struct string_slice {
 
         Always returns the same result as "memcmp(@a a, @a b, @a len) == 0",
         but can be faster on some machines. */
-    static bool equals_sloppy(const char *a, const char *b, int len) {
+    static bool equals_sloppy(const char* a, const char* b, int len) {
 #if HAVE_UNALIGNED_ACCESS
         if (len <= size) {
             typename mass::make_unsigned<T>::type delta
-                = *reinterpret_cast<const T *>(a)
-                ^ *reinterpret_cast<const T *>(b);
-            if (unlikely(len <= 0))
+                = *reinterpret_cast<const T*>(a)
+                  ^ *reinterpret_cast<const T*>(b);
+            if (unlikely(len <= 0)) {
                 return true;
+            }
 # if WORDS_BIGENDIAN
             return (delta >> (8 * (size - len))) == 0;
 # else

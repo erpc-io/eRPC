@@ -48,39 +48,64 @@ inline void napms(int n) /* nap n milliseconds */
 }
 
 struct quick_istr {
+    char* bbuf_;
     char buf_[32];
-    char *bbuf_;
     quick_istr() {
-      set(0);
+        buf_[sizeof(buf_) - 1] = 0;
+        set(0);
     }
     quick_istr(unsigned long x, int minlen = 0) {
-      set(x, minlen);
+        buf_[sizeof(buf_) - 1] = 0;
+        set(x, minlen);
     }
-    void set(unsigned long x, int minlen = 0){
-	bbuf_ = buf_ + sizeof(buf_) - 1;
-	do {
-	    *--bbuf_ = (x % 10) + '0';
-	    x /= 10;
-	} while (--minlen > 0 || x != 0);
+    void set(unsigned long x, int minlen = 0) {
+        bbuf_ = buf_ + sizeof(buf_) - 1;
+        do {
+            *--bbuf_ = (x % 10) + '0';
+            x /= 10;
+        } while (--minlen > 0 || x != 0);
     }
     lcdf::Str string() const {
-	return lcdf::Str(bbuf_, buf_ + sizeof(buf_) - 1);
+        return lcdf::Str(bbuf_, buf_ + sizeof(buf_) - 1);
     }
-    const char *c_str() {
-	buf_[sizeof(buf_) - 1] = 0;
-	return bbuf_;
+    const char* data() const {
+        return bbuf_;
+    }
+    size_t length() const {
+        return (buf_ + sizeof(buf_) - 1) - bbuf_;
+    }
+    const char* c_str() const {
+        return bbuf_;
     }
     bool operator==(lcdf::Str s) const {
-	return s.len == (buf_ + sizeof(buf_) - 1) - bbuf_
-	    && memcmp(s.s, bbuf_, s.len) == 0;
+        return s.len == int(length()) && memcmp(s.s, data(), s.len) == 0;
     }
     bool operator!=(lcdf::Str s) const {
-	return !(*this == s);
+        return !(*this == s);
+    }
+    static void increment_from_end(char* ends) {
+        while (true) {
+            --ends;
+            ++*ends;
+            if (*ends <= '9') {
+                return;
+            }
+            *ends = '0';
+        }
+    }
+    static void binary_increment_from_end(char* ends) {
+        while (true) {
+            --ends;
+            *ends = (char) ((unsigned char) *ends + 1);
+            if (*ends != 0) {
+                return;
+            }
+        }
     }
 };
 
 struct Clp_Parser;
 int clp_parse_suffixdouble(struct Clp_Parser *clp, const char *vstr,
-			   int complain, void *user_data);
+                           int complain, void *user_data);
 
 #endif

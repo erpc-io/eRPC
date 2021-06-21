@@ -16,7 +16,6 @@
 #include "file.hh"
 #include "straccum.hh"
 #include <fcntl.h>
-#include <stdio.h>
 
 lcdf::String read_file_contents(int fd) {
     lcdf::StringAccum sa;

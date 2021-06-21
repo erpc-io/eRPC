@@ -12,6 +12,7 @@ if test "${CXXFLAGS+y}" != y; then CXXFLAGS="-g -W -Wall -O3"; fi
 AC_PROG_CC
 AC_PROG_CXX
 AC_LANG_CPLUSPLUS
+AC_PROG_RANLIB
 
 AC_DEFINE([WORDS_BIGENDIAN_SET], [1], [Define if WORDS_BIGENDIAN has been set.])
 AC_C_BIGENDIAN()
@@ -108,13 +109,13 @@ KVDB_CHECK_BUILTIN([__sync_lock_release_set],
 dnl C++ features
 
 dnl Mimics AC_CACHE_CHECK(MESSAGE, CACHE-ID, COMMANDS), but retries COMMANDS
-dnl with CXX='${CXX} -std=gnu++0x' if the user has not specified CXX.
+dnl with CXX='${CXX} -std=gnu++1y' if the user has not specified CXX.
 AC_DEFUN([KVDB_CHECK_C11_FEATURE], [
     AC_CACHE_CHECK([$1], [$2], [$3])
 
     if test "$$2" != yes -a -z "$ac_user_cxx"; then
-        CXX="${CXX} -std=gnu++0x"
-        AC_MSG_CHECKING([$1 with -std=gnu++0x])
+        CXX="${CXX} -std=gnu++1y"
+        AC_MSG_CHECKING([$1 with -std=gnu++1y])
         $3
         AC_MSG_RESULT([$$2])
     fi
@@ -123,42 +124,35 @@ AC_DEFUN([KVDB_CHECK_C11_FEATURE], [
 KVDB_CHECK_C11_FEATURE([whether the C++ compiler understands 'auto'], [ac_cv_cxx_auto], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[struct s { int a; }; int f(s x) { auto &y = x; return y.a; }]], [[]])],
 	[ac_cv_cxx_auto=yes], [ac_cv_cxx_auto=no])])
-if test "$ac_cv_cxx_auto" != yes; then
-    AC_MSG_ERROR([
-
-The C++ compiler does not appear to understand C++11.
-To fix this problem, try supplying a "CXX" argument to ./configure,
-such as "./configure CXX='c++ -std=gnu++0x'".
-
-========================================================])
-fi
 
 KVDB_CHECK_C11_FEATURE([whether the C++ compiler understands constexpr], [ac_cv_cxx_constexpr], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[constexpr int f(int x) { return x + 1; }]], [[]])],
 	[ac_cv_cxx_constexpr=yes], [ac_cv_cxx_constexpr=no])])
-if test "$ac_cv_cxx_constexpr" = yes; then
-    AC_DEFINE([HAVE_CXX_CONSTEXPR], [1], [Define if the C++ compiler understands constexpr.])
-fi
 
 KVDB_CHECK_C11_FEATURE([whether the C++ compiler understands static_assert], [ac_cv_cxx_static_assert], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[const int f = 2;]], [[static_assert(f == 2, "f should be 2");]])],
 	[ac_cv_cxx_static_assert=yes], [ac_cv_cxx_static_assert=no])])
-if test "$ac_cv_cxx_static_assert" = yes; then
-    AC_DEFINE([HAVE_CXX_STATIC_ASSERT], [1], [Define if the C++ compiler understands static_assert.])
-fi
 
 KVDB_CHECK_C11_FEATURE([whether the C++ compiler understands rvalue references], [ac_cv_cxx_rvalue_references], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[int f(int &) { return 1; } int f(int &&) { return 0; }]], [[return f(int());]])],
 	[ac_cv_cxx_rvalue_references=yes], [ac_cv_cxx_rvalue_references=no])])
-if test "$ac_cv_cxx_rvalue_references" = yes; then
-    AC_DEFINE([HAVE_CXX_RVALUE_REFERENCES], [1], [Define if the C++ compiler understands rvalue references.])
-fi
 
 KVDB_CHECK_C11_FEATURE([whether the C++ compiler understands template alias], [ac_cv_cxx_template_alias], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[template <typename T> struct X { typedef T type; }; template <typename T> using Y = X<T>; int f(int x) { return x; }]], [[return f(Y<int>::type());]])],
 	[ac_cv_cxx_template_alias=yes], [ac_cv_cxx_template_alias=no])])
 if test "$ac_cv_cxx_template_alias" = yes; then
     AC_DEFINE([HAVE_CXX_TEMPLATE_ALIAS], [1], [Define if the C++ compiler understands template alias.])
+fi
+
+if test "$ac_cv_cxx_auto" != yes -o "$ac_cv_cxx_static_assert" != yes \
+    -o "$ac_cv_cxx_rvalue_references" != yes -o "$ac_cv_cxx_constexpr" != yes; then
+    AC_MSG_ERROR([
+
+The C++ compiler does not appear to understand C++14.
+To fix this problem, try supplying a "CXX" argument to ./configure,
+such as "./configure CXX='c++ -std=gnu++1y'".
+
+========================================================])
 fi
 
 AC_CHECK_HEADERS([type_traits])

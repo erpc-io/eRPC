@@ -27,6 +27,7 @@ class query_table {
   public:
     typedef P parameters_type;
     typedef node_base<P> node_type;
+    typedef leaf<P> leaf_type;
     typedef typename P::threadinfo_type threadinfo;
     typedef unlocked_tcursor<P> unlocked_cursor_type;
     typedef tcursor<P> cursor_type;
@@ -58,7 +59,7 @@ class query_table {
         return j;
     }
 
-    void print(FILE* f, int indent) const;
+    void print(FILE* f) const;
 
     static void test(threadinfo& ti);
 

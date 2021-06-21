@@ -20,13 +20,13 @@
 // also, fwrite just isn't very fast, at
 // least on the Mac.
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <assert.h>
-#include <stdio.h>
 #include <errno.h>
 #include "kvio.hh"
 
