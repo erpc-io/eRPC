@@ -183,18 +183,19 @@ void client_print_stats(AppContext &c) {
   app_stats_t &stats = c.client.app_stats[c.thread_id_];
   stats.mrps = tput_mrps;
   stats.lat_us_50 = c.client.point_latency.perc(0.50) / 10.0;
+  stats.lat_us_90 = c.client.point_latency.perc(0.90) / 10.0;
   stats.lat_us_99 = c.client.point_latency.perc(0.99) / 10.0;
 
   printf(
       "Client %zu. Tput = %.3f Mrps. "
-      "Point-query latency (us) = {%.2f 50th, %.2f 99th}. "
+      "Point-query latency (us) = {%.1f 50th, %.1f 90th, %.1f 99th}. "
       "Range-query latency (us) = {%zu 99th}.\n",
-      c.thread_id_, tput_mrps, stats.lat_us_50, stats.lat_us_99,
-      c.client.range_latency.perc(.99));
+      c.thread_id_, tput_mrps, stats.lat_us_50, stats.lat_us_90,
+      stats.lat_us_99, c.client.range_latency.perc(.99));
 
   if (c.thread_id_ == 0) {
     app_stats_t accum;
-    for (size_t i = 0; i < fLU64::FLAGS_num_client_threads; i++) {
+    for (size_t i = 0; i < FLAGS_num_client_threads; i++) {
       accum += c.client.app_stats[i];
     }
     accum.lat_us_50 /= FLAGS_num_client_threads;

@@ -89,22 +89,26 @@ struct wire_resp_t {
 struct app_stats_t {
   double mrps;       // Point request rate
   double lat_us_50;  // Point request median latency
+  double lat_us_90;  // Point request 90th percentile latency
   double lat_us_99;  // Point request 99th percentile latency
-  size_t pad[5];
+  size_t pad[4];
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
-  static std::string get_template_str() { return "mrps lat_us_50 lat_us_99"; }
+  static std::string get_template_str() {
+    return "mrps lat_us_50 lat_us_90 lat_us_99";
+  }
 
   std::string to_string() {
     return std::to_string(mrps) + " " + std::to_string(lat_us_50) + " " +
-           std::to_string(lat_us_99);
+           std::to_string(lat_us_90) + " " + std::to_string(lat_us_99);
   }
 
   /// Accumulate stats
   app_stats_t &operator+=(const app_stats_t &rhs) {
     this->mrps += rhs.mrps;
     this->lat_us_50 += rhs.lat_us_50;
+    this->lat_us_90 += rhs.lat_us_90;
     this->lat_us_99 += rhs.lat_us_99;
     return *this;
   }
