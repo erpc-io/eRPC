@@ -277,6 +277,62 @@ void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
   while (ctrl_c_pressed == 0) rpc.run_event_loop(200);
 }
 
+/**
+ * @brief Populate Masstree in parallel from multiple threads
+ *
+ * @param thread_id Index of this thread among the threads doing population
+ * @param mti The Masstree index
+ * @param ti The Masstree threadinfo for this thread
+ * @param num_cores Number of threads doing population
+ */
+void masstree_populate_func(size_t thread_id, MtIndex *mti, threadinfo_t *ti,
+                            size_t num_cores) {
+  const size_t num_keys_to_insert_this_thread = FLAGS_num_keys / num_cores;
+  size_t num_keys_inserted_this_thread = 0;
+
+  for (size_t i = 0; i < FLAGS_num_keys; i++) {
+    if (i % num_cores != thread_id) continue;
+
+    const uint32_t req_seed = i;
+    uint8_t key[MtIndex::kKeySize];
+    uint8_t value[MtIndex::kValueSize];
+    key_gen(req_seed, key);
+
+    auto *value_32 = reinterpret_cast<uint32_t *>(value);
+    for (size_t j = 0; j < MtIndex::kValueSize / sizeof(uint32_t); j++) {
+      value_32[j] = get_value32_for_seed(req_seed);
+    }
+
+    if (kAppVerbose) {
+      fprintf(stderr, "PUT: Key: [");
+      for (size_t i = 0; i < MtIndex::kKeySize; i++) {
+        fprintf(stderr, "%u ", key[i]);
+      }
+      fprintf(stderr, "] Value: [");
+      for (size_t i = 0; i < MtIndex::kValueSize; i++) {
+        fprintf(stderr, "%u ", value[i]);
+      }
+      fprintf(stderr, "]\n");
+    }
+
+    mti->put(key, value, ti);
+    num_keys_inserted_this_thread++;
+
+    // Progress bar
+    {
+      if (thread_id == 0) {
+        const size_t by_20 = num_keys_to_insert_this_thread / 20;
+        if (by_20 > 0 && num_keys_inserted_this_thread % by_20 == 0) {
+          const double progress_percent = 100.0 *
+                                          num_keys_inserted_this_thread /
+                                          num_keys_to_insert_this_thread;
+          printf("Percent done = %.1f\n", progress_percent);
+        }
+      }
+    }
+  }
+}
+
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -297,48 +353,24 @@ int main(int argc, char **argv) {
     MtIndex mti;
     mti.setup(ti);
 
-    printf("main: Populating masstree with %zu keys\n", FLAGS_num_keys);
-    for (size_t i = 0; i < FLAGS_num_keys; i++) {
-      const uint32_t req_seed = i;
-      uint8_t key[MtIndex::kKeySize];
-      uint8_t value[MtIndex::kValueSize];
-      key_gen(req_seed, key);
-
-      auto *value_32 = reinterpret_cast<uint32_t *>(value);
-      for (size_t j = 0; j < MtIndex::kValueSize / sizeof(uint32_t); j++) {
-        value_32[j] = get_value32_for_seed(req_seed);
-      }
-
-      if (kAppVerbose) {
-        fprintf(stderr, "PUT: Key: [");
-        for (size_t i = 0; i < MtIndex::kKeySize; i++) {
-          fprintf(stderr, "%u ", key[i]);
-        }
-        fprintf(stderr, "] Value: [");
-        for (size_t i = 0; i < MtIndex::kValueSize; i++) {
-          fprintf(stderr, "%u ", value[i]);
-        }
-        fprintf(stderr, "]\n");
-      }
-
-      mti.put(key, value, ti);
-
-      // Progress bar
-      {
-        const size_t by_20 = FLAGS_num_keys / 20;
-        if (by_20 > 0 && i % by_20 == 0) {
-          printf("Done inserting %zu/%zu keys\n", i, FLAGS_num_keys);
-        }
-      }
+    // Create a thread_info for every core, we'll use only some of them for
+    // performance measurement
+    const size_t num_cores = static_cast<size_t>(sysconf(_SC_NPROCESSORS_ONLN));
+    auto ti_arr = new threadinfo_t *[num_cores];
+    for (size_t i = 0; i < num_cores; i++) {
+      ti_arr[i] = threadinfo::make(threadinfo::TI_PROCESS, i);
     }
 
-    // Create Masstree threadinfo structs for server threads
-    size_t total_server_threads =
-        FLAGS_num_server_fg_threads + FLAGS_num_server_bg_threads;
-    auto ti_arr = new threadinfo_t *[total_server_threads];
-
-    for (size_t i = 0; i < total_server_threads; i++) {
-      ti_arr[i] = threadinfo::make(threadinfo::TI_PROCESS, i);
+    // Populate the tree in parallel to reduce initialization time
+    {
+      printf("main: Populating masstree with %zu keys from %zu cores\n",
+             FLAGS_num_keys, num_cores);
+      std::vector<std::thread> populate_thread_arr(num_cores);
+      for (size_t i = 0; i < num_cores; i++) {
+        populate_thread_arr[i] =
+            std::thread(masstree_populate_func, i, &mti, ti_arr[i], num_cores);
+      }
+      for (size_t i = 0; i < num_cores; i++) populate_thread_arr[i].join();
     }
 
     // eRPC stuff
