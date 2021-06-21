@@ -25,6 +25,8 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 // Flags
 DEFINE_uint64(num_server_fg_threads, 0, "Number of server foreground threads");
 DEFINE_uint64(num_server_bg_threads, 0, "Number of server background threads");
+DEFINE_uint64(num_population_threads, 0,
+              "Number of threads to use to populate the server's Masstree");
 DEFINE_uint64(num_client_threads, 0, "Number of client threads");
 DEFINE_uint64(req_window, 0, "Outstanding requests per client thread");
 DEFINE_uint64(num_keys, 0, "Number of keys in the server's Masstree");

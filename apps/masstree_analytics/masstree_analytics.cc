@@ -305,12 +305,12 @@ void masstree_populate_func(size_t thread_id, MtIndex *mti, threadinfo_t *ti,
 
     if (kAppVerbose) {
       fprintf(stderr, "PUT: Key: [");
-      for (size_t i = 0; i < MtIndex::kKeySize; i++) {
-        fprintf(stderr, "%u ", key[i]);
+      for (size_t j = 0; j < MtIndex::kKeySize; j++) {
+        fprintf(stderr, "%u ", key[j]);
       }
       fprintf(stderr, "] Value: [");
-      for (size_t i = 0; i < MtIndex::kValueSize; i++) {
-        fprintf(stderr, "%u ", value[i]);
+      for (size_t j = 0; j < MtIndex::kValueSize; j++) {
+        fprintf(stderr, "%u ", value[j]);
       }
       fprintf(stderr, "]\n");
     }
@@ -364,13 +364,16 @@ int main(int argc, char **argv) {
     // Populate the tree in parallel to reduce initialization time
     {
       printf("main: Populating masstree with %zu keys from %zu cores\n",
-             FLAGS_num_keys, num_cores);
-      std::vector<std::thread> populate_thread_arr(num_cores);
-      for (size_t i = 0; i < num_cores; i++) {
+             FLAGS_num_keys, FLAGS_num_population_threads);
+      std::vector<std::thread> populate_thread_arr(
+          FLAGS_num_population_threads);
+      for (size_t i = 0; i < FLAGS_num_population_threads; i++) {
         populate_thread_arr[i] =
-            std::thread(masstree_populate_func, i, &mti, ti_arr[i], num_cores);
+            std::thread(masstree_populate_func, i, &mti, ti_arr[i],
+                        FLAGS_num_population_threads);
       }
-      for (size_t i = 0; i < num_cores; i++) populate_thread_arr[i].join();
+      for (size_t i = 0; i < FLAGS_num_population_threads; i++)
+        populate_thread_arr[i].join();
     }
 
     // eRPC stuff
