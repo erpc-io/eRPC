@@ -32,12 +32,13 @@ enum class SessionState {
 
 /// Packet types used for session management
 enum class SmPktType : int {
-  kPingReq,         ///< Ping request
-  kPingResp,        ///< Ping response
-  kConnectReq,      ///< Session connect request
-  kConnectResp,     ///< Session connect response
-  kDisconnectReq,   ///< Session disconnect request
-  kDisconnectResp,  ///< Session disconnect response
+  kUnblock,         /// Unblock the session management request blocked on recv()
+  kPingReq,         /// Heartbeat ping request
+  kPingResp,        /// Heartbeat ping response
+  kConnectReq,      /// Request to connect an eRPC session
+  kConnectResp,     /// Response for the eRPC session connection request
+  kDisconnectReq,   /// Request to disconnect an eRPC session
+  kDisconnectResp,  /// Response for the eRPC session disconnect request
 };
 
 /// The types of responses to a session management packet
@@ -73,8 +74,9 @@ static std::string session_state_str(SessionState state) {
 
 static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
-    case SmPktType::kPingReq: return "[Ping request]";
-    case SmPktType::kPingResp: return "[Ping response]";
+    case SmPktType::kUnblock: return "[Unblock SM thread request]";
+    case SmPktType::kPingReq: return "[Heartbeat ping request]";
+    case SmPktType::kPingResp: return "[Heartbeat ping response]";
     case SmPktType::kConnectReq: return "[Connect request]";
     case SmPktType::kConnectResp: return "[Connect response]";
     case SmPktType::kDisconnectReq: return "[Disconnect request]";
@@ -87,6 +89,7 @@ static std::string sm_pkt_type_str(SmPktType sm_pkt_type) {
 /// Check if a session management packet type is valid
 static bool sm_pkt_type_is_valid(SmPktType sm_pkt_type) {
   switch (sm_pkt_type) {
+    case SmPktType::kUnblock:
     case SmPktType::kPingReq:
     case SmPktType::kPingResp:
     case SmPktType::kConnectReq:
@@ -106,6 +109,7 @@ static bool sm_pkt_type_is_req(SmPktType sm_pkt_type) {
     case SmPktType::kConnectReq:
     case SmPktType::kDisconnectReq: return true;
     case SmPktType::kPingResp:
+    case SmPktType::kUnblock:
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp: return false;
   }
@@ -121,6 +125,7 @@ static SmPktType sm_pkt_type_req_to_resp(SmPktType sm_pkt_type) {
     case SmPktType::kConnectReq: return SmPktType::kConnectResp;
     case SmPktType::kDisconnectReq: return SmPktType::kDisconnectResp;
     case SmPktType::kPingResp:
+    case SmPktType::kUnblock:
     case SmPktType::kConnectResp:
     case SmPktType::kDisconnectResp: break;
   }
@@ -235,8 +240,12 @@ class SmPkt {
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << sm_pkt_type_str(pkt_type_) << ", " << sm_err_type_str(err_type_)
-        << ", client: " << client_.name() << ", server: " << server_.name();
+    if (pkt_type_ != SmPktType::kUnblock) {
+      ret << sm_pkt_type_str(pkt_type_) << ", " << sm_err_type_str(err_type_)
+          << ", client: " << client_.name() << ", server: " << server_.name();
+    } else {
+      ret << sm_pkt_type_str(pkt_type_);
+    }
     return ret.str();
   }
 
@@ -250,11 +259,20 @@ class SmPkt {
         client_(client),
         server_(server) {}
 
-  // The response to a ping is the same packet but with packet type switched
+  /// Construct a response to a heartbeat ping request
   static SmPkt make_ping_resp(const SmPkt &ping_req) {
+    // The response to a ping is the same packet but with packet type switched
     SmPkt ping_resp = ping_req;
     ping_resp.pkt_type_ = SmPktType::kPingResp;
     return ping_resp;
+  }
+
+  /// Construct a SmPkt to unblock a session management thread blocked on
+  /// receving a session management packet
+  static SmPkt make_unblock_req() {
+    SmPkt ret;
+    ret.pkt_type_ = SmPktType::kUnblock;
+    return ret;
   }
 
   bool is_req() const { return sm_pkt_type_is_req(pkt_type_); }

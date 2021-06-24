@@ -8,8 +8,9 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <ifaddrs.h>
-#include <linux/if_arp.h>
-#include <linux/if_packet.h>
+#include <net/if.h>
+#include <net/if_arp.h>
+#include <net/if_packet.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/ioctl.h>

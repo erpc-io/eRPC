@@ -15,7 +15,8 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
       sm_udp_port_(extract_udp_port_from_uri(local_uri)),
       numa_node_(numa_node),
       num_bg_threads_(num_bg_threads),
-      heartbeat_mgr_(hostname_, sm_udp_port_, freq_ghz_, kMachineFailureTimeoutMs) {
+      heartbeat_mgr_(hostname_, sm_udp_port_, freq_ghz_,
+                     kMachineFailureTimeoutMs) {
   if (kTesting) {
     ERPC_WARN("eRPC Nexus: Testing enabled. Perf will be low.\n");
   }
@@ -73,8 +74,18 @@ Nexus::~Nexus() {
 
   // Signal background and session management threads to kill themselves
   kill_switch_ = true;
-  for (size_t i = 0; i < num_bg_threads_; i++) bg_thread_arr_[i].join();
-  sm_thread_.join();
+
+  for (size_t i = 0; i < num_bg_threads_; i++) {
+    bg_thread_arr_[i].join();
+  }
+
+  {
+    // The SM thread could be blocked on a recv(), unblock it
+    UDPClient<SmPkt> udp_client;
+    SmPkt unblock_sm_pkt = SmPkt::make_unblock_req();
+    udp_client.send(hostname_, sm_udp_port_, unblock_sm_pkt);
+    sm_thread_.join();
+  }
 
   // Reset thread-local storage to prevent errors if gtest reuses the process.
   // Rationale: At this point, eRPC-owned threads are dead. All worker threads

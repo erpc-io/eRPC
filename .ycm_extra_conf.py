@@ -43,7 +43,7 @@ flags = [
     '-DERPC_RAW=true',
     '-isystem' + str(home_dir) + '/dpdk/include/dpdk/',
     '-I' + str(home_dir) + '/eRPC/src',
-    '-I' + str(home_dir) + '/eRPC/third_party',
+    '-I' + str(home_dir) + '/eRPC/third_party/asio/include',
     '-I' + str(home_dir) + '/eRPC/third_party/googletest/googletest/include',
     '-I' + str(home_dir) + '/eRPC/mica/src',
     '-isystem' + '/home/ankalia/eRPC/third_party/masstree-beta',

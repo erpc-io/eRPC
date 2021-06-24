@@ -34,6 +34,9 @@ add_subdirectory(./third_party/googletest)
 enable_testing()
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
+# Common sub-projects: asio
+include_directories(SYSTEM third_party/asio/include)
+
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party)
