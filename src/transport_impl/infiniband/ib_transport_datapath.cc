@@ -11,7 +11,7 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
                            size_t num_pkts) {
   for (size_t i = 0; i < num_pkts; i++) {
     const tx_burst_item_t& item = tx_burst_arr[i];
-    const MsgBuffer* msg_buffer = item.msg_buffer;
+    const MsgBuffer* msg_buffer = item.msg_buffer_;
 
     // Verify constant fields of work request
     struct ibv_send_wr& wr = send_wr[i];
@@ -25,12 +25,12 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     // Set signaling + poll SEND CQ if needed. The wr is non-inline by default.
     wr.send_flags = get_signaled_flag() ? IBV_SEND_SIGNALED : 0;
 
-    if (item.pkt_idx == 0) {
+    if (item.pkt_idx_ == 0) {
       // This is the first packet, so we need only 1 SGE. This can be CR/RFR.
       const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_0();
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = msg_buffer->get_pkt_size<kMaxDataPerPkt>(0);
-      sgl[0].lkey = msg_buffer->buffer.lkey;
+      sgl[0].lkey = msg_buffer->buffer_.lkey_;
 
       // Only single-SGE work requests are inlined
       wr.send_flags |= (sgl[0].length <= kMaxInline) ? IBV_SEND_INLINE : 0;
@@ -38,24 +38,24 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
     } else {
       // This is not the first packet, so we need 2 SGEs. This involves a
       // a division, which is OK because it is a large message.
-      const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(item.pkt_idx);
+      const pkthdr_t* pkthdr = msg_buffer->get_pkthdr_n(item.pkt_idx_);
       sgl[0].addr = reinterpret_cast<uint64_t>(pkthdr);
       sgl[0].length = static_cast<uint32_t>(sizeof(pkthdr_t));
-      sgl[0].lkey = msg_buffer->buffer.lkey;
+      sgl[0].lkey = msg_buffer->buffer_.lkey_;
 
-      size_t offset = item.pkt_idx * kMaxDataPerPkt;
-      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[offset]);
-      sgl[1].length = std::min(kMaxDataPerPkt, msg_buffer->data_size - offset);
-      sgl[1].lkey = msg_buffer->buffer.lkey;
+      size_t offset = item.pkt_idx_ * kMaxDataPerPkt;
+      sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf_[offset]);
+      sgl[1].length = std::min(kMaxDataPerPkt, msg_buffer->data_size_ - offset);
+      sgl[1].lkey = msg_buffer->buffer_.lkey_;
 
       wr.num_sge = 2;
     }
 
     const auto* ib_rinfo =
-        reinterpret_cast<ib_routing_info_t*>(item.routing_info);
+        reinterpret_cast<ib_routing_info_t*>(item.routing_info_);
     wr.wr.ud.ah = ib_rinfo->ah;
     wr.wr.ud.remote_qpn = ib_rinfo->qpn;
-    if (kTesting && item.drop) wr.wr.ud.remote_qpn = 0;
+    if (kTesting && item.drop_) wr.wr.ud.remote_qpn = 0;
   }
 
   send_wr[num_pkts - 1].next = nullptr;  // Breaker of chains, first of her name
@@ -112,7 +112,7 @@ void IBTransport::tx_flush() {
   poll_cq_one_helper(send_cq);  // Poll the signaled WQE posted above
   nb_tx = 0;                    // Reset signaling logic
 
-  testing.tx_flush_count++;
+  testing_.tx_flush_count_++;
 }
 
 size_t IBTransport::rx_burst() {

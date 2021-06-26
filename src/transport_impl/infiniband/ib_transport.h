@@ -73,11 +73,11 @@ class IBTransport : public Transport {
   /// Create an address handle using this routing info
   struct ibv_ah *create_ah(const ib_routing_info_t *) const;
 
-  void fill_local_routing_info(RoutingInfo *routing_info) const;
-  bool resolve_remote_routing_info(RoutingInfo *routing_info);
+  void fill_local_routing_info(routing_info_t *routing_info) const;
+  bool resolve_remote_routing_info(routing_info_t *routing_info);
   size_t get_bandwidth() const { return resolve.bandwidth; }
 
-  static std::string routing_info_str(RoutingInfo *routing_info) {
+  static std::string routing_info_str(routing_info_t *routing_info) {
     auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
     const auto &gid = ib_routing_info->gid.global;
 

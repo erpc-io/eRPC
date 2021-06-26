@@ -43,7 +43,7 @@ IBTransport::IBTransport(uint16_t sm_udp_port, uint8_t rpc_id, uint8_t phy_port,
 
 void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
                                            uint8_t **rx_ring) {
-  this->huge_alloc = huge_alloc;
+  this->huge_alloc_ = huge_alloc;
   init_recvs(rx_ring);
   init_sends();
 }
@@ -54,7 +54,7 @@ void IBTransport::init_hugepage_structures(HugeAlloc *huge_alloc,
 //
 // We only need to clean up non-hugepage structures.
 IBTransport::~IBTransport() {
-  ERPC_INFO("Destroying transport for ID %u\n", rpc_id);
+  ERPC_INFO("Destroying transport for ID %u\n", rpc_id_);
 
   // Destroy QPs and CQs. QPs must be destroyed before CQs.
   exit_assert(ibv_destroy_qp(qp) == 0, "Failed to destroy send QP");
@@ -90,7 +90,7 @@ struct ibv_ah *IBTransport::create_ah(const ib_routing_info_t *ib_rinfo) const {
   return ibv_create_ah(pd, &ah_attr);
 }
 
-void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
+void IBTransport::fill_local_routing_info(routing_info_t *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
   auto *ib_routing_info = reinterpret_cast<ib_routing_info_t *>(routing_info);
   ib_routing_info->port_lid = resolve.port_lid;
@@ -98,7 +98,7 @@ void IBTransport::fill_local_routing_info(RoutingInfo *routing_info) const {
   if (kIsRoCE) ib_routing_info->gid = resolve.gid;
 }
 
-bool IBTransport::resolve_remote_routing_info(RoutingInfo *routing_info) {
+bool IBTransport::resolve_remote_routing_info(routing_info_t *routing_info) {
   auto *ib_rinfo = reinterpret_cast<ib_routing_info_t *>(routing_info);
   ib_rinfo->ah = create_ah(ib_rinfo);
   ah_to_free_vec.push_back(ib_rinfo->ah);
@@ -177,7 +177,7 @@ void IBTransport::init_verbs_structs() {
 
   // Create self address handle. We use local routing info for convenience,
   // so this must be done after creating the QP.
-  RoutingInfo self_routing_info;
+  routing_info_t self_routing_info;
   fill_local_routing_info(&self_routing_info);
   self_ah =
       create_ah(reinterpret_cast<ib_routing_info_t *>(&self_routing_info));
@@ -209,35 +209,35 @@ void IBTransport::init_verbs_structs() {
 void IBTransport::init_mem_reg_funcs() {
   using namespace std::placeholders;
   assert(pd != nullptr);
-  reg_mr_func = std::bind(ibv_reg_mr_wrapper, pd, _1, _2);
-  dereg_mr_func = std::bind(ibv_dereg_mr_wrapper, _1);
+  reg_mr_func_ = std::bind(ibv_reg_mr_wrapper, pd, _1, _2);
+  dereg_mr_func_ = std::bind(ibv_dereg_mr_wrapper, _1);
 }
 
 void IBTransport::init_recvs(uint8_t **rx_ring) {
   std::ostringstream xmsg;  // The exception message
 
   // Initialize the memory region for RECVs
-  size_t ring_extent_size = kNumRxRingEntries * kRecvSize;
-  ring_extent = huge_alloc->alloc_raw(ring_extent_size, DoRegister::kTrue);
-  if (ring_extent.buf == nullptr) {
+  const size_t ring_extent_size = kNumRxRingEntries * kRecvSize;
+  ring_extent = huge_alloc_->alloc_raw(ring_extent_size, DoRegister::kTrue);
+  if (ring_extent.buf_ == nullptr) {
     xmsg << "Failed to allocate " << std::setprecision(2)
          << 1.0 * ring_extent_size / MB(1) << "MB for ring buffers. "
-         << HugeAlloc::alloc_fail_help_str;
+         << HugeAlloc::kAllocFailHelpStr;
     throw std::runtime_error(xmsg.str());
   }
 
   // Initialize constant fields of RECV descriptors
   for (size_t i = 0; i < kRQDepth; i++) {
-    uint8_t *buf = ring_extent.buf;
+    uint8_t *buf = ring_extent.buf_;
 
     // From each slot of size kRecvSize = (kMTU + 64), we give up the first
     // (64 - kGRHBytes) bytes. Each slot is still large enough to receive the
     // GRH and kMTU payload bytes.
-    size_t offset = (i * kRecvSize) + (64 - kGRHBytes);
+    const size_t offset = (i * kRecvSize) + (64 - kGRHBytes);
     assert(offset + (kGRHBytes + kMTU) <= ring_extent_size);
 
     recv_sgl[i].length = kRecvSize;
-    recv_sgl[i].lkey = ring_extent.lkey;
+    recv_sgl[i].lkey = ring_extent.lkey_;
     recv_sgl[i].addr = reinterpret_cast<uint64_t>(&buf[offset]);
 
     recv_wr[i].wr_id = recv_sgl[i].addr + kGRHBytes;  // For quick prefetch
