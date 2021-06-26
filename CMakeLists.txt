@@ -6,6 +6,23 @@ include(CMakeDependentOption)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Common sub-projects: HdrHistogram
+set(HDR_HISTOGRAM_BUILD_PROGRAMS OFF CACHE BOOL "Minimize HDR histogram build")
+set(HDR_LOG_REQUIRED OFF CACHE BOOL "Disable HDR histogram's log to avoid zlib dependency")
+add_subdirectory(third_party/HdrHistogram_c)
+
+# Common sub-projects: gtest
+set(INSTALL_GTEST OFF)
+add_subdirectory(third_party/googletest)
+enable_testing()
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+
+# Common sub-projects: gflags
+add_subdirectory(third_party/gflags)
+
+# Common sub-projects: asio
+include_directories(SYSTEM third_party/asio/include)
+
 if(MSVC)
   message("Using MSVC build")
 else()
@@ -28,20 +45,6 @@ else(PERF)
   SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
   set(TESTING ON)
 endif(PERF)
-
-# Common sub-projects: HdrHistogram
-set(HDR_HISTOGRAM_BUILD_PROGRAMS OFF CACHE BOOL "Minimize HDR histogram build")
-set(HDR_LOG_REQUIRED OFF CACHE BOOL "Disable HDR histogram's log to avoid zlib dependency")
-add_subdirectory(third_party/HdrHistogram_c)
-
-# Common sub-projects: GTest
-set(INSTALL_GTEST OFF)
-add_subdirectory(./third_party/googletest)
-enable_testing()
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
-
-# Common sub-projects: asio
-include_directories(SYSTEM third_party/asio/include)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static)
 include_directories(${CMAKE_SOURCE_DIR}/src)
