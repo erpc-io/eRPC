@@ -1,13 +1,17 @@
 #pragma once
 
-#include <numa.h>
 #include <stdio.h>
 #include <vector>
 #include "common.h"
 #include "util/logger.h"
 
+#ifdef __linux__
+#include <numa.h>
+#endif
+
 namespace erpc {
 
+#ifdef __linux__
 /// Return the number of logical cores per NUMA node
 static size_t num_lcores_per_numa_node() {
   return static_cast<size_t>(numa_num_configured_cpus() /
@@ -66,4 +70,27 @@ static void clear_affinity_for_process() {
   rt_assert(ret == 0, "Failed to clear CPU affinity for this process");
 }
 
+#else
+
+static size_t num_lcores_per_numa_node() {
+  rt_assert(false, "Not implemented for Windows yet");
+  return 0;
+}
+
+static std::vector<size_t> get_lcores_for_numa_node(size_t) {
+  rt_assert(false, "Not implemented for Windows yet");
+  std::vector<size_t> ret;
+  return ret;
+}
+
+/// Bind \p thread to core with index \p numa_local_index on \p numa_node
+static void bind_to_core(std::thread &, size_t, size_t) {
+  rt_assert(false, "Not implemented for Windows yet");
+}
+
+/// Reset this process's core mask to be all cores
+static void clear_affinity_for_process() {
+  rt_assert(false, "Not implemented for Windows yet");
+}
+#endif
 }  // namespace erpc
