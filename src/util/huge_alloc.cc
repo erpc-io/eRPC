@@ -2,6 +2,12 @@
 #include <iostream>
 #include "util/logger.h"
 
+#ifdef __linux__
+#include <numaif.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#endif
+
 namespace erpc {
 
 HugeAlloc::HugeAlloc(size_t initial_size, size_t numa_node,
@@ -20,12 +26,17 @@ HugeAlloc::~HugeAlloc() {
   // Deregister and detach the created SHM regions
   for (shm_region_t &shm_region : shm_list_) {
     if (shm_region.registered_) dereg_mr_func_(shm_region.mem_reg_info_);
-    int ret = shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_region.buf_)));
+#ifdef __linux__
+    const int ret =
+        shmdt(static_cast<void *>(const_cast<uint8_t *>(shm_region.buf_)));
     if (ret != 0) {
       fprintf(stderr, "HugeAlloc: Error freeing SHM buf for key %d.\n",
               shm_region.shm_key_);
       exit(-1);
     }
+#else
+    rt_assert(false, "Not implemented on Windows yet");
+#endif
   }
 }
 
@@ -48,7 +59,8 @@ void HugeAlloc::print_stats() {
   for (size_t i = 0; i < k_num_classes; i++) {
     size_t class_size = class_max_size(i);
     if (class_size < KB(1)) {
-      fprintf(stderr, "\t%zu B: %zu Buffers\n", class_size, freelist_[i].size());
+      fprintf(stderr, "\t%zu B: %zu Buffers\n", class_size,
+              freelist_[i].size());
     } else if (class_size < MB(1)) {
       fprintf(stderr, "\t%zu KB: %zu Buffers\n", class_size / KB(1),
               freelist_[i].size());
@@ -60,6 +72,7 @@ void HugeAlloc::print_stats() {
 }
 
 Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
+#ifdef __linux__
   std::ostringstream xmsg;  // The exception message
   size = round_up<kHugepageSize>(size);
   int shm_key, shm_id;
@@ -75,8 +88,7 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
 
     if (shm_id == -1) {
       switch (errno) {
-        case EEXIST:
-          continue;  // shm_key already exists. Try again.
+        case EEXIST: continue;  // shm_key already exists. Try again.
 
         case EACCES:
           xmsg << "eRPC HugeAlloc: SHM allocation error. "
@@ -115,7 +127,8 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   shmctl(shm_id, IPC_RMID, nullptr);
 
   // Bind the buffer to the NUMA node
-  const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node_));
+  const unsigned long nodemask =
+      (1ul << static_cast<unsigned long>(numa_node_));
   long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
   rt_assert(ret == 0,
             "eRPC HugeAlloc: mbind() failed. Key " + std::to_string(shm_key));
@@ -133,6 +146,10 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   // buffer.class_size is invalid because we didn't allocate from a class
   return Buffer(shm_buf, SIZE_MAX,
                 do_register_bool ? reg_info.lkey_ : UINT32_MAX);
+#else
+  rt_assert(false, "Not implemented on Windows yet\n");
+  return Buffer(nullptr, SIZE_MAX, UINT32_MAX);
+#endif
 }
 
 Buffer HugeAlloc::alloc(size_t size) {

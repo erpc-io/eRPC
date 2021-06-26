@@ -2,9 +2,6 @@
 
 #include <errno.h>
 #include <malloc.h>
-#include <numaif.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include <stdexcept>
 #include <vector>
 
@@ -58,13 +55,15 @@ class HugeAlloc {
  public:
   static constexpr const char *kAllocFailHelpStr =
       "This could be due to insufficient huge pages or SHM limits.";
-  static const size_t k_min_class_size = 64;     /// Min allocation size
-  static const size_t k_min_class_bit_shift = 6;  /// For division by kMinClassSize
+  static const size_t k_min_class_size = 64;  /// Min allocation size
+  static const size_t k_min_class_bit_shift =
+      6;  /// For division by kMinClassSize
   static_assert((k_min_class_size >> k_min_class_bit_shift) == 1, "");
 
   static const size_t k_max_class_size = MB(8);  /// Max allocation size
-  static const size_t k_num_classes = 18;       /// 64 B (2^6), ..., 8 MB (2^23)
-  static_assert(k_max_class_size == k_min_class_size << (k_num_classes - 1), "");
+  static const size_t k_num_classes = 18;  /// 64 B (2^6), ..., 8 MB (2^23)
+  static_assert(k_max_class_size == k_min_class_size << (k_num_classes - 1),
+                "");
 
   /// Return the maximum size of a class
   static constexpr size_t class_max_size(size_t class_i) {
@@ -161,7 +160,7 @@ class HugeAlloc {
   inline size_t get_class_slow(size_t size) {
     assert(size >= 1 && size <= k_max_class_size);
 
-    size_t size_class = 0;             // The size class for \p size
+    size_t size_class = 0;                // The size class for \p size
     size_t class_lim = k_min_class_size;  // The max size for \p size_class
     while (size > class_lim) {
       size_class++;
