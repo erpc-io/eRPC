@@ -2,7 +2,6 @@
 
 #include <numa.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <vector>
 #include "common.h"
 #include "util/logger.h"
@@ -60,7 +59,7 @@ static void bind_to_core(std::thread &thread, size_t numa_node,
 static void clear_affinity_for_process() {
   cpu_set_t mask;
   CPU_ZERO(&mask);
-  const size_t num_cpus = static_cast<size_t>(sysconf(_SC_NPROCESSORS_ONLN));
+  const size_t num_cpus = std::thread::hardware_concurrency();
   for (size_t i = 0; i < num_cpus; i++) CPU_SET(i, &mask);
 
   int ret = sched_setaffinity(0 /* whole-process */, sizeof(cpu_set_t), &mask);

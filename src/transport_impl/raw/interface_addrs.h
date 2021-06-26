@@ -5,6 +5,8 @@
 
 #pragma once
 
+#ifdef __linux__
+
 #include <arpa/inet.h>
 #include <assert.h>
 #include <ifaddrs.h>
@@ -65,5 +67,7 @@ static void fill_interface_mac(std::string interface, uint8_t* mac) {
     mac[i] = static_cast<uint8_t>(ifr.ifr_hwaddr.sa_data[i]);
   }
 }
+
+#endif
 
 }  // namespace erpc
