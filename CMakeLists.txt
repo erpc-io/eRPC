@@ -5,9 +5,15 @@ include(CMakeDependentOption)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
+
+if(MSVC)
+  message("Using MSVC build")
+else()
+  message("Using non-MSVC build")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
+endif()
 
 # Parse the user-exposed options
 if(PERF)
@@ -159,7 +165,12 @@ if(TRANSPORT STREQUAL "dpdk")
     set(CONFIG_IS_AZURE false)
     message(STATUS "Configuring DPDK for bare-metal cluster (i.e., not Azure)")
   endif()
+elseif(TRANSPORT STREQUAL "fake")
+  set(CONFIG_IS_AZURE false)
+  set(CONFIG_TRANSPORT "FakeTransport")
+  set(CONFIG_HEADROOM 40)
 else()
+  # Here, the transport is either InfiniBand or Mellanox Raw Ethernet
   set(CONFIG_IS_AZURE false)
   find_library(IBVERBS_LIB ibverbs)
   if(NOT IBVERBS_LIB)
@@ -185,7 +196,9 @@ else()
   endif()
 endif()
 
+# Generate config.h
 configure_file(src/config.h.in src/config.h)
+include_directories(${CMAKE_BINARY_DIR}/src)
 
 # MICA sources
 set(MICA_SOURCES
