@@ -50,7 +50,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 set(DPDK_NEEDED "false")
 
 # Options exposed to the user
-set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
+set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk/fake)")
 option(ROCE "Use RoCE if TRANSPORT is infiniband" OFF)
 option(AZURE "Configure DPDK for Azure if TRANSPORT is dpdk" OFF)
 option(PERF "Compile for performance" ON)
@@ -135,6 +135,7 @@ set(SOURCES
   src/transport_impl/infiniband/ib_transport_datapath.cc
   src/transport_impl/raw/raw_transport.cc
   src/transport_impl/raw/raw_transport_datapath.cc
+  src/transport_impl/fake/fake_transport.cc
   src/util/huge_alloc.cc
   src/util/tls_registry.cc)
 
@@ -168,6 +169,9 @@ else()
   set(LIBRARIES ${LIBRARIES} ibverbs)
   if(TRANSPORT STREQUAL "raw")
     set(CONFIG_TRANSPORT "RawTransport")
+    set(CONFIG_HEADROOM 40)
+  elseif(TRANSPORT STREQUAL "fake")
+    set(CONFIG_TRANSPORT "FakeTransport")
     set(CONFIG_HEADROOM 40)
   elseif(TRANSPORT STREQUAL "infiniband")
     set(CONFIG_TRANSPORT "IBTransport")

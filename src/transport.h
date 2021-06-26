@@ -18,7 +18,7 @@ class HugeAlloc;  // Forward declaration: HugeAlloc needs MemRegInfo
 /// The avialable transport backend implementations. RoCE transport is
 /// implemented through minor modifications to InfiniBand transport via the
 /// kIsRoCE config parameter.
-enum class TransportType { kInfiniBand, kRaw, kDPDK, kInvalid };
+enum class TransportType { kInfiniBand, kRaw, kDPDK, kFake, kInvalid };
 
 /// Generic unreliable transport
 class Transport {
@@ -69,6 +69,7 @@ class Transport {
       case TransportType::kInfiniBand: return "[InfiniBand]";
       case TransportType::kRaw: return "[Raw Ethernet]";
       case TransportType::kDPDK: return "[DPDK]";
+      case TransportType::kFake: return "[Fake, for compilation only]";
       case TransportType::kInvalid: return "[Invalid]";
     }
     throw std::runtime_error("eRPC: Invalid transport");

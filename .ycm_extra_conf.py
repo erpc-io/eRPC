@@ -39,6 +39,7 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
+    '-DERPC_FAKE=true',
     '-DERPC_DPDK=true',
     '-DERPC_RAW=true',
     '-DERPC_INFINIBAND=true',
