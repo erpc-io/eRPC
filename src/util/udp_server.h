@@ -5,7 +5,6 @@
 #endif
 
 #define ASIO_STANDLONE
-#include <asio.hpp>
 #include <asio/ts/buffer.hpp>
 #include <asio/ts/internet.hpp>
 
