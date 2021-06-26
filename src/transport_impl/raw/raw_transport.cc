@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <stdexcept>
 
+#include "interface_addrs.h"
 #include "raw_transport.h"
 #include "util/huge_alloc.h"
 
