@@ -61,7 +61,8 @@ void Rpc<TTr>::process_bg_queues_enqueue_request_st() {
   for (size_t i = 0; i < cmds_to_process; i++) {
     enq_req_args_t args = queue.unlocked_pop();
     enqueue_request(args.session_num_, args.req_type_, args.req_msgbuf_,
-                    args.resp_msgbuf_, args.cont_func_, args.tag_, args.cont_etid_);
+                    args.resp_msgbuf_, args.cont_func_, args.tag_,
+                    args.cont_etid_);
   }
 }
 

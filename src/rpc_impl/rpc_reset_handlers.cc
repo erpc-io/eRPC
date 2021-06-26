@@ -19,7 +19,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   // Erase session slots from credit stall queue
   for (const SSlot &sslot : session->sslot_arr_) {
     stallq_.erase(std::remove(stallq_.begin(), stallq_.end(), &sslot),
-                 stallq_.end());
+                  stallq_.end());
   }
 
   // Invoke continuation-with-failure for all active requests
@@ -44,7 +44,7 @@ bool Rpc<TTr>::handle_reset_client_st(Session *session) {
   ERPC_INFO("%s: None. Session resetted.\n", issue_msg);
   free_ring_entries();  // Free before callback to allow creating new session
   sm_handler_(session->local_session_num_, SmEventType::kDisconnected,
-             SmErrType::kSrvDisconnected, context_);
+              SmErrType::kSrvDisconnected, context_);
   bury_session_st(session);
   return true;
 }
@@ -63,7 +63,9 @@ bool Rpc<TTr>::handle_reset_server_st(Session *session) {
 
   size_t pending_enqueue_resps = 0;
   for (const SSlot &sslot : session->sslot_arr_) {
-    if (sslot.server_info_.req_type_ != kInvalidReqType) pending_enqueue_resps++;
+    if (sslot.server_info_.req_type_ != kInvalidReqType) {
+      pending_enqueue_resps++;
+    }
   }
 
   if (pending_enqueue_resps == 0) {

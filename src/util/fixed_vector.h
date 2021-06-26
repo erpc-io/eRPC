@@ -25,7 +25,7 @@ class FixedVector {
   }
 
   inline T pop_back() {
-    assert(free_index_ > 0);     // If free_index is 0, there is nothing to pop
+    assert(free_index_ > 0);      // If free_index is 0, there is nothing to pop
     T t = arr_[free_index_ - 1];  // The slot at free_index - 1 is occupied
     free_index_--;
 

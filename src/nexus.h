@@ -172,7 +172,7 @@ class Nexus {
 
   /// Rpc-Nexus hooks. All non-null hooks are valid.
   Hook *reg_hooks_arr_[kMaxRpcId + 1] = {nullptr};
-  std::mutex reg_hooks_lock_;  ///< Lock for concurrent access to the hooks array
+  std::mutex reg_hooks_lock_;  /// Lock for concurrent access to the hooks array
 
   HeartbeatMgr heartbeat_mgr_;  ///< The heartbeat manager
   volatile bool kill_switch_;   ///< Used to turn off SM and background threads

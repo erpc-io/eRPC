@@ -1,7 +1,7 @@
 #pragma once
 
-#include <set>
 #include <map>
+#include <set>
 #include "cc/timing_wheel.h"
 #include "common.h"
 #include "msg_buffer.h"
@@ -360,7 +360,8 @@ class Rpc {
 
   /// Return the hostname of the remote endpoint for a connected session
   std::string get_remote_hostname(int session_num) const {
-    return session_vec_[static_cast<size_t>(session_num)]->get_remote_hostname();
+    return session_vec_[static_cast<size_t>(session_num)]
+        ->get_remote_hostname();
   }
 
   /// Return the maximum number of sessions supported
@@ -550,7 +551,8 @@ class Rpc {
     // 2. Ignore if the corresponding client packet for pkthdr is still in wheel
     if (unlikely(pkthdr->pkt_num_ >= ci.num_tx_)) return false;
 
-    if (kCcPacing && unlikely(ci.in_wheel_[pkthdr->pkt_num_ % kSessionCredits])) {
+    if (kCcPacing &&
+        unlikely(ci.in_wheel_[pkthdr->pkt_num_ % kSessionCredits])) {
       pkt_loss_stats_.still_in_wheel_during_retx_++;
       return false;
     }
@@ -740,9 +742,11 @@ class Rpc {
   /// Enqueue a request packet to the timing wheel
   inline void enqueue_wheel_req_st(SSlot *sslot, size_t pkt_num) {
     const size_t pkt_idx = pkt_num;
-    size_t pktsz = sslot->tx_msgbuf_->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
+    size_t pktsz =
+        sslot->tx_msgbuf_->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
     size_t ref_tsc = dpath_rdtsc();
-    size_t desired_tx_tsc = sslot->session_->cc_getupdate_tx_tsc(ref_tsc, pktsz);
+    size_t desired_tx_tsc =
+        sslot->session_->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
     ERPC_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, REQ wheeled for %.3f us.\n",
             rpc_id_, sslot->session_->local_session_num_, sslot->cur_req_num_,
@@ -759,7 +763,8 @@ class Rpc {
     const MsgBuffer *resp_msgbuf = sslot->client_info_.resp_msgbuf_;
     size_t pktsz = resp_msgbuf->get_pkt_size<TTr::kMaxDataPerPkt>(pkt_idx);
     size_t ref_tsc = dpath_rdtsc();
-    size_t desired_tx_tsc = sslot->session_->cc_getupdate_tx_tsc(ref_tsc, pktsz);
+    size_t desired_tx_tsc =
+        sslot->session_->cc_getupdate_tx_tsc(ref_tsc, pktsz);
 
     ERPC_CC("Rpc %u: lsn/req/pkt %u/%zu/%zu, RFR wheeled for %.3f us.\n",
             rpc_id_, sslot->session_->local_session_num_, sslot->cur_req_num_,
@@ -914,7 +919,8 @@ class Rpc {
   /// Return true iff a packet should be dropped
   inline bool roll_pkt_drop() {
     static constexpr uint32_t kBillion = 1000000000;
-    return ((fast_rand_.next_u32() % kBillion) < faults_.pkt_drop_thresh_billion_);
+    return ((fast_rand_.next_u32() % kBillion) <
+            faults_.pkt_drop_thresh_billion_);
   }
 
  public:
@@ -1026,8 +1032,8 @@ class Rpc {
   /// All the faults that can be injected into eRPC for testing
   struct {
     bool fail_resolve_rinfo_ = false;  ///< Fail routing info resolution
-    bool hard_wheel_bypass_ = false;   ///< Wheel bypass regardless of congestion
-    double pkt_drop_prob_ = 0.0;       ///< Probability of dropping an RPC packet
+    bool hard_wheel_bypass_ = false;  ///< Wheel bypass regardless of congestion
+    double pkt_drop_prob_ = 0.0;      ///< Probability of dropping an RPC packet
 
     /// Derived: Drop packet iff urand[0, ..., one billion] is smaller than this
     uint32_t pkt_drop_thresh_billion_ = 0;

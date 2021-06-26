@@ -100,7 +100,8 @@ class Timely {
         (rate_ == link_bandwidth_ && sample_rtt_tsc <= t_low_tsc_)) {
       // Bypass expensive computation, but include the latency sample in stats.
       if (kLatencyStats) {
-        latency_.update(static_cast<size_t>(to_usec(sample_rtt_tsc, freq_ghz_)));
+        latency_.update(
+            static_cast<size_t>(to_usec(sample_rtt_tsc, freq_ghz_)));
       }
       return;
     }
@@ -113,7 +114,8 @@ class Timely {
 
     double rtt_diff = sample_rtt - prev_rtt_;
     neg_gradient_count_ = (rtt_diff < 0) ? neg_gradient_count_ + 1 : 0;
-    avg_rtt_diff_ = ((1 - kEwmaAlpha) * avg_rtt_diff_) + (kEwmaAlpha * rtt_diff);
+    avg_rtt_diff_ =
+        ((1 - kEwmaAlpha) * avg_rtt_diff_) + (kEwmaAlpha * rtt_diff);
 
     double delta_factor = (_rdtsc - last_update_tsc_) / min_rtt_tsc_;  // fdiv
     delta_factor = std::min(delta_factor, 1.0);
@@ -125,7 +127,7 @@ class Timely {
       // Additive increase
       new_rate = rate_ + ai_factor;
     } else {
-      double md_factor = delta_factor * kBeta;   // Scaled factor for decrease
+      double md_factor = delta_factor * kBeta;     // Scaled factor for decrease
       double norm_grad = avg_rtt_diff_ / kMinRTT;  // Normalized gradient
 
       if (likely(sample_rtt <= kTHigh)) {

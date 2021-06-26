@@ -103,8 +103,8 @@ struct udp_hdr_t {
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[UDP: src_port " << std::to_string(ntohs(src_port_)) << ", dst_port "
-        << std::to_string(ntohs(dst_port_)) << ", len "
+    ret << "[UDP: src_port " << std::to_string(ntohs(src_port_))
+        << ", dst_port " << std::to_string(ntohs(dst_port_)) << ", len "
         << std::to_string(ntohs(len_)) << ", check " << std::to_string(check_)
         << "]";
     return ret.str();
@@ -120,17 +120,20 @@ static_assert(kInetHdrsTotSize == 42, "");
 /// UDP port are in host-byte order.
 struct eth_routing_info_t {
   uint8_t mac_[6];
-  uint32_t ipv4_addr_;            // The IPv4 address for this endpoint
-  uint16_t udp_port_;             // The UDP port this endpoint listens on
-  uint16_t rxq_id_ = UINT16_MAX;  // The NIC RX queue ID this endpoint listens on
+  uint32_t ipv4_addr_;  // The IPv4 address for this endpoint
+  uint16_t udp_port_;   // The UDP port this endpoint listens on
+
+  /// The NIC RX queue ID this endpoint listens on
+  uint16_t rxq_id_ = UINT16_MAX;
 
   // Number of entries in this endpoint's NIC RSS indirection table
   uint16_t reta_size_ = UINT16_MAX;
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[MAC " << mac_to_string(mac_) << ", IP " << ipv4_to_string(ipv4_addr_)
-        << ", UDP port " << std::to_string(udp_port_) << ", RQ queue ID "
+    ret << "[MAC " << mac_to_string(mac_) << ", IP "
+        << ipv4_to_string(ipv4_addr_) << ", UDP port "
+        << std::to_string(udp_port_) << ", RQ queue ID "
         << (rxq_id_ == UINT16_MAX ? " N/A " : std::to_string(rxq_id_))
         << ", RETA size "
         << ((reta_size_ == UINT16_MAX) ? " N/A" : std::to_string(reta_size_))
@@ -166,7 +169,8 @@ static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
   ipv4_hdr->ihl_ = 5;
   ipv4_hdr->ecn_ = 1;  // ECT => ECN-capable transport
   ipv4_hdr->dscp_ = 0;
-  ipv4_hdr->tot_len_ = htons(sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t) + data_size);
+  ipv4_hdr->tot_len_ =
+      htons(sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t) + data_size);
   ipv4_hdr->id_ = htons(0);
   ipv4_hdr->frag_off_ = htons(0);
   ipv4_hdr->ttl_ = 128;

@@ -17,9 +17,9 @@
 #include "sm_types.h"
 #include "sslot.h"
 #include "transport_impl/dpdk/dpdk_transport.h"
+#include "transport_impl/fake/fake_transport.h"
 #include "transport_impl/infiniband/ib_transport.h"
 #include "transport_impl/raw/raw_transport.h"
-#include "transport_impl/fake/fake_transport.h"
 #include "util/mempool.h"
 #include "wheel_record.h"
 

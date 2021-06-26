@@ -26,8 +26,8 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   // If a free sslot is unavailable, save to session backlog
   if (unlikely(session->client_info_.sslot_free_vec_.size() == 0)) {
     session->client_info_.enq_req_backlog_.emplace(session_num, req_type,
-                                                 req_msgbuf, resp_msgbuf,
-                                                 cont_func, tag, cont_etid);
+                                                   req_msgbuf, resp_msgbuf,
+                                                   cont_func, tag, cont_etid);
     return;
   }
 
@@ -226,7 +226,9 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   }
 
   // Send a credit return for every request packet except the last in sequence
-  if (pkthdr->pkt_num_ != req_msgbuf.num_pkts_ - 1) enqueue_cr_st(sslot, pkthdr);
+  if (pkthdr->pkt_num_ != req_msgbuf.num_pkts_ - 1) {
+    enqueue_cr_st(sslot, pkthdr);
+  }
 
   copy_data_to_msgbuf(&req_msgbuf, pkthdr->pkt_num_, pkthdr);  // Omits header
 

@@ -27,8 +27,7 @@ class UDPClient {
 
   ~UDPClient() {}
 
-  size_t send(const std::string rem_hostname, uint16_t rem_port,
-               const T &msg) {
+  size_t send(const std::string rem_hostname, uint16_t rem_port, const T &msg) {
     asio::error_code error;
     asio::ip::udp::resolver::results_type results =
         resolver_->resolve(rem_hostname, std::to_string(rem_port), error);
