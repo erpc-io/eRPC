@@ -8,9 +8,9 @@ using namespace erpc;
 
 static constexpr double kTestFreqGhz = 2.5;
 static constexpr double kTestMachineFailureTimeoutMs = 50;
-static constexpr const char *kTestLocalHostname = "localhost";
+static constexpr const char *kTestLocalHostname = "127.0.0.1";
 static constexpr uint16_t kTestLocalSmUdpPort = 31850;
-static constexpr const char *kTestLocalUri = "localhost:31850";
+static constexpr const char *kTestLocalUri = "127.0.0.1:31850";
 
 /// Return true iff vec contains s
 static bool str_vec_contains(const std::vector<std::string> &vec,
@@ -65,7 +65,7 @@ TEST(HeartbeatMgrTest, Basic) {
   // The manager will sent actual UDP packets, so we need valid addresses
   heartbeat_mgr.unlocked_add_remote("127.0.0.1:1");
   heartbeat_mgr.unlocked_add_remote("127.0.0.1:2");
-  heartbeat_mgr.unlocked_add_remote("localhost:2");
+  heartbeat_mgr.unlocked_add_remote("127.0.0.1:2");
 
   // Test heartbeat sending
   //
@@ -83,7 +83,7 @@ TEST(HeartbeatMgrTest, Basic) {
   }
   assert(sh.count(std::string(kTestLocalUri) + "-" + "127.0.0.1:1") > 0);
   assert(sh.count(std::string(kTestLocalUri) + "-" + "127.0.0.1:2") > 0);
-  assert(sh.count(std::string(kTestLocalUri) + "-" + "localhost:2") > 0);
+  assert(sh.count(std::string(kTestLocalUri) + "-" + "127.0.0.1:2") > 0);
 
   // Test failure timeout for the latter two URIs
   usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
@@ -99,7 +99,7 @@ TEST(HeartbeatMgrTest, Basic) {
   assert(failed_uris.size() == 2);
   assert(!str_vec_contains(failed_uris, "127.0.0.1:1"));
   assert(str_vec_contains(failed_uris, "127.0.0.1:2"));
-  assert(str_vec_contains(failed_uris, "localhost:2"));
+  assert(str_vec_contains(failed_uris, "127.0.0.1:2"));
 
   // Now wait for the first URI to time out
   failed_uris.clear();

@@ -40,7 +40,7 @@ class RpcTest : public ::testing::Test {
       return;
     }
 
-    nexus_ = new Nexus("localhost:31850", kTestNumaNode, 0);
+    nexus_ = new Nexus("127.0.0.1:31850", kTestNumaNode, 0);
     rt_assert(nexus_ != nullptr, "Failed to create nexus");
     nexus_->register_req_func(kTestReqType, req_handler,
                               ReqFuncType::kForeground);
@@ -55,7 +55,7 @@ class RpcTest : public ::testing::Test {
 
     // Init local endpoint
     local_endpoint_.transport_type_ = rpc_->transport_->transport_type_;
-    strcpy(local_endpoint_.hostname_, "localhost");
+    strcpy(local_endpoint_.hostname_, "127.0.0.1");
     local_endpoint_.sm_udp_port_ = 31850;
     local_endpoint_.rpc_id_ = kTestRpcId;
     local_endpoint_.session_num_ = 0;
@@ -63,7 +63,7 @@ class RpcTest : public ::testing::Test {
 
     // Init remote endpoint. Reusing local routing info & hostname is fine.
     remote_endpoint_.transport_type_ = rpc_->transport_->transport_type_;
-    strcpy(remote_endpoint_.hostname_, "localhost");
+    strcpy(remote_endpoint_.hostname_, "127.0.0.1");
     remote_endpoint_.sm_udp_port_ = 31850;
     remote_endpoint_.rpc_id_ = kTestRpcId + 1;
     remote_endpoint_.session_num_ = 1;

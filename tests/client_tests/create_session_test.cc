@@ -31,11 +31,11 @@ void simple_connect(Nexus *nexus, size_t) {
   // We're testing session connection, so can't use client_connect_sessions
   AppContext c;
   c.rpc_ = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
-                              &test_sm_handler, kTestClientPhyPort);
+                               &test_sm_handler, kTestClientPhyPort);
 
   // Connect the session
   c.exp_err_ = SmErrType::kNoError;
-  c.session_num_ = c.rpc_->create_session("localhost:31850", kTestServerRpcId);
+  c.session_num_ = c.rpc_->create_session("127.0.0.1:31850", kTestServerRpcId);
   ASSERT_GE(c.session_num_, 0);
 
   c.rpc_->run_event_loop(kTestEventLoopMs);

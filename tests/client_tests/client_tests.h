@@ -169,7 +169,7 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
       if (other_rpc_id == rpc_id) continue;
 
       c.session_num_arr_[i] = c.rpc_->create_session(
-          "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
+          "127.0.0.1:31850", kTestServerRpcId + static_cast<uint8_t>(i));
       assert(c.session_num_arr_[i] >= 0);
     }
 
@@ -237,7 +237,7 @@ void launch_server_client_threads(
     void (*client_thread_func)(Nexus *, size_t),
     std::vector<ReqFuncRegInfo> req_func_reg_info_vec,
     ConnectServers connect_servers, double srv_pkt_drop_prob) {
-  Nexus nexus("localhost:31850", kTestNumaNode, num_bg_threads);
+  Nexus nexus("127.0.0.1:31850", kTestNumaNode, num_bg_threads);
 
   // Register the request handler functions
   for (ReqFuncRegInfo &info : req_func_reg_info_vec) {
@@ -276,12 +276,12 @@ void launch_server_client_threads(
 
 /**
  * @brief Initialize client context and create sessions to server Rpcs running
- * on localhost
+ * on 127.0.0.1
  *
  * @param nexus The process's Nexus
  * @param c The uninitialized client context
  * @param num_sessions The number of sessions to create for the client. Session
- * \p i is created to Rpc \p {kTestServerRpcId + i} at localhost
+ * \p i is created to Rpc \p {kTestServerRpcId + i} at 127.0.0.1
  * @param sm_handler The client's sm handler
  */
 void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
@@ -299,7 +299,7 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
   c.session_num_arr_ = new int[num_sessions];
   for (size_t i = 0; i < num_sessions; i++) {
     c.session_num_arr_[i] = c.rpc_->create_session(
-        "localhost:31850", kTestServerRpcId + static_cast<uint8_t>(i));
+        "127.0.0.1:31850", kTestServerRpcId + static_cast<uint8_t>(i));
   }
 
   while (c.num_sm_resps_ < num_sessions) {

@@ -17,7 +17,7 @@ void cont_func(void *_c, void *) {
 
 // This threads acts as a process with a Nexus
 void process_proxy_thread_func(size_t process_id, size_t num_processes) {
-  auto uri = "localhost:" + std::to_string(kBaseSmUdpPort + process_id);
+  auto uri = "127.0.0.1:" + std::to_string(kBaseSmUdpPort + process_id);
   Nexus nexus(uri, 0, 0);
   nexus.register_req_func(kTestReqType, req_handler);
 
@@ -37,7 +37,7 @@ void process_proxy_thread_func(size_t process_id, size_t num_processes) {
   for (size_t i = 0; i < num_processes; i++) {
     if (i == process_id) continue;
 
-    auto remote_uri = "localhost:" + std::to_string(kBaseSmUdpPort + i);
+    auto remote_uri = "127.0.0.1:" + std::to_string(kBaseSmUdpPort + i);
     c.session_num_arr_[i] = c.rpc_->create_session(remote_uri, 0);
 
     c.req_msgbufs_[i] = c.rpc_->alloc_msg_buffer_or_die(sizeof(size_t));

@@ -237,13 +237,13 @@ TEST_F(RpcSmTest, handle_disconnect_resp_st) {
 //
 TEST_F(RpcSmTest, create_session_st) {
   // Correct args
-  int session_num = rpc_->create_session("localhost:31850", kTestRpcId + 1);
+  int session_num = rpc_->create_session("127.0.0.1:31850", kTestRpcId + 1);
   ASSERT_EQ(session_num, 0);
   common_check(1, SmPktType::kConnectReq, SmErrType::kNoError);
   ASSERT_EQ(rpc_->session_vec_[0]->state_, SessionState::kConnectInProgress);
 
   // Try to create session to self
-  session_num = rpc_->create_session("localhost:31850", kTestRpcId);
+  session_num = rpc_->create_session("127.0.0.1:31850", kTestRpcId);
   ASSERT_LT(session_num, 0);
 }
 
