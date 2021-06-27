@@ -30,8 +30,42 @@ static void nano_sleep(size_t ns, double freq_ghz) {
   while (end - start < upp) end = rdtsc();
 }
 
+/// Simple time that uses std::chrono
+class ChronoTimer {
+ public:
+  ChronoTimer() { reset(); }
+  void reset() { start_time_ = std::chrono::high_resolution_clock::now(); }
+
+  /// Return milliseconds elapsed since this timer was created or last reset
+  size_t get_ms() const {
+    return static_cast<size_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - start_time_)
+            .count());
+  }
+
+  /// Return microseconds elapsed since this timer was created or last reset
+  size_t get_us() const {
+    return static_cast<size_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now() - start_time_)
+            .count());
+  }
+
+  /// Return nanoseconds elapsed since this timer was created or last reset
+  size_t get_ns() const {
+    return static_cast<size_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now() - start_time_)
+            .count());
+  }
+
+ private:
+  std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
+};
+
 static double measure_rdtsc_freq() {
-  const auto start_time = std::chrono::high_resolution_clock::now();
+  ChronoTimer chrono_timer;
   const uint64_t rdtsc_start = rdtsc();
 
   // Do not change this loop! The hardcoded value below depends on this loop
@@ -42,13 +76,8 @@ static double measure_rdtsc_freq() {
   }
   rt_assert(sum == 13580802877818827968ull, "Error in RDTSC freq measurement");
 
-  const size_t chrono_ns = static_cast<size_t>(
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::high_resolution_clock::now() - start_time)
-          .count());
   const uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
-
-  const double freq_ghz = rdtsc_cycles * 1.0 / chrono_ns;
+  const double freq_ghz = rdtsc_cycles * 1.0 / chrono_timer.get_ns();
   rt_assert(freq_ghz >= 0.5 && freq_ghz <= 5.0, "Invalid RDTSC frequency");
 
   return freq_ghz;

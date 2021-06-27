@@ -7,6 +7,7 @@
 
 #include "rpc.h"
 #include "util/test_printf.h"
+#include "util/timer.h"
 
 using namespace erpc;
 
@@ -321,15 +322,10 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
  */
 void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
-  const auto start_time = std::chrono::high_resolution_clock::now();
+  ChronoTimer chrono_timer;
   while (c.num_sm_resps_ < num_resps) {
     c.rpc_->run_event_loop(kTestEventLoopMs);
-
-    const size_t ms_elapsed = static_cast<size_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::high_resolution_clock::now() - start_time)
-            .count());
-    if (ms_elapsed > kTestMaxEventLoopMs) break;
+    if (chrono_timer.get_ms() > kTestMaxEventLoopMs) break;
   }
 }
 
@@ -342,14 +338,9 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
  */
 void wait_for_rpc_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
-  const auto start_time = std::chrono::high_resolution_clock::now();
+  ChronoTimer chrono_timer;
   while (c.num_rpc_resps_ < num_resps) {
     c.rpc_->run_event_loop(kTestEventLoopMs);
-
-    const size_t ms_elapsed = static_cast<size_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::high_resolution_clock::now() - start_time)
-            .count());
-    if (ms_elapsed > kTestMaxEventLoopMs) break;
+    if (chrono_timer.get_ms() > kTestMaxEventLoopMs) break;
   }
 }
