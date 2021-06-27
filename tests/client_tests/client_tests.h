@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <string.h>
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <thread>
 
@@ -320,12 +321,14 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
  */
 void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
-  struct timespec start;
-  clock_gettime(CLOCK_REALTIME, &start);
+  const auto start_time = std::chrono::high_resolution_clock::now();
   while (c.num_sm_resps_ < num_resps) {
     c.rpc_->run_event_loop(kTestEventLoopMs);
 
-    double ms_elapsed = sec_since(start) * 1000;
+    const size_t ms_elapsed = static_cast<size_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - start_time)
+            .count());
     if (ms_elapsed > kTestMaxEventLoopMs) break;
   }
 }
@@ -339,12 +342,14 @@ void wait_for_sm_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
  */
 void wait_for_rpc_resps_or_timeout(BasicAppContext &c, const size_t num_resps) {
   // Run the event loop for up to kTestMaxEventLoopMs milliseconds
-  struct timespec start;
-  clock_gettime(CLOCK_REALTIME, &start);
+  const auto start_time = std::chrono::high_resolution_clock::now();
   while (c.num_rpc_resps_ < num_resps) {
     c.rpc_->run_event_loop(kTestEventLoopMs);
 
-    double ms_elapsed = sec_since(start) * 1000;
+    const size_t ms_elapsed = static_cast<size_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - start_time)
+            .count());
     if (ms_elapsed > kTestMaxEventLoopMs) break;
   }
 }

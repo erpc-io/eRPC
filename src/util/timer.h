@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <chrono>
 #include "common.h"
 
 namespace erpc {
@@ -30,9 +31,8 @@ static void nano_sleep(size_t ns, double freq_ghz) {
 }
 
 static double measure_rdtsc_freq() {
-  struct timespec start, end;
-  clock_gettime(CLOCK_REALTIME, &start);
-  uint64_t rdtsc_start = rdtsc();
+  const auto start_time = std::chrono::high_resolution_clock::now();
+  const uint64_t rdtsc_start = rdtsc();
 
   // Do not change this loop! The hardcoded value below depends on this loop
   // and prevents it from being optimized out.
@@ -42,13 +42,13 @@ static double measure_rdtsc_freq() {
   }
   rt_assert(sum == 13580802877818827968ull, "Error in RDTSC freq measurement");
 
-  clock_gettime(CLOCK_REALTIME, &end);
-  uint64_t clock_ns =
-      static_cast<uint64_t>(end.tv_sec - start.tv_sec) * 1000000000 +
-      static_cast<uint64_t>(end.tv_nsec - start.tv_nsec);
-  uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
+  const size_t chrono_ns = static_cast<size_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::high_resolution_clock::now() - start_time)
+          .count());
+  const uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
 
-  double freq_ghz = rdtsc_cycles * 1.0 / clock_ns;
+  const double freq_ghz = rdtsc_cycles * 1.0 / chrono_ns;
   rt_assert(freq_ghz >= 0.5 && freq_ghz <= 5.0, "Invalid RDTSC frequency");
 
   return freq_ghz;
