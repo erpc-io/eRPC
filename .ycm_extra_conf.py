@@ -45,6 +45,7 @@ flags = [
     '-DERPC_INFINIBAND=true',
     '-isystem' + str(home_dir) + '/dpdk/include/dpdk/',
     '-isystem' + str(home_dir) + '/eRPC/third_party/asio/include',
+    '-isystem' + str(home_dir) + '/eRPC/third_party/gflags/include',
     '-I' + str(home_dir) + '/eRPC/src',
     '-I' + str(home_dir) + '/eRPC/third_party/googletest/googletest/include',
     '-I' + str(home_dir) + '/eRPC/mica/src',

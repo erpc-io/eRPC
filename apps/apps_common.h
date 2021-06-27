@@ -13,9 +13,7 @@
 #define Mi(x) (static_cast<size_t>(x) * 1000 * 1000)
 #define Gi(x) (static_cast<size_t>(x) * 1000 * 1000 * 1000)
 
-//
 // Gflags
-//
 
 // Flags that must be used in every app. test_ms and num_processes are required
 // in the app's config file by the autorun scripts.
@@ -27,8 +25,22 @@ DEFINE_uint64(numa_node, 0, "NUMA node for this process");
 DEFINE_string(numa_0_ports, "", "Fabric ports on NUMA node 0, CSV, no spaces");
 DEFINE_string(numa_1_ports, "", "Fabric ports on NUMA node 1, CSV, no spaces");
 
-// Return the fabric ports for a NUMA node. The user must specify numa_0_ports
-// and numa_1_ports, but they may be empty.
+/// Return seconds elapsed since timestamp \p t0
+static double sec_since(const struct timespec &t0) {
+  struct timespec t1;
+  clock_gettime(CLOCK_REALTIME, &t1);
+  return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
+}
+
+/// Return nanoseconds elapsed since timestamp \p t0
+static double ns_since(const struct timespec &t0) {
+  struct timespec t1;
+  clock_gettime(CLOCK_REALTIME, &t1);
+  return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
+}
+
+/// Return the fabric ports for a NUMA node. The user must specify numa_0_ports
+/// and numa_1_ports, but they may be empty.
 std::vector<size_t> flags_get_numa_ports(size_t numa_node) {
   erpc::rt_assert(numa_node <= 1);  // Only NUMA 0 and 1 supported for now
   std::vector<size_t> ret;
@@ -45,8 +57,8 @@ std::vector<size_t> flags_get_numa_ports(size_t numa_node) {
   return ret;
 }
 
-// A basic mempool for preallocated objects of type T. eRPC has a faster,
-// hugepage-backed one.
+/// A basic mempool for preallocated objects of type T. eRPC has a faster,
+/// hugepage-backed one.
 template <class T>
 class AppMemPool {
  public:
@@ -76,7 +88,7 @@ class AppMemPool {
   }
 };
 
-// A utility class to write stats to /tmp/
+/// A utility class to write stats to /tmp
 class TmpStat {
  public:
   TmpStat() {}
@@ -118,7 +130,7 @@ class TmpStat {
   FILE *stat_file_;
 };
 
-// Per-thread application context
+/// Base class for per-thread application context
 class BasicAppContext {
  public:
   TmpStat *tmp_stat_ = nullptr;
@@ -144,7 +156,7 @@ class BasicAppContext {
   }
 };
 
-// A basic session management handler that expects successful responses
+/// A basic session management handler that expects successful responses
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
                       erpc::SmErrType sm_err_type, void *_context) {
   auto *c = static_cast<BasicAppContext *>(_context);
@@ -185,14 +197,13 @@ static constexpr uint8_t kPingReqHandlerType = 201;
 static constexpr uint8_t kPingEvLoopMs = 1;
 static constexpr uint8_t kPingTimeoutMs = 50;
 
-// Apps must register this request handler with type = kPingReqHandlerType to
-// support pings
+/// Apps must register this request handler with type = kPingReqHandlerType to
+/// support pings
 void ping_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<BasicAppContext *>(_context);
 
   erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf_;
   c->rpc_->resize_msg_buffer(&resp_msgbuf, kPingMsgSize);
-
   c->rpc_->enqueue_response(req_handle, &resp_msgbuf);
 }
 
@@ -201,7 +212,7 @@ void ping_cont_func(void *_context, void *) {
   c->ping_pending_ = false;  // Mark ping as completed
 }
 
-// Ping all sessions after connecting them
+/// Ping all sessions after connecting them
 void ping_all_blocking(BasicAppContext &c) {
   std::set<std::string> hostname_set;
   erpc::MsgBuffer ping_req, ping_resp;

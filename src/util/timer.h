@@ -7,7 +7,6 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <time.h>
 #include "common.h"
 
 namespace erpc {
@@ -85,20 +84,6 @@ static size_t ns_to_cycles(double ns, double freq_ghz) {
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to nsec
 static double to_nsec(size_t cycles, double freq_ghz) {
   return (cycles / freq_ghz);
-}
-
-/// Return seconds elapsed since timestamp \p t0
-static double sec_since(const struct timespec &t0) {
-  struct timespec t1;
-  clock_gettime(CLOCK_REALTIME, &t1);
-  return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-}
-
-/// Return nanoseconds elapsed since timestamp \p t0
-static double ns_since(const struct timespec &t0) {
-  struct timespec t1;
-  clock_gettime(CLOCK_REALTIME, &t1);
-  return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
 }
 
 /// Simple time that uses RDTSC
