@@ -25,20 +25,6 @@ DEFINE_uint64(numa_node, 0, "NUMA node for this process");
 DEFINE_string(numa_0_ports, "", "Fabric ports on NUMA node 0, CSV, no spaces");
 DEFINE_string(numa_1_ports, "", "Fabric ports on NUMA node 1, CSV, no spaces");
 
-/// Return seconds elapsed since timestamp \p t0
-static double sec_since(const struct timespec &t0) {
-  struct timespec t1;
-  clock_gettime(CLOCK_REALTIME, &t1);
-  return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-}
-
-/// Return nanoseconds elapsed since timestamp \p t0
-static double ns_since(const struct timespec &t0) {
-  struct timespec t1;
-  clock_gettime(CLOCK_REALTIME, &t1);
-  return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
-}
-
 /// Return the fabric ports for a NUMA node. The user must specify numa_0_ports
 /// and numa_1_ports, but they may be empty.
 std::vector<size_t> flags_get_numa_ports(size_t numa_node) {
