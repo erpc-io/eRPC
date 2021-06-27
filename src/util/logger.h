@@ -17,7 +17,7 @@
  * @author Hideaki, modified by Anuj
  */
 
-#include <ctime>
+#include <chrono>
 #include <string>
 
 namespace erpc {
@@ -105,13 +105,22 @@ namespace erpc {
 
 /// Return decent-precision time formatted as seconds:microseconds
 static std::string get_formatted_time() {
-  struct timespec t;
-  clock_gettime(CLOCK_REALTIME, &t);
-  char buf[20];
-  uint32_t seconds = t.tv_sec % 100;  // Rollover every 100 seconds
-  uint32_t usec = t.tv_nsec / 1000;
+  const auto now = std::chrono::high_resolution_clock::now();
 
-  sprintf(buf, "%u:%06u", seconds, usec);
+  const size_t sec = static_cast<size_t>(
+      std::chrono::time_point_cast<std::chrono::seconds>(now)
+          .time_since_epoch()
+          .count());
+
+  const size_t usec = static_cast<size_t>(
+      std::chrono::time_point_cast<std::chrono::microseconds>(now)
+          .time_since_epoch()
+          .count());
+
+  // Roll-over seconds every 100 seconds
+  char buf[20];
+  sprintf(buf, "%zu:%06zu", sec % 100,
+          (usec - (sec * 1000000)) /* spare microseconds */);
   return std::string(buf);
 }
 
