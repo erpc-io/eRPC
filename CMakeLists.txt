@@ -30,6 +30,7 @@ else()
   set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
+  set(LIBRARIES ${LIBRARIES} flags hdr_histogram_static)
 endif()
 
 # Parse the user-exposed options
@@ -46,7 +47,6 @@ else(PERF)
   set(TESTING ON)
 endif(PERF)
 
-set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party)
 
@@ -300,6 +300,12 @@ if(PERF)
   target_compile_options(${APP} PRIVATE "-flto")
 endif()
 target_link_libraries(${APP} ${LIBRARIES})
+
+# Compile hello_world apps
+add_executable(hello_server hello_world/server.cc)
+target_link_libraries(hello_server erpc)
+add_executable(hello_client hello_world/client.cc)
+target_link_libraries(hello_client erpc)
 
 # Compile the tests
 if(TESTING)
