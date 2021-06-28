@@ -8,6 +8,10 @@
 
 #ifdef ERPC_DPDK
 
+#ifdef _WIN32
+#include <rte_windows.h>
+#endif
+
 #include <rte_common.h>
 #include <rte_mempool.h>
 #include <atomic>

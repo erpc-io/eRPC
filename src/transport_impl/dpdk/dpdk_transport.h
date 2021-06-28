@@ -11,6 +11,10 @@
 #include "util/barrier.h"
 #include "util/logger.h"
 
+#ifdef _WIN32
+#include <rte_windows.h>
+#endif
+
 #include <rte_common.h>
 #include <rte_config.h>
 #include <rte_errno.h>

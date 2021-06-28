@@ -264,30 +264,68 @@ endif()
 
 if(DPDK_NEEDED STREQUAL "true")
   message(STATUS "DPDK needed to build eRPC")
-  find_library(DPDK_LIB dpdk)
-  if(NOT DPDK_LIB)
-    message(FATAL_ERROR "DPDK library not found")
-  endif()
 
-  set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive numa dl ibverbs mlx4 mlx5)
+  if (MSVC)
+    message(STATUS "DPDK for Windows")
 
-  # DPDK include directory. Locating rte_config.h does not work on some systems.
-  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
-  # from the real DPDK include directory (/usr/include/dpdk/).
-  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
-  if (DPDK_INCLUDE_DIR)
-    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
-  else()
-    message(FATAL_ERROR "DPDK include directory not found")
-  endif()
-  include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+    # Set this to your DPDK directory
+    set(DPDK_WINDIR "C:\\Users\\ankalia\\Desktop\\dpdk-21.05")
+    if(NOT EXISTS "${DPDK_WINDIR}\\lib\\eal\\include\\rte_common.h")
+      message(FATAL_ERROR "rte_common.h not found")
+      return()
+    endif()
 
-  # Build the eRPC DPDK management daemon
-  add_executable(erpc_dpdk_daemon
-    src/transport_impl/dpdk/dpdk_daemon.cc
-    src/transport_impl/dpdk/dpdk_externs.cc
-    src/transport_impl/dpdk/dpdk_init.cc)
-  target_link_libraries(erpc_dpdk_daemon ${LIBRARIES})
+    set(DPDK_WINLIBS
+      acl bbdev bitratestats bpf cfgfile cmdline compressdev cryptodev
+      distributor eal efd ethdev eventdev fib flow_classify graph gro gso hash
+      ip_frag ipsec jobstats kni kvargs latencystats lpm mbuf member mempool
+      meter metrics net node pci pdump pipeline port power rawdev rcu regexdev
+      reorder rib ring sched security stack table telemetry timer vhost)
+    foreach(lib_name IN LISTS DPDK_WINLIBS)
+      include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\${lib_name}")
+    endforeach()
+
+    include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\eal\\include")
+    include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\eal\\windows\\include")
+    include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\eal\\x86\\include")
+    include_directories(SYSTEM "${DPDK_WINDIR}\\config")
+    include_directories(SYSTEM "${DPDK_WINDIR}\\build")
+
+    link_directories("${DPDK_WINDIR}\\build\\lib")
+    set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive -librte_common_iavf.a
+      -librte_bus_pci.a -librte_bus_vdev.a -librte_mempool_ring.a
+      -librte_net_i40e.a -librte_net_ice.a -librte_net_vmxnet3.a
+      -librte_cfgfile.a -librte_hash.a -librte_cmdline.a -librte_pci.a
+      -librte_ethdev.a -librte_meter.a -librte_net.a -librte_mbuf.a
+      -librte_mempool.a -librte_rcu.a -librte_ring.a -librte_eal.a
+      -librte_telemetry.a -librte_kvargs.a -Wl,--no-whole-archive)
+  else(MSVC)
+    message(STATUS "DPDK for Linux")
+    find_library(DPDK_LIB dpdk)
+    if(NOT DPDK_LIB)
+      message(FATAL_ERROR "DPDK library not found")
+    endif()
+
+    set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive numa dl ibverbs mlx4 mlx5)
+
+    # DPDK include directory. Locating rte_config.h does not work on some systems.
+    # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+    # from the real DPDK include directory (/usr/include/dpdk/).
+    find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+    if (DPDK_INCLUDE_DIR)
+      message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+    else()
+      message(FATAL_ERROR "DPDK include directory not found")
+    endif()
+    include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+
+    # Build the eRPC DPDK management daemon
+    add_executable(erpc_dpdk_daemon
+      src/transport_impl/dpdk/dpdk_daemon.cc
+      src/transport_impl/dpdk/dpdk_externs.cc
+      src/transport_impl/dpdk/dpdk_init.cc)
+    target_link_libraries(erpc_dpdk_daemon ${LIBRARIES})
+  endif(MSVC)
 else()
   message(STATUS "DPDK not needed to build eRPC")
 endif()
