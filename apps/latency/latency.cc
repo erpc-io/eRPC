@@ -203,6 +203,7 @@ void client_func(erpc::Nexus *nexus) {
 }
 
 int main(int argc, char **argv) {
+  printf("Latency: Welcome!");
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");

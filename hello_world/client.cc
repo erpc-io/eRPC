@@ -3,7 +3,7 @@ erpc::Rpc<erpc::CTransport> *rpc;
 erpc::MsgBuffer req;
 erpc::MsgBuffer resp;
 
-void cont_func(void *, void *) { printf("%s\n", resp.buf); }
+void cont_func(void *, void *) { printf("%s\n", resp.buf_); }
 
 void sm_handler(int, erpc::SmEventType, erpc::SmErrType, void *) {}
 
