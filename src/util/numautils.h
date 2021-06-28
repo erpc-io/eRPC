@@ -72,25 +72,18 @@ static void clear_affinity_for_process() {
 
 #else
 
-static size_t num_lcores_per_numa_node() {
-  rt_assert(false, "Not implemented for Windows yet");
-  return 0;
-}
+static size_t num_lcores_per_numa_node() { return 1; }
 
 static std::vector<size_t> get_lcores_for_numa_node(size_t) {
-  rt_assert(false, "Not implemented for Windows yet");
   std::vector<size_t> ret;
+  ret.push_back(0);
   return ret;
 }
 
 /// Bind \p thread to core with index \p numa_local_index on \p numa_node
-static void bind_to_core(std::thread &, size_t, size_t) {
-  rt_assert(false, "Not implemented for Windows yet");
-}
+static void bind_to_core(std::thread &, size_t, size_t) { return; }
 
 /// Reset this process's core mask to be all cores
-static void clear_affinity_for_process() {
-  rt_assert(false, "Not implemented for Windows yet");
-}
+static void clear_affinity_for_process() { return; }
 #endif
 }  // namespace erpc
