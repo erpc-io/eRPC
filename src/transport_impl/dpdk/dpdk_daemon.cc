@@ -5,6 +5,7 @@
  */
 
 #include <gflags/gflags.h>
+#include <chrono>
 #include "dpdk_externs.h"
 #include "dpdk_transport.h"
 
@@ -80,7 +81,7 @@ int main(int argc, char **argv) {
 
   size_t prev_epoch = 0;
   while (true) {
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     size_t cur_epoch = ownership_memzone->get_epoch();
     if (cur_epoch != prev_epoch) {
       erpc::ERPC_WARN("eRPC DPDK daemon: %s\n",

@@ -45,7 +45,9 @@ Nexus::Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads)
 
     // Wait for the launched thread to grab a eRPC thread ID, otherwise later
     // background threads or the foreground thread can grab ID = i.
-    while (tls_registry_.cur_etid_ == i) usleep(1);
+    while (tls_registry_.cur_etid_ == i) {
+      std::this_thread::sleep_for(std::chrono::microseconds(1));
+    }
   }
 
   // Launch the session management thread
