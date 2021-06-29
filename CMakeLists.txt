@@ -30,7 +30,6 @@ else()
   set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
-  set(LIBRARIES ${LIBRARIES} flags hdr_histogram_static)
 endif()
 
 # Parse the user-exposed options
@@ -208,9 +207,6 @@ set(MICA_SOURCES
   mica/src/mica/util/cityhash/city_mod.cc
   mica/src/mica/util/config.cc)
 
-# Compile the library
-add_library(erpc ${SOURCES})
-
 # The app to compile. Only one app is compiled to reduce compile time.
 if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/autorun_app_file")
   file(STRINGS "scripts/autorun_app_file" APP)
@@ -329,6 +325,11 @@ if(DPDK_NEEDED STREQUAL "true")
 else()
   message(STATUS "DPDK not needed to build eRPC")
 endif()
+
+set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static)
+
+# Compile the library
+add_library(erpc ${SOURCES})
 
 # Using link-time optimization sometimes requires building with sources instead
 # of liberpc. See the hello world example's Makefile for an example of

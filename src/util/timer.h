@@ -36,6 +36,14 @@ class ChronoTimer {
   ChronoTimer() { reset(); }
   void reset() { start_time_ = std::chrono::high_resolution_clock::now(); }
 
+  /// Return seconds elapsed since this timer was created or last reset
+  size_t get_sec() const {
+    return static_cast<size_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::high_resolution_clock::now() - start_time_)
+            .count());
+  }
+
   /// Return milliseconds elapsed since this timer was created or last reset
   size_t get_ms() const {
     return static_cast<size_t>(

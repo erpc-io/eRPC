@@ -178,7 +178,7 @@ void app_cont_func(void *_context, void *_msgbuf_idx) {
 }
 
 void client_print_stats(AppContext &c) {
-  const double seconds = erpc::sec_since(c.client.tput_t0);
+  const double seconds = c.client.tput_timer.get_sec();
   const double tput_mrps = c.client.num_resps_tot / (seconds * 1000000);
   app_stats_t &stats = c.client.app_stats[c.thread_id_];
   stats.mrps = tput_mrps;
@@ -207,7 +207,7 @@ void client_print_stats(AppContext &c) {
   c.client.point_latency.reset();
   c.client.range_latency.reset();
 
-  clock_gettime(CLOCK_REALTIME, &c.client.tput_t0);
+  c.client.tput_timer.reset();
 }
 
 void client_thread_func(size_t thread_id, app_stats_t *app_stats,
@@ -250,7 +250,7 @@ void client_thread_func(size_t thread_id, app_stats_t *app_stats,
           thread_id);
 
   alloc_req_resp_msg_buffers(&c);
-  clock_gettime(CLOCK_REALTIME, &c.client.tput_t0);
+  c.client.tput_timer.reset();
   for (size_t i = 0; i < FLAGS_req_window; i++) send_req(&c, i);
 
   for (size_t i = 0; i < FLAGS_test_ms; i += kAppEvLoopMs) {

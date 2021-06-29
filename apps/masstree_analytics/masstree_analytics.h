@@ -8,6 +8,7 @@
 #include "rpc.h"
 #include "util/latency.h"
 #include "util/numautils.h"
+#include "util/timer.h"
 
 static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppPointReqType = 1;
@@ -124,8 +125,8 @@ class AppContext : public BasicAppContext {
   } server;
 
   struct {
-    struct timespec tput_t0;  // Throughput measurement start
-    app_stats_t *app_stats;   // Common stats array for all threads
+    erpc::ChronoTimer tput_timer;  // Throughput measurement start
+    app_stats_t *app_stats;  // Common stats array for all threads
 
     erpc::Latency point_latency;  // Latency of point requests (factor = 10)
     erpc::Latency range_latency;  // Latency of point requests (factor = 1)
