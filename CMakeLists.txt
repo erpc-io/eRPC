@@ -326,7 +326,10 @@ else()
   message(STATUS "DPDK not needed to build eRPC")
 endif()
 
-set(LIBRARIES ${LIBRARIES} rt numa pthread gflags hdr_histogram_static)
+set(LIBRARIES ${LIBRARIES} gflags hdr_histogram_static)
+if(NOT MSVC)
+  set(LIBRARIES ${LIBRARIES} rt numa pthread)
+endif()
 
 # Compile the library
 add_library(erpc ${SOURCES})
