@@ -17,7 +17,7 @@ static constexpr size_t kAppEvLoopMs = 500;
 
 // Workload params
 static constexpr bool kBypassMasstree = false;  // Bypass Masstree?
-static constexpr size_t kAppMaxReqWindow = 8;   // Max pending reqs per client
+static constexpr size_t kAppMaxReqWindow = 16;   // Max pending reqs per client
 
 // Globals
 volatile sig_atomic_t ctrl_c_pressed = 0;

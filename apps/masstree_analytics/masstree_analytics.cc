@@ -178,7 +178,7 @@ void app_cont_func(void *_context, void *_msgbuf_idx) {
 }
 
 void client_print_stats(AppContext &c) {
-  const double seconds = c.client.tput_timer.get_sec();
+  const double seconds = c.client.tput_timer.get_us() / 1e6;
   const double tput_mrps = c.client.num_resps_tot / (seconds * 1000000);
   app_stats_t &stats = c.client.app_stats[c.thread_id_];
   stats.mrps = tput_mrps;
