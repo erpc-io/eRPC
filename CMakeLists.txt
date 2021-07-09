@@ -25,6 +25,7 @@ include_directories(SYSTEM third_party/asio/include)
 
 if(MSVC)
   message("Using MSVC build")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
 else()
   message("Using non-MSVC build")
   set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
