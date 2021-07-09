@@ -263,29 +263,7 @@ class DpdkTransport : public Transport {
 
   /// Get the IPv4 address for \p phy_port. The returned IPv4 address is assumed
   /// to be in host-byte order.
-  uint32_t get_port_ipv4_addr(size_t phy_port) {
-    _unused(phy_port);
-    if (kIsAzure) {
-      // This routine gets the IPv4 address of the interface called eth1
-      int fd = socket(AF_INET, SOCK_DGRAM, 0);
-      struct ifreq ifr;
-      ifr.ifr_addr.sa_family = AF_INET;
-      strncpy(ifr.ifr_name, "eth1", IFNAMSIZ - 1);
-      int ret = ioctl(fd, SIOCGIFADDR, &ifr);
-      rt_assert(ret == 0, "DPDK: Failed to get IPv4 address of eth1");
-      close(fd);
-      return ntohl(
-          reinterpret_cast<sockaddr_in *>(&ifr.ifr_addr)->sin_addr.s_addr);
-    } else {
-      // As a hack, use the LSBs of the port's MAC address for IP address
-      struct rte_ether_addr mac;
-      rte_eth_macaddr_get(phy_port, &mac);
-
-      uint32_t ret;
-      memcpy(&ret, &mac.addr_bytes[2], sizeof(ret));
-      return ret;
-    }
-  }
+  static uint32_t get_port_ipv4_addr(size_t phy_port);
 
   // dpdk_transport_datapath.cc
   void tx_burst(const tx_burst_item_t *tx_burst_arr, size_t num_pkts);

@@ -220,6 +220,33 @@ void DpdkTransport::resolve_phy_port() {
       resolve_.bandwidth_ * 8.0 / (1000 * 1000 * 1000));
 }
 
+uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
+#ifdef _WIN32
+  rt_assert(false, "get_port_ipv4_addr not implemented yet");
+#else
+  if (kIsAzure) {
+    // This routine gets the IPv4 address of the interface called eth1
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    struct ifreq ifr;
+    ifr.ifr_addr.sa_family = AF_INET;
+    strncpy(ifr.ifr_name, "eth1", IFNAMSIZ - 1);
+    int ret = ioctl(fd, SIOCGIFADDR, &ifr);
+    rt_assert(ret == 0, "DPDK: Failed to get IPv4 address of eth1");
+    close(fd);
+    return ntohl(
+        reinterpret_cast<sockaddr_in *>(&ifr.ifr_addr)->sin_addr.s_addr);
+  } else {
+    // As a hack, use the LSBs of the port's MAC address for IP address
+    struct rte_ether_addr mac;
+    rte_eth_macaddr_get(phy_port, &mac);
+
+    uint32_t ret;
+    memcpy(&ret, &mac.addr_bytes[2], sizeof(ret));
+    return ret;
+  }
+#endif
+}
+
 void DpdkTransport::fill_local_routing_info(
     routing_info_t *routing_info) const {
   memset(static_cast<void *>(routing_info), 0, kMaxRoutingInfoSize);
