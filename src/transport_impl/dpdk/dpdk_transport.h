@@ -33,8 +33,8 @@ class DpdkTransport : public Transport {
   /// Contents of the memzone created by the eRPC DPDK daemon process
   struct ownership_memzone_t {
    private:
-    pthread_mutex_t lock_;  /// Guard for reading/writing to the memzone
-    size_t epoch_;  /// Incremented after each QP ownership change attempt
+    std::mutex mutex_;  /// Guard for reading/writing to the memzone
+    size_t epoch_;      /// Incremented after each QP ownership change attempt
     size_t num_qps_available_;
 
     struct {
@@ -51,29 +51,24 @@ class DpdkTransport : public Transport {
     struct rte_eth_link link_[kMaxPhyPorts];  /// Resolved link status
 
     void init() {
-      pthread_mutex_init(&lock_, nullptr);
-      memset(this, 0, sizeof(ownership_memzone_t));
+      new (&mutex_) std::mutex();  // Fancy in-place construction
       num_qps_available_ = kMaxQueuesPerPort;
+      epoch_ = 0;
+      memset(owner_, 0, sizeof(owner_));
     }
 
     size_t get_epoch() {
-      size_t ret;
-      pthread_mutex_lock(&lock_);
-      ret = epoch_;
-      pthread_mutex_unlock(&lock_);
-      return ret;
+      const std::lock_guard<std::mutex> guard(mutex_);
+      return epoch_;
     }
 
     size_t get_num_qps_available() {
-      size_t ret;
-      pthread_mutex_lock(&lock_);
-      ret = num_qps_available_;
-      pthread_mutex_unlock(&lock_);
-      return ret;
+      const std::lock_guard<std::mutex> guard(mutex_);
+      return num_qps_available_;
     }
 
     std::string get_summary(size_t phy_port) {
-      pthread_mutex_lock(&lock_);
+      const std::lock_guard<std::mutex> guard(mutex_);
       std::ostringstream ret;
       ret << "[" << num_qps_available_ << " QPs of " << kMaxQueuesPerPort
           << " available] ";
@@ -89,7 +84,6 @@ class DpdkTransport : public Transport {
         }
         ret << "]";
       }
-      pthread_mutex_unlock(&lock_);
 
       return ret.str();
     }
@@ -104,7 +98,7 @@ class DpdkTransport : public Transport {
      * reserved on phy_port. Else return kInvalidQpId.
      */
     size_t get_qp(size_t phy_port, size_t proc_random_id) {
-      pthread_mutex_lock(&lock_);
+      const std::lock_guard<std::mutex> guard(mutex_);
       epoch_++;
       const int my_pid = getpid();
 
@@ -116,7 +110,6 @@ class DpdkTransport : public Transport {
               "eRPC DpdkTransport: Found another process with same PID (%d) as "
               "mine. Process random IDs: mine %zu, other: %zu\n",
               my_pid, proc_random_id, owner.proc_random_id_);
-          pthread_mutex_unlock(&lock_);
           return kInvalidQpId;
         }
       }
@@ -127,12 +120,10 @@ class DpdkTransport : public Transport {
           owner.pid_ = my_pid;
           owner.proc_random_id_ = proc_random_id;
           num_qps_available_--;
-          pthread_mutex_unlock(&lock_);
           return i;
         }
       }
 
-      pthread_mutex_unlock(&lock_);
       return kInvalidQpId;
     }
 
@@ -146,14 +137,13 @@ class DpdkTransport : public Transport {
      * @return 0 if success, else errno
      */
     int free_qp(size_t phy_port, size_t qp_id) {
+      const std::lock_guard<std::mutex> guard(mutex_);
       const int my_pid = getpid();
-      pthread_mutex_lock(&lock_);
       epoch_++;
       auto &owner = owner_[phy_port][qp_id];
       if (owner.pid_ == 0) {
         ERPC_ERROR("eRPC DpdkTransport: PID %d tried to already-free QP %zu.\n",
                    my_pid, qp_id);
-        pthread_mutex_unlock(&lock_);
         return EALREADY;
       }
 
@@ -162,20 +152,18 @@ class DpdkTransport : public Transport {
             "eRPC DpdkTransport: PID %d tried to free QP %zu owned by PID "
             "%d. Disallowed.\n",
             my_pid, qp_id, owner.pid_);
-        pthread_mutex_unlock(&lock_);
         return EPERM;
       }
 
       num_qps_available_++;
       owner_[phy_port][qp_id].pid_ = 0;
-      pthread_mutex_unlock(&lock_);
       return 0;
     }
 
     /// Free-up QPs reserved by processes that exited before freeing a QP.
     /// This is safe, but it can leak QPs because of PID reuse.
     void daemon_reclaim_qps_from_crashed(size_t phy_port) {
-      pthread_mutex_lock(&lock_);
+      const std::lock_guard<std::mutex> guard(mutex_);
 
       for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
         auto &owner = owner_[phy_port][i];
@@ -187,7 +175,6 @@ class DpdkTransport : public Transport {
           owner_[phy_port][i].pid_ = 0;
         }
       }
-      pthread_mutex_unlock(&lock_);
     }
   };
 
