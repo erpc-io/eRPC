@@ -163,6 +163,10 @@ class DpdkTransport : public Transport {
     /// Free-up QPs reserved by processes that exited before freeing a QP.
     /// This is safe, but it can leak QPs because of PID reuse.
     void daemon_reclaim_qps_from_crashed(size_t phy_port) {
+#ifdef _WIN32
+      _unused(phy_port);
+      rt_assert(false, "Not implemented yet");
+#else
       const std::lock_guard<std::mutex> guard(mutex_);
 
       for (size_t i = 0; i < kMaxQueuesPerPort; i++) {
@@ -175,6 +179,7 @@ class DpdkTransport : public Transport {
           owner_[phy_port][i].pid_ = 0;
         }
       }
+#endif
     }
   };
 
