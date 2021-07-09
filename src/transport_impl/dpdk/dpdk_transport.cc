@@ -1,13 +1,10 @@
 #ifdef ERPC_DPDK
 
-#include <iomanip>
-#include <stdexcept>
-
-#include <rte_thash.h>
-#include <rte_version.h>
-#include <set>
-#include "dpdk_externs.h"
 #include "dpdk_transport.h"
+#include <iomanip>
+#include <set>
+#include <stdexcept>
+#include "dpdk_externs.h"
 #include "util/huge_alloc.h"
 #include "util/numautils.h"
 

@@ -8,16 +8,11 @@
 
 #ifdef ERPC_DPDK
 
-#ifdef _WIN32
-#include <rte_windows.h>
-#endif
+#include "dpdk_transport.h"
 
-#include <rte_common.h>
-#include <rte_mempool.h>
 #include <atomic>
 #include <set>
 #include "common.h"
-#include "dpdk_transport.h"
 
 namespace erpc {
 

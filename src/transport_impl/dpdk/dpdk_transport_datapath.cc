@@ -1,6 +1,5 @@
 #ifdef ERPC_DPDK
 
-#include <rte_thash.h>
 #include "dpdk_transport.h"
 #include "util/huge_alloc.h"
 

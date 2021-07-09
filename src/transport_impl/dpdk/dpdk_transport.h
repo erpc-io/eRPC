@@ -21,6 +21,7 @@
 #include <rte_ethdev.h>
 #include <rte_ip.h>
 #include <rte_mbuf.h>
+#include <rte_thash.h>
 #include <signal.h>
 
 namespace erpc {

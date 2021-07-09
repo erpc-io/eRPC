@@ -1,3 +1,9 @@
+/**
+ * @file dpdk_init.cc
+ * @brief Initialization code for a DPDK port. This is a separate file because
+ * it's used by both the eRPC library and the DPDK QP management daemon.
+ */
+
 #ifdef ERPC_DPDK
 
 #include "dpdk_externs.h"
