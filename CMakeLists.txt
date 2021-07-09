@@ -314,13 +314,6 @@ if(DPDK_NEEDED STREQUAL "true")
       message(FATAL_ERROR "DPDK include directory not found")
     endif()
     include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
-
-    # Build the eRPC DPDK management daemon
-    add_executable(erpc_dpdk_daemon
-      src/transport_impl/dpdk/dpdk_daemon.cc
-      src/transport_impl/dpdk/dpdk_externs.cc
-      src/transport_impl/dpdk/dpdk_init.cc)
-    target_link_libraries(erpc_dpdk_daemon ${LIBRARIES})
   endif(MSVC)
 else()
   message(STATUS "DPDK not needed to build eRPC")
@@ -334,6 +327,17 @@ endif()
 # Compile the library
 add_library(erpc ${SOURCES})
 
+if(DPDK_NEEDED STREQUAL "true")
+  if (NOT MSVC)
+    # Build the eRPC DPDK management daemon for Linux only
+    add_executable(erpc_dpdk_daemon
+      src/transport_impl/dpdk/dpdk_daemon.cc
+      src/transport_impl/dpdk/dpdk_externs.cc
+      src/transport_impl/dpdk/dpdk_init.cc)
+    target_link_libraries(erpc_dpdk_daemon ${LIBRARIES})
+  endif()
+endif()
+
 # Using link-time optimization sometimes requires building with sources instead
 # of liberpc. See the hello world example's Makefile for an example of
 # compiling with liberpc.
@@ -345,9 +349,9 @@ target_link_libraries(${APP} ${LIBRARIES})
 
 # Compile hello_world apps
 add_executable(hello_server hello_world/server.cc)
-target_link_libraries(hello_server erpc)
+target_link_libraries(hello_server erpc ${LIBRARIES})
 add_executable(hello_client hello_world/client.cc)
-target_link_libraries(hello_client erpc)
+target_link_libraries(hello_client erpc ${LIBRARIES})
 
 # Compile the tests
 if(TESTING)
