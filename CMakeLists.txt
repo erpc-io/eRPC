@@ -289,13 +289,13 @@ if(DPDK_NEEDED STREQUAL "true")
     include_directories(SYSTEM "${DPDK_WINDIR}\\build")
 
     link_directories("${DPDK_WINDIR}\\build\\lib")
-    set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive -librte_common_iavf.a
-      -librte_bus_pci.a -librte_bus_vdev.a -librte_mempool_ring.a
-      -librte_net_i40e.a -librte_net_ice.a -librte_net_vmxnet3.a
-      -librte_cfgfile.a -librte_hash.a -librte_cmdline.a -librte_pci.a
-      -librte_ethdev.a -librte_meter.a -librte_net.a -librte_mbuf.a
-      -librte_mempool.a -librte_rcu.a -librte_ring.a -librte_eal.a
-      -librte_telemetry.a -librte_kvargs.a -Wl,--no-whole-archive)
+    link_directories("${DPDK_WINDIR}\\build\\drivers")
+
+    set(LIBRARIES ${LIBRARIES} rte_bus_pci rte_bus_vdev rte_common_iavf
+      rte_mempool_ring rte_net_i40e rte_net_ice rte_net_vmxnet3 rte_cfgfile
+      rte_cmdline rte_eal rte_ethdev rte_hash rte_kvargs rte_mbuf rte_mempool
+      rte_meter rte_net rte_pci rte_rcu rte_ring rte_telemetry)
+
   else(MSVC)
     message(STATUS "DPDK for Linux")
     find_library(DPDK_LIB dpdk)
