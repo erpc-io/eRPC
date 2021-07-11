@@ -53,12 +53,20 @@ static std::string pkt_type_str(uint64_t pkt_type) {
 
 struct pkthdr_t {
   static_assert(kHeadroom == 0 || kHeadroom == 40, "");
-  uint8_t headroom_[kHeadroom + 2];   ///< Ethernet L2/L3/L3 headers
-  uint64_t req_type_ : 8;             ///< RPC request type
-  uint64_t msg_size_ : kMsgSizeBits;  ///< Req/resp msg size, excluding headers
-  uint64_t dest_session_num_ : 16;    ///< Destination session number
-  uint64_t pkt_type_ : 2;             ///< The packet type
-  uint64_t pkt_num_ : kPktNumBits;  ///< Monotonically increasing packet number
+  uint8_t headroom_[kHeadroom + 2];  /// Ethernet L2/L3/L3 headers
+
+  // Fit one set of fields in six bytes, left over after (kHeadroom + 2) bytes.
+  // On MSVC, these fields cannot use uint64_t. In the future, we can increase
+  // the bits for msg_size_ by shrinking req_type_.
+
+  uint32_t req_type_ : 8;             /// RPC request type
+  uint32_t msg_size_ : kMsgSizeBits;  /// Req/resp msg size, excluding headers
+  uint16_t dest_session_num_;  /// Session number of the destination endpoint
+
+  // The next set of fields goes in eight bytes total
+
+  uint64_t pkt_type_ : 2;           /// The eRPC packet type
+  uint64_t pkt_num_ : kPktNumBits;  /// Monotonically increasing packet number
 
   /// Request number, carried by all data and control packets for a request.
   uint64_t req_num_ : kReqNumBits;
@@ -140,5 +148,7 @@ struct pkthdr_t {
 
 } __attribute__((packed));
 
+static_assert(sizeof(pkthdr_t) == kHeadroom + 16, "");
 static_assert(sizeof(pkthdr_t) % sizeof(size_t) == 0, "");
+
 }  // namespace erpc
