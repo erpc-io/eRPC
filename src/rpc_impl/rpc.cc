@@ -25,7 +25,9 @@ Rpc<TTr>::Rpc(Nexus *nexus, void *context, uint8_t rpc_id,
       rpc_rto_cycles_(us_to_cycles(kRpcRTOUs, freq_ghz_)),
       rpc_pkt_loss_scan_cycles_(rpc_rto_cycles_ / 10),
       req_func_arr_(nexus->req_func_arr_) {
+#ifndef _WIN32
   rt_assert(!getuid(), "You need to be root to use eRPC");
+#endif
   rt_assert(rpc_id != kInvalidRpcId, "Invalid Rpc ID");
   rt_assert(!nexus->rpc_id_exists(rpc_id), "Rpc ID already exists");
   rt_assert(phy_port < kMaxPhyPorts, "Invalid physical port");
