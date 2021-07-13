@@ -219,7 +219,9 @@ void DpdkTransport::resolve_phy_port() {
 
 uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
 #ifdef _WIN32
+  _unused(phy_port);
   rt_assert(false, "get_port_ipv4_addr not implemented yet");
+  return 0;
 #else
   if (kIsAzure) {
     // This routine gets the IPv4 address of the interface called eth1

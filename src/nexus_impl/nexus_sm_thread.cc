@@ -6,7 +6,6 @@ namespace erpc {
 
 /// Amount of time to block for UDP packets
 static constexpr size_t kSmThreadRxBlockMs = 20;
-static constexpr size_t kUDPBufferSz = MB(4);
 
 void Nexus::sm_thread_func(SmThreadCtx ctx) {
   UDPServer<SmPkt> udp_server(ctx.sm_udp_port_, kSmThreadRxBlockMs);

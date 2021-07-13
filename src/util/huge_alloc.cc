@@ -147,6 +147,7 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
   return Buffer(shm_buf, SIZE_MAX,
                 do_register_bool ? reg_info.lkey_ : UINT32_MAX);
 #else
+  _unused(do_register);
   uint8_t *buf = new uint8_t[size];
   return Buffer(buf, SIZE_MAX, UINT32_MAX);
 #endif

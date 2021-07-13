@@ -23,15 +23,9 @@ add_subdirectory(third_party/gflags)
 # Common sub-projects: asio
 include_directories(SYSTEM third_party/asio/include)
 
-if(MSVC)
-  message("Using MSVC build")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
-else()
-  message("Using non-MSVC build")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
-endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
 
 # Parse the user-exposed options
 if(PERF)
@@ -262,13 +256,13 @@ endif()
 if(DPDK_NEEDED STREQUAL "true")
   message(STATUS "DPDK needed to build eRPC")
 
-  if (MSVC)
+  if (WIN32)
     message(STATUS "DPDK for Windows")
 
     # Set this to your DPDK directory
-    set(DPDK_WINDIR "C:\\Users\\ankalia\\Desktop\\dpdk-21.05")
-    if(NOT EXISTS "${DPDK_WINDIR}\\lib\\eal\\include\\rte_common.h")
-      message(FATAL_ERROR "rte_common.h not found")
+    set(DPDK_WINDIR "${CMAKE_CURRENT_SOURCE_DIR}/../dpdk")
+    if(NOT EXISTS "${DPDK_WINDIR}/lib/eal/include/rte_common.h")
+      message(FATAL_ERROR "rte_common.h not found. DPDK_WINDIR = ${DPDK_WINLIBS}")
       return()
     endif()
 
@@ -279,24 +273,48 @@ if(DPDK_NEEDED STREQUAL "true")
       meter metrics net node pci pdump pipeline port power rawdev rcu regexdev
       reorder rib ring sched security stack table telemetry timer vhost)
     foreach(lib_name IN LISTS DPDK_WINLIBS)
-      include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\${lib_name}")
+      include_directories(SYSTEM "${DPDK_WINDIR}/lib/${lib_name}")
     endforeach()
 
-    include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\eal\\include")
-    include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\eal\\windows\\include")
-    include_directories(SYSTEM "${DPDK_WINDIR}\\lib\\eal\\x86\\include")
-    include_directories(SYSTEM "${DPDK_WINDIR}\\config")
-    include_directories(SYSTEM "${DPDK_WINDIR}\\build")
+    include_directories(SYSTEM "${DPDK_WINDIR}/lib/eal/include")
+    include_directories(SYSTEM "${DPDK_WINDIR}/lib/eal/windows/include")
+    include_directories(SYSTEM "${DPDK_WINDIR}/lib/eal/x86/include")
+    include_directories(SYSTEM "${DPDK_WINDIR}/config")
+    include_directories(SYSTEM "${DPDK_WINDIR}/build")
 
-    link_directories("${DPDK_WINDIR}\\build\\lib")
-    link_directories("${DPDK_WINDIR}\\build\\drivers")
+    link_directories("${DPDK_WINDIR}/build/lib")
+    link_directories("${DPDK_WINDIR}/build/drivers")
 
-    set(LIBRARIES ${LIBRARIES} rte_bus_pci rte_bus_vdev rte_common_iavf
-      rte_mempool_ring rte_net_i40e rte_net_ice rte_net_vmxnet3 rte_cfgfile
-      rte_cmdline rte_eal rte_ethdev rte_hash rte_kvargs rte_mbuf rte_mempool
-      rte_meter rte_net rte_pci rte_rcu rte_ring rte_telemetry)
+    set(LIBRARIES
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_cfgfile.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_hash.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_cmdline.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_pci.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_ethdev.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_meter.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_net.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_mbuf.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_mempool.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_rcu.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_ring.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_eal.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_telemetry.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_kvargs.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_common_iavf.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_bus_pci.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_bus_vdev.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_common_mlx5.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_mempool_ring.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_net_i40e.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_net_ice.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_net_mlx5.a"
+      "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/drivers/librte_net_vmxnet3.a"
+      "-lws2_32" "-lmincore" "-ladvapi32" "-lsetupapi" "-ldbghelp"
+      "C:/Program Files/Mellanox/MLNX_WinOF2_DevX_SDK/lib/mlx5devx.lib"
+      "-Wl,/SUBSYSTEM:CONSOLE" "-lkernel32" "-luser32" "-lgdi32" "-lwinspool"
+      "-lshell32" "-lole32" "-loleaut32" "-luuid" "-lcomdlg32")
 
-  else(MSVC)
+  else(WIN32)
     message(STATUS "DPDK for Linux")
     find_library(DPDK_LIB dpdk)
     if(NOT DPDK_LIB)
@@ -315,13 +333,13 @@ if(DPDK_NEEDED STREQUAL "true")
       message(FATAL_ERROR "DPDK include directory not found")
     endif()
     include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
-  endif(MSVC)
+  endif(WIN32)
 else()
   message(STATUS "DPDK not needed to build eRPC")
 endif()
 
 set(LIBRARIES ${LIBRARIES} gflags hdr_histogram_static)
-if(NOT MSVC)
+if(NOT WIN32)
   set(LIBRARIES ${LIBRARIES} rt numa pthread)
 endif()
 
@@ -329,7 +347,7 @@ endif()
 add_library(erpc ${SOURCES})
 
 if(DPDK_NEEDED STREQUAL "true")
-  if (NOT MSVC)
+  if (NOT WIN32)
     # Build the eRPC DPDK management daemon for Linux only
     add_executable(erpc_dpdk_daemon
       src/transport_impl/dpdk/dpdk_daemon.cc
