@@ -6,14 +6,14 @@
 
 void app_cont_func(void *, void *);  // Forward declaration
 
-/// Generate the random key for this seed
-void key_gen(size_t seed, uint8_t *key) {
+static constexpr bool kAppVerbose = false;
+
+// Generate the key for this key index
+void key_gen(size_t index, uint8_t *key) {
+  static_assert(MtIndex::kKeySize >= 2 * sizeof(uint64_t), "");
   auto *key_64 = reinterpret_cast<uint64_t *>(key);
-  key_64[0] = CityHash64(reinterpret_cast<const char *>(&seed), sizeof(size_t));
-  for (size_t i = 1; i < MtIndex::kKeySize / sizeof(uint64_t); i++) {
-    key_64[i] = CityHash64(reinterpret_cast<const char *>(&key_64[i - 1]),
-                           sizeof(size_t));
-  }
+  key_64[0] = 10;
+  key_64[1] = index * 8192;
 }
 
 /// Return the pre-known quantity stored in each 32-bit chunk of the value for
@@ -125,6 +125,7 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
 
   if (kAppVerbose) {
     printf("main: Enqueuing request with msgbuf_idx %zu.\n", msgbuf_idx);
+    sleep(1);
   }
 
   c->rpc_->enqueue_request(0, req.req_type, &req_msgbuf,
@@ -284,30 +285,33 @@ void server_thread_func(size_t thread_id, erpc::Nexus *nexus, MtIndex *mti,
  * @param thread_id Index of this thread among the threads doing population
  * @param mti The Masstree index
  * @param ti The Masstree threadinfo for this thread
+ * @param shuffled_key_indices Indexes of the keys to be inserted, in order
  * @param num_cores Number of threads doing population
  */
 void masstree_populate_func(size_t thread_id, MtIndex *mti, threadinfo_t *ti,
+                            const std::vector<size_t> *shuffled_key_indices,
                             size_t num_cores) {
   const size_t num_keys_to_insert_this_thread = FLAGS_num_keys / num_cores;
   size_t num_keys_inserted_this_thread = 0;
 
   for (size_t i = 0; i < FLAGS_num_keys; i++) {
-    if (i % num_cores != thread_id) continue;
+    if (i % num_cores != thread_id) continue;  // Not this thread's job
 
-    const uint32_t req_seed = i;
+    const uint32_t key_index = shuffled_key_indices->at(i);
     uint8_t key[MtIndex::kKeySize];
     uint8_t value[MtIndex::kValueSize];
-    key_gen(req_seed, key);
+    key_gen(key_index, key);
 
     auto *value_32 = reinterpret_cast<uint32_t *>(value);
     for (size_t j = 0; j < MtIndex::kValueSize / sizeof(uint32_t); j++) {
-      value_32[j] = get_value32_for_seed(req_seed);
+      value_32[j] = get_value32_for_seed(key_index);
     }
 
     if (kAppVerbose) {
       fprintf(stderr, "PUT: Key: [");
-      for (size_t j = 0; j < MtIndex::kKeySize; j++) {
-        fprintf(stderr, "%u ", key[j]);
+      const uint64_t *key_64 = reinterpret_cast<uint64_t *>(key);
+      for (size_t j = 0; j < MtIndex::kKeySize / sizeof(uint64_t); j++) {
+        fprintf(stderr, "%zu ", key_64[j]);
       }
       fprintf(stderr, "] Value: [");
       for (size_t j = 0; j < MtIndex::kValueSize; j++) {
@@ -355,7 +359,7 @@ int main(int argc, char **argv) {
     mti.setup(ti);
 
     // Create a thread_info for every core, we'll use only some of them for
-    // performance measurement
+    // the actual benchmark
     const size_t num_cores = static_cast<size_t>(sysconf(_SC_NPROCESSORS_ONLN));
     auto ti_arr = new threadinfo_t *[num_cores];
     for (size_t i = 0; i < num_cores; i++) {
@@ -366,12 +370,28 @@ int main(int argc, char **argv) {
     {
       printf("main: Populating masstree with %zu keys from %zu cores\n",
              FLAGS_num_keys, FLAGS_num_population_threads);
+
+      printf("main: Shuffling key insertion order\n");
+      std::vector<size_t> shuffled_key_indices;
+      shuffled_key_indices.reserve(FLAGS_num_keys);
+
+      // Populate and shuffle the order in which keys will be inserted
+      {
+        for (size_t i = 0; i < FLAGS_num_keys; i++) {
+          shuffled_key_indices.push_back(i);
+        }
+        auto rng = std::default_random_engine{};
+        std::shuffle(std::begin(shuffled_key_indices),
+                     std::end(shuffled_key_indices), rng);
+      }
+
+      printf("main: Launching threads to populate Masstree\n");
       std::vector<std::thread> populate_thread_arr(
           FLAGS_num_population_threads);
       for (size_t i = 0; i < FLAGS_num_population_threads; i++) {
         populate_thread_arr[i] =
             std::thread(masstree_populate_func, i, &mti, ti_arr[i],
-                        FLAGS_num_population_threads);
+                        &shuffled_key_indices, FLAGS_num_population_threads);
       }
       for (size_t i = 0; i < FLAGS_num_population_threads; i++)
         populate_thread_arr[i].join();

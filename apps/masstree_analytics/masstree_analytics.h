@@ -10,14 +10,13 @@
 #include "util/numautils.h"
 #include "util/timer.h"
 
-static constexpr bool kAppVerbose = false;
 static constexpr size_t kAppPointReqType = 1;
 static constexpr size_t kAppRangeReqType = 2;
 static constexpr size_t kAppEvLoopMs = 500;
 
 // Workload params
 static constexpr bool kBypassMasstree = false;  // Bypass Masstree?
-static constexpr size_t kAppMaxReqWindow = 16;   // Max pending reqs per client
+static constexpr size_t kAppMaxReqWindow = 16;  // Max pending reqs per client
 
 // Globals
 volatile sig_atomic_t ctrl_c_pressed = 0;
@@ -55,12 +54,16 @@ struct wire_req_t {
     ret << "[Type " << (req_type == kAppPointReqType ? "point" : "range")
         << ", key: ";
     if (req_type == kAppPointReqType) {
-      for (size_t i = 0; i < MtIndex::kKeySize; i++) {
-        ret << std::to_string(point_req.key[i]) << " ";
+      const uint64_t *key_64 =
+          reinterpret_cast<const uint64_t *>(point_req.key);
+      for (size_t i = 0; i < MtIndex::kKeySize / sizeof(uint64_t); i++) {
+        ret << std::to_string(key_64[i]) << " ";
       }
     } else {
+      const uint64_t *key_64 =
+          reinterpret_cast<const uint64_t *>(point_req.key);
       for (size_t i = 0; i < MtIndex::kKeySize; i++) {
-        ret << std::to_string(range_req.key[i]) << " ";
+        ret << std::to_string(key_64[i]) << " ";
       }
     }
     ret << "]";
@@ -126,7 +129,7 @@ class AppContext : public BasicAppContext {
 
   struct {
     erpc::ChronoTimer tput_timer;  // Throughput measurement start
-    app_stats_t *app_stats;  // Common stats array for all threads
+    app_stats_t *app_stats;        // Common stats array for all threads
 
     erpc::Latency point_latency;  // Latency of point requests (factor = 10)
     erpc::Latency range_latency;  // Latency of point requests (factor = 1)
