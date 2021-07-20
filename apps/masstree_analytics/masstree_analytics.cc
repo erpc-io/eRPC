@@ -335,6 +335,8 @@ void masstree_populate_func(size_t thread_id, MtIndex *mti, threadinfo_t *ti,
         }
       }
     }
+
+    if (ctrl_c_pressed == 1) break;
   }
 }
 
