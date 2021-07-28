@@ -220,10 +220,12 @@ void DpdkTransport::resolve_phy_port() {
 uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
 #ifdef _WIN32
   _unused(phy_port);
+  struct rte_ether_addr mac;
+  rte_eth_macaddr_get(phy_port, &mac);
 
   // Assumption: ipconfig.exe reports two interfaces, and the second interface
   // is the accelerated NIC
-  if (resolve_.mac_addr_[5] == 0x8f) {
+  if (mac.addr_bytes[5] == 0x8f) {
     fprintf(stderr, "Returning hard-coded IP address 10.0.0.9\n");
     return ipv4_from_str("10.0.0.9");
   } else {
