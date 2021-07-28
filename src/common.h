@@ -66,6 +66,8 @@ static std::string trim_hostname(const std::string hostname) {
 }
 
 #ifndef _WIN32
+static constexpr bool kIsWindows = false;
+
 /// Check a condition at runtime. If the condition is false, throw exception.
 static inline void rt_assert(bool condition, std::string throw_str, char *s) {
   if (unlikely(!condition)) {
@@ -89,6 +91,8 @@ static inline void rt_assert(bool condition) {
   if (unlikely(!condition)) throw std::runtime_error("Error");
 }
 #else
+static constexpr bool kIsWindows = true;
+
 static inline void rt_assert(bool condition, std::string throw_str, char *s) {
   if (unlikely(!condition)) {
     fprintf(stderr, "%s %s\n", throw_str.c_str(), s);

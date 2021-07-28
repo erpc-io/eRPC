@@ -51,11 +51,16 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
   rte_eth_conf eth_conf;
   memset(&eth_conf, 0, sizeof(eth_conf));
 
-  eth_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
-  eth_conf.lpbk_mode = 1;
-  eth_conf.rx_adv_conf.rss_conf.rss_key = const_cast<uint8_t *>(kDefaultRssKey);
-  eth_conf.rx_adv_conf.rss_conf.rss_key_len = 40;
-  eth_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_UDP;
+  if (!kIsWindows) {
+    eth_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+    eth_conf.lpbk_mode = 1;
+    eth_conf.rx_adv_conf.rss_conf.rss_key =
+        const_cast<uint8_t *>(kDefaultRssKey);
+    eth_conf.rx_adv_conf.rss_conf.rss_key_len = 40;
+    eth_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_UDP;
+  } else {
+    eth_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
+  }
 
   eth_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
   eth_conf.txmode.offloads = kOffloads;
@@ -78,10 +83,6 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
     rte_eth_rxconf eth_rx_conf;
     memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
     eth_rx_conf.rx_thresh.pthresh = 8;
-    eth_rx_conf.rx_thresh.hthresh = 0;
-    eth_rx_conf.rx_thresh.wthresh = 0;
-    eth_rx_conf.rx_free_thresh = 0;
-    eth_rx_conf.rx_drop_en = 0;
 
     int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
                                      &eth_rx_conf, mempool);
@@ -91,10 +92,6 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
     rte_eth_txconf eth_tx_conf;
     memset(&eth_tx_conf, 0, sizeof(eth_tx_conf));
     eth_tx_conf.tx_thresh.pthresh = 32;
-    eth_tx_conf.tx_thresh.hthresh = 0;
-    eth_tx_conf.tx_thresh.wthresh = 0;
-    eth_tx_conf.tx_free_thresh = 0;
-    eth_tx_conf.tx_rs_thresh = 0;
     eth_tx_conf.offloads = eth_conf.txmode.offloads;
 
     ret = rte_eth_tx_queue_setup(phy_port, i, kNumTxRingDesc, numa_node,
