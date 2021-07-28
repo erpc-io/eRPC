@@ -166,11 +166,13 @@ void Rpc<TTr>::process_large_req_one_st(SSlot *sslot, const pkthdr_t *pkthdr) {
   bool in_order = is_next_pkt_same_req || is_first_pkt_next_req;
   if (unlikely(!in_order)) {
     char issue_msg[kMaxIssueMsgLen];
+    // XXX: The static_cast for pkt_num_ is a hack for compiling with clang
     sprintf(issue_msg,
             "Rpc %u, lsn %u: Received out-of-order request. "
             "Req/pkt numbers: %zu/%zu (pkt), %zu/%zu (sslot). Action",
             rpc_id_, sslot->session_->local_session_num_, pkthdr->req_num_,
-            pkthdr->pkt_num_, sslot->cur_req_num_, sslot->server_info_.num_rx_);
+            static_cast<size_t>(pkthdr->pkt_num_), sslot->cur_req_num_,
+            sslot->server_info_.num_rx_);
 
     // Only past packets belonging to this request are not dropped
     if (pkthdr->req_num_ != sslot->cur_req_num_ ||

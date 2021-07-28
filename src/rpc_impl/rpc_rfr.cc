@@ -37,12 +37,14 @@ void Rpc<TTr>::process_rfr_st(SSlot *sslot, const pkthdr_t *pkthdr) {
                   (pkthdr->pkt_num_ == si.num_rx_);
   if (unlikely(!in_order)) {
     char issue_msg[kMaxIssueMsgLen];
+    // The static_cast for pkt_num_ is a hack for compiling with clang
     sprintf(issue_msg,
             "Rpc %u, lsn %u (%s): Received out-of-order RFR. "
             "Pkt = %zu/%zu. cur_req_num = %zu, num_rx = %zu. Action",
             rpc_id_, sslot->session_->local_session_num_,
             sslot->session_->get_remote_hostname().c_str(), pkthdr->req_num_,
-            pkthdr->pkt_num_, sslot->cur_req_num_, si.num_rx_);
+            static_cast<size_t>(pkthdr->pkt_num_), sslot->cur_req_num_,
+            si.num_rx_);
 
     if (pkthdr->req_num_ < sslot->cur_req_num_ ||
         pkthdr->pkt_num_ > si.num_rx_) {

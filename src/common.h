@@ -65,6 +65,7 @@ static std::string trim_hostname(const std::string hostname) {
   return hostname;
 }
 
+#ifndef _WIN32
 /// Check a condition at runtime. If the condition is false, throw exception.
 static inline void rt_assert(bool condition, std::string throw_str, char *s) {
   if (unlikely(!condition)) {
@@ -87,6 +88,36 @@ static inline void rt_assert(bool condition, std::string throw_str) {
 static inline void rt_assert(bool condition) {
   if (unlikely(!condition)) throw std::runtime_error("Error");
 }
+#else
+static inline void rt_assert(bool condition, std::string throw_str, char *s) {
+  if (unlikely(!condition)) {
+    fprintf(stderr, "%s %s\n", throw_str.c_str(), s);
+    exit(-1);
+  }
+}
+
+static inline void rt_assert(bool condition, const char *throw_str) {
+  if (unlikely(!condition)) {
+    fprintf(stderr, "%s\n", throw_str);
+    exit(-1);
+  }
+}
+
+static inline void rt_assert(bool condition, std::string throw_str) {
+  if (unlikely(!condition)) {
+    fprintf(stderr, "%s\n", throw_str.c_str());
+    exit(-1);
+  }
+}
+
+static inline void rt_assert(bool condition) {
+  if (unlikely(!condition)) {
+    fprintf(stderr, "Error\n");
+    assert(false);
+    exit(-1);
+  }
+}
+#endif
 
 /// Check a condition at runtime. If the condition is false, print error message
 /// and exit.

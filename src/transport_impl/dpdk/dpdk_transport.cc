@@ -220,8 +220,28 @@ void DpdkTransport::resolve_phy_port() {
 uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
 #ifdef _WIN32
   _unused(phy_port);
-  rt_assert(false, "get_port_ipv4_addr not implemented yet");
-  return 0;
+
+  // Assumption: ipconfig.exe reports two interfaces, and the second interface
+  // is the accelerated NIC
+
+  const std::string cmd = "ipconfig.exe | findstr.exe IPv4 | more.exe +2";
+  FILE *pipe = _popen(cmd.c_str(), "r");
+  rt_assert(pipe != nullptr, "Failed to open pipe to execute ipconfig.exe");
+
+  // Read from the pipe in chunks
+  static constexpr size_t kChunkSize = 512;
+  std::string ipconfig_out = "";
+  while (!feof(pipe)) {
+    char buf[kChunkSize];
+    if (fgets(buf, kChunkSize, pipe) != nullptr) ipconfig_out += buf;
+  }
+  _pclose(pipe);
+
+  rt_assert(ipconfig_out.length() > 0,
+            "ipconfig.exe failed to report two interfaces");
+
+  fprintf(stderr, "IPV4 address = %s\n", ipconfig_out.c_str());
+  exit(-1);
 #else
   if (kIsAzure) {
     // This routine gets the IPv4 address of the interface called eth1

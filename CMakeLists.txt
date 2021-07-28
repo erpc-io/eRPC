@@ -6,6 +6,20 @@ include(CMakeDependentOption)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Parse the build type
+if(PERF)
+  message(STATUS "Compilation optimized for performance.")
+  message(STATUS "Debugging is disabled.")
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+  set(TESTING OFF)
+else(PERF)
+  message(STATUS "Compilation not optimized for performance.")
+  message(STATUS "Debugging is enabled. Perf will be low.")
+  set(CMAKE_BUILD_TYPE Debug)
+  SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+  set(TESTING ON)
+endif(PERF)
+
 # Common sub-projects: HdrHistogram
 set(HDR_HISTOGRAM_BUILD_PROGRAMS OFF CACHE BOOL "Minimize HDR histogram build")
 set(HDR_LOG_REQUIRED OFF CACHE BOOL "Disable HDR histogram's log to avoid zlib dependency")
@@ -23,23 +37,10 @@ add_subdirectory(third_party/gflags)
 # Common sub-projects: asio
 include_directories(SYSTEM third_party/asio/include)
 
+# Add additional compilation flags only after adding subprojects
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -Wall -Wextra -Werror -pedantic")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-conversion -Wold-style-cast -Wno-unused-function")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations")
-
-# Parse the user-exposed options
-if(PERF)
-  message(STATUS "Compilation optimized for performance.")
-  message(STATUS "Debugging is disabled.")
-  set(CMAKE_BUILD_TYPE RelWithDebInfo)
-  set(TESTING OFF)
-else(PERF)
-  message(STATUS "Compilation not optimized for performance.")
-  message(STATUS "Debugging is enabled. Perf will be low.")
-  set(CMAKE_BUILD_TYPE Debug)
-  SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
-  set(TESTING ON)
-endif(PERF)
 
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party)
