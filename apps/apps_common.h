@@ -89,7 +89,8 @@ class TmpStat {
                     std::to_string(FLAGS_process_id);
 #else
     // Without the /tmp prefix
-    auto filename = autorun_app + "_stats_" + std::to_string(FLAGS_process_id);
+    auto filename =
+        std::string(autorun_app) + "_stats_" + std::to_string(FLAGS_process_id);
 #endif
 
     printf("Writing stats to file %s\n", filename.c_str());
