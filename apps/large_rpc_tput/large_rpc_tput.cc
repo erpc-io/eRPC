@@ -40,13 +40,13 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
 
   if (kAppVerbose) {
     printf("large_rpc_tput: Thread %zu sending request using msgbuf_idx %zu.\n",
-           c->thread_id, msgbuf_idx);
+           c->thread_id_, msgbuf_idx);
   }
 
   c->req_ts[msgbuf_idx] = erpc::rdtsc();
-  c->rpc->enqueue_request(c->session_num_vec[0], kAppReqType, &req_msgbuf,
-                          &c->resp_msgbuf[msgbuf_idx], app_cont_func,
-                          reinterpret_cast<void *>(msgbuf_idx));
+  c->rpc_->enqueue_request(c->session_num_vec_[0], kAppReqType, &req_msgbuf,
+                           &c->resp_msgbuf[msgbuf_idx], app_cont_func,
+                           reinterpret_cast<void *>(msgbuf_idx));
 
   c->stat_tx_bytes_tot += FLAGS_req_size;
 }
@@ -54,23 +54,23 @@ void send_req(AppContext *c, size_t msgbuf_idx) {
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<AppContext *>(_context);
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
-  uint8_t resp_byte = req_msgbuf->buf[0];
+  uint8_t resp_byte = req_msgbuf->buf_[0];
 
   // Use dynamic response
-  erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
-  resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(FLAGS_resp_size);
+  erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf_;
+  resp_msgbuf = c->rpc_->alloc_msg_buffer_or_die(FLAGS_resp_size);
 
   // Touch the response
   if (kAppServerMemsetResp) {
-    memset(resp_msgbuf.buf, resp_byte, FLAGS_resp_size);
+    memset(resp_msgbuf.buf_, resp_byte, FLAGS_resp_size);
   } else {
-    resp_msgbuf.buf[0] = resp_byte;
+    resp_msgbuf.buf_[0] = resp_byte;
   }
 
   c->stat_rx_bytes_tot += FLAGS_req_size;
   c->stat_tx_bytes_tot += FLAGS_resp_size;
 
-  c->rpc->enqueue_response(req_handle, &resp_msgbuf);
+  c->rpc_->enqueue_response(req_handle, &resp_msgbuf);
 }
 
 void app_cont_func(void *_context, void *_tag) {
@@ -84,7 +84,7 @@ void app_cont_func(void *_context, void *_tag) {
 
   // Measure latency. 1 us granularity is sufficient for large RPC latency.
   double usec = erpc::to_usec(erpc::rdtsc() - c->req_ts[msgbuf_idx],
-                              c->rpc->get_freq_ghz());
+                              c->rpc_->get_freq_ghz());
   c->lat_vec.push_back(usec);
 
   // Check the response
@@ -95,20 +95,20 @@ void app_cont_func(void *_context, void *_tag) {
     bool match = true;
     // Check all response cachelines (checking every byte is slow)
     for (size_t i = 0; i < FLAGS_resp_size; i += 64) {
-      if (resp_msgbuf.buf[i] != kAppDataByte) match = false;
+      if (resp_msgbuf.buf_[i] != kAppDataByte) match = false;
     }
     erpc::rt_assert(match, "Invalid resp data");
   } else {
-    erpc::rt_assert(resp_msgbuf.buf[0] == kAppDataByte, "Invalid resp data");
+    erpc::rt_assert(resp_msgbuf.buf_[0] == kAppDataByte, "Invalid resp data");
   }
 
   c->stat_rx_bytes_tot += FLAGS_resp_size;
 
   // Create a new request clocking this response, and put in request queue
   if (kAppClientMemsetReq) {
-    memset(c->req_msgbuf[msgbuf_idx].buf, kAppDataByte, FLAGS_req_size);
+    memset(c->req_msgbuf[msgbuf_idx].buf_, kAppDataByte, FLAGS_req_size);
   } else {
-    c->req_msgbuf[msgbuf_idx].buf[0] = kAppDataByte;
+    c->req_msgbuf[msgbuf_idx].buf_[0] = kAppDataByte;
   }
 
   send_req(c, msgbuf_idx);
@@ -117,9 +117,10 @@ void app_cont_func(void *_context, void *_tag) {
 // The function executed by each thread in the cluster
 void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   AppContext c;
-  c.thread_id = thread_id;
+  c.thread_id_ = thread_id;
   c.app_stats = app_stats;
-  if (thread_id == 0) c.tmp_stat = new TmpStat(app_stats_t::get_template_str());
+  if (thread_id == 0)
+    c.tmp_stat_ = new TmpStat(app_stats_t::get_template_str());
 
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
   erpc::rt_assert(port_vec.size() > 0);
@@ -128,17 +129,17 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c),
                                   static_cast<uint8_t>(thread_id),
                                   basic_sm_handler, phy_port);
-  rpc.retry_connect_on_invalid_rpc_id = true;
+  rpc.retry_connect_on_invalid_rpc_id_ = true;
   if (erpc::kTesting) rpc.fault_inject_set_pkt_drop_prob_st(FLAGS_drop_prob);
 
-  c.rpc = &rpc;
+  c.rpc_ = &rpc;
 
   // Create the session. Some threads may not create any sessions, and therefore
   // not run the event loop required for other threads to connect them. This
   // is OK because all threads will run the event loop below.
   connect_sessions_func(&c);
 
-  if (c.session_num_vec.size() > 0) {
+  if (c.session_num_vec_.size() > 0) {
     printf("large_rpc_tput: Thread %zu: All sessions connected.\n", thread_id);
   } else {
     printf("large_rpc_tput: Thread %zu: No sessions created.\n", thread_id);
@@ -148,29 +149,28 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
   alloc_req_resp_msg_buffers(&c);
 
   size_t console_ref_tsc = erpc::rdtsc();
-  clock_gettime(CLOCK_REALTIME, &c.tput_t0);
 
   // Any thread that creates a session sends requests
-  if (c.session_num_vec.size() > 0) {
+  if (c.session_num_vec_.size() > 0) {
     for (size_t msgbuf_idx = 0; msgbuf_idx < FLAGS_concurrency; msgbuf_idx++) {
       send_req(&c, msgbuf_idx);
     }
   }
 
-  clock_gettime(CLOCK_REALTIME, &c.tput_t0);
+  c.tput_t0.reset();
   for (size_t i = 0; i < FLAGS_test_ms; i += kAppEvLoopMs) {
     rpc.run_event_loop(kAppEvLoopMs);
     if (unlikely(ctrl_c_pressed == 1)) break;
-    if (c.session_num_vec.size() == 0) continue;  // No stats to print
+    if (c.session_num_vec_.size() == 0) continue;  // No stats to print
 
-    double ns = erpc::ns_since(c.tput_t0);  // Don't rely on kAppEvLoopMs
-    erpc::Timely *timely_0 = c.rpc->get_timely(0);
+    const double ns = c.tput_t0.get_ns();
+    erpc::Timely *timely_0 = c.rpc_->get_timely(0);
 
     // Publish stats
-    auto &stats = c.app_stats[c.thread_id];
+    auto &stats = c.app_stats[c.thread_id_];
     stats.rx_gbps = c.stat_rx_bytes_tot * 8 / ns;
     stats.tx_gbps = c.stat_tx_bytes_tot * 8 / ns;
-    stats.re_tx = c.rpc->get_num_re_tx(c.session_num_vec[0]);
+    stats.re_tx = c.rpc_->get_num_re_tx(c.session_num_vec_[0]);
     stats.rtt_50_us = timely_0->get_rtt_perc(0.50);
     stats.rtt_99_us = timely_0->get_rtt_perc(0.99);
 
@@ -187,7 +187,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     // Reset stats for next iteration
     c.stat_rx_bytes_tot = 0;
     c.stat_tx_bytes_tot = 0;
-    c.rpc->reset_num_re_tx(c.session_num_vec[0]);
+    c.rpc_->reset_num_re_tx(c.session_num_vec_[0]);
     c.lat_vec.clear();
     timely_0->reset_rtt_stats();
 
@@ -196,11 +196,11 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
         "Retransmissions %zu. Packet RTTs: {%.1f, %.1f} us. "
         "RPC latency {%.1f, %.1f}. Timely rate %.1f Gbps. "
         "Credits %zu (best = 32).\n",
-        c.thread_id, stats.rx_gbps, stats.tx_gbps, stats.re_tx, stats.rtt_50_us,
-        stats.rtt_99_us, stats.rpc_50_us, stats.rpc_99_us,
+        c.thread_id_, stats.rx_gbps, stats.tx_gbps, stats.re_tx,
+        stats.rtt_50_us, stats.rtt_99_us, stats.rpc_50_us, stats.rpc_99_us,
         timely_0->get_rate_gbps(), erpc::kSessionCredits);
 
-    if (c.thread_id == 0) {
+    if (c.thread_id_ == 0) {
       app_stats_t accum_stats;
       for (size_t i = 0; i < FLAGS_num_proc_other_threads; i++) {
         accum_stats += c.app_stats[i];
@@ -211,23 +211,23 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
       accum_stats.rtt_99_us /= FLAGS_num_proc_other_threads;
       accum_stats.rpc_50_us /= FLAGS_num_proc_other_threads;
       accum_stats.rpc_99_us /= FLAGS_num_proc_other_threads;
-      c.tmp_stat->write(accum_stats.to_string());
+      c.tmp_stat_->write(accum_stats.to_string());
     }
 
-    clock_gettime(CLOCK_REALTIME, &c.tput_t0);
+    c.tput_t0.reset();
   }
 
   erpc::TimingWheel *wheel = rpc.get_wheel();
-  if (wheel != nullptr && !wheel->record_vec.empty()) {
+  if (wheel != nullptr && !wheel->record_vec_.empty()) {
     const size_t num_to_print = 200;
-    const size_t tot_entries = wheel->record_vec.size();
+    const size_t tot_entries = wheel->record_vec_.size();
     const size_t base_entry = tot_entries * .9;
 
     printf("Printing up to 200 entries toward the end of wheel record\n");
     size_t num_printed = 0;
 
     for (size_t i = base_entry; i < tot_entries; i++) {
-      auto &rec = wheel->record_vec.at(i);
+      auto &rec = wheel->record_vec_.at(i);
       printf("wheel: %s\n",
              rec.to_string(console_ref_tsc, rpc.get_freq_ghz()).c_str());
 

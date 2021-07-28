@@ -72,8 +72,8 @@ class AppContext : public BasicAppContext {
   // >10 ms for 8MB RPCs under congestion. So erpc::Latency doesn't work here.
   std::vector<double> lat_vec;
 
-  struct timespec tput_t0;  // Start time for throughput measurement
-  app_stats_t* app_stats;   // Common stats array for all threads
+  erpc::ChronoTimer tput_t0;  // Start time for throughput measurement
+  app_stats_t* app_stats;     // Common stats array for all threads
 
   size_t stat_rx_bytes_tot = 0;  // Total bytes received
   size_t stat_tx_bytes_tot = 0;  // Total bytes transmitted
@@ -86,11 +86,11 @@ class AppContext : public BasicAppContext {
 // Allocate request and response MsgBuffers
 void alloc_req_resp_msg_buffers(AppContext* c) {
   for (size_t i = 0; i < FLAGS_concurrency; i++) {
-    c->req_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_req_size);
-    c->resp_msgbuf[i] = c->rpc->alloc_msg_buffer_or_die(FLAGS_resp_size);
+    c->req_msgbuf[i] = c->rpc_->alloc_msg_buffer_or_die(FLAGS_req_size);
+    c->resp_msgbuf[i] = c->rpc_->alloc_msg_buffer_or_die(FLAGS_resp_size);
 
     // Fill the request regardless of kAppMemset. This is a one-time thing.
-    memset(c->req_msgbuf[i].buf, kAppDataByte, FLAGS_req_size);
+    memset(c->req_msgbuf[i].buf_, kAppDataByte, FLAGS_req_size);
   }
 }
 
