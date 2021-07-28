@@ -153,7 +153,9 @@ void basic_server_thread_func(Nexus *nexus, uint8_t rpc_id,
   num_servers_up++;
 
   // Wait for all servers to come up
-  while (num_servers_up < num_srv_threads) usleep(1);
+  while (num_servers_up < num_srv_threads) {
+    std::this_thread::sleep_for(std::chrono::microseconds(1));
+  }
   all_servers_ready = true;
 
   // Connect to all other server threads if needed
@@ -268,7 +270,9 @@ void launch_server_client_threads(
   }
 
   // Wait for all servers to be ready before launching client thread
-  while (!all_servers_ready) usleep(1);
+  while (!all_servers_ready) {
+    std::this_thread::sleep_for(std::chrono::microseconds(1));
+  }
 
   std::thread client_thread(client_thread_func, &nexus, num_sessions);
 
@@ -291,7 +295,9 @@ void client_connect_sessions(Nexus *nexus, BasicAppContext &c,
   assert(num_sessions >= 1);
 
   // Wait for all server threads to start
-  while (!all_servers_ready) usleep(1);
+  while (!all_servers_ready) {
+    std::this_thread::sleep_for(std::chrono::microseconds(1));
+  }
 
   c.is_client_ = true;
   c.rpc_ = new Rpc<CTransport>(nexus, static_cast<void *>(&c), kTestClientRpcId,
