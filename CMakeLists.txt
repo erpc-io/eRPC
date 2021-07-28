@@ -17,7 +17,11 @@ else(PERF)
   message(STATUS "Debugging is enabled. Perf will be low.")
   set(CMAKE_BUILD_TYPE Debug)
   SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
-  set(TESTING ON)
+
+  # For now, disable unit tests on Windows
+  if (NOT WIN32)
+    set(TESTING ON)
+  endif()
 endif(PERF)
 
 # Common sub-projects: HdrHistogram
@@ -437,7 +441,6 @@ if(TESTING)
 
   # Utils that don't depend on liberpc. These tests are not run using ctest.
   set(UTIL_TESTS_INDEP
-    hugepage_caching_virt2phy_test
     heartbeat_mgr_test
     rand_test
     misc_test
@@ -445,6 +448,12 @@ if(TESTING)
     timely_test
     numautil_test
     hdr_histogram_test)
+
+  # Non-Windows tests
+  if (NOT WIN32)
+    set(UTIL_TESTS_INDEP ${UTIL_TESTS_INDEP}
+      hugepage_caching_virt2phy_test)
+  endif()
 
   foreach(test_name IN LISTS UTIL_TESTS_INDEP)
     add_executable(${test_name} tests/util_tests/${test_name}.cc)
