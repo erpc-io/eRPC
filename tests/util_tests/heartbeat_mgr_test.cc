@@ -71,8 +71,8 @@ TEST(HeartbeatMgrTest, Basic) {
   //
   // To check that all heartbeats are sent, we encode the sent packets into
   // strings and add them to a set.
-  usleep(2 *
-         to_usec(heartbeat_mgr.hb_send_delta_tsc_, kTestFreqGhz));  // wiggle
+  std::this_thread::sleep_for(std::chrono::microseconds(static_cast<size_t>(
+      2 * to_usec(heartbeat_mgr.hb_send_delta_tsc_, kTestFreqGhz))));  // wiggle
   heartbeat_mgr.do_one(failed_uris);
 
   assert(sent_vec.size() >= 3);
@@ -86,7 +86,8 @@ TEST(HeartbeatMgrTest, Basic) {
   assert(sh.count(std::string(kTestLocalUri) + "-" + "127.0.0.1:2") > 0);
 
   // Test failure timeout for the latter two URIs
-  usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
+  std::this_thread::sleep_for(std::chrono::microseconds(static_cast<size_t>(
+      2 * kTestMachineFailureTimeoutMs * 1000)));  // x2 for wiggle-room
 
   // Receive a heartbeat from remote "127.0.0.1:1".
   //
@@ -103,7 +104,8 @@ TEST(HeartbeatMgrTest, Basic) {
 
   // Now wait for the first URI to time out
   failed_uris.clear();
-  usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
+  std::this_thread::sleep_for(std::chrono::microseconds(static_cast<size_t>(
+      2 * kTestMachineFailureTimeoutMs * 1000)));  // x2 for wiggle-room
   heartbeat_mgr.do_one(failed_uris);
   assert(failed_uris.size() == 1);
   assert(str_vec_contains(failed_uris, "127.0.0.1:1"));
