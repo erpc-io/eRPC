@@ -45,6 +45,9 @@ CMakeScripts
 Makefile
 Testing
 *.cmake
+.ninja_deps
+.ninja_log
+build.ninja
 
 # gdb
 .gdb_history
