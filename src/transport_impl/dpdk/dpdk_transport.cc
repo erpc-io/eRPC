@@ -63,7 +63,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       if (dpdk_proc_type_ == DpdkProcType::kPrimary) {
         ERPC_WARN(
             "Running as primary DPDK process. eRPC DPDK daemon is not "
-            "running.\n");
+                  "running.\n");
 
         // Create a fake memzone
         g_memzone = new ownership_memzone_t();
@@ -85,7 +85,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
         ERPC_WARN(
             "Running as secondary DPDK process. eRPC DPDK daemon is "
-            "running.\n");
+                  "running.\n");
         g_port_initialized[phy_port] = true;
       }
 
@@ -223,7 +223,15 @@ uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
 
   // Assumption: ipconfig.exe reports two interfaces, and the second interface
   // is the accelerated NIC
+  if (resolve_.mac_addr_[5] == 0x8f) {
+    fprintf(stderr, "Returning hard-coded IP address 10.0.0.9\n");
+    return ipv4_from_str("10.0.0.9");
+  } else {
+    fprintf(stderr, "Returning hard-coded IP address 10.0.0.11\n");
+    return ipv4_from_str("10.0.0.11");
+  }
 
+  /*
   const std::string cmd = "ipconfig.exe | findstr.exe IPv4 | more.exe +2";
   FILE *pipe = _popen(cmd.c_str(), "r");
   rt_assert(pipe != nullptr, "Failed to open pipe to execute ipconfig.exe");
@@ -242,6 +250,7 @@ uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
 
   fprintf(stderr, "IPV4 address = %s\n", ipconfig_out.c_str());
   exit(-1);
+  */
 #else
   if (kIsAzure) {
     // This routine gets the IPv4 address of the interface called eth1
@@ -332,6 +341,6 @@ void DpdkTransport::init_mem_reg_funcs() {
   reg_mr_func_ = std::bind(dpdk_reg_mr_wrapper, _1, _2);
   dereg_mr_func_ = std::bind(dpdk_dereg_mr_wrapper, _1);
 }
-}  // namespace erpc
+} // namespace erpc
 
 #endif

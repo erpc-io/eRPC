@@ -34,12 +34,12 @@ static std::string mac_to_string(const uint8_t* mac) {
   return ret.str();
 }
 
-/// Get the network-byte-order IPv4 address from a human-readable IP string
+/// Get the host-byte-order IPv4 address from a human-readable IP string
 static uint32_t ipv4_from_str(const char* ip) {
   uint32_t addr;
-  int ret = inet_pton(AF_INET, ip, &addr);
+  int ret = inet_pton(AF_INET, ip, &addr);  // addr is in network-byte order
   rt_assert(ret == 1, "inet_pton() failed for " + std::string(ip));
-  return addr;
+  return ntohl(addr);
 }
 
 /// Convert a network-byte-order IPv4 address to a human-readable IP string
