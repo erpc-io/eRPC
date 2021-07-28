@@ -84,8 +84,13 @@ class TmpStat {
     char *autorun_app = std::getenv("autorun_app");
     erpc::rt_assert(autorun_app != nullptr, "autorun_app environment invalid");
 
+#ifndef _WIN32
     auto filename = std::string("/tmp/") + autorun_app + "_stats_" +
                     std::to_string(FLAGS_process_id);
+#else
+    // Without the /tmp prefix
+    auto filename = autorun_app + "_stats_" + std::to_string(FLAGS_process_id);
+#endif
 
     printf("Writing stats to file %s\n", filename.c_str());
     stat_file_ = fopen(filename.c_str(), "w");
