@@ -113,7 +113,8 @@ TEST(HeartbeatMgrTest, Basic) {
   // All servers have failed, so no heartbeats should be sent from now
   sent_vec.clear();
   failed_uris.clear();
-  usleep(2 * kTestMachineFailureTimeoutMs * 1000);  // x2 for wiggle-room
+  std::this_thread::sleep_for(std::chrono::microseconds(static_cast<size_t>(
+      2 * kTestMachineFailureTimeoutMs * 1000)));  // x2 for wiggle-room
   heartbeat_mgr.do_one(failed_uris);
   assert(sent_vec.empty());
   assert(failed_uris.empty());
