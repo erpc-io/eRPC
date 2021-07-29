@@ -11,7 +11,6 @@
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
 static constexpr size_t kAppReqType = 1;      // eRPC request type
-static constexpr size_t kAppRespSize = 8;
 static constexpr size_t kAppMinReqSize = 64;
 static constexpr size_t kAppMaxReqSize = 1024;
 
@@ -22,6 +21,7 @@ volatile sig_atomic_t ctrl_c_pressed = 0;
 void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 
 DEFINE_uint64(num_server_processes, 1, "Number of server processes");
+DEFINE_uint64(resp_size, 8, "Size of the server's RPC response in bytes");
 
 class ServerContext : public BasicAppContext {
  public:
@@ -57,7 +57,7 @@ class ClientContext : public BasicAppContext {
 void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
-                                                 kAppRespSize);
+                                                 FLAGS_resp_size);
   // erpc::nano_sleep((c->fast_rand_.next_u32() % 5) * 1000 * 1000, 3.0);
   c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
@@ -70,7 +70,7 @@ void server_func(erpc::Nexus *nexus) {
   ServerContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
                                   basic_sm_handler, phy_port);
-  rpc.set_pre_resp_msgbuf_size(kAppRespSize);
+  rpc.set_pre_resp_msgbuf_size(FLAGS_resp_size);
   c.rpc_ = &rpc;
 
   while (true) {
@@ -121,7 +121,7 @@ inline void send_req(ClientContext &c) {
 
 void app_cont_func(void *_context, void *) {
   auto *c = static_cast<ClientContext *>(_context);
-  assert(c->resp_msgbuf_.get_data_size() == kAppRespSize);
+  assert(c->resp_msgbuf_.get_data_size() == FLAGS_resp_size);
 
   if (kAppVerbose) {
     printf("Latency: Received response of size %zu bytes\n",
