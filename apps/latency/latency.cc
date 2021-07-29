@@ -105,7 +105,7 @@ inline void send_req(ClientContext &c) {
     if (c.req_size_ > kAppMaxReqSize) c.req_size_ = kAppMinReqSize;
 
     c.rpc_->resize_msg_buffer(&c.req_msgbuf_, c.req_size_);
-    c.rpc_->resize_msg_buffer(&c.resp_msgbuf_, c.req_size_);
+    c.rpc_->resize_msg_buffer(&c.resp_msgbuf_, FLAGS_resp_size);
   }
 
   c.start_tsc_ = erpc::rdtsc();
@@ -152,9 +152,7 @@ void client_func(erpc::Nexus *nexus) {
   c.req_size_ = kAppMinReqSize;
 
   c.req_msgbuf_ = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
-  c.resp_msgbuf_ = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
-  c.rpc_->resize_msg_buffer(&c.req_msgbuf_, c.req_size_);
-  c.rpc_->resize_msg_buffer(&c.resp_msgbuf_, c.req_size_);
+  c.resp_msgbuf_ = rpc.alloc_msg_buffer_or_die(FLAGS_resp_size);
 
   connect_sessions(c);
 
