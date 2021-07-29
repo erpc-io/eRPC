@@ -83,7 +83,7 @@ static std::vector<size_t> get_lcores_for_numa_node(size_t numa_node) {
   rt_assert(numa_node == 0,
             "eRPC/Windows currently supports only one NUMA node");
   std::vector<size_t> ret;
-  for (size_t i = 0; i < get_lcores_for_numa_node(); i++) ret.push_back(i);
+  for (size_t i = 0; i < num_lcores_per_numa_node(); i++) ret.push_back(i);
   return ret;
 }
 
@@ -93,7 +93,7 @@ static void bind_to_core(std::thread &thread, size_t numa_node,
                          size_t numa_local_index) {
   rt_assert(numa_node == 0,
             "eRPC/Windows currently supports only one NUMA node");
-  rt_assert(numa_local_index < get_lcores_for_numa_node() and
+  rt_assert(numa_local_index < num_lcores_per_numa_node() and
                 numa_local_index < 8 * sizeof(DWORD_PTR),
             "Requested core index is too high");
 
