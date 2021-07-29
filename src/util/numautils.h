@@ -7,6 +7,8 @@
 
 #ifdef __linux__
 #include <numa.h>
+#else
+#include <windows.h>
 #endif
 
 namespace erpc {
@@ -34,7 +36,8 @@ static std::vector<size_t> get_lcores_for_numa_node(size_t numa_node) {
   return ret;
 }
 
-/// Bind \p thread to core with index \p numa_local_index on \p numa_node
+/// Bind this thread to the core with index numa_local_index on the socket =
+/// numa_node
 static void bind_to_core(std::thread &thread, size_t numa_node,
                          size_t numa_local_index) {
   cpu_set_t cpuset;
@@ -72,7 +75,9 @@ static void clear_affinity_for_process() {
 
 #else
 
-static size_t num_lcores_per_numa_node() { return 1; }
+static size_t num_lcores_per_numa_node() {
+  return std::thread::hardware_concurrency();
+}
 
 static std::vector<size_t> get_lcores_for_numa_node(size_t) {
   std::vector<size_t> ret;
@@ -80,8 +85,27 @@ static std::vector<size_t> get_lcores_for_numa_node(size_t) {
   return ret;
 }
 
-/// Bind \p thread to core with index \p numa_local_index on \p numa_node
-static void bind_to_core(std::thread &, size_t, size_t) { return; }
+/// Bind this thread to the core with index numa_local_index on the socket =
+/// numa_node
+static void bind_to_core(std::thread &thread, size_t numa_node,
+                         size_t numa_local_index) {
+  rt_assert(numa_node == 0,
+            "eRPC/Windows currently supports only one NUMA node");
+  rt_assert(numa_local_index < std::thread::hardware_concurrency() and
+                numa_local_index < 8 * sizeof(DWORD_PTR),
+            "Requested core index is too high");
+
+  ERPC_INFO("eRPC: Binding thread to core %zu\n", numa_local_index);
+
+  const DWORD_PTR dw = SetThreadAffinityMask(thread.native_handle(),
+                                             DWORD_PTR(1) << numa_local_index);
+  if (dw == 0) {
+    ERPC_ERROR(
+        "eRPC: SetThreadAffinityMask failed with error %lu. Ignoring, but this "
+        "can cause very low performance.\n",
+        GetLastError());
+  }
+}
 
 /// Reset this process's core mask to be all cores
 static void clear_affinity_for_process() { return; }
