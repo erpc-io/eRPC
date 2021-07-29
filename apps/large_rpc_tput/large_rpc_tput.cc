@@ -194,11 +194,12 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     timely_0->reset_rtt_stats();
 
     printf(
-        "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps. "
-        "Retransmissions %zu. Packet RTTs: {%.1f, %.1f} us. "
+        "large_rpc_tput: Thread %zu: Tput {RX %.2f (%zu), TX %.2f (%zu)} "
+        "Gbps (IOPS). Retransmissions %zu. Packet RTTs: {%.1f, %.1f} us. "
         "RPC latency {%.1f 50th, %.1f 99th, %.1f 99.9th}. Timely rate %.1f "
         "Gbps. Credits %zu (best = 32).\n",
-        c.thread_id_, stats.rx_gbps, stats.tx_gbps, stats.re_tx,
+        c.thread_id_, stats.rx_gbps, c.stat_rx_bytes_tot / FLAGS_resp_size,
+        stats.tx_gbps, c.stat_tx_bytes_tot / FLAGS_req_size, stats.re_tx,
         stats.rtt_50_us, stats.rtt_99_us, stats.rpc_50_us, stats.rpc_99_us,
         stats.rpc_999_us, timely_0->get_rate_gbps(), erpc::kSessionCredits);
 
