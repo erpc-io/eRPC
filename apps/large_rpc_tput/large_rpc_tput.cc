@@ -186,13 +186,6 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
       stats.rpc_999_us = kAppEvLoopMs * 1000;
     }
 
-    // Reset stats for next iteration
-    c.stat_rx_bytes_tot = 0;
-    c.stat_tx_bytes_tot = 0;
-    c.rpc_->reset_num_re_tx(c.session_num_vec_[0]);
-    c.lat_vec.clear();
-    timely_0->reset_rtt_stats();
-
     printf(
         "large_rpc_tput: Thread %zu: Tput {RX %.2f (%zu), TX %.2f (%zu)} "
         "Gbps (IOPS). Retransmissions %zu. Packet RTTs: {%.1f, %.1f} us. "
@@ -202,6 +195,13 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
         stats.tx_gbps, c.stat_tx_bytes_tot / FLAGS_req_size, stats.re_tx,
         stats.rtt_50_us, stats.rtt_99_us, stats.rpc_50_us, stats.rpc_99_us,
         stats.rpc_999_us, timely_0->get_rate_gbps(), erpc::kSessionCredits);
+
+    // Reset stats for next iteration
+    c.stat_rx_bytes_tot = 0;
+    c.stat_tx_bytes_tot = 0;
+    c.rpc_->reset_num_re_tx(c.session_num_vec_[0]);
+    c.lat_vec.clear();
+    timely_0->reset_rtt_stats();
 
     if (c.thread_id_ == 0) {
       app_stats_t accum_stats;
