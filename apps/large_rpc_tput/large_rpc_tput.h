@@ -35,12 +35,13 @@ struct app_stats_t {
   double rtt_99_us;  // 99th percentile packet RTT
   double rpc_50_us;
   double rpc_99_us;
-  size_t pad[1];
+  double rpc_999_us;
 
   app_stats_t() { memset(this, 0, sizeof(app_stats_t)); }
 
   static std::string get_template_str() {
-    return "rx_gbps tx_gbps re_tx rtt_50_us rtt_99_us rpc_50_us rpc_99_us";
+    return "rx_gbps tx_gbps re_tx rtt_50_us rtt_99_us rpc_50_us rpc_99_us "
+           "rpc_999_us";
   }
 
   /// Return a space-separated string of all stats
@@ -48,7 +49,7 @@ struct app_stats_t {
     return std::to_string(rx_gbps) + " " + std::to_string(tx_gbps) + " " +
            std::to_string(re_tx) + " " + std::to_string(rtt_50_us) + " " +
            std::to_string(rtt_99_us) + " " + std::to_string(rpc_50_us) + " " +
-           std::to_string(rpc_99_us);
+           std::to_string(rpc_99_us) + " " + std::to_string(rpc_999_us);
   }
 
   /// Accumulate stats
@@ -60,6 +61,7 @@ struct app_stats_t {
     this->rtt_99_us += rhs.rtt_99_us;
     this->rpc_50_us += rhs.rpc_50_us;
     this->rpc_99_us += rhs.rpc_99_us;
+    this->rpc_999_us += rhs.rpc_999_us;
     return *this;
   }
 };

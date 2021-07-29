@@ -178,10 +178,12 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
       std::sort(c.lat_vec.begin(), c.lat_vec.end());
       stats.rpc_50_us = c.lat_vec[c.lat_vec.size() * 0.50];
       stats.rpc_99_us = c.lat_vec[c.lat_vec.size() * 0.99];
+      stats.rpc_999_us = c.lat_vec[c.lat_vec.size() * 0.999];
     } else {
       // Even if no RPCs completed, we need retransmission counter
       stats.rpc_50_us = kAppEvLoopMs * 1000;
       stats.rpc_99_us = kAppEvLoopMs * 1000;
+      stats.rpc_999_us = kAppEvLoopMs * 1000;
     }
 
     // Reset stats for next iteration
@@ -194,11 +196,11 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
     printf(
         "large_rpc_tput: Thread %zu: Tput {RX %.2f, TX %.2f} Gbps. "
         "Retransmissions %zu. Packet RTTs: {%.1f, %.1f} us. "
-        "RPC latency {%.1f, %.1f}. Timely rate %.1f Gbps. "
-        "Credits %zu (best = 32).\n",
+        "RPC latency {%.1f 50th, %.1f 99th, %.1f 99.9th}. Timely rate %.1f "
+        "Gbps. Credits %zu (best = 32).\n",
         c.thread_id_, stats.rx_gbps, stats.tx_gbps, stats.re_tx,
         stats.rtt_50_us, stats.rtt_99_us, stats.rpc_50_us, stats.rpc_99_us,
-        timely_0->get_rate_gbps(), erpc::kSessionCredits);
+        stats.rpc_999_us, timely_0->get_rate_gbps(), erpc::kSessionCredits);
 
     if (c.thread_id_ == 0) {
       app_stats_t accum_stats;
@@ -211,6 +213,7 @@ void thread_func(size_t thread_id, app_stats_t *app_stats, erpc::Nexus *nexus) {
       accum_stats.rtt_99_us /= FLAGS_num_proc_other_threads;
       accum_stats.rpc_50_us /= FLAGS_num_proc_other_threads;
       accum_stats.rpc_99_us /= FLAGS_num_proc_other_threads;
+      accum_stats.rpc_999_us /= FLAGS_num_proc_other_threads;
       c.tmp_stat_->write(accum_stats.to_string());
     }
 
