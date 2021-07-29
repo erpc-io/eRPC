@@ -70,6 +70,7 @@ void server_func(erpc::Nexus *nexus) {
   ServerContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
                                   basic_sm_handler, phy_port);
+  rpc.set_pre_resp_msgbuf_size(kAppRespSize);
   c.rpc_ = &rpc;
 
   while (true) {
