@@ -160,7 +160,8 @@ void client_func(erpc::Nexus *nexus) {
          FLAGS_process_id);
   printf(
       "req_size median_us 5th_us 99th_us 99.9th_us 99.99th_us 99.999th_us "
-      "99.9999th_us max_us [total_samples, total_time]\n");
+      "99.9999th_us max_us [new samples, total_samples in distribution, "
+      "total_time]\n");
 
   send_req(c);
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
@@ -175,7 +176,7 @@ void client_func(erpc::Nexus *nexus) {
     } else {
       printf(
           "%zu %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f "
-          "[%zu samples, %zu seconds]\n",
+          "[%zu new samples, %zu total samples, %zu seconds]\n",
           c.req_size_,
           hdr_value_at_percentile(c.latency_hist_, 50.0) / kAppLatFac,
           hdr_value_at_percentile(c.latency_hist_, 5.0) / kAppLatFac,
@@ -184,7 +185,9 @@ void client_func(erpc::Nexus *nexus) {
           hdr_value_at_percentile(c.latency_hist_, 99.99) / kAppLatFac,
           hdr_value_at_percentile(c.latency_hist_, 99.999) / kAppLatFac,
           hdr_value_at_percentile(c.latency_hist_, 99.9999) / kAppLatFac,
-          hdr_max(c.latency_hist_) / kAppLatFac, c.latency_samples_, i / 1000);
+          hdr_max(c.latency_hist_) / kAppLatFac,
+          c.latency_samples_ - c.latency_samples_prev_, c.latency_samples_,
+          i / 1000);
     }
     fflush(stdout);
 
