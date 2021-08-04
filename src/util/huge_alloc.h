@@ -151,9 +151,14 @@ class HugeAlloc {
    * @param size The size of the buffer, which may or may not be a class size
    */
   inline size_t get_class(size_t size) {
+#ifdef _WIN32
+    // XXX: There's to be an issue with asm(bsrl) used for fast get_class()
+    return get_class_slow(size);
+#else
     assert(size >= 1 && size <= k_max_class_size);
     // Use bit shift instead of division to make debug-mode code a faster
     return msb_index(static_cast<int>((size - 1) >> k_min_class_bit_shift));
+#endif
   }
 
   /// Reference function for the optimized \p get_class function above
