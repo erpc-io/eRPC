@@ -232,7 +232,7 @@ static std::vector<std::string> ipconfig_helper_split(std::string input,
 
 uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
   _unused(phy_port);
-#ifndef _WIN32
+#ifdef _WIN32
   // Hack for now: Get the IP address of the second NIC using ipconfig.exe
   std::string ipconfig_out = "";
   {
