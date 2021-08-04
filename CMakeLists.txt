@@ -317,7 +317,7 @@ if(DPDK_NEEDED STREQUAL "true")
       "-lws2_32" "-lmincore" "-ladvapi32" "-lsetupapi" "-ldbghelp"
       "C:/Program Files/Mellanox/MLNX_WinOF2_DevX_SDK/lib/mlx5devx.lib"
       "-Wl,/SUBSYSTEM:CONSOLE" "-lkernel32" "-luser32" "-lgdi32" "-lwinspool"
-      "-lshell32" "-lole32" "-loleaut32" "-luuid" "-lcomdlg32")
+      "-lshell32" "-lole32" "-loleaut32" "-luuid" "-lcomdlg32" "-liphlpapi")
 
   else(WIN32)
     message(STATUS "DPDK for Linux")

@@ -63,7 +63,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       if (dpdk_proc_type_ == DpdkProcType::kPrimary) {
         ERPC_WARN(
             "Running as primary DPDK process. eRPC DPDK daemon is not "
-                  "running.\n");
+            "running.\n");
 
         // Create a fake memzone
         g_memzone = new ownership_memzone_t();
@@ -85,7 +85,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
 
         ERPC_WARN(
             "Running as secondary DPDK process. eRPC DPDK daemon is "
-                  "running.\n");
+            "running.\n");
         g_port_initialized[phy_port] = true;
       }
 
@@ -173,7 +173,7 @@ void DpdkTransport::resolve_phy_port() {
 
   const std::string drv_name = dev_info.driver_name;
   rt_assert(drv_name == "net_mlx4" or drv_name == "net_mlx5" or
-            drv_name == "mlx5_pci",
+                drv_name == "mlx5_pci",
             "eRPC supports only mlx4 or mlx5 devices with DPDK");
 
   if (std::string(dev_info.driver_name) == "net_mlx4") {
@@ -219,42 +219,60 @@ void DpdkTransport::resolve_phy_port() {
       resolve_.bandwidth_ * 8.0 / (1000 * 1000 * 1000));
 }
 
+/// Tokenize the input string by the delimiter into a vector
+static std::vector<std::string> ipconfig_helper_split(std::string input,
+                                                      char delimiter) {
+  std::vector<std::string> ret;
+  std::stringstream ss(input);
+  std::string token;
+
+  while (getline(ss, token, delimiter)) ret.push_back(token);
+  return ret;
+}
+
 uint32_t DpdkTransport::get_port_ipv4_addr(size_t phy_port) {
-#ifdef _WIN32
   _unused(phy_port);
-  struct rte_ether_addr mac;
-  rte_eth_macaddr_get(phy_port, &mac);
-
-  // Assumption: ipconfig.exe reports two interfaces, and the second interface
-  // is the accelerated NIC
-  if (mac.addr_bytes[5] == 0x8f) {
-    fprintf(stderr, "Returning hard-coded IP address 10.0.0.9\n");
-    return ipv4_from_str("10.0.0.9");
-  } else {
-    fprintf(stderr, "Returning hard-coded IP address 10.0.0.11\n");
-    return ipv4_from_str("10.0.0.11");
-  }
-
-  /*
-  const std::string cmd = "ipconfig.exe | findstr.exe IPv4 | more.exe +2";
-  FILE *pipe = _popen(cmd.c_str(), "r");
-  rt_assert(pipe != nullptr, "Failed to open pipe to execute ipconfig.exe");
-
-  // Read from the pipe in chunks
-  static constexpr size_t kChunkSize = 512;
+#ifndef _WIN32
+  // Hack for now: Get the IP address of the second NIC using ipconfig.exe
   std::string ipconfig_out = "";
-  while (!feof(pipe)) {
-    char buf[kChunkSize];
-    if (fgets(buf, kChunkSize, pipe) != nullptr) ipconfig_out += buf;
+  {
+    const std::string cmd = "ipconfig.exe | findstr.exe IPv4";
+    FILE *pipe = _popen(cmd.c_str(), "r");
+    rt_assert(pipe != nullptr, "Failed to open pipe to run ipconfig.exe");
+
+    // Read from the pipe in chunks
+    static constexpr size_t kChunkSize = 512;
+    while (!feof(pipe)) {
+      char buf[kChunkSize];
+      if (fgets(buf, kChunkSize, pipe) != nullptr) ipconfig_out += buf;
+    }
+    _pclose(pipe);
   }
-  _pclose(pipe);
 
-  rt_assert(ipconfig_out.length() > 0,
-            "ipconfig.exe failed to report two interfaces");
+  // Here, ipconfig_out is a string of the form:
+  // \"   IPv4 Address. . . . . . . . . . . : 10.0.0.8
+  //      IPv4 Address. . . . . . . . . . . : 10.0.0.9\"
+  rt_assert(ipconfig_out.length() > 0, "ipconfig.exe failed to report ifaces");
 
-  fprintf(stderr, "IPV4 address = %s\n", ipconfig_out.c_str());
-  exit(-1);
-  */
+  // Extract the second line
+  const std::vector<std::string> ip_lines =
+      ipconfig_helper_split(ipconfig_out, '\n');
+  rt_assert(ip_lines.size() == 2,
+            "Failed to split ipconfig.exe output into two lines");
+
+  // ip_lines[1] is the string (ex):
+  // \"   IPv4 Address. . . . . . . . . . . : 10.0.0.9\"
+
+  const std::vector<std::string> ip_addr_splits =
+      ipconfig_helper_split(ip_lines[1], ':');
+  rt_assert(ip_addr_splits.size() == 2,
+            "Failed to split IP address line into two with delimiter :");
+
+  // ip_addr_splits[1] is the string (ex):
+  // \" 10.0.0.9\"
+  rt_assert(ip_addr_splits[1].at(0) == ' ',
+            "Expected space at beginning of IP address not found");
+  return ipv4_from_str(ip_addr_splits[1].substr(1).c_str());
 #else
   if (kIsAzure) {
     // This routine gets the IPv4 address of the interface called eth1
@@ -345,6 +363,6 @@ void DpdkTransport::init_mem_reg_funcs() {
   reg_mr_func_ = std::bind(dpdk_reg_mr_wrapper, _1, _2);
   dereg_mr_func_ = std::bind(dpdk_dereg_mr_wrapper, _1);
 }
-} // namespace erpc
+}  // namespace erpc
 
 #endif
