@@ -1,0 +1,6 @@
+*.o
+*.gcno
+*~
+libcraft.so
+libcraft.a
+.travis.yml

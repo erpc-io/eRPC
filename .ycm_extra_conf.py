@@ -47,7 +47,7 @@ flags = [
     '-isystem' + str(home_dir) + '/eRPC/third_party/asio/include',
     '-isystem' + str(home_dir) + '/eRPC/third_party/gflags/include',
     '-isystem' + str(home_dir) + '/eRPC/third_party',
-    '-isystem' + str(home_dir) + '/eRPC/apps/smr/willemt',
+    '-isystem' + str(home_dir) + '/eRPC/apps/smr/willemt_raft/include',
     '-I' + str(home_dir) + '/eRPC/src',
     '-I' + str(home_dir) + '/eRPC/third_party/googletest/googletest/include',
     '-I' + str(home_dir) + '/eRPC/mica/src',

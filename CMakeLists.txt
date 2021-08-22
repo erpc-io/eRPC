@@ -229,10 +229,11 @@ else()
 endif()
 
 if(APP STREQUAL "smr")
-  set(LIBRARIES ${LIBRARIES} ${PMEM})
+  set(LIBRARIES ${LIBRARIES} raft ${PMEM})
   include_directories(mica/src)
-  include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/apps/smr/willemt)
-  set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
+  add_subdirectory(${CMAKE_SOURCE_DIR}/apps/smr/willemt_raft)
+  link_directories(${CMAKE_SOURCE_DIR}/apps/smr/willemt_raft)
+  include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/apps/smr/willemt_raft/include)
 elseif(APP STREQUAL "masstree_analytics")
   # CMake-based Masstree library from anujkaliaiitd/masstree-beta
   link_directories(${CMAKE_SOURCE_DIR}/third_party/masstree-beta)
@@ -367,7 +368,7 @@ endif()
 add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES})
 
 if(APP STREQUAL "smr")
-  target_compile_options(${APP} PRIVATE -Wno-class-memaccess -fpermissive)
+  target_compile_options(${APP} PRIVATE -fpermissive)
 endif()
 
 if(PERF)
