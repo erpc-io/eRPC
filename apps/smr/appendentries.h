@@ -17,8 +17,8 @@ struct app_appendentries_t {
   // Serialize the ingredients of an app_appendentries_t into a network buffer
   static void serialize(erpc::MsgBuffer &req_msgbuf, int node_id,
                         msg_appendentries_t *msg_ae) {
-    uint8_t *buf = req_msgbuf.buf;
-    auto *srlz = reinterpret_cast<app_appendentries_t *>(req_msgbuf.buf);
+    uint8_t *buf = req_msgbuf.buf_;
+    auto *srlz = reinterpret_cast<app_appendentries_t *>(req_msgbuf.buf_);
 
     // Copy the whole-message header
     srlz->node_id = node_id;
@@ -39,7 +39,7 @@ struct app_appendentries_t {
       buf += sizeof(client_req_t);
     }
 
-    assert(buf == req_msgbuf.buf + req_msgbuf.get_data_size());
+    assert(buf == req_msgbuf.buf_ + req_msgbuf.get_data_size());
   }
 
   static constexpr size_t kStaticMsgEntryArrSize = 16;
@@ -51,7 +51,7 @@ struct app_appendentries_t {
   static void unpack(const erpc::MsgBuffer *req_msgbuf,
                      msg_entry_t *static_msg_entry_arr,
                      AppMemPool<client_req_t> &log_entry_appdata_pool) {
-    uint8_t *buf = req_msgbuf->buf;
+    uint8_t *buf = req_msgbuf->buf_;
     auto *ae_req = reinterpret_cast<app_appendentries_t *>(buf);
     msg_appendentries_t &msg_ae = ae_req->msg_ae;
     assert(msg_ae.entries == nullptr);
@@ -81,7 +81,7 @@ struct app_appendentries_t {
         buf += sizeof(client_req_t);
       }
 
-      assert(buf == req_msgbuf->buf + req_msgbuf->get_data_size());
+      assert(buf == req_msgbuf->buf_ + req_msgbuf->get_data_size());
     }
   }
 };
@@ -102,7 +102,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   app_appendentries_t::unpack(req_msgbuf, static_msg_entry_arr,
                               c->server.log_entry_appdata_pool);
 
-  auto *ae_req = reinterpret_cast<app_appendentries_t *>(req_msgbuf->buf);
+  auto *ae_req = reinterpret_cast<app_appendentries_t *>(req_msgbuf->buf_);
   msg_appendentries_t &msg_ae = ae_req->msg_ae;
 
   if (kAppVerbose) {
@@ -112,19 +112,19 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
            erpc::get_formatted_time().c_str());
   }
 
-  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf_;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_appendentries_response_t));
 
   // Only the buffers for entries in the append
   int e = raft_recv_appendentries(
       c->server.raft, raft_get_node(c->server.raft, ae_req->node_id), &msg_ae,
-      reinterpret_cast<msg_appendentries_response_t *>(resp_msgbuf.buf));
+      reinterpret_cast<msg_appendentries_response_t *>(resp_msgbuf.buf_));
   erpc::rt_assert(e == 0);
 
   if (msg_ae.entries != static_msg_entry_arr) delete[] msg_ae.entries;
 
   if (kAppTimeEnt) c->server.time_ents.emplace_back(TimeEntType::kSendAeResp);
-  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
 void appendentries_cont(void *, void *);  // Fwd decl
@@ -191,7 +191,8 @@ void appendentries_cont(void *_context, void *_tag) {
 
     int e = raft_recv_appendentries_response(
         c->server.raft, rrt->node,
-        reinterpret_cast<msg_appendentries_response_t *>(rrt->resp_msgbuf.buf));
+        reinterpret_cast<msg_appendentries_response_t *>(
+            rrt->resp_msgbuf.buf_));
     erpc::rt_assert(e == 0);
   } else {
     // The RPC failed. Fall through and call raft_periodic() again.

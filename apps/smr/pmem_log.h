@@ -8,10 +8,35 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
-extern "C" {
-#include <raft/raft.h>
-}
+#include "common.h"
 #include "../apps_common.h"
+
+#ifdef SMR_USE_PMEM
+#include <libpmem.h>
+#else
+// Dummy versions of libpmem functions, to avoid #ifdef SMR_USE_PMEM everywhere
+
+void *pmem_memcpy_persist(void *, const void *, size_t) {
+  erpc::rt_assert(false, "pmem not supported\n");
+  return nullptr;
+}
+
+void *pmem_memset_persist(void *, int, size_t) {
+  erpc::rt_assert(false, "pmem not supported\n");
+  return nullptr;
+}
+
+void *pmem_map_file(const char *, size_t, int,
+                    mode_t , size_t *, int *) {
+  erpc::rt_assert(false, "pmem not supported\n");
+  return nullptr;
+}
+#endif
+
+extern "C" {
+#include <raft.h>
+}
+
 
 // A persistent memory log that stores objects of type T
 template <class T>

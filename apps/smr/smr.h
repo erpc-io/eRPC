@@ -5,13 +5,8 @@
 
 #pragma once
 
-#include <stddef.h>
-extern "C" {
-#include <raft/raft.h>
-}
-
-#include <libpmem.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <set>
@@ -25,6 +20,10 @@ extern "C" {
 
 #include "pmem_log.h"
 #include "util/autorun_helpers.h"
+
+extern "C" {
+#include <raft.h>
+}
 
 static constexpr bool kUsePmem = false;
 

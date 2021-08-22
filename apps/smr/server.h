@@ -79,11 +79,11 @@ void send_client_response(AppContext *c, erpc::ReqHandle *req_handle,
            client_resp.to_string().c_str(), erpc::get_formatted_time().c_str());
   }
 
-  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
-  auto *_client_resp = reinterpret_cast<client_resp_t *>(resp_msgbuf.buf);
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf_;
+  auto *_client_resp = reinterpret_cast<client_resp_t *>(resp_msgbuf.buf_);
   *_client_resp = client_resp;
 
-  c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+  c->rpc->resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
                             sizeof(client_resp_t));
   c->rpc->enqueue_response(req_handle, &resp_msgbuf);
 }
@@ -100,7 +100,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
 
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(client_req_t));
-  const auto *client_req = reinterpret_cast<client_req_t *>(req_msgbuf->buf);
+  const auto *client_req = reinterpret_cast<client_req_t *>(req_msgbuf->buf_);
 
   // Check if it's OK to receive the client's request
   raft_node_t *leader = raft_get_current_leader_node(c->server.raft);
@@ -165,7 +165,7 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   c->rpc = new erpc::Rpc<erpc::CTransport>(
       nexus, static_cast<void *>(c), kAppServerRpcId, sm_handler, kAppPhyPort);
 
-  c->rpc->retry_connect_on_invalid_rpc_id = true;
+  c->rpc->retry_connect_on_invalid_rpc_id_ = true;
 
   // Create a session to each Raft server, excluding self
   for (size_t i = 0; i < FLAGS_num_raft_servers; i++) {

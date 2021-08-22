@@ -229,10 +229,9 @@ else()
 endif()
 
 if(APP STREQUAL "smr")
-  # Raft library from willemt/raft, installed at system-level
   set(LIBRARIES ${LIBRARIES} raft ${PMEM})
-  # MICA
   include_directories(mica/src)
+  include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/apps/smr/willemt)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})
 elseif(APP STREQUAL "masstree_analytics")
   # CMake-based Masstree library from anujkaliaiitd/masstree-beta
@@ -366,6 +365,11 @@ endif()
 # of liberpc. See the hello world example's Makefile for an example of
 # compiling with liberpc.
 add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES})
+
+if(APP STREQUAL "smr")
+  target_compile_options(${APP} PRIVATE -Wno-class-memaccess -fpermissive)
+endif()
+
 if(PERF)
   target_compile_options(${APP} PRIVATE "-flto")
 endif()

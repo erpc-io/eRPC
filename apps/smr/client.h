@@ -50,7 +50,7 @@ void send_req_one(AppContext *c) {
   c->client.req_start_tsc = erpc::rdtsc();
 
   // Format the client's PUT request. Key and value are identical.
-  auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf);
+  auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf_);
   size_t rand_key = c->fast_rand.next_u32() & (kAppNumKeys - 1);
   req->key[0] = rand_key;
   req->value[0] = rand_key;
@@ -88,9 +88,8 @@ void client_cont(void *_context, void *) {
     printf(
         "smr: Latency us = "
         "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f max}. "
-        "Request window = %zu (best 1). Inline size = %zu (best 120).\n",
-        us_min, us_median, us_99, us_999, us_max, erpc::kSessionReqWindow,
-        erpc::CTransport::kMaxInline);
+        "Request window = %zu (best 1).\n",
+        us_min, us_median, us_99, us_999, us_max, erpc::kSessionReqWindow);
     c->client.num_resps = 0;
     c->client.req_us_vec.clear();
   }
@@ -98,7 +97,7 @@ void client_cont(void *_context, void *) {
   if (likely(c->client.resp_msgbuf.get_data_size() > 0)) {
     // The RPC was successful
     auto *client_resp =
-        reinterpret_cast<client_resp_t *>(c->client.resp_msgbuf.buf);
+        reinterpret_cast<client_resp_t *>(c->client.resp_msgbuf.buf_);
 
     if (kAppVerbose) {
       printf("smr: Client received resp %s [%s].\n",
@@ -155,7 +154,7 @@ void client_func(erpc::Nexus *nexus, AppContext *c) {
 
   c->rpc = new erpc::Rpc<erpc::CTransport>(
       nexus, static_cast<void *>(c), kAppClientRpcId, sm_handler, kAppPhyPort);
-  c->rpc->retry_connect_on_invalid_rpc_id = true;
+  c->rpc->retry_connect_on_invalid_rpc_id_ = true;
 
   // Pre-allocate MsgBuffers
   c->client.req_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(client_req_t));

@@ -51,7 +51,7 @@ FixedTable<StaticConfig>::FixedTable(const ::mica::util::Config& config,
     // Zeroes out everything
     erpc::Buffer bucket_buffer =
         alloc->alloc_raw(shm_size, erpc::DoRegister::kFalse);
-    buckets_ = reinterpret_cast<Bucket*>(bucket_buffer.buf);
+    buckets_ = reinterpret_cast<Bucket*>(bucket_buffer.buf_);
     assert(buckets_ != NULL);
     memset(buckets_, 0, shm_size);  // alloc_raw does not give zeroed memory
   }

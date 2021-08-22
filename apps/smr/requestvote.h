@@ -37,17 +37,17 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   const erpc::MsgBuffer *req_msgbuf = req_handle->get_req_msgbuf();
   assert(req_msgbuf->get_data_size() == sizeof(app_requestvote_t));
 
-  auto *rv_req = reinterpret_cast<app_requestvote_t *>(req_msgbuf->buf);
+  auto *rv_req = reinterpret_cast<app_requestvote_t *>(req_msgbuf->buf_);
   printf("smr: Received requestvote request from %s: %s [%s].\n",
          node_id_to_name_map[rv_req->node_id].c_str(),
          msg_requestvote_string(&rv_req->msg_rv).c_str(),
          erpc::get_formatted_time().c_str());
 
-  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf;
+  erpc::MsgBuffer &resp_msgbuf = req_handle->pre_resp_msgbuf_;
   c->rpc->resize_msg_buffer(&resp_msgbuf, sizeof(msg_requestvote_response_t));
 
   auto *rv_resp =
-      reinterpret_cast<msg_requestvote_response_t *>(resp_msgbuf.buf);
+      reinterpret_cast<msg_requestvote_response_t *>(resp_msgbuf.buf_);
 
   // rv_req->msg_rv is valid only for the duration of this handler, which is OK
   // as msg_requestvote_t does not contain any dynamically allocated members.
@@ -61,7 +61,7 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
          msg_requestvote_response_string(rv_resp).c_str(),
          erpc::get_formatted_time().c_str());
 
-  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
+  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
 void requestvote_cont(void *, void *);  // Fwd decl
@@ -86,7 +86,7 @@ static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
   rrt->resp_msgbuf = c->rpc->alloc_msg_buffer_or_die(sizeof(app_requestvote_t));
   rrt->node = node;
 
-  auto *rv_req = reinterpret_cast<app_requestvote_t *>(rrt->req_msgbuf.buf);
+  auto *rv_req = reinterpret_cast<app_requestvote_t *>(rrt->req_msgbuf.buf_);
   rv_req->node_id = c->server.node_id;
   rv_req->msg_rv = *msg_rv;
 
@@ -102,7 +102,7 @@ void requestvote_cont(void *_context, void *_tag) {
   auto *rrt = reinterpret_cast<raft_req_tag_t *>(_tag);
 
   auto *msg_rv_resp =
-      reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf);
+      reinterpret_cast<msg_requestvote_response_t *>(rrt->resp_msgbuf.buf_);
 
   if (likely(rrt->resp_msgbuf.get_data_size() > 0)) {
     // The RPC was successful
