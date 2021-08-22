@@ -126,7 +126,7 @@ void client_cont(void *_context, void *) {
               c->client.leader_idx);
         }
 
-        usleep(200000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         break;
       }
 
@@ -135,7 +135,7 @@ void client_cont(void *_context, void *) {
             "smr: Client request to server %zu failed with code = "
             "try again. Trying again after 200 ms.\n",
             c->client.leader_idx);
-        usleep(200000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         break;
       }
     }

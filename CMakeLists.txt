@@ -367,10 +367,6 @@ endif()
 # compiling with liberpc.
 add_executable(${APP} apps/${APP}/${APP}.cc ${APP_ADDITIONAL_SOURCES} ${SOURCES})
 
-if(APP STREQUAL "smr")
-  target_compile_options(${APP} PRIVATE -fpermissive)
-endif()
-
 if(PERF)
   target_compile_options(${APP} PRIVATE "-flto")
 endif()
