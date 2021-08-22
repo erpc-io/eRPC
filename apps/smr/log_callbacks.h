@@ -73,7 +73,7 @@ static int smr_raft_persist_vote_cb(raft_server_t *, void *udata,
 static int smr_raft_persist_term_cb(raft_server_t *, void *udata,
                                     raft_term_t term,
                                     raft_node_id_t voted_for) {
-  erpc::rt_assert(term < UINT32_MAX, "Term too large");
+  erpc::rt_assert(term < INT32_MAX, "Term too large for atomic pmem append");
   if (kUsePmem) {
     auto *c = static_cast<AppContext *>(udata);
     c->server.pmem_log->persist_term(term, voted_for);

@@ -58,11 +58,8 @@ class PmemLog {
 
   // Persistent metadata records
   struct {
-    static_assert(sizeof(raft_node_id_t) == 4, "");
-    static_assert(sizeof(raft_term_t) == 8, "");
-
     // This is a hack. In the persist_term callback, we must atomically commit
-    // both the term and the vote. raft_term_t is eight bytes, so the
+    // both the term and the vote. raft_term_t can be eight bytes, so the
     // combined size (12 B) exceeds the atomic write length (8 B). This is
     // simplified by shrinking the term to 4 B, and atomically doing an
     // 8-byte write to both \p term and \p voted_for.

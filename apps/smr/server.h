@@ -222,7 +222,7 @@ void server_func(erpc::Nexus *nexus, AppContext *c) {
 
       printf(
           "smr: Leader commit latency (us) = "
-          "{%.2f median, %.2f 99%%}. Number of log entries = %zu.\n",
+          "{%.2f median, %.2f 99%%}. Number of log entries = %ld.\n",
           kAppMeasureCommitLatency ? commit_latency.perc(.50) / 10.0 : -1.0,
           kAppMeasureCommitLatency ? commit_latency.perc(.99) / 10.0 : -1.0,
           raft_get_log_count(c->server.raft));
