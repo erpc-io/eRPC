@@ -229,11 +229,16 @@ else()
 endif()
 
 if(APP STREQUAL "smr")
-  set(LIBRARIES ${LIBRARIES} raft ${PMEM})
   include_directories(mica/src)
   add_subdirectory(${CMAKE_SOURCE_DIR}/apps/smr/willemt_raft)
-  link_directories(${CMAKE_SOURCE_DIR}/apps/smr/willemt_raft)
   include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/apps/smr/willemt_raft/include)
+  if (WIN32)
+    link_directories(${CMAKE_SOURCE_DIR}/build)
+    set(LIBRARIES ${LIBRARIES} raft.lib)
+  else()
+    link_directories(${CMAKE_SOURCE_DIR}/apps/smr/willemt_raft)
+    set(LIBRARIES ${LIBRARIES} raft ${PMEM})
+  endif()
 elseif(APP STREQUAL "masstree_analytics")
   # CMake-based Masstree library from anujkaliaiitd/masstree-beta
   link_directories(${CMAKE_SOURCE_DIR}/third_party/masstree-beta)
@@ -290,7 +295,7 @@ if(DPDK_NEEDED STREQUAL "true")
     link_directories("${DPDK_WINDIR}/build/lib")
     link_directories("${DPDK_WINDIR}/build/drivers")
 
-    set(LIBRARIES
+    set(LIBRARIES ${LIBRARIES}
       "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_cfgfile.a"
       "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_hash.a"
       "-Wl,/WHOLEARCHIVE:${DPDK_WINDIR}/build/lib/librte_cmdline.a"
