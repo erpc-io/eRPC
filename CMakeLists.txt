@@ -229,7 +229,7 @@ else()
 endif()
 
 if(APP STREQUAL "smr")
-  set(LIBRARIES ${LIBRARIES} raft ${PMEM})
+  set(LIBRARIES ${LIBRARIES} ${PMEM})
   include_directories(mica/src)
   include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/apps/smr/willemt)
   set(APP_ADDITIONAL_SOURCES ${MICA_SOURCES})

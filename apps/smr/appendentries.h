@@ -130,8 +130,9 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
 void appendentries_cont(void *, void *);  // Fwd decl
 
 // Raft callback for sending appendentries message
-static int __raft_send_appendentries(raft_server_t *, void *, raft_node_t *node,
-                                     msg_appendentries_t *msg_ae) {
+static int smr_raft_send_appendentries_cb(raft_server_t *, void *,
+                                          raft_node_t *node,
+                                          msg_appendentries_t *msg_ae) {
   auto *conn = static_cast<connection_t *>(raft_node_get_udata(node));
   AppContext *c = conn->c;
 

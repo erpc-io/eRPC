@@ -67,8 +67,9 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
 void requestvote_cont(void *, void *);  // Fwd decl
 
 // Raft callback for sending requestvote request
-static int __raft_send_requestvote(raft_server_t *, void *, raft_node_t *node,
-                                   msg_requestvote_t *msg_rv) {
+static int smr_raft_send_requestvote_cb(raft_server_t *, void *,
+                                        raft_node_t *node,
+                                        msg_requestvote_t *msg_rv) {
   auto *conn = static_cast<connection_t *>(raft_node_get_udata(node));
   AppContext *c = conn->c;
 

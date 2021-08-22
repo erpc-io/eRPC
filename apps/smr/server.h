@@ -11,8 +11,8 @@
 #include "smr.h"
 
 // Raft callback for displaying debugging information
-void __raft_console_log(raft_server_t *, raft_node_t *, void *,
-                        const char *buf) {
+void smr_raft_console_log_cb(raft_server_t *, raft_node_t *, void *,
+                             const char *buf) {
   if (kAppVerbose) {
     printf("raft: %s [%s].\n", buf, erpc::get_formatted_time().c_str());
   }
@@ -20,21 +20,21 @@ void __raft_console_log(raft_server_t *, raft_node_t *, void *,
 
 void set_raft_callbacks(AppContext *c) {
   raft_cbs_t raft_funcs;
-  raft_funcs.send_requestvote = __raft_send_requestvote;
-  raft_funcs.send_appendentries = __raft_send_appendentries;
-  raft_funcs.send_snapshot = __raft_send_snapshot;
-  raft_funcs.applylog = __raft_applylog;
-  raft_funcs.persist_vote = __raft_persist_vote;
-  raft_funcs.persist_term = __raft_persist_term;
-  raft_funcs.log_offer = __raft_log_offer;
-  raft_funcs.log_poll = __raft_log_poll;
-  raft_funcs.log_pop = __raft_log_pop;
-  raft_funcs.log_get_node_id = __raft_log_get_node_id;
-  raft_funcs.node_has_sufficient_logs = __raft_node_has_sufficient_logs;
-  raft_funcs.notify_membership_event = __raft_notify_membership_event;
+  raft_funcs.send_requestvote = smr_raft_send_requestvote_cb;
+  raft_funcs.send_appendentries = smr_raft_send_appendentries_cb;
+  raft_funcs.send_snapshot = smr_raft_send_snapshot_cb;
+  raft_funcs.applylog = smr_raft_applylog_cb;
+  raft_funcs.persist_vote = smr_raft_persist_vote_cb;
+  raft_funcs.persist_term = smr_raft_persist_term_cb;
+  raft_funcs.log_offer = smr_raft_log_offer_cb;
+  raft_funcs.log_poll = smr_raft_log_poll_cb;
+  raft_funcs.log_pop = smr_raft_log_pop_cb;
+  raft_funcs.log_get_node_id = smr_raft_log_get_node_id_cb;
+  raft_funcs.node_has_sufficient_logs = smr_raft_node_has_sufficient_logs_cb;
+  raft_funcs.notify_membership_event = smr_raft_notify_membership_event_cb;
 
   // Any non-null console callback will require vsnprintf in willemt/raft
-  raft_funcs.log = kAppEnableRaftConsoleLog ? __raft_console_log : nullptr;
+  raft_funcs.log = kAppEnableRaftConsoleLog ? smr_raft_console_log_cb : nullptr;
   raft_set_callbacks(c->server.raft, &raft_funcs, static_cast<void *>(c));
 }
 

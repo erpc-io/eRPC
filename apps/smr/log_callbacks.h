@@ -6,14 +6,14 @@
 #pragma once
 #include "smr.h"
 
-static int __raft_send_snapshot(raft_server_t *, void *, raft_node_t *) {
+static int smr_raft_send_snapshot_cb(raft_server_t *, void *, raft_node_t *) {
   erpc::rt_assert(false, "Snapshots not supported");
   return -1;
 }
 
 // Raft callback for setting the log entry at \p entry_idx to \p *ety
-static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
-                            raft_index_t entry_idx) {
+static int smr_raft_log_offer_cb(raft_server_t *, void *udata,
+                                 raft_entry_t *ety, raft_index_t entry_idx) {
   // We currently handle only application log entries
   assert(!raft_entry_is_cfg_change(ety));
   assert(ety->data.len == sizeof(client_req_t));
@@ -34,8 +34,8 @@ static int __raft_log_offer(raft_server_t *, void *udata, raft_entry_t *ety,
 }
 
 // Raft callback for applying an entry to the FSM
-static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
-                           raft_index_t) {
+static int smr_raft_applylog_cb(raft_server_t *, void *udata, raft_entry_t *ety,
+                                raft_index_t) {
   assert(!raft_entry_is_cfg_change(ety));
 
   // We're applying an entry to the application's state machine, so we're sure
@@ -65,8 +65,8 @@ static int __raft_applylog(raft_server_t *, void *udata, raft_entry_t *ety,
 }
 
 // Raft callback for saving voted_for field to persistent storage.
-static int __raft_persist_vote(raft_server_t *, void *udata,
-                               raft_node_id_t voted_for) {
+static int smr_raft_persist_vote_cb(raft_server_t *, void *udata,
+                                    raft_node_id_t voted_for) {
   if (kUsePmem) {
     auto *c = static_cast<AppContext *>(udata);
     c->server.pmem_log->persist_vote(voted_for);
@@ -76,8 +76,9 @@ static int __raft_persist_vote(raft_server_t *, void *udata,
 }
 
 // Raft callback for saving term and voted_for field to persistent storage
-static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
-                               raft_node_id_t voted_for) {
+static int smr_raft_persist_term_cb(raft_server_t *, void *udata,
+                                    raft_term_t term,
+                                    raft_node_id_t voted_for) {
   erpc::rt_assert(term < UINT32_MAX, "Term too large");
   if (kUsePmem) {
     auto *c = static_cast<AppContext *>(udata);
@@ -88,8 +89,8 @@ static int __raft_persist_term(raft_server_t *, void *udata, raft_term_t term,
 
 // Raft callback for removing the first entry from the log. This is provided to
 // support log compaction in the future.
-static int __raft_log_poll(raft_server_t *, void *, raft_entry_t *,
-                           raft_index_t) {
+static int smr_raft_log_poll_cb(raft_server_t *, void *, raft_entry_t *,
+                                raft_index_t) {
   erpc::rt_assert(false, "Log compaction not supported");
   return -1;
 }
@@ -97,8 +98,8 @@ static int __raft_log_poll(raft_server_t *, void *, raft_entry_t *,
 // Raft callback for deleting the most recent entry from the log. This happens
 // when an invalid leader finds a valid leader and has to delete superseded
 // log entries.
-static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *ety,
-                          raft_index_t) {
+static int smr_raft_log_pop_cb(raft_server_t *, void *udata, raft_entry_t *ety,
+                               raft_index_t) {
   auto *c = static_cast<AppContext *>(udata);
   if (kUsePmem) c->server.pmem_log->pop();
 
@@ -116,24 +117,24 @@ static int __raft_log_pop(raft_server_t *, void *udata, raft_entry_t *ety,
 }
 
 // Raft callback for determining which node this configuration log entry affects
-static int __raft_log_get_node_id(raft_server_t *, void *, raft_entry_t *,
-                                  raft_index_t) {
+static int smr_raft_log_get_node_id_cb(raft_server_t *, void *, raft_entry_t *,
+                                       raft_index_t) {
   erpc::rt_assert(false, "Configuration change not supported");
   return -1;
 }
 
 // Non-voting node now has enough logs to be able to vote. Append a finalization
 // cfg log entry.
-static int __raft_node_has_sufficient_logs(raft_server_t *, void *,
-                                           raft_node_t *) {
-  printf("smr: Ignoring __raft_node_has_sufficient_logs callback.\n");
+static int smr_raft_node_has_sufficient_logs_cb(raft_server_t *, void *,
+                                                raft_node_t *) {
+  printf("smr: Ignoring smr_raft_node_has_sufficient_logs callback.\n");
   return 0;
 }
 
 // Callback for being notified of membership changes. Implementing this callback
 // is optional.
-static void __raft_notify_membership_event(raft_server_t *, void *,
-                                           raft_node_t *, raft_entry_t *,
-                                           raft_membership_e) {
-  printf("smr: Ignoring __raft_notify_membership_event callback.\n");
+static void smr_raft_notify_membership_event_cb(raft_server_t *, void *,
+                                                raft_node_t *, raft_entry_t *,
+                                                raft_membership_e) {
+  printf("smr: Ignoring smr_raft_notify_membership_event callback.\n");
 }
