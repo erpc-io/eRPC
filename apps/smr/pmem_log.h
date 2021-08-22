@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
-#include "common.h"
 #include "../apps_common.h"
+#include "common.h"
 
 #ifdef SMR_USE_PMEM
 #include <libpmem.h>
@@ -26,8 +26,7 @@ void *pmem_memset_persist(void *, int, size_t) {
   return nullptr;
 }
 
-void *pmem_map_file(const char *, size_t, int,
-                    mode_t , size_t *, int *) {
+void *pmem_map_file(const char *, size_t, int, uint32_t, size_t *, int *) {
   erpc::rt_assert(false, "pmem not supported\n");
   return nullptr;
 }
@@ -36,7 +35,6 @@ void *pmem_map_file(const char *, size_t, int,
 extern "C" {
 #include <raft.h>
 }
-
 
 // A persistent memory log that stores objects of type T
 template <class T>
