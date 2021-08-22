@@ -52,8 +52,8 @@ void send_req_one(AppContext *c) {
   // Format the client's PUT request. Key and value are identical.
   auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf_);
   size_t rand_key = c->fast_rand.next_u32() & (kAppNumKeys - 1);
-  req->key[0] = rand_key;
-  req->value[0] = rand_key;
+  req->key = rand_key;
+  req->value.v[0] = rand_key;
 
   if (kAppVerbose) {
     printf("smr: Client sending request %s to leader index %zu [%s].\n",

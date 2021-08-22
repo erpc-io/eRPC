@@ -10,14 +10,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <set>
+#include <unordered_map>
 
 #include "../apps_common.h"
-#include "mica/util/cityhash/city.h"
 #include "time_entry.h"
-
-#include "mica/table/fixedtable.h"
-#include "mica/util/hash.h"
-
 #include "pmem_log.h"
 #include "util/autorun_helpers.h"
 
@@ -35,16 +31,14 @@ static constexpr size_t kAppServerRpcId = 2;  // Rpc ID of all Raft servers
 static constexpr size_t kAppClientRpcId = 3;  // Rpc ID of the Raft client
 
 // Key-value configuration
+
+/// Number of keys in the replicated key-value store
 static constexpr size_t kAppNumKeys = MB(1);  // 1 million keys ~ ZabFPGA
 static_assert(erpc::is_power_of_two(kAppNumKeys), "");
 
-static constexpr size_t kAppKeySize = 16;
-static constexpr size_t kAppValueSize = 64;
-static_assert(kAppKeySize % sizeof(size_t) == 0, "");
+/// Size of values in the replicated key-value store, in bytes
+static constexpr size_t kAppValueSize = 32;
 static_assert(kAppValueSize % sizeof(size_t) == 0, "");
-
-typedef mica::table::FixedTable<mica::table::BasicFixedTableConfig> FixedTable;
-static_assert(sizeof(FixedTable::ft_key_t) == kAppKeySize, "");
 
 // Debug/measurement
 static constexpr bool kAppTimeEnt = false;
@@ -73,17 +67,20 @@ enum class ReqType : uint8_t {
   kClientReq         // Client-to-server Rpc
 };
 
-// The client's key-value PUT request = the SMR command replicated in logs
+/// The value type for the key-value pairs
+struct value_t {
+  size_t v[kAppValueSize / sizeof(size_t)];
+};
+
+/// The client's key-value PUT request = the SMR command replicated in logs
 struct client_req_t {
-  size_t key[kAppKeySize / sizeof(size_t)];
-  size_t value[kAppValueSize / sizeof(size_t)];
+  size_t key;
+  value_t value;
 
   std::string to_string() const {
     std::ostringstream ret;
-    ret << "[Key (";
-    for (size_t k : key) ret << std::to_string(k) << ", ";
-    ret << "), Value (";
-    for (size_t v : value) ret << std::to_string(v) << ", ";
+    ret << "[Key (" << std::to_string(key) << "), Value (";
+    for (size_t v : value.v) ret << std::to_string(v) << ", ";
     ret << ")]";
     return ret.str();
   }
@@ -178,8 +175,8 @@ class AppContext {
     // Request tags used for RPCs exchanged among Raft servers
     AppMemPool<raft_req_tag_t> raft_req_tag_pool;
 
-    // App state
-    FixedTable *table = nullptr;
+    /// The key-value store, replicated in the Raft cluster
+    std::unordered_map<size_t, value_t> table;
 
     // Stats
     erpc::Latency commit_latency;            // Amplification factor = 10
@@ -210,8 +207,7 @@ class AppContext {
 // unique at the cluster level. XXX: This can collide!
 static int get_raft_node_id_for_process(size_t process_id) {
   std::string uri = erpc::get_uri_for_process(process_id);
-  uint32_t hash = CityHash32(uri.c_str(), uri.length());
-  return static_cast<int>(hash);
+  return std::hash<std::string>{}(uri);
 }
 
 // eRPC session management handler

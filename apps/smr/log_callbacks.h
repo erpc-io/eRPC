@@ -43,7 +43,7 @@ static int smr_raft_applylog_cb(raft_server_t *, void *udata, raft_entry_t *ety,
   // log entries.
   assert(ety->data.len == sizeof(client_req_t));
   auto *client_req = reinterpret_cast<client_req_t *>(ety->data.buf);
-  assert(client_req->key[0] == client_req->value[0]);
+  assert(client_req->key == client_req->value.v[0]);
 
   auto *c = static_cast<AppContext *>(udata);
 
@@ -53,14 +53,8 @@ static int smr_raft_applylog_cb(raft_server_t *, void *udata, raft_entry_t *ety,
            erpc::get_formatted_time().c_str());
   }
 
-  size_t key_hash = mica::util::hash(&client_req->key, kAppKeySize);
-  FixedTable *table = c->server.table;
-  FixedTable::ft_key_t *ft_key =
-      reinterpret_cast<FixedTable::ft_key_t *>(client_req->key);
-
-  auto result = table->set(key_hash, *ft_key,
-                           reinterpret_cast<char *>(&client_req->value));
-  erpc::rt_assert(result == mica::table::Result::kSuccess);
+  c->server.table.insert(
+      std::pair<size_t, value_t>(client_req->key, client_req->value));
   return 0;
 }
 

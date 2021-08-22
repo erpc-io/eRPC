@@ -189,12 +189,6 @@ void init_erpc(AppContext *c, erpc::Nexus *nexus) {
   printf("smr: All sessions connected\n");
 }
 
-void init_mica(AppContext *c) {
-  auto config = mica::util::Config::load_file("apps/smr/kv_store.json");
-  c->server.table = new FixedTable(config.get("table"), kAppValueSize,
-                                   c->rpc->get_huge_alloc());
-}
-
 inline void call_raft_periodic(AppContext *c) {
   // raft_periodic() uses msec_elapsed for only request and election timeouts.
   // msec_elapsed is in integer milliseconds which does not work for us because
@@ -217,9 +211,8 @@ void server_func(erpc::Nexus *nexus, AppContext *c) {
   // The Raft server must be initialized before running the eRPC event loop,
   // including running it for eRPC session management.
   init_raft(c);
-
-  init_erpc(c, nexus);  // Initialize eRPC
-  init_mica(c);         // Initialize the key-value store
+  init_erpc(c, nexus);
+  c->server.table.reserve(kAppNumKeys * 2); // Pre-allocate buckets with room
 
   // The main loop
   size_t loop_tsc = erpc::rdtsc();
