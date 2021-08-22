@@ -131,13 +131,13 @@ class PmemLog {
   }
 
   void persist_term(raft_term_t term, raft_node_id_t voted_for) {
-    erpc::rt_assert(term < UINT32_MAX, "Term too large");
+    erpc::rt_assert(term < INT32_MAX, "Term too large for atomic pmem append");
     erpc::rt_assert(reinterpret_cast<uint8_t *>(p.voted_for) ==
                     reinterpret_cast<uint8_t *>(p.term) + 4);
 
     // 8-byte atomic commit
     uint32_t to_persist[2];
-    to_persist[0] = term;
+    to_persist[0] = static_cast<uint32_t>(term);
     to_persist[1] = static_cast<uint32_t>(voted_for);
     pmem_memcpy_persist(p.term, &to_persist, sizeof(size_t));
   }
