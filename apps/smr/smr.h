@@ -13,8 +13,8 @@
 #include <unordered_map>
 
 #include "../apps_common.h"
-#include "time_entry.h"
 #include "pmem_log.h"
+#include "time_entry.h"
 #include "util/autorun_helpers.h"
 #include "util/hdr_histogram_wrapper.h"
 
@@ -191,7 +191,7 @@ class AppContext {
 
     size_t num_resps_total = 0;
     size_t num_resps_this_measurement = 0;
-    size_t num_measurements = 0;
+    size_t num_console_prints = 0;
 
     erpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
     erpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
