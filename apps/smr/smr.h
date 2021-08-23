@@ -191,8 +191,7 @@ class AppContext {
     erpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
     erpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
 
-    // For latency measurement
-    uint64_t req_start_tsc;
+    erpc::ChronoTimer chrono_timer;  // For latency measurement
     std::vector<double> req_us_vec;  // We clear this after printing stats
   } client;
 

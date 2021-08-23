@@ -47,7 +47,7 @@ bool change_leader_to_node(AppContext *c, int raft_node_id) {
 void client_cont(void *, void *);  // Forward declaration
 
 void send_req_one(AppContext *c) {
-  c->client.req_start_tsc = erpc::rdtsc();
+  c->client.chrono_timer.reset();
 
   // Format the client's PUT request. Key and value are identical.
   auto *req = reinterpret_cast<client_req_t *>(c->client.req_msgbuf.buf_);
@@ -69,8 +69,7 @@ void send_req_one(AppContext *c) {
 
 void client_cont(void *_context, void *) {
   auto *c = static_cast<AppContext *>(_context);
-  double latency_us = erpc::to_usec(erpc::rdtsc() - c->client.req_start_tsc,
-                                    c->rpc->get_freq_ghz());
+  const double latency_us = c->client.chrono_timer.get_ns() / 1000.0;
   c->client.req_us_vec.push_back(latency_us);
   c->client.num_resps++;
 
@@ -79,17 +78,19 @@ void client_cont(void *_context, void *) {
     auto &lat_vec = c->client.req_us_vec;
     std::sort(lat_vec.begin(), lat_vec.end());
 
-    double us_min = lat_vec.at(0);
-    double us_median = lat_vec.at(lat_vec.size() / 2);
-    double us_99 = lat_vec.at(lat_vec.size() * .99);
-    double us_999 = lat_vec.at(lat_vec.size() * .999);
-    double us_max = lat_vec.at(lat_vec.size() - 1);
+    const double us_min = lat_vec.at(0);
+    const double us_median = lat_vec.at(lat_vec.size() / 2);
+    const double us_99 = lat_vec.at(lat_vec.size() * .99);
+    const double us_999 = lat_vec.at(lat_vec.size() * .999);
+    const double us_9999 = lat_vec.at(lat_vec.size() * .999);
+    const double us_max = lat_vec.at(lat_vec.size() - 1);
 
     printf(
         "smr: Latency us = "
-        "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f max}. "
+        "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f 99.99, %.2f max}. "
         "Request window = %zu (best 1).\n",
-        us_min, us_median, us_99, us_999, us_max, erpc::kSessionReqWindow);
+        us_min, us_median, us_99, us_999, us_9999, us_max,
+        erpc::kSessionReqWindow);
     c->client.num_resps = 0;
     c->client.req_us_vec.clear();
   }
