@@ -183,10 +183,7 @@ void client_func(erpc::Nexus *nexus, AppContext *c) {
   printf("smr: Client connected to all. Sending reqs.\n");
 
   send_req_one(c);
-  while (ctrl_c_pressed == 0) {
-    c->rpc->run_event_loop(200);
-    std::this_thread::sleep_for(std::chrono::microseconds(1));  // Allow OS
-  }
+  while (ctrl_c_pressed == 0) c->rpc->run_event_loop(200);
 
   delete c->rpc;
 }
