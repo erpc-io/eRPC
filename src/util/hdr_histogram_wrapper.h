@@ -12,7 +12,7 @@ class LatencyUsHdrHistogram {
   static constexpr int64_t kMaxLatencyMicros = 1000 * 1000 * 100;  // 100 sec
   static constexpr int64_t kLatencyPrecision = 2;  // Two significant digits
   LatencyUsHdrHistogram() {
-    int ret = hdr_init(kMaxLatencyMicros, kMaxLatencyMicros, kLatencyPrecision,
+    int ret = hdr_init(kMinLatencyMicros, kMaxLatencyMicros, kLatencyPrecision,
                        &hist);
     if (ret != 0) {
       fprintf(stderr, "Failed to init HDR histogram");
