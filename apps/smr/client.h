@@ -70,29 +70,29 @@ void send_req_one(AppContext *c) {
 void client_cont(void *_context, void *) {
   auto *c = static_cast<AppContext *>(_context);
   const double latency_us = c->client.chrono_timer.get_ns() / 1000.0;
-  c->client.req_us_vec.push_back(latency_us);
+  c->client.lat_us_hdr_histogram.insert(latency_us);
   c->client.num_resps++;
 
+  static size_t s_num_epochs = 0;
   if (c->client.num_resps == 100000) {
-    // At this point, there is no request outstanding, so long compute is OK
-    auto &lat_vec = c->client.req_us_vec;
-    std::sort(lat_vec.begin(), lat_vec.end());
-
-    const double us_min = lat_vec.at(0);
-    const double us_median = lat_vec.at(lat_vec.size() / 2);
-    const double us_99 = lat_vec.at(lat_vec.size() * .99);
-    const double us_999 = lat_vec.at(lat_vec.size() * .999);
-    const double us_9999 = lat_vec.at(lat_vec.size() * .9999);
-    const double us_max = lat_vec.at(lat_vec.size() - 1);
-
+    s_num_epochs++;
     printf(
         "smr: Latency us = "
-        "{%.2f min, %.2f 50, %.2f 99, %.2f 99.9, %.2f 99.99, %.2f max}. "
-        "Request window = %zu (best 1).\n",
-        us_min, us_median, us_99, us_999, us_9999, us_max,
+        "{%.2f 50, %.2f 99, %.2f 99.9, %.2f 99.99, %.2f 99.999, %.2f max}. "
+        "Cumulative num responses %zu, request window = %zu (best 1).\n",
+        c->client.lat_us_hdr_histogram.percentile(50.0),
+        c->client.lat_us_hdr_histogram.percentile(99),
+        c->client.lat_us_hdr_histogram.percentile(99.9),
+        c->client.lat_us_hdr_histogram.percentile(99.99),
+        c->client.lat_us_hdr_histogram.percentile(99.999),
+        c->client.lat_us_hdr_histogram.max(), c->client.num_resps,
         erpc::kSessionReqWindow);
-    c->client.num_resps = 0;
-    c->client.req_us_vec.clear();
+
+    // Warmup for the first few epochs
+    if (s_num_epochs <= 4) {
+      c->client.num_resps = 0;
+      c->client.lat_us_hdr_histogram.reset();
+    }
   }
 
   if (likely(c->client.resp_msgbuf.get_data_size() > 0)) {

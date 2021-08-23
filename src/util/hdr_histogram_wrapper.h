@@ -22,12 +22,18 @@ class LatencyUsHdrHistogram {
 
   ~LatencyUsHdrHistogram() { hdr_close(hist); }
 
-  inline void record_value(double v) { hdr_record_value(hist, v); }
+  /// Add a value into the histogram
+  inline void insert(double v) { hdr_record_value(hist, v); }
 
+  /// Return the value at percentile 0.0 < p < 100.0
   double percentile(double p) {
-    return hdr_value_at_percentile(hist, p);;
+    return hdr_value_at_percentile(hist, p);
   }
 
+  /// Return the max value in the histogram
+  double max() { return hdr_max(hist); }
+
+  /// Clear the underlying histogram
   void reset() { hdr_reset(hist); }
 
   hdr_histogram* get_raw_hist() { return hist; }

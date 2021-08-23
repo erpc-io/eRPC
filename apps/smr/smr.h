@@ -16,6 +16,7 @@
 #include "time_entry.h"
 #include "pmem_log.h"
 #include "util/autorun_helpers.h"
+#include "util/hdr_histogram_wrapper.h"
 
 extern "C" {
 #include <raft.h>
@@ -192,7 +193,7 @@ class AppContext {
     erpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
 
     erpc::ChronoTimer chrono_timer;  // For latency measurement
-    std::vector<double> req_us_vec;  // We clear this after printing stats
+    LatencyUsHdrHistogram lat_us_hdr_histogram;
   } client;
 
   // Common members
