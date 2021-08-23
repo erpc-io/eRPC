@@ -212,7 +212,7 @@ void server_func(erpc::Nexus *nexus, AppContext *c) {
   // including running it for eRPC session management.
   init_raft(c);
   init_erpc(c, nexus);
-  c->server.table.reserve(kAppNumKeys * 2); // Pre-allocate buckets with room
+  c->server.table.reserve(kAppNumKeys * 2);  // Pre-allocate buckets with room
 
   // The main loop
   size_t loop_tsc = erpc::rdtsc();
@@ -272,7 +272,8 @@ void server_func(erpc::Nexus *nexus, AppContext *c) {
   // This is OK even when kAppTimeEnt = false
   printf("smr: Printing first 1000 of %zu time entries.\n",
          c->server.time_ents.size());
-  size_t num_print = std::min(c->server.time_ents.size(), 1000ul);
+  const size_t num_print =
+      std::min(c->server.time_ents.size(), static_cast<size_t>(1000));
 
   if (num_print > 0) {
     size_t base_tsc = c->server.time_ents[0].tsc;
@@ -283,7 +284,7 @@ void server_func(erpc::Nexus *nexus, AppContext *c) {
     }
   }
 
-  printf("smr: Final log size (including uncommitted entries) = %zu.\n",
+  printf("smr: Final log size (including uncommitted entries) = %ld\n",
          raft_get_log_count(c->server.raft));
   delete c->rpc;
 }
