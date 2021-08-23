@@ -188,7 +188,11 @@ class AppContext {
   // SMR client members
   struct {
     size_t leader_idx;  // Client's view of the leader node's index in conn_vec
-    size_t num_resps = 0;
+
+    size_t num_resps_total = 0;
+    size_t num_resps_this_measurement = 0;
+    size_t num_measurements = 0;
+
     erpc::MsgBuffer req_msgbuf;   // Preallocated req msgbuf
     erpc::MsgBuffer resp_msgbuf;  // Preallocated response msgbuf
 

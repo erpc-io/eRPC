@@ -71,11 +71,11 @@ void client_cont(void *_context, void *) {
   auto *c = static_cast<AppContext *>(_context);
   const double latency_us = c->client.chrono_timer.get_ns() / 1000.0;
   c->client.lat_us_hdr_histogram.insert(latency_us);
-  c->client.num_resps++;
+  c->client.num_resps_this_measurement++;
+  c->client.num_resps_total++;
 
-  static size_t s_num_epochs = 0;
-  if (c->client.num_resps == 100000) {
-    s_num_epochs++;
+  if (c->client.num_resps_this_measurement == 100000) {
+    c->client.num_measurements++;
     printf(
         "smr: Latency us = "
         "{%.2f 50, %.2f 99, %.2f 99.9, %.2f 99.99, %.2f 99.999, %.2f max}. "
@@ -85,12 +85,12 @@ void client_cont(void *_context, void *) {
         c->client.lat_us_hdr_histogram.percentile(99.9),
         c->client.lat_us_hdr_histogram.percentile(99.99),
         c->client.lat_us_hdr_histogram.percentile(99.999),
-        c->client.lat_us_hdr_histogram.max(), c->client.num_resps,
+        c->client.lat_us_hdr_histogram.max(), c->client.num_resps_total,
         erpc::kSessionReqWindow);
 
     // Warmup for the first few epochs
-    if (s_num_epochs <= 4) {
-      c->client.num_resps = 0;
+    if (c->client.num_measurements <= 4) {
+      c->client.num_resps_total = 0;
       c->client.lat_us_hdr_histogram.reset();
     }
   }
