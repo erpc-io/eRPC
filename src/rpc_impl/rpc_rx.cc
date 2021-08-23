@@ -19,9 +19,10 @@ void Rpc<TTr>::process_comps_st() {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring_[rx_ring_head_]);
     rx_ring_head_ = (rx_ring_head_ + 1) % Transport::kNumRxRingEntries;
 
+    // XXX: This acts as a stopgap function to filter non-eRPC packets, like
+    // broadcast/ARP packets.
     if (unlikely(!pkthdr->check_magic())) {
-      // This is very bad, but we can handle it
-      ERPC_ERROR(
+      ERPC_INFO(
           "Rpc %u: Received %s with invalid magic. Packet headroom = %s. "
           "Dropping.\n",
           rpc_id_, pkthdr->to_string().c_str(),
