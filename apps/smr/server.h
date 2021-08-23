@@ -216,7 +216,13 @@ void server_func(erpc::Nexus *nexus, AppContext *c) {
 
   // The main loop
   size_t loop_tsc = erpc::rdtsc();
+  erpc::ChronoTimer yield_timer;
   while (ctrl_c_pressed == 0) {
+    if (yield_timer.get_ms() > 200) {
+      std::this_thread::sleep_for(std::chrono::microseconds(1));
+      yield_timer.reset();
+    }
+
     if (erpc::rdtsc() - loop_tsc > 3000000000ull) {
       erpc::Latency &commit_latency = c->server.commit_latency;
 
