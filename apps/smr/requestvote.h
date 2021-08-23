@@ -54,7 +54,7 @@ void requestvote_handler(erpc::ReqHandle *req_handle, void *_context) {
   int e = raft_recv_requestvote(c->server.raft,
                                 raft_get_node(c->server.raft, rv_req->node_id),
                                 &rv_req->msg_rv, rv_resp);
-  erpc::rt_assert(e == 0);
+  erpc::rt_assert(e == 0, "raft_recv_requestvote failed");
 
   printf("smr: Sending requestvote response to %s: %s [%s].\n",
          node_id_to_name_map[rv_req->node_id].c_str(),
@@ -114,7 +114,9 @@ void requestvote_cont(void *_context, void *_tag) {
 
     int e =
         raft_recv_requestvote_response(c->server.raft, rrt->node, msg_rv_resp);
-    erpc::rt_assert(e == 0);  // XXX: Doc says: Shutdown if e != 0
+    // XXX: Doc says shutdown if e != 0
+    erpc::rt_assert(
+        e == 0, "raft_recv_requestvote_response failed");
   } else {
     // This is a continuation-with-failure
     printf("smr: Requestvote RPC to node %s failed to complete [%s].\n",

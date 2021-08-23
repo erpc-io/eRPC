@@ -42,7 +42,7 @@ void init_raft(AppContext *c) {
   c->server.raft = raft_new();
   raft_set_election_timeout(c->server.raft, kAppRaftElectionTimeoutMsec);
 
-  erpc::rt_assert(c->server.raft != nullptr);
+  erpc::rt_assert(c->server.raft != nullptr, "Failed to init raft");
 
   c->server.node_id = get_raft_node_id_for_process(FLAGS_process_id);
   printf("smr: Created Raft node with ID = %d.\n", c->server.node_id);
@@ -149,7 +149,7 @@ void client_req_handler(erpc::ReqHandle *req_handle, void *_context) {
   ent.data.len = sizeof(client_req_t);
 
   int e = raft_recv_entry(c->server.raft, &ent, &leader_sav.msg_entry_response);
-  erpc::rt_assert(e == 0);
+  erpc::rt_assert(e == 0, "client_req_handle: raft_recv_entry failed");
 }
 
 void init_erpc(AppContext *c, erpc::Nexus *nexus) {

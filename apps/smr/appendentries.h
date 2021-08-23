@@ -119,7 +119,7 @@ void appendentries_handler(erpc::ReqHandle *req_handle, void *_context) {
   int e = raft_recv_appendentries(
       c->server.raft, raft_get_node(c->server.raft, ae_req->node_id), &msg_ae,
       reinterpret_cast<msg_appendentries_response_t *>(resp_msgbuf.buf_));
-  erpc::rt_assert(e == 0);
+  erpc::rt_assert(e == 0, "raft_recv_appendentries failed");
 
   if (msg_ae.entries != static_msg_entry_arr) delete[] msg_ae.entries;
 
@@ -159,7 +159,8 @@ static int smr_raft_send_appendentries_cb(raft_server_t *, void *,
     req_size += sizeof(msg_entry_t) + sizeof(client_req_t);
   }
 
-  erpc::rt_assert(req_size <= c->rpc->get_max_msg_size());
+  erpc::rt_assert(req_size <= c->rpc->get_max_msg_size(),
+                  "send_appendentries_cb: Message size too large");
 
   raft_req_tag_t *rrt = c->server.raft_req_tag_pool.alloc();
   rrt->req_msgbuf = c->rpc->alloc_msg_buffer_or_die(req_size);
@@ -194,7 +195,7 @@ void appendentries_cont(void *_context, void *_tag) {
         c->server.raft, rrt->node,
         reinterpret_cast<msg_appendentries_response_t *>(
             rrt->resp_msgbuf.buf_));
-    erpc::rt_assert(e == 0);
+    erpc::rt_assert(e == 0, "raft_recv_appendentries_response error");
   } else {
     // The RPC failed. Fall through and call raft_periodic() again.
     printf("smr: Appendentries RPC to node %s failed to complete [%s].\n",
