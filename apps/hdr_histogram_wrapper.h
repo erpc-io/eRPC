@@ -1,26 +1,31 @@
 /**
  * @file hdr_histogram_wrapper.h
- * @brief A wrapper for hdr_histogram that supports floating point values with
- * magnified precision. A floating point record x is inserted as x * AMP.
+ * A histogram good for microsecond-scale precision latency measurement
  */
 
-#include <hdr/hdr_histogram.h>
-#include "apps_common.h"
+#include <stdlib.h>
+#include "HdrHistogram_c/src/hdr_histogram.h"
 
-template <size_t AMP>
-class HdrHistogramAmp {
+class LatencyUsHdrHistogram {
  public:
-  HdrHistogramAmp(int64_t min, int64_t max, uint32_t precision) {
-    int ret = hdr_init(min * AMP, max * AMP, precision, &hist);
-    erpc::rt_assert(ret == 0);
+  static constexpr int64_t kMinLatencyMicros = 1;
+  static constexpr int64_t kMaxLatencyMicros = 1000 * 1000 * 100;  // 100 sec
+  static constexpr int64_t kLatencyPrecision = 2;  // Two significant digits
+  LatencyUsHdrHistogram() {
+    int ret = hdr_init(kMaxLatencyMicros, kMaxLatencyMicros, kLatencyPrecision,
+                       &hist);
+    if (ret != 0) {
+      fprintf(stderr, "Failed to init HDR histogram");
+      exit(-1);
+    }
   }
 
-  ~HdrHistogramAmp() { hdr_close(hist); }
+  ~LatencyUsHdrHistogram() { hdr_close(hist); }
 
-  inline void record_value(double v) { hdr_record_value(hist, v * AMP); }
+  inline void record_value(double v) { hdr_record_value(hist, v); }
 
   double percentile(double p) {
-    return hdr_value_at_percentile(hist, p) * (AMP * 1.0);
+    return hdr_value_at_percentile(hist, p);;
   }
 
   void reset() { hdr_reset(hist); }
