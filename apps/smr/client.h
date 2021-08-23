@@ -82,7 +82,7 @@ void client_cont(void *_context, void *) {
     const double us_median = lat_vec.at(lat_vec.size() / 2);
     const double us_99 = lat_vec.at(lat_vec.size() * .99);
     const double us_999 = lat_vec.at(lat_vec.size() * .999);
-    const double us_9999 = lat_vec.at(lat_vec.size() * .999);
+    const double us_9999 = lat_vec.at(lat_vec.size() * .9999);
     const double us_max = lat_vec.at(lat_vec.size() - 1);
 
     printf(
