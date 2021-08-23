@@ -195,7 +195,8 @@ void appendentries_cont(void *_context, void *_tag) {
         c->server.raft, rrt->node,
         reinterpret_cast<msg_appendentries_response_t *>(
             rrt->resp_msgbuf.buf_));
-    erpc::rt_assert(e == 0, "raft_recv_appendentries_response error");
+    erpc::rt_assert(e == 0 || e == RAFT_ERR_NOT_LEADER,
+                    "raft_recv_appendentries_response error");
   } else {
     // The RPC failed. Fall through and call raft_periodic() again.
     printf("smr: Appendentries RPC to node %s failed to complete [%s].\n",
