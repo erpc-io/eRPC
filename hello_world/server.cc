@@ -10,7 +10,7 @@ void req_handler(erpc::ReqHandle *req_handle, void *) {
 
 int main() {
   std::string server_uri = kServerHostname + ":" + std::to_string(kUDPPort);
-  erpc::Nexus nexus(server_uri, 0, 0);
+  erpc::Nexus nexus(server_uri);
   nexus.register_req_func(kReqType, req_handler);
 
   rpc = new erpc::Rpc<erpc::CTransport>(&nexus, nullptr, 0, nullptr);

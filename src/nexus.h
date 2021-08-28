@@ -36,7 +36,7 @@ class Nexus {
    * @throw runtime_error if Nexus creation fails.
    */
  public:
-  Nexus(std::string local_uri, size_t numa_node, size_t num_bg_threads);
+  Nexus(std::string local_uri, size_t numa_node = 0, size_t num_bg_threads = 0);
 
   ~Nexus();
 

@@ -9,7 +9,7 @@ void sm_handler(int, erpc::SmEventType, erpc::SmErrType, void *) {}
 
 int main() {
   std::string client_uri = kClientHostname + ":" + std::to_string(kUDPPort);
-  erpc::Nexus nexus(client_uri, 0, 0);
+  erpc::Nexus nexus(client_uri);
 
   rpc = new erpc::Rpc<erpc::CTransport>(&nexus, nullptr, 0, sm_handler);
 
