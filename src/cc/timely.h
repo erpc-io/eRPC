@@ -118,7 +118,7 @@ class Timely {
         ((1 - kEwmaAlpha) * avg_rtt_diff_) + (kEwmaAlpha * rtt_diff);
 
     double delta_factor = (_rdtsc - last_update_tsc_) / min_rtt_tsc_;  // fdiv
-    delta_factor = std::min(delta_factor, 1.0);
+    delta_factor = (std::min)(delta_factor, 1.0);
 
     double ai_factor = kAddRate * delta_factor;
 
@@ -157,9 +157,9 @@ class Timely {
       }
     }
 
-    rate_ = std::max(new_rate, rate_ * 0.5);
-    rate_ = std::min(rate_, link_bandwidth_);
-    rate_ = std::max(rate_, double(kMinRate));
+    rate_ = (std::max)(new_rate, rate_ * 0.5);
+    rate_ = (std::min)(rate_, link_bandwidth_);
+    rate_ = (std::max)(rate_, double(kMinRate));
 
     prev_rtt_ = sample_rtt;
     last_update_tsc_ = _rdtsc;

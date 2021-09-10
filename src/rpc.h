@@ -810,7 +810,8 @@ class Rpc {
   static inline void copy_data_to_msgbuf(MsgBuffer *msgbuf, size_t pkt_idx,
                                          const pkthdr_t *pkthdr) {
     size_t offset = pkt_idx * TTr::kMaxDataPerPkt;
-    size_t to_copy = std::min(TTr::kMaxDataPerPkt, pkthdr->msg_size_ - offset);
+    size_t to_copy =
+        (std::min)(TTr::kMaxDataPerPkt, pkthdr->msg_size_ - offset);
     memcpy(&msgbuf->buf_[offset], pkthdr + 1, to_copy);  // From end of pkthdr
   }
 

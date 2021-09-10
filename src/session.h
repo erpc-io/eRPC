@@ -118,7 +118,7 @@ class Session {
     double cycle_delta = ns_to_cycles(ns_delta, freq_ghz_);
 
     size_t desired_tx_tsc = client_info_.cc_.prev_desired_tx_tsc_ + cycle_delta;
-    desired_tx_tsc = std::max(desired_tx_tsc, ref_tsc);
+    desired_tx_tsc = (std::max)(desired_tx_tsc, ref_tsc);
 
     client_info_.cc_.prev_desired_tx_tsc_ = desired_tx_tsc;
 

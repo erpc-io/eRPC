@@ -9,7 +9,8 @@ void Rpc<TTr>::kick_req_st(SSlot *sslot) {
   assert(credits > 0);  // Precondition
 
   auto &ci = sslot->client_info_;
-  size_t sending = std::min(credits, sslot->tx_msgbuf_->num_pkts_ - ci.num_tx_);
+  size_t sending =
+      (std::min)(credits, sslot->tx_msgbuf_->num_pkts_ - ci.num_tx_);
   bool bypass = can_bypass_wheel(sslot);
 
   for (size_t x = 0; x < sending; x++) {
@@ -40,7 +41,7 @@ void Rpc<TTr>::kick_rfr_st(SSlot *sslot) {
 
   // TODO: Pace RFRs
   size_t rfr_pndng = wire_pkts(sslot->tx_msgbuf_, ci.resp_msgbuf_) - ci.num_tx_;
-  size_t sending = std::min(credits, rfr_pndng);  // > 0
+  size_t sending = (std::min)(credits, rfr_pndng);  // > 0
   for (size_t x = 0; x < sending; x++) {
     enqueue_rfr_st(sslot, ci.resp_msgbuf_->get_pkthdr_0());
     ci.num_tx_++;

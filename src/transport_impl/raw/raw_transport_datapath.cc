@@ -47,7 +47,7 @@ void RawTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
       size_t offset = item.pkt_idx * kMaxDataPerPkt;
       sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf[offset]);
-      sgl[1].length = std::min(kMaxDataPerPkt, msg_buffer->data_size - offset);
+      sgl[1].length = (std::min)(kMaxDataPerPkt, msg_buffer->data_size - offset);
       sgl[1].lkey = msg_buffer->buffer.lkey;
 
       pkt_size = sgl[0].length + sgl[1].length;

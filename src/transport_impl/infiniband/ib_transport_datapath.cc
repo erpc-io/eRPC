@@ -45,7 +45,8 @@ void IBTransport::tx_burst(const tx_burst_item_t* tx_burst_arr,
 
       size_t offset = item.pkt_idx_ * kMaxDataPerPkt;
       sgl[1].addr = reinterpret_cast<uint64_t>(&msg_buffer->buf_[offset]);
-      sgl[1].length = std::min(kMaxDataPerPkt, msg_buffer->data_size_ - offset);
+      sgl[1].length =
+          (std::min)(kMaxDataPerPkt, msg_buffer->data_size_ - offset);
       sgl[1].lkey = msg_buffer->buffer_.lkey_;
 
       wr.num_sge = 2;

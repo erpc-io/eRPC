@@ -62,7 +62,7 @@ class MsgBuffer {
   template <size_t kMaxDataPerPkt>
   inline size_t get_pkt_size(size_t pkt_idx) const {
     size_t offset = pkt_idx * kMaxDataPerPkt;
-    return sizeof(pkthdr_t) + std::min(kMaxDataPerPkt, data_size_ - offset);
+    return sizeof(pkthdr_t) + (std::min)(kMaxDataPerPkt, data_size_ - offset);
   }
 
   /// Return a string representation of this MsgBuffer

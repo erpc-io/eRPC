@@ -82,7 +82,7 @@ class Latency {
   /// Return the (approximate) average sample
   double avg() const {
     return static_cast<double>(sum()) /
-           static_cast<double>(std::max(size_t(1), count()));
+           static_cast<double>((std::max)(size_t(1), count()));
   }
 
   /// Return the (approximate) minimum sample
