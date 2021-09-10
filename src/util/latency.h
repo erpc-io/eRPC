@@ -86,7 +86,7 @@ class Latency {
   }
 
   /// Return the (approximate) minimum sample
-  size_t min() const {
+  size_t latency_min() const {
     size_t i;
     for (i = 0; i < 128; i++)
       if (bin0_[i] != 0) return 0 + i * 1;
@@ -103,7 +103,7 @@ class Latency {
   }
 
   /// Return the (approximate) max sample
-  size_t max() const {
+  size_t latency_max() const {
     int64_t i;
     if (bin5_ != 0) return 3968;
     for (i = 127; i >= 0; i--)
