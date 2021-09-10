@@ -145,6 +145,7 @@ set(SOURCES
   src/transport_impl/raw/raw_transport_datapath.cc
   src/transport_impl/fake/fake_transport.cc
   src/util/huge_alloc.cc
+  src/util/numautils.cc
   src/util/tls_registry.cc)
 
 # Transport-specific. Mellanox OFED drivers are the best choice for raw and
