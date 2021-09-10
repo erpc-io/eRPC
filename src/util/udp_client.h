@@ -36,8 +36,7 @@ class UDPClient {
    *
    * @return Number of bytes sent on success, SIZE_MAX on failure
    */
-  size_t send(const std::string rem_hostname, uint16_t rem_port,
-               const T &msg) {
+  size_t send(const std::string rem_hostname, uint16_t rem_port, const T &msg) {
     asio::error_code error;
     asio::ip::udp::resolver::results_type results =
         resolver_->resolve(rem_hostname, std::to_string(rem_port), error);
@@ -48,16 +47,27 @@ class UDPClient {
       return SIZE_MAX;
     }
 
-    asio::ip::udp::endpoint endpoint = *results.begin();
-    try {
-      const size_t ret =
-          socket_->send_to(asio::buffer(&msg, sizeof(T)), endpoint);
-      return ret;
-    } catch (const asio::system_error &e) {
-      ERPC_ERROR("eRPC: asio send_to() failed to %s, error: %s\n",
-                 rem_hostname.c_str(), e.what());
-      return SIZE_MAX;
+    // Pick an IPv4 endpoint
+    for (const auto &endpoint_iter : results) {
+      if (!endpoint_iter.endpoint().address().is_v4()) continue;
+
+      try {
+        const size_t ret =
+            socket_->send_to(asio::buffer(&msg, sizeof(T)), endpoint_iter);
+        return ret;
+      } catch (const asio::system_error &e) {
+        ERPC_ERROR("eRPC: asio send_to() failed to %s, error: %s\n",
+                   rem_hostname.c_str(), e.what());
+        return SIZE_MAX;
+      }
     }
+
+    // We failed to find an IPv4 endpoint
+    ERPC_ERROR(
+        "eRPC: Failed to find an IPv4 endpoint to %s. Found %zu non-IPv4 "
+        "endpoints to %s though.\n",
+        rem_hostname.c_str(), results.size(), rem_hostname.c_str());
+    return SIZE_MAX;
   }
 
   /// Maintain a all packets sent by this client

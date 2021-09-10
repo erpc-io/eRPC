@@ -1,14 +1,14 @@
 #include "util/udp_client.h"
 #include <gtest/gtest.h>
 
-TEST(UdpClientTest, LocalhostWrong) {
+TEST(UdpClientTest, LocalhostName) {
   erpc::UDPClient<int> udp_client;
   int msg = 33;
   size_t ret = udp_client.send("localhost", 31850, msg);
-  ASSERT_EQ(ret, SIZE_MAX);  // The name localhost is not supported as a remote
+  ASSERT_EQ(ret, sizeof(int));
 }
 
-TEST(UdpClientTest, LocalhostRight) {
+TEST(UdpClientTest, LocalhostIP) {
   erpc::UDPClient<int> udp_client;
   int msg = 33;
   size_t ret = udp_client.send("127.0.0.1", 31850, msg);
