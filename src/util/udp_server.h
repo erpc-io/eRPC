@@ -14,17 +14,15 @@ namespace erpc {
 template <class T>
 class UDPServer {
  public:
-  UDPServer(uint16_t port, size_t timeout_ms) : timeout_ms_(timeout_ms) {
-    socket_ = new asio::ip::udp::socket(
-        io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), port));
-  }
+  UDPServer(uint16_t port, size_t timeout_ms)
+      : timeout_ms_(timeout_ms),
+        socket_(new asio::ip::udp::socket(
+            io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), port))) {}
 
   UDPServer() {}
   UDPServer(const UDPServer &) = delete;
 
-  ~UDPServer() {
-    if (socket_ != nullptr) delete socket_;
-  }
+  ~UDPServer() {}
 
   size_t recv_blocking(T &msg) {
     size_t ret = socket_->receive(
@@ -33,9 +31,9 @@ class UDPServer {
   }
 
  private:
-  asio::io_context io_context_;
-  asio::ip::udp::socket *socket_;
   size_t timeout_ms_;
+  asio::io_context io_context_;
+  std::unique_ptr<asio::ip::udp::socket> socket_;
 };
 
 }  // namespace erpc

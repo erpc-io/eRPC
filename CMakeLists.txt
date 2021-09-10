@@ -453,7 +453,9 @@ if(TESTING)
     fixed_vector_test
     timely_test
     numautil_test
-    hdr_histogram_test)
+    hdr_histogram_test
+    udp_client_test
+    udp_server_test)
 
   # Non-Windows tests
   if (NOT WIN32)
