@@ -34,9 +34,9 @@ class UDPClient {
    * @param rem_port Destination UDP port to send the message to
    * @param msg Contents of the message
    *
-   * @return Number of bytes sent on success, -1 on failure
+   * @return Number of bytes sent on success, SIZE_MAX on failure
    */
-  ssize_t send(const std::string rem_hostname, uint16_t rem_port,
+  size_t send(const std::string rem_hostname, uint16_t rem_port,
                const T &msg) {
     asio::error_code error;
     asio::ip::udp::resolver::results_type results =
@@ -45,18 +45,18 @@ class UDPClient {
     if (results.size() == 0) {
       ERPC_ERROR("eRPC: Failed to resolve %s, asio error = %s.\n",
                  rem_hostname.c_str(), error.message().c_str());
-      return -1;
+      return SIZE_MAX;
     }
 
     asio::ip::udp::endpoint endpoint = *results.begin();
     try {
       const size_t ret =
           socket_->send_to(asio::buffer(&msg, sizeof(T)), endpoint);
-      return static_cast<ssize_t>(ret);
+      return ret;
     } catch (const asio::system_error &e) {
       ERPC_ERROR("eRPC: asio send_to() failed to %s, error: %s\n",
                  rem_hostname.c_str(), e.what());
-      return -1;
+      return SIZE_MAX;
     }
   }
 
