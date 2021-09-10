@@ -1,6 +1,7 @@
 #include "HdrHistogram_c/src/hdr_histogram.h"
 #include <gtest/gtest.h>
 #include <util/rand.h>
+#include <iostream>
 
 static int64_t kLatencyMinMicroseconds = 1;
 static int64_t kLatencyMaxMicroseconds = 1000 * 1000 * 100;  // 100 seconds
@@ -55,11 +56,11 @@ TEST(HdrHistogramTest, Basic) {
   const int64_t perc_998 = hdr_value_at_percentile(hist, 99.8);
   const int64_t perc_9999 = hdr_value_at_percentile(hist, 99.99);
   const int64_t perc_99999 = hdr_value_at_percentile(hist, 99.999);
-  const int64_t max = hdr_max(hist);
+  const int64_t max_lat = hdr_max(hist);
 
   printf("50%% 99%% 99.8%% 99.99%% 99.999%% max\n");
-  printf("%ld %ld %ld %ld %ld %ld\n", perc_50, perc_99, perc_998, perc_9999,
-         perc_99999, max);
+  std::cout << perc_50 << " " << perc_99 << " " << perc_998 << " " << perc_9999
+            << " " << perc_99999 << " " << max_lat << std::endl;
 
   EXPECT_LE(perc_50, k_low_latency);
   EXPECT_LE(perc_99, k_low_latency);
@@ -68,8 +69,8 @@ TEST(HdrHistogramTest, Basic) {
   EXPECT_GE(perc_99999, k_high_latency);
 
   // hdr_max() does not give exact max
-  EXPECT_LE((max - k_max_latency) * 1.0 / k_max_latency, 0.01);
-  EXPECT_NE(max, k_max_latency);
+  EXPECT_LE((max_lat - k_max_latency) * 1.0 / k_max_latency, 0.01);
+  EXPECT_NE(max_lat, k_max_latency);
 
   hdr_close(hist);
 }
