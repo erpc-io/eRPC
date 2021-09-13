@@ -71,3 +71,8 @@ src/config.h
 
 # Third-party downloads
 third_party
+
+# vscode
+.clang_complete
+.cache
+compile_commands.json
