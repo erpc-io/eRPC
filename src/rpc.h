@@ -41,7 +41,7 @@ namespace erpc {
  *      be invoked when requests are received from clients.
  *    - Create the response in the request handle supplied to the handler.
  *      Use Rpc::enqueue_response with either of the two response handle msgbufs
- *      to send the reply.
+ *      (pre_resp_msgbuf_ or dyn_resp_msgbuf_) to send the reply.
  * -# For an RPC client thread:
  *    - Create an Rpc endpoint using the Nexus
  *    - Connect to remote endpoints with Rpc::create_session, specifying the
@@ -190,6 +190,9 @@ class Rpc {
    * kConnected or \p kConnectFailed will be invoked after session creation
    * completes or fails.
    *
+   * Session establisment in eRPC is not optimized, and should be avoided
+   * on the datapath.
+   *
    * @return The local session number (>= 0) of the session if the session
    * handshake is successfully initiated, negative errno otherwise.
    *
@@ -265,9 +268,10 @@ class Rpc {
    * @param req_handle The handle passed to the request handler by eRPC
    *
    * @param resp_msgbuf The message buffer containing the response. This must
-   * be either the request handle's preallocated response buffer or its
-   * dynamic response. The preallocated response buffer may be used for only
-   * responses that fit in one packet, in which case it is the better choice.
+   * be either the request handle's preallocated response msgbuf or the request
+   * handle's dynamic response msgbuf. The preallocated response msgbuf may be
+   * used for only responses that fit in one packet, in which case it is the
+   * better choice.
    *
    * @note The restriction on resp_msgbuf is inconvenient to the user because
    * they cannot provide an arbitrary application-owned buffer. Unfortunately,
