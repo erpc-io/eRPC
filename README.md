@@ -77,7 +77,7 @@ Some highlights:
       --resource-group <your resource group> --name <a name for the NIC>
       --vnet-name <name of the VMs' virtual network> --subnet default
       --accelerated-networking true --subscription <Azure subscription, if
-      any>`
+      any> --location <the VM's availability zone>`
     * Stop the VM launched earlier, and attach the NIC created in the previous
       step to the VM (i.e., in "Networking" -> "Attach network interface").
     * Re-start the VM. It should have a new interface called `eth1`, which eRPC
