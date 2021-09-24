@@ -90,7 +90,7 @@ Some highlights:
        * `cmake .`
        * `sudo make install`
     * Install upstream pre-requisite libraries and modules:
-       * `sudo apt install make cmake g++ gcc libnuma-dev libibverbs-dev libgflags-dev numactl`
+       * `sudo apt install make cmake g++ gcc libnuma-dev libgflags-dev numactl`
        * `sudo modprobe ib_uverbs`
        * `sudo modprobe mlx4_ib`
     * Download the [DPDK 19.11.5 tarball](https://core.dpdk.org/download/) and
