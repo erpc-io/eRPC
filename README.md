@@ -73,7 +73,7 @@ Some highlights:
       --resource-group <your resource group> --name <a name for the NIC>
       --vnet-name <name of the VMs' virtual network> --subnet default
       --accelerated-networking true --subscription <Azure subscription, if
-      any>`
+      any> --location <the VM's availability zone>`
     * Stop the VM launched earlier, and attach the NIC created in the previous
       step to the VM (i.e., in "Networking" -> "Attach network interface").
     * Re-start the VM. It should have a new interface called `eth1`, which eRPC
@@ -86,7 +86,7 @@ Some highlights:
        * `cmake .`
        * `sudo make install`
     * Install upstream pre-requisite libraries and modules:
-       * `sudo apt install make cmake g++ gcc libnuma-dev libibverbs-dev libgflags-dev numactl`
+       * `sudo apt install make cmake g++ gcc libnuma-dev libgflags-dev numactl`
        * `sudo modprobe ib_uverbs`
        * `sudo modprobe mlx4_ib`
     * Download the [DPDK 19.11.5 tarball](https://core.dpdk.org/download/) and
