@@ -173,7 +173,6 @@ elseif(TRANSPORT STREQUAL "fake")
   set(CONFIG_TRANSPORT "FakeTransport")
   set(CONFIG_HEADROOM 40)
 else()
-  # Here, the transport is either InfiniBand or Mellanox Raw Ethernet
   set(CONFIG_IS_AZURE false)
   find_library(IBVERBS_LIB ibverbs)
   if(NOT IBVERBS_LIB)
@@ -184,6 +183,11 @@ else()
   if(TRANSPORT STREQUAL "raw")
     set(CONFIG_TRANSPORT "RawTransport")
     set(CONFIG_HEADROOM 40)
+    message(FATAL_ERROR
+      "eRPC no longer supports Raw transport, please use DTRANSPORT=dpdk instead. "
+      "If you wish to use the Raw transport, please use this version: "
+      "https://github.com/erpc-io/eRPC/releases/tag/v0.1. You'll need to "
+      "install an old version of Mellanox OFED (4.4 or older).")
   elseif(TRANSPORT STREQUAL "fake")
     set(CONFIG_TRANSPORT "FakeTransport")
     set(CONFIG_HEADROOM 40)
