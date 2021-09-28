@@ -1,5 +1,0 @@
-[gerrit]
-host=r-webdev02.lab.mtl.com
-port=29418
-project=connect-ib/libmlx5.git
-defaultbranch=mlnx_ofed_2_1

@@ -56,8 +56,6 @@ Some highlights:
    * DPDK-enabled NICs on Microsoft Azure: Use `-DTRANSPORT=dpdk -DAZURE=on`
  * RDMA (InfiniBand/RoCE) NICs: Use `DTRANSPORT=infiniband`. Add `DROCE=on`
    if using RoCE.
- * Mellanox drivers optimized specially for eRPC are available in the `drivers`
-   directory
 
 ## Running eRPC over DPDK on Microsoft Azure VMs
 
