@@ -17,12 +17,11 @@ static std::vector<std::string> split(std::string input, char delimiter) {
   return ret;
 }
 
-// Return the nth line from a file
+/// Return the nth line from a file. n is zero-indexed.
 static std::string get_line_n(std::string filename, size_t n) {
   std::ifstream in(filename.c_str());
-
+  erpc::rt_assert(!in.fail(), "Required file " + filename + " not found");
   std::string s;
-  s.reserve(100);  // For performance
 
   for (size_t i = 0; i < n; i++) {
     std::getline(in, s);
