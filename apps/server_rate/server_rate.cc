@@ -6,6 +6,7 @@
 #include "util/autorun_helpers.h"
 #include "util/latency.h"
 #include "util/numautils.h"
+#include "util/timer.h"
 
 static constexpr size_t kAppEvLoopMs = 1000;     // Duration of event loop
 static constexpr bool kAppVerbose = false;       // Print debug info on datapath
@@ -31,7 +32,7 @@ class ClientContext : public BasicAppContext {
  public:
   size_t num_resps = 0;
   size_t thread_id;
-  size_t start_tsc[kAppMaxWindowSize];
+  erpc::ChronoTimer start_time[kAppMaxWindowSize];
   erpc::Latency latency;
   erpc::MsgBuffer req_msgbuf[kAppMaxWindowSize], resp_msgbuf[kAppMaxWindowSize];
   ~ClientContext() {}
@@ -41,9 +42,9 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
   c->num_resps++;
 
-  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
+  erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
                                                  FLAGS_resp_size);
-  c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
+  c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
 void server_func(erpc::Nexus *nexus, size_t thread_id) {
@@ -53,20 +54,19 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
   ServerContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, phy_port);
-  c.rpc = &rpc;
+  c.rpc_ = &rpc;
 
   while (true) {
     c.num_resps = 0;
-    struct timespec start;
-    clock_gettime(CLOCK_REALTIME, &start);
+    erpc::ChronoTimer start;
     rpc.run_event_loop(kAppEvLoopMs);
 
-    double seconds = erpc::sec_since(start);
+    const double seconds = start.get_sec();
     printf("thread %zu: %.2f M/s. rx batch %.2f, tx batch %.2f\n", thread_id,
-           c.num_resps / (seconds * Mi(1)), c.rpc->get_avg_rx_batch(),
-           c.rpc->get_avg_tx_batch());
+           c.num_resps / (seconds * Mi(1)), c.rpc_->get_avg_rx_batch(),
+           c.rpc_->get_avg_tx_batch());
 
-    c.rpc->reset_dpath_stats();
+    c.rpc_->reset_dpath_stats();
     c.num_resps = 0;
 
     if (ctrl_c_pressed == 1) break;
@@ -75,19 +75,18 @@ void server_func(erpc::Nexus *nexus, size_t thread_id) {
 
 void app_cont_func(void *, void *);
 inline void send_req(ClientContext &c, size_t ws_i) {
-  c.start_tsc[ws_i] = erpc::rdtsc();
-  c.rpc->enqueue_request(c.fast_get_rand_session_num(), kAppReqType,
+  c.start_time[ws_i].reset();
+  c.rpc_->enqueue_request(c.fast_get_rand_session_num(), kAppReqType,
                          &c.req_msgbuf[ws_i], &c.resp_msgbuf[ws_i],
                          app_cont_func, reinterpret_cast<void *>(ws_i));
 }
 
 void app_cont_func(void *_context, void *_ws_i) {
   auto *c = static_cast<ClientContext *>(_context);
-  auto ws_i = reinterpret_cast<size_t>(_ws_i);
+  const auto ws_i = reinterpret_cast<size_t>(_ws_i);
   assert(c->resp_msgbuf[ws_i].get_data_size() == FLAGS_resp_size);
 
-  double req_lat_us =
-      erpc::to_usec(erpc::rdtsc() - c->start_tsc[ws_i], c->rpc->get_freq_ghz());
+  const double req_lat_us = c->start_time[ws_i].get_us();
   c->latency.update(static_cast<size_t>(req_lat_us * kAppLatFac));
   c->num_resps++;
 
@@ -103,13 +102,13 @@ void create_sessions(ClientContext &c) {
   }
 
   for (size_t i = 0; i < FLAGS_num_server_threads; i++) {
-    int session_num = c.rpc->create_session(server_uri, i);
+    int session_num = c.rpc_->create_session(server_uri, i);
     erpc::rt_assert(session_num >= 0, "Failed to create session");
-    c.session_num_vec.push_back(session_num);
+    c.session_num_vec_.push_back(session_num);
   }
 
-  while (c.num_sm_resps != FLAGS_num_server_threads) {
-    c.rpc->run_event_loop(kAppEvLoopMs);
+  while (c.num_sm_resps_ != FLAGS_num_server_threads) {
+    c.rpc_->run_event_loop(kAppEvLoopMs);
     if (unlikely(ctrl_c_pressed == 1)) return;
   }
 }
@@ -122,8 +121,8 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), thread_id,
                                   basic_sm_handler, phy_port);
 
-  rpc.retry_connect_on_invalid_rpc_id = true;
-  c.rpc = &rpc;
+  rpc.retry_connect_on_invalid_rpc_id_ = true;
+  c.rpc_ = &rpc;
   c.thread_id = thread_id;
 
   create_sessions(c);
@@ -141,13 +140,11 @@ void client_func(erpc::Nexus *nexus, size_t thread_id) {
   }
 
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
-    struct timespec start;
-    clock_gettime(CLOCK_REALTIME, &start);
-
+    erpc::ChronoTimer start;
     rpc.run_event_loop(kAppEvLoopMs);  // 1 second
     if (ctrl_c_pressed == 1) break;
 
-    double seconds = erpc::sec_since(start);
+    const double seconds = start.get_sec();
     printf("%zu: %.1f %.1f %.1f %.1f %.2f\n", thread_id,
            c.latency.perc(.5) / kAppLatFac, c.latency.perc(.05) / kAppLatFac,
            c.latency.perc(.99) / kAppLatFac, c.latency.perc(.999) / kAppLatFac,
