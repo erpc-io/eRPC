@@ -330,24 +330,34 @@ if(DPDK_NEEDED STREQUAL "true")
       "-lshell32" "-lole32" "-loleaut32" "-luuid" "-lcomdlg32" "-liphlpapi")
 
   else(WIN32)
-    message(STATUS "DPDK for Linux")
-    find_library(DPDK_LIB dpdk)
-    if(NOT DPDK_LIB)
-      message(FATAL_ERROR "DPDK library not found")
-    endif()
+		find_package(PkgConfig REQUIRED)
+		if(NOT DEFINED ENV{RTE_SDK})
+			message(FATAL_ERROR "Please define RTE_SDK")
+		endif()
+    set(DPDK_INSTALL_DIR "$ENV{RTE_SDK}/build/install/usr/local")
 
-    set(LIBRARIES ${LIBRARIES} -Wl,--whole-archive dpdk -Wl,--no-whole-archive numa dl ibverbs mlx4 mlx5)
+    # DPDK installs libraries in local/lib on some OSes, but
+    # in local/lib/x86_64-linux-gnu on other OSes
+		set(DPDK_LIB_DIR "${DPDK_INSTALL_DIR}/lib/x86_64-linux-gnu")
+		if(NOT EXISTS ${DPDK_LIB_DIR})
+			set(DPDK_LIB_DIR "${DPDK_INSTALL_DIR}/lib")
+			if(NOT EXISTS ${DPDK_LIB_DIR})
+				message(FATAL_ERROR "${DPDK_LIB_DIR} not found. Did you run `ninja install`?")
+			endif()
+		endif()
 
-    # DPDK include directory. Locating rte_config.h does not work on some systems.
-    # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
-    # from the real DPDK include directory (/usr/include/dpdk/).
-    find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
-    if (DPDK_INCLUDE_DIR)
-      message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
-    else()
-      message(FATAL_ERROR "DPDK include directory not found")
-    endif()
-    include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+    link_directories(${DPDK_LIB_DIR})
+    include_directories(SYSTEM ${DPDK_INSTALL_DIR}/include)
+
+    # We use some hacky command-line and CMake magic to construct DPDK library list
+		execute_process(
+			COMMAND bash -c "PKG_CONFIG_PATH=${DPDK_LIB_DIR}/pkgconfig pkg-config --static --libs-only-l libdpdk"
+			OUTPUT_VARIABLE DPDK_PKGCONFIG_OUT)
+		string(STRIP ${DPDK_PKGCONFIG_OUT} DPDK_PKGCONFIG_OUT) # Remove newline from pkg-config output
+    string(REPLACE "-lpthread" "" DPDK_PKGCONFIG_OUT ${DPDK_PKGCONFIG_OUT}) # Remove DPDK's pthread library
+
+		set(LIBRARIES ${LIBRARIES}
+			"-Wl,--whole-archive -Wl,--as-needed -L${DPDK_LIB_DIR} ${DPDK_PKGCONFIG_OUT} -Wl,--no-whole-archive")
   endif(WIN32)
 else()
   message(STATUS "DPDK not needed to build eRPC")
