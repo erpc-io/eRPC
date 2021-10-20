@@ -129,7 +129,6 @@ set(SOURCES
   src/rpc_impl/rpc_fault_inject.cc
   src/rpc_impl/rpc_pkt_loss.cc
   src/rpc_impl/rpc_rx.cc
-  src/rpc_impl/rpc_sslot.cc
   src/rpc_impl/rpc_connect_handlers.cc
   src/rpc_impl/rpc_disconnect_handlers.cc
   src/rpc_impl/rpc_reset_handlers.cc

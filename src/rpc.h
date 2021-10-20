@@ -7,6 +7,7 @@
 #include "msg_buffer.h"
 #include "nexus.h"
 #include "pkthdr.h"
+#include "req_handle.h"
 #include "rpc_types.h"
 #include "session.h"
 #include "transport.h"
