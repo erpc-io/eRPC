@@ -56,6 +56,7 @@ class Rpc;
 /// A one-to-one session class for all transports
 class Session {
   friend class Rpc<CTransport>;
+  friend class ReqHandle;
 
  public:
   enum class Role : int { kServer, kClient };
