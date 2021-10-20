@@ -1,7 +1,7 @@
 eRPC is a fast and general-purpose RPC library for datacenter networks.
 Our NSDI 2019 [paper](https://www.usenix.org/system/files/nsdi19-kalia.pdf)
 describes the system in detail.
-[Documentation](http://www.cs.cmu.edu/~akalia/erpc_doc) is available online.
+[Documentation](https://erpc.io/docs/index.html) is available online.
 
 Some highlights:
  * Multiple supported networks: Ethernet, InfiniBand, and RoCE
