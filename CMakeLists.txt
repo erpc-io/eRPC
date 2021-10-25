@@ -358,6 +358,10 @@ if(DPDK_NEEDED STREQUAL "true")
 
 		set(LIBRARIES ${LIBRARIES}
 			"-Wl,--whole-archive -Wl,--as-needed -L${DPDK_LIB_DIR} ${DPDK_PKGCONFIG_OUT} -Wl,--no-whole-archive")
+
+    # To use DPDK dynamic libs
+    # set(DPDK_LIBS "-Wl,--no-as-needed -lrte_ethdev -lrte_mbuf -lrte_eal -lrte_mempool -lrte_net_mlx5 -lrte_net_mlx4 -lrte_mempool_ring -Wl,--as-needed")
+    # set(LIBRARIES ${LIBRARIES} -L${DPDK_LIB_DIR} ${DPDK_LIBS})
   endif(WIN32)
 else()
   message(STATUS "DPDK not needed to build eRPC")
