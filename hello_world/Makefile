@@ -18,7 +18,7 @@ dpdk:
 	g++ -g -std=c++11 -o server server.cc \
 		-Wno-deprecated-declarations \
 		-DERPC_DPDK=true -march=native \
-		-I ../src -I /usr/include/dpdk \
+		-I ../src -I ../third_party/asio/include -I /usr/include/dpdk \
 		-L ../build $(LIBS) \
 		-Wl,--whole-archive -ldpdk -Wl,--no-whole-archive \
 		-lnuma -ldl -libverbs -lmlx4 -lmlx5
@@ -26,7 +26,7 @@ dpdk:
 	g++ -g -std=c++11 -o client client.cc \
 		-Wno-deprecated-declarations \
 		-DERPC_DPDK=true -march=native \
-		-I ../src -I /usr/include/dpdk \
+		-I ../src -I ../third_party/asio/include -I /usr/include/dpdk \
 		-L ../build $(LIBS) \
 		-Wl,--whole-archive -ldpdk -Wl,--no-whole-archive \
 		-lnuma -ldl -libverbs -lmlx4 -lmlx5

@@ -3,6 +3,7 @@
 #include "rpc_types.h"
 #include "session.h"
 #include "util/mt_queue.h"
+#include "req_handle.h"
 
 namespace erpc {
 

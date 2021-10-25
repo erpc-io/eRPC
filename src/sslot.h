@@ -122,10 +122,4 @@ class SSlot {
   size_t get_cur_req_num() const { return cur_req_num_; }
 };
 
-class ReqHandle : public SSlot {
- public:
-  inline const MsgBuffer *get_req_msgbuf() const {
-    return &server_info_.req_msgbuf_;
-  }
-};
 }  // namespace erpc
