@@ -101,10 +101,12 @@ class Rpc {
    * \param sm_handler The session management callback that is invoked when
    * sessions are successfully created or destroyed.
    *
-   * @param phy_port An Rpc object uses one physical port on the NIC. phy_port
-   * is the zero-based index of that port among active ports, as listed by
-   * `ibv_devinfo` for Raw, InfiniBand, and RoCE transports; or by
-   * `dpdk-devbind` for DPDK transport.
+   * @param phy_port An Rpc object uses one port on a "datapath" NIC, which
+   * refers to a NIC that supports DPDK or ibverbs. phy_port is the zero-based
+   * index of that port among active ports, same as the one passed to
+   * `rte_eth_dev_info_get` for the DPDK transport; or as listed by
+   * `ibv_devinfo` for Raw, InfiniBand, and RoCE transports. Multiple Rpc
+   * objects may use the same phy_port.
    *
    * @throw runtime_error if construction fails
    */
