@@ -20,7 +20,7 @@ int Rpc<TTr>::create_session_st(std::string remote_uri, uint8_t rem_rpc_id) {
   if (!in_dispatch()) {
     ERPC_WARN(
         "%s: Cannot create session from a thread other than the one that "
-        "created this erpc::Rpc object.\n",
+        "created this Rpc object.\n",
         issue_msg);
     return -EPERM;
   }
@@ -86,7 +86,7 @@ int Rpc<TTr>::destroy_session_st(int session_num) {
   if (!in_dispatch()) {
     ERPC_WARN(
         "%s: Can't destroy session from a thread other than the one that "
-        "created this erpc::Rpc object.\n",
+        "created this Rpc object.\n",
         issue_msg);
     return -EPERM;
   }

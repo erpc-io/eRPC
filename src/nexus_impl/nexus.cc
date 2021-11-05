@@ -94,7 +94,9 @@ Nexus::~Nexus() {
   // should be dead as well, so it's safe to reset TLS.
   for (const Hook *hook : reg_hooks_arr_) {
     if (hook != nullptr) {
-      ERPC_WARN("Rpc: Deleting Nexus, but a worker is still registered");
+      ERPC_ERROR(
+          "eRPC Nexus: Nexus destroyed while an Rpc object depending on this "
+          "Nexus is still alive.");
       assert(false);  // Die in debug mode
     }
   }
