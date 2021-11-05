@@ -48,7 +48,7 @@ namespace erpc {
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_ERROR
 #define ERPC_ERROR(...)                                 \
-  erpc_output_log_header(stderr, ERPC_LOG_LEVEL_ERROR); \
+  erpc::output_log_header(stderr, ERPC_LOG_LEVEL_ERROR); \
   fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);        \
   fflush(ERPC_LOG_DEFAULT_STREAM)
 #else
@@ -57,7 +57,7 @@ namespace erpc {
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_WARN
 #define ERPC_WARN(...)                                                  \
-  erpc_output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_WARN); \
+  erpc::output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_WARN); \
   fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);                        \
   fflush(ERPC_LOG_DEFAULT_STREAM)
 #else
@@ -66,7 +66,7 @@ namespace erpc {
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_INFO
 #define ERPC_INFO(...)                                                  \
-  erpc_output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_INFO); \
+  erpc::output_log_header(ERPC_LOG_DEFAULT_STREAM, ERPC_LOG_LEVEL_INFO); \
   fprintf(ERPC_LOG_DEFAULT_STREAM, __VA_ARGS__);                        \
   fflush(ERPC_LOG_DEFAULT_STREAM)
 #else
@@ -75,7 +75,7 @@ namespace erpc {
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_REORDER
 #define ERPC_REORDER(...)                                   \
-  erpc_output_log_header(erpc_trace_file_or_default_stream, \
+  erpc::output_log_header(erpc_trace_file_or_default_stream, \
                          ERPC_LOG_LEVEL_REORDER);           \
   fprintf(erpc_trace_file_or_default_stream, __VA_ARGS__);  \
   fflush(erpc_trace_file_or_default_stream)
@@ -85,7 +85,7 @@ namespace erpc {
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_TRACE
 #define ERPC_TRACE(...)                                     \
-  erpc_output_log_header(erpc_trace_file_or_default_stream, \
+  erpc::output_log_header(erpc_trace_file_or_default_stream, \
                          ERPC_LOG_LEVEL_TRACE);             \
   fprintf(erpc_trace_file_or_default_stream, __VA_ARGS__);  \
   fflush(erpc_trace_file_or_default_stream)
@@ -95,7 +95,7 @@ namespace erpc {
 
 #if ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_CC
 #define ERPC_CC(...)                                        \
-  erpc_output_log_header(erpc_trace_file_or_default_stream, \
+  erpc::output_log_header(erpc_trace_file_or_default_stream, \
                          ERPC_LOG_LEVEL_CC);                \
   fprintf(erpc_trace_file_or_default_stream, __VA_ARGS__);  \
   fflush(erpc_trace_file_or_default_stream)
@@ -125,7 +125,7 @@ static std::string get_formatted_time() {
 }
 
 // Output log message header
-static void erpc_output_log_header(FILE *stream, int level) {
+static void output_log_header(FILE *stream, int level) {
   std::string formatted_time = get_formatted_time();
 
   const char *type;
