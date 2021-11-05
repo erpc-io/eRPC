@@ -284,12 +284,26 @@ class Rpc {
    */
   void enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf);
 
-  /// Run the event loop for some milliseconds
+  /// Run the event loop for some milliseconds. See Rpc::run_event_loop_once()
+  /// for more on eRPC's event loop.
   inline void run_event_loop(size_t timeout_ms) {
     run_event_loop_timeout_st(timeout_ms);
   }
 
-  /// Run the event loop once
+  /**
+   * @brief Run one iteration of eRPC's event loop. Users must call this
+   * periodically to make progress, since the event loop performs most of eRPC's
+   * work, including
+   *
+   * -# Checking for new session handshake requests and responses, and invoking
+   *  corresponding callbacks
+   * -# Checking for new datapath requests and responses, and invoking
+   *  corresponding callbacks
+   * -# Scheduling and transmitting datapath packets, and retransmitting lost
+   *  packets
+   *
+   * This call returns immediately when there is no work to be done.
+   */
   inline void run_event_loop_once() { run_event_loop_do_one_st(); }
 
   /// Identical to alloc_msg_buffer(), but throws an exception on failure
