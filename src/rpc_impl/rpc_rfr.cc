@@ -3,7 +3,7 @@
 namespace erpc {
 
 template <class TTr>
-void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
+void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot) {
   assert(in_dispatch());
 
   MsgBuffer *ctrl_msgbuf = &ctrl_msgbufs_[ctrl_msgbuf_head_];
@@ -12,12 +12,12 @@ void Rpc<TTr>::enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr) {
 
   // Fill in the RFR packet header. Avoid copying resp_pkthdr's headroom.
   pkthdr_t *rfr_pkthdr = ctrl_msgbuf->get_pkthdr_0();
-  rfr_pkthdr->req_type_ = resp_pkthdr->req_type_;
+  rfr_pkthdr->req_type_ = sslot->client_info_.req_type_;
   rfr_pkthdr->msg_size_ = 0;
   rfr_pkthdr->dest_session_num_ = sslot->session_->remote_session_num_;
   rfr_pkthdr->pkt_type_ = PktType::kRFR;
   rfr_pkthdr->pkt_num_ = sslot->client_info_.num_tx_;
-  rfr_pkthdr->req_num_ = resp_pkthdr->req_num_;
+  rfr_pkthdr->req_num_ = sslot->cur_req_num_;
   rfr_pkthdr->magic_ = kPktHdrMagic;
 
   enqueue_hdr_tx_burst_st(

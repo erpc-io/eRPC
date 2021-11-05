@@ -43,7 +43,7 @@ void Rpc<TTr>::kick_rfr_st(SSlot *sslot) {
   size_t rfr_pndng = wire_pkts(sslot->tx_msgbuf_, ci.resp_msgbuf_) - ci.num_tx_;
   size_t sending = (std::min)(credits, rfr_pndng);  // > 0
   for (size_t x = 0; x < sending; x++) {
-    enqueue_rfr_st(sslot, ci.resp_msgbuf_->get_pkthdr_0());
+    enqueue_rfr_st(sslot);
     ci.num_tx_++;
     credits--;
   }

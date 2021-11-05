@@ -694,11 +694,8 @@ class Rpc {
    * sslot's num_tx.
    *
    * @param sslot The session slot to send the RFR for
-   * @param req_pkthdr The packet header of the response packet that triggered
-   * this RFR. Since one response packet can trigger multiple RFRs, the RFR's
-   * packet number should be computed from num_tx, not from resp_pkthdr.
    */
-  void enqueue_rfr_st(SSlot *sslot, const pkthdr_t *resp_pkthdr);
+  void enqueue_rfr_st(SSlot *sslot);
 
   /// Process a request-for-response
   void process_rfr_st(SSlot *, const pkthdr_t *);

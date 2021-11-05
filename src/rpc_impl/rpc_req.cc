@@ -40,14 +40,16 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
 
   auto &ci = sslot.client_info_;
   ci.resp_msgbuf_ = resp_msgbuf;
+  ci.req_type_ = req_type;
   ci.cont_func_ = cont_func;
   ci.tag_ = tag;
+  ci.cont_etid_ = cont_etid;
+
   ci.progress_tsc_ = ev_loop_tsc_;
   add_to_active_rpc_list(sslot);
 
   ci.num_rx_ = 0;
   ci.num_tx_ = 0;
-  ci.cont_etid_ = cont_etid;
 
   // Fill in packet 0's header
   pkthdr_t *pkthdr_0 = req_msgbuf->get_pkthdr_0();

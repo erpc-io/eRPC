@@ -42,8 +42,7 @@ void Rpc<TTr>::process_wheel_st() {
     if (pkt_num < sslot->tx_msgbuf_->num_pkts_) {
       enqueue_pkt_tx_burst_st(sslot, pkt_num /* pkt_idx */, &ci.tx_ts_[crd_i]);
     } else {
-      MsgBuffer *resp_msgbuf = ci.resp_msgbuf_;
-      enqueue_rfr_st(sslot, resp_msgbuf->get_pkthdr_0());
+      enqueue_rfr_st(sslot);
     }
 
     sslot->client_info_.wheel_count_--;

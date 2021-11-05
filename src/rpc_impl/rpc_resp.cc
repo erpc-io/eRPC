@@ -98,12 +98,8 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // Special handling for single-packet responses
   if (likely(pkthdr->msg_size_ <= TTr::kMaxDataPerPkt)) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size_);
-
-    // Copy eRPC header and data (but not Transport headroom). The eRPC header
-    // will be needed (e.g., to determine the request type) if the continuation
-    // runs in a background thread.
-    memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
-           pkthdr->msg_size_ + sizeof(pkthdr_t) - kHeadroom);
+    memcpy(resp_msgbuf->buf_, pkthdr->ehdrptr() + sizeof(pkthdr_t),
+           pkthdr->msg_size_ + sizeof(pkthdr_t));
 
     // Fall through to invoke continuation
   } else {
@@ -140,12 +136,12 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   sslot->tx_msgbuf_ = nullptr;  // Mark response as received
   delete_from_active_rpc_list(*sslot);
 
-  // Free-up this sslot by copying-out needed fields. The sslot may get re-used
-  // immediately if there are backlogged requests, or much later from a request
-  // enqueued by a background thread.
-  const erpc_cont_func_t cont_func = ci.cont_func_;
-  void *tag = ci.tag_;
-  const size_t cont_etid = ci.cont_etid_;
+  // Free-up this sslot by copying-out fields needed for the continuation. The
+  // sslot may get re-used by a new request immediately if there are backlogged
+  // requests, or much later from a request enqueued by a background thread.
+  const erpc_cont_func_t save_cont_func = ci.cont_func_;
+  void *save_tag = ci.tag_;
+  const size_t save_cont_etid = ci.cont_etid_;
 
   Session *session = sslot->session_;
   session->client_info_.sslot_free_vec_.push_back(sslot->index_);
@@ -161,10 +157,10 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     session->client_info_.enq_req_backlog_.pop();
   }
 
-  if (likely(cont_etid == kInvalidBgETid)) {
-    cont_func(context_, tag);
+  if (likely(save_cont_etid == kInvalidBgETid)) {
+    save_cont_func(context_, save_tag);
   } else {
-    submit_bg_resp_st(cont_func, tag, cont_etid);
+    submit_bg_resp_st(save_cont_func, save_tag, save_cont_etid);
   }
   return;
 }

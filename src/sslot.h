@@ -51,9 +51,11 @@ class SSlot {
 
   union {
     struct {
-      MsgBuffer *resp_msgbuf_;      ///< User-supplied response buffer
-      erpc_cont_func_t cont_func_;  ///< Continuation function for the request
-      void *tag_;                   ///< Tag of the request
+      MsgBuffer *resp_msgbuf_;      /// Saved from enqueue_request()
+      uint8_t req_type_;            /// Saved from enqueue_request()
+      erpc_cont_func_t cont_func_;  /// Saved from enqueue_request()
+      void *tag_;                   /// Saved from enqueue_request()
+      size_t cont_etid_;            /// Saved from enqueue_request()
 
       /// Number of packets sent. Packets up to (num_tx - 1) have been sent.
       size_t num_tx_;
@@ -64,8 +66,6 @@ class SSlot {
       /// TSC at which we last sent or retransmitted a packet, or received an
       /// in-order packet for this request
       size_t progress_tsc_;
-
-      size_t cont_etid_;  ///< eRPC thread ID to run the continuation on
 
       /// Pointers for the intrusive doubly-linked list of active RPCs
       SSlot *prev_, *next_;
