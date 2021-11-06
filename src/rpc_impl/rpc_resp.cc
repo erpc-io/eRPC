@@ -107,14 +107,11 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
     if (pkthdr->pkt_num_ == req_msgbuf->num_pkts_ - 1) {
       // This is the first response packet. Size the response and copy header.
       resize_msg_buffer(resp_msgbuf, pkthdr->msg_size_);
-      memcpy(resp_msgbuf->get_pkthdr_0()->ehdrptr(), pkthdr->ehdrptr(),
-             sizeof(pkthdr_t) - kHeadroom);
     }
 
     // Transmit remaining RFRs before response memcpy. We have credits.
     if (ci.num_tx_ != wire_pkts(req_msgbuf, resp_msgbuf)) kick_rfr_st(sslot);
 
-    // Hdr 0 was copied earlier, other headers are unneeded, so copy just data.
     const size_t pkt_idx = resp_ntoi(pkthdr->pkt_num_, req_msgbuf->num_pkts_);
     copy_data_to_msgbuf(resp_msgbuf, pkt_idx, pkthdr);
 
