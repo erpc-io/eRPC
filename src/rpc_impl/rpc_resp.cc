@@ -98,9 +98,7 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   // Special handling for single-packet responses
   if (likely(pkthdr->msg_size_ <= TTr::kMaxDataPerPkt)) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size_);
-    memcpy(resp_msgbuf->buf_, pkthdr->ehdrptr() + sizeof(pkthdr_t),
-           pkthdr->msg_size_ + sizeof(pkthdr_t));
-
+    memcpy(resp_msgbuf->buf_, pkthdr + 1 /* skip header */, pkthdr->msg_size_);
     // Fall through to invoke continuation
   } else {
     // This is an in-order response packet. So, we still have the request.
