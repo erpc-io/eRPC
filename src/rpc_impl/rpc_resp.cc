@@ -95,29 +95,21 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
   ci.num_rx_++;
   ci.progress_tsc_ = ev_loop_tsc_;
 
-  // Special handling for single-packet responses
-  if (likely(pkthdr->msg_size_ <= TTr::kMaxDataPerPkt)) {
+  // This is an in-order response packet, so we still have the request
+  MsgBuffer *req_msgbuf = sslot->tx_msgbuf_;
+
+  // Resize/allocate response for the first response packet
+  if (pkthdr->pkt_num_ == req_msgbuf->num_pkts_ - 1) {
     resize_msg_buffer(resp_msgbuf, pkthdr->msg_size_);
-    memcpy(resp_msgbuf->buf_, pkthdr + 1 /* skip header */, pkthdr->msg_size_);
-    // Fall through to invoke continuation
-  } else {
-    // This is an in-order response packet. So, we still have the request.
-    MsgBuffer *req_msgbuf = sslot->tx_msgbuf_;
-
-    if (pkthdr->pkt_num_ == req_msgbuf->num_pkts_ - 1) {
-      // This is the first response packet. Size the response and copy header.
-      resize_msg_buffer(resp_msgbuf, pkthdr->msg_size_);
-    }
-
-    // Transmit remaining RFRs before response memcpy. We have credits.
-    if (ci.num_tx_ != wire_pkts(req_msgbuf, resp_msgbuf)) kick_rfr_st(sslot);
-
-    const size_t pkt_idx = resp_ntoi(pkthdr->pkt_num_, req_msgbuf->num_pkts_);
-    copy_data_to_msgbuf(resp_msgbuf, pkt_idx, pkthdr);
-
-    if (ci.num_rx_ != wire_pkts(req_msgbuf, resp_msgbuf)) return;
-    // Else fall through to invoke continuation
   }
+
+  // Transmit any remaining RFRs before response memcpy. We have credits.
+  if (ci.num_tx_ != wire_pkts(req_msgbuf, resp_msgbuf)) kick_rfr_st(sslot);
+
+  const size_t pkt_idx = resp_ntoi(pkthdr->pkt_num_, req_msgbuf->num_pkts_);
+  copy_data_to_msgbuf(resp_msgbuf, pkt_idx, pkthdr);
+
+  if (ci.num_rx_ != wire_pkts(req_msgbuf, resp_msgbuf)) return;
 
   // Here, the complete response has been received. All references to sslot must
   // have been removed previously, before invalidating the sslot (done next).
