@@ -28,7 +28,10 @@ class IBTransport : public Transport {
   static constexpr size_t kPostlist = 16;    ///< Maximum SEND postlist
   static constexpr size_t kMaxInline = 60;   ///< Maximum send wr inline data
   static constexpr size_t kRecvSlack = 32;   ///< RECVs batched before posting
-  static constexpr uint32_t kQKey = 0xffffffff;  ///< Secure key for all nodes
+
+  /// Ideally, the connection handshake should establish a secure queue key.
+  /// For now, anything outside 0xffff0000..0xffffffff (reserved by CX3) works.
+  static constexpr uint32_t kQKey = 0x0205; 
   static constexpr size_t kGRHBytes = 40;
 
   static_assert(kSQDepth >= 2 * kUnsigBatch, "");  // Queue capacity check
