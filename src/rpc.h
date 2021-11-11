@@ -519,7 +519,9 @@ class Rpc {
    */
   inline void bury_req_msgbuf_server_st(SSlot *sslot) {
     MsgBuffer &req_msgbuf = sslot->server_info_.req_msgbuf_;
-    if (unlikely(req_msgbuf.is_dynamic())) {
+
+    // Free if this request msgbuf is not just a view into the RX ring
+    if (unlikely(req_msgbuf.buffer_.buf_ != nullptr)) {
       free_msg_buffer(req_msgbuf);
       req_msgbuf.buffer_.buf_ = nullptr;  // Mark invalid for future
     }

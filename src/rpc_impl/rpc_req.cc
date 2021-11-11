@@ -134,9 +134,9 @@ void Rpc<TTr>::process_small_req_st(SSlot *sslot, pkthdr_t *pkthdr) {
 
   if (likely(!req_func.is_background())) {
     if (kZeroCopyRX) {
-      // For foreground request handlers, a "fake" static request msgbuf
-      // suffices. This improves performance, but it restricts ownership of the
-      // request msgbuf to the duration of req_func.
+      // For foreground request handlers, a "fake" request msgbuf that is a view
+      // into the RX ring suffices. This improves performance, but it restricts
+      // ownership of the request msgbuf to the duration of req_func.
       req_msgbuf = MsgBuffer(pkthdr, pkthdr->msg_size_);
     } else {
       req_msgbuf = alloc_msg_buffer(pkthdr->msg_size_);

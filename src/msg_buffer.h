@@ -49,10 +49,6 @@ class MsgBuffer {
     return get_pkthdr_n(pkt_idx)->to_string();
   }
 
-  /// Return true iff this MsgBuffer uses a dynamically-allocated MsgBuffer.
-  /// This function does not sanity-check other fields.
-  inline bool is_dynamic() const { return buffer_.buf_ != nullptr; }
-
   /// Check if this MsgBuffer is buried
   inline bool is_buried() const {
     return (buf_ == nullptr && buffer_.buf_ == nullptr);
@@ -102,9 +98,10 @@ class MsgBuffer {
     pkthdr_0->headroom_[kHeadroom + 1] = 0;
   }
 
-  /// Construct a single-packet "fake" MsgBuffer using a received packet,
-  /// setting \p buffer to invalid so that we know not to free it.
-  /// \p pkt must have space for \p max_data_bytes and one packet header.
+  /// Construct a single-packet "fake" MsgBuffer as a view into a RX ring
+  /// packet. Mark \p buffer as invalid so that we know not to free this
+  /// msgbuf later. \p pkt must have space for \p max_data_size bytes and one
+  /// packet header.
   MsgBuffer(pkthdr_t *pkthdr, size_t max_data_size)
       : max_data_size_(max_data_size),
         data_size_(max_data_size),
