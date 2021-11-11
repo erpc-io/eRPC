@@ -178,7 +178,7 @@ class Rpc {
     msg_buffer->resize(new_data_size, new_num_pkts);
   }
 
-  /// Free a MsgBuffer created by alloc_msg_buffer(). Safe to call from
+  /// Free a MsgBuffer allocated by alloc_msg_buffer(). Safe to call from
   /// background threads (TS).
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     lock_cond(&huge_alloc_lock_);
@@ -240,8 +240,8 @@ class Rpc {
    * @param req_msgbuf The MsgBuffer containing the request data
    *
    * @param resp_msgbuf The MsgBuffer that will contain the response data when
-   * the continuation is invoked. Its allocation size be large enough to
-   * accomodate any response for this request.
+   * the continuation is invoked. If the capacity of this msgbuf is smaller than
+   * the response, eRPC will reallocate this msgbuf to the required size.
    *
    * @param cont_func The continuation that will be invoked when this request
    * completes. See erpc_req_func_t.

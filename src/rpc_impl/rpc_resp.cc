@@ -58,9 +58,8 @@ void Rpc<TTr>::enqueue_response(ReqHandle *req_handle, MsgBuffer *resp_msgbuf) {
   }
 
   // Fill in the slot and reset queueing progress
-  assert(sslot->tx_msgbuf_ ==
-         nullptr);                  // Buried before calling request handler
-  sslot->tx_msgbuf_ = resp_msgbuf;  // Mark response as valid
+  assert(sslot->tx_msgbuf_ == nullptr);  // Buried before calling req handler
+  sslot->tx_msgbuf_ = resp_msgbuf;       // Mark response as valid
 
   // Mark enqueue_response() as completed
   assert(sslot->server_info_.req_type_ != kInvalidReqType);
@@ -100,7 +99,21 @@ void Rpc<TTr>::process_resp_one_st(SSlot *sslot, const pkthdr_t *pkthdr,
 
   // Resize/allocate response for the first response packet
   if (pkthdr->pkt_num_ == req_msgbuf->num_pkts_ - 1) {
-    resize_msg_buffer(resp_msgbuf, pkthdr->msg_size_);
+    if (resp_msgbuf->max_data_size_ < pkthdr->msg_size_) {
+      // User's resp msgbuf was too small
+      ERPC_INFO(
+          "Rpc %u, lsn %u (%s), req num %zu: Received response (%u bytes) "
+          "larger than user-provided buffer's capacity (%zu bytes). Freeing "
+          "and re-allocating.\n",
+          rpc_id_, sslot->session_->local_session_num_,
+          sslot->session_->get_remote_hostname().c_str(), sslot->cur_req_num_,
+          pkthdr->msg_size_, resp_msgbuf->max_data_size_);
+
+      free_msg_buffer(*resp_msgbuf);
+      *resp_msgbuf = alloc_msg_buffer(pkthdr->msg_size_);
+    } else {
+      resize_msg_buffer(resp_msgbuf, pkthdr->msg_size_);
+    }
   }
 
   // Transmit any remaining RFRs before response memcpy. We have credits.
