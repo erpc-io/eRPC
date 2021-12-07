@@ -346,6 +346,7 @@ if(DPDK_NEEDED STREQUAL "true")
 			endif()
 		endif()
 
+    message(STATUS "Using DPDK libraries from ${DPDK_LIB_DIR}")
     link_directories(${DPDK_LIB_DIR})
     include_directories(SYSTEM ${DPDK_INSTALL_DIR}/include)
 
@@ -354,7 +355,16 @@ if(DPDK_NEEDED STREQUAL "true")
 			COMMAND bash -c "PKG_CONFIG_PATH=${DPDK_LIB_DIR}/pkgconfig pkg-config --static --libs-only-l libdpdk"
 			OUTPUT_VARIABLE DPDK_PKGCONFIG_OUT)
 		string(STRIP ${DPDK_PKGCONFIG_OUT} DPDK_PKGCONFIG_OUT) # Remove newline from pkg-config output
-    string(REPLACE "-lpthread" "" DPDK_PKGCONFIG_OUT ${DPDK_PKGCONFIG_OUT}) # Remove DPDK's pthread library
+
+    set(DELETE_DPDK_LIBS
+      -librte_bbdev.a -l:librte_baseband_null.a -l:librte_baseband_turbo_sw.a
+      -l:librte_baseband_fpga_lte_fec.a -l:librte_baseband_fpga_5gnr_fec.a
+      -l:librte_baseband_acc100.a -lrte_bbdev
+      -l:librte_crypto_openssl.a -l:librte_crypto_ccp.a
+      -lpthread)
+    foreach(l IN LISTS DELETE_DPDK_LIBS)
+      string(REPLACE ${l} "" DPDK_PKGCONFIG_OUT ${DPDK_PKGCONFIG_OUT})
+    endforeach()
 
 		set(LIBRARIES ${LIBRARIES}
 			"-Wl,--whole-archive -Wl,--as-needed -L${DPDK_LIB_DIR} ${DPDK_PKGCONFIG_OUT} -Wl,--no-whole-archive")

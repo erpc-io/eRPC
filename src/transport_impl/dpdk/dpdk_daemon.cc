@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
   const std::string memzone_name = erpc::DpdkTransport::get_memzone_name();
   const rte_memzone *memzone = rte_memzone_reserve(
       memzone_name.c_str(), sizeof(erpc::DpdkTransport::ownership_memzone_t),
-      FLAGS_numa_node, RTE_MEMZONE_2MB);
+      FLAGS_numa_node, RTE_MEMZONE_2MB | RTE_MEMZONE_SIZE_HINT_ONLY);
   erpc::rt_assert(memzone != nullptr,
                   "eRPC DPDK daemon: Failed to create memzone");
   ERPC_WARN("eRPC DPDK daemon: Successfully initialized shared memzone %s\n",
