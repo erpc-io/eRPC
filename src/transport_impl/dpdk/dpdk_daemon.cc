@@ -16,8 +16,8 @@ DEFINE_uint64(numa_node, 0,
 int main(int argc, char **argv) {
   erpc::rt_assert(!getuid(), "You need to be root to use eRPC");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  erpc::ERPC_WARN("eRPC DPDK daemon: Managing DPDK port %zu on NUMA node %zu\n",
-                  FLAGS_phy_port, FLAGS_numa_node);
+  ERPC_WARN("eRPC DPDK daemon: Managing DPDK port %zu on NUMA node %zu\n",
+            FLAGS_phy_port, FLAGS_numa_node);
 
   // clang-format off
   const char *rte_argv[] = {
@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
       "eRPC DPDK daemon: Error: Failed to initialize DPDK. Is another "
       "eRPC DPDK daemon or primary DPDK process already running?");
 
-  erpc::ERPC_WARN("eRPC DPDK daemon: Successfully initialized DPDK EAL\n");
+  ERPC_WARN("eRPC DPDK daemon: Successfully initialized DPDK EAL\n");
 
   const std::string memzone_name = erpc::DpdkTransport::get_memzone_name();
   const rte_memzone *memzone = rte_memzone_reserve(
@@ -53,9 +53,8 @@ int main(int argc, char **argv) {
       FLAGS_numa_node, RTE_MEMZONE_2MB);
   erpc::rt_assert(memzone != nullptr,
                   "eRPC DPDK daemon: Failed to create memzone");
-  erpc::ERPC_WARN(
-      "eRPC DPDK daemon: Successfully initialized shared memzone %s\n",
-      memzone_name.c_str());
+  ERPC_WARN("eRPC DPDK daemon: Successfully initialized shared memzone %s\n",
+            memzone_name.c_str());
 
   auto *ownership_memzone =
       reinterpret_cast<erpc::DpdkTransport::ownership_memzone_t *>(
@@ -66,8 +65,8 @@ int main(int argc, char **argv) {
       FLAGS_phy_port, FLAGS_numa_node,
       erpc::DpdkTransport::DpdkProcType::kPrimary);
 
-  erpc::ERPC_WARN("eRPC DPDK daemon: Successfully initialized DPDK port %zu\n",
-                  FLAGS_phy_port);
+  ERPC_WARN("eRPC DPDK daemon: Successfully initialized DPDK port %zu\n",
+            FLAGS_phy_port);
 
   // Check if the link is up
   struct rte_eth_link link;
@@ -84,8 +83,8 @@ int main(int argc, char **argv) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     size_t cur_epoch = ownership_memzone->get_epoch();
     if (cur_epoch != prev_epoch) {
-      erpc::ERPC_WARN("eRPC DPDK daemon: %s\n",
-                      ownership_memzone->get_summary(FLAGS_phy_port).c_str());
+      ERPC_WARN("eRPC DPDK daemon: %s\n",
+                ownership_memzone->get_summary(FLAGS_phy_port).c_str());
       prev_epoch = cur_epoch;
     }
     ownership_memzone->daemon_reclaim_qps_from_crashed(FLAGS_phy_port);

@@ -97,7 +97,10 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     if (qp_id_ != kInvalidQpId) {
       ERPC_INFO("DPDK transport for Rpc %u got QP %zu\n", rpc_id, qp_id_);
     } else {
-      ERPC_ERROR("DPDK transport for Rpc %u failed to get free QP\n", rpc_id);
+      ERPC_ERROR(
+          "DPDK transport for Rpc %u failed to get a free TX/RQ queue pair. "
+          "All %zu available queue pairs are in use by Rpc objects.\n",
+          rpc_id, kMaxQueuesPerPort);
       throw std::runtime_error("Failed to get DPDK QP");
     }
 

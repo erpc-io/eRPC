@@ -25,6 +25,16 @@ class Nexus {
    * @brief Initialize eRPC for this process
    *
    * @param local_uri A URI for this process formatted as hostname:udp_port.
+   * This hostname and UDP port correspond to the "control" network interface of
+   * the host, which eRPC uses for non-performance-critical session handshakes
+   * and management traffic. This is different from the fast "datapath" network
+   * interface that eRPC uses for performance-critical RPC traffic (see
+   * Rpc::Rpc).
+   *
+   * The "control" network interface is often (a) a slow 1 Gbps NIC used for
+   * SSH, (b) a non-accelerated NIC in a cloud. Generally, this hostname should
+   * be reachable from other servers using eRPC via ping.
+   *
    * This UDP port is used for listening to management packets, and it must
    * be in [#kBaseSmUdpPort, #kBaseSmUdpPort + #kMaxNumERpcProcesses).
    *

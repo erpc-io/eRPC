@@ -54,6 +54,7 @@ class UDPClient {
       try {
         const size_t ret =
             socket_->send_to(asio::buffer(&msg, sizeof(T)), endpoint_iter);
+        if (enable_recording_flag_) sent_vec_.push_back(msg);
         return ret;
       } catch (const asio::system_error &e) {
         ERPC_ERROR("eRPC: asio send_to() failed to %s, error: %s\n",
