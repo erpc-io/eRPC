@@ -5,6 +5,7 @@ include(CMakeDependentOption)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Parse the build type
 if(PERF)
