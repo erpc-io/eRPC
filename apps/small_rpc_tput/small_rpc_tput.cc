@@ -129,24 +129,24 @@ void send_reqs(AppContext *c, size_t batch_i) {
   for (size_t i = 0; i < FLAGS_batch_size; i++) {
     if (kAppVerbose) {
       printf("Process %zu, Rpc %u: Sending request for batch %zu.\n",
-             FLAGS_process_id, c->rpc->get_rpc_id(), batch_i);
+             FLAGS_process_id, c->rpc_->get_rpc_id(), batch_i);
     }
 
     if (!kAppPayloadCheck) {
-      bc.req_msgbuf[i].buf[0] = kAppDataByte;  // Touch req MsgBuffer
+      bc.req_msgbuf[i].buf_[0] = kAppDataByte;  // Touch req MsgBuffer
     } else {
       // Fill the request MsgBuffer with a checkable sequence
-      uint8_t *buf = bc.req_msgbuf[i].buf;
-      buf[0] = c->fastrand.next_u32();
+      uint8_t *buf = bc.req_msgbuf[i].buf_;
+      buf[0] = c->fastrand_.next_u32();
       for (size_t j = 1; j < FLAGS_msg_size; j++) buf[j] = buf[0] + j;
     }
 
     if (kAppMeasureLatency) bc.req_tsc[i] = erpc::rdtsc();
 
     tag_t tag(batch_i, i);
-    c->rpc->enqueue_request(c->fast_get_rand_session_num(), kAppReqType,
-                            &bc.req_msgbuf[i], &bc.resp_msgbuf[i],
-                            app_cont_func, reinterpret_cast<void *>(tag._tag));
+    c->rpc_->enqueue_request(c->fast_get_rand_session_num(), kAppReqType,
+                             &bc.req_msgbuf[i], &bc.resp_msgbuf[i],
+                             app_cont_func, reinterpret_cast<void *>(tag._tag));
   }
 }
 
@@ -160,34 +160,35 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   // RX ring request optimization knob
   if (kAppOptDisableRxRingReq) {
     // Simulate copying the request off the RX ring
-    auto copy_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_msg_size);
+    auto copy_msgbuf = c->rpc_->alloc_msg_buffer(FLAGS_msg_size);
     assert(copy_msgbuf.buf != nullptr);
-    memcpy(copy_msgbuf.buf, req_msgbuf->buf, FLAGS_msg_size);
-    c->rpc->free_msg_buffer(copy_msgbuf);
+    memcpy(copy_msgbuf.buf_, req_msgbuf->buf_, FLAGS_msg_size);
+    c->rpc_->free_msg_buffer(copy_msgbuf);
   }
 
   // Preallocated response optimization knob
   if (kAppOptDisablePreallocResp) {
-    erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf;
-    resp_msgbuf = c->rpc->alloc_msg_buffer(FLAGS_msg_size);
+    erpc::MsgBuffer &resp_msgbuf = req_handle->dyn_resp_msgbuf_;
+    resp_msgbuf = c->rpc_->alloc_msg_buffer(FLAGS_msg_size);
     assert(resp_msgbuf.buf != nullptr);
 
     if (!kAppPayloadCheck) {
-      resp_msgbuf.buf[0] = req_msgbuf->buf[0];
+      resp_msgbuf.buf_[0] = req_msgbuf->buf_[0];
     } else {
-      memcpy(resp_msgbuf.buf, req_msgbuf->buf, FLAGS_msg_size);
+      memcpy(resp_msgbuf.buf_, req_msgbuf->buf_, FLAGS_msg_size);
     }
-    c->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
+    c->rpc_->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf_);
   } else {
-    erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf,
-                                                   FLAGS_msg_size);
+    erpc::Rpc<erpc::CTransport>::resize_msg_buffer(
+        &req_handle->pre_resp_msgbuf_, FLAGS_msg_size);
 
     if (!kAppPayloadCheck) {
-      req_handle->pre_resp_msgbuf.buf[0] = req_msgbuf->buf[0];
+      req_handle->pre_resp_msgbuf_.buf_[0] = req_msgbuf->buf_[0];
     } else {
-      memcpy(req_handle->pre_resp_msgbuf.buf, req_msgbuf->buf, FLAGS_msg_size);
+      memcpy(req_handle->pre_resp_msgbuf_.buf_, req_msgbuf->buf_,
+             FLAGS_msg_size);
     }
-    c->rpc->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf);
+    c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
   }
 }
 
@@ -201,14 +202,14 @@ void app_cont_func(void *_context, void *_tag) {
 
   if (!kAppPayloadCheck) {
     // Do a cheap check, but touch the response MsgBuffer
-    if (unlikely(resp_msgbuf.buf[0] != kAppDataByte)) {
+    if (unlikely(resp_msgbuf.buf_[0] != kAppDataByte)) {
       fprintf(stderr, "Invalid response.\n");
       exit(-1);
     }
   } else {
     // Check the full response MsgBuffer
     for (size_t i = 0; i < FLAGS_msg_size; i++) {
-      const uint8_t *buf = resp_msgbuf.buf;
+      const uint8_t *buf = resp_msgbuf.buf_;
       if (unlikely(buf[i] != static_cast<uint8_t>(buf[0] + i))) {
         fprintf(stderr, "Invalid resp at %zu (%u, %u)\n", i, buf[0], buf[i]);
         exit(-1);
@@ -217,7 +218,7 @@ void app_cont_func(void *_context, void *_tag) {
   }
 
   if (kAppVerbose) {
-    printf("Received response for batch %zu, msgbuf %zu.\n", tag.s.batch_i,
+    printf("Received response for batch %u, msgbuf %u.\n", tag.s.batch_i,
            tag.s.msgbuf_i);
   }
 
@@ -226,7 +227,7 @@ void app_cont_func(void *_context, void *_tag) {
   if (kAppMeasureLatency) {
     size_t req_tsc = bc.req_tsc[tag.s.msgbuf_i];
     double req_lat_us =
-        erpc::to_usec(erpc::rdtsc() - req_tsc, c->rpc->get_freq_ghz());
+        erpc::to_usec(erpc::rdtsc() - req_tsc, c->rpc_->get_freq_ghz());
     c->latency.update(static_cast<size_t>(req_lat_us * kAppLatFac));
   }
 
@@ -258,15 +259,15 @@ void connect_sessions(AppContext &c) {
     }
 
     for (size_t t_i = 0; t_i < FLAGS_num_threads; t_i++) {
-      if (FLAGS_process_id == p_i && c.thread_id == t_i) continue;
-      int session_num = c.rpc->create_session(remote_uri, t_i);
+      if (FLAGS_process_id == p_i && c.thread_id_ == t_i) continue;
+      int session_num = c.rpc_->create_session(remote_uri, t_i);
       erpc::rt_assert(session_num >= 0, "Failed to create session");
-      c.session_num_vec.push_back(session_num);
+      c.session_num_vec_.push_back(session_num);
     }
   }
 
-  while (c.num_sm_resps != c.session_num_vec.size()) {
-    c.rpc->run_event_loop(kAppEvLoopMs);
+  while (c.num_sm_resps_ != c.session_num_vec_.size()) {
+    c.rpc_->run_event_loop(kAppEvLoopMs);
     if (unlikely(ctrl_c_pressed == 1)) return;
   }
 }
