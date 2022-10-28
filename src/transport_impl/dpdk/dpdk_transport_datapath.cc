@@ -53,24 +53,20 @@ void DpdkTransport::tx_burst(const tx_burst_item_t *tx_burst_arr,
       tx_mbufs[i]->data_len = pkt_size;
       memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *), pkthdr, pkt_size);
     } else {
-      // This is not the first packet, so we need 2 segments.
+      // This is not the first packet, we also need only one seg.
       pkthdr = msg_buffer->get_pkthdr_n(item.pkt_idx_);
       const size_t pkt_size =
           msg_buffer->get_pkt_size<kMaxDataPerPkt>(item.pkt_idx_);
       format_pkthdr(pkthdr, item, pkt_size);
 
-      tx_mbufs[i]->nb_segs = 2;
+      tx_mbufs[i]->nb_segs = 1;
       tx_mbufs[i]->pkt_len = pkt_size;
-      tx_mbufs[i]->data_len = sizeof(pkthdr_t);
+      tx_mbufs[i]->data_len = pkt_size;
       memcpy(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t *), pkthdr,
-             sizeof(pkthdr_t));
-
-      tx_mbufs[i]->next = rte_pktmbuf_alloc(mempool_);
-      assert(tx_mbufs[i]->next != nullptr);
-      tx_mbufs[i]->next->data_len = pkt_size - sizeof(pkthdr_t);
-      memcpy(rte_pktmbuf_mtod(tx_mbufs[i]->next, uint8_t *),
-             &msg_buffer->buf_[item.pkt_idx_ * kMaxDataPerPkt],
-             pkt_size - sizeof(pkthdr_t));
+               sizeof(pkthdr_t));
+      memcpy(rte_pktmbuf_mtod_offset(tx_mbufs[i], uint8_t *, sizeof(pkthdr_t)),
+               &msg_buffer->buf_[item.pkt_idx_ * kMaxDataPerPkt],
+               pkt_size - sizeof(pkthdr_t));
     }
 
     ERPC_TRACE(
