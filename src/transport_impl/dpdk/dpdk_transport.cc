@@ -35,6 +35,9 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
     if (g_dpdk_initialized) {
       ERPC_INFO("DPDK transport for Rpc %u skipping DPDK EAL initialization.\n",
                 rpc_id);
+      dpdk_proc_type_ = ((rte_eal_process_type() == RTE_PROC_PRIMARY)
+                             ? DpdkProcType::kPrimary
+                             : DpdkProcType::kSecondary);
     } else {
       ERPC_INFO("DPDK transport for Rpc %u initializing DPDK EAL.\n", rpc_id);
 
