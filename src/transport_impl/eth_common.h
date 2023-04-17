@@ -10,13 +10,14 @@
 #endif
 
 #define ASIO_STANDLONE
-#include <asio/ts/internet.hpp>
-
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
+
+#include <asio/ts/internet.hpp>
 #include <sstream>
 #include <string>
+
 #include "common.h"
 
 namespace erpc {
@@ -180,7 +181,8 @@ static void gen_ipv4_header(ipv4_hdr_t* ipv4_hdr, uint32_t src_ip,
 
 // Compute IP header checksum (copied from DPDK testpmd)
 static uint16_t get_ipv4_checksum(const ipv4_hdr_t* ipv4_hdr) {
-  auto* ptr16 = reinterpret_cast<const uint16_t*>(ipv4_hdr);
+  auto* void_ptr16  = reinterpret_cast<const void*>(ipv4_hdr);
+  auto* ptr16 = reinterpret_cast<const uint16_t*>(void_ptr16);
   uint32_t ip_cksum = 0;
   ip_cksum += ptr16[0];
   ip_cksum += ptr16[1];

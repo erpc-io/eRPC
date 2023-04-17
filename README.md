@@ -16,13 +16,7 @@ Some highlights:
  * A port of [Raft](https://github.com/willemt/raft) as an example. Our 3-way
    replication latency is 5.3 microseconds with traditional UDP over Ethernet.
 
-## Requirements
- * Toolchain: A C++11 compiler and CMake 2.8+
- * See `scripts/packages/` for required software packages for your distro.
- * The latest `rdma_core`, preferably installed from source
- * For non-Mellanox DPDK-compatible NICs, a system-wide installation from DPDK
-   19.11.5 LTS sources (i.e., `sudo make install T=x86_64-native-linuxapp-gcc
-   DESTDIR=/usr`). Other DPDK versions are not supported.
+## System requirements
  * NICs: Fast (10 GbE+) NICs are needed for good performance. eRPC works best
    with Mellanox Ethernet and InfiniBand NICs. Any DPDK-capable NICs
    also work well.
@@ -37,7 +31,7 @@ Some highlights:
  * Build and run the test suite:
    `cmake . -DPERF=OFF -DTRANSPORT=dpdk; make -j; sudo ctest`.
    * `DPERF=OFF` enables debugging, which greatly reduces performance. Set
-     `DPERF=ON` for performance measurements.
+     `DPERF=ON` for good performance.
    * Here, `dpdk` should be replaced with `infiniband` for InfiniBand NICs.
    * A machine with two ports is needed to run the unit tests if DPDK is chosen.
      Run `scripts/run-tests-dpdk.sh` instead of `ctest`.
@@ -51,8 +45,7 @@ Some highlights:
 
 ## Supported bare-metal NICs:
  * Ethernet/UDP mode:
-   * DPDK-enabled NICs: Use `DTRANSPORT=dpdk`
-     * We have primarily tested Mellanox CX3--CX5 NICs.
+   * DPDK-enabled bare-metal NICs: Use `DTRANSPORT=dpdk`. We have primarily tested Mellanox CX3--CX5 NICs.
    * DPDK-enabled NICs on Microsoft Azure: Use `-DTRANSPORT=dpdk -DAZURE=on`
  * RDMA (InfiniBand/RoCE) NICs: Use `DTRANSPORT=infiniband`. Add `DROCE=on`
    if using RoCE.
@@ -77,9 +70,10 @@ Some highlights:
     * Re-start the VM. It should have a new interface called `eth1`, which eRPC
       will use for DPDK traffic.
 
-  * Prepare DPDK 19.11.5:
+  * Prepare DPDK 21.11
     * [rdma-core](https://github.com/linux-rdma/rdma-core) must be installed
-      from source. First, install its dependencies listed in rdma-core's README.
+      from source. We recommend the tag `stable-v40. First, install its
+      dependencies listed in rdma-core's README.
       Then, in the `rdma-core` directory:
        * `cmake .`
        * `sudo make install`
@@ -87,22 +81,29 @@ Some highlights:
        * `sudo apt install make cmake g++ gcc libnuma-dev libgflags-dev numactl`
        * `sudo modprobe ib_uverbs`
        * `sudo modprobe mlx4_ib`
-    * Download the [DPDK 19.11.5 tarball](https://core.dpdk.org/download/) and
+    * Download the [DPDK  tarball](https://core.dpdk.org/download/) and
       extract it. Other DPDK versions are not supported.
     * Edit `config/common_base` by changing `CONFIG_RTE_LIBRTE_MLX5_PMD` and
       `CONFIG_RTE_LIBRTE_MLX4_PMD` to `y` instead of `n`.
-    * Build and install DPDK: `sudo make install T=x86_64-native-linuxapp-gcc
-      DESTDIR=/usr`
-
-    * Create hugepages:
+    * Build and locally install DPDK: 
+```bash
+export RTE_SDK=<some dpdk directory>
+git clone --depth 1 --branch 'v21.11' https://github.com/DPDK/dpdk.git "${RTE_SDK}"
+cd "${RTE_SDK}"
+meson build -Dexamples='' -Denable_kmods=false -Dtests=false -Ddisable_drivers='raw/*,crypto/*,baseband/*,dma/*'
+cd build/
+DESTDIR="${RTE_SDK}/build/install" ninja install
 ```
+
+  *  Create hugepages:
+```bash
 sudo bash -c "echo 2048 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages"
 sudo mkdir /mnt/huge
 sudo mount -t hugetlbfs nodev /mnt/huge
 ```
 
   * Build eRPC's library and latency benchmark:
-```
+```bash
 cmake . -DTRANSPORT=dpdk -DAZURE=on
 make
 make latency

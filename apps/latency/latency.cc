@@ -1,7 +1,10 @@
 #include "util/latency.h"
+
 #include <gflags/gflags.h>
 #include <signal.h>
+
 #include <cstring>
+
 #include "../apps_common.h"
 #include "HdrHistogram_c/src/hdr_histogram.h"
 #include "rpc.h"
@@ -11,8 +14,8 @@
 static constexpr size_t kAppEvLoopMs = 1000;  // Duration of event loop
 static constexpr bool kAppVerbose = false;    // Print debug info on datapath
 static constexpr size_t kAppReqType = 1;      // eRPC request type
-static constexpr size_t kAppMinReqSize = 64;
-static constexpr size_t kAppMaxReqSize = 1024;
+static constexpr size_t kAppStartReqSize = 64;
+static constexpr size_t kAppEndReqSize = 1024;
 
 // Precision factor for latency measurement
 static constexpr double kAppLatFac = erpc::kIsAzure ? 1.0 : 10.0;
@@ -35,13 +38,13 @@ class ClientContext : public BasicAppContext {
 
  public:
   size_t start_tsc_;
-  size_t req_size_;  // Between kAppMinReqSize and kAppMaxReqSize
+  size_t req_size_;  // Between kAppStartReqSize and kAppEndReqSize
   erpc::MsgBuffer req_msgbuf_, resp_msgbuf_;
   hdr_histogram *latency_hist_;
   size_t latency_samples_ = 0;
   size_t latency_samples_prev_ = 0;
 
-  // If true, the client doubles its request size (up to kAppMaxReqSize) when
+  // If true, the client doubles its request size (up to kAppEndReqSize) when
   // issuing the next request, and resets this flag to false
   bool double_req_size_ = false;
 
@@ -58,7 +61,6 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   auto *c = static_cast<ServerContext *>(_context);
   erpc::Rpc<erpc::CTransport>::resize_msg_buffer(&req_handle->pre_resp_msgbuf_,
                                                  FLAGS_resp_size);
-  // erpc::nano_sleep((c->fast_rand_.next_u32() % 5) * 1000 * 1000, 3.0);
   c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
@@ -102,7 +104,7 @@ inline void send_req(ClientContext &c) {
   if (c.double_req_size_) {
     c.double_req_size_ = false;
     c.req_size_ *= 2;
-    if (c.req_size_ > kAppMaxReqSize) c.req_size_ = kAppMinReqSize;
+    if (c.req_size_ > kAppEndReqSize) c.req_size_ = kAppStartReqSize;
 
     c.rpc_->resize_msg_buffer(&c.req_msgbuf_, c.req_size_);
     c.rpc_->resize_msg_buffer(&c.resp_msgbuf_, FLAGS_resp_size);
@@ -149,9 +151,9 @@ void client_func(erpc::Nexus *nexus) {
 
   rpc.retry_connect_on_invalid_rpc_id_ = true;
   c.rpc_ = &rpc;
-  c.req_size_ = kAppMinReqSize;
+  c.req_size_ = kAppStartReqSize;
 
-  c.req_msgbuf_ = rpc.alloc_msg_buffer_or_die(kAppMaxReqSize);
+  c.req_msgbuf_ = rpc.alloc_msg_buffer_or_die(kAppEndReqSize);
   c.resp_msgbuf_ = rpc.alloc_msg_buffer_or_die(FLAGS_resp_size);
 
   connect_sessions(c);
@@ -205,10 +207,11 @@ void client_func(erpc::Nexus *nexus) {
 }
 
 int main(int argc, char **argv) {
-  printf("Latency: Welcome!");
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
+  printf("Latency: Starting latency test. Response size = %zu bytes\n",
+         FLAGS_resp_size);
 
   erpc::Nexus nexus(erpc::get_uri_for_process(FLAGS_process_id),
                     FLAGS_numa_node, 0);
