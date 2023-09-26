@@ -118,7 +118,8 @@ class Rpc {
 
   /**
    * @brief Create a hugepage-backed buffer for storing request or response
-   * messages. Safe to call from background threads (TS).
+   * messages. Safe to call from background threads (TS), but not thread-safe
+   * to call from user threads.
    *
    * @param max_data_size If this call is successful, the returned MsgBuffer
    * contains space for this many application data bytes. The MsgBuffer should
@@ -159,7 +160,7 @@ class Rpc {
 
   /**
    * @brief Resize a MsgBuffer to fit a request or response. Safe to call from
-   * background threads (TS).
+   * background threads (TS), but not thread-safe to call from user threads.
    *
    * @param msg_buffer The MsgBuffer to resize
    *
@@ -179,7 +180,7 @@ class Rpc {
   }
 
   /// Free a MsgBuffer created by alloc_msg_buffer(). Safe to call from
-  /// background threads (TS).
+  /// background threads (TS), but not thread-safe to call from user threads.
   inline void free_msg_buffer(MsgBuffer msg_buffer) {
     lock_cond(&huge_alloc_lock_);
     huge_alloc_->free_buf(msg_buffer.buffer_);
@@ -206,6 +207,8 @@ class Rpc {
    * so it won't work in create_session.
    *
    * @param rem_rpc_id The ID of the remote Rpc object
+   * 
+   * @note This function can be called only from the creator thread.
    */
   int create_session(std::string remote_uri, uint8_t rem_rpc_id) {
     return create_session_st(remote_uri, rem_rpc_id);
@@ -221,6 +224,8 @@ class Rpc {
    * @return 0 if the session disconnect packet was sent, and the disconnect
    * callback will be invoked later. Negative errno if the session cannot be
    * disconnected.
+   * 
+   * @note This function can be called only from the creator thread.
    */
   int destroy_session(int session_num) {
     return destroy_session_st(session_num);
@@ -229,7 +234,8 @@ class Rpc {
   /**
    * @brief Enqueue a request for transmission. This always succeeds. eRPC owns
    * the request and response msgbufs until it invokes the continuation
-   * callback. This function is safe to call from background threads (TS).
+   * callback. This function is safe to call from background threads (TS), but
+   * not thread-safe to call from user threads.
    *
    * @param session_num The session number to send the request on. This session
    * must be connected.
@@ -264,7 +270,7 @@ class Rpc {
    * dynamic response.  See ReqHandle for details about creating the response.
    * On calling this, the application loses ownership of the request and
    * response MsgBuffer. This function is safe to call from background threads
-   * (TS).
+   * (TS), but not thread-safe to call from user threads.
    *
    * This can be called outside the request handler.
    *
@@ -286,6 +292,7 @@ class Rpc {
 
   /// Run the event loop for some milliseconds. See Rpc::run_event_loop_once()
   /// for more on eRPC's event loop.
+  /// @note This function can be called only from the creator thread.
   inline void run_event_loop(size_t timeout_ms) {
     run_event_loop_timeout_st(timeout_ms);
   }
@@ -303,6 +310,8 @@ class Rpc {
    *  packets
    *
    * This call returns immediately when there is no work to be done.
+   * 
+   * @note This function can be called only from the creator thread.
    */
   inline void run_event_loop_once() { run_event_loop_do_one_st(); }
 
@@ -430,12 +439,14 @@ class Rpc {
   /**
    * @brief Inject a fault that always fails all routing info resolution
    * @throw runtime_error if the caller cannot inject faults
+   * @note This function can be called only from the creator thread.
    */
   void fault_inject_fail_resolve_rinfo_st();
 
   /**
    * @brief Set the TX packet drop probability for this Rpc
    * @throw runtime_error if the caller cannot inject faults
+   * @note This function can be called only from the creator thread.
    */
   void fault_inject_set_pkt_drop_prob_st(double pkt_drop_prob);
 
