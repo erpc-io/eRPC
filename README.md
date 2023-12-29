@@ -1,3 +1,5 @@
+**News [Dec 2023]: Check out [Machnet](https://github.com/microsoft/machnet) for fast and easy DPDK-based messaging. It supports many types of cloud VMs and bare-metal NICs, multiple application processes, language bindings, etc.**
+
 eRPC is a fast and general-purpose RPC library for datacenter networks.
 Our NSDI 2019 [paper](https://www.usenix.org/system/files/nsdi19-kalia.pdf)
 describes the system in detail.
