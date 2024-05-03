@@ -1,4 +1,5 @@
 #include "util/numautils.h"
+#include <cstdio>
 using namespace erpc;
 
 int main() {
