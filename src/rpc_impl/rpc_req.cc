@@ -42,7 +42,7 @@ void Rpc<TTr>::enqueue_request(int session_num, uint8_t req_type,
   ci.resp_msgbuf_ = resp_msgbuf;
   ci.cont_func_ = cont_func;
   ci.tag_ = tag;
-  ci.progress_tsc_ = ev_loop_tsc_;
+  ci.progress_tsc_ = dpath_rdtsc();
   add_to_active_rpc_list(sslot);
 
   ci.num_rx_ = 0;

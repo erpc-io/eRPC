@@ -113,6 +113,23 @@ class TimingWheel {
   /// The max_tsc of all these wheel slots is advanced.
   /// This function must be called with non-decreasing values of reap_tsc
   void reap(size_t reap_tsc) {
+    // An empty wheel has nothing to move to the ready queue, so all that work
+    // is re-basing slot timestamps. Once the lag exceeds one full revolution
+    // every slot would be visited anyway, so re-base the whole wheel in one
+    // pass and cap the cost at kWheelNumWslots iterations. Sessions that are
+    // actually using the wheel are unaffected.
+    // Note: written as an addition, not "reap_tsc - tx_tsc_ >= ...", since
+    // tx_tsc_ is usually in the future here and the subtraction would underflow
+    if (num_wheel_entries_ == 0 &&
+        unlikely(reap_tsc >= wheel_[cur_wslot_].tx_tsc_ +
+                                 wslot_width_tsc_ * kWheelNumWslots)) {
+      for (size_t ws_i = 0; ws_i < kWheelNumWslots; ws_i++) {
+        wheel_[ws_i].tx_tsc_ = reap_tsc + (ws_i + 1) * wslot_width_tsc_;
+      }
+      cur_wslot_ = 0;
+      return;
+    }
+
     while (wheel_[cur_wslot_].tx_tsc_ <= reap_tsc) {
       reap_wslot(cur_wslot_);
       wheel_[cur_wslot_].tx_tsc_ += (wslot_width_tsc_ * kWheelNumWslots);
@@ -167,6 +184,7 @@ class TimingWheel {
     assert(last_bkt->num_entries_ < kWheelBucketCap);
     last_bkt->entry_[last_bkt->num_entries_] = ent;
     last_bkt->num_entries_++;
+    num_wheel_entries_++;
 
     // If last_bkt is full, allocate a new one and make it the last
     if (last_bkt->num_entries_ == kWheelBucketCap) {
@@ -187,6 +205,9 @@ class TimingWheel {
           record_vec_.push_back(wheel_record_t(bkt->entry_[i].pkt_num_));
         }
       }
+
+      assert(num_wheel_entries_ >= bkt->num_entries_);
+      num_wheel_entries_ -= bkt->num_entries_;
 
       wheel_bkt_t *tmp_next = bkt->next_;
 
@@ -216,6 +237,7 @@ class TimingWheel {
 
   wheel_bkt_t *wheel_;
   size_t cur_wslot_ = 0;
+  size_t num_wheel_entries_ = 0;  ///< Total entries in all of the wheel's slots
   MemPool<wheel_bkt_t> bkt_pool_;
 
  public:
