@@ -14,7 +14,8 @@ namespace erpc {
 constexpr uint8_t DpdkTransport::kDefaultRssKey[];
 
 void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
-                                   DpdkProcType proc_type) {
+                                   DpdkProcType proc_type,
+                                   bool enable_loopback) {
   _unused(proc_type);
   uint16_t num_ports = rte_eth_dev_count_avail();
   if (phy_port >= num_ports) {
@@ -40,6 +41,10 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
 
   rte_eth_dev_info dev_info;
   rte_eth_dev_info_get(phy_port, &dev_info);
+  // Solarflare EF10/SFN8xxx requires RX drop enabled and does not support
+  // the queue threshold / NIC loopback assumptions used by the mlx path.
+  const std::string drv_name = dev_info.driver_name;
+  const bool is_sfc = (drv_name == "net_sfc_efx");
   rt_assert(dev_info.rx_desc_lim.nb_max >= kNumRxRingEntries,
             "Device RX ring too small");
   rt_assert(dev_info.tx_desc_lim.nb_max >= kNumTxRingDesc,
@@ -53,7 +58,7 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
 
   if (!kIsWindows) {
     eth_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
-    eth_conf.lpbk_mode = 1;
+    eth_conf.lpbk_mode = enable_loopback ? 1 : 0;
     eth_conf.rx_adv_conf.rss_conf.rss_key =
         const_cast<uint8_t *>(kDefaultRssKey);
     eth_conf.rx_adv_conf.rss_conf.rss_key_len = 40;
@@ -82,7 +87,8 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
 
     rte_eth_rxconf eth_rx_conf;
     memset(&eth_rx_conf, 0, sizeof(eth_rx_conf));
-    eth_rx_conf.rx_thresh.pthresh = 8;
+    eth_rx_conf.rx_thresh.pthresh = is_sfc ? 0 : 8;
+    eth_rx_conf.rx_drop_en = is_sfc ? 1 : 0;
 
     int ret = rte_eth_rx_queue_setup(phy_port, i, kNumRxRingEntries, numa_node,
                                      &eth_rx_conf, mempool);
@@ -91,7 +97,7 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
 
     rte_eth_txconf eth_tx_conf;
     memset(&eth_tx_conf, 0, sizeof(eth_tx_conf));
-    eth_tx_conf.tx_thresh.pthresh = 32;
+    eth_tx_conf.tx_thresh.pthresh = is_sfc ? 0 : 32;
     eth_tx_conf.offloads = eth_conf.txmode.offloads;
 
     ret = rte_eth_tx_queue_setup(phy_port, i, kNumTxRingDesc, numa_node,

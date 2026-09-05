@@ -12,6 +12,10 @@
 DEFINE_uint64(phy_port, 0, "DPDK port ID to manage with this daemon");
 DEFINE_uint64(numa_node, 0,
               "NUMA node for the DPDK port managed by this daemon");
+DEFINE_bool(loopback, true,
+            "Enable NIC hardware loopback mode");
+DEFINE_int64(peer_phy_port, -1,
+             "Optional second DPDK port to initialize");
 
 int main(int argc, char **argv) {
   erpc::rt_assert(!getuid(), "You need to be root to use eRPC");
@@ -63,7 +67,8 @@ int main(int argc, char **argv) {
 
   erpc::DpdkTransport::setup_phy_port(
       FLAGS_phy_port, FLAGS_numa_node,
-      erpc::DpdkTransport::DpdkProcType::kPrimary);
+      erpc::DpdkTransport::DpdkProcType::kPrimary,
+      FLAGS_loopback);
 
   ERPC_WARN("eRPC DPDK daemon: Successfully initialized DPDK port %zu\n",
             FLAGS_phy_port);

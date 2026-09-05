@@ -280,7 +280,8 @@ class DpdkTransport : public Transport {
   /// Do DPDK initialization for \p phy_port as a primary or secondary DPDK
   /// process type. \p phy_port must not have been already initialized.
   static void setup_phy_port(uint16_t phy_port, size_t numa_node,
-                             DpdkProcType proc_type);
+                             DpdkProcType proc_type,
+                             bool enable_loopback = true);
 
  private:
   /**

@@ -179,8 +179,8 @@ void DpdkTransport::resolve_phy_port() {
 
   const std::string drv_name = dev_info.driver_name;
   rt_assert(drv_name == "net_mlx4" or drv_name == "net_mlx5" or
-                drv_name == "mlx5_pci",
-            "eRPC supports only mlx4 or mlx5 devices with DPDK");
+                drv_name == "mlx5_pci" or drv_name == "net_sfc_efx",
+            "eRPC supports only mlx4/mlx5/Solarflare devices with DPDK");
 
   if (std::string(dev_info.driver_name) == "net_mlx4") {
     // MLX4 NICs report a reta size of zero, but they use 128 internally
