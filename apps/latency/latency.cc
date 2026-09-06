@@ -1,3 +1,4 @@
+#include "util/hdr_export.h"
 #include "util/latency.h"
 
 #include <gflags/gflags.h>
@@ -26,6 +27,13 @@ void ctrl_c_handler(int) { ctrl_c_pressed = 1; }
 DEFINE_uint64(num_server_processes, 1, "Number of server processes");
 DEFINE_uint64(resp_size, 8, "Size of the server's RPC response in bytes");
 
+DEFINE_string(histogram_file, "", "Optional end-of-run HDR CSV path (fixed/preflight client only)");
+
+DEFINE_uint64(req_size, 0,
+              "Fixed request bytes (64 to 1024); 0 preserves size cycling");
+DEFINE_uint64(warmup_ms, 2000,
+              "Warmup before fixed-size measurement, in multiples of 1000 ms");
+
 class ServerContext : public BasicAppContext {
  public:
   erpc::FastRand fast_rand_;
@@ -41,6 +49,7 @@ class ClientContext : public BasicAppContext {
   size_t req_size_;  // Between kAppStartReqSize and kAppEndReqSize
   erpc::MsgBuffer req_msgbuf_, resp_msgbuf_;
   hdr_histogram *latency_hist_;
+  bool discard_next_sample_ = false;
   size_t latency_samples_ = 0;
   size_t latency_samples_prev_ = 0;
 
@@ -64,6 +73,17 @@ void req_handler(erpc::ReqHandle *req_handle, void *_context) {
   c->rpc_->enqueue_response(req_handle, &req_handle->pre_resp_msgbuf_);
 }
 
+// Rpc construction may change the calling thread's affinity during DPDK EAL
+// initialization. Pin from the worker afterwards, before any benchmark traffic.
+static void pin_benchmark_worker() {
+  const auto cores = erpc::get_lcores_for_numa_node(FLAGS_numa_node);
+  erpc::rt_assert(!cores.empty(), "No CPUs on requested NUMA node");
+  const size_t index = FLAGS_process_id % cores.size();
+  erpc::bind_current_thread_to_core(FLAGS_numa_node, index);
+  printf("Latency: Worker pinned after transport initialization to CPU %zu\n",
+         cores.at(index));
+}
+
 void server_func(erpc::Nexus *nexus) {
   printf("Latency: Running server, process ID %zu\n", FLAGS_process_id);
   std::vector<size_t> port_vec = flags_get_numa_ports(FLAGS_numa_node);
@@ -72,12 +92,13 @@ void server_func(erpc::Nexus *nexus) {
   ServerContext c;
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0 /* tid */,
                                   basic_sm_handler, phy_port);
+  pin_benchmark_worker();
   rpc.set_pre_resp_msgbuf_size(FLAGS_resp_size);
   c.rpc_ = &rpc;
 
   while (true) {
     rpc.run_event_loop(1000);
-    if (ctrl_c_pressed == 1) break;
+    if (ctrl_c_pressed == 1) return;
   }
 }
 
@@ -133,9 +154,14 @@ void app_cont_func(void *_context, void *) {
   const double req_lat_us =
       erpc::to_usec(erpc::rdtsc() - c->start_tsc_, c->rpc_->get_freq_ghz());
 
-  hdr_record_value(c->latency_hist_,
-                   static_cast<int64_t>(req_lat_us * kAppLatFac));
-  c->latency_samples_++;
+  if (c->discard_next_sample_) {
+    c->discard_next_sample_ = false;
+  } else {
+    erpc::rt_assert(hdr_record_value(c->latency_hist_,
+                     static_cast<int64_t>(req_lat_us * kAppLatFac)),
+                     "Latency exceeds histogram range");
+    c->latency_samples_++;
+  }
 
   send_req(*c);
 }
@@ -149,14 +175,19 @@ void client_func(erpc::Nexus *nexus) {
   erpc::Rpc<erpc::CTransport> rpc(nexus, static_cast<void *>(&c), 0,
                                   basic_sm_handler, phy_port);
 
+  pin_benchmark_worker();
   rpc.retry_connect_on_invalid_rpc_id_ = true;
   c.rpc_ = &rpc;
-  c.req_size_ = kAppStartReqSize;
+  c.req_size_ = FLAGS_req_size == 0 ? kAppStartReqSize : FLAGS_req_size;
 
   c.req_msgbuf_ = rpc.alloc_msg_buffer_or_die(kAppEndReqSize);
   c.resp_msgbuf_ = rpc.alloc_msg_buffer_or_die(FLAGS_resp_size);
 
+  rpc.resize_msg_buffer(&c.req_msgbuf_, c.req_size_);
+  rpc.resize_msg_buffer(&c.resp_msgbuf_, FLAGS_resp_size);
+
   connect_sessions(c);
+  if (ctrl_c_pressed == 1) return;
 
   printf("Latency: Process %zu: Session connected. Starting work.\n",
          FLAGS_process_id);
@@ -166,11 +197,27 @@ void client_func(erpc::Nexus *nexus) {
       "total_time]\n");
 
   send_req(c);
+  if (FLAGS_req_size != 0) {
+    printf("Latency: Warming up for %zu ms at %zu request bytes\n",
+           FLAGS_warmup_ms, c.req_size_);
+    for (size_t elapsed = 0; elapsed < FLAGS_warmup_ms; elapsed += 1000) {
+      rpc.run_event_loop(kAppEvLoopMs);
+      if (ctrl_c_pressed == 1) return;
+    }
+    hdr_reset(c.latency_hist_);
+    c.latency_samples_ = 0;
+    c.latency_samples_prev_ = 0;
+    // Exclude the one outstanding RPC that straddles the warmup boundary.
+    c.discard_next_sample_ = FLAGS_warmup_ms != 0;
+    printf("Latency: Measuring for %zu ms; cumulative fixed-size histogram\n",
+           FLAGS_test_ms);
+  }
   for (size_t i = 0; i < FLAGS_test_ms; i += 1000) {
     rpc.run_event_loop(kAppEvLoopMs);  // 1 second
-    if (ctrl_c_pressed == 1) break;
+    if (ctrl_c_pressed == 1) return;
 
     if (c.latency_samples_ == c.latency_samples_prev_) {
+      erpc::rt_assert(FLAGS_histogram_file.empty(), "No responses during histogram measurement");
       printf("No new responses in %.2f seconds\n", kAppEvLoopMs / 1000.0);
       fprintf(stderr, "No new responses in %.2f seconds\n",
               kAppEvLoopMs / 1000.0);
@@ -189,27 +236,44 @@ void client_func(erpc::Nexus *nexus) {
           hdr_value_at_percentile(c.latency_hist_, 99.9999) / kAppLatFac,
           hdr_max(c.latency_hist_) / kAppLatFac,
           c.latency_samples_ - c.latency_samples_prev_, c.latency_samples_,
-          i / 1000);
+          (i + 1000) / 1000);
     }
     fflush(stdout);
 
     // Warmup for the first two seconds. Also, reset percentiles every minute.
     const size_t seconds = i / 1000;
-    if (seconds < 2 || (seconds % 60 == 0)) {
+    if (FLAGS_req_size == 0 && (seconds < 2 || (seconds % 60 == 0))) {
       hdr_reset(c.latency_hist_);
       c.latency_samples_ = 0;
       c.latency_samples_prev_ = 0;
     }
 
     c.latency_samples_prev_ = c.latency_samples_;
-    c.double_req_size_ = true;
+    c.double_req_size_ = FLAGS_req_size == 0;
   }
+  erpc::export_hdr(FLAGS_histogram_file, c.latency_hist_, kAppLatFac,
+      "# benchmark=erpc_latency\n# request_bytes=" + std::to_string(FLAGS_req_size) +
+      "\n# response_bytes=" + std::to_string(FLAGS_resp_size) + "\n# window=1\n" +
+      "# warmup_ms=" + std::to_string(FLAGS_warmup_ms) +
+      "\n# measurement_ms=" + std::to_string(FLAGS_test_ms) + "\n");
 }
 
 int main(int argc, char **argv) {
   signal(SIGINT, ctrl_c_handler);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  erpc::rt_assert(FLAGS_histogram_file.empty() || (FLAGS_req_size != 0 && FLAGS_process_id >= FLAGS_num_server_processes),
+                  "Histogram export requires a fixed-size/preflight client");
   erpc::rt_assert(FLAGS_numa_node <= 1, "Invalid NUMA node");
+  erpc::rt_assert(FLAGS_req_size == 0 ||
+                      (FLAGS_req_size >= kAppStartReqSize &&
+                       FLAGS_req_size <= kAppEndReqSize),
+                  "--req_size must be 0 or between 64 and 1024");
+  if (FLAGS_req_size != 0) {
+    erpc::rt_assert(FLAGS_test_ms > 0 && FLAGS_test_ms % 1000 == 0 &&
+                        FLAGS_warmup_ms % 1000 == 0,
+                    "Fixed-size mode requires positive --test_ms and durations "
+                    "in multiples of 1000 ms");
+  }
   printf("Latency: Starting latency test. Response size = %zu bytes\n",
          FLAGS_resp_size);
 
@@ -221,17 +285,5 @@ int main(int argc, char **argv) {
       FLAGS_process_id < FLAGS_num_server_processes ? server_func : client_func,
       &nexus);
 
-  const size_t num_socket_cores =
-      erpc::get_lcores_for_numa_node(FLAGS_numa_node).size();
-  const size_t affinity_core = FLAGS_process_id % num_socket_cores;
-  printf("Latency: Will run on CPU core %zu\n", affinity_core);
-  if (FLAGS_process_id >= num_socket_cores) {
-    fprintf(stderr,
-            "Latency: Warning: The number of latency processes is close to "
-            "this machine's core count. This could be fine, but to ensure good "
-            "performance, please double-check for core collision.\n");
-  }
-
-  erpc::bind_to_core(t, FLAGS_numa_node, affinity_core);
   t.join();
 }

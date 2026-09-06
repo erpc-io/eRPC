@@ -405,6 +405,17 @@ if(PERF)
 endif()
 target_link_libraries(${APP} ${LIBRARIES})
 
+# Optional extra benchmark without changing scripts/autorun_app_file.
+option(ERPC_BUILD_SERVER_RATE "Build server_rate alongside the selected app" OFF)
+if(ERPC_BUILD_SERVER_RATE AND NOT APP STREQUAL "server_rate")
+  add_executable(server_rate apps/server_rate/server_rate.cc ${SOURCES})
+  if(PERF)
+    target_compile_options(server_rate PRIVATE "-flto")
+  endif()
+  target_link_libraries(server_rate ${LIBRARIES})
+endif()
+
+
 # Compile hello_world apps
 add_executable(hello_server hello_world/server.cc)
 target_link_libraries(hello_server erpc ${LIBRARIES})

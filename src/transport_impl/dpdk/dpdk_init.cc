@@ -13,12 +13,31 @@ namespace erpc {
 
 constexpr uint8_t DpdkTransport::kDefaultRssKey[];
 
+size_t DpdkTransport::get_port_reta_size(uint16_t phy_port) {
+  rte_eth_dev_info info = {};
+  const int ret = rte_eth_dev_info_get(phy_port, &info);
+  rt_assert(ret == 0, "Failed to query RSS device information for port " +
+                          std::to_string(phy_port));
+  rt_assert(info.driver_name != nullptr, "Missing DPDK driver name");
+  const std::string driver = info.driver_name;
+  rt_assert(driver == "net_mlx4" || driver == "net_mlx5" ||
+                driver == "mlx5_pci" || driver == "net_sfc_efx",
+            "eRPC supports only mlx4/mlx5/Solarflare devices with DPDK");
+  if (driver == "net_mlx4") {
+    rt_assert(info.reta_size == 0, "Unexpected RETA size for MLX4");
+    return 128;
+  }
+  rt_assert(info.reta_size >= kMaxQueuesPerPort,
+            "Too few entries in NIC RSS indirection table");
+  return info.reta_size;
+}
+
 void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
                                    DpdkProcType proc_type,
                                    bool enable_loopback) {
   _unused(proc_type);
   uint16_t num_ports = rte_eth_dev_count_avail();
-  if (phy_port >= num_ports) {
+  if (!rte_eth_dev_is_valid_port(phy_port)) {
     fprintf(stderr,
             "Error: Port %u (0-based) requested, but only %u DPDK ports "
             "available. Please ensure:\n",
@@ -40,7 +59,8 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
   }
 
   rte_eth_dev_info dev_info;
-  rte_eth_dev_info_get(phy_port, &dev_info);
+  int ret = rte_eth_dev_info_get(phy_port, &dev_info);
+  rt_assert(ret == 0, "Failed to get DPDK device information");
   // Solarflare EF10/SFN8xxx requires RX drop enabled and does not support
   // the queue threshold / NIC loopback assumptions used by the mlx path.
   const std::string drv_name = dev_info.driver_name;
@@ -70,7 +90,7 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
   eth_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
   eth_conf.txmode.offloads = kOffloads;
 
-  int ret = rte_eth_dev_configure(phy_port, kMaxQueuesPerPort,
+  ret = rte_eth_dev_configure(phy_port, kMaxQueuesPerPort,
                                   kMaxQueuesPerPort, &eth_conf);
   rt_assert(ret == 0, "Ethdev configuration error: ", strerror(-1 * ret));
 
@@ -105,7 +125,9 @@ void DpdkTransport::setup_phy_port(uint16_t phy_port, size_t numa_node,
     rt_assert(ret == 0, "Failed to setup TX queue: " + std::to_string(i));
   }
 
-  rte_eth_dev_start(phy_port);
+  ret = rte_eth_dev_start(phy_port);
+  rt_assert(ret == 0, "Failed to start DPDK port " + std::to_string(phy_port) +
+                          ": " + strerror(-ret));
 }
 
 }  // namespace erpc

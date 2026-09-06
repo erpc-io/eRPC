@@ -47,7 +47,7 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
           "-n",            "6",  // Memory channels
           "-m",            "1024", // Max memory in megabytes
           "--proc-type",   "auto",
-          "--log-level",   (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_INFO) ? "8" : "0",
+          "--log-level",   (ERPC_LOG_LEVEL >= ERPC_LOG_LEVEL_INFO) ? "8" : "4",
           nullptr};
       // clang-format on
 
@@ -122,8 +122,8 @@ DpdkTransport::DpdkTransport(uint16_t sm_udp_port, uint8_t rpc_id,
       if (n_avail < kNumMbufs) {
         ERPC_WARN(
             "DPDK transport for Rpc %u: Mempool has only %zu free mbufs "
-            "out of %zu. %zu mbufs have been leaked by previous processes that "
-            "owned this mempool.\n",
+            "out of %zu. %zu mbufs are in use (including RX descriptors); "
+            "this alone does not indicate a leak.\n",
             rpc_id, n_avail, kNumMbufs, (kNumMbufs - n_avail));
       }
     } else {
@@ -173,25 +173,13 @@ void DpdkTransport::resolve_phy_port() {
 
   resolve_.ipv4_addr_ = get_port_ipv4_addr(phy_port_);
 
-  // Resolve RSS indirection table size
-  struct rte_eth_dev_info dev_info;
-  rte_eth_dev_info_get(phy_port_, &dev_info);
-
-  const std::string drv_name = dev_info.driver_name;
-  rt_assert(drv_name == "net_mlx4" or drv_name == "net_mlx5" or
-                drv_name == "mlx5_pci" or drv_name == "net_sfc_efx",
-            "eRPC supports only mlx4/mlx5/Solarflare devices with DPDK");
-
-  if (std::string(dev_info.driver_name) == "net_mlx4") {
-    // MLX4 NICs report a reta size of zero, but they use 128 internally
-    rt_assert(dev_info.reta_size == 0,
-              "Unexpected RETA size for MLX4 NIC (expected zero)");
-    resolve_.reta_size_ = 128;
-  } else {
-    resolve_.reta_size_ = dev_info.reta_size;
-    rt_assert(resolve_.reta_size_ >= kMaxQueuesPerPort,
-              "Too few entries in NIC RSS indirection table");
-  }
+  // Some PMDs (including sfc in DPDK 21.11) cannot query device info
+  // in a secondary process. The daemon publishes the resolved table size.
+  resolve_.reta_size_ = dpdk_proc_type_ == DpdkProcType::kPrimary
+                            ? get_port_reta_size(phy_port_)
+                            : g_memzone->reta_size_[phy_port_];
+  rt_assert(resolve_.reta_size_ >= kMaxQueuesPerPort,
+            "Missing or invalid RSS table size; restart the rebuilt daemon");
 
   // Resolve bandwidth. XXX: For some reason, rte_eth_link_get() does not work
   // in secondary DPDK processes (up to DPDK 21.05).

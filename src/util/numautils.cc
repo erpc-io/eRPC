@@ -57,6 +57,22 @@ void bind_to_core(std::thread &thread, size_t numa_node,
   rt_assert(rc == 0, "Error setting thread affinity");
 }
 
+void bind_current_thread_to_core(size_t numa_node, size_t numa_local_index) {
+  const auto cores = get_lcores_for_numa_node(numa_node);
+  rt_assert(numa_local_index < cores.size(), "Invalid NUMA-local CPU index");
+  const size_t cpu = cores.at(numa_local_index);
+  rt_assert(cpu < CPU_SETSIZE, "CPU exceeds affinity mask capacity");
+  cpu_set_t requested, actual;
+  CPU_ZERO(&requested);
+  CPU_SET(cpu, &requested);
+  int ret = pthread_setaffinity_np(pthread_self(), sizeof(requested), &requested);
+  rt_assert(ret == 0, "Failed to pin benchmark worker");
+  CPU_ZERO(&actual);
+  ret = pthread_getaffinity_np(pthread_self(), sizeof(actual), &actual);
+  rt_assert(ret == 0 && CPU_EQUAL(&requested, &actual),
+            "Worker affinity does not match requested CPU");
+}
+
 void clear_affinity_for_process() {
   cpu_set_t mask;
   CPU_ZERO(&mask);
@@ -99,6 +115,14 @@ void bind_to_core(std::thread &thread, size_t numa_node,
         "can cause very low performance.\n",
         GetLastError());
   }
+}
+
+void bind_current_thread_to_core(size_t numa_node, size_t numa_local_index) {
+  rt_assert(numa_node == 0 && numa_local_index < 8 * sizeof(DWORD_PTR),
+            "Invalid CPU index");
+  const DWORD_PTR mask = DWORD_PTR(1) << numa_local_index;
+  rt_assert(SetThreadAffinityMask(GetCurrentThread(), mask) != 0,
+            "Failed to pin benchmark worker");
 }
 
 void clear_affinity_for_process() { return; }

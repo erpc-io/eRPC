@@ -51,11 +51,15 @@ class DpdkTransport : public Transport {
    public:
     struct rte_eth_link link_[kMaxPhyPorts];  /// Resolved link status
 
+    size_t reta_size_[kMaxPhyPorts];  /// Resolved by the primary process
+
     void init() {
       new (&mutex_) std::mutex();  // Fancy in-place construction
       num_qps_available_ = kMaxQueuesPerPort;
       epoch_ = 0;
       memset(owner_, 0, sizeof(owner_));
+      memset(link_, 0, sizeof(link_));
+      memset(reta_size_, 0, sizeof(reta_size_));
     }
 
     size_t get_epoch() {
@@ -244,7 +248,7 @@ class DpdkTransport : public Transport {
 
   /// Get the name of the memzone shared between the DPDK daemon and eRPC
   /// processes
-  static std::string get_memzone_name() { return "erpc_daemon_memzone"; }
+  static std::string get_memzone_name() { return "erpc_daemon_memzone_v2"; }
 
   static std::string routing_info_str(routing_info_t *ri) {
     return reinterpret_cast<eth_routing_info_t *>(ri)->to_string();
@@ -252,12 +256,6 @@ class DpdkTransport : public Transport {
 
   static std::string dpdk_strerror() {
     return std::string(rte_strerror(rte_errno));
-  }
-
-  /// Convert an RX ring data pointer to its corresponding DPDK mbuf pointer
-  static rte_mbuf *dpdk_dtom(uint8_t *data) {
-    return reinterpret_cast<rte_mbuf *>(data - RTE_PKTMBUF_HEADROOM -
-                                        sizeof(rte_mbuf));
   }
 
   /// Return the UDP port to use for queue \p qp_id on DPDK port \p phy_port.
@@ -283,12 +281,16 @@ class DpdkTransport : public Transport {
                              DpdkProcType proc_type,
                              bool enable_loopback = true);
 
+  /// Query RSS table size in the primary process for sharing with secondaries.
+  static size_t get_port_reta_size(uint16_t phy_port);
+
  private:
   /**
    * @brief Resolve fields in \p resolve using \p phy_port
    * @throw runtime_error if the port cannot be resolved
    */
   void resolve_phy_port();
+
 
   /// Poll for packets on this transport's RX queue until there are no more
   /// packets left
@@ -305,6 +307,9 @@ class DpdkTransport : public Transport {
   /// For DPDK, the RX ring buffers might not always be used in a circular
   /// order. Instead, we write pointers to the Rpc's RX ring.
   uint8_t **rx_ring_;
+
+  // Preserve ownership independently of PMD-specific packet data offsets.
+  rte_mbuf *rx_mbuf_ring_[kNumRxRingEntries] = {};
 
   size_t rx_ring_head_ = 0, rx_ring_tail_ = 0;
 

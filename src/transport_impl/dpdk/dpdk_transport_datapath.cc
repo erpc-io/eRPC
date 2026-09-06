@@ -113,7 +113,7 @@ size_t DpdkTransport::rx_burst() {
 
   for (size_t i = 0; i < nb_rx_new; i++) {
     rx_ring_[rx_ring_head_] = rte_pktmbuf_mtod(rx_pkts[i], uint8_t *);
-    assert(dpdk_dtom(rx_ring_[rx_ring_head_]) == rx_pkts[i]);
+    rx_mbuf_ring_[rx_ring_head_] = rx_pkts[i];
 
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring_[rx_ring_head_]);
     _unused(pkthdr);
@@ -142,11 +142,12 @@ size_t DpdkTransport::rx_burst() {
 
 void DpdkTransport::post_recvs(size_t num_recvs) {
   for (size_t i = 0; i < num_recvs; i++) {
-    auto *mbuf = dpdk_dtom(rx_ring_[rx_ring_tail_]);
+    auto *mbuf = rx_mbuf_ring_[rx_ring_tail_];
 #if DEBUG
     rte_mbuf_sanity_check(mbuf, true /* is_header */);
 #endif
     rte_pktmbuf_free(mbuf);
+    rx_mbuf_ring_[rx_ring_tail_] = nullptr;
 
     rx_ring_tail_ = (rx_ring_tail_ + 1) % kNumRxRingEntries;
   }
